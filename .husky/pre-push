@@ -1,59 +1,8 @@
 #!/bin/sh
-
-# Ensure node is in PATH (nvm lazy-loading fix)
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# Colors
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
-
-print_header() {
-    BRANCH_NAME=$(git symbolic-ref --short HEAD)
-    echo "\n${BOLD}${BLUE}════════════════════════════════════════════${NC}"
-    echo "${BOLD}${BLUE}   PRE-PUSH CHECKS (${BRANCH_NAME})${NC}"
-    echo "${BOLD}${BLUE}════════════════════════════════════════════${NC}\n"
-}
-
-print_footer() {
-    echo "\n${BOLD}════════════════════════════════════════════${NC}"
-    if [ $1 -eq 0 ]; then
-        echo "${BOLD}${GREEN}ALL PRE-PUSH CHECKS PASSED${NC}"
-    else
-        echo "${BOLD}${RED}PRE-PUSH CHECKS FAILED${NC}"
-    fi
-    echo "${BOLD}════════════════════════════════════════════${NC}\n"
-}
-
-run_step() {
-    echo "${CYAN}> $1...${NC}"
-    eval "$2"
-    if [ $? -ne 0 ]; then
-        print_footer 1
-        exit 1
-    fi
-    echo "${GREEN}  $1${NC}"
-}
-
-print_header
-
-# Uncommitted changes check
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    echo "${RED}Uncommitted changes detected. Commit before pushing.${NC}"
-    print_footer 1
+    echo "\033[0;31mUncommitted changes detected. Commit before pushing.\033[0m"
     exit 1
 fi
-
-# Same checks as CI (.github/workflows/ci.yml)
-run_step "Biome CI (lint + format)" "pnpm ci:check"
-run_step "Type check" "pnpm type-check"
-run_step "Code duplication" "pnpm check:duplication"
-run_step "Unused code (knip)" "pnpm check:unused"
-run_step "Tests" "pnpm test"
-run_step "Build" "pnpm build"
-
-print_footer 0
