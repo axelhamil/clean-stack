@@ -28,17 +28,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: rharkor/caching-for-turbo@v2.3.14
-
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
 
       - uses: pnpm/action-setup@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - name: Resolve pnpm store
         shell: bash
@@ -53,11 +47,8 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
 
-      - name: Lint
-        run: pnpm ci:check
-
-      - name: Build + type-check + test (affected)
-        run: pnpm turbo run build test --affected --output-logs=errors-only
+      - name: Type check (safety net)
+        run: pnpm turbo run type-check --output-logs=errors-only
 
       - name: Release
         env:

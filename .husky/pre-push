@@ -2,7 +2,14 @@
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+set -e
+
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     echo "\033[0;31mUncommitted changes detected. Commit before pushing.\033[0m"
     exit 1
 fi
+
+pnpm ci:check
+pnpm turbo run build test --output-logs=errors-only
+pnpm check:duplication
+pnpm check:unused
