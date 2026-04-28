@@ -1,3 +1,24 @@
+## [1.2.0](https://github.com/axelhamil/clean-stack/compare/v1.1.0...v1.2.0) (2026-04-28)
+
+### ⚠ BREAKING CHANGES
+
+* complete repo restructure. The previous Next.js app
+with auth/billing/LLM features is removed. New layout:
+- apps/api (Hono + Node.js, bare skeleton)
+- apps/app (Vite + React 19 + TanStack Router, bare skeleton)
+- packages/{ddd-kit, drizzle, test, typescript-config, ui}
+
+History preserved via CHANGELOG.md.
+
+### Features
+
+* rebuild as generic boilerplate ([5f0d32e](https://github.com/axelhamil/clean-stack/commit/5f0d32e0a46d9931613aaa04cd716987fac033ed))
+
+### Documentation
+
+* add boilerplate restructure design spec ([c55214a](https://github.com/axelhamil/clean-stack/commit/c55214a4059bd1dde9d2e8d6a3401f5bf23583f2))
+* add boilerplate restructure implementation plan ([071862d](https://github.com/axelhamil/clean-stack/commit/071862d4dff55bb5b879398584e18683ba597955))
+
 # [1.1.0](https://github.com/axelhamil/CleanStack/compare/v1.0.0...v1.1.0) (2026-02-11)
 
 
