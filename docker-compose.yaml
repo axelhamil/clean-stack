@@ -1,9 +1,12 @@
+name: clean-stack
+
 services:
   postgres:
     image: postgres:17-alpine
+    container_name: clean-stack-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

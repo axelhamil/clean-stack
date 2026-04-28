@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
     "start": "vite preview",
     "type-check": "tsc --noEmit",
     "test": "vitest run"
@@ -13,21 +13,23 @@
   "dependencies": {
     "@packages/ddd-kit": "workspace:*",
     "@packages/ui": "workspace:*",
-    "@tanstack/react-router": "^1.99.0",
-    "@tanstack/react-query": "^5.62.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "@tanstack/react-query": "^5.100.6",
+    "@tanstack/react-router": "^1.168.25",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
-    "@tanstack/router-plugin": "^1.99.0",
-    "@types/node": "^25.3.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.9.3",
-    "vite": "^7.0.0",
-    "vitest": "^3.2.4"
+    "@tailwindcss/vite": "^4.2.4",
+    "@tanstack/router-plugin": "^1.167.28",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
   }
 }

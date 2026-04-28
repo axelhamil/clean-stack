@@ -1,7 +1,6 @@
 {
   "extends": "@packages/typescript-config/node.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "rootDir": "./src",
     "moduleResolution": "Bundler",
     "module": "ESNext",

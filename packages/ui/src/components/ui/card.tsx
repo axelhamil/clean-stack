@@ -2,20 +2,12 @@ import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-function Card({
-  className,
-  interactive,
-  ...props
-}: React.ComponentProps<"div"> & { interactive?: boolean }) {
+function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      data-interactive={interactive ? "true" : undefined}
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-lg border py-6",
-        "transition-[box-shadow,border-color] duration-slow ease-out-quart",
-        interactive &&
-          "hover:shadow-soft-md hover:border-border/60 cursor-pointer",
+        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
         className,
       )}
       {...props}
@@ -50,7 +42,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />
   );

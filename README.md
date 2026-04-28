@@ -4,20 +4,21 @@ Generic monorepo boilerplate for Clean Architecture + DDD projects.
 
 ## Stack
 
-- **API**: Hono + Node.js
-- **App**: Vite + React 19 + TanStack Router + TanStack Query
+- **Runtime**: Bun 1.3+ (api, scripts, tests)
+- **API**: Hono on native `Bun.serve()` (`bun build` → 7ms cold builds)
+- **App**: Vite 8 + React 19 + TanStack Router + TanStack Query + Tailwind 4
 - **DB**: Drizzle ORM + Postgres
-- **Tooling**: Turborepo, Biome, Husky, commitlint, semantic-release
 - **DDD primitives**: `@packages/ddd-kit` (Result, Option, Entity, Aggregate, ValueObject, DomainEvent)
 - **DI**: inwire
+- **Tooling**: pnpm + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd
 
 ## Quick start
 
 ```bash
 pnpm install
-pnpm db          # start Postgres via docker compose
-pnpm db:push     # push initial schema (none yet)
-pnpm dev         # start everything in parallel
+docker compose up -d   # start Postgres
+pnpm db:push           # push initial schema (none yet)
+pnpm dev               # start everything in parallel
 ```
 
 Scoped dev:
@@ -31,7 +32,7 @@ pnpm dev:app
 
 ```
 apps/
-  api/   Hono + Node.js (Clean Arch + DDD layout: domain/, application/, adapters/, di/, routes/)
+  api/   Hono on Bun (Clean Arch + DDD layout: domain/, application/, adapters/, di/, routes/)
   app/   Vite + React (routes -> features -> entities -> shared)
 packages/
   ddd-kit            DDD primitives

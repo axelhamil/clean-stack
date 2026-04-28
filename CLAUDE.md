@@ -4,12 +4,15 @@ Generic monorepo boilerplate. Clean Architecture + DDD. No business features inc
 
 ## Stack
 
-- **API**: Hono on `@hono/node-server` (plain Node.js)
-- **App**: Vite + React 19 + TanStack Router + TanStack Query + Tailwind 4
-- **DB**: Drizzle ORM + Postgres
+- **Runtime**: Bun 1.3+ (api + scripts), Node 24.15+ for tooling
+- **API**: Hono on native `Bun.serve()` — `bun build` (prod, ~7ms), `bun --hot` (dev)
+- **App**: Vite 8 + React 19 + TanStack Router + TanStack Query + Tailwind 4 (`@tailwindcss/vite`)
+- **DB**: Drizzle ORM + Postgres 17 (Docker, port `5433` to avoid collisions with other local Postgres)
 - **DI**: `inwire`
 - **Primitives**: `@packages/ddd-kit` (`Result<T,E>`, `Option<T>`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `DomainEvent`, `BaseRepository`, `UseCase`)
-- **Tooling**: pnpm + Turborepo + Biome + Husky + commitlint + semantic-release
+- **Packages tooling**: `tsup` (esbuild) for `ddd-kit` + `drizzle` build
+- **Repo tooling**: pnpm + Turborepo (TUI + daemon + fine-grained inputs + `with`) + Biome + Husky + commitlint + semantic-release + knip + jscpd
+- **Testing**: `bun test` (api) + `vitest` (packages, app)
 
 ## Layout
 
@@ -115,6 +118,27 @@ class Email extends ValueObject<string> {
 }
 ```
 
+## Turborepo
+
+- `ui: "tui"` + `daemon: true` set in `turbo.json` — no CLI flags needed.
+- `globalDependencies`: `biome.json`, `tsconfig.json`, `pnpm-workspace.yaml`, `.env*` — modifying any of these busts every cache.
+- `inputs` are scoped per task (build/test/type-check) — README/doc edits do NOT invalidate code caches.
+- `build` declares `with: ["type-check"]` — `pnpm build` always runs type-check in parallel for free.
+- `dev`, `test:watch`, `db:studio` are `interruptible: true` — clean ctrl+C kill on next reload.
+
+## Useful scripts
+
+- `pnpm dev` / `dev:api` / `dev:app` — TUI panels
+- `pnpm dev:affected` / `build:affected` / `test:affected` — only packages changed since main (CI-friendly)
+- `pnpm watch:test` / `watch:type-check` — global Turbo watch mode
+- `pnpm check:all` — type-check + biome + jscpd + knip + tests
+
+## DB
+
+- `docker compose up -d` from repo root — Postgres on `localhost:5433`
+- Schema goes in `packages/drizzle/src/schema/*.ts`
+- After adding/modifying schema: `pnpm db:push` (dev) or `pnpm db:generate && pnpm db:migrate` (prod-style migrations)
+
 ## Don't
 
 - Add business features without first agreeing on the bounded context.
@@ -122,3 +146,5 @@ class Email extends ValueObject<string> {
 - Use `null` for absence.
 - Add `index.ts` barrels.
 - Add inline comments that restate what the code does.
+- Reintroduce `@hono/node-server`, `tsx`, `tsc-alias` — the API runs on Bun natively.
+- Pin Postgres back to port 5432 — collides with other local Postgres instances.

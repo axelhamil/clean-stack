@@ -1,7 +1,6 @@
 {
   "extends": "@packages/typescript-config/node.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "noEmit": true
   },
   "include": ["**/*.ts"],

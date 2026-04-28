@@ -7,6 +7,11 @@
     "dev": "turbo dev",
     "dev:api": "turbo dev --filter=api",
     "dev:app": "turbo dev --filter=app",
+    "dev:affected": "turbo dev --affected",
+    "build:affected": "turbo build --affected",
+    "test:affected": "turbo test --affected",
+    "watch:test": "turbo watch test",
+    "watch:type-check": "turbo watch type-check",
     "db:migrate": "turbo db:migrate",
     "db:generate": "turbo db:generate",
     "db:push": "turbo db:push",
@@ -27,22 +32,23 @@
     "test": "turbo test",
     "test:watch": "turbo test:watch",
     "test:coverage": "turbo test:coverage",
-    "setup": "pnpm install && pnpm db && pnpm db:push",
+    "setup": "pnpm install && pnpm db:push",
     "quick-check": "pnpm type-check && pnpm check",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.2",
-    "@commitlint/cli": "^20.4.1",
-    "@commitlint/config-conventional": "^20.4.1",
+    "@biomejs/biome": "^2.4.13",
+    "@commitlint/cli": "^20.5.2",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@packages/typescript-config": "workspace:*",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "husky": "^9.1.7",
-    "jscpd": "^4.0.8",
-    "knip": "^5.84.1",
-    "lint-staged": "^16.2.7",
+    "jscpd": "^4.0.9",
+    "knip": "^6.7.0",
+    "lint-staged": "^16.4.0",
     "semantic-release": "^25.0.3",
-    "turbo": "^2.8.10"
+    "turbo": "^2.9.6"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -52,14 +58,15 @@
       "biome format --write --no-errors-on-unmatched"
     ]
   },
-  "packageManager": "pnpm@10.26.2",
+  "packageManager": "pnpm@10.33.2",
   "engines": {
-    "node": ">=22.14.0"
+    "node": ">=24.15.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "sharp",
-      "@swc/core"
+      "@swc/core",
+      "esbuild",
+      "sharp"
     ]
   }
 }

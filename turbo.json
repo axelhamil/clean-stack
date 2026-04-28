@@ -1,17 +1,37 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "daemon": true,
+  "globalDependencies": [
+    "biome.json",
+    "tsconfig.json",
+    "pnpm-workspace.yaml",
+    ".env",
+    ".env.local",
+    ".env.production"
+  ],
   "globalEnv": ["DATABASE_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "with": ["type-check"],
+      "inputs": [
+        "src/**",
+        "common/**",
+        "package.json",
+        "tsconfig*.json",
+        "tsup.config.ts",
+        "vite.config.ts",
+        "drizzle.config.ts"
+      ],
+      "outputs": ["dist/**", "build/**", "!dist/**/*.map"],
       "env": ["DATABASE_URL"],
-      "outputs": ["dist/**", "build/**"],
       "passThroughEnv": ["DATABASE_URL"]
     },
     "dev": {
-      "dependsOn": ["db:migrate"],
       "cache": false,
       "persistent": true,
+      "interruptible": true,
       "env": ["DATABASE_URL"]
     },
     "start": {
@@ -21,15 +41,30 @@
     },
     "test": {
       "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "common/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__TESTS__/**",
+        "package.json",
+        "tsconfig*.json",
+        "vitest.config.*"
+      ],
       "outputs": []
     },
-    "test:watch": { "cache": false },
+    "test:watch": {
+      "cache": false,
+      "persistent": true,
+      "interruptible": true
+    },
     "test:coverage": {
       "dependsOn": ["^build"],
-      "cache": false
+      "outputs": ["coverage/**"]
     },
     "type-check": {
       "dependsOn": ["^build"],
+      "inputs": ["src/**", "common/**", "package.json", "tsconfig*.json"],
       "outputs": []
     },
     "format": { "outputs": [] },
@@ -37,7 +72,12 @@
     "db:generate": { "cache": false, "env": ["DATABASE_URL"] },
     "db:push": { "cache": false, "env": ["DATABASE_URL"] },
     "db:seed": { "cache": false, "env": ["DATABASE_URL"] },
-    "db:studio": { "cache": false, "env": ["DATABASE_URL"] },
+    "db:studio": {
+      "cache": false,
+      "persistent": true,
+      "interruptible": true,
+      "env": ["DATABASE_URL"]
+    },
     "db:migrate": {
       "dependsOn": ["db:generate"],
       "cache": false,

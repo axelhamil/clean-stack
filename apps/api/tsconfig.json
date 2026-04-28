@@ -1,7 +1,6 @@
 {
   "extends": "@packages/typescript-config/hono.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
