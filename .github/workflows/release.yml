@@ -18,26 +18,37 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: "24.15"
-          cache: pnpm
+          node-version-file: .nvmrc
+
+      - uses: pnpm/action-setup@v4
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install
-        run: pnpm install --frozen-lockfile
+      - name: Resolve pnpm store
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache deps (pnpm store + node_modules)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.STORE_PATH }}
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: deps-${{ runner.os }}-
 
       - name: Cache turbo
         uses: actions/cache@v4
@@ -47,13 +58,15 @@ jobs:
             apps/*/.turbo
             packages/*/.turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ runner.os }}-
+          restore-keys: turbo-${{ runner.os }}-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Lint
         run: pnpm ci:check
 
-      - name: Build + type-check + test (turbo orchestrated)
+      - name: Build + type-check + test
         run: pnpm turbo run build test --output-logs=errors-only
 
       - name: Release

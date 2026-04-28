@@ -85,8 +85,5 @@
 # Local plugin settings
 **/*.local.md
 
-# TanStack Router generated file
-apps/app/src/routeTree.gen.ts
-
 # tsup temp bundled configs
 **/tsup.config.bundled_*.mjs
