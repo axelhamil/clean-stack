@@ -43,6 +43,7 @@
     "@packages/typescript-config": "workspace:*",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "husky": "^9.1.7",
     "jscpd": "^4.0.9",
     "knip": "^6.7.0",

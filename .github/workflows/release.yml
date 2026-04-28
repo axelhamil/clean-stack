@@ -9,38 +9,52 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22.14"
+          node-version: "24.15"
           cache: pnpm
 
-      - name: Install dependencies
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Lint & Format
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.cache/turbo
+            apps/*/.turbo
+            packages/*/.turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
+      - name: Lint
         run: pnpm ci:check
 
-      - name: Type Check
-        run: pnpm type-check
-
-      - name: Tests
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
+      - name: Build + type-check + test (turbo orchestrated)
+        run: pnpm turbo run build test --output-logs=errors-only
 
       - name: Release
         env:

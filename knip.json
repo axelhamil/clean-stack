@@ -30,7 +30,8 @@
     "@packages/ddd-kit",
     "@packages/typescript-config",
     "lint-staged",
-    "tailwindcss"
+    "tailwindcss",
+    "conventional-changelog-conventionalcommits"
   ],
   "ignoreExportsUsedInFile": true,
   "rules": {
