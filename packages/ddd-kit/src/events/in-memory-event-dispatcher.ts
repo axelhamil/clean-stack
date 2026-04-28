@@ -14,7 +14,6 @@ export class InMemoryEventDispatcher implements IEventDispatcher {
 
   private log(message: string, error?: unknown): void {
     if (this.enableLogging) {
-      // biome-ignore lint/suspicious/noConsole: Intentional logging for event dispatcher debugging
       console.error(message, error);
     }
   }

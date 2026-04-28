@@ -26,7 +26,10 @@
         "noDoubleEquals": "warn",
         "noPrototypeBuiltins": "warn",
         "noConstEnum": "off",
-        "noConsole": { "level": "warn", "options": { "allow": ["log"] } },
+        "noConsole": {
+          "level": "warn",
+          "options": { "allow": ["log", "error", "warn", "info"] }
+        },
         "noImportCycles": "error",
         "noUnusedExpressions": "warn"
       },

@@ -13,6 +13,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     name: Release
@@ -20,12 +23,14 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: actions/setup-node@v4
+      - uses: rharkor/caching-for-turbo@v2
+
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
 
@@ -39,35 +44,20 @@ jobs:
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - name: Cache deps (pnpm store + node_modules)
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
-          path: |
-            ${{ env.STORE_PATH }}
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: deps-${{ runner.os }}-
-
-      - name: Cache turbo
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules/.cache/turbo
-            apps/*/.turbo
-            packages/*/.turbo
-          key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: turbo-${{ runner.os }}-
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install
-        run: pnpm install --frozen-lockfile --prefer-offline
+        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
 
       - name: Lint
         run: pnpm ci:check
 
-      - name: Build + type-check + test
-        run: pnpm turbo run build test --output-logs=errors-only
+      - name: Build + type-check + test (affected)
+        run: pnpm turbo run build test --affected --output-logs=errors-only
 
       - name: Release
         env:
