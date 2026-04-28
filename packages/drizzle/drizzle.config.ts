@@ -1,8 +1,7 @@
-import { resolve } from "node:path";
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
 
-config({ path: resolve(__dirname, "../../.env") });
+config();
 
 // Use placeholder for static analysis tools (knip), actual value required at runtime
 const databaseUrl = process.env.DATABASE_URL ?? "postgresql://placeholder";

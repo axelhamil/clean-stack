@@ -1,5 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Base",
   "compilerOptions": {
     "strict": true,
     "esModuleInterop": true,
@@ -14,6 +15,7 @@
     "allowJs": true,
     "moduleDetection": "force",
     "noUncheckedIndexedAccess": true,
-    "target": "ES2022"
+    "target": "ES2022",
+    "verbatimModuleSyntax": false
   }
 }

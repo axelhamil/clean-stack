@@ -2,12 +2,20 @@ import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+function Card({
+  className,
+  interactive,
+  ...props
+}: React.ComponentProps<"div"> & { interactive?: boolean }) {
   return (
     <div
       data-slot="card"
+      data-interactive={interactive ? "true" : undefined}
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-2xl border border-border/50 p-6 shadow-soft-md transition-all duration-300 hover:shadow-soft-lg",
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-lg border py-6",
+        "transition-[box-shadow,border-color] duration-slow ease-out-quart",
+        interactive &&
+          "hover:shadow-soft-md hover:border-border/60 cursor-pointer",
         className,
       )}
       {...props}
@@ -19,18 +27,8 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-header"
-      className={cn("flex flex-col space-y-1.5", className)}
-      {...props}
-    />
-  );
-}
-
-function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
-  return (
-    <h3
-      data-slot="card-title"
       className={cn(
-        "text-xl font-semibold leading-none tracking-tight",
+        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
         className,
       )}
       {...props}
@@ -38,11 +36,21 @@ function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
   );
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<"p">) {
+function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <p
+    <div
+      data-slot="card-title"
+      className={cn("leading-none font-semibold", className)}
+      {...props}
+    />
+  );
+}
+
+function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("text-muted-foreground text-sm", className)}
       {...props}
     />
   );
@@ -63,7 +71,11 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div data-slot="card-content" className={cn("", className)} {...props} />
+    <div
+      data-slot="card-content"
+      className={cn("px-6", className)}
+      {...props}
+    />
   );
 }
 
@@ -71,7 +83,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center pt-2", className)}
+      className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
       {...props}
     />
   );

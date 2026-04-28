@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Result } from "../core/Result";
+import { Result } from "../primitives/result";
 
 describe("Result", () => {
   describe("ok()", () => {

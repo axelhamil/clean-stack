@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Documentation
-    url: https://github.com/axmusic/nextjs-clean-architecture-starter/blob/main/CLAUDE.md
-    about: Check the AI development guide first
-  - name: Discussions
-    url: https://github.com/axmusic/nextjs-clean-architecture-starter/discussions
-    about: Ask questions and share ideas

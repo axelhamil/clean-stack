@@ -1,66 +1,47 @@
 #!/bin/sh
 
+# Ensure node is in PATH (nvm lazy-loading fix)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
 # Colors
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 print_header() {
     echo "\n${BOLD}${BLUE}════════════════════════════════════════════${NC}"
-    echo "${BOLD}${BLUE}   🔍 PRE-COMMIT CHECKS${NC}"
+    echo "${BOLD}${BLUE}   PRE-COMMIT CHECKS${NC}"
     echo "${BOLD}${BLUE}════════════════════════════════════════════${NC}\n"
-}
-
-print_success() {
-    echo "${GREEN}✓ $1${NC}"
-}
-
-print_error() {
-    echo "\n${RED}────────────────────────────────────────${NC}"
-    echo "${RED}${BOLD}✕ $1${NC}"
-    echo "${RED}────────────────────────────────────────${NC}\n"
 }
 
 print_footer() {
     echo "\n${BOLD}════════════════════════════════════════════${NC}"
     if [ $1 -eq 0 ]; then
-        echo "${BOLD}${GREEN}✅ ALL PRE-COMMIT CHECKS PASSED${NC}"
+        echo "${BOLD}${GREEN}ALL PRE-COMMIT CHECKS PASSED${NC}"
     else
-        echo "${BOLD}${RED}❌ PRE-COMMIT CHECKS FAILED${NC}"
-        echo "${RED}Please fix the errors above before committing.${NC}"
+        echo "${BOLD}${RED}PRE-COMMIT CHECKS FAILED${NC}"
     fi
     echo "${BOLD}════════════════════════════════════════════${NC}\n"
 }
 
+run_step() {
+    echo "${CYAN}> $1...${NC}"
+    eval "$2"
+    if [ $? -ne 0 ]; then
+        print_footer 1
+        exit 1
+    fi
+    echo "${GREEN}  $1${NC}"
+}
+
 print_header
 
-# Run lint-staged
-echo "${CYAN}▶ Running lint-staged...${NC}"
-pnpm lint-staged
-lint_staged_exit_code=$?
-
-if [ $lint_staged_exit_code -ne 0 ]; then
-    print_error "lint-staged failed"
-    print_footer 1
-    exit 1
-fi
-print_success "Code is formatted and linted"
-
-# Type checking
-echo "${CYAN}▶ Checking types...${NC}"
-pnpm type-check
-type_check_exit_code=$?
-
-if [ $type_check_exit_code -ne 0 ]; then
-    print_error "Type check failed"
-    print_footer 1
-    exit 1
-fi
-print_success "Types are valid"
+run_step "lint-staged" "pnpm lint-staged"
+run_step "Type check" "pnpm type-check"
 
 print_footer 0
 exit 0

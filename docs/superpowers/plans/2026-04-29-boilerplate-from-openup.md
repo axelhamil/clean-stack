@@ -13,9 +13,9 @@
 - Target repo (rewritten): `/home/axel/DEV/clean-stack/`
 
 **Environment notes:**
-- The user's interactive shell (zsh) sources nvm, so `node`/`pnpm` are on PATH for the harness Bash tool. No PATH munging needed for plain `pnpm` calls. The only place PATH may need adjustment is inside husky hooks, which spawn `sh` and do not source nvm — if a hook fails with `node: command not found`, prefix the offending `git` invocation with `PATH="$HOME/.nvm/versions/node/v22.20.0/bin:$PATH"`.
-- Commit signing is operational again (SSH key restored). Do NOT pass `-c commit.gpgsign=false`.
-- Use `dangerouslyDisableSandbox: true` only for commands that genuinely need it (the final `git commit` because husky reads `~/.huskyrc`-adjacent files).
+- `node` and `npx` are symlinked at `~/.local/bin/{node,npx}` (already on global PATH), so husky's `sh` subshells find node without env munging. No `PATH=...` prefixes needed anywhere.
+- Commit signing is operational (SSH key in place). Do NOT pass `-c commit.gpgsign=false`.
+- Use `dangerouslyDisableSandbox: true` only for the final `git commit` step (husky reads beyond the working dir).
 
 ---
 
@@ -1130,8 +1130,6 @@ EOF
 )"
 ```
 Expected: pre-commit hooks (lint-staged, type-check) pass; commit created and SSH-signed.
-
-If husky fails with `node: command not found`, the hook's `sh` subshell can't see node — re-run prefixed with `PATH="$HOME/.nvm/versions/node/v22.20.0/bin:$PATH"`. Otherwise no PATH munging needed.
 
 - [ ] **Step 3: Verify the commit**
 

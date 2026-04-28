@@ -2,7 +2,8 @@ import "dotenv/config";
 import { drizzle, type NodePgTransaction } from "drizzle-orm/node-postgres";
 import type { ExtractTablesWithRelations } from "drizzle-orm/relations";
 import { Pool } from "pg";
-import * as schema from "./schema";
+
+const schema = {};
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
@@ -12,7 +13,12 @@ function getDb(): ReturnType<typeof drizzle<typeof schema>> {
     if (!connectionString) {
       throw new Error("DATABASE_URL is not set");
     }
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({
+      connectionString,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
     _db = drizzle(pool, { schema });
   }
   return _db;

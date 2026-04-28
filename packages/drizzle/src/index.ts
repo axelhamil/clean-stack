@@ -1,6 +1,4 @@
-export * from "drizzle-orm";
-export * from "./config";
-export * from "./schema";
+export { type DbClient, db, type Transaction } from "./config";
 
-// services
-export * from "./services/transaction-manager.service";
+export { TransactionService } from "./services/transaction-manager.service";
+export type { ITransactionManagerService } from "./services/transaction-manager.type";

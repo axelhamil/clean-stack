@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BaseDomainEvent, type IDomainEvent } from "../core/DomainEvent";
+import { BaseDomainEvent, type IDomainEvent } from "../domain/domain-event";
 
 interface TestPayload {
   userId: string;

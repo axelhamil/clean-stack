@@ -5,23 +5,13 @@
     "build": {
       "dependsOn": ["^build"],
       "env": ["DATABASE_URL"],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**",
-        ".next/types/**",
-        "build/**"
-      ],
+      "outputs": ["dist/**", "build/**"],
       "passThroughEnv": ["DATABASE_URL"]
     },
-    "lint": {
-      "dependsOn": ["^lint"],
-      "outputs": []
-    },
     "dev": {
+      "dependsOn": ["db:migrate"],
       "cache": false,
       "persistent": true,
-      "dependsOn": ["^db:generate"],
       "env": ["DATABASE_URL"]
     },
     "start": {
@@ -30,51 +20,30 @@
       "env": ["DATABASE_URL"]
     },
     "test": {
-      "cache": false
+      "dependsOn": ["^build"],
+      "outputs": []
     },
-    "test:watch": {
-      "cache": false
-    },
+    "test:watch": { "cache": false },
     "test:coverage": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"],
       "cache": false
-    },
-    "test:e2e": {
-      "dependsOn": ["build"],
-      "cache": false,
-      "env": ["DATABASE_URL"]
     },
     "type-check": {
       "dependsOn": ["^build"],
-      "outputs": ["next-env.d.ts", ".next/types/**"]
-    },
-    "format": {
       "outputs": []
     },
-    "clean": {
-      "cache": false
-    },
-    "db:generate": {
-      "cache": false,
-      "env": ["DATABASE_URL"]
-    },
-    "db:push": {
-      "cache": false,
-      "env": ["DATABASE_URL"]
-    },
-    "db:studio": {
-      "cache": false,
-      "env": ["DATABASE_URL"]
-    },
+    "format": { "outputs": [] },
+    "lint": { "outputs": [] },
+    "db:generate": { "cache": false, "env": ["DATABASE_URL"] },
+    "db:push": { "cache": false, "env": ["DATABASE_URL"] },
+    "db:seed": { "cache": false, "env": ["DATABASE_URL"] },
+    "db:studio": { "cache": false, "env": ["DATABASE_URL"] },
     "db:migrate": {
+      "dependsOn": ["db:generate"],
       "cache": false,
       "outputs": ["drizzle/migrations/**"],
       "env": ["DATABASE_URL"]
     },
-    "ui:add": {
-      "cache": false,
-      "interactive": true
-    }
+    "ui:add": { "cache": false, "interactive": true }
   }
 }

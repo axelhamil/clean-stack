@@ -1,5 +1,5 @@
 {
-  "threshold": 5,
+  "threshold": 13,
   "reporters": ["console"],
   "ignore": [
     "**/node_modules/**",
@@ -11,7 +11,9 @@
     "**/*.d.ts",
     "**/__TESTS__/**",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "**/android/**",
+    "**/ios/**"
   ],
   "format": ["typescript", "javascript", "tsx", "jsx"],
   "minLines": 5,

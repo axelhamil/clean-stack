@@ -1,29 +1,20 @@
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: postgres
+    image: postgres:17-alpine
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: nextjs-clean-architecture-starter
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: clean_stack
     volumes:
-      - nextjs-clean-architecture-starter_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - app-network
 
 volumes:
-  nextjs-clean-architecture-starter_data:
-    name: nextjs-clean-architecture-starter_data
-
-networks:
-  app-network:
-    driver: bridge
+  postgres_data:

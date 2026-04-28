@@ -1,5 +1,5 @@
-import { Result } from "../../core/Result";
-import { ValueObject } from "../../core/ValueObject";
+import { ValueObject } from "../../domain/value-object";
+import { Result } from "../../primitives/result";
 
 export class StringStubs extends ValueObject<string> {
   protected validate(value: string): Result<string> {

@@ -1,5 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Claude Code
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
 # Dependencies
 **/node_modules
 **/.pnp
@@ -29,6 +33,7 @@
 
 # Local env files
 **/.env
+**/.env.prod
 **/.env*.local
 **/.env.development
 **/.env.test
@@ -65,6 +70,7 @@
 **/.eslintcache
 **/.cache
 **/.npm
+**/.tanstack
 
 # Build
 **/dist/
@@ -78,3 +84,9 @@
 
 # Local plugin settings
 **/*.local.md
+
+# TanStack Router generated file
+apps/app/src/routeTree.gen.ts
+
+# tsup temp bundled configs
+**/tsup.config.bundled_*.mjs

@@ -12,5 +12,4 @@ export default defineConfig({
   sourcemap: true,
   treeshake: true,
   minify: false,
-  external: ["@packages/drizzle"],
 });

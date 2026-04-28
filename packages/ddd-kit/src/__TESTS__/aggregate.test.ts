@@ -1,26 +1,36 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { Aggregate, type DomainEvent, DomainEvents, UUID } from "../index";
+import { describe, expect, it } from "vitest";
+import { Aggregate, type IDomainEvent, UUID } from "../index";
 
-class UserCreated implements DomainEvent {
-  type = "UserCreated";
-  dateTimeOccurred = new Date();
+interface TestPayload {
   aggregateId: string;
+}
+
+class UserCreated implements IDomainEvent<TestPayload> {
+  readonly eventType = "UserCreated";
+  readonly dateOccurred = new Date();
+  aggregateId: string;
+  payload: TestPayload;
 
   constructor(aggregateId: string) {
     this.aggregateId = aggregateId;
+    this.payload = { aggregateId };
   }
 }
 
-class UserNameChanged implements DomainEvent {
-  type = "UserNameChanged";
-  dateTimeOccurred = new Date();
+class UserNameChanged
+  implements IDomainEvent<TestPayload & { newName: string }>
+{
+  readonly eventType = "UserNameChanged";
+  readonly dateOccurred = new Date();
   aggregateId: string;
+  payload: TestPayload & { newName: string };
 
   constructor(
     aggregateId: string,
     public readonly newName: string,
   ) {
     this.aggregateId = aggregateId;
+    this.payload = { aggregateId, newName };
   }
 }
 
@@ -59,26 +69,16 @@ class TestAggregate extends Aggregate<TestAggregateProps> {
     this.addEvent(new UserNameChanged(this._id.value.toString(), newName));
   }
 
-  addMultipleEvents(events: DomainEvent[]): void {
+  addMultipleEvents(events: IDomainEvent[]): void {
     this.addEvents(events);
   }
 
-  addSingleEvent(event: DomainEvent): void {
+  addSingleEvent(event: IDomainEvent): void {
     this.addEvent(event);
-  }
-
-  addDomainEventAlias(event: DomainEvent): void {
-    this.addDomainEvent(event);
   }
 }
 
 describe("Aggregate", () => {
-  beforeEach(() => {
-    DomainEvents.clearEvents();
-    DomainEvents.clearHandlers();
-    DomainEvents.setLogging(false);
-  });
-
   describe("creation", () => {
     it("should create aggregate with props and id", () => {
       const id = new UUID();
@@ -156,23 +156,6 @@ describe("Aggregate", () => {
       expect(aggregate.domainEvents[0]).toBeInstanceOf(UserCreated);
       expect(aggregate.domainEvents[1]).toBeInstanceOf(UserNameChanged);
     });
-
-    it("should register event with DomainEvents", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-
-      expect(DomainEvents.hasEvents(aggregate._id.value.toString())).toBe(true);
-    });
-  });
-
-  describe("addDomainEvent() alias", () => {
-    it("should work same as addEvent", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.addDomainEventAlias(
-        new UserNameChanged(aggregate._id.value.toString(), "Test"),
-      );
-
-      expect(aggregate.domainEvents).toHaveLength(2);
-    });
   });
 
   describe("addEvents()", () => {
@@ -181,7 +164,7 @@ describe("Aggregate", () => {
         name: "John",
         age: 30,
       });
-      const events = [
+      const events: IDomainEvent[] = [
         new UserCreated(aggregate._id.value.toString()),
         new UserNameChanged(aggregate._id.value.toString(), "Jane"),
       ];
@@ -189,25 +172,6 @@ describe("Aggregate", () => {
       aggregate.addMultipleEvents(events);
 
       expect(aggregate.domainEvents).toHaveLength(2);
-    });
-
-    it("should register all events with DomainEvents", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-      const events = [
-        new UserCreated(aggregate._id.value.toString()),
-        new UserNameChanged(aggregate._id.value.toString(), "Jane"),
-      ];
-
-      aggregate.addMultipleEvents(events);
-
-      const registeredEvents = DomainEvents.getEventsForEntity(
-        aggregate._id.value.toString(),
-      );
-      expect(registeredEvents.isSome()).toBe(true);
-      expect(registeredEvents.unwrap()).toHaveLength(2);
     });
   });
 
@@ -220,15 +184,6 @@ describe("Aggregate", () => {
       aggregate.clearEvents();
 
       expect(aggregate.domainEvents).toHaveLength(0);
-    });
-
-    it("should not affect DomainEvents registry", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      const aggregateId = aggregate._id.value.toString();
-
-      aggregate.clearEvents();
-
-      expect(DomainEvents.hasEvents(aggregateId)).toBe(true);
     });
   });
 
@@ -279,34 +234,6 @@ describe("Aggregate", () => {
       aggregate.clearEvents();
 
       expect(aggregate.getEventCount()).toBe(0);
-    });
-  });
-
-  describe("markEventsForDispatch()", () => {
-    it("should register all events for dispatch", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.changeName("Jane");
-
-      DomainEvents.clearEvents();
-      expect(DomainEvents.hasEvents(aggregate._id.value.toString())).toBe(
-        false,
-      );
-
-      const result = aggregate.markEventsForDispatch();
-
-      expect(result.isSuccess).toBe(true);
-      expect(DomainEvents.hasEvents(aggregate._id.value.toString())).toBe(true);
-    });
-
-    it("should succeed with empty events", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-
-      const result = aggregate.markEventsForDispatch();
-
-      expect(result.isSuccess).toBe(true);
     });
   });
 
@@ -379,8 +306,8 @@ describe("Aggregate", () => {
       aggregate.changeName("Jane");
 
       const events = aggregate.domainEvents;
-      expect(events[0].type).toBe("UserCreated");
-      expect(events[1].type).toBe("UserNameChanged");
+      expect(events[0].eventType).toBe("UserCreated");
+      expect(events[1].eventType).toBe("UserNameChanged");
     });
 
     it("should set correct aggregateId on events", () => {
@@ -390,10 +317,10 @@ describe("Aggregate", () => {
       expect(aggregate.domainEvents[0].aggregateId).toBe("test-id");
     });
 
-    it("should set dateTimeOccurred on events", () => {
+    it("should set dateOccurred on events", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
 
-      expect(aggregate.domainEvents[0].dateTimeOccurred).toBeInstanceOf(Date);
+      expect(aggregate.domainEvents[0].dateOccurred).toBeInstanceOf(Date);
     });
   });
 });

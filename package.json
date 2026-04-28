@@ -1,13 +1,16 @@
 {
-  "name": "nextjs-clean-architecture-starter",
+  "name": "clean-stack",
   "private": true,
+  "version": "1.1.0",
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev --filter=nextjs",
-    "db": "docker compose up -d postgres",
+    "dev": "turbo dev",
+    "dev:api": "turbo dev --filter=api",
+    "dev:app": "turbo dev --filter=app",
     "db:migrate": "turbo db:migrate",
     "db:generate": "turbo db:generate",
     "db:push": "turbo db:push",
+    "db:seed": "turbo db:seed",
     "db:studio": "turbo db:studio",
     "ui:add": "turbo ui:add",
     "format": "biome format . --write",
@@ -15,33 +18,31 @@
     "check": "biome check .",
     "fix": "biome check --write .",
     "ci:check": "biome ci .",
-    "check:duplication": "jscpd ./packages ./apps/nextjs/src",
+    "check:duplication": "jscpd ./packages ./apps/api/src ./apps/app/src",
     "check:unused": "knip",
     "check:all": "pnpm type-check && pnpm check && pnpm check:duplication && pnpm check:unused && pnpm test",
-    "clean": "turbo clean && rm -rf node_modules",
+    "clean": "rm -rf node_modules .turbo apps/*/.turbo packages/*/.turbo apps/api/dist apps/app/dist",
+    "start": "turbo start",
     "type-check": "turbo type-check",
     "test": "turbo test",
     "test:watch": "turbo test:watch",
     "test:coverage": "turbo test:coverage",
-    "test:ui": "vitest --ui",
-    "test:e2e": "turbo test:e2e",
     "setup": "pnpm install && pnpm db && pnpm db:push",
-    "validate": "pnpm type-check && pnpm check && pnpm test",
     "quick-check": "pnpm type-check && pnpm check",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.10",
-    "@commitlint/cli": "^20.3.1",
-    "@commitlint/config-conventional": "^20.3.1",
-    "husky": "^9.1.7",
-    "jscpd": "^4.0.7",
-    "knip": "^5.81.0",
-    "lint-staged": "^16.2.7",
-    "semantic-release": "^24.2.6",
+    "@biomejs/biome": "^2.4.2",
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "turbo": "latest"
+    "husky": "^9.1.7",
+    "jscpd": "^4.0.8",
+    "knip": "^5.84.1",
+    "lint-staged": "^16.2.7",
+    "semantic-release": "^25.0.3",
+    "turbo": "^2.8.10"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -53,7 +54,12 @@
   },
   "packageManager": "pnpm@10.26.2",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.14.0"
   },
-  "version": "1.1.0"
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "@swc/core"
+    ]
+  }
 }

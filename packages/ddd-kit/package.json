@@ -2,21 +2,18 @@
   "name": "@packages/ddd-kit",
   "version": "1.0.0",
   "description": "DDD primitives for TypeScript: Result, Option, Entity, Aggregate, ValueObject",
+  "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "README.md",
-    "CHANGELOG.md"
-  ],
   "keywords": [
     "ddd",
     "domain-driven-design",
@@ -31,7 +28,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/axmusic/nextjs-clean-architecture-starter",
+    "url": "https://github.com/axelhamil/clean-stack",
     "directory": "packages/ddd-kit"
   },
   "publishConfig": {
@@ -57,9 +54,9 @@
     "@packages/drizzle": "workspace:*",
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
-    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/coverage-v8": "^4.0.18",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.18"
   }
 }

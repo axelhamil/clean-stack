@@ -7,15 +7,6 @@ export class TransactionService implements ITransactionManagerService {
     parent?: Transaction,
   ): Promise<T> {
     const invoker = parent ?? db;
-
-    return invoker.transaction(async (trx) => {
-      try {
-        const result = await callback(trx);
-        return result;
-      } catch (error) {
-        trx.rollback();
-        throw error;
-      }
-    });
+    return invoker.transaction(async (trx) => callback(trx));
   }
 }

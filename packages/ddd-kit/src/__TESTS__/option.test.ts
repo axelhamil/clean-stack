@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { match, None, Option, Some } from "../core/Option";
+import { match, None, Option, Some } from "../primitives/option";
 
 describe("Option", () => {
   describe("Option.some()", () => {

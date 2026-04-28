@@ -165,27 +165,23 @@ describe("Entity", () => {
       expect(entity.get("nickname")).toBeNull();
     });
 
-    it("should throw for undefined property", () => {
+    it("should return undefined for undefined property", () => {
       const entity = EntityWithNullable.create({
         name: "John",
         nickname: null,
         description: undefined,
       });
 
-      expect(() => entity.get("description")).toThrow(
-        "The property description doesn't exist in EntityWithNullable",
-      );
+      expect(entity.get("description")).toBeUndefined();
     });
 
-    it("should throw for empty string property", () => {
+    it("should return empty string for empty string property", () => {
       const entity = EntityWithNullable.create({
         name: "",
         nickname: null,
       });
 
-      expect(() => entity.get("name")).toThrow(
-        "The property name doesn't exist in EntityWithNullable",
-      );
+      expect(entity.get("name")).toBe("");
     });
 
     it("should return entity id when accessing id prop that is undefined", () => {
@@ -340,10 +336,10 @@ describe("Entity", () => {
       expect(entity.equals(undefined)).toBe(false);
     });
 
-    it("should return false when comparing with same instance", () => {
+    it("should return true when comparing with same instance", () => {
       const entity = TestEntity.create({ name: "John", age: 30 });
 
-      expect(entity.equals(entity)).toBe(false);
+      expect(entity.equals(entity)).toBe(true);
     });
 
     it("should return false when comparing with non-entity", () => {

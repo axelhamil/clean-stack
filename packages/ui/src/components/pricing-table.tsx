@@ -70,5 +70,5 @@ function PricingTable({
   );
 }
 
-export { PricingTable };
 export type { Plan };
+export { PricingTable };

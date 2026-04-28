@@ -1,0 +1,35 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.26.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --conditions=development src/index.ts",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
+    "start": "node dist/src/index.js",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.9",
+    "@hono/zod-validator": "^0.7.6",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "dotenv": "^17.3.1",
+    "hono": "^4.11.10",
+    "inwire": "^2.1.6",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/node": "^25.3.0",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

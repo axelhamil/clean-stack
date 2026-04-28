@@ -1,3 +1,7 @@
 #!/bin/sh
 
+# Ensure node is in PATH (nvm lazy-loading fix)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
 pnpm commitlint --edit $1

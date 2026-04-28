@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
   "root": true,
   "assist": {
     "actions": {
@@ -10,9 +10,6 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "nursery": {
-        "noImportCycles": "error"
-      },
       "correctness": {
         "noUnusedVariables": "error",
         "noUndeclaredVariables": "error",
@@ -29,7 +26,9 @@
         "noDoubleEquals": "warn",
         "noPrototypeBuiltins": "warn",
         "noConstEnum": "off",
-        "noConsole": { "level": "warn", "options": { "allow": ["log"] } }
+        "noConsole": { "level": "warn", "options": { "allow": ["log"] } },
+        "noImportCycles": "error",
+        "noUnusedExpressions": "warn"
       },
       "style": {
         "noNonNullAssertion": "warn",
@@ -101,7 +100,8 @@
       "!**/node_modules/**",
       "!**/.next/**",
       "!**/dist/**",
-      "!**/build/**"
+      "!**/build/**",
+      "!**/routeTree.gen.ts"
     ]
   },
   "javascript": {
@@ -131,6 +131,53 @@
       "enabled": true
     }
   },
+  "overrides": [
+    {
+      "includes": ["packages/ui/src/components/ui/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useKeyWithClickEvents": "off",
+            "useAriaPropsForRole": "off",
+            "noRedundantRoles": "off",
+            "useFocusableInteractive": "off",
+            "useSemanticElements": "off"
+          },
+          "suspicious": {
+            "noArrayIndexKey": "off",
+            "noDocumentCookie": "off"
+          },
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          },
+          "correctness": {
+            "useExhaustiveDependencies": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/drizzle/src/seeds/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/routeTree.gen.ts"],
+      "linter": { "enabled": false },
+      "assist": { "enabled": false }
+    },
+    {
+      "includes": ["packages/drizzle/migrations/**"],
+      "linter": { "enabled": false },
+      "formatter": { "enabled": false },
+      "assist": { "enabled": false }
+    }
+  ],
   "vcs": {
     "enabled": true,
     "clientKind": "git",

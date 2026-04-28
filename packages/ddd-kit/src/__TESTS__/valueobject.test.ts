@@ -62,12 +62,11 @@ describe("ValueObject", () => {
       expect(result.getError()).toBe("Invalid email format");
     });
 
-    it("should preserve original value (transformation happens in validation only)", () => {
+    it("should store validated/transformed value", () => {
       const result = Email.create("TEST@EXAMPLE.COM");
 
       expect(result.isSuccess).toBe(true);
-      // ValueObject stores original value, not transformed one
-      expect(result.getValue().value).toBe("TEST@EXAMPLE.COM");
+      expect(result.getValue().value).toBe("test@example.com");
     });
 
     it("should work with numeric values", () => {
@@ -170,7 +169,7 @@ describe("ValueObject", () => {
       expect(age1.equals(age2)).toBe(false);
     });
 
-    it("should not be equal for object values (reference comparison)", () => {
+    it("should be equal for object values with same structure", () => {
       const address1 = Address.create({
         street: "123 Main St",
         city: "New York",
@@ -182,7 +181,21 @@ describe("ValueObject", () => {
         country: "USA",
       }).getValue();
 
-      // Objects are compared by reference, not deep equality
+      expect(address1.equals(address2)).toBe(true);
+    });
+
+    it("should not be equal for object values with different structure", () => {
+      const address1 = Address.create({
+        street: "123 Main St",
+        city: "New York",
+        country: "USA",
+      }).getValue();
+      const address2 = Address.create({
+        street: "456 Oak Ave",
+        city: "New York",
+        country: "USA",
+      }).getValue();
+
       expect(address1.equals(address2)).toBe(false);
     });
   });
@@ -226,11 +239,11 @@ describe("ValueObject", () => {
       expect(result.getError()).toBe("Name cannot be empty");
     });
 
-    it("should trim whitespace", () => {
+    it("should trim whitespace when validate transforms value", () => {
       const result = Name.create("  John Doe  ");
 
       expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe("  John Doe  "); // Not trimmed in value, just in validation
+      expect(result.getValue().value).toBe("John Doe");
     });
 
     it("should validate maximum length", () => {

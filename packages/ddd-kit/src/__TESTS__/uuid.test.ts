@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UUID } from "../core/UUID";
+import { UUID } from "../primitives/uuid";
 import { StubId } from "./stubs/uuidStub";
 
 describe("UUID", () => {
@@ -29,10 +29,10 @@ describe("UUID", () => {
     });
   });
 
-  describe("create()", () => {
-    it("should create a new UUID from another UUID", () => {
+  describe("copy via constructor", () => {
+    it("should create a new UUID from another UUID value", () => {
       const originalUuid = new UUID<string>("original-uuid");
-      const newUuid = originalUuid.create(originalUuid);
+      const newUuid = new UUID<string>(originalUuid.value);
 
       expect(newUuid).toBeInstanceOf(UUID);
       expect(newUuid.value).toBe(originalUuid.value);
