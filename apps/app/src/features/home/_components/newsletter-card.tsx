@@ -12,8 +12,11 @@ export function NewsletterCard() {
     <section id="newsletter">
       <Card className="mx-auto max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Newsletter</CardTitle>
-          <CardDescription>Reçois les updates du boilerplate.</CardDescription>
+          <CardTitle>Stay in the loop</CardTitle>
+          <CardDescription>
+            One release, one breaking change, one architecture decision → one
+            short email. Never spam.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <NewsletterForm />

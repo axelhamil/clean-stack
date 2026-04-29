@@ -79,7 +79,7 @@ export function ThemeToggle() {
       variant="outline"
       size="icon"
       onClick={handleClick}
-      aria-label={isDark ? "Activer le thème clair" : "Activer le thème sombre"}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       className="transition-transform hover:scale-110 active:scale-95"
     >
       <Sun className="size-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />

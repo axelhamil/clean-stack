@@ -4,10 +4,10 @@ import {
 } from "@packages/ui/components/ui/typography";
 
 const stats = [
-  { value: "~7ms", label: "Bun build (cold)" },
-  { value: "100%", label: "End-to-end typed (Hono RPC)" },
-  { value: "0", label: "Imports externes en domain" },
-  { value: "9", label: "Règles d'architecture" },
+  { value: "~7ms", label: "Production build (cold, Bun)" },
+  { value: "100%", label: "TypeScript strict, end-to-end" },
+  { value: "0", label: "throw, null, barrel in domain" },
+  { value: "14", label: "Non-negotiable architecture rules" },
 ];
 
 export function StatsBand() {

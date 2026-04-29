@@ -1,90 +1,108 @@
 # ROADMAP
 
-Intégrations à venir, **toutes en SOTA 2026**, **hors DDD** (couche pragmatique : `adapters/`, `routes/`, `_hooks/`). DDD reste réservé au métier pur (`domain/`, `application/use-cases/`).
+Upcoming integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `adapters/`, `routes/`, `_hooks/`). DDD stays reserved for the pure business domain (`domain/`, `application/use-cases/`).
 
 ---
 
 ## Auth — BetterAuth (end-to-end)
 
-**Pourquoi** : owner du token, multi-provider, plugins typés (Stripe, organizations, 2FA, passkeys, magic-link), sessions DB-backed, 1ère lib qui tourne nativement Bun + Hono sans hack.
+**Why**: own the token, multi-provider, typed plugins (Stripe, organizations, 2FA, passkeys, magic-link), DB-backed sessions, first lib that runs natively on Bun + Hono with no hacks.
 
-- [ ] Install `better-auth` + adapter Drizzle (`better-auth/adapters/drizzle`)
-- [ ] Schémas auth générés via `better-auth generate` → `packages/drizzle/src/schema/auth.ts`
-- [ ] Handler Hono : `app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))`
-- [ ] Client React : `createAuthClient` dans `apps/app/src/adapters/auth-client.ts`
-- [ ] Plugins : `organization` (multi-tenant dès J1, cf section dédiée), `twoFactor`, `passkey`, `magicLink`, `stripe` (cf section Stripe)
-- [ ] Session côté serveur via middleware Hono → injecté dans `c.var.user`
-- [ ] Pages `/sign-in`, `/sign-up`, `/forgot-password`, `/verify-email` en `features/auth/`
-- [ ] Middleware route `beforeLoad` (TanStack Router) → redirect si non auth
-- [ ] Cookies : `httpOnly` + `sameSite=lax` + `secure` en prod
-
----
-
-## Multi-tenant — plugin `organization` BetterAuth
-
-**Pourquoi dès J1** : migrer single-user → multi-tenant après coup = enfer (backfill `organizationId` partout, owners orphelins, réécrire toutes les queries). L'inverse est gratuit : si finalement B2C, chaque user a une "personal org" auto-créée invisible.
-
-- [ ] Plugin `organization` activé dans `auth` config
-- [ ] Schémas Drizzle générés : `organization`, `member`, `invitation` (+ `team` si besoin)
-- [ ] Auto-création d'une org perso à l'inscription (`databaseHooks.user.create.after`)
-- [ ] Session enrichie avec `activeOrganizationId` → middleware Hono qui le pousse dans `c.var.orgId`
-- [ ] **Toutes les tables métier** ont une FK `organizationId` dès la 1ère migration (jamais ajouté après)
-- [ ] Helper Drizzle `withOrg(qb, orgId)` pour scoper systématiquement les queries
-- [ ] Pages : `/org/new`, `/org/settings`, `/org/members`, `/org/invitations` en `features/organization/`
-- [ ] Switcher d'org dans le header (`authClient.organization.setActive(id)`)
-- [ ] Invitations par email (template Resend dédié)
-- [ ] Rôles : `owner`, `admin`, `member` (custom roles plus tard si besoin)
-- [ ] Stripe customer = **par organization**, pas par user (le plugin Stripe le supporte nativement)
+- [ ] Install `better-auth` + Drizzle adapter (`better-auth/adapters/drizzle`)
+- [ ] Auth schemas generated via `better-auth generate` → `packages/drizzle/src/schema/auth.ts`
+- [ ] Hono handler: `app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))`
+- [ ] React client: `createAuthClient` in `apps/app/src/adapters/auth-client.ts`
+- [ ] Plugins: `organization` (multi-tenant from day one, see dedicated section), `twoFactor`, `passkey`, `magicLink`, `stripe` (see Stripe section)
+- [ ] Server-side session via Hono middleware → injected into `c.var.user`
+- [ ] Pages `/sign-in`, `/sign-up`, `/forgot-password`, `/verify-email` in `features/auth/`
+- [ ] Route middleware `beforeLoad` (TanStack Router) → redirect when not authenticated
+- [ ] Cookies: `httpOnly` + `sameSite=lax` + `secure` in production
 
 ---
 
-## Billing — Stripe via plugin BetterAuth
+## Multi-tenant — BetterAuth `organization` plugin
 
-**Pourquoi** : `@better-auth/stripe` (officiel, fin 2025) wrappe customer creation, subscriptions, customer portal, webhooks, sync DB. Plus besoin d'écrire 600 lignes de glue Stripe à la main.
+**Why from day one**: migrating single-user → multi-tenant after the fact is hell (backfill `organizationId` everywhere, orphaned owners, rewrite every query). The reverse is free: if it ends up being B2C, every user gets an invisible auto-created "personal org".
 
-- [ ] Install `@better-auth/stripe` + `stripe` SDK
-- [ ] Plugin déclaré dans `auth` config : products, prices, trial, webhook secret
-- [ ] Webhook endpoint auto-monté par le plugin → `/api/auth/stripe/webhook`
-- [ ] Customer Portal : bouton qui call `authClient.subscription.billingPortal()`
-- [ ] Checkout : `authClient.subscription.upgrade({ plan: "pro" })`
-- [ ] Hook `useSubscription()` dans `apps/app/src/adapters/queries/` (cross-feature)
-- [ ] Gating UI via `subscription.status === "active"` (pas de feature flag custom)
-- [ ] Tests Stripe via `stripe listen` en dev (forward webhooks)
+- [ ] `organization` plugin enabled in the `auth` config
+- [ ] Drizzle schemas generated: `organization`, `member`, `invitation` (+ `team` if needed)
+- [ ] Auto-create a personal org on signup (`databaseHooks.user.create.after`)
+- [ ] Session enriched with `activeOrganizationId` → Hono middleware that pushes it into `c.var.orgId`
+- [ ] **Every business table** has an `organizationId` FK from the very first migration (never added later)
+- [ ] Drizzle helper `withOrg(qb, orgId)` to systematically scope queries
+- [ ] Pages: `/org/new`, `/org/settings`, `/org/members`, `/org/invitations` in `features/organization/`
+- [ ] Org switcher in the header (`authClient.organization.setActive(id)`)
+- [ ] Email invitations (dedicated Resend template)
+- [ ] Roles: `owner`, `admin`, `member` (custom roles later if needed)
+- [ ] Stripe customer = **per organization**, not per user (the Stripe plugin supports it natively)
 
 ---
 
-## Email — Resend (templates dashboard)
+## Billing — Stripe via the BetterAuth plugin
 
-**Pourquoi** : templates gérés depuis le dashboard Resend (no code, no rebuild pour changer un wording), versioning intégré, A/B test natif. Resté pragmatique : on appelle juste l'API par template ID.
+**Why**: `@better-auth/stripe` (official, late 2025) wraps customer creation, subscriptions, customer portal, webhooks, DB sync. No more 600 lines of hand-written Stripe glue.
+
+- [ ] Install `@better-auth/stripe` + the `stripe` SDK
+- [ ] Plugin declared in the `auth` config: products, prices, trial, webhook secret
+- [ ] Webhook endpoint auto-mounted by the plugin → `/api/auth/stripe/webhook`
+- [ ] Customer Portal: button calling `authClient.subscription.billingPortal()`
+- [ ] Checkout: `authClient.subscription.upgrade({ plan: "pro" })`
+- [ ] `useSubscription()` hook in `apps/app/src/adapters/queries/` (cross-feature)
+- [ ] UI gating via `subscription.status === "active"` (no custom feature flag)
+- [ ] Stripe tests via `stripe listen` in dev (forward webhooks)
+
+---
+
+## Email — Resend (dashboard templates)
+
+**Why**: templates managed from the Resend dashboard (no code, no rebuild to change wording), built-in versioning, native A/B test. Stays pragmatic: we just call the API by template ID.
 
 - [ ] Install `resend`
-- [ ] Service `apps/api/src/adapters/services/email.service.ts` → wrapper minimal `sendTemplate(templateId, to, data)`
-- [ ] Templates créés dans dashboard Resend, IDs en env (`RESEND_TPL_WELCOME`, `RESEND_TPL_RESET_PWD`, etc.)
-- [ ] Webhook Resend pour bounces/complaints → `routes/webhooks/resend.ts`
-- [ ] Domain DNS (SPF/DKIM/DMARC) check dans le README
-- [ ] BetterAuth : brancher `sendVerificationEmail` / `sendResetPassword` sur le service Resend
+- [ ] Service `apps/api/src/adapters/services/email.service.ts` → minimal wrapper `sendTemplate(templateId, to, data)`
+- [ ] Templates created in the Resend dashboard, IDs in env (`RESEND_TPL_WELCOME`, `RESEND_TPL_RESET_PWD`, etc.)
+- [ ] Resend webhook for bounces/complaints → `routes/webhooks/resend.ts`
+- [ ] DNS domain (SPF/DKIM/DMARC) check in the README
+- [ ] BetterAuth: wire `sendVerificationEmail` / `sendResetPassword` to the Resend service
 
 ---
 
 ## Storage — Cloudflare R2 (prod) + MinIO (dev)
 
-**Pourquoi** : R2 = pas d'egress fees, S3-compatible. MinIO local = même API S3 → un seul code, switch via env.
+**Why**: R2 = no egress fees, S3-compatible. MinIO local = same S3 API → one codebase, switched via env.
 
-- [x] MinIO ajouté dans `docker-compose.yaml` (ports 9000 API, 9001 console, bucket `clean-stack` auto-créé)
+- [x] MinIO added to `docker-compose.yaml` (ports 9000 API, 9001 console, bucket `clean-stack` auto-created)
 - [ ] Install `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`
-- [ ] Service `apps/api/src/adapters/services/storage.service.ts` (presigned URLs upload + download)
-- [ ] Env : `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
-  - Dev : `http://localhost:9000` + `minioadmin` / `minioadmin` / bucket `clean-stack`
-  - Prod : R2 endpoint + R2 access keys
-- [ ] Route `POST /uploads/presign` → renvoie URL signée (auth required via BetterAuth middleware)
-- [ ] Hook `useUpload()` côté app (PUT direct vers presigned URL, pas de proxy via API)
-- [ ] Console MinIO : http://localhost:9001 (`minioadmin` / `minioadmin`)
+- [ ] Service `apps/api/src/adapters/services/storage.service.ts` (presigned upload + download URLs)
+- [ ] Env: `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+  - Dev: `http://localhost:9000` + `minioadmin` / `minioadmin` / bucket `clean-stack`
+  - Prod: R2 endpoint + R2 access keys
+- [ ] Route `POST /uploads/presign` → returns a signed URL (auth required via BetterAuth middleware)
+- [ ] `useUpload()` hook on the app (PUT directly to the presigned URL, no proxy through the API)
+- [ ] MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`)
 
 ---
 
-## Règles transverses
+## i18n — TanStack Router locale routes + typed catalogs
 
-1. **Pas de DDD pour ces intégrations** — `adapters/services/*` côté api, `adapters/*` + `_hooks/*` côté app. Si un concept devient métier (ex: `Subscription` avec règles propres), promouvoir dans `domain/` à ce moment-là.
-2. **Env validé par zod** dans `apps/api/common/env.ts` et `apps/app/src/common/env.ts`.
-3. **Webhooks** : tous sous `routes/webhooks/<provider>.ts`, vérification de signature obligatoire avant tout traitement.
-4. **Secrets** : jamais en commit, `.env.local` (gitignore) + 1Password/Doppler en prod.
+**Why**: most i18n stacks ship as runtime plugins that crash production with missing keys at the worst moment. Bake locale into routing (`/en/...`, `/fr/...`), enforce keys at build time, detect on the server. Zero "Translation missing" string ever shipped.
+
+- [ ] Install `@lingui/core` + `@lingui/react` + `@lingui/cli` (chosen for CLDR plurals + AST extraction; alternative: `next-intl` if SSR streaming becomes a concern)
+- [ ] Locale-aware route segment: `routes/$lang/_app/**` with TanStack `parseParams` validating against the supported list (`["en", "fr"]`)
+- [ ] Server-side detection in a Hono middleware: `Accept-Language` → 302 to `/en/...` or `/fr/...` if root requested
+- [ ] Catalogs in `apps/app/src/locales/<lang>/messages.po`, compiled to `messages.ts` at build time (Vite plugin)
+- [ ] Typed message keys: a script generates a `.d.ts` from the source catalog so `t({ id: "…" })` is checked by `tsc`
+- [ ] Lang switcher in the header (writes a cookie + navigates to the same path under the new lang)
+- [ ] Zod messages localized via `setErrorMap` per lang at the providers boundary
+- [ ] Email templates per lang in Resend (`RESEND_TPL_WELCOME_EN`, `_FR`) — picked by user's preferred lang
+- [ ] CI gate: `lingui extract --clean` followed by a git diff check — any drift fails the build
+- [ ] Date / number / relative-time formatting via `Intl.*` (no extra dep)
+- [ ] Skip route segments for assets / API: only the app uses lang prefixes; `/api/*` stays lang-agnostic (locale comes from the user record)
+
+---
+
+## Cross-cutting rules
+
+1. **No DDD for these integrations** — `adapters/services/*` on the api side, `adapters/*` + `_hooks/*` on the app side. If a concept becomes domain (e.g. a `Subscription` with its own rules), promote it into `domain/` then.
+2. **Env validated by zod** in `apps/api/common/env.ts` and `apps/app/src/common/env.ts`.
+3. **Webhooks**: all under `routes/webhooks/<provider>.ts`, mandatory signature verification before any processing.
+4. **Secrets**: never committed, `.env.local` (gitignored) + 1Password/Doppler in production.

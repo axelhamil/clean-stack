@@ -11,13 +11,13 @@ export function useNewsletterSubscribe() {
       return res.json();
     },
     onSuccess: ({ email }) => {
-      toast.success("Inscription confirmée", {
-        description: `${email} recevra les prochains updates.`,
+      toast.success("You're subscribed", {
+        description: `${email} will get the next updates.`,
       });
     },
     onError: () => {
-      toast.error("Inscription échouée", {
-        description: "Réessaye dans un instant.",
+      toast.error("Subscription failed", {
+        description: "Please try again in a moment.",
       });
     },
   });

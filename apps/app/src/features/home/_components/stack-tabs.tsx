@@ -51,9 +51,12 @@ export function StackTabs() {
   return (
     <section id="stack" className="space-y-6">
       <div className="space-y-2 text-center">
-        <TypographyH2 className="border-0 pb-0">Stack complète</TypographyH2>
+        <TypographyH2 className="border-0 pb-0">
+          Stack wired, not pre-chewed
+        </TypographyH2>
         <TypographyMuted>
-          Tout est déjà câblé. Tu ajoutes le métier.
+          Thirty-five libraries — picked, wired, tested together. None of them
+          got there by default.
         </TypographyMuted>
       </div>
       <Tabs defaultValue="frontend" className="mx-auto max-w-3xl">

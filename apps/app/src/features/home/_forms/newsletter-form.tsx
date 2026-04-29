@@ -47,7 +47,7 @@ export function NewsletterForm() {
           )}
         />
         <Button type="submit" className="w-full" disabled={subscribe.isPending}>
-          {subscribe.isPending ? "Inscription..." : "S'inscrire"}
+          {subscribe.isPending ? "Subscribing…" : "Subscribe"}
         </Button>
       </form>
     </Form>

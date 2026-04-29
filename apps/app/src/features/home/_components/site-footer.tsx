@@ -8,11 +8,11 @@ export function SiteFooter() {
         <div className="flex items-center gap-2">
           <Boxes className="size-4 text-muted-foreground" />
           <TypographyMuted>
-            clean-stack — boilerplate Clean Architecture + DDD
+            clean-stack — opinionated, so you stop arbitrating mid-sprint
           </TypographyMuted>
         </div>
         <TypographyMuted>
-          Bun · Hono · React 19 · Drizzle · DDD-kit
+          MIT · No moral dependency on any stack
         </TypographyMuted>
       </div>
     </footer>
