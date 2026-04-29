@@ -1,7 +1,7 @@
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
-import { db } from "@packages/drizzle";
+import { db, eq, schema } from "@packages/drizzle";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, magicLink, organization, twoFactor } from "better-auth/plugins";
@@ -9,6 +9,7 @@ import { CryptoHasher } from "bun";
 import { env } from "../common/env";
 import { logger } from "../common/logger";
 import type { EmailTemplates, TemplateVariables } from "./application/ports/email.port";
+import { ac, admin, member, owner } from "./application/services/access-control";
 import { di } from "./di/container";
 
 const isProd = env.NODE_ENV === "production";
@@ -104,9 +105,59 @@ export const auth = betterAuth({
     }),
     passkey({ rpName: "clean-stack" }),
     organization({
-      teams: { enabled: true },
+      ac,
+      roles: { owner, admin, member },
+      creatorRole: "owner",
+      teams: {
+        enabled: true,
+        maximumTeams: 25,
+        allowRemovingAllTeams: false,
+      },
+      sendInvitationEmail: async (_params) => {
+        // wired in Task 6 (org_invitation email template)
+      },
     }),
   ],
+
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          const orgId = crypto.randomUUID();
+          const memberId = crypto.randomUUID();
+          const now = new Date();
+          await db.transaction(async (tx) => {
+            await tx.insert(schema.organization).values({
+              id: orgId,
+              name: "Personal",
+              slug: `personal-${user.id.slice(0, 12)}`,
+              createdAt: now,
+            });
+            await tx.insert(schema.member).values({
+              id: memberId,
+              organizationId: orgId,
+              userId: user.id,
+              role: "owner",
+              createdAt: now,
+            });
+          });
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (session) => {
+          if (session.activeOrganizationId) return { data: session };
+          const [first] = await db
+            .select({ id: schema.member.organizationId })
+            .from(schema.member)
+            .where(eq(schema.member.userId, session.userId))
+            .limit(1);
+          return { data: { ...session, activeOrganizationId: first?.id ?? null } };
+        },
+      },
+    },
+  },
 });
 
 export type SessionUser = typeof auth.$Infer.Session.user;
