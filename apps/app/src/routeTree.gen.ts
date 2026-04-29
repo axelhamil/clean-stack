@@ -20,6 +20,7 @@ import { Route as ProtectedDashboardRouteImport } from './routes/_protected/dash
 import { Route as GuestSignUpRouteImport } from './routes/_guest/sign-up'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
 import { Route as GuestForgotPasswordRouteImport } from './routes/_guest/forgot-password'
+import { Route as ProtectedOrgNewRouteImport } from './routes/_protected/org/new'
 import { Route as ProtectedAccountSecurityRouteImport } from './routes/_protected/account.security'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -75,6 +76,11 @@ const GuestForgotPasswordRoute = GuestForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => GuestRoute,
 } as any)
+const ProtectedOrgNewRoute = ProtectedOrgNewRouteImport.update({
+  id: '/org/new',
+  path: '/org/new',
+  getParentRoute: () => ProtectedRoute,
+} as any)
 const ProtectedAccountSecurityRoute =
   ProtectedAccountSecurityRouteImport.update({
     id: '/account/security',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof GuestSignUpRoute
   '/dashboard': typeof ProtectedDashboardRoute
   '/account/security': typeof ProtectedAccountSecurityRoute
+  '/org/new': typeof ProtectedOrgNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof GuestSignUpRoute
   '/dashboard': typeof ProtectedDashboardRoute
   '/account/security': typeof ProtectedAccountSecurityRoute
+  '/org/new': typeof ProtectedOrgNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/_guest/sign-up': typeof GuestSignUpRoute
   '/_protected/dashboard': typeof ProtectedDashboardRoute
   '/_protected/account/security': typeof ProtectedAccountSecurityRoute
+  '/_protected/org/new': typeof ProtectedOrgNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/dashboard'
     | '/account/security'
+    | '/org/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/dashboard'
     | '/account/security'
+    | '/org/new'
   id:
     | '__root__'
     | '/'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_guest/sign-up'
     | '/_protected/dashboard'
     | '/_protected/account/security'
+    | '/_protected/org/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -251,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuestForgotPasswordRouteImport
       parentRoute: typeof GuestRoute
     }
+    '/_protected/org/new': {
+      id: '/_protected/org/new'
+      path: '/org/new'
+      fullPath: '/org/new'
+      preLoaderRoute: typeof ProtectedOrgNewRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
     '/_protected/account/security': {
       id: '/_protected/account/security'
       path: '/account/security'
@@ -278,11 +297,13 @@ const GuestRouteWithChildren = GuestRoute._addFileChildren(GuestRouteChildren)
 interface ProtectedRouteChildren {
   ProtectedDashboardRoute: typeof ProtectedDashboardRoute
   ProtectedAccountSecurityRoute: typeof ProtectedAccountSecurityRoute
+  ProtectedOrgNewRoute: typeof ProtectedOrgNewRoute
 }
 
 const ProtectedRouteChildren: ProtectedRouteChildren = {
   ProtectedDashboardRoute: ProtectedDashboardRoute,
   ProtectedAccountSecurityRoute: ProtectedAccountSecurityRoute,
+  ProtectedOrgNewRoute: ProtectedOrgNewRoute,
 }
 
 const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(

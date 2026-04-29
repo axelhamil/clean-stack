@@ -51,9 +51,8 @@ export function OrgSwitcher() {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        {/* TODO(Task 15): replace "." with "/org/new" once that route exists */}
         <DropdownMenuItem asChild>
-          <Link to="." className="flex items-center gap-2">
+          <Link to="/org/new" className="flex items-center gap-2">
             <Plus className="size-4" /> New organization
           </Link>
         </DropdownMenuItem>
