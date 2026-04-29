@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/axelhamil/clean-stack/compare/v1.8.0...v1.9.0) (2026-04-29)
+
+### Features
+
+* **api,app:** r2-first storage feature + hono rpc sota 2026 + flat inwire di ([ba74e22](https://github.com/axelhamil/clean-stack/commit/ba74e22968a60b7a1e13e80bb5b86d682abd029d))
+
 ## [1.8.0](https://github.com/axelhamil/clean-stack/compare/v1.7.0...v1.8.0) (2026-04-29)
 
 ### Features
