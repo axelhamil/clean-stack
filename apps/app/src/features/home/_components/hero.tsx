@@ -11,7 +11,7 @@ export function Hero() {
     <section className="space-y-6 text-center">
       <Badge variant="outline" className="animate-fade-up">
         <span className="live-dot mr-1" aria-hidden />
-        SaaS-ready · Auth + Billing + Multi-tenant + Storage already wired
+        Lean by design · Build → Measure → Learn, plumbing already wired
       </Badge>
       <TypographyH1 className="animate-fade-up-delay-1 text-5xl md:text-6xl">
         The boilerplate
@@ -20,9 +20,9 @@ export function Hero() {
       </TypographyH1>
       <TypographyLead className="mx-auto max-w-2xl animate-fade-up-delay-2 text-balance">
         BetterAuth, Stripe, Resend, R2 — already wired, already tested, signed
-        webhooks. Multi-tenant from the very first migration. Fourteen
-        non-negotiable architecture rules. You clone, you write business logic.
-        Everything else is settled.
+        webhooks. Multi-tenant from the very first migration. The Lean Startup
+        loop, minus the six weeks of plumbing: you clone, you ship the
+        hypothesis, real customers pay you in week one.
       </TypographyLead>
       <div className="flex animate-fade-up-delay-3 flex-wrap justify-center gap-3">
         <Button className="hover-arrow" asChild>

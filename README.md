@@ -4,6 +4,16 @@
 
 Bun + Hono on the API · Vite + React 19 + TanStack on the app · Drizzle + Postgres at the bottom · DDD-kit for the business domain · BetterAuth + Stripe + Resend + R2 for the SaaS layer.
 
+## Lean by design
+
+Built around the [Lean Startup](https://bpifrance-creation.fr/moment-de-vie/lean-startup) loop (Eric Ries) — **Build → Measure → Learn** — where the bottleneck is *Build*. clean-stack collapses that phase to the only thing your customers pay for: your domain.
+
+- **Build** — auth, billing, multi-tenant, email, storage already wired. Day one ships the feature that tests your hypothesis, not six weeks of foundation.
+- **Measure** — Stripe checkout, signed webhooks, multi-tenant from the very first migration. Real customers, real dollars, week one. No vanity metrics.
+- **Learn** — Clean Architecture isolates your domain. When a hypothesis breaks, you replace use cases — not auth, email, or DI. Pivots stay cheap.
+
+Ship the smallest thing that tests one hypothesis. Read the signal. Iterate or kill. The stack stays out of the way.
+
 ## Why this one
 
 Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billing layer, and zero opinion on what goes where. **clean-stack** starts from the opposite premise:

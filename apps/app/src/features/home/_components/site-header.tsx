@@ -18,6 +18,11 @@ export function SiteHeader() {
         </div>
         <nav className="hidden items-center gap-6 justify-self-center md:flex">
           <NavLink asChild>
+            <Link to="." hash="lean">
+              Lean
+            </Link>
+          </NavLink>
+          <NavLink asChild>
             <Link to="." hash="integrations">
               Integrations
             </Link>

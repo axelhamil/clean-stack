@@ -2,6 +2,10 @@
 
 Generic monorepo boilerplate. Clean Architecture + DDD. No business features included.
 
+## Philosophy
+
+Lean Startup — **Build → Measure → Learn**. The bottleneck is *Build*, so this stack ships the SaaS plumbing (auth, billing, multi-tenant, email, storage) and isolates the domain so pivots don't trash the foundation. Default move when in doubt: ship the smallest thing that tests one hypothesis, never gold-plate the plumbing. "Done > perfect" applies to features; the architecture rules below stay non-negotiable because they're what *makes* shipping fast sustainable.
+
 ## Working method
 
 **Whenever something is unclear about a library API, version, config option, deprecation, or "is this still SOTA" — check the docs before guessing.**

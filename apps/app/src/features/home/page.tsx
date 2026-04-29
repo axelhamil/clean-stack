@@ -5,6 +5,7 @@ import { FeaturesGrid } from "./_components/features-grid";
 import { Hero } from "./_components/hero";
 import { InTheBox } from "./_components/in-the-box";
 import { Integrations } from "./_components/integrations";
+import { LeanPhilosophy } from "./_components/lean-philosophy";
 import { NewsletterCard } from "./_components/newsletter-card";
 import { QuickStart } from "./_components/quick-start";
 import { SiteFooter } from "./_components/site-footer";
@@ -20,6 +21,8 @@ export function HomePage() {
       <main className="w-full flex-1 space-y-20 px-6 py-8 md:px-12 md:py-12">
         <Hero />
         <StatsBand />
+        <Separator />
+        <LeanPhilosophy />
         <Separator />
         <Integrations />
         <Separator />
