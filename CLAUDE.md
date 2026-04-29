@@ -344,6 +344,28 @@ class Email extends ValueObject<string> {
 - Schema goes in `packages/drizzle/src/schema/*.ts`
 - After adding/modifying schema: `pnpm db:push` (dev) or `pnpm db:generate && pnpm db:migrate` (prod-style migrations)
 
+## Release flow
+
+Two-branch model. **`main` is the released branch — every merge to `main` triggers a semantic-release run.** `dev` is the integration branch where work accumulates between releases.
+
+- **Daily work** happens on `dev` (or feature branches PR'd into `dev`). Pushing to `dev` does **not** trigger a release.
+- **Shipping** is a deliberate act: open a PR `dev` → `main`, merge it. `release.yml` runs, semantic-release analyzes **all** commits since the last tag and produces one bundled version bump + changelog covering everything in the batch.
+- **Merge strategy `dev` → `main` MUST be a merge commit** (not squash, not rebase-and-merge). Squash collapses every conventional commit (`feat:`, `fix:`, …) into a single message — semantic-release would only see one entry and the changelog would lose its substance. The repo is configured GitHub-side to allow merge commits only; respect it.
+- **`main` is protected** (require PR, no force push, conversation resolution required). Never push directly to `main`. If a CI fix is needed during release, do it on `dev` and re-merge.
+- **Don't release on every commit.** The whole point of `dev` → `main` is to bundle. If a single commit lands on `main` you get the same "tiny tag" problem the flow was designed to avoid. Wait until there's a meaningful batch (a feature complete, a coherent set of fixes) before merging.
+- **`.releaserc.json` and `release.yml` stay as-is** — the cadence is controlled by *when you merge to main*, not by the semantic-release config.
+
+```bash
+# work
+git checkout dev
+git push                       # no release
+
+# release
+gh pr create --base main --head dev --title "Release: <theme>"
+# merge via "Create a merge commit" on GitHub UI (squash is disabled repo-wide)
+# → release.yml runs, one consolidated tag + changelog drops
+```
+
 ## Don't
 
 - Add business features without first agreeing on the bounded context.
@@ -355,3 +377,4 @@ class Email extends ValueObject<string> {
 - Pin Postgres back to port 5432 — collides with other local Postgres instances.
 - Break Hono RPC by un-chaining routes (`app.get(...); app.post(...)`) — types are accumulated by chaining only.
 - Call `fetch` directly in features — use `api` from `adapters/api-client.ts`.
+- Push directly to `main` or merge `dev` → `main` with squash/rebase — squash destroys the conventional-commit history semantic-release reads, so you'd lose the bundled changelog the dev/main split exists to produce.
