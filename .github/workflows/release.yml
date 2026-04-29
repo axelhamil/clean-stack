@@ -33,10 +33,6 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
       - uses: pnpm/action-setup@v4
 
       - name: Resolve pnpm store
@@ -51,9 +47,6 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
-
-      - name: Type check (safety net)
-        run: pnpm turbo run type-check --output-logs=errors-only
 
       - name: Release
         env:
