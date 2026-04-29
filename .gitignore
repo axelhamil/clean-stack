@@ -39,6 +39,7 @@
 # Claude Code
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+docs/superpowers/
 
 # tsup temp configs
 **/tsup.config.bundled_*.mjs
