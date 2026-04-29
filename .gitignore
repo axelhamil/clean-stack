@@ -30,6 +30,7 @@
 !**/.vscode/settings.json
 !**/.vscode/extensions.json
 **/.idea
+**/.zed
 
 # Cache
 **/.cache
