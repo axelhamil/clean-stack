@@ -16,6 +16,7 @@ import { Route as MagicLinkRouteImport } from './routes/magic-link'
 import { Route as ProtectedRouteImport } from './routes/_protected'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AcceptInvitationInvitationIdRouteImport } from './routes/accept-invitation.$invitationId'
 import { Route as ProtectedDashboardRouteImport } from './routes/_protected/dashboard'
 import { Route as GuestSignUpRouteImport } from './routes/_guest/sign-up'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
@@ -59,6 +60,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AcceptInvitationInvitationIdRoute =
+  AcceptInvitationInvitationIdRouteImport.update({
+    id: '/accept-invitation/$invitationId',
+    path: '/accept-invitation/$invitationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProtectedDashboardRoute = ProtectedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof GuestSignInRoute
   '/sign-up': typeof GuestSignUpRoute
   '/dashboard': typeof ProtectedDashboardRoute
+  '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
   '/account/security': typeof ProtectedAccountSecurityRoute
   '/org/invitations': typeof ProtectedOrgInvitationsRoute
   '/org/members': typeof ProtectedOrgMembersRoute
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof GuestSignInRoute
   '/sign-up': typeof GuestSignUpRoute
   '/dashboard': typeof ProtectedDashboardRoute
+  '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
   '/account/security': typeof ProtectedAccountSecurityRoute
   '/org/invitations': typeof ProtectedOrgInvitationsRoute
   '/org/members': typeof ProtectedOrgMembersRoute
@@ -151,6 +160,7 @@ export interface FileRoutesById {
   '/_guest/sign-in': typeof GuestSignInRoute
   '/_guest/sign-up': typeof GuestSignUpRoute
   '/_protected/dashboard': typeof ProtectedDashboardRoute
+  '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
   '/_protected/account/security': typeof ProtectedAccountSecurityRoute
   '/_protected/org/invitations': typeof ProtectedOrgInvitationsRoute
   '/_protected/org/members': typeof ProtectedOrgMembersRoute
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/dashboard'
+    | '/accept-invitation/$invitationId'
     | '/account/security'
     | '/org/invitations'
     | '/org/members'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/dashboard'
+    | '/accept-invitation/$invitationId'
     | '/account/security'
     | '/org/invitations'
     | '/org/members'
@@ -203,6 +215,7 @@ export interface FileRouteTypes {
     | '/_guest/sign-in'
     | '/_guest/sign-up'
     | '/_protected/dashboard'
+    | '/accept-invitation/$invitationId'
     | '/_protected/account/security'
     | '/_protected/org/invitations'
     | '/_protected/org/members'
@@ -218,6 +231,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   TwoFactorRoute: typeof TwoFactorRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  AcceptInvitationInvitationIdRoute: typeof AcceptInvitationInvitationIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -269,6 +283,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accept-invitation/$invitationId': {
+      id: '/accept-invitation/$invitationId'
+      path: '/accept-invitation/$invitationId'
+      fullPath: '/accept-invitation/$invitationId'
+      preLoaderRoute: typeof AcceptInvitationInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_protected/dashboard': {
@@ -381,6 +402,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   TwoFactorRoute: TwoFactorRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  AcceptInvitationInvitationIdRoute: AcceptInvitationInvitationIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
