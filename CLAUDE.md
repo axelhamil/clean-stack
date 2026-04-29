@@ -85,7 +85,7 @@ packages/
 8. **Self-documenting code** — no inline comments unless the WHY is non-obvious.
 9. **Only `get id()` getter on aggregates**. Access other props via `entity.get('propName')`.
 10. **Never override visual style at the component level** — only positioning/sizing/layout (`flex`, `grid`, `w-*`, `h-*`, `mx-auto`, `gap-*`, `space-*`, responsive breakpoints) belong in JSX `className`. Colors, typography, radius, shadows, paddings/margins that define a component's *look*, dark/light tokens — all that lives in the **theme** (Tailwind 4 `@theme` in `packages/ui/src/styles/globals.css`) or in the shadcn component itself (`packages/ui/src/components/ui/*`). If a button looks wrong, fix the `Button` variant or the theme token, never patch it inline with `bg-foo text-bar p-3`. Inline overrides = theme drift = no design system.
-11. **Always use shadcn/ui first** — before writing any custom UI primitive, check the [shadcn/ui registry](https://ui.shadcn.com/docs/components) and `@packages/ui/components/ui/*`. If shadcn ships it (`Button`, `Card`, `Tabs`, `Sheet`, `Dialog`, `Form`, `Tooltip`, `DropdownMenu`, `Sonner`, `Typography`, …), use it. Custom is a **last resort** — only when no shadcn equivalent exists, or when the official primitive truly cannot be adapted. When you do go custom, put it in `@packages/ui/components/ui/*` so the rest of the app can reuse it, never inline in a feature.
+11. **Always use shadcn/ui first, and stay shadcn-pure** — before writing any custom UI primitive, check the [shadcn/ui registry](https://ui.shadcn.com/docs/components) and `@packages/ui/components/ui/*`. If shadcn ships it (`Button`, `Card`, `Tabs`, `Sheet`, `Dialog`, `Form`, `Tooltip`, `DropdownMenu`, `Sonner`, `Typography`, …), use it. **Use the actual slots** — `<Card>` with a title means `CardHeader` + `CardTitle`, not a `<TypographyP className="font-medium">` shoved inside `CardContent`. Reaching for the wrong slot leads to manual padding/spacing hacks (`pt-6`, `space-y-4`) that fight the primitive instead of using it. **No custom outside the theme** for any shadcn primitive: no wrapper variants, no CSS overrides targeting `data-slot="*"`, no inline styling that re-shapes how the primitive renders. The only adjustments live in the theme (`packages/ui/src/styles/globals.css` — design tokens, `@theme` block, shared utilities like `.hover-lift`) or in the primitive file itself (`packages/ui/src/components/ui/<name>.tsx`). Custom is a **last resort** — only when no shadcn equivalent exists, or when the official primitive truly cannot be adapted. When you do go custom, put it in `@packages/ui/components/ui/*` so the rest of the app can reuse it, never inline in a feature.
 12. **Respect HTML semantics — exactly one `<main>` per rendered page**. `routes/__root.tsx` is a **passthrough** (`component: Outlet`) — never wraps `<Outlet />` in `<main>`, `<header>`, `<footer>` or any other landmark. Each `<feature>/page.tsx` owns its own document landmarks (`<header>`, `<main>`, `<footer>`, `<nav>`, `<aside>`) so the page is self-contained and you never end up with nested or duplicated landmarks. Same rule for `<h1>` (one per page) — use `TypographyH1` in the page hero, `TypographyH2` for sections, etc.
 13. **Zero warnings, zero errors before push**. If any hook (Husky pre-commit, lint-staged, commit-msg, pre-push, CI) emits a warning or error — Biome `noImportantStyles`, knip unused, jscpd duplication, type-check, commitlint — **fix it before pushing**. Do not bypass with `--no-verify`. If the warning is genuinely intentional (e.g. `!important` for an a11y override that must beat inline styles), silence it with a targeted ignore comment that explains *why* (`/* biome-ignore <rule>: <reason> */`) — never globally disable the rule. The pipeline must stay clean: a green `pnpm ci:check` is the contract.
 14. **Reusability-first — promote, don't duplicate**. The moment a behavior (animation, micro-interaction, hover effect, focus style, layout pattern, transition, conditional class set) appears for the **second time** at the call site, stop and promote it. Two destinations:
@@ -109,9 +109,9 @@ The api exports its routes as a type (`AppType`) consumed by the app via `hono/c
 const routes = app
   .get("/health", (c) => c.json({ status: "ok" as const }))
   .post(
-    "/newsletter/subscribe",
-    zValidator("json", z.object({ email: z.email() })),
-    (c) => c.json({ ok: true as const, email: c.req.valid("json").email }),
+    "/widgets",
+    zValidator("json", z.object({ name: z.string() })),
+    (c) => c.json({ ok: true as const, name: c.req.valid("json").name }),
   );
 
 export type AppType = typeof routes;
@@ -137,14 +137,14 @@ The `api` workspace dep is wired via `apps/api/package.json` `exports: { ".": ".
 ```typescript
 return useMutation({
   mutationFn: async (input) => {
-    const res = await api.newsletter.subscribe.$post({ json: input });
+    const res = await api.widgets.$post({ json: input });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   },
 });
 ```
 
-Path segments mirror the URL: `/newsletter/subscribe` → `api.newsletter.subscribe`. Method: `$post`/`$get`/etc.
+Path segments mirror the URL: `/widgets` → `api.widgets`. Method: `$post`/`$get`/etc.
 
 ## App import direction
 
@@ -187,7 +187,7 @@ features/<name>/
 
 **File naming rules (Next-flavored):**
 
-- Components/files: `kebab-case.tsx`. Component exports use `PascalCase` named exports (`export function HomePage`).
+- Components/files: `kebab-case.tsx`. Component exports use `PascalCase` named exports (`export function <Feature>Page`).
 - Hooks: `use-<verb>-<noun>.ts`, exporting `useVerbNoun`.
 - Schemas: `<noun>.schema.ts`, exporting `<noun>Schema` and `<Noun>Input` (inferred type).
 - Page entry: `page.tsx` (Next convention) — the route file simply imports the page component and wires it as `component`.
@@ -224,40 +224,51 @@ features/<name>/
 
 Feature hooks **are the use cases of the UI**, by analogy with `apps/api/src/application/use-cases/`. Even if a hook is currently a thin wrapper over a single RPC call, it owns the *workflow contract* of the feature: input schema, success/error handling, toasts, redirects, optimistic updates, query invalidation. Those concerns are feature-specific and grow over time.
 
-- **Belongs in `features/<x>/_hooks/`** — anything tied to a specific workflow (`useNewsletterSubscribe`, `useCheckout`, `useUpdateProfile`). Owns side-effects (toasts, navigation, cache invalidation).
+- **Belongs in `features/<x>/_hooks/`** — anything tied to a specific workflow (`useCheckout`, `useUpdateProfile`, `useCreateWidget`). Owns side-effects (toasts, navigation, cache invalidation).
 - **Belongs in `adapters/`** — generic infra primitives (`useApiQuery<T>`, `useDebouncedValue`, RPC client itself). No workflow logic.
 - **Cross-feature resource hooks** — when 2+ features need the same `useUser` / `useCart`, extract to `adapters/queries/` (or promote to a dedicated feature that owns the resource). Don't pre-emptively place them there.
 
-**Example layout (the boilerplate `home` feature):**
+**Generic feature shape:**
 
 ```
-features/home/
-  page.tsx                       composes header + hero + sections + newsletter + footer
-  _components/
-    site-header.tsx              sticky header, nav, ThemeToggle, GitHub link
-    site-footer.tsx
-    hero.tsx                     uses TypographyH1 + TypographyLead
-    stats-band.tsx               4 stats — TypographyH2 (border-0) + TypographyMuted
-    features-grid.tsx            6 cards — Card hover + lucide icons
-    stack-tabs.tsx               Tabs Frontend/Backend/Tooling + Badges
-    architecture-flow.tsx        Cards with border-l-chart-* tokens (theme accents)
-    newsletter-card.tsx          Card host — layout only, mounts NewsletterForm
-  _forms/
-    newsletter-form.tsx          RHF + zodResolver + shadcn Form, owns submit
-  _hooks/
-    use-newsletter-subscribe.ts
-  _schemas/
-    newsletter.schema.ts
+features/<name>/
+  page.tsx               feature entry — wired by routes/<x>.tsx
+  layout.tsx             (optional)
+  loading.tsx            (optional) → route's pendingComponent
+  error.tsx              (optional) → route's errorComponent
+  _components/<x>.tsx    private sections / cards / sub-components
+  _forms/<x>-form.tsx    isolated RHF + zodResolver forms
+  _hooks/use-<x>.ts      one mutation/query hook per workflow action
+  _schemas/<x>.schema.ts zod schema + inferred type
 ```
+
+A feature ships only the sub-folders it actually needs (YAGNI). The repo ships a placeholder `home` feature as a working example — **delete it on clone**, then build your own features following the patterns below.
+
+**Composition patterns (apply to any feature):**
+
+- **Cards**: use the actual slots — `Card` + `CardHeader` + `CardTitle` (+ optional `CardDescription`) + `CardContent` (+ optional `CardFooter`). The `Card` primitive already provides `py-6` and `gap-6` between slots; never re-add `pt-6` / `space-y-4` at the call site to compensate for skipping a slot.
+- **Numbered / iconic markers** (steps, list bullets, status pills): use `Badge` (already `rounded-full`) with `variant="secondary"` and a layout class (`size-6`, `size-8`, `font-mono`). Don't hand-roll `<span className="rounded-full bg-secondary …">`.
+- **Styled links / nav items**: a primitive owns the *style*, a router component owns the *navigation*. Compose via `asChild` (Radix `Slot`) — the style primitive forwards its className onto the child:
+
+  ```tsx
+  <NavLink asChild>
+    <Link to="/dashboard">Dashboard</Link>
+  </NavLink>
+  ```
+
+  `NavLink` (in `@packages/ui/components/ui/nav-link.tsx`) holds the muted color + hover transition; TanStack `<Link>` holds typed routes, hash, active state, prefetch. Same logic for `<Button asChild><Link …/></Button>` when you want a button-styled call to action that navigates.
+- **List bullets**: prefer a lucide icon (`<Dot />`, `<Check />`, `<Minus />`) over a custom rounded `<span>`. Icons live in `lucide-react`; styling stays at the icon level (`size-*`, theme color tokens).
+
+**Rule of thumb**: if a feature contains raw `<a className="text-…">`, `<span className="… rounded-full bg-…">`, or `<div className="… rounded-lg border bg-… px-… py-…">`, it has either skipped a shadcn slot or duplicated a primitive — promote, don't patch (rule 14).
 
 The route is one line of wiring:
 
 ```tsx
-// routes/index.tsx
+// routes/<x>.tsx
 import { createFileRoute } from "@tanstack/react-router";
-import { HomePage } from "../features/home/page";
+import { DashboardPage } from "../features/dashboard/page";
 
-export const Route = createFileRoute("/")({ component: HomePage });
+export const Route = createFileRoute("/dashboard")({ component: DashboardPage });
 ```
 
 ## Domain Events

@@ -1,8 +1,12 @@
-import { Card, CardContent } from "@packages/ui/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@packages/ui/components/ui/card";
 import {
   TypographyH2,
   TypographyMuted,
-  TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { Check, Minus } from "lucide-react";
 
@@ -63,11 +67,13 @@ export function InTheBox() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardContent className="space-y-4 pt-6">
-            <TypographyP className="font-medium">
-              <Check className="mr-2 inline size-4 text-chart-1" />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Check className="size-4 text-chart-1" />
               In the box
-            </TypographyP>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <ul className="space-y-2">
               {shipped.map((s) => (
                 <li
@@ -83,11 +89,13 @@ export function InTheBox() {
         </Card>
 
         <Card>
-          <CardContent className="space-y-4 pt-6">
-            <TypographyP className="font-medium">
-              <Minus className="mr-2 inline size-4 text-muted-foreground" />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Minus className="size-4 text-muted-foreground" />
               Not in the box (by design)
-            </TypographyP>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <ul className="space-y-3">
               {notShipped.map((n) => (
                 <li key={n.item} className="space-y-1">

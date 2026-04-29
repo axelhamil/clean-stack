@@ -1,8 +1,12 @@
-import { Card, CardContent } from "@packages/ui/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@packages/ui/components/ui/card";
 import {
   TypographyH2,
   TypographyMuted,
-  TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { Check, X } from "lucide-react";
 
@@ -35,8 +39,10 @@ export function WhoItsFor() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-l-4 border-l-chart-1">
-          <CardContent className="space-y-4 pt-6">
-            <TypographyP className="font-medium">For you if…</TypographyP>
+          <CardHeader>
+            <CardTitle>For you if…</CardTitle>
+          </CardHeader>
+          <CardContent>
             <ul className="space-y-2">
               {fits.map((item) => (
                 <li
@@ -52,8 +58,10 @@ export function WhoItsFor() {
         </Card>
 
         <Card className="border-l-4 border-l-chart-3">
-          <CardContent className="space-y-4 pt-6">
-            <TypographyP className="font-medium">Move along if…</TypographyP>
+          <CardHeader>
+            <CardTitle>Move along if…</CardTitle>
+          </CardHeader>
+          <CardContent>
             <ul className="space-y-2">
               {doesntFit.map((item) => (
                 <li

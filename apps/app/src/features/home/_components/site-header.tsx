@@ -1,5 +1,7 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { Link } from "@tanstack/react-router";
 import { Boxes, Code2 } from "lucide-react";
 import { ThemeToggle } from "../../../common/ui/theme-toggle";
 
@@ -14,37 +16,32 @@ export function SiteHeader() {
             v1.4.0
           </Badge>
         </div>
-        <nav className="hidden items-center gap-6 justify-self-center text-muted-foreground text-sm md:flex">
-          <a
-            href="#integrations"
-            className="transition-colors hover:text-foreground"
-          >
-            Integrations
-          </a>
-          <a
-            href="#in-the-box"
-            className="transition-colors hover:text-foreground"
-          >
-            What's shipped
-          </a>
-          <a
-            href="#architecture"
-            className="transition-colors hover:text-foreground"
-          >
-            Architecture
-          </a>
-          <a
-            href="#ai-ready"
-            className="transition-colors hover:text-foreground"
-          >
-            AI-ready
-          </a>
-          <a
-            href="#quick-start"
-            className="transition-colors hover:text-foreground"
-          >
-            Quick start
-          </a>
+        <nav className="hidden items-center gap-6 justify-self-center md:flex">
+          <NavLink asChild>
+            <Link to="." hash="integrations">
+              Integrations
+            </Link>
+          </NavLink>
+          <NavLink asChild>
+            <Link to="." hash="in-the-box">
+              What's shipped
+            </Link>
+          </NavLink>
+          <NavLink asChild>
+            <Link to="." hash="architecture">
+              Architecture
+            </Link>
+          </NavLink>
+          <NavLink asChild>
+            <Link to="." hash="ai-ready">
+              AI-ready
+            </Link>
+          </NavLink>
+          <NavLink asChild>
+            <Link to="." hash="quick-start">
+              Quick start
+            </Link>
+          </NavLink>
         </nav>
         <div className="flex items-center gap-2 justify-self-end">
           <Button variant="outline" size="icon" asChild>

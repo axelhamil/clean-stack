@@ -152,11 +152,11 @@ export function ArchitectureFlow() {
               key={step.title}
               className={`border-l-4 ${meta.color} ${isWire ? "bg-muted/40" : ""}`}
             >
-              <CardContent className="flex gap-4 pt-5">
+              <CardContent className="flex gap-4">
                 <div className="flex flex-col items-center gap-2">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary font-mono text-secondary-foreground text-xs">
+                  <Badge variant="secondary" className="size-8 font-mono">
                     {String(idx + 1).padStart(2, "0")}
-                  </span>
+                  </Badge>
                   <Icon className="size-4 text-muted-foreground" />
                 </div>
                 <div className="flex-1 space-y-1.5">
@@ -183,8 +183,8 @@ export function ArchitectureFlow() {
         })}
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-2 rounded-lg border bg-muted/30 px-4 py-3">
-        <div className="flex items-center gap-3">
+      <Card className="mx-auto max-w-3xl bg-muted/30">
+        <CardContent className="flex items-center gap-3">
           <ArrowDown className="size-4 shrink-0 text-muted-foreground" />
           <TypographyMuted className="text-xs">
             Domain isolated: zero external imports (zod + ddd-kit only). Use
@@ -192,8 +192,8 @@ export function ArchitectureFlow() {
             post-commit, never inside the aggregate. On the app, hooks never
             touch <code>fetch</code> — always <code>api.*</code>.
           </TypographyMuted>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </section>
   );
 }

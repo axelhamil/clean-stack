@@ -1,12 +1,16 @@
 import { Badge } from "@packages/ui/components/ui/badge";
-import { Card, CardContent } from "@packages/ui/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@packages/ui/components/ui/card";
 import {
   TypographyH2,
   TypographyInlineCode,
   TypographyMuted,
-  TypographyP,
 } from "@packages/ui/components/ui/typography";
-import { Bot, FileCode2, Sparkles } from "lucide-react";
+import { Bot, Dot, FileCode2, Sparkles } from "lucide-react";
 
 const rules = [
   "Domain has zero external imports",
@@ -40,20 +44,20 @@ export function AiReady() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="flex items-center gap-2">
-              <FileCode2 className="size-4 text-muted-foreground" />
-              <TypographyP className="font-medium">
-                A few of the rules your agent will follow
-              </TypographyP>
-            </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileCode2 className="size-4 text-muted-foreground" />A few of the
+              rules your agent will follow
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <ul className="space-y-2">
               {rules.map((r) => (
                 <li
                   key={r}
                   className="flex items-start gap-2 text-muted-foreground text-sm"
                 >
-                  <span className="mt-1 size-1.5 shrink-0 rounded-full bg-foreground/40" />
+                  <Dot className="size-4 shrink-0 text-muted-foreground" />
                   {r}
                 </li>
               ))}
@@ -62,13 +66,13 @@ export function AiReady() {
         </Card>
 
         <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="flex items-center gap-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
               <Bot className="size-4 text-muted-foreground" />
-              <TypographyP className="font-medium">
-                Compatible with your AI stack
-              </TypographyP>
-            </div>
+              Compatible with your AI stack
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {agents.map((a) => (
                 <Badge key={a} variant="secondary">

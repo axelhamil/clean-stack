@@ -1,3 +1,4 @@
+import { Badge } from "@packages/ui/components/ui/badge";
 import { Card, CardContent } from "@packages/ui/components/ui/card";
 import {
   TypographyH2,
@@ -24,13 +25,13 @@ export function QuickStart() {
         </TypographyMuted>
       </div>
       <Card className="mx-auto max-w-2xl">
-        <CardContent className="pt-6">
+        <CardContent>
           <ol className="space-y-3">
             {steps.map((s, i) => (
               <li key={s.cmd} className="flex items-start gap-3">
-                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-secondary font-mono text-secondary-foreground text-xs">
+                <Badge variant="secondary" className="mt-0.5 size-6 font-mono">
                   {i + 1}
-                </span>
+                </Badge>
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2 font-mono text-sm">
                     <Terminal className="size-3.5 text-muted-foreground" />

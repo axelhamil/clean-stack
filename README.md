@@ -78,12 +78,14 @@ packages/
   drizzle                    DB client + TransactionService + schemas
   test                       Shared Vitest config
   typescript-config          Shared tsconfig presets
-  ui                         Full shadcn/ui + typography + theme tokens
+  ui                         Full shadcn/ui + typography + theme tokens + custom primitives (NavLink, …)
 ```
 
 ## Conventions
 
-Read `CLAUDE.md` for the full ruleset (fourteen total): Result/Option, no null, no throw in domain, CQRS, mandatory DI, strict import direction, theme tokens only, shadcn-first, strict HTML semantics (one `<main>` per page), zero-warning pipeline, DDD scope limited to business logic, reusability-first promotion to theme/primitives, etc.
+Read `CLAUDE.md` for the full ruleset (fourteen total): Result/Option, no null, no throw in domain, CQRS, mandatory DI, strict import direction, theme tokens only, **shadcn-first and shadcn-pure** (use the actual slots — `CardHeader`/`CardTitle`/`CardContent`, never patch with `pt-6` / `space-y-4`; no custom outside the theme or primitive), strict HTML semantics (one `<main>` per page), zero-warning pipeline, DDD scope limited to business logic, reusability-first promotion to theme/primitives.
+
+UI composition follows the **`asChild` pattern**: a primitive owns the *style* (e.g. `NavLink` = muted color + hover transition), and TanStack `<Link>` owns the *navigation*. Wire them via `<NavLink asChild><Link to="." hash="x">…</Link></NavLink>`. Never style raw `<a>` tags inside features.
 
 ## Roadmap & integrations
 
