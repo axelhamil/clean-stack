@@ -1,13 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@packages/ui/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { KeyRoundIcon } from "lucide-react";
 import { useEffect } from "react";
@@ -67,10 +61,7 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
           render={({ field }) => (
             <FormItem className="flex flex-row items-center gap-2">
               <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
               </FormControl>
               <FormLabel weight="normal">Remember me</FormLabel>
             </FormItem>

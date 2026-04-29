@@ -15,8 +15,7 @@ export function usePasskeySupported(): PasskeySupport {
     if (typeof window === "undefined" || !window.PublicKeyCredential) return;
 
     const available = true;
-    const checkConditional =
-      window.PublicKeyCredential.isConditionalMediationAvailable;
+    const checkConditional = window.PublicKeyCredential.isConditionalMediationAvailable;
 
     if (typeof checkConditional !== "function") {
       setSupport({ available, conditional: false });

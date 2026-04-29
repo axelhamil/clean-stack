@@ -1,8 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  TypographyH1,
-  TypographyMuted,
-} from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon } from "lucide-react";
 import { ThemeToggle } from "../../common/components/theme-toggle";

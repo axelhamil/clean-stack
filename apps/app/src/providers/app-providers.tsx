@@ -35,12 +35,7 @@ onAuthChange(async () => {
 export function AppProviders() {
   return (
     <StrictMode>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <QueryClientProvider client={queryClient}>
           <RouterProvider router={router} />
           <Toaster richColors closeButton />

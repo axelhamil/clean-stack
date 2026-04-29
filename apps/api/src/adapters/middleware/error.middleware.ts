@@ -32,10 +32,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
     return c.json(body, status);
   }
 
-  logger.error(
-    { err, requestId, path: c.req.path, method: c.req.method },
-    "Unhandled error",
-  );
+  logger.error({ err, requestId, path: c.req.path, method: c.req.method }, "Unhandled error");
 
   const body: ErrorBody = {
     error: {

@@ -1,13 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@packages/ui/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useVerifyTwoFactor } from "../_hooks/use-verify-two-factor";
@@ -46,10 +40,7 @@ export function TwoFactorForm({ redirectTo }: TwoFactorFormProps = {}) {
           render={({ field }) => (
             <FormItem className="flex flex-row items-center gap-2">
               <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
               </FormControl>
               <FormLabel weight="normal">Trust this device</FormLabel>
             </FormItem>

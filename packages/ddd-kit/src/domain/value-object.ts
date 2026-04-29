@@ -38,8 +38,7 @@ export abstract class ValueObject<T> {
     const tempInstance = new ValueObjectConstructor(value);
     const validationResult = tempInstance.validate(value);
 
-    if (validationResult.isFailure)
-      return Result.fail(validationResult.getError());
+    if (validationResult.isFailure) return Result.fail(validationResult.getError());
 
     const validatedValue = validationResult.getValue();
     const finalInstance = new ValueObjectConstructor(validatedValue);

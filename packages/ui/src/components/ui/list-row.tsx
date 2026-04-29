@@ -6,10 +6,7 @@ function ListRow({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
       data-slot="list-row"
-      className={cn(
-        "flex items-center justify-between gap-3 rounded-md border p-3",
-        className,
-      )}
+      className={cn("flex items-center justify-between gap-3 rounded-md border p-3", className)}
       {...props}
     />
   );
@@ -27,11 +24,7 @@ function ListRowMedia({ className, ...props }: React.ComponentProps<"div">) {
 
 function ListRowContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div
-      data-slot="list-row-content"
-      className={cn("flex flex-col gap-1", className)}
-      {...props}
-    />
+    <div data-slot="list-row-content" className={cn("flex flex-col gap-1", className)} {...props} />
   );
 }
 

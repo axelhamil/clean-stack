@@ -15,10 +15,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import {
-  type EnableTwoFactorResult,
-  useEnableTwoFactor,
-} from "../_hooks/use-enable-two-factor";
+import { type EnableTwoFactorResult, useEnableTwoFactor } from "../_hooks/use-enable-two-factor";
 import { useVerifyTwoFactorSetup } from "../_hooks/use-verify-two-factor-setup";
 import {
   type PasswordPromptInput,
@@ -31,9 +28,7 @@ interface EnableTwoFactorFormProps {
   onSuccess?: () => void;
 }
 
-export function EnableTwoFactorForm({
-  onSuccess,
-}: EnableTwoFactorFormProps = {}) {
+export function EnableTwoFactorForm({ onSuccess }: EnableTwoFactorFormProps = {}) {
   const [setup, setSetup] = useState<EnableTwoFactorResult | null>(null);
 
   if (!setup) return <PasswordStep onSetup={setSetup} />;
@@ -55,9 +50,7 @@ function PasswordStep({ onSetup }: PasswordStepProps) {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((values) =>
-          mutation.mutate(values, { onSuccess: onSetup }),
-        )}
+        onSubmit={form.handleSubmit((values) => mutation.mutate(values, { onSuccess: onSetup }))}
         className="flex flex-col gap-4"
         noValidate
       >
@@ -118,16 +111,10 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
             <div className="flex flex-col gap-1.5">
               <CardTitle>Backup codes</CardTitle>
               <CardDescription>
-                Save these in a safe place. Each can be used once if you lose
-                your device.
+                Save these in a safe place. Each can be used once if you lose your device.
               </CardDescription>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={copyBackupCodes}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={copyBackupCodes}>
               <CopyIcon />
               Copy
             </Button>
@@ -158,11 +145,7 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
             autoComplete="one-time-code"
             placeholder="123456"
           />
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={mutation.isPending}
-          >
+          <Button type="submit" className="w-full" disabled={mutation.isPending}>
             {mutation.isPending ? "Verifying…" : "Enable two-factor"}
           </Button>
         </form>

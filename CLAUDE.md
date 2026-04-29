@@ -48,7 +48,7 @@ apps/
         repositories/          Drizzle repositories
         mappers/               Domain <-> DB
       routes/                  Hono route registration
-      di/                      inwire container + per-context modules
+      di/                      inwire container (flat by default; modules/ only when a context grows large)
       auth.ts                  BetterAuth singleton
     common/
       env.ts                   Validated env (zod)
@@ -103,36 +103,134 @@ packages/
 - **Commands** (writes): Controller → Use Case → Aggregate → Repository → EventDispatcher → Handlers
 - **Queries** (reads): Controller → Query (direct ORM access, no use case layer)
 
+## DI (inwire)
+
+inwire's whole point is **type inference, no declarations**. The builder accumulates types as you `.add()`; `c` in every factory is fully typed against everything registered before. There is no `AppDeps` interface to maintain — `AppDeps = typeof di` is derived after `.build()`.
+
+**Default: flat container with sections** in `apps/api/src/di/container.ts`. Group `add()` calls by bounded context with line comments. Promote to a separate module file only when a bounded context grows large (≥ 5 use-cases of the same domain) and would noticeably bloat `container.ts`:
+
+```typescript
+// apps/api/src/di/container.ts
+import { container } from "inwire";
+import { ResendEmailService } from "../adapters/services/email.service";
+import { S3StorageService } from "../adapters/services/storage.service";
+import { CreateUploadUrlUseCase } from "../application/use-cases/create-upload-url.use-case";
+import { ConfirmUploadUseCase } from "../application/use-cases/confirm-upload.use-case";
+import { CreateDownloadUrlUseCase } from "../application/use-cases/create-download-url.use-case";
+
+export const di = container()
+  // infra
+  .add("IEmailService", () => new ResendEmailService())
+  .add("IStorageService", () => new S3StorageService())
+  // uploads
+  .add("CreateUploadUrlUseCase", (c) => new CreateUploadUrlUseCase(c.IStorageService))
+  .add("ConfirmUploadUseCase", (c) => new ConfirmUploadUseCase(c.IStorageService))
+  .add("CreateDownloadUrlUseCase", (c) => new CreateDownloadUrlUseCase(c.IStorageService))
+  .build();
+
+export type AppDeps = typeof di;
+```
+
+Reorder a call — put a use-case before the port it depends on — and `tsc` rejects: `c.IStorageService` is unknown until the port is registered. Order is enforced by inference, not by hand-declared constraints.
+
+**Rules**:
+
+1. **No declared types until they pay for themselves.** Don't write `interface XxxDeps`, don't write `<T extends { IPort: PortType }>` constraints, don't maintain a central `types.ts`. inwire infers it all. Hand-declaring those types is exactly the boilerplate inwire was built to remove.
+2. **`AppDeps = typeof di`** after `.build()` — derived, never declared.
+3. **Sections by bounded context with line comments** (`// uploads`, `// billing`, `// auth`). When a section reaches ≥ 5 use-cases *and* container.ts becomes hard to scan, extract that section to `apps/api/src/di/modules/<context>.module.ts` using the `addModule` pattern from inwire (see `inwire/examples/04-modules.ts`). At that point, the type constraint on the module *is* the right form — but only because the bounded context has earned its own file.
+4. **Use-cases stay in `application/use-cases/`**, one file per use-case. The DI is *wiring*; the use-case file is the *implementation*.
+5. **Routes consume use-cases by name** (`di.CreateUploadUrlUseCase.execute(...)`). Never `new CreateUploadUrlUseCase(...)` at the call site — bypasses the container and breaks per-test impl swapping via `di.module(...)`.
+6. **No barrel `index.ts`** in `di/`.
+
 ## Hono RPC (end-to-end type safety)
 
 The api exports its routes as a type (`AppType`) consumed by the app via `hono/client`. Routes **must be chained** to accumulate types — `app.use` and `app.onError` don't add to the typed schema.
+
+**Two subpath exports from the api package**:
+
+```jsonc
+// apps/api/package.json
+"exports": {
+  ".": "./src/index.ts",        // AppType (server runtime imports too)
+  "./client": "./src/client.ts" // hcWithType (frontend only — pre-typed RPC client)
+}
+```
 
 ```typescript
 // apps/api/src/index.ts
 const routes = app
   .get("/health", (c) => c.json({ status: "ok" as const }))
-  .post("/widgets",
+  .post(
+    "/widgets",
     zValidator("json", z.object({ name: z.string() })),
     (c) => c.json({ ok: true as const, name: c.req.valid("json").name }),
   );
 export type AppType = typeof routes;
 
-// apps/app/src/adapters/api-client.ts
-import type { AppType } from "api";
+// apps/api/src/client.ts — pre-computed RPC client type
 import { hc } from "hono/client";
-export const api = hc<AppType>(env.VITE_API_URL, { init: { credentials: "include" } });
+import type { AppType } from "./index";
+export type ApiClient = ReturnType<typeof hc<AppType>>;
+export const hcWithType = (
+  ...args: Parameters<typeof hc<AppType>>
+): ApiClient => hc<AppType>(...args);
+```
 
-// feature usage
-useMutation({
-  mutationFn: async (input) => {
-    const res = await api.widgets.$post({ json: input });
+```typescript
+// apps/app/src/adapters/api-client.ts — single instance, custom fetch interceptor
+import { hcWithType } from "api/client";
+import { env } from "../common/env";
+
+const baseUrl = env.VITE_API_URL.endsWith("/")
+  ? env.VITE_API_URL
+  : `${env.VITE_API_URL}/`;
+
+type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+const customFetch: FetchFn = async (input, init) => {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("X-Request-Id")) {
+    headers.set("X-Request-Id", crypto.randomUUID());
+  }
+  return fetch(input, { ...init, headers });
+};
+
+export const api = hcWithType(baseUrl, {
+  init: { credentials: "include" },
+  fetch: customFetch,
+});
+```
+
+```typescript
+// Mutation factory — adapters/mutations/<verb>.ts
+import { mutationOptions } from "@tanstack/react-query";
+import type { InferRequestType, InferResponseType } from "hono/client";
+import { api } from "../api-client";
+
+const $post = api.widgets.$post;
+type Body = InferRequestType<typeof $post>["json"];
+type Response = InferResponseType<typeof $post, 200>; // status-narrowed
+
+export const createWidgetMutationOptions = mutationOptions({
+  mutationKey: ["widgets", "create"] as const,
+  mutationFn: async (input: Body): Promise<Response> => {
+    const res = await $post({ json: input });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   },
 });
 ```
 
-The `api` workspace dep is wired via `apps/api/package.json` `exports`. App consumes `AppType` only — runtime never bundled. Path segments mirror the URL (`/widgets` → `api.widgets`); method is `$post` / `$get` / etc.
+**Non-negotiables**:
+
+- **`hcWithType` exported from `api/client`, not inline `hc<AppType>` in the app** — eliminates per-callsite generic re-inference. `tsc` resolves `ApiClient` once.
+- **Trailing-slash normalize** the `baseUrl` — `hc` drops the last segment of the base when the slash is missing.
+- **Single client instance** with a custom `fetch` — adds `X-Request-Id` per request (correlates with the api `requestId()` middleware), and is the natural slot for future global handlers (401 redirect, token refresh) and for the Capacitor branch (Bearer header from secure storage).
+- **`AbortSignal`**: pass via the per-call second arg → `await $get({}, { init: { signal } })`. TanStack Query's `queryFn`/`mutationFn` receive `signal`; thread it through.
+- **`InferRequestType` / `InferResponseType<typeof $endpoint, 200>`** for sharing request/response shapes — status-narrowed (`200`) so the type is the success-only payload.
+- **Errors stay throw-on-`!res.ok`** — Hono 2026 ships `ApplyGlobalResponse` to widen `InferResponseType` with error shapes, but it does not give a discriminated union you can exhaustively `match`. Don't fake a SOTA you'll regret.
+
+The `api` workspace dep is wired via `apps/api/package.json` `exports`. The app consumes types only — server runtime never bundled. Path segments mirror the URL (`/widgets` → `api.widgets`); method is `$post` / `$get` / etc.
 
 ## App import direction
 
@@ -186,11 +284,97 @@ Naming follows **Next.js App Router conventions** — suffix-based files (`<name
 
 **Theme & dark mode:** `next-themes` provider in `providers/app-providers.tsx` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`). The toggle (`apps/app/src/common/components/theme-toggle.tsx`) uses View Transitions API for a circle-reveal animation, with `prefers-reduced-motion` fallback. The view-transition CSS lives in `packages/ui/src/styles/globals.css` (theme-level, rule 10).
 
-**Where do hooks belong?**
+**Queries / mutations / hooks — three forms, one decision tree.**
 
-- **`features/<x>/_hooks/`** — workflow-specific (`useCheckout`, `useCreateWidget`). Owns side-effects (toasts, navigation, cache invalidation). These are the UI's use cases.
-- **`adapters/`** — generic infra (`useApiQuery<T>`, `useDebouncedValue`, RPC client). No workflow logic.
-- **Cross-feature resource hooks** — when 2+ features need the same `useUser` / `useCart`, extract to `adapters/queries/` or promote one feature to own it. Don't pre-emptively place them there.
+TanStack Query options factories (`queryOptions` / `mutationOptions`) compose better than hook wrappers: they're typed, prefetchable in `beforeLoad`, and let the call site override `onSuccess` / `onError` / `staleTime` / `select` per-use. Hook wrappers are reserved for cases where the workflow itself owns side-effects (toast, navigation, broadcast, cache invalidation) that always fire and aren't the call site's concern.
+
+| Case | Where | Form |
+|---|---|---|
+| **Query** (any read) | `adapters/queries/<noun>.ts` | `xxxQueryOptions` factory via `queryOptions(...)`. Consumed via `useQuery(xxxQueryOptions)` and `queryClient.ensureQueryData(xxxQueryOptions)` in `beforeLoad`. |
+| **Mutation, cross-feature or multi-step** (e.g. upload pipeline, signed URL refresh) | `adapters/mutations/<verb>.ts` | `xxxMutationOptions` factory via `mutationOptions(...)`. Consumed via `useMutation(xxxMutationOptions)`. The call site owns side-effects. |
+| **Mutation feature-specific with bundled side-effects** (toast + navigate + invalidate + broadcast) | `features/<x>/_hooks/use-<verb>.ts` | Hook wrapping `useMutation`. The hook owns `onSuccess` / `onError`. Used by exactly one feature. |
+| **Pure React utility** (no API, no workflow — e.g. `usePasskeySupported`, `useDebouncedValue`) | `features/<x>/_hooks/` if scoped, `adapters/` if generic | Plain hook. |
+
+**Rule**: if a hook does nothing but `return useMutation({ mutationFn })`, it's an indirection — promote to a `mutationOptions` factory. The hook only earns its keep when it bundles side-effects that the call site must not have to remember.
+
+**Cross-feature resource hooks** — when 2+ features need the same `useUser` / `useCart`, extract to `adapters/queries/`. Don't pre-emptively place them there.
+
+### `mutationOptions` cookbook
+
+**Where**: `apps/app/src/adapters/mutations/<verb-noun>.ts`. Verb is the action (`create-upload`, `delete-account`, `invite-member`); the file name mirrors the backend use-case (e.g. `apps/api/src/application/use-cases/create-upload-url.use-case.ts` ↔ `mutations/create-upload.ts`).
+
+**Naming**: file = `<verb-noun>.ts`, export = `<verbNoun>MutationOptions`. Never prefix with `use-` — these are objects, not hooks. The `mutations/` folder makes the role unambiguous.
+
+**Anatomy**:
+
+```typescript
+// adapters/mutations/create-widget.ts
+import { mutationOptions } from "@tanstack/react-query";
+import type { InferRequestType, InferResponseType } from "hono/client";
+import { api } from "../api-client";
+
+const $post = api.widgets.$post;
+type Body = InferRequestType<typeof $post>["json"];
+type Response = InferResponseType<typeof $post, 200>;
+
+export interface CreateWidgetInput {
+  // Public input shape — translates UI concerns (e.g. a `File`)
+  // into the wire shape (`Body`). Use it as the type the call
+  // site sees, so the factory absorbs presign / multi-step flows.
+  // For trivial pass-throughs, `Body` directly is fine.
+}
+
+async function createWidget(input: CreateWidgetInput): Promise<Response> {
+  const res = await $post({ json: /* … */ });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export const createWidgetMutationOptions = mutationOptions({
+  mutationKey: ["widgets", "create"] as const,
+  mutationFn: createWidget,
+});
+```
+
+**Consume** — at the call site, the page or component owns the side-effects:
+
+```typescript
+// features/widgets/_components/create-widget-form.tsx
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { createWidgetMutationOptions } from "../../../adapters/mutations/create-widget";
+import { widgetsQueryOptions } from "../../../adapters/queries/widgets";
+
+export function CreateWidgetForm() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const { mutate, isPending } = useMutation({
+    ...createWidgetMutationOptions,
+    onSuccess: async (widget) => {
+      toast.success(`Widget ${widget.name} created`);
+      await queryClient.invalidateQueries({
+        queryKey: widgetsQueryOptions.queryKey,
+      });
+      void navigate({ to: "/widgets/$id", params: { id: widget.id } });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  return <form onSubmit={form.handleSubmit((v) => mutate(v))}>…</form>;
+}
+```
+
+**Rules**:
+
+1. **Side-effects belong to the call site, not the factory.** No `toast` / `navigate` / `invalidateQueries` inside the `mutationOptions` body. The factory does **only** the network work. Different call sites have different success messages and different post-success destinations — keep them free.
+2. **Spread, don't override.** Compose at the call site with `useMutation({ ...createWidgetMutationOptions, onSuccess: … })`. Never mutate the exported options object.
+3. **`mutationKey`** is `[<resource>, <verb>]` (e.g. `["uploads", "create"]`). Lets `useIsMutating({ mutationKey })` and `queryClient.getMutationCache().findAll({ mutationKey })` find in-flight mutations.
+4. **Types via `InferRequestType` / `InferResponseType<…, 200>`.** The status discriminant (`200`) narrows to the success shape — pair with `if (!res.ok) throw` so the function's signature stays accurate.
+5. **Multi-step workflows go in the factory** (presign → PUT → confirm in `create-upload`). The factory presents a single `mutationFn` that returns server-verified output. The call site never reasons about the intermediate steps.
+6. **Hook only when side-effects are truly bundled** (sign-in: toast + refetch session + broadcast + navigate, every call). If the side-effects vary per call site, factory + per-call override is the better fit.
+7. **`AbortSignal`**: factories that do a single API call thread it via `init.signal`. Multi-step flows with cleanup logic typically can't honour cancellation cleanly — document this in a comment if the factory does not propagate `signal`.
 
 **Composition patterns:**
 
@@ -292,6 +476,31 @@ sendInvitation: async ({ email, token }) => {
 - Anything else → `500` `{ error: { code: "INTERNAL_ERROR", message: "Internal Server Error", requestId, stack? } }`. Logged with full error + request context. Stack only outside production.
 
 **Throwing the right exception is the API.** Domain & application use `Result<T, E>` (no throw). At the controller boundary, translate failures to `HTTPException(<status>, { message })`. The handler does the rest. Never invent a custom error envelope per route — the envelope above is the contract for the whole API.
+
+## Storage (R2-first, MinIO for dev)
+
+**Server is blind during the upload.** The client `PUT`s **directly** to R2/MinIO using the presigned URL — the API only sees `presign` (issue URL) and `confirm` (verify after). Three-step flow, in order:
+
+1. **`POST /uploads/presign`** — auth + Zod (`filename`, `contentType`, `size`, `scope`, `expiresInSeconds?`). `CreateUploadUrlUseCase` clamps TTL to `[STORAGE_PRESIGN_TTL_MIN_SECONDS, STORAGE_PRESIGN_TTL_MAX_SECONDS]`, generates the **owner-scoped key** `<userId>/<scope>/<uuid>-<filename>`, calls `IStorageService.presignUpload`. Adapter signs `content-type` + `content-length` (`signableHeaders`) so the client can't drop them — sending different headers fails with 403 `SignatureDoesNotMatch`. Response includes `expectedSize` + `expectedContentType` (echo of the declared values, used by `confirm`).
+2. **Client `PUT <signed_url>`** — direct to R2, exact `Content-Type` + `Content-Length` headers, file body. Zero proxy through the API.
+3. **`POST /uploads/confirm`** — auth + Zod (`key`, `expectedSize`, `expectedContentType`). `ConfirmUploadUseCase` enforces **owner check** (`key.startsWith("<userId>/")` → 403 `STORAGE_FORBIDDEN`), then `HeadObject` to read real `size`/`contentType`. **Size is permissive** (only fails if `actual > expected` — undershooting is fine, e.g. client-side compression produced a smaller payload than estimated). **Content-type is strict** (must match exactly). On mismatch: `DeleteObject` + 422 `STORAGE_INTEGRITY_FAILED` (delete failure is propagated as `STORAGE_PROVIDER_FAILURE`, never silently swallowed). On success: returns `{ key, size, contentType, publicUrl }` — the only metadata the rest of the app should trust.
+
+**Why three steps**: R2 does not support Presigned POST policies (no `content-length-range` condition, verified 2026). Signed `ContentLength` blocks naïve clients (different declared header → 403) but R2 does not verify the body size against it — `confirm` is the real enforcement. Same logic for content-type.
+
+**Download** (`POST /uploads/download`) — symmetric: auth + Zod, `CreateDownloadUrlUseCase` runs the same owner check, presigns a `GetObjectCommand`, returns `{ url, expiresAt }`.
+
+**Architecture rules specific to this section**:
+
+1. **Port = pure transport.** `IStorageService` only exposes SDK-level operations (`presignUpload`, `presignDownload`, `headObject`, `deleteObject`, `publicUrlFor`). Zero business rules in the adapter.
+2. **Use-cases = orchestration only.** Key generation, owner check, TTL clamping, integrity verification. No `throw` — return `Result<T, StorageError>`.
+3. **Validation lives in the route's Zod schema** — filename regex (`^[\w\-. ]+$`), scope regex (`^[a-z][a-z0-9-]{0,31}$`), size cap (`STORAGE_MAX_UPLOAD_BYTES`), max TTL. Zod failures become 400 via the centralised error handler. Use-cases trust their input.
+4. **Routes = thin controllers.** Resolve the use-case from the inwire container (`di.CreateUploadUrlUseCase`, `di.ConfirmUploadUseCase`, `di.CreateDownloadUrlUseCase`), `await execute(...)`, map `Result` → HTTP via the central `statusFor(error)` switch. Error mapping: 403 (`STORAGE_FORBIDDEN`), 404 (`STORAGE_NOT_FOUND`), 422 (`STORAGE_INTEGRITY_FAILED`), 502 (`STORAGE_PROVIDER_FAILURE`). The `requireAuth` middleware narrows `c.get("user")` to a non-null `SessionUser` — no manual null guard in the handler.
+5. **R2-first, MinIO is dev convenience.** `S3Client` config: `region: "auto"` (R2's only accepted value), `forcePathStyle: true` (harmless on R2, required for MinIO). Boot-time fail-hard if `NODE_ENV === "production"` and `S3_ENDPOINT` is localhost or creds are default `minioadmin`. R2 prod endpoint: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (or `…eu.r2.cloudflarestorage.com` for EU jurisdiction — once chosen, R2 cannot move the bucket).
+6. **`createUploadMutationOptions` chains all three calls.** The factory (`apps/app/src/adapters/mutations/create-upload.ts`) only resolves after `confirm` succeeds. The UI consumes via `useMutation({ ...createUploadMutationOptions, onSuccess, onError })` and receives server-verified metadata or an explicit error — never a "maybe uploaded" intermediate state. The client PUT explicitly sends `Content-Length: String(file.size)` to match the server-signed header (browsers would inject it anyway, but stating it is the documented contract).
+
+**Phase 2 (deferred until first concrete consumer)**:
+- **Orphan GC**: client may crash between `PUT` and `confirm`, leaving an unreferenced object. Add a worker (R2 prod: Cloudflare Worker on a cron; dev: Bun cron) that deletes objects older than X minutes with no DB row referencing the key. Requires the first business table that stores keys (Avatar, Document, …).
+- **Integration event bus**: when 2+ handlers need to react to `UploadConfirmedEvent` (e.g. avatar update + audit log + push notif), promote an `IAppEventBus` port (distinct from domain events — those stay reserved for aggregates). The current single-consumer call from `ConfirmUploadUseCase` is a direct call by design (rule 14: promote on second occurrence).
 
 ## Domain Events
 
@@ -396,3 +605,8 @@ gh pr create --base main --head dev --title "Release: <theme>"
 - Type component props with `type` — use `interface <Component>Props { ... }`. `type` is for unions / intersections / mapped shapes / zod-inferred types.
 - Consume a single-use token from `useEffect` without a `useRef(false)` guard — StrictMode double-fire would invalidate the token even though the first call succeeded.
 - Pass `redirectTo` / `callbackURL` to BetterAuth client methods when the corresponding `send*` server hook already builds the URL — duplicate dead code that can later silently override the canonical URL.
+- Wrap a one-liner mutation in a custom hook (`useUpload`, `useCreateX`) that only does `return useMutation({ mutationFn })` — promote to a `mutationOptions` factory in `adapters/`. Hook wrappers earn their keep only when bundling side-effects (toast + navigate + invalidate + broadcast) that callers should not have to repeat.
+- Trust the size or content-type a client declares at `presign` time without running `confirm` — the server is blind during the upload (client `PUT`s direct to R2). The signed `Content-Length` only blocks naïve clients; integrity is enforced by `HeadObject` + `DeleteObject` on mismatch. Skipping `confirm` = trusting the client.
+- Skip the owner-prefix check (`key.startsWith("<userId>/")`) in download or confirm use-cases — without it any authenticated user can presign a GET / verify any key in the bucket.
+- Stuff business rules into `IStorageService` (validation, key shape, ACLs) — port stays pure transport. Rules belong in the use-case (orchestration) or the route's Zod schema (input validation).
+- Add a Presigned POST flow to upload to R2 — R2 does not implement POST policies (verified 2026, see ROADMAP). PUT presigned + `confirm` is the correct shape.

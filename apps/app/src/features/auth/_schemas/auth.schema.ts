@@ -2,9 +2,7 @@ import { z } from "zod";
 
 export const emailSchema = z.email({ message: "Invalid email address" });
 
-export const passwordSchema = z
-  .string()
-  .min(1, { message: "Password is required" });
+export const passwordSchema = z.string().min(1, { message: "Password is required" });
 
 export const strongPasswordSchema = z
   .string()

@@ -72,9 +72,7 @@ describe("Result", () => {
     it("should throw when called on failure", () => {
       const result = Result.fail("error");
 
-      expect(() => result.getValue()).toThrow(
-        "Can't get value from failure result",
-      );
+      expect(() => result.getValue()).toThrow("Can't get value from failure result");
     });
   });
 
@@ -88,9 +86,7 @@ describe("Result", () => {
     it("should throw when called on success", () => {
       const result = Result.ok(42);
 
-      expect(() => result.getError()).toThrow(
-        "Can't get error from success result",
-      );
+      expect(() => result.getError()).toThrow("Can't get error from success result");
     });
   });
 
@@ -115,11 +111,7 @@ describe("Result", () => {
     });
 
     it("should return first failure when any result fails", () => {
-      const results = [
-        Result.ok(1),
-        Result.fail("first error"),
-        Result.fail("second error"),
-      ];
+      const results = [Result.ok(1), Result.fail("first error"), Result.fail("second error")];
       const combined = Result.combine(results);
 
       expect(combined.isFailure).toBe(true);
@@ -141,12 +133,7 @@ describe("Result", () => {
     });
 
     it("should handle mixed success and failure results", () => {
-      const results = [
-        Result.ok("a"),
-        Result.ok("b"),
-        Result.fail("middle error"),
-        Result.ok("c"),
-      ];
+      const results = [Result.ok("a"), Result.ok("b"), Result.fail("middle error"), Result.ok("c")];
       const combined = Result.combine(results);
 
       expect(combined.isFailure).toBe(true);

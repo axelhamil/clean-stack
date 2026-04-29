@@ -6,10 +6,7 @@ export type EventHandlerFn<T extends IDomainEvent = IDomainEvent> = (
 ) => Promise<Result<void>> | Result<void>;
 
 export interface IEventDispatcher {
-  subscribe<T extends IDomainEvent>(
-    eventType: string,
-    handler: EventHandlerFn<T>,
-  ): Result<void>;
+  subscribe<T extends IDomainEvent>(eventType: string, handler: EventHandlerFn<T>): Result<void>;
 
   unsubscribe(eventType: string, handler: EventHandlerFn): Result<void>;
 

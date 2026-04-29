@@ -26,7 +26,7 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 - **i18n built-in** — locale-aware TanStack routes, type-safe message keys, server-side detection, no missing-key surprises in production.
 - **Pragmatic DDD** — reserved for the business logic you actually charge for. Not for billing, not for auth, not for gating. ~70% less code than going full-DDD.
 - **Zero-warning pipeline** — Biome, knip, jscpd, type-check, commitlint. Fix before push, never `--no-verify`.
-- **AI-pair ready** — A 450-line `CLAUDE.md` shipped at the root: architecture, DDD scope, form contracts, banned anti-patterns. Your agent already knows the rules.
+- **AI-pair ready** — A `CLAUDE.md` shipped at the root: architecture, DDD scope, form contracts, banned anti-patterns. Your agent already knows the rules.
 
 ## Stack
 
@@ -75,12 +75,12 @@ apps/
       application/           Use cases, ports, DTOs, event handlers
       adapters/              Middlewares, repositories, services (auth, email, storage)
       routes/                Hono routes (incl. /api/auth/*, signed webhooks)
-      di/                    inwire container + modules per bounded context
+      di/                    inwire container (flat; AppDeps = typeof di)
   app/                       Vite + React (routes → features → adapters → common)
     src/
       routes/                TanStack Router file-based
       features/<x>/          page.tsx + _components/ + _forms/ + _hooks/ + _schemas/
-      adapters/              api-client, auth-client, query-client, storage
+      adapters/              api-client (Hono RPC), auth-client, auth-broadcast, query-client, queries/, mutations/
       providers/             Provider tree (next-themes, query, router)
       common/                env, format, theme-toggle
 packages/
@@ -93,7 +93,7 @@ packages/
 
 ## Conventions
 
-Read `CLAUDE.md` for the full ruleset (fourteen total): Result/Option, no null, no throw in domain, CQRS, mandatory DI, strict import direction, theme tokens only, **shadcn-first and shadcn-pure** (use the actual slots — `CardHeader`/`CardTitle`/`CardContent`, never patch with `pt-6` / `space-y-4`; no custom outside the theme or primitive), strict HTML semantics (one `<main>` per page), zero-warning pipeline, DDD scope limited to business logic, reusability-first promotion to theme/primitives.
+Read `CLAUDE.md` for the full ruleset: Result/Option, no null, no throw in domain, CQRS, mandatory DI, strict import direction, theme tokens only, **shadcn-first and shadcn-pure** (use the actual slots — `CardHeader`/`CardTitle`/`CardContent`, never patch with `pt-6` / `space-y-4`; no custom outside the theme or primitive), strict HTML semantics (one `<main>` per page), zero-warning pipeline, DDD scope limited to business logic, reusability-first promotion to theme/primitives, `interface` for component props, `void navigate(...)` in mutation callbacks.
 
 UI composition follows the **`asChild` pattern**: a primitive owns the *style* (e.g. `NavLink` = muted color + hover transition), and TanStack `<Link>` owns the *navigation*. Wire them via `<NavLink asChild><Link to="." hash="x">…</Link></NavLink>`. Never style raw `<a>` tags inside features.
 

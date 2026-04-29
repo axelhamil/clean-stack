@@ -37,8 +37,7 @@ export abstract class WatchedList<T> {
   public add(item: T): Result<void> {
     if (this.isRemovedItem(item)) this.removeFromRemoved(item);
 
-    if (!this.isNewItem(item) && !this.wasAddedInitially(item))
-      this.new.push(item);
+    if (!this.isNewItem(item) && !this.wasAddedInitially(item)) this.new.push(item);
 
     if (!this.isCurrentItem(item)) this.currentItems.push(item);
 
@@ -73,8 +72,7 @@ export abstract class WatchedList<T> {
 
   public mapToObject(): unknown[] {
     return this.currentItems.map((item) => {
-      if (item instanceof ValueObject || item instanceof UUID)
-        return item.value;
+      if (item instanceof ValueObject || item instanceof UUID) return item.value;
 
       if (
         item &&
@@ -109,9 +107,7 @@ export abstract class WatchedList<T> {
   }
 
   private removeFromCurrent(item: T): void {
-    this.currentItems = this.currentItems.filter(
-      (v) => !this.compareItems(item, v),
-    );
+    this.currentItems = this.currentItems.filter((v) => !this.compareItems(item, v));
   }
 
   private removeFromRemoved(item: T): void {

@@ -45,9 +45,7 @@ class MockUserRepository implements BaseRepository<User> {
     return Result.ok(entity);
   }
 
-  async delete(
-    id: UUID<string | number>,
-  ): Promise<Result<UUID<string | number>>> {
+  async delete(id: UUID<string | number>): Promise<Result<UUID<string | number>>> {
     const index = this.users.findIndex((u) => u._id.equals(id));
     if (index === -1) return Result.fail("User not found");
     this.users.splice(index, 1);
@@ -59,9 +57,7 @@ class MockUserRepository implements BaseRepository<User> {
     return Result.ok(Option.fromNullable(user));
   }
 
-  async findAll(
-    pagination?: PaginationParams,
-  ): Promise<Result<PaginatedResult<User>>> {
+  async findAll(pagination?: PaginationParams): Promise<Result<PaginatedResult<User>>> {
     const params = pagination ?? DEFAULT_PAGINATION;
     const start = (params.page - 1) * params.limit;
     const data = this.users.slice(start, start + params.limit);
@@ -73,9 +69,7 @@ class MockUserRepository implements BaseRepository<User> {
     pagination?: PaginationParams,
   ): Promise<Result<PaginatedResult<User>>> {
     const filtered = this.users.filter((u) =>
-      Object.entries(props).every(
-        ([k, v]) => u._props[k as keyof UserProps] === v,
-      ),
+      Object.entries(props).every(([k, v]) => u._props[k as keyof UserProps] === v),
     );
     const params = pagination ?? DEFAULT_PAGINATION;
     const start = (params.page - 1) * params.limit;
@@ -85,9 +79,7 @@ class MockUserRepository implements BaseRepository<User> {
 
   async findBy(props: Partial<UserProps>): Promise<Result<Option<User>>> {
     const user = this.users.find((u) =>
-      Object.entries(props).every(
-        ([k, v]) => u._props[k as keyof UserProps] === v,
-      ),
+      Object.entries(props).every(([k, v]) => u._props[k as keyof UserProps] === v),
     );
     return Result.ok(Option.fromNullable(user));
   }
@@ -218,9 +210,7 @@ describe("BaseRepository", () => {
 
     it("should return paginated results", async () => {
       for (let i = 0; i < 25; i++) {
-        await repo.create(
-          User.create({ name: `User ${i}`, email: `u${i}@test.com` }),
-        );
+        await repo.create(User.create({ name: `User ${i}`, email: `u${i}@test.com` }));
       }
 
       const result = await repo.findAll({ page: 1, limit: 10 });
@@ -234,9 +224,7 @@ describe("BaseRepository", () => {
 
     it("should return second page", async () => {
       for (let i = 0; i < 25; i++) {
-        await repo.create(
-          User.create({ name: `User ${i}`, email: `u${i}@test.com` }),
-        );
+        await repo.create(User.create({ name: `User ${i}`, email: `u${i}@test.com` }));
       }
 
       const result = await repo.findAll({ page: 2, limit: 10 });
@@ -249,9 +237,7 @@ describe("BaseRepository", () => {
 
     it("should return last page with fewer items", async () => {
       for (let i = 0; i < 25; i++) {
-        await repo.create(
-          User.create({ name: `User ${i}`, email: `u${i}@test.com` }),
-        );
+        await repo.create(User.create({ name: `User ${i}`, email: `u${i}@test.com` }));
       }
 
       const result = await repo.findAll({ page: 3, limit: 10 });
@@ -284,16 +270,11 @@ describe("BaseRepository", () => {
 
     it("should filter with pagination", async () => {
       for (let i = 0; i < 15; i++) {
-        await repo.create(
-          User.create({ name: "John", email: `john${i}@test.com` }),
-        );
+        await repo.create(User.create({ name: "John", email: `john${i}@test.com` }));
       }
       await repo.create(User.create({ name: "Jane", email: "jane@test.com" }));
 
-      const result = await repo.findMany(
-        { name: "John" },
-        { page: 1, limit: 10 },
-      );
+      const result = await repo.findMany({ name: "John" }, { page: 1, limit: 10 });
 
       expect(result.getValue().data).toHaveLength(10);
       expect(result.getValue().pagination.total).toBe(15);
@@ -426,11 +407,7 @@ describe("Pagination", () => {
     });
 
     it("should handle single page", () => {
-      const result = createPaginatedResult(
-        [1, 2, 3],
-        { page: 1, limit: 10 },
-        3,
-      );
+      const result = createPaginatedResult([1, 2, 3], { page: 1, limit: 10 }, 3);
 
       expect(result.pagination.totalPages).toBe(1);
       expect(result.pagination.hasNextPage).toBe(false);

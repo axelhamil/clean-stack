@@ -3,8 +3,7 @@ import { sessionQueryOptions } from "../adapters/queries/session";
 
 export const Route = createFileRoute("/_guest")({
   beforeLoad: async ({ context }) => {
-    const session =
-      await context.queryClient.ensureQueryData(sessionQueryOptions);
+    const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
 
     if (session) throw redirect({ to: "/dashboard" });
   },

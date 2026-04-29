@@ -3,10 +3,7 @@ import type { Option } from "../primitives/option";
 import type { Result } from "../primitives/result";
 import type { PaginatedResult, PaginationParams } from "./pagination";
 
-export interface BaseRepository<
-  T extends IEntity<unknown>,
-  TTransaction = unknown,
-> {
+export interface BaseRepository<T extends IEntity<unknown>, TTransaction = unknown> {
   create(entity: T, trx?: TTransaction): Promise<Result<T>>;
   update(entity: T, trx?: TTransaction): Promise<Result<T>>;
   delete(id: T["_id"], trx?: TTransaction): Promise<Result<T["_id"]>>;

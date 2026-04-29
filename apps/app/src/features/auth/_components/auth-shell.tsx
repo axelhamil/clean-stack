@@ -20,13 +20,7 @@ interface AuthShellProps {
   className?: string;
 }
 
-export function AuthShell({
-  title,
-  description,
-  children,
-  footer,
-  className,
-}: AuthShellProps) {
+export function AuthShell({ title, description, children, footer, className }: AuthShellProps) {
   return (
     <div className="relative flex min-h-dvh items-center justify-center">
       <ThemeToggle className="absolute top-4 right-4" />
