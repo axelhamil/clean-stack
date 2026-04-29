@@ -3,6 +3,7 @@ import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typogr
 import { Link } from "@tanstack/react-router";
 import { ShieldIcon } from "lucide-react";
 import { ThemeToggle } from "../../common/components/theme-toggle";
+import { OrgSwitcher } from "../organization/_components/org-switcher";
 import { SignOutButton } from "./_components/sign-out-button";
 
 interface DashboardPageProps {
@@ -20,6 +21,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <OrgSwitcher />
           <Button asChild variant="outline">
             <Link to="/account/security">
               <ShieldIcon />
