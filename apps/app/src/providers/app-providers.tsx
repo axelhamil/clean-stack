@@ -26,9 +26,12 @@ declare module "@tanstack/react-router" {
 }
 
 onAuthChange(async () => {
-  await queryClient.refetchQueries({
-    queryKey: sessionQueryOptions.queryKey,
-  });
+  await Promise.all([
+    queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey }),
+    queryClient.refetchQueries({ queryKey: ["active-org"] }),
+    queryClient.refetchQueries({ queryKey: ["current-membership"] }),
+    queryClient.refetchQueries({ queryKey: ["orgs"] }),
+  ]);
   await router.invalidate();
 });
 
