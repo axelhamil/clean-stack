@@ -268,7 +268,7 @@ Protected handlers compose `requireAuth` — reads the resolved session and thro
 - **`bearer()` plugin** — alongside cookies. Web stays cookie-based (httpOnly, XSS-safe); Capacitor / mobile uses bearer with secure storage. Same session row in DB — only transport differs.
 - **Cookies**: `httpOnly: true`, `sameSite: "lax"`, `secure: isProd` in `auth.advanced.defaultCookieAttributes`.
 
-**Email URLs route through the app, not the API.** Every email link points to `${env.APP_URL}/<route>?token=...`; the frontend route consumes the token via the typed client. Reasons: branded UX (loading / error / redirect); avoids Outlook/Gmail re-autolinking visible URL text and mangling `?callbackURL=...`. Use a short label like "Verify your email", never the full URL. Apply to all auth-token emails (org invitations, etc.).
+**Email URLs route through the app, not the API.** Every email link points to `${env.APP_URL}/<route>?token=...` (for opaque tokens like `verify-email`, `reset-password`, `magic-link`) **or** `${env.APP_URL}/<route>/<id>` (for ID-based flows like `accept-invitation/<invitationId>`, where the ID is a stable resource identifier). The frontend route consumes the token or ID via the typed client. Reasons: branded UX (loading / error / redirect); avoids Outlook/Gmail re-autolinking visible URL text and mangling `?callbackURL=...`. Use a short label like "Verify your email", never the full URL. Apply to all auth-token emails (org invitations, etc.).
 
 ## Logging & error handling
 
@@ -406,7 +406,7 @@ Two-branch model. **`main` is the released branch — every merge to `main` trig
 - Call `fetch` directly in features — use `api` from `adapters/api-client.ts`.
 - Wrap the auth library in a port/service or register it in DI — `auth` is the integration. Import directly.
 - Re-call `auth.api.getSession()` per route handler — `sessionMiddleware` reads it once; `requireAuth` / `c.get("user")` does the rest.
-- Embed the API verification URL in an email — every link points to `${env.APP_URL}/<route>?token=...`. Use a short label, never the full URL.
+- Embed the API verification URL in an email — every link points to `${env.APP_URL}/<route>?token=...` (opaque tokens) or `${env.APP_URL}/<route>/<id>` (ID-based flows like invitation accept). Use a short label, never the full URL.
 - Sprinkle `console.log` / `console.error` — go through `pino` and the centralised handler.
 - Duplicate `beforeLoad` auth checks per route — host them on a pathless layout.
 - Push directly to `main` or merge `dev` → `main` with squash/rebase — destroys conventional-commit history.

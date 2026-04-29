@@ -137,21 +137,26 @@ export const auth = betterAuth({
           const orgId = crypto.randomUUID();
           const memberId = crypto.randomUUID();
           const now = new Date();
-          await db.transaction(async (tx) => {
-            await tx.insert(schema.organization).values({
-              id: orgId,
-              name: "Personal",
-              slug: `personal-${user.id.slice(0, 12)}`,
-              createdAt: now,
+          try {
+            await db.transaction(async (tx) => {
+              await tx.insert(schema.organization).values({
+                id: orgId,
+                name: "Personal",
+                slug: `personal-${user.id.slice(0, 12)}`,
+                createdAt: now,
+              });
+              await tx.insert(schema.member).values({
+                id: memberId,
+                organizationId: orgId,
+                userId: user.id,
+                role: "owner",
+                createdAt: now,
+              });
             });
-            await tx.insert(schema.member).values({
-              id: memberId,
-              organizationId: orgId,
-              userId: user.id,
-              role: "owner",
-              createdAt: now,
-            });
-          });
+          } catch (err) {
+            logger.error({ err, userId: user.id }, "personal-org creation failed at signup");
+            throw err;
+          }
         },
       },
     },
