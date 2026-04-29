@@ -17,28 +17,18 @@
     "./styles/globals.css": "./src/styles/globals.css",
     "./libs/*": "./src/libs/*",
     "./hooks/*": "./src/hooks/*.ts",
-    "./components/*": "./src/components/*.tsx",
     "./components/ui/*": "./src/components/ui/*.tsx",
     "./index": "./src/index.ts"
   },
   "peerDependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "lucide-react-native": ">=0.400",
-    "nativewind": "^4",
     "react": "^19",
     "react-dom": "^19",
     "react-hook-form": "^7.71.1",
-    "react-native": ">=0.70",
     "zod": "^4.2.1"
   },
   "peerDependenciesMeta": {
     "@hookform/resolvers": {
-      "optional": true
-    },
-    "lucide-react-native": {
-      "optional": true
-    },
-    "nativewind": {
       "optional": true
     },
     "react-dom": {
@@ -46,29 +36,18 @@
     },
     "react-hook-form": {
       "optional": true
-    },
-    "react-native": {
-      "optional": true
     }
   },
   "dependencies": {
-    "@base-ui/react": "^1.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "date-fns": "^4.1.0",
-    "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.38.0",
-    "input-otp": "^1.4.2",
     "lucide-react": "^1.12.0",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",
-    "react-day-picker": "^9.14.0",
-    "react-resizable-panels": "^4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "tw-animate-css": "^1.4.0",
-    "vaul": "^1.1.2"
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
