@@ -20,7 +20,10 @@ import { Route as ProtectedDashboardRouteImport } from './routes/_protected/dash
 import { Route as GuestSignUpRouteImport } from './routes/_guest/sign-up'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
 import { Route as GuestForgotPasswordRouteImport } from './routes/_guest/forgot-password'
+import { Route as ProtectedOrgSettingsRouteImport } from './routes/_protected/org/settings'
 import { Route as ProtectedOrgNewRouteImport } from './routes/_protected/org/new'
+import { Route as ProtectedOrgMembersRouteImport } from './routes/_protected/org/members'
+import { Route as ProtectedOrgInvitationsRouteImport } from './routes/_protected/org/invitations'
 import { Route as ProtectedAccountSecurityRouteImport } from './routes/_protected/account.security'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -76,9 +79,24 @@ const GuestForgotPasswordRoute = GuestForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => GuestRoute,
 } as any)
+const ProtectedOrgSettingsRoute = ProtectedOrgSettingsRouteImport.update({
+  id: '/org/settings',
+  path: '/org/settings',
+  getParentRoute: () => ProtectedRoute,
+} as any)
 const ProtectedOrgNewRoute = ProtectedOrgNewRouteImport.update({
   id: '/org/new',
   path: '/org/new',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedOrgMembersRoute = ProtectedOrgMembersRouteImport.update({
+  id: '/org/members',
+  path: '/org/members',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedOrgInvitationsRoute = ProtectedOrgInvitationsRouteImport.update({
+  id: '/org/invitations',
+  path: '/org/invitations',
   getParentRoute: () => ProtectedRoute,
 } as any)
 const ProtectedAccountSecurityRoute =
@@ -99,7 +117,10 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof GuestSignUpRoute
   '/dashboard': typeof ProtectedDashboardRoute
   '/account/security': typeof ProtectedAccountSecurityRoute
+  '/org/invitations': typeof ProtectedOrgInvitationsRoute
+  '/org/members': typeof ProtectedOrgMembersRoute
   '/org/new': typeof ProtectedOrgNewRoute
+  '/org/settings': typeof ProtectedOrgSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -112,7 +133,10 @@ export interface FileRoutesByTo {
   '/sign-up': typeof GuestSignUpRoute
   '/dashboard': typeof ProtectedDashboardRoute
   '/account/security': typeof ProtectedAccountSecurityRoute
+  '/org/invitations': typeof ProtectedOrgInvitationsRoute
+  '/org/members': typeof ProtectedOrgMembersRoute
   '/org/new': typeof ProtectedOrgNewRoute
+  '/org/settings': typeof ProtectedOrgSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -128,7 +152,10 @@ export interface FileRoutesById {
   '/_guest/sign-up': typeof GuestSignUpRoute
   '/_protected/dashboard': typeof ProtectedDashboardRoute
   '/_protected/account/security': typeof ProtectedAccountSecurityRoute
+  '/_protected/org/invitations': typeof ProtectedOrgInvitationsRoute
+  '/_protected/org/members': typeof ProtectedOrgMembersRoute
   '/_protected/org/new': typeof ProtectedOrgNewRoute
+  '/_protected/org/settings': typeof ProtectedOrgSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,7 +170,10 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/dashboard'
     | '/account/security'
+    | '/org/invitations'
+    | '/org/members'
     | '/org/new'
+    | '/org/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -156,7 +186,10 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/dashboard'
     | '/account/security'
+    | '/org/invitations'
+    | '/org/members'
     | '/org/new'
+    | '/org/settings'
   id:
     | '__root__'
     | '/'
@@ -171,7 +204,10 @@ export interface FileRouteTypes {
     | '/_guest/sign-up'
     | '/_protected/dashboard'
     | '/_protected/account/security'
+    | '/_protected/org/invitations'
+    | '/_protected/org/members'
     | '/_protected/org/new'
+    | '/_protected/org/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -263,11 +299,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuestForgotPasswordRouteImport
       parentRoute: typeof GuestRoute
     }
+    '/_protected/org/settings': {
+      id: '/_protected/org/settings'
+      path: '/org/settings'
+      fullPath: '/org/settings'
+      preLoaderRoute: typeof ProtectedOrgSettingsRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
     '/_protected/org/new': {
       id: '/_protected/org/new'
       path: '/org/new'
       fullPath: '/org/new'
       preLoaderRoute: typeof ProtectedOrgNewRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/org/members': {
+      id: '/_protected/org/members'
+      path: '/org/members'
+      fullPath: '/org/members'
+      preLoaderRoute: typeof ProtectedOrgMembersRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/org/invitations': {
+      id: '/_protected/org/invitations'
+      path: '/org/invitations'
+      fullPath: '/org/invitations'
+      preLoaderRoute: typeof ProtectedOrgInvitationsRouteImport
       parentRoute: typeof ProtectedRoute
     }
     '/_protected/account/security': {
@@ -297,13 +354,19 @@ const GuestRouteWithChildren = GuestRoute._addFileChildren(GuestRouteChildren)
 interface ProtectedRouteChildren {
   ProtectedDashboardRoute: typeof ProtectedDashboardRoute
   ProtectedAccountSecurityRoute: typeof ProtectedAccountSecurityRoute
+  ProtectedOrgInvitationsRoute: typeof ProtectedOrgInvitationsRoute
+  ProtectedOrgMembersRoute: typeof ProtectedOrgMembersRoute
   ProtectedOrgNewRoute: typeof ProtectedOrgNewRoute
+  ProtectedOrgSettingsRoute: typeof ProtectedOrgSettingsRoute
 }
 
 const ProtectedRouteChildren: ProtectedRouteChildren = {
   ProtectedDashboardRoute: ProtectedDashboardRoute,
   ProtectedAccountSecurityRoute: ProtectedAccountSecurityRoute,
+  ProtectedOrgInvitationsRoute: ProtectedOrgInvitationsRoute,
+  ProtectedOrgMembersRoute: ProtectedOrgMembersRoute,
   ProtectedOrgNewRoute: ProtectedOrgNewRoute,
+  ProtectedOrgSettingsRoute: ProtectedOrgSettingsRoute,
 }
 
 const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(
