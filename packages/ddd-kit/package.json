@@ -54,6 +54,7 @@
     "@packages/drizzle": "workspace:*",
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
+    "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.5",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
