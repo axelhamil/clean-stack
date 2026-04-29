@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { activeOrgQueryOptions } from "../../adapters/queries/active-org";
 import { currentMembershipQueryOptions } from "../../adapters/queries/current-membership";
@@ -22,7 +22,7 @@ export function OrgMembersPage() {
   if (!org) {
     return (
       <main className="p-6">
-        <p>No active organization.</p>
+        <TypographyMuted>No active organization.</TypographyMuted>
       </main>
     );
   }

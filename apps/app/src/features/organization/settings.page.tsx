@@ -6,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
-import { TypographyH1, TypographyH2 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ export function OrgSettingsPage() {
   if (!org) {
     return (
       <main className="p-6">
-        <p>No active organization.</p>
+        <TypographyMuted>No active organization.</TypographyMuted>
       </main>
     );
   }
@@ -111,9 +111,7 @@ export function OrgSettingsPage() {
         </CardContent>
       </Card>
 
-      <TypographyH2 className="text-muted-foreground text-sm">
-        Role: {role ?? "loading…"}
-      </TypographyH2>
+      <TypographyMuted>Role: {role ?? "loading…"}</TypographyMuted>
     </main>
   );
 }

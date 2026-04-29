@@ -1,5 +1,6 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
 import {
   Select,
   SelectContent,
@@ -7,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
+import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { removeMemberMutationOptions } from "../../../adapters/mutations/remove-member";
@@ -56,12 +58,12 @@ export function MemberRow({ member, organizationId, canEdit }: MemberRowProps) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <div className="flex flex-col">
-        <span className="font-medium">{member.user.name ?? member.user.email}</span>
-        <span className="text-muted-foreground text-sm">{member.user.email}</span>
-      </div>
-      <div className="flex items-center gap-2">
+    <ListRow>
+      <ListRowContent>
+        <TypographyP>{member.user.name ?? member.user.email}</TypographyP>
+        <TypographyMuted>{member.user.email}</TypographyMuted>
+      </ListRowContent>
+      <ListRowAction>
         {canEdit ? (
           <Select
             value={member.role}
@@ -89,7 +91,7 @@ export function MemberRow({ member, organizationId, canEdit }: MemberRowProps) {
             Remove
           </Button>
         )}
-      </div>
-    </div>
+      </ListRowAction>
+    </ListRow>
   );
 }

@@ -1,5 +1,7 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
+import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cancelInvitationMutationOptions } from "../../../adapters/mutations/cancel-invitation";
@@ -34,14 +36,14 @@ export function InvitationRow({ invitation, organizationId, canCancel }: Invitat
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <div className="flex flex-col">
-        <span className="font-medium">{invitation.email}</span>
-        <span className="text-muted-foreground text-sm">
+    <ListRow>
+      <ListRowContent>
+        <TypographyP>{invitation.email}</TypographyP>
+        <TypographyMuted>
           {invitation.role} · expires {new Date(invitation.expiresAt).toLocaleDateString()}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
+        </TypographyMuted>
+      </ListRowContent>
+      <ListRowAction>
         <Badge variant="outline">{invitation.status}</Badge>
         {canCancel && invitation.status === "pending" && (
           <Button
@@ -53,7 +55,7 @@ export function InvitationRow({ invitation, organizationId, canCancel }: Invitat
             Cancel
           </Button>
         )}
-      </div>
-    </div>
+      </ListRowAction>
+    </ListRow>
   );
 }

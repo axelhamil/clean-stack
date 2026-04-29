@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Card,
@@ -6,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -34,7 +35,7 @@ export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps
     return (
       <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
         <TypographyH1>Sign in to accept</TypographyH1>
-        <p className="text-muted-foreground">You need to be signed in to accept this invitation.</p>
+        <TypographyMuted>You need to be signed in to accept this invitation.</TypographyMuted>
         <Button asChild>
           <Link to="/sign-in" search={{ redirect: `/accept-invitation/${invitationId}` }}>
             Sign in
@@ -84,7 +85,11 @@ export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps
           >
             Accept invitation
           </Button>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     </main>

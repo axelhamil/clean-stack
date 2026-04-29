@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
-import { TypographyH1, TypographyH2 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { activeOrgQueryOptions } from "../../adapters/queries/active-org";
 import { currentMembershipQueryOptions } from "../../adapters/queries/current-membership";
@@ -25,7 +25,7 @@ export function OrgInvitationsPage() {
   if (!org) {
     return (
       <main className="p-6">
-        <p>No active organization.</p>
+        <TypographyMuted>No active organization.</TypographyMuted>
       </main>
     );
   }
@@ -55,7 +55,7 @@ export function OrgInvitationsPage() {
         </CardHeader>
         <CardContent className="flex flex-col divide-y">
           {invitations.length === 0 ? (
-            <TypographyH2 className="text-muted-foreground text-sm">No invitations.</TypographyH2>
+            <TypographyMuted>No invitations.</TypographyMuted>
           ) : (
             invitations.map((inv) => (
               <InvitationRow
