@@ -4,18 +4,20 @@ import type { EventHandlerFn, IEventDispatcher } from "./event-dispatcher";
 
 type HandlersMap = Map<string, EventHandlerFn[]>;
 
+export interface EventDispatcherLogger {
+  error(message: string, error?: unknown): void;
+}
+
 export class InMemoryEventDispatcher implements IEventDispatcher {
   private handlers: HandlersMap = new Map();
-  private enableLogging = false;
+  private logger: EventDispatcherLogger | null = null;
 
-  setLogging(enabled: boolean): void {
-    this.enableLogging = enabled;
+  setLogger(logger: EventDispatcherLogger | null): void {
+    this.logger = logger;
   }
 
   private log(message: string, error?: unknown): void {
-    if (this.enableLogging) {
-      console.error(message, error);
-    }
+    this.logger?.error(message, error);
   }
 
   subscribe<T extends IDomainEvent>(

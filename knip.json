@@ -3,7 +3,8 @@
   "workspaces": {
     "apps/api": {
       "entry": ["src/di/container.ts", "common/**/*.ts"],
-      "project": ["**/*.ts"]
+      "project": ["**/*.ts"],
+      "ignoreDependencies": ["pino-pretty"]
     },
     "apps/app": {
       "project": ["**/*.ts", "**/*.tsx"]

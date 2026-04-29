@@ -4,19 +4,29 @@ Upcoming integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `ada
 
 ---
 
-## Auth — BetterAuth (end-to-end)
+## Auth — BetterAuth (end-to-end) ✅ Phase 1 done
 
 **Why**: own the token, multi-provider, typed plugins (Stripe, organizations, 2FA, passkeys, magic-link), DB-backed sessions, first lib that runs natively on Bun + Hono with no hacks.
 
-- [ ] Install `better-auth` + Drizzle adapter (`better-auth/adapters/drizzle`)
-- [ ] Auth schemas generated via `better-auth generate` → `packages/drizzle/src/schema/auth.ts`
-- [ ] Hono handler: `app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))`
-- [ ] React client: `createAuthClient` in `apps/app/src/adapters/auth-client.ts`
-- [ ] Plugins: `organization` (multi-tenant from day one, see dedicated section), `twoFactor`, `passkey`, `magicLink`, `stripe` (see Stripe section)
-- [ ] Server-side session via Hono middleware → injected into `c.var.user`
-- [ ] Pages `/sign-in`, `/sign-up`, `/forgot-password`, `/verify-email` in `features/auth/`
-- [ ] Route middleware `beforeLoad` (TanStack Router) → redirect when not authenticated
-- [ ] Cookies: `httpOnly` + `sameSite=lax` + `secure` in production
+- [x] Install `better-auth` + Drizzle adapter (`better-auth/adapters/drizzle`)
+- [x] Auth schemas generated via `@better-auth/cli generate` → `packages/drizzle/src/schema/auth.ts` (6 tables: user, session, account, verification, two_factor, passkey)
+- [x] Hono handler: `app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))`
+- [x] React client: `createAuthClient` in `apps/app/src/adapters/auth-client.ts`
+- [x] Plugins: `twoFactor`, `passkey`, `magicLink`, `bearer` (mobile/Capacitor-ready). `organization` + `stripe` deferred to their dedicated sections.
+- [x] `sessionMiddleware` (`adapters/middleware/auth.middleware.ts`) populates `c.var.user` / `c.var.session` ; companion `requireAuth` middleware throws `HTTPException(401)` on protected handlers.
+- [x] Pages `/sign-in`, `/sign-up`, `/forgot-password`, `/verify-email`, `/reset-password`, `/magic-link`, `/two-factor` in `features/auth/`.
+- [x] Pathless layouts `routes/_protected.tsx` (block when no session) and `routes/_guest.tsx` (block when already logged in) — single `beforeLoad` shared by all children, URLs unchanged.
+- [x] Cookies: `httpOnly` + `sameSite=lax` + `secure` in production.
+- [x] **Performance**: `session.cookieCache` (5 min) on the server — auth check is signature-only between refreshes (no DB hit). DB stays the source of truth at expiry → instant revoke on sign-out/ban.
+- [x] **Native readiness**: `bearer()` plugin enables `Authorization: Bearer <token>` alongside cookies. Web stays cookie-based (httpOnly, XSS-safe), Capacitor/mobile uses bearer with secure storage. Same session row, transport differs.
+- [x] **Email URLs route through the app, not the API** — every email link points to `${APP_URL}/<route>?token=...`. The frontend page consumes the token via the typed client (`authClient.verifyEmail`, `resetPassword`, `magicLink.verify`). No more `callbackURL` mangling by Outlook & co.
+- [x] **Pino structured logging + centralised error handler** — `hono-pino` middleware (`adapters/middleware/logger.middleware.ts`), JSON in prod, `pino-pretty` in dev. Single `errorHandler` (`adapters/middleware/error.middleware.ts`) returns `{ error: { code, message, requestId, stack? } }`.
+- [x] **Session as TanStack Query, not React state** — `sessionQueryOptions` (`adapters/queries/session.ts`, staleTime 5 min aligned with `cookieCache`). Router context only exposes `queryClient`; gates do `await context.queryClient.ensureQueryData(sessionQueryOptions)` in `beforeLoad`. No `useSession()` React bridge, zero race between nanostores and beforeLoad.
+- [x] **Realtime cross-tab session sync** — native `BroadcastChannel('clean-stack-auth')` (`adapters/auth-broadcast.ts`, ~15 LoC, no experimental dep). Auth mutations call `broadcastAuthChange()` after refetching the session query; `app-providers.tsx` listens once and on receive does `refetchQueries(['session']) + router.invalidate()`. Tab A signs out → tab B (idle on `/dashboard`) instantly transitions to `/sign-in` without polling, hard reload, or navigation in B.
+- [x] **Strong password schema split** — `_schemas/auth.schema.ts` exposes `passwordSchema` (loose: `min(1)`, used by sign-in to capture, the server validates) and `strongPasswordSchema` (strict: `min(12).max(128)` + lowercase/uppercase/digit, used by sign-up + reset). NIST-aligned: no required special character.
+- [x] **StrictMode-safe token consumption** — `useRef(false)` guard in `verify-email.page.tsx` and `magic-link.page.tsx` prevents the dev-only double-fire of single-use tokens.
+- [ ] Phase 2 — `organization` plugin (see dedicated section).
+- [ ] Phase 3 — `@better-auth/stripe` plugin (see dedicated section).
 
 ---
 

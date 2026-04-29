@@ -109,7 +109,7 @@ describe("Aggregate", () => {
       });
 
       expect(aggregate.get("name")).toBe("John");
-      expect(aggregate.getProps()).toEqual({ name: "John", age: 30 });
+      expect(aggregate.get("age")).toBe(30);
     });
   });
 
@@ -244,14 +244,6 @@ describe("Aggregate", () => {
 
       expect(aggregate.domainEvents).toHaveLength(2);
       expect(aggregate.name).toBe("Jane");
-    });
-
-    it("should preserve events through getProps()", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-
-      aggregate.getProps();
-
-      expect(aggregate.domainEvents).toHaveLength(1);
     });
 
     it("should preserve events through toObject()", () => {

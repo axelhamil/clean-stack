@@ -1,15 +1,20 @@
-import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { HTTPException } from "hono/http-exception";
-import { logger } from "hono/logger";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
-import { z } from "zod";
 import { env } from "../common/env";
+import { logger } from "../common/logger";
+import {
+  type AuthVariables,
+  requireAuth,
+  sessionMiddleware,
+} from "./adapters/middleware/auth.middleware";
+import { errorHandler } from "./adapters/middleware/error.middleware";
+import { httpLogger } from "./adapters/middleware/logger.middleware";
+import { auth } from "./auth";
 
 type AppEnv = {
-  Variables: {
+  Variables: AuthVariables & {
     requestId: string;
   };
 };
@@ -17,6 +22,7 @@ type AppEnv = {
 const app = new Hono<AppEnv>();
 
 app.use("*", requestId());
+app.use("*", httpLogger);
 app.use("*", secureHeaders());
 app.use(
   "*",
@@ -25,29 +31,19 @@ app.use(
     credentials: true,
   }),
 );
-app.use("*", logger());
 
-app.onError((err, c) => {
-  if (err instanceof HTTPException) return err.getResponse();
-  console.error(`\x1b[31m✗\x1b[0m ${err.name}: ${err.message}`);
-  return c.json({ error: "Internal Server Error" }, 500);
-});
+app.use("*", sessionMiddleware);
+
+app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+app.onError(errorHandler);
 
 const routes = app
   .get("/health", (c) => c.json({ status: "ok" as const }))
   .get("/ready", (c) => c.json({ status: "ok" as const }))
-  .post(
-    "/newsletter/subscribe",
-    zValidator("json", z.object({ email: z.email() })),
-    (c) => {
-      const { email } = c.req.valid("json");
-      return c.json({ ok: true as const, email });
-    },
-  );
+  .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }));
 
-console.log(
-  `\x1b[36m▶\x1b[0m api ready · \x1b[1mhttp://localhost:${env.PORT}\x1b[0m`,
-);
+logger.info({ port: env.PORT, env: env.NODE_ENV }, "api ready");
 
 export type AppType = typeof routes;
 export default {

@@ -1,15 +1,26 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-function TypographyH1({ className, ...props }: React.ComponentProps<"h1">) {
+const typographyH1Variants = cva("scroll-m-20 font-extrabold tracking-tight", {
+  variants: {
+    variant: {
+      hero: "text-center text-4xl text-balance",
+      page: "text-left text-3xl",
+    },
+  },
+  defaultVariants: { variant: "hero" },
+});
+
+type TypographyH1Props = React.ComponentProps<"h1"> &
+  VariantProps<typeof typographyH1Variants>;
+
+function TypographyH1({ className, variant, ...props }: TypographyH1Props) {
   return (
     <h1
       data-slot="typography-h1"
-      className={cn(
-        "scroll-m-20 text-center font-extrabold text-4xl tracking-tight text-balance",
-        className,
-      )}
+      className={cn(typographyH1Variants({ variant }), className)}
       {...props}
     />
   );

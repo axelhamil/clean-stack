@@ -390,6 +390,17 @@ html.theme-transitioning::view-transition-new(root) {
   animation: liveDot 1.6s ease-in-out infinite;
 }
 
+/* Press feedback — scale up on hover, scale down on active. Applique sur n'importe quel bouton/élément interactif */
+.tap-scale {
+  transition: transform 150ms ease-out;
+}
+.tap-scale:hover {
+  transform: scale(1.1);
+}
+.tap-scale:active {
+  transform: scale(0.95);
+}
+
 /* Card hover micro-lift — applique sur n'importe quelle Card */
 .hover-lift {
   transition:

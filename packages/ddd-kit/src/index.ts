@@ -16,10 +16,6 @@ export * from "./domain/watched-list";
 export * from "./events/event-dispatcher";
 export * from "./events/event-handler";
 export * from "./events/in-memory-event-dispatcher";
-// HTTP
-export * from "./http/http-code";
-export * from "./http/http-exception";
-export * from "./http/http-response";
 // Primitives
 export * from "./primitives/option";
 export * from "./primitives/result";

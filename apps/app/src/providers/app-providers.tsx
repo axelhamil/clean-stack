@@ -3,11 +3,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
+import { onAuthChange } from "../adapters/auth-broadcast";
+import { sessionQueryOptions } from "../adapters/queries/session";
 import { queryClient } from "../adapters/query-client";
 import { routeTree } from "../routeTree.gen";
 
 const router = createRouter({
   routeTree,
+  context: { queryClient },
   defaultViewTransition: true,
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
@@ -21,6 +24,13 @@ declare module "@tanstack/react-router" {
     router: typeof router;
   }
 }
+
+onAuthChange(async () => {
+  await queryClient.refetchQueries({
+    queryKey: sessionQueryOptions.queryKey,
+  });
+  await router.invalidate();
+});
 
 export function AppProviders() {
   return (

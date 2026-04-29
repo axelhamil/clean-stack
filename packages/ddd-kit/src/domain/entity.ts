@@ -6,7 +6,6 @@ export interface IEntity<T> {
   readonly _id: UUID<string | number>;
   readonly _props: T;
   equals(object?: IEntity<T>): boolean;
-  getProps(): unknown;
   toObject(): Record<string, unknown>;
 }
 
@@ -37,10 +36,6 @@ export abstract class Entity<T> implements IEntity<T> {
     }
 
     return prop;
-  }
-
-  public getProps(): T {
-    return { ...this._props };
   }
 
   public toObject(): Record<string, unknown> {

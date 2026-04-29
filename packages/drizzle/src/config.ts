@@ -2,8 +2,9 @@ import "dotenv/config";
 import { drizzle, type NodePgTransaction } from "drizzle-orm/node-postgres";
 import type { ExtractTablesWithRelations } from "drizzle-orm/relations";
 import { Pool } from "pg";
+import * as authSchema from "./schema/auth";
 
-const schema = {};
+const schema = { ...authSchema };
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
