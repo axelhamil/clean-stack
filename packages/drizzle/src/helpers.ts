@@ -1,6 +1,6 @@
 import { and, eq, type SQL } from "drizzle-orm";
 
-export function withOrg<T extends { organizationId: any }>(
+export function withOrg<T extends { organizationId: SQL }>(
   table: T,
   orgId: string,
   extra?: SQL,
