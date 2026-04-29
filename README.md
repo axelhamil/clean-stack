@@ -48,7 +48,7 @@ packages/
 
 ## Conventions
 
-See `CLAUDE.md` for architecture rules (Result/Option, no null, no throw in domain, CQRS, DI rules, import direction in app).
+See `CLAUDE.md` for architecture rules (Result/Option, no null, no throw in domain, CQRS, DI rules, import direction in app, theme tokens only, shadcn-first, HTML semantics, zero-warning pipeline).
 
 ## Scripts
 

@@ -37,5 +37,10 @@ The `_` prefix mirrors Next's "private folder" convention. Inside `features/` it
 - Sections inside the page use `<section>` with an `id` when they're navigation targets (e.g. `<section id="stack">`).
 - One `TypographyH1` per page (in the hero), `TypographyH2` for top-level sections, `H3`/`H4` for nested headings.
 
+**Zero-warning pipeline:**
+
+- Husky / lint-staged / commit-msg / pre-push / `pnpm ci:check` must run **clean** before pushing — no warnings, no errors.
+- Never bypass with `--no-verify`. If a Biome warning is genuinely intentional (a11y `!important`, regex with intentional duplication, etc.), silence it with a targeted ignore + reason: `/* biome-ignore <rule>: <why> */`. Never disable rules globally.
+
 May import from: `adapters/`, `common/`, `@packages/ui`, `@packages/ddd-kit`.
 Must NOT import from: other `features/`, `routes/`, `providers/`.

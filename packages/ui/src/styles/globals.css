@@ -218,9 +218,13 @@ html.theme-transitioning::view-transition-new(root) {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: a11y override — must beat inline styles + 3rd-party animations (framer, tw-animate-css) */
     animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: a11y override — must beat inline styles + 3rd-party animations (framer, tw-animate-css) */
     animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: a11y override — must beat inline styles + 3rd-party animations (framer, tw-animate-css) */
     transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: a11y override — must beat inline styles + 3rd-party animations (framer, tw-animate-css) */
     scroll-behavior: auto !important;
   }
 }
