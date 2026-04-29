@@ -22,10 +22,7 @@ import {
   ListRowMedia,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
-import {
-  TypographyMuted,
-  TypographySmall,
-} from "@packages/ui/components/ui/typography";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
@@ -42,8 +39,8 @@ export function PasskeysCard() {
       <CardHeader>
         <CardTitle>Passkeys</CardTitle>
         <CardDescription>
-          Sign in with biometrics or a hardware key. Passkeys are
-          phishing-resistant and replace passwords.
+          Sign in with biometrics or a hardware key. Passkeys are phishing-resistant and replace
+          passwords.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -76,9 +73,7 @@ export function PasskeysCard() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add a passkey</DialogTitle>
-              <DialogDescription>
-                Give it a name so you can identify it later.
-              </DialogDescription>
+              <DialogDescription>Give it a name so you can identify it later.</DialogDescription>
             </DialogHeader>
             <AddPasskeyForm onSuccess={() => setOpen(false)} />
           </DialogContent>
@@ -96,13 +91,7 @@ interface PasskeyRowProps {
   createdAt: Date;
 }
 
-function PasskeyRow({
-  id,
-  name,
-  deviceType,
-  backedUp,
-  createdAt,
-}: PasskeyRowProps) {
+function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowProps) {
   const mutation = useDeletePasskey();
   const created = new Date(createdAt).toLocaleDateString();
 

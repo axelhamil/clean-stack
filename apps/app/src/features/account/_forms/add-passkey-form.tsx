@@ -4,10 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useAddPasskey } from "../_hooks/use-add-passkey";
-import {
-  type AddPasskeyInput,
-  addPasskeySchema,
-} from "../_schemas/account.schema";
+import { type AddPasskeyInput, addPasskeySchema } from "../_schemas/account.schema";
 
 interface AddPasskeyFormProps {
   onSuccess?: () => void;

@@ -16,10 +16,7 @@ export function SignInPage({ redirectTo }: SignInPageProps = {}) {
         title="Sign in"
         description="Welcome back. Enter your details to continue."
         footer={
-          <AuthShellFooter
-            lead="No account yet?"
-            link={<Link to="/sign-up">Create one</Link>}
-          />
+          <AuthShellFooter lead="No account yet?" link={<Link to="/sign-up">Create one</Link>} />
         }
         className="flex flex-col gap-6"
       >

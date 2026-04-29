@@ -30,12 +30,7 @@ export function MagicLinkForm() {
           placeholder="you@example.com"
         />
 
-        <Button
-          type="submit"
-          variant="outline"
-          className="w-full"
-          disabled={mutation.isPending}
-        >
+        <Button type="submit" variant="outline" className="w-full" disabled={mutation.isPending}>
           {mutation.isPending ? "Sending…" : "Email me a magic link"}
         </Button>
       </form>

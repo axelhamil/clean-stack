@@ -20,10 +20,7 @@ export class InMemoryEventDispatcher implements IEventDispatcher {
     this.logger?.error(message, error);
   }
 
-  subscribe<T extends IDomainEvent>(
-    eventType: string,
-    handler: EventHandlerFn<T>,
-  ): Result<void> {
+  subscribe<T extends IDomainEvent>(eventType: string, handler: EventHandlerFn<T>): Result<void> {
     try {
       const existing = this.handlers.get(eventType) ?? [];
       this.handlers.set(eventType, [...existing, handler as EventHandlerFn]);

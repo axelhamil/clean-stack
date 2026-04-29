@@ -24,10 +24,7 @@ class TestEntity extends Entity<TestEntityProps> {
     return this._props.age;
   }
 
-  static create(
-    props: TestEntityProps,
-    id?: UUID<string | number>,
-  ): TestEntity {
+  static create(props: TestEntityProps, id?: UUID<string | number>): TestEntity {
     return new TestEntity(props, id);
   }
 }
@@ -52,10 +49,7 @@ interface NestedEntityProps {
 }
 
 class NestedEntity extends Entity<NestedEntityProps> {
-  static create(
-    props: NestedEntityProps,
-    id?: UUID<string | number>,
-  ): NestedEntity {
+  static create(props: NestedEntityProps, id?: UUID<string | number>): NestedEntity {
     return new NestedEntity(props, id);
   }
 }
@@ -91,10 +85,7 @@ interface EntityWithNullableProps {
 }
 
 class EntityWithNullable extends Entity<EntityWithNullableProps> {
-  static create(
-    props: EntityWithNullableProps,
-    id?: UUID<string | number>,
-  ): EntityWithNullable {
+  static create(props: EntityWithNullableProps, id?: UUID<string | number>): EntityWithNullable {
     return new EntityWithNullable(props, id);
   }
 }
@@ -105,10 +96,7 @@ interface IdPropEntityProps {
 }
 
 class IdPropEntity extends Entity<IdPropEntityProps> {
-  static create(
-    props: IdPropEntityProps,
-    id?: UUID<string | number>,
-  ): IdPropEntity {
+  static create(props: IdPropEntityProps, id?: UUID<string | number>): IdPropEntity {
     return new IdPropEntity(props, id);
   }
 }
@@ -219,10 +207,7 @@ describe("Entity", () => {
 
     it("should serialize UUID props to their values", () => {
       const customId = new UUID("custom-uuid");
-      const entity = IdPropEntity.create(
-        { id: customId, name: "Test" },
-        new UUID(),
-      );
+      const entity = IdPropEntity.create({ id: customId, name: "Test" }, new UUID());
       const obj = entity.toObject();
 
       expect(obj.id).toBe(entity._id.value);
@@ -347,10 +332,7 @@ describe("Entity", () => {
       }
 
       class ComplexEntity extends Entity<ComplexProps> {
-        static create(
-          props: ComplexProps,
-          id?: UUID<string | number>,
-        ): ComplexEntity {
+        static create(props: ComplexProps, id?: UUID<string | number>): ComplexEntity {
           return new ComplexEntity(props, id);
         }
       }

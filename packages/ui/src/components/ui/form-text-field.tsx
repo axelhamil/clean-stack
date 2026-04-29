@@ -1,18 +1,9 @@
 import type { ComponentProps } from "react";
 import type { Control, FieldPath, FieldValues } from "react-hook-form";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "./form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "./form";
 import { Input } from "./input";
 
-type FormTextFieldProps<
-  TFieldValues extends FieldValues,
-  TName extends FieldPath<TFieldValues>,
-> = {
+type FormTextFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>> = {
   control: Control<TFieldValues>;
   name: TName;
   label: string;
@@ -21,12 +12,7 @@ type FormTextFieldProps<
 export function FormTextField<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>,
->({
-  control,
-  name,
-  label,
-  ...inputProps
-}: FormTextFieldProps<TFieldValues, TName>) {
+>({ control, name, label, ...inputProps }: FormTextFieldProps<TFieldValues, TName>) {
   return (
     <FormField
       control={control}

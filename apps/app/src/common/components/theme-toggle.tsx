@@ -24,17 +24,14 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     setMounted(true);
   }, []);
 
-  if (!mounted)
-    return <Button variant="outline" size="icon" aria-hidden disabled />;
+  if (!mounted) return <Button variant="outline" size="icon" aria-hidden disabled />;
 
   const isDark = resolvedTheme === "dark";
   const next = isDark ? "light" : "dark";
 
   const handleClick = async () => {
     const doc = document as DocWithVT;
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const button = buttonRef.current;
 
     if (!doc.startViewTransition || reduced || !button) {
@@ -61,10 +58,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       await transition.ready;
       root.animate(
         {
-          clipPath: [
-            `circle(0px at ${x}px ${y}px)`,
-            `circle(${endRadius}px at ${x}px ${y}px)`,
-          ],
+          clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`],
         },
         {
           duration: 550,

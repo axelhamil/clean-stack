@@ -41,13 +41,9 @@ function MagicLinkError({ message }: MagicLinkErrorProps) {
     <AuthShell
       title="Link invalid or expired"
       description={message}
-      footer={
-        <AuthShellFooter link={<Link to="/sign-in">Request a new link</Link>} />
-      }
+      footer={<AuthShellFooter link={<Link to="/sign-in">Request a new link</Link>} />}
     >
-      <TypographyMuted>
-        Magic links are single-use and expire after a few minutes.
-      </TypographyMuted>
+      <TypographyMuted>Magic links are single-use and expire after a few minutes.</TypographyMuted>
     </AuthShell>
   );
 }

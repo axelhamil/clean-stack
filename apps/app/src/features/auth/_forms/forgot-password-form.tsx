@@ -4,10 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useForgotPassword } from "../_hooks/use-forgot-password";
-import {
-  type ForgotPasswordInput,
-  forgotPasswordSchema,
-} from "../_schemas/auth.schema";
+import { type ForgotPasswordInput, forgotPasswordSchema } from "../_schemas/auth.schema";
 
 export function ForgotPasswordForm() {
   const mutation = useForgotPassword();

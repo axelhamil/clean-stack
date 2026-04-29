@@ -32,8 +32,7 @@ export const requireAuth = createMiddleware<{
   const user = c.get("user") as SessionUser | null;
   const session = c.get("session") as SessionData | null;
 
-  if (!user || !session)
-    throw new HTTPException(401, { message: "Unauthorized" });
+  if (!user || !session) throw new HTTPException(401, { message: "Unauthorized" });
 
   c.set("user", user);
   c.set("session", session);

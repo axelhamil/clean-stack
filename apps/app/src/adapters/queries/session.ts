@@ -1,9 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { authClient } from "../auth-client";
 
-type SessionData = NonNullable<
-  Awaited<ReturnType<typeof authClient.getSession>>["data"]
->;
+type SessionData = NonNullable<Awaited<ReturnType<typeof authClient.getSession>>["data"]>;
 
 export const sessionQueryOptions = queryOptions({
   queryKey: ["session"] as const,

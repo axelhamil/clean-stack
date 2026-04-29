@@ -22,16 +22,11 @@ const STATUS_HINTS: Record<number, string> = {
 };
 
 type ResendSendPayload = Parameters<Resend["emails"]["send"]>[0];
-type AttemptOutcome =
-  | { ok: true }
-  | { ok: false; status: number; message: string };
+type AttemptOutcome = { ok: true } | { ok: false; status: number; message: string };
 
 export class ResendEmailService implements IEmailService {
   private readonly resend: Resend | null;
-  private readonly templateIds: Record<
-    keyof EmailTemplates,
-    string | undefined
-  >;
+  private readonly templateIds: Record<keyof EmailTemplates, string | undefined>;
 
   constructor() {
     this.resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
@@ -49,17 +44,13 @@ export class ResendEmailService implements IEmailService {
     if (isProd && (!this.resend || missing.length > 0)) {
       throw new Error(
         `Email service misconfigured in production: ${
-          !this.resend
-            ? "RESEND_API_KEY missing"
-            : `template IDs missing: ${missing.join(", ")}`
+          !this.resend ? "RESEND_API_KEY missing" : `template IDs missing: ${missing.join(", ")}`
         }`,
       );
     }
 
     if (!this.resend) {
-      logger.warn(
-        "RESEND_API_KEY not set — emails will be dropped (dev fallback)",
-      );
+      logger.warn("RESEND_API_KEY not set — emails will be dropped (dev fallback)");
       return;
     }
 
@@ -96,9 +87,7 @@ export class ResendEmailService implements IEmailService {
       from: options?.from ?? env.RESEND_FROM,
       to,
       template: { id: templateId, variables },
-      ...(options?.idempotencyKey
-        ? { idempotencyKey: options.idempotencyKey }
-        : {}),
+      ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
     };
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -106,8 +95,7 @@ export class ResendEmailService implements IEmailService {
       if (outcome.ok) return Result.ok();
 
       const isLast = attempt === MAX_ATTEMPTS;
-      const retryable =
-        outcome.status === 0 || RETRYABLE_STATUSES.has(outcome.status);
+      const retryable = outcome.status === 0 || RETRYABLE_STATUSES.has(outcome.status);
 
       if (!retryable || isLast) {
         const hint = STATUS_HINTS[outcome.status] ?? "resend email send failed";
@@ -147,9 +135,7 @@ export class ResendEmailService implements IEmailService {
     });
   }
 
-  private async attemptSend(
-    payload: ResendSendPayload,
-  ): Promise<AttemptOutcome> {
+  private async attemptSend(payload: ResendSendPayload): Promise<AttemptOutcome> {
     if (!this.resend) {
       return { ok: false, status: 0, message: "resend client not initialized" };
     }

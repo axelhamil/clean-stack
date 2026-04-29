@@ -12,8 +12,7 @@ export const Route = createFileRoute("/verify-email")({
   beforeLoad: async ({ context, search }) => {
     if (search.token) return;
 
-    const session =
-      await context.queryClient.ensureQueryData(sessionQueryOptions);
+    const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
     if (session) throw redirect({ to: "/dashboard" });
   },
   component: () => {

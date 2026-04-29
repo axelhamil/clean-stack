@@ -4,18 +4,13 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useDisableTwoFactor } from "../_hooks/use-disable-two-factor";
-import {
-  type PasswordPromptInput,
-  passwordPromptSchema,
-} from "../_schemas/account.schema";
+import { type PasswordPromptInput, passwordPromptSchema } from "../_schemas/account.schema";
 
 interface DisableTwoFactorFormProps {
   onSuccess?: () => void;
 }
 
-export function DisableTwoFactorForm({
-  onSuccess,
-}: DisableTwoFactorFormProps = {}) {
+export function DisableTwoFactorForm({ onSuccess }: DisableTwoFactorFormProps = {}) {
   const mutation = useDisableTwoFactor();
   const form = useForm<PasswordPromptInput>({
     resolver: zodResolver(passwordPromptSchema),

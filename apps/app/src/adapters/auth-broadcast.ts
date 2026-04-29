@@ -1,9 +1,7 @@
 type AuthEvent = { type: "session-changed" };
 
 const channel =
-  typeof BroadcastChannel !== "undefined"
-    ? new BroadcastChannel("clean-stack-auth")
-    : null;
+  typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("clean-stack-auth") : null;
 
 export function broadcastAuthChange(): void {
   channel?.postMessage({ type: "session-changed" } satisfies AuthEvent);

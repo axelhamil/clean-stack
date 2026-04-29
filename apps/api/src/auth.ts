@@ -8,19 +8,13 @@ import { bearer, magicLink, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
 import { env } from "../common/env";
 import { logger } from "../common/logger";
-import type {
-  EmailTemplates,
-  TemplateVariables,
-} from "./application/ports/email.port";
+import type { EmailTemplates, TemplateVariables } from "./application/ports/email.port";
 import { di } from "./di/container";
 
 const isProd = env.NODE_ENV === "production";
 
 function tokenIdempotencyKey(template: string, token: string): string {
-  const hash = new CryptoHasher("sha256")
-    .update(token)
-    .digest("hex")
-    .slice(0, 32);
+  const hash = new CryptoHasher("sha256").update(token).digest("hex").slice(0, 32);
   return `${template}/${hash}`;
 }
 
@@ -38,10 +32,7 @@ async function dispatchEmail<K extends keyof EmailTemplates>(
     if (error.code === "EMAIL_PROVIDER_FAILURE") {
       throw new Error(`email send failed (${template}): ${error.message}`);
     }
-    logger.warn(
-      { template, to, code: error.code },
-      "email skipped — transport not configured",
-    );
+    logger.warn({ template, to, code: error.code }, "email skipped — transport not configured");
   }
 }
 

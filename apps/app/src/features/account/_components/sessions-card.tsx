@@ -14,10 +14,7 @@ import {
   ListRowMedia,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
-import {
-  TypographyMuted,
-  TypographySmall,
-} from "@packages/ui/components/ui/typography";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { LogOutIcon, MonitorIcon } from "lucide-react";
 import { sessionsQueryOptions } from "../../../adapters/queries/sessions";
@@ -39,9 +36,7 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
       <CardHeader className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1.5">
           <CardTitle>Active sessions</CardTitle>
-          <CardDescription>
-            Devices currently signed in to your account.
-          </CardDescription>
+          <CardDescription>Devices currently signed in to your account.</CardDescription>
         </div>
         {others.length > 0 && (
           <Button
@@ -87,13 +82,7 @@ interface SessionRowProps {
   expiresAt: Date;
 }
 
-function SessionRow({
-  token,
-  isCurrent,
-  ipAddress,
-  userAgent,
-  expiresAt,
-}: SessionRowProps) {
+function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt }: SessionRowProps) {
   const mutation = useRevokeSession();
   const expires = new Date(expiresAt).toLocaleDateString();
   const ua = userAgent ? summarizeUserAgent(userAgent) : "Unknown device";

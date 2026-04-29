@@ -17,9 +17,7 @@ class UserCreated implements IDomainEvent<TestPayload> {
   }
 }
 
-class UserNameChanged
-  implements IDomainEvent<TestPayload & { newName: string }>
-{
+class UserNameChanged implements IDomainEvent<TestPayload & { newName: string }> {
   readonly eventType = "UserNameChanged";
   readonly dateOccurred = new Date();
   aggregateId: string;
@@ -48,19 +46,13 @@ class TestAggregate extends Aggregate<TestAggregateProps> {
     return this._props.age;
   }
 
-  static create(
-    props: TestAggregateProps,
-    id?: UUID<string | number>,
-  ): TestAggregate {
+  static create(props: TestAggregateProps, id?: UUID<string | number>): TestAggregate {
     const aggregate = new TestAggregate(props, id ?? new UUID());
     aggregate.addEvent(new UserCreated(aggregate._id.value.toString()));
     return aggregate;
   }
 
-  static createWithoutEvent(
-    props: TestAggregateProps,
-    id?: UUID<string | number>,
-  ): TestAggregate {
+  static createWithoutEvent(props: TestAggregateProps, id?: UUID<string | number>): TestAggregate {
     return new TestAggregate(props, id);
   }
 
@@ -82,10 +74,7 @@ describe("Aggregate", () => {
   describe("creation", () => {
     it("should create aggregate with props and id", () => {
       const id = new UUID();
-      const aggregate = TestAggregate.createWithoutEvent(
-        { name: "John", age: 30 },
-        id,
-      );
+      const aggregate = TestAggregate.createWithoutEvent({ name: "John", age: 30 }, id);
 
       expect(aggregate._id.equals(id)).toBe(true);
       expect(aggregate.name).toBe("John");
@@ -267,14 +256,8 @@ describe("Aggregate", () => {
 
     it("should support equals()", () => {
       const id = new UUID();
-      const aggregate1 = TestAggregate.createWithoutEvent(
-        { name: "John", age: 30 },
-        id,
-      );
-      const aggregate2 = TestAggregate.createWithoutEvent(
-        { name: "Jane", age: 25 },
-        id,
-      );
+      const aggregate1 = TestAggregate.createWithoutEvent({ name: "John", age: 30 }, id);
+      const aggregate2 = TestAggregate.createWithoutEvent({ name: "Jane", age: 25 }, id);
 
       expect(aggregate1.equals(aggregate2)).toBe(true);
     });

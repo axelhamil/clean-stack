@@ -13,8 +13,7 @@ const typographyH1Variants = cva("scroll-m-20 font-extrabold tracking-tight", {
   defaultVariants: { variant: "hero" },
 });
 
-type TypographyH1Props = React.ComponentProps<"h1"> &
-  VariantProps<typeof typographyH1Variants>;
+type TypographyH1Props = React.ComponentProps<"h1"> & VariantProps<typeof typographyH1Variants>;
 
 function TypographyH1({ className, variant, ...props }: TypographyH1Props) {
   return (
@@ -43,10 +42,7 @@ function TypographyH3({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
       data-slot="typography-h3"
-      className={cn(
-        "scroll-m-20 font-semibold text-2xl tracking-tight",
-        className,
-      )}
+      className={cn("scroll-m-20 font-semibold text-2xl tracking-tight", className)}
       {...props}
     />
   );
@@ -56,10 +52,7 @@ function TypographyH4({ className, ...props }: React.ComponentProps<"h4">) {
   return (
     <h4
       data-slot="typography-h4"
-      className={cn(
-        "scroll-m-20 font-semibold text-xl tracking-tight",
-        className,
-      )}
+      className={cn("scroll-m-20 font-semibold text-xl tracking-tight", className)}
       {...props}
     />
   );
@@ -95,10 +88,7 @@ function TypographyLarge({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function TypographySmall({
-  className,
-  ...props
-}: React.ComponentProps<"small">) {
+function TypographySmall({ className, ...props }: React.ComponentProps<"small">) {
   return (
     <small
       data-slot="typography-small"
@@ -118,10 +108,7 @@ function TypographyMuted({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
-function TypographyBlockquote({
-  className,
-  ...props
-}: React.ComponentProps<"blockquote">) {
+function TypographyBlockquote({ className, ...props }: React.ComponentProps<"blockquote">) {
   return (
     <blockquote
       data-slot="typography-blockquote"
@@ -131,10 +118,7 @@ function TypographyBlockquote({
   );
 }
 
-function TypographyInlineCode({
-  className,
-  ...props
-}: React.ComponentProps<"code">) {
+function TypographyInlineCode({ className, ...props }: React.ComponentProps<"code">) {
   return (
     <code
       data-slot="typography-inline-code"

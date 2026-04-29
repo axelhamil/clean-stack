@@ -36,9 +36,7 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
             Require a 6-digit code from your authenticator app on every sign-in.
           </CardDescription>
         </div>
-        <Badge variant={enabled ? "default" : "secondary"}>
-          {enabled ? "Enabled" : "Off"}
-        </Badge>
+        <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Off"}</Badge>
       </CardHeader>
       <CardContent>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -50,9 +48,7 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {enabled ? "Disable" : "Enable"} two-factor
-              </DialogTitle>
+              <DialogTitle>{enabled ? "Disable" : "Enable"} two-factor</DialogTitle>
               <DialogDescription>
                 {enabled
                   ? "You'll only need your password to sign in."

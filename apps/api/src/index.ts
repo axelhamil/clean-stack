@@ -12,6 +12,7 @@ import {
 import { errorHandler } from "./adapters/middleware/error.middleware";
 import { httpLogger } from "./adapters/middleware/logger.middleware";
 import { auth } from "./auth";
+import { uploadsRoutes } from "./routes/uploads.routes";
 
 type AppEnv = {
   Variables: AuthVariables & {
@@ -41,7 +42,8 @@ app.onError(errorHandler);
 const routes = app
   .get("/health", (c) => c.json({ status: "ok" as const }))
   .get("/ready", (c) => c.json({ status: "ok" as const }))
-  .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }));
+  .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
+  .route("/uploads", uploadsRoutes);
 
 logger.info({ port: env.PORT, env: env.NODE_ENV }, "api ready");
 

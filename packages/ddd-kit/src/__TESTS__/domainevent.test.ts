@@ -82,9 +82,7 @@ describe("BaseDomainEvent", () => {
       });
       const after = new Date();
 
-      expect(event.dateOccurred.getTime()).toBeGreaterThanOrEqual(
-        before.getTime(),
-      );
+      expect(event.dateOccurred.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(event.dateOccurred.getTime()).toBeLessThanOrEqual(after.getTime());
     });
 
@@ -93,9 +91,7 @@ describe("BaseDomainEvent", () => {
       await new Promise((r) => setTimeout(r, 5));
       const event2 = new TestEvent("2", { userId: "2", email: "b@test.com" });
 
-      expect(event1.dateOccurred.getTime()).toBeLessThanOrEqual(
-        event2.dateOccurred.getTime(),
-      );
+      expect(event1.dateOccurred.getTime()).toBeLessThanOrEqual(event2.dateOccurred.getTime());
     });
   });
 
