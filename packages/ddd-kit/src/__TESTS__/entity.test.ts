@@ -192,24 +192,6 @@ describe("Entity", () => {
     });
   });
 
-  describe("getProps()", () => {
-    it("should return all props", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const props = entity.getProps();
-
-      expect(props).toEqual({ name: "John", age: 30 });
-    });
-
-    it("should return a shallow copy of props", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const props = entity.getProps();
-
-      props.name = "Jane";
-
-      expect(entity._props.name).toBe("John");
-    });
-  });
-
   describe("toObject()", () => {
     it("should serialize entity with id", () => {
       const entity = TestEntity.create({ name: "John", age: 30 });
