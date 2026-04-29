@@ -33,6 +33,10 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: pnpm/action-setup@v4
 
       - name: Resolve pnpm store
