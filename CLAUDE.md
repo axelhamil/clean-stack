@@ -308,6 +308,18 @@ Protected handlers compose `requireAuth` — reads the resolved session and thro
 - **Orphan GC**: client crash between `PUT` and `confirm` leaves an unreferenced object. Add a worker (cron) deleting objects older than X minutes with no DB row referencing the key. Requires the first business table that stores keys.
 - **Integration event bus**: when 2+ handlers need to react to `UploadConfirmedEvent`, promote an `IAppEventBus` port (distinct from domain events — those stay reserved for aggregates). Current single-consumer is a direct call by design (rule 14).
 
+## Organization scoping
+
+1. **`requireOrg` family is mandatory on every business mutation/query route.** `requireOrg` exposes `c.var.orgId`; `requireOrgRole(["owner"|"admin"])` gates write privileges; `requireOrgOwnership({ table, idFrom })` validates cross-org access on read-by-id and per-resource mutations. Same composition pattern as `requireAuth`. **Why**: cross-org leak is the #1 multi-tenant CVE class. **How to apply**: any handler reading or writing a row that has `organizationId` chains the relevant guards.
+
+2. **List queries on org-scoped tables must use `withOrg(table, orgId)`.** Free-form `where(eq(table.organizationId, orgId))` is allowed but flagged for promotion on second occurrence. **Why**: a missing scope is undetectable in code review without grep. **How to apply**: use the helper as soon as a list query touches an org-scoped table.
+
+3. **Every business table from its first migration owns `organizationId NOT NULL` + FK to `organization(id) ON DELETE CASCADE`.** Adding it later requires backfill, orphan handling, and rewriting every query. **Why**: history shows post-hoc multi-tenancy migrations are the most expensive class of refactor. **How to apply**: never write a business table without `organizationId` — even if the product is solo today.
+
+4. **Org-changing events broadcast through the same `BroadcastChannel` as auth events.** `setActive`, `create-org`, `delete-org`, `leave-org`, `accept-invitation` all call `broadcastAuthChange()` after the canonical refetch. **Why**: a tab can hold a stale `activeOrganizationId` for up to `cookieCache.maxAge` (5 min) without a signal. **How to apply**: add `broadcastAuthChange()` to every mutation `onSuccess` that mutates session-org state. The listener already refetches `["session", "active-org", "current-membership", "orgs"]`.
+
+5. **Personal org is never special-cased in product code.** `slug = personal-${userId.slice(0,12)}`, `name = "Personal"`. No `isPersonal` flag, no metadata branch, no filter in switcher. The slug pattern is a *naming convention*, not a *behavior switch* — code never reads it as a discriminator. **Why**: branch logic for "personal vs team" propagates to every org-aware screen and inflates LOC for cosmetics. **How to apply**: treat personal org as any other org. The "invisibility" is label-level only.
+
 ## Domain Events
 
 Events are *added* in aggregate methods (`this.addEvent(...)`), NOT dispatched there. Dispatch in use cases AFTER successful persistence:
@@ -410,3 +422,9 @@ Two-branch model. **`main` is the released branch — every merge to `main` trig
 - Skip the owner-prefix check (`key.startsWith("<userId>/")`) in download/confirm use-cases — without it any authenticated user can presign a GET / verify any key in the bucket.
 - Stuff business rules into `IStorageService` (validation, key shape, ACLs) — port stays pure transport. Rules belong in the use-case or the route's Zod schema.
 - Add a Presigned POST flow to upload — providers like R2 don't implement POST policies (verified 2026). PUT presigned + `confirm` is the correct shape.
+- Add `if (org.isPersonal)` branches anywhere — personal org is structurally identical to a team org.
+- Skip `requireOrg` on a business handler — silently accepts requests with no active org and falls back to undefined behavior.
+- Add `organizationId` later — backfill is hell. First migration or never.
+- Mutate session-org state without `broadcastAuthChange()` — other tabs stay on stale data.
+- Re-implement `auth.api.organization.*` server-side — the plugin already mounts everything under `/api/auth/organization/*`. No custom Hono routes for org CRUD.
+- Validate role server-side via `requireOrgRole` on plugin endpoints — the plugin owns role checks for `/api/auth/organization/*`. Use `requireOrgRole` only on **our** business routes.
