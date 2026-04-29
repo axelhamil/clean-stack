@@ -4,7 +4,7 @@ import { passkey } from "@better-auth/passkey";
 import { db } from "@packages/drizzle";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { bearer, magicLink, twoFactor } from "better-auth/plugins";
+import { bearer, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
 import { env } from "../common/env";
 import { logger } from "../common/logger";
@@ -103,6 +103,9 @@ export const auth = betterAuth({
       },
     }),
     passkey({ rpName: "clean-stack" }),
+    organization({
+      teams: { enabled: true },
+    }),
   ],
 });
 
