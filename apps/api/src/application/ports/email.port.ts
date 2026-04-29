@@ -6,6 +6,7 @@ export type EmailTemplates = {
   verify_email: { name: string; verifyUrl: string };
   reset_password: { name: string; resetUrl: string };
   magic_link: { magicUrl: string };
+  org_invitation: { inviterName: string; orgName: string; role: string; inviteUrl: string };
 };
 
 export type EmailError =

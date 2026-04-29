@@ -18,6 +18,7 @@ const envSchema = z.object({
   RESEND_TPL_VERIFY_EMAIL: z.string().min(1).optional(),
   RESEND_TPL_RESET_PASSWORD: z.string().min(1).optional(),
   RESEND_TPL_MAGIC_LINK: z.string().min(1).optional(),
+  RESEND_TPL_ORG_INVITATION: z.string().min(1).optional(),
   S3_ENDPOINT: z.url().default("http://localhost:9000"),
   S3_REGION: z.string().default("auto"),
   S3_BUCKET: z.string().default("clean-stack"),

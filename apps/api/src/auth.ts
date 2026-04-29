@@ -113,8 +113,19 @@ export const auth = betterAuth({
         maximumTeams: 25,
         allowRemovingAllTeams: false,
       },
-      sendInvitationEmail: async (_params) => {
-        // wired in Task 6 (org_invitation email template)
+      sendInvitationEmail: async ({ id, email, role, inviter, organization: org }) => {
+        const inviteUrl = `${env.APP_URL}/accept-invitation/${id}`;
+        await dispatchEmail(
+          "org_invitation",
+          email,
+          {
+            inviterName: inviter.user.name ?? inviter.user.email,
+            orgName: org.name,
+            role,
+            inviteUrl,
+          },
+          tokenIdempotencyKey("org-invitation", id),
+        );
       },
     }),
   ],
