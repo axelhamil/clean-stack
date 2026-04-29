@@ -3,7 +3,7 @@ import { Button } from "@packages/ui/components/ui/button";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { Link } from "@tanstack/react-router";
 import { Boxes, Code2 } from "lucide-react";
-import { ThemeToggle } from "../../../common/ui/theme-toggle";
+import { ThemeToggle } from "../../../common/components/theme-toggle";
 
 export function SiteHeader() {
   return (

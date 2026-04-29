@@ -68,7 +68,7 @@ apps/
           _schemas/            private zod schemas
       adapters/                api-client, query-client, storage (≈ adapters/)
       providers/               Provider tree composition (≈ di/)
-      common/                  Zero-business infra (env.ts, format.ts, ui/theme-toggle.tsx) — single common/ on the app side, conceptually mirrors apps/api/common/
+      common/                  Zero-business infra (env.ts, format.ts, components/theme-toggle.tsx) — single common/ on the app side, conceptually mirrors apps/api/common/
 packages/
   ddd-kit                      DDD primitives
   drizzle                      DB client + TransactionService
@@ -221,7 +221,7 @@ features/<name>/
 **Theme & dark mode:**
 
 - `next-themes` provider lives in `providers/app-providers.tsx` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`).
-- The reusable theme switch is `apps/app/src/common/ui/theme-toggle.tsx` — uses the View Transitions API for a circle-reveal animation from the button center, with `prefers-reduced-motion` fallback.
+- The reusable theme switch is `apps/app/src/common/components/theme-toggle.tsx` — uses the View Transitions API for a circle-reveal animation from the button center, with `prefers-reduced-motion` fallback.
 - The view-transition CSS (`html.theme-transitioning::view-transition-*`) lives in `packages/ui/src/styles/globals.css` (theme-level, not component-level — matches rule 10).
 
 **Where do hooks belong (`features/<x>/_hooks/` vs `adapters/`) ?**
