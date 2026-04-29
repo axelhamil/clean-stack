@@ -1,10 +1,8 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "daemon": true,
   "globalDependencies": [
     "biome.json",
-    "tsconfig.json",
     "pnpm-workspace.yaml",
     ".env",
     ".env.local",

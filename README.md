@@ -6,11 +6,13 @@ Generic monorepo boilerplate for Clean Architecture + DDD projects.
 
 - **Runtime**: Bun 1.3+ (api, scripts, tests)
 - **API**: Hono on native `Bun.serve()` (`bun build` → 7ms cold builds)
-- **App**: Vite 8 + React 19 + TanStack Router + TanStack Query + Tailwind 4
+- **App**: Vite 8 + React 19 + TanStack Router (prefetch + view transitions) + TanStack Query + Tailwind 4 + shadcn/ui
+- **Forms**: react-hook-form + `@hookform/resolvers/zod` + shadcn `Form` primitives
+- **API ↔ App contract**: Hono RPC (`hc<AppType>`) — end-to-end type safety
 - **DB**: Drizzle ORM + Postgres
 - **DDD primitives**: `@packages/ddd-kit` (Result, Option, Entity, Aggregate, ValueObject, DomainEvent)
 - **DI**: inwire
-- **Tooling**: pnpm + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd
+- **Tooling**: pnpm 10 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd
 
 ## Quick start
 
@@ -21,11 +23,11 @@ pnpm db:push           # push initial schema (none yet)
 pnpm dev               # start everything in parallel
 ```
 
-Scoped dev:
+Scoped dev (Turbo filters):
 
 ```bash
-pnpm dev:api
-pnpm dev:app
+pnpm dev --filter=api
+pnpm dev --filter=app
 ```
 
 ## Layout
@@ -33,7 +35,7 @@ pnpm dev:app
 ```
 apps/
   api/   Hono on Bun (Clean Arch + DDD layout: domain/, application/, adapters/, di/, routes/)
-  app/   Vite + React (routes -> features -> entities -> shared)
+  app/   Vite + React (routes -> features -> adapters -> common)
 packages/
   ddd-kit            DDD primitives
   drizzle            DB client + transaction service (schema/migrations are empty)
@@ -49,11 +51,14 @@ See `CLAUDE.md` for architecture rules (Result/Option, no null, no throw in doma
 ## Scripts
 
 ```bash
+pnpm dev               # Turbo TUI (all apps)
+pnpm build             # build all (runs type-check in parallel via `with`)
+pnpm test              # all tests (bun test for api, vitest elsewhere)
 pnpm type-check        # all workspaces
 pnpm check             # Biome lint + format check
 pnpm fix               # auto-fix lint/format
+pnpm ci:check          # Biome CI mode (used by pre-push)
 pnpm check:duplication # jscpd
 pnpm check:unused      # knip
-pnpm check:all         # everything + tests
-pnpm test
+pnpm clean             # wipe node_modules + .turbo + dist
 ```

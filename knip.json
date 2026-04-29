@@ -2,11 +2,10 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     "apps/api": {
-      "entry": ["src/index.ts", "src/di/container.ts", "common/**/*.ts"],
+      "entry": ["src/di/container.ts", "common/**/*.ts"],
       "project": ["**/*.ts"]
     },
     "apps/app": {
-      "entry": ["src/routeTree.gen.ts"],
       "project": ["**/*.ts", "**/*.tsx"]
     },
     "packages/ddd-kit": {
@@ -25,9 +24,9 @@
     }
   },
   "ignoreDependencies": [
-    "@packages/test",
-    "@packages/drizzle",
     "@packages/ddd-kit",
+    "@packages/drizzle",
+    "@packages/test",
     "@packages/typescript-config",
     "lint-staged",
     "tailwindcss",

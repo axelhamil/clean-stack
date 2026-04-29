@@ -1,0 +1,41 @@
+import { Toaster } from "@packages/ui/components/ui/sonner";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
+import { StrictMode } from "react";
+import { queryClient } from "../adapters/query-client";
+import { routeTree } from "../routeTree.gen";
+
+const router = createRouter({
+  routeTree,
+  defaultViewTransition: true,
+  defaultPreload: "intent",
+  defaultPreloadStaleTime: 0,
+  defaultPendingMs: 100,
+  defaultPendingMinMs: 300,
+  scrollRestoration: true,
+});
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+export function AppProviders() {
+  return (
+    <StrictMode>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+          <Toaster richColors closeButton />
+        </QueryClientProvider>
+      </ThemeProvider>
+    </StrictMode>
+  );
+}

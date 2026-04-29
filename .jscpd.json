@@ -1,22 +1,19 @@
 {
-  "threshold": 13,
+  "threshold": 3,
   "reporters": ["console"],
   "ignore": [
     "**/node_modules/**",
     "**/dist/**",
-    "**/.next/**",
     "**/coverage/**",
     "**/.turbo/**",
     "**/pnpm-lock.yaml",
     "**/*.d.ts",
     "**/__TESTS__/**",
     "**/*.test.ts",
-    "**/*.spec.ts",
-    "**/android/**",
-    "**/ios/**"
+    "**/*.spec.ts"
   ],
   "format": ["typescript", "javascript", "tsx", "jsx"],
-  "minLines": 5,
-  "minTokens": 50,
+  "minLines": 10,
+  "minTokens": 70,
   "absolute": true
 }

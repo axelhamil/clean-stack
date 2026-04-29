@@ -11,15 +11,21 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@packages/ddd-kit": "workspace:*",
     "@packages/ui": "workspace:*",
     "@tanstack/react-query": "^5.100.6",
     "@tanstack/react-router": "^1.168.25",
+    "api": "workspace:*",
+    "hono": "^4.12.15",
+    "next-themes": "^0.4.6",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "react-hook-form": "^7.74.0",
+    "sonner": "^2.0.7",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/router-plugin": "^1.167.28",

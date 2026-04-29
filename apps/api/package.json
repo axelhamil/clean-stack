@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun --minify",
@@ -13,6 +16,7 @@
     "test:coverage": "bun test --coverage --pass-with-no-tests"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.7.4",
     "@packages/ddd-kit": "workspace:*",
     "@packages/drizzle": "workspace:*",
     "hono": "^4.12.15",

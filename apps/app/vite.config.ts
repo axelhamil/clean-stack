@@ -12,6 +12,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: { "@": resolve(__dirname, "./src") },
+    dedupe: ["react", "react-dom"],
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
   },
   server: { port: 5173 },
 });
