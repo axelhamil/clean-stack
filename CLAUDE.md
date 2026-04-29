@@ -64,7 +64,7 @@ apps/
           _schemas/            private zod schemas
       adapters/                api-client, query-client, storage (≈ adapters/)
       providers/               Provider tree composition (≈ di/)
-    common/                    Zero-business infrastructure (matches apps/api)
+      common/                  Zero-business infra (env.ts, format.ts, ui/theme-toggle.tsx) — single common/ on the app side, conceptually mirrors apps/api/common/
 packages/
   ddd-kit                      DDD primitives
   drizzle                      DB client + TransactionService
@@ -85,6 +85,8 @@ packages/
 8. **Self-documenting code** — no inline comments unless the WHY is non-obvious.
 9. **Only `get id()` getter on aggregates**. Access other props via `entity.get('propName')`.
 10. **Never override visual style at the component level** — only positioning/sizing/layout (`flex`, `grid`, `w-*`, `h-*`, `mx-auto`, `gap-*`, `space-*`, responsive breakpoints) belong in JSX `className`. Colors, typography, radius, shadows, paddings/margins that define a component's *look*, dark/light tokens — all that lives in the **theme** (Tailwind 4 `@theme` in `packages/ui/src/styles/globals.css`) or in the shadcn component itself (`packages/ui/src/components/ui/*`). If a button looks wrong, fix the `Button` variant or the theme token, never patch it inline with `bg-foo text-bar p-3`. Inline overrides = theme drift = no design system.
+11. **Always use shadcn/ui first** — before writing any custom UI primitive, check the [shadcn/ui registry](https://ui.shadcn.com/docs/components) and `@packages/ui/components/ui/*`. If shadcn ships it (`Button`, `Card`, `Tabs`, `Sheet`, `Dialog`, `Form`, `Tooltip`, `DropdownMenu`, `Sonner`, `Typography`, …), use it. Custom is a **last resort** — only when no shadcn equivalent exists, or when the official primitive truly cannot be adapted. When you do go custom, put it in `@packages/ui/components/ui/*` so the rest of the app can reuse it, never inline in a feature.
+12. **Respect HTML semantics — exactly one `<main>` per rendered page**. `routes/__root.tsx` is a **passthrough** (`component: Outlet`) — never wraps `<Outlet />` in `<main>`, `<header>`, `<footer>` or any other landmark. Each `<feature>/page.tsx` owns its own document landmarks (`<header>`, `<main>`, `<footer>`, `<nav>`, `<aside>`) so the page is self-contained and you never end up with nested or duplicated landmarks. Same rule for `<h1>` (one per page) — use `TypographyH1` in the page hero, `TypographyH2` for sections, etc.
 
 ## CQRS
 
@@ -200,6 +202,18 @@ features/<name>/
 - Submit goes through `form.handleSubmit((values) => mutation.mutate(values))` — never wrap in a manual `(e) => …` handler. The deprecated React `FormEvent` type stays out.
 - The form imports its hook (`../_hooks/use-<action>`) and schema (`../_schemas/<thing>.schema`). It never calls `fetch` directly.
 
+**Typography contract:**
+
+- Headings and paragraphs go through the shadcn typography exports in `@packages/ui/components/ui/typography`: `TypographyH1`, `TypographyH2`, `TypographyH3`, `TypographyH4`, `TypographyP`, `TypographyLead`, `TypographyLarge`, `TypographyMuted`, `TypographySmall`, `TypographyBlockquote`, `TypographyInlineCode`, `TypographyList`. **Named exports**, not a namespace (consistent with `CardHeader`, `FormItem`, etc.).
+- Never write raw `<h1 className="text-5xl font-bold ...">` or `<p className="text-muted-foreground text-sm">` in features. Custom typography belongs **in the theme or in the Typography component itself**, not inline at the call site (matches rule 10).
+- `className` overrides are reserved for **layout** (e.g. `border-0 pb-0` to drop the H2 separator on a centered section title, or `mx-auto max-w-2xl text-balance` on a Lead). Never override colors / weights / fonts there.
+
+**Theme & dark mode:**
+
+- `next-themes` provider lives in `providers/app-providers.tsx` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`).
+- The reusable theme switch is `apps/app/src/common/ui/theme-toggle.tsx` — uses the View Transitions API for a circle-reveal animation from the button center, with `prefers-reduced-motion` fallback.
+- The view-transition CSS (`html.theme-transitioning::view-transition-*`) lives in `packages/ui/src/styles/globals.css` (theme-level, not component-level — matches rule 10).
+
 **Where do hooks belong (`features/<x>/_hooks/` vs `adapters/`) ?**
 
 Feature hooks **are the use cases of the UI**, by analogy with `apps/api/src/application/use-cases/`. Even if a hook is currently a thin wrapper over a single RPC call, it owns the *workflow contract* of the feature: input schema, success/error handling, toasts, redirects, optimistic updates, query invalidation. Those concerns are feature-specific and grow over time.
@@ -212,10 +226,15 @@ Feature hooks **are the use cases of the UI**, by analogy with `apps/api/src/app
 
 ```
 features/home/
-  page.tsx                       composes hero + grid + newsletter
+  page.tsx                       composes header + hero + sections + newsletter + footer
   _components/
-    hero.tsx
-    features-grid.tsx
+    site-header.tsx              sticky header, nav, ThemeToggle, GitHub link
+    site-footer.tsx
+    hero.tsx                     uses TypographyH1 + TypographyLead
+    stats-band.tsx               4 stats — TypographyH2 (border-0) + TypographyMuted
+    features-grid.tsx            6 cards — Card hover + lucide icons
+    stack-tabs.tsx               Tabs Frontend/Backend/Tooling + Badges
+    architecture-flow.tsx        Cards with border-l-chart-* tokens (theme accents)
     newsletter-card.tsx          Card host — layout only, mounts NewsletterForm
   _forms/
     newsletter-form.tsx          RHF + zodResolver + shadcn Form, owns submit

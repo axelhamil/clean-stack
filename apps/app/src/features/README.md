@@ -24,5 +24,18 @@ The `_` prefix mirrors Next's "private folder" convention. Inside `features/` it
 - Submit: `form.handleSubmit((values) => mutation.mutate(values))` — never wrap in a manual `(e) => …` handler. The deprecated React `FormEvent` type stays out.
 - The form imports its hook (`../_hooks/use-<action>`) and schema (`../_schemas/<thing>.schema`). Never `fetch` directly.
 
+**Typography contract:**
+
+- All headings/paragraphs go through `@packages/ui/components/ui/typography` exports: `TypographyH1`, `TypographyH2`, `TypographyH3`, `TypographyH4`, `TypographyP`, `TypographyLead`, `TypographyLarge`, `TypographyMuted`, `TypographySmall`, `TypographyBlockquote`, `TypographyInlineCode`, `TypographyList`.
+- Never write raw `<h1 className="text-5xl font-bold ...">` or `<p className="text-muted-foreground text-sm">` in features. Custom typography classes belong in the theme or in the Typography component itself, not inline.
+- Override via `className` only for **layout** concerns (e.g. `border-0 pb-0` to drop the H2 separator when used as a centered section title) — never for color, weight, or font.
+
+**HTML semantics:**
+
+- Each `page.tsx` owns its document landmarks: exactly **one `<main>`** per page, plus optionally `<header>`, `<footer>`, `<nav>`, `<aside>`.
+- `routes/__root.tsx` is a passthrough (`component: Outlet`) — it never wraps the outlet in a landmark, so pages are free to define their own without nesting.
+- Sections inside the page use `<section>` with an `id` when they're navigation targets (e.g. `<section id="stack">`).
+- One `TypographyH1` per page (in the hero), `TypographyH2` for top-level sections, `H3`/`H4` for nested headings.
+
 May import from: `adapters/`, `common/`, `@packages/ui`, `@packages/ddd-kit`.
 Must NOT import from: other `features/`, `routes/`, `providers/`.

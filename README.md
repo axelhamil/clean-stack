@@ -8,6 +8,8 @@ Generic monorepo boilerplate for Clean Architecture + DDD projects.
 - **API**: Hono on native `Bun.serve()` (`bun build` → 7ms cold builds)
 - **App**: Vite 8 + React 19 + TanStack Router (prefetch + view transitions) + TanStack Query + Tailwind 4 + shadcn/ui
 - **Forms**: react-hook-form + `@hookform/resolvers/zod` + shadcn `Form` primitives
+- **Typography**: shadcn typography (`@packages/ui/components/ui/typography` — `TypographyH1/H2/.../P/Lead/Muted`…)
+- **Theme**: `next-themes` (light/dark/system) + View Transitions API circle reveal toggle (`apps/app/src/common/ui/theme-toggle.tsx`)
 - **API ↔ App contract**: Hono RPC (`hc<AppType>`) — end-to-end type safety
 - **DB**: Drizzle ORM + Postgres
 - **DDD primitives**: `@packages/ddd-kit` (Result, Option, Entity, Aggregate, ValueObject, DomainEvent)

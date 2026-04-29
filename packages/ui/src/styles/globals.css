@@ -194,6 +194,20 @@
   navigation: auto;
 }
 
+html.theme-transitioning::view-transition-old(root),
+html.theme-transitioning::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-transitioning::view-transition-old(root) {
+  z-index: 1;
+}
+
+html.theme-transitioning::view-transition-new(root) {
+  z-index: 2;
+}
+
 @media (display-mode: standalone) {
   html {
     overscroll-behavior: none;
