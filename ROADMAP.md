@@ -63,16 +63,22 @@ Upcoming integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `ada
 
 ---
 
-## Email — Resend (dashboard templates)
+## Email — Resend (dashboard templates) ✅ Phase 1 done
 
 **Why**: templates managed from the Resend dashboard (no code, no rebuild to change wording), built-in versioning, native A/B test. Stays pragmatic: we just call the API by template ID.
 
-- [ ] Install `resend`
-- [ ] Service `apps/api/src/adapters/services/email.service.ts` → minimal wrapper `sendTemplate(templateId, to, data)`
-- [ ] Templates created in the Resend dashboard, IDs in env (`RESEND_TPL_WELCOME`, `RESEND_TPL_RESET_PWD`, etc.)
-- [ ] Resend webhook for bounces/complaints → `routes/webhooks/resend.ts`
-- [ ] DNS domain (SPF/DKIM/DMARC) check in the README
-- [ ] BetterAuth: wire `sendVerificationEmail` / `sendResetPassword` to the Resend service
+- [x] Install `resend`
+- [x] Port `IEmailService` (`apps/api/src/application/ports/email.port.ts`) + adapter `ResendEmailService` (`apps/api/src/adapters/services/email.service.ts`) wired through inwire DI in **contract mode** (key = interface name `IEmailService`).
+- [x] **Type-safe variables per template** — `EmailTemplates` maps each template name to its required variables. Adding a new template = updating the type + adding a `RESEND_TPL_*` env var. Renaming a variable in the dashboard without updating code = TS red, no silent break.
+- [x] **`Result<void, EmailError>`** — `sendTemplate` never throws, returns a discriminated `EmailError` (`EMAIL_TRANSPORT_NOT_CONFIGURED` | `EMAIL_PROVIDER_FAILURE`). Use cases keep the `Result` until the controller boundary; integration adapters (`auth.ts`) translate to `throw` only at the BetterAuth-hook frontier.
+- [x] **Retry with exponential backoff** — 3 attempts (1s/2s/4s), retry only on `429` and `5xx` + network errors (`status === 0`). 4xx non-rate-limit fail fast (validation = retry futile). Distinct `STATUS_HINTS` log per `401` / `403` / `409` / `422` so prod debug isn't blind.
+- [x] **`Idempotency-Key`** — `${event-type}/${sha256(token)[:32]}` (Resend pattern, 24h window). Hash via `Bun.CryptoHasher`. Safe under retries — same payload returns the original response, different payload returns 409 with explicit log hint.
+- [x] **`SendTemplateOptions.from?`** — per-tenant `from` override slot for the future `organization` plugin (per-org sending domain). Defaults to `env.RESEND_FROM`. Adding it now = zero breaking change in phase 2.
+- [x] **`SendTemplateOptions.locale?`** — slot reserved for the i18n phase. Adapter currently logs a warn ("not yet implemented") if passed; resolution will switch to `${template}_${locale}` env lookup when locale-prefixed templates land. Port stays stable.
+- [x] **Boot-time fail-hard in production** — constructor throws if `NODE_ENV === "production"` and `RESEND_API_KEY` or any template ID is missing. Prevents a silent deploy where every transactional email is dropped. Dev mode keeps the warn-only fallback.
+- [x] BetterAuth `sendVerificationEmail` / `sendResetPassword` / `magicLink.sendMagicLink` consume `di.IEmailService.sendTemplate` via a `dispatchEmail()` helper that unwraps `Result` (`EMAIL_PROVIDER_FAILURE` → throw → centralised error handler; `EMAIL_TRANSPORT_NOT_CONFIGURED` → `logger.warn`, never silent).
+- [ ] Webhook bounces/complaints — `routes/webhooks/resend.ts` (signature verification + suppress hard-bounced addresses). Required before going live or IP reputation degrades.
+- [ ] DNS domain (SPF/DKIM/DMARC) check in the README.
 
 ---
 

@@ -5,10 +5,45 @@ import { db } from "@packages/drizzle";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, magicLink, twoFactor } from "better-auth/plugins";
+import { CryptoHasher } from "bun";
 import { env } from "../common/env";
-import { sendEmail } from "./adapters/services/email.service";
+import { logger } from "../common/logger";
+import type {
+  EmailTemplates,
+  TemplateVariables,
+} from "./application/ports/email.port";
+import { di } from "./di/container";
 
 const isProd = env.NODE_ENV === "production";
+
+function tokenIdempotencyKey(template: string, token: string): string {
+  const hash = new CryptoHasher("sha256")
+    .update(token)
+    .digest("hex")
+    .slice(0, 32);
+  return `${template}/${hash}`;
+}
+
+async function dispatchEmail<K extends keyof EmailTemplates>(
+  template: K,
+  to: string,
+  variables: EmailTemplates[K] & TemplateVariables,
+  idempotencyKey: string,
+): Promise<void> {
+  const result = await di.IEmailService.sendTemplate(template, to, variables, {
+    idempotencyKey,
+  });
+  if (result.isFailure) {
+    const error = result.getError();
+    if (error.code === "EMAIL_PROVIDER_FAILURE") {
+      throw new Error(`email send failed (${template}): ${error.message}`);
+    }
+    logger.warn(
+      { template, to, code: error.code },
+      "email skipped — transport not configured",
+    );
+  }
+}
 
 export const auth = betterAuth({
   appName: "clean-stack",
@@ -23,12 +58,13 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     sendResetPassword: async ({ user, token }) => {
-      const url = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
-      await sendEmail({
-        to: user.email,
-        subject: "Reset your password",
-        html: `<p>Click the link below to reset your password.</p><p><a href="${url}">Reset password</a></p>`,
-      });
+      const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+      await dispatchEmail(
+        "reset_password",
+        user.email,
+        { name: user.name ?? "", resetUrl },
+        tokenIdempotencyKey("reset-password", token),
+      );
     },
   },
 
@@ -36,12 +72,13 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, token }) => {
-      const url = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
-      await sendEmail({
-        to: user.email,
-        subject: "Verify your email",
-        html: `<p>Welcome${user.name ? ` ${user.name}` : ""}.</p><p><a href="${url}">Verify your email</a></p>`,
-      });
+      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+      await dispatchEmail(
+        "verify_email",
+        user.email,
+        { name: user.name ?? "", verifyUrl },
+        tokenIdempotencyKey("verify-email", token),
+      );
     },
   },
 
@@ -65,12 +102,13 @@ export const auth = betterAuth({
     twoFactor(),
     magicLink({
       sendMagicLink: async ({ email, token }) => {
-        const url = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;
-        await sendEmail({
-          to: email,
-          subject: "Your magic sign-in link",
-          html: `<p><a href="${url}">Sign in to clean-stack</a></p>`,
-        });
+        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;
+        await dispatchEmail(
+          "magic_link",
+          email,
+          { magicUrl },
+          tokenIdempotencyKey("magic-link", token),
+        );
       },
     }),
     passkey({ rpName: "clean-stack" }),

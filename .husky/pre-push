@@ -10,6 +10,6 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 
 pnpm ci:check
-pnpm turbo run build test --output-logs=errors-only
+pnpm turbo run build type-check test --output-logs=errors-only
 pnpm check:duplication
 pnpm check:unused
