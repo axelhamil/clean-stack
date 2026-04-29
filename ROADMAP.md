@@ -63,6 +63,29 @@ Upcoming integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `ada
 
 ---
 
+## Feature gating & quota gating — guards (implementation TBD)
+
+**Why**: gating is *not* DDD — the rule fits in `array.includes()` / `count(*)` / config lookup. Wrapping it in aggregates + use-cases is the OpenUp anti-pattern (~6.4k LOC for what 330 LOC of config + guard would cover). Stay in pragmatic infra: typed plan config + Hono guard middlewares on the API + React hook on the app.
+
+**Shape (target, not committed)**:
+
+- Typed plan catalog (e.g. `PLANS = { free: { features: [...], quotas: { uploads: 10, ... } }, pro: { ... } }`) — single source of truth, fed by the Stripe plugin's active subscription.
+- API: `requireFeature("x")` + `requireQuota("uploads")` Hono guard middlewares composed per-route, drawing the active plan from session/org. Same composition pattern as `requireAuth` (rule 14 — promote on second occurrence).
+- App: `useEntitlements()` hook for UI gating (disable buttons, hide tabs) — never the only check, server guard is authoritative.
+- Quota counters: live in DB tables scoped by `organizationId`, incremented in the same transaction as the gated write.
+
+**Open questions before implementing**:
+
+- [ ] Source of plan: read straight from `subscription.status` + `subscription.priceId` (Stripe plugin), or denormalize into an `entitlement` table for faster reads / offline reasoning?
+- [ ] Quota window semantics: rolling 30d, calendar month aligned with billing period, or hard lifetime caps? Each has different counter-reset complexity.
+- [ ] Soft vs hard gates: 402 `PAYMENT_REQUIRED` immediately, or warn at 80% + block at 100% with a dedicated UX flow?
+- [ ] Per-org overrides for sales-led deals (custom quotas above plan baseline) — config table or Stripe metadata?
+- [ ] Caching: plan/entitlement reads on every gated route — cache on session (5 min, like auth) or per-request only?
+
+Depends on **Billing** (Stripe plugin must be live) and **Multi-tenant** (quota is per-org, not per-user).
+
+---
+
 ## Email — Resend (dashboard templates) ✅ Phase 1 done
 
 **Why**: templates managed from the Resend dashboard (no code, no rebuild to change wording), built-in versioning, native A/B test. Stays pragmatic: we just call the API by template ID.
@@ -77,8 +100,9 @@ Upcoming integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `ada
 - [x] **`SendTemplateOptions.locale?`** — slot reserved for the i18n phase. Adapter currently logs a warn ("not yet implemented") if passed; resolution will switch to `${template}_${locale}` env lookup when locale-prefixed templates land. Port stays stable.
 - [x] **Boot-time fail-hard in production** — constructor throws if `NODE_ENV === "production"` and `RESEND_API_KEY` or any template ID is missing. Prevents a silent deploy where every transactional email is dropped. Dev mode keeps the warn-only fallback.
 - [x] BetterAuth `sendVerificationEmail` / `sendResetPassword` / `magicLink.sendMagicLink` consume `di.IEmailService.sendTemplate` via a `dispatchEmail()` helper that unwraps `Result` (`EMAIL_PROVIDER_FAILURE` → throw → centralised error handler; `EMAIL_TRANSPORT_NOT_CONFIGURED` → `logger.warn`, never silent).
-- [ ] Webhook bounces/complaints — `routes/webhooks/resend.ts` (signature verification + suppress hard-bounced addresses). Required before going live or IP reputation degrades.
-- [ ] DNS domain (SPF/DKIM/DMARC) check in the README.
+- [x] **IP reputation guarded by Resend, not by us** — Resend ships a domain-scoped suppression list since 2025: hard bounces and spam complaints auto-add the address; future sends to a suppressed address are blocked at the provider edge with a 422 + `email.suppressed` webhook event. **No own suppression table needed** until a product feature actually consumes it (org invitations gating, account-settings "your email bounces" UI, abuse detection). Building it earlier is the OpenUp anti-pattern: ~150 LOC + 2 tables sitting empty until the first consumer arrives. Promote on second occurrence (rule 14), not in anticipation. The webhook integration (`POST /webhooks/resend`, `resend.webhooks.verify()` first-party SDK helper, Svix HMAC, `svix-id` dedupe) ships when the first consumer lands.
+- [x] **DNS** documented in `README.md` (SPF + DKIM CNAMEs from Resend dashboard + DMARC TXT progression `p=none` → `p=quarantine` once stable, target `p=reject`). **Mandatory before any production send** — Gmail (Feb 2024), Yahoo (Feb 2024), Microsoft Outlook (May 2025) all reject unauthenticated bulk senders with 550 5.7.515.
+- [ ] **Deferred to first product consumer**: webhook + own suppression table + `List-Unsubscribe` / `List-Unsubscribe-Post` (RFC 8058) headers. The unsubscribe headers are required by Gmail/Yahoo/Microsoft only for bulk senders (>5k/day) — irrelevant for transactional auth, mandatory before the first marketing/notification opt-in flow ships.
 
 ---
 
