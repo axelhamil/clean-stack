@@ -1,41 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
-import { env } from "../../common/env";
 import { type AuthVariables, requireAuth } from "../adapters/middleware/auth.middleware";
+import { confirmUploadBodySchema } from "../application/dto/confirm-upload.dto";
+import { presignDownloadBodySchema } from "../application/dto/presign-download.dto";
+import { presignUploadBodySchema } from "../application/dto/presign-upload.dto";
 import type { StorageError } from "../application/ports/storage.port";
 import { di } from "../di/container";
-
-const SAFE_FILENAME = /^[\w\-. ]+$/;
-const SAFE_SCOPE = /^[a-z][a-z0-9-]{0,31}$/;
-
-const presignUploadBodySchema = z.object({
-  filename: z.string().min(1).max(200).regex(SAFE_FILENAME),
-  contentType: z.string().min(1).max(120),
-  size: z.number().int().positive().max(env.STORAGE_MAX_UPLOAD_BYTES),
-  scope: z.string().regex(SAFE_SCOPE).default("uploads"),
-  expiresInSeconds: z
-    .number()
-    .int()
-    .positive()
-    .default(env.STORAGE_PRESIGN_TTL_MIN_SECONDS * 5),
-});
-
-const confirmUploadBodySchema = z.object({
-  key: z.string().min(1).max(512),
-  expectedSize: z.number().int().positive(),
-  expectedContentType: z.string().min(1).max(120),
-});
-
-const presignDownloadBodySchema = z.object({
-  key: z.string().min(1).max(512),
-  expiresInSeconds: z
-    .number()
-    .int()
-    .positive()
-    .default(env.STORAGE_PRESIGN_TTL_MIN_SECONDS * 10),
-});
 
 function statusFor(error: StorageError): 403 | 404 | 422 | 502 {
   switch (error.code) {
