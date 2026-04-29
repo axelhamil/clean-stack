@@ -1,4 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
+import { cn } from "@packages/ui/libs/utils.js";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
@@ -10,7 +11,11 @@ type DocWithVT = Document & {
   };
 };
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  className?: string;
+}
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -80,10 +85,10 @@ export function ThemeToggle() {
       size="icon"
       onClick={handleClick}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      className="transition-transform hover:scale-110 active:scale-95"
+      className={cn("tap-scale", className)}
     >
-      <Sun className="size-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-      <Moon className="absolute size-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+      <Sun className="size-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
+      <Moon className="absolute size-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
     </Button>
   );
 }

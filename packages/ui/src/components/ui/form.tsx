@@ -87,17 +87,23 @@ function FormItem({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function FormLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof LabelPrimitive.Root>) {
+interface FormLabelProps
+  extends React.ComponentProps<typeof LabelPrimitive.Root> {
+  weight?: "medium" | "normal";
+}
+
+function FormLabel({ className, weight = "medium", ...props }: FormLabelProps) {
   const { error, formItemId } = useFormField();
 
   return (
     <Label
       data-slot="form-label"
       data-error={!!error}
-      className={cn("data-[error=true]:text-destructive", className)}
+      className={cn(
+        "data-[error=true]:text-destructive",
+        weight === "normal" && "font-normal",
+        className,
+      )}
       htmlFor={formItemId}
       {...props}
     />
