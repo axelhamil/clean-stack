@@ -9,38 +9,213 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as TwoFactorRouteImport } from './routes/two-factor'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as MagicLinkRouteImport } from './routes/magic-link'
+import { Route as ProtectedRouteImport } from './routes/_protected'
+import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProtectedDashboardRouteImport } from './routes/_protected/dashboard'
+import { Route as GuestSignUpRouteImport } from './routes/_guest/sign-up'
+import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
+import { Route as GuestForgotPasswordRouteImport } from './routes/_guest/forgot-password'
+import { Route as ProtectedAccountSecurityRouteImport } from './routes/_protected/account.security'
 
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TwoFactorRoute = TwoFactorRouteImport.update({
+  id: '/two-factor',
+  path: '/two-factor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MagicLinkRoute = MagicLinkRouteImport.update({
+  id: '/magic-link',
+  path: '/magic-link',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProtectedRoute = ProtectedRouteImport.update({
+  id: '/_protected',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuestRoute = GuestRouteImport.update({
+  id: '/_guest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProtectedDashboardRoute = ProtectedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const GuestSignUpRoute = GuestSignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => GuestRoute,
+} as any)
+const GuestSignInRoute = GuestSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => GuestRoute,
+} as any)
+const GuestForgotPasswordRoute = GuestForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => GuestRoute,
+} as any)
+const ProtectedAccountSecurityRoute =
+  ProtectedAccountSecurityRouteImport.update({
+    id: '/account/security',
+    path: '/account/security',
+    getParentRoute: () => ProtectedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/magic-link': typeof MagicLinkRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/forgot-password': typeof GuestForgotPasswordRoute
+  '/sign-in': typeof GuestSignInRoute
+  '/sign-up': typeof GuestSignUpRoute
+  '/dashboard': typeof ProtectedDashboardRoute
+  '/account/security': typeof ProtectedAccountSecurityRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/magic-link': typeof MagicLinkRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/forgot-password': typeof GuestForgotPasswordRoute
+  '/sign-in': typeof GuestSignInRoute
+  '/sign-up': typeof GuestSignUpRoute
+  '/dashboard': typeof ProtectedDashboardRoute
+  '/account/security': typeof ProtectedAccountSecurityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_guest': typeof GuestRouteWithChildren
+  '/_protected': typeof ProtectedRouteWithChildren
+  '/magic-link': typeof MagicLinkRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/_guest/forgot-password': typeof GuestForgotPasswordRoute
+  '/_guest/sign-in': typeof GuestSignInRoute
+  '/_guest/sign-up': typeof GuestSignUpRoute
+  '/_protected/dashboard': typeof ProtectedDashboardRoute
+  '/_protected/account/security': typeof ProtectedAccountSecurityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/magic-link'
+    | '/reset-password'
+    | '/two-factor'
+    | '/verify-email'
+    | '/forgot-password'
+    | '/sign-in'
+    | '/sign-up'
+    | '/dashboard'
+    | '/account/security'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/magic-link'
+    | '/reset-password'
+    | '/two-factor'
+    | '/verify-email'
+    | '/forgot-password'
+    | '/sign-in'
+    | '/sign-up'
+    | '/dashboard'
+    | '/account/security'
+  id:
+    | '__root__'
+    | '/'
+    | '/_guest'
+    | '/_protected'
+    | '/magic-link'
+    | '/reset-password'
+    | '/two-factor'
+    | '/verify-email'
+    | '/_guest/forgot-password'
+    | '/_guest/sign-in'
+    | '/_guest/sign-up'
+    | '/_protected/dashboard'
+    | '/_protected/account/security'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GuestRoute: typeof GuestRouteWithChildren
+  ProtectedRoute: typeof ProtectedRouteWithChildren
+  MagicLinkRoute: typeof MagicLinkRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  TwoFactorRoute: typeof TwoFactorRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/two-factor': {
+      id: '/two-factor'
+      path: '/two-factor'
+      fullPath: '/two-factor'
+      preLoaderRoute: typeof TwoFactorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/magic-link': {
+      id: '/magic-link'
+      path: '/magic-link'
+      fullPath: '/magic-link'
+      preLoaderRoute: typeof MagicLinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected': {
+      id: '/_protected'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ProtectedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_guest': {
+      id: '/_guest'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof GuestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +223,80 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_protected/dashboard': {
+      id: '/_protected/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof ProtectedDashboardRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_guest/sign-up': {
+      id: '/_guest/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof GuestSignUpRouteImport
+      parentRoute: typeof GuestRoute
+    }
+    '/_guest/sign-in': {
+      id: '/_guest/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof GuestSignInRouteImport
+      parentRoute: typeof GuestRoute
+    }
+    '/_guest/forgot-password': {
+      id: '/_guest/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof GuestForgotPasswordRouteImport
+      parentRoute: typeof GuestRoute
+    }
+    '/_protected/account/security': {
+      id: '/_protected/account/security'
+      path: '/account/security'
+      fullPath: '/account/security'
+      preLoaderRoute: typeof ProtectedAccountSecurityRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
   }
 }
 
+interface GuestRouteChildren {
+  GuestForgotPasswordRoute: typeof GuestForgotPasswordRoute
+  GuestSignInRoute: typeof GuestSignInRoute
+  GuestSignUpRoute: typeof GuestSignUpRoute
+}
+
+const GuestRouteChildren: GuestRouteChildren = {
+  GuestForgotPasswordRoute: GuestForgotPasswordRoute,
+  GuestSignInRoute: GuestSignInRoute,
+  GuestSignUpRoute: GuestSignUpRoute,
+}
+
+const GuestRouteWithChildren = GuestRoute._addFileChildren(GuestRouteChildren)
+
+interface ProtectedRouteChildren {
+  ProtectedDashboardRoute: typeof ProtectedDashboardRoute
+  ProtectedAccountSecurityRoute: typeof ProtectedAccountSecurityRoute
+}
+
+const ProtectedRouteChildren: ProtectedRouteChildren = {
+  ProtectedDashboardRoute: ProtectedDashboardRoute,
+  ProtectedAccountSecurityRoute: ProtectedAccountSecurityRoute,
+}
+
+const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(
+  ProtectedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GuestRoute: GuestRouteWithChildren,
+  ProtectedRoute: ProtectedRouteWithChildren,
+  MagicLinkRoute: MagicLinkRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  TwoFactorRoute: TwoFactorRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
