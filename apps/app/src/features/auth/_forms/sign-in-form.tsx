@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
-import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@packages/ui/components/ui/form";
+import { Form } from "@packages/ui/components/ui/form";
+import { FormCheckboxField } from "@packages/ui/components/ui/form-checkbox-field";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { KeyRoundIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -51,18 +51,7 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
           placeholder="••••••••"
         />
 
-        <FormField
-          control={form.control}
-          name="rememberMe"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center gap-2">
-              <FormControl>
-                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-              </FormControl>
-              <FormLabel weight="normal">Remember me</FormLabel>
-            </FormItem>
-          )}
-        />
+        <FormCheckboxField control={form.control} name="rememberMe" label="Remember me" />
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
           {mutation.isPending ? "Signing in…" : "Sign in"}
         </Button>
