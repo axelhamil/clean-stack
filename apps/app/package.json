@@ -14,6 +14,7 @@
   "dependencies": {
     "@better-auth/passkey": "^1.6.9",
     "@hookform/resolvers": "^5.2.2",
+    "@packages/access-control": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
     "@packages/ui": "workspace:*",
     "@tanstack/react-query": "^5.100.6",
