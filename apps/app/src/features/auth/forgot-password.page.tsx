@@ -1,8 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { ForgotPasswordForm } from "./_forms/forgot-password-form";
+import { EmailRequestForm } from "./_forms/email-request-form";
+import { useForgotPassword } from "./_hooks/use-forgot-password";
 
 export function ForgotPasswordPage() {
+  const mutation = useForgotPassword();
+
   return (
     <main>
       <AuthShell
@@ -15,7 +18,11 @@ export function ForgotPasswordPage() {
           />
         }
       >
-        <ForgotPasswordForm />
+        <EmailRequestForm
+          mutation={mutation}
+          submitLabel="Send reset link"
+          pendingLabel="Sending…"
+        />
       </AuthShell>
     </main>
   );
