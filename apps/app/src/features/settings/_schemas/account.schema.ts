@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { passwordSchema } from "../../auth/_schemas/auth.schema";
+import { passwordSchema } from "../../../adapters/schemas/auth.schema";
 
 export const passwordPromptSchema = z.object({
   password: passwordSchema,

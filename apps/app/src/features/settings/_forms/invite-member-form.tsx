@@ -21,7 +21,10 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { inviteMemberMutationOptions } from "../../../adapters/mutations/invite-member";
 import { orgInvitationsQueryOptions } from "../../../adapters/queries/org-invitations";
-import { type InviteMemberInput, inviteMemberSchema } from "../_schemas/organization.schema";
+import {
+  type InviteMemberInput,
+  inviteMemberSchema,
+} from "../../../adapters/schemas/organization.schema";
 
 export interface InviteMemberFormProps {
   organizationId: string;
@@ -29,25 +32,25 @@ export interface InviteMemberFormProps {
 
 export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
   const queryClient = useQueryClient();
-  const invite = useMutation(inviteMemberMutationOptions);
 
   const form = useForm<InviteMemberInput>({
     resolver: zodResolver(inviteMemberSchema),
     defaultValues: { email: "", role: "member" },
   });
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    try {
-      await invite.mutateAsync({ ...values, organizationId });
+  const invite = useMutation({
+    ...inviteMemberMutationOptions,
+    onSuccess: async (_data, variables) => {
       await queryClient.refetchQueries({
         queryKey: orgInvitationsQueryOptions(organizationId).queryKey,
       });
-      toast.success(`Invitation sent to ${values.email}`);
+      toast.success(`Invitation sent to ${variables.email}`);
       form.reset();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to send invitation");
-    }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to send invitation"),
   });
+
+  const onSubmit = form.handleSubmit((values) => invite.mutate({ ...values, organizationId }));
 
   return (
     <Form {...form}>

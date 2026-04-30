@@ -4,6 +4,7 @@ import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuthorization } from "../../../adapters/hooks/use-authorization";
 import { cancelInvitationMutationOptions } from "../../../adapters/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../adapters/queries/org-invitations";
 
@@ -16,24 +17,24 @@ export interface InvitationRowProps {
     expiresAt: string | Date;
   };
   organizationId: string;
-  canCancel: boolean;
 }
 
-export function InvitationRow({ invitation, organizationId, canCancel }: InvitationRowProps) {
+export function InvitationRow({ invitation, organizationId }: InvitationRowProps) {
   const queryClient = useQueryClient();
-  const cancel = useMutation(cancelInvitationMutationOptions);
+  const { can } = useAuthorization();
+  const canCancel = can({ invitation: ["cancel"] });
 
-  const onCancel = async () => {
-    try {
-      await cancel.mutateAsync({ invitationId: invitation.id });
+  const cancel = useMutation({
+    ...cancelInvitationMutationOptions,
+    onSuccess: async () => {
       await queryClient.refetchQueries({
         queryKey: orgInvitationsQueryOptions(organizationId).queryKey,
       });
       toast.success("Invitation cancelled");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel invitation");
-    }
-  };
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Failed to cancel invitation"),
+  });
 
   return (
     <ListRow>
@@ -49,7 +50,7 @@ export function InvitationRow({ invitation, organizationId, canCancel }: Invitat
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => void onCancel()}
+            onClick={() => cancel.mutate({ invitationId: invitation.id })}
             disabled={cancel.isPending}
           >
             Cancel
