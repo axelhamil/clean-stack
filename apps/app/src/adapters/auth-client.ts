@@ -1,5 +1,6 @@
 import { passkeyClient } from "@better-auth/passkey/client";
-import { magicLinkClient, twoFactorClient } from "better-auth/client/plugins";
+import { ac, roles } from "@packages/access-control";
+import { magicLinkClient, organizationClient, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { env } from "../common/env";
 
@@ -17,5 +18,10 @@ export const authClient = createAuthClient({
     magicLinkClient(),
 
     passkeyClient(),
+    organizationClient({
+      ac,
+      roles,
+      teams: { enabled: true },
+    }),
   ],
 });

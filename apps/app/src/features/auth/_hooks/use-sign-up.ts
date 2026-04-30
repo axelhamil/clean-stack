@@ -2,11 +2,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { authClient } from "../../../adapters/auth-client";
-import type { SignUpInput } from "../_schemas/auth.schema";
+import type { SignUpInput } from "../../../adapters/schemas/auth.schema";
 
 export function useSignUp() {
   const navigate = useNavigate();
   return useMutation({
+    mutationKey: ["session", "sign-up"],
     mutationFn: async (input: SignUpInput) => {
       const { data, error } = await authClient.signUp.email({
         email: input.email,

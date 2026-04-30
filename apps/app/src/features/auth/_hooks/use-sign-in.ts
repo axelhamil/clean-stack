@@ -4,13 +4,14 @@ import { toast } from "sonner";
 import { broadcastAuthChange } from "../../../adapters/auth-broadcast";
 import { authClient } from "../../../adapters/auth-client";
 import { sessionQueryOptions } from "../../../adapters/queries/session";
-import type { SignInInput } from "../_schemas/auth.schema";
+import type { SignInInput } from "../../../adapters/schemas/auth.schema";
 
 export function useSignIn(redirectTo?: string) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   return useMutation({
+    mutationKey: ["session", "sign-in"],
     mutationFn: async (input: SignInInput) => {
       const { data, error } = await authClient.signIn.email({
         email: input.email,

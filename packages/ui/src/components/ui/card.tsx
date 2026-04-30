@@ -1,6 +1,17 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "../../libs/utils";
+
+const cardTitleVariants = cva("leading-none font-semibold", {
+  variants: {
+    variant: {
+      default: "",
+      destructive: "text-destructive",
+    },
+  },
+  defaultVariants: { variant: "default" },
+});
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -28,11 +39,15 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+interface CardTitleProps
+  extends React.ComponentProps<"div">,
+    VariantProps<typeof cardTitleVariants> {}
+
+function CardTitle({ className, variant, ...props }: CardTitleProps) {
   return (
     <div
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      className={cn(cardTitleVariants({ variant }), className)}
       {...props}
     />
   );

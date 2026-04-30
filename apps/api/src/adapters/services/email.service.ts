@@ -34,6 +34,7 @@ export class ResendEmailService implements IEmailService {
       verify_email: env.RESEND_TPL_VERIFY_EMAIL,
       reset_password: env.RESEND_TPL_RESET_PASSWORD,
       magic_link: env.RESEND_TPL_MAGIC_LINK,
+      org_invitation: env.RESEND_TPL_ORG_INVITATION,
     };
 
     const isProd = env.NODE_ENV === "production";

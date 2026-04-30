@@ -21,6 +21,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1039.0",
     "@better-auth/passkey": "^1.6.9",
     "@hono/zod-validator": "^0.7.6",
+    "@packages/access-control": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
     "@packages/drizzle": "workspace:*",
     "@simplewebauthn/server": "^13.3.0",

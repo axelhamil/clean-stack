@@ -3,8 +3,11 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import {
+  type ResetPasswordInput,
+  resetPasswordSchema,
+} from "../../../adapters/schemas/auth.schema";
 import { useResetPassword } from "../_hooks/use-reset-password";
-import { type ResetPasswordInput, resetPasswordSchema } from "../_schemas/auth.schema";
 
 interface ResetPasswordFormProps {
   token: string;

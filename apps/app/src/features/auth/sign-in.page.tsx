@@ -2,14 +2,17 @@ import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { Link } from "@tanstack/react-router";
 import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { MagicLinkForm } from "./_forms/magic-link-form";
+import { EmailRequestForm } from "./_forms/email-request-form";
 import { SignInForm } from "./_forms/sign-in-form";
+import { useMagicLink } from "./_hooks/use-magic-link";
 
 interface SignInPageProps {
   redirectTo?: string;
 }
 
 export function SignInPage({ redirectTo }: SignInPageProps = {}) {
+  const magicLinkMutation = useMagicLink();
+
   return (
     <main>
       <AuthShell
@@ -27,7 +30,12 @@ export function SignInPage({ redirectTo }: SignInPageProps = {}) {
         </NavLink>
 
         <Separator />
-        <MagicLinkForm />
+        <EmailRequestForm
+          mutation={magicLinkMutation}
+          submitLabel="Email me a magic link"
+          pendingLabel="Sending…"
+          buttonVariant="outline"
+        />
       </AuthShell>
     </main>
   );

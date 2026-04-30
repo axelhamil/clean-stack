@@ -4,6 +4,9 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
 import { onAuthChange } from "../adapters/auth-broadcast";
+import { activeOrgQueryOptions } from "../adapters/queries/active-org";
+import { currentMembershipQueryOptions } from "../adapters/queries/current-membership";
+import { orgsListQueryOptions } from "../adapters/queries/orgs-list";
 import { sessionQueryOptions } from "../adapters/queries/session";
 import { queryClient } from "../adapters/query-client";
 import { routeTree } from "../routeTree.gen";
@@ -11,7 +14,6 @@ import { routeTree } from "../routeTree.gen";
 const router = createRouter({
   routeTree,
   context: { queryClient },
-  defaultViewTransition: true,
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
   defaultPendingMs: 100,
@@ -26,9 +28,12 @@ declare module "@tanstack/react-router" {
 }
 
 onAuthChange(async () => {
-  await queryClient.refetchQueries({
-    queryKey: sessionQueryOptions.queryKey,
-  });
+  await Promise.all([
+    queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey }),
+    queryClient.refetchQueries({ queryKey: activeOrgQueryOptions.queryKey }),
+    queryClient.refetchQueries({ queryKey: currentMembershipQueryOptions.queryKey }),
+    queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
+  ]);
   await router.invalidate();
 });
 

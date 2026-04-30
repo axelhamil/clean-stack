@@ -67,6 +67,9 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
         },
       );
       await transition.finished;
+    } catch (err) {
+      // AbortError fires when a transition is interrupted by another click.
+      if (!(err instanceof DOMException && err.name === "AbortError")) throw err;
     } finally {
       root.classList.remove("theme-transitioning");
     }

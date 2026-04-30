@@ -1,8 +1,10 @@
 # clean-stack
 
-> The SaaS boilerplate that says no. Auth, billing, multi-tenant, email, storage already wired. Fourteen non-negotiable architecture rules. You clone, you write business logic — everything else is settled.
+> The SaaS boilerplate that says no. Auth, multi-tenant, email, storage already wired. Fourteen non-negotiable architecture rules. You clone, you write business logic — everything else is settled.
 
-Bun + Hono on the API · Vite + React 19 + TanStack on the app · Drizzle + Postgres at the bottom · DDD-kit for the business domain · BetterAuth + Stripe + Resend + R2 for the SaaS layer.
+Bun + Hono on the API · Vite + React 19 + TanStack on the app · Drizzle + Postgres at the bottom · DDD-kit for the business domain · BetterAuth + Resend + R2 for the SaaS layer.
+
+See [`docs/FEATURES.md`](docs/FEATURES.md) for what ships today and [`ROADMAP.md`](ROADMAP.md) for what's next (GDPR/CCPA → Billing → Gating → Admin → Audit log → i18n).
 
 ## Lean by design
 
@@ -20,10 +22,9 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 
 - **Real auth, not a demo** — BetterAuth (passkeys, 2FA, magic-link, DB-backed sessions), the first auth that runs natively on Bun + Hono with no hacks.
 - **Multi-tenant from day one** — `organization` plugin, `organizationId` FK on every business table from the very first migration. Migrating single-user → multi-tenant after the fact is hell; the reverse is free.
-- **Wrapped Stripe billing** — `@better-auth/stripe` plugin. Customer portal, subscriptions, signed webhooks, DB sync. Stripe customer = per organization.
-- **Resend email** — templates managed from the dashboard, bounces & complaints tracked.
-- **S3-compatible storage** — Cloudflare R2 in production (zero egress fees), MinIO in dev (same API, zero divergence).
-- **i18n built-in** — locale-aware TanStack routes, type-safe message keys, server-side detection, no missing-key surprises in production.
+- **Capability-based authorization SSOT** — `@packages/access-control` exports `ac`, `roles`, `authorizeRole`. Same predicate enforced server-side (`requireOrgPermission`), at the route gate (`ensureOrgPermission`), and in the UI (`<Can>` + `useAuthorization`).
+- **Resend email** — dashboard-managed templates with retry + idempotency; Resend's own suppression list guards IP reputation (hard bounces & complaints auto-blocked at the edge).
+- **S3-compatible storage** — Cloudflare R2 in production (zero egress fees), MinIO in dev (same API, zero divergence). Owner-scoped keys, three-step presign → PUT → confirm flow.
 - **Pragmatic DDD** — reserved for the business logic you actually charge for. Not for billing, not for auth, not for gating. ~70% less code than going full-DDD.
 - **Zero-warning pipeline** — Biome, knip, jscpd, type-check, commitlint. Fix before push, never `--no-verify`.
 - **AI-pair ready** — A `CLAUDE.md` shipped at the root: architecture, DDD scope, form contracts, banned anti-patterns. Your agent already knows the rules.
@@ -33,20 +34,20 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 | Layer | Choice |
 |---|---|
 | **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
-| **API** | Hono on native `Bun.serve()` (~7 ms cold prod build) |
+| **API** | Hono 4 on native `Bun.serve()` (~7 ms cold prod build) |
 | **App** | Vite 8 · React 19 · TanStack Router (file-based, prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
-| **Forms** | react-hook-form + `@hookform/resolvers/zod` + shadcn `Form` |
-| **Auth** | BetterAuth + plugins `organization`, `twoFactor`, `passkey`, `magicLink`, `stripe` |
-| **Billing** | Stripe via `@better-auth/stripe` |
-| **Email** | Resend (dashboard templates, bounce webhooks) |
+| **Forms** | react-hook-form + `@hookform/resolvers/zod` 4 + shadcn `Form` |
+| **Auth** | BetterAuth + plugins `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
+| **Access control** | `@packages/access-control` SSOT (statements, roles, `authorizeRole`) consumed by server, route gates and UI |
+| **Email** | Resend (dashboard templates, retry + idempotency, provider-side suppression) |
 | **Storage** | Cloudflare R2 in prod / MinIO in dev (S3-compatible, presigned URLs) |
-| **i18n** | TanStack Router locale routes + typed message catalogs |
 | **DB** | Drizzle ORM + Postgres 17 (port 5433 dedicated) |
-| **API ↔ App** | Hono RPC (`hc<AppType>`) — end-to-end types, no client to write |
-| **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, Entity, ValueObject, DomainEvent, EventDispatcher, UseCase, QueryHandler) |
+| **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types, no client to write |
+| **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, Entity, ValueObject, DomainEvent, EventDispatcher, QueryHandler, AppErrorException) |
 | **DI** | inwire (modules per bounded context) |
 | **Theme** | `next-themes` + View Transitions API circle reveal |
-| **Tooling** | pnpm 10 · Turborepo TUI · Biome · Husky · commitlint · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 10 · Turborepo TUI · Biome 2 · Husky · commitlint · semantic-release · knip · jscpd |
+| **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, GDPR/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
 
 ## Quick start
 
@@ -79,16 +80,19 @@ apps/
   app/                       Vite + React (routes → features → adapters → common)
     src/
       routes/                TanStack Router file-based
+        _protected.tsx       pure auth gate (passthrough Outlet)
+        _protected/_shell.tsx  shell layout (header, command palette, devtool)
       features/<x>/          page.tsx + _components/ + _forms/ + _hooks/ + _schemas/
-      adapters/              api-client (Hono RPC), auth-client, auth-broadcast, query-client, queries/, mutations/
+      adapters/              api-client (Hono RPC), auth-client, auth-broadcast, query-client, queries/, mutations/, hooks/, components/, schemas/, route-helpers/
       providers/             Provider tree (next-themes, query, router)
-      common/                env, format, theme-toggle
+      common/                env, format, theme-toggle, is-personal-org, initials
 packages/
-  ddd-kit                    DDD primitives
+  access-control             BetterAuth access-control SSOT (statements, roles, authorizeRole)
+  ddd-kit                    DDD primitives + AppErrorException
   drizzle                    DB client + TransactionService + schemas
   test                       Shared Vitest config
   typescript-config          Shared tsconfig presets
-  ui                         Full shadcn/ui + typography + theme tokens + custom primitives (NavLink, …)
+  ui                         shadcn/ui + typography + theme tokens + custom primitives (NavLink, BrandLink, TextLink, ListRow, FormTextField, DestructiveActionDialog, BackupCodeList)
 ```
 
 ## Conventions
@@ -96,6 +100,18 @@ packages/
 Read `CLAUDE.md` for the full ruleset: Result/Option, no null, no throw in domain, CQRS, mandatory DI, strict import direction, theme tokens only, **shadcn-first and shadcn-pure** (use the actual slots — `CardHeader`/`CardTitle`/`CardContent`, never patch with `pt-6` / `space-y-4`; no custom outside the theme or primitive), strict HTML semantics (one `<main>` per page), zero-warning pipeline, DDD scope limited to business logic, reusability-first promotion to theme/primitives, `interface` for component props, `void navigate(...)` in mutation callbacks.
 
 UI composition follows the **`asChild` pattern**: a primitive owns the *style* (e.g. `NavLink` = muted color + hover transition), and TanStack `<Link>` owns the *navigation*. Wire them via `<NavLink asChild><Link to="." hash="x">…</Link></NavLink>`. Never style raw `<a>` tags inside features.
+
+## Email DNS (mandatory before production)
+
+Gmail (Feb 2024), Yahoo (Feb 2024) and Microsoft Outlook (May 2025) all reject unauthenticated bulk senders with `550 5.7.515`. Three records to publish on the sending domain:
+
+- **SPF** — `TXT @  "v=spf1 include:amazonses.com ~all"` (Resend handles the rest).
+- **DKIM** — three CNAME records generated by Resend on domain verification (`Domain Settings → Add domain`).
+- **DMARC** — `TXT _dmarc  "v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com"` to start. Watch the aggregate reports for two weeks, then progress `p=none` → `p=quarantine` → `p=reject` once SPF/DKIM alignment is stable.
+
+For bulk / marketing email (>5k/day, deferred until the first newsletter ships), Gmail/Yahoo/Microsoft additionally require `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) headers and a working `POST /unsubscribe` endpoint. Transactional auth emails (verify, reset, magic-link) are exempt.
+
+Resend's domain-scoped suppression list automatically blocks future sends to hard-bounced or complained addresses — IP reputation is guarded out of the box, no webhook required.
 
 ## Roadmap & integrations
 

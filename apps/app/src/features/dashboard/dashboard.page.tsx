@@ -1,35 +1,61 @@
-import { Button } from "@packages/ui/components/ui/button";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { Link } from "@tanstack/react-router";
-import { ShieldIcon } from "lucide-react";
-import { ThemeToggle } from "../../common/components/theme-toggle";
-import { SignOutButton } from "./_components/sign-out-button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@packages/ui/components/ui/card";
+import { TypographyH1, TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { type DisplayUser, displayName } from "../../common/display-name";
 
 interface DashboardPageProps {
-  user: { name?: string | null; email: string };
+  user: DisplayUser;
 }
 
 export function DashboardPage({ user }: DashboardPageProps) {
+  const firstName = displayName(user).split(" ")[0];
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 px-6 py-12">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <TypographyH1 variant="page">Welcome, {user.name ?? user.email}</TypographyH1>
-
-          <TypographyMuted>{user.email}</TypographyMuted>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link to="/account/security">
-              <ShieldIcon />
-              Security
-            </Link>
-          </Button>
-          <ThemeToggle />
-          <SignOutButton />
-        </div>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">
+      <header className="flex flex-col gap-1">
+        <TypographyH1 variant="page">Welcome back, {firstName}</TypographyH1>
+        <TypographyMuted>Here's what's happening today.</TypographyMuted>
       </header>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Getting started</CardTitle>
+            <CardDescription>Configure your workspace.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TypographyP>
+              Invite teammates, configure billing, and start shipping. Everything lives under
+              Settings.
+            </TypographyP>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Activity</CardTitle>
+            <CardDescription>Recent events in your workspace.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TypographyMuted>Nothing yet — your activity will surface here.</TypographyMuted>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Usage</CardTitle>
+            <CardDescription>Quota and limits for the current period.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TypographyMuted>Hook up metering once a billable resource exists.</TypographyMuted>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }

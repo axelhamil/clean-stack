@@ -4,30 +4,25 @@ Generic monorepo boilerplate. Clean Architecture + DDD. No business features.
 
 ## Philosophy
 
-Lean Startup — **Build → Measure → Learn**. The bottleneck is *Build*, so this stack ships the SaaS plumbing (auth, billing, multi-tenant, email, storage) and isolates the domain so pivots don't trash the foundation. Default move when in doubt: ship the smallest thing that tests one hypothesis. "Done > perfect" applies to features; the architecture rules below stay non-negotiable because they're what *makes* shipping fast sustainable.
+Lean Startup — **Build → Measure → Learn**. The bottleneck is *Build*, so this stack ships SaaS plumbing (auth, billing, multi-tenant, email, storage) and isolates the domain so pivots don't trash the foundation. "Done > perfect" applies to features; the rules below stay non-negotiable — they're what *makes* shipping fast sustainable.
 
 ## Working method
 
-**Whenever something is unclear about a library API, version, config option, or "is this still SOTA" — check the docs before guessing.**
-
-1. **Primary**: Context7 MCP via the `explore-docs` agent (Hono, TanStack Router/Query, Drizzle, Zod, shadcn, sonner, next-themes, react-hook-form, Vite, Bun…).
-2. **Fallback**: web search via the `websearch` agent / `WebFetch` for libs Context7 doesn't index, or for broader questions (architecture posts, RFCs).
-3. **Never** invent API surface from memory when it's a 30s lookup. Outdated patterns (deprecated hooks, removed flags) are a frequent failure mode.
+When unclear about a library API / config / "is this still SOTA" — **check docs before guessing**. Outdated patterns are a frequent failure mode. Primary: Context7 MCP via `explore-docs` agent. Fallback: `websearch` agent / `WebFetch`.
 
 ## Stack
 
-- **Runtime**: Bun 1.3+ (api + scripts), Node 24.15+ for tooling
-- **API**: Hono on native `Bun.serve()` — `bun build` (prod, ~7ms), `bun --hot` (dev)
-- **App**: Vite 8 + React 19 + TanStack Router + TanStack Query + Tailwind 4 (`@tailwindcss/vite`)
-- **UI kit**: shadcn/ui (`@packages/ui`) + `sonner` (toasts) + `next-themes` (light/dark/system)
-- **DB**: Drizzle ORM + Postgres 17 (Docker, port `5433` to avoid local Postgres collisions)
-- **DI**: `inwire`
-- **Auth**: BetterAuth (Drizzle adapter + `twoFactor`, `passkey`, `magicLink`, `bearer`) — module-level singleton in `apps/api/src/auth.ts`, never wrapped in DI
-- **Observability**: `pino` (root, JSON in prod, `pino-pretty` in dev) + `hono-pino` (per-request, status-driven level)
-- **API ↔ App contract**: Hono RPC (`hc<AppType>`) — type-safe routes end-to-end
-- **Primitives**: `@packages/ddd-kit` (`Result<T,E>`, `Option<T>`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `DomainEvent`, `BaseRepository`, `UseCase`)
-- **Packages tooling**: `tsup` (esbuild) for `ddd-kit` + `drizzle`
-- **Repo tooling**: pnpm 10 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd
+- **Runtime**: Bun 1.3+ (api + scripts), Node 24.15+ (tooling)
+- **API**: Hono on native `Bun.serve()` — `bun build` (prod), `bun --hot` (dev)
+- **App**: Vite 8 + React 19 + TanStack Router/Query + Tailwind 4
+- **UI**: shadcn/ui (`@packages/ui`) + `sonner` + `next-themes`
+- **DB**: Drizzle + Postgres 17 (Docker, port `5433`)
+- **DI**: `inwire` (type-inference container)
+- **Auth**: BetterAuth (Drizzle adapter + `twoFactor`, `passkey`, `magicLink`, `bearer`) — module-level singleton, never wrapped in DI
+- **Observability**: `pino` + `hono-pino`
+- **Contract**: Hono RPC (`hc<AppType>`)
+- **Primitives**: `@packages/ddd-kit` (`Result`, `Option`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `DomainEvent`, `BaseRepository`, `UseCase`)
+- **Tooling**: pnpm 10 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd
 - **Testing**: `bun test` (api) + `vitest` (packages, app)
 
 ## Layout
@@ -40,7 +35,7 @@ apps/
       application/
         ports/                 Interfaces (repositories, services)
         use-cases/             One file per use case
-        dto/                   Zod schemas
+        dto/                   Zod schemas (`<verb-noun>.dto.ts`, export `<Noun>Input = z.infer<...>`)
         event-handlers/        Side effects on domain events
       adapters/
         middleware/            Hono middleware (auth, error, logger, rate-limit)
@@ -48,30 +43,27 @@ apps/
         repositories/          Drizzle repositories
         mappers/               Domain <-> DB
       routes/                  Hono route registration
-      di/                      inwire container (flat by default; modules/ only when a context grows large)
+      di/                      inwire container (flat; modules/ only when a context grows)
       auth.ts                  BetterAuth singleton
-    common/
-      env.ts                   Validated env (zod)
-      logger.ts                pino root logger
+      client.ts                hcWithType (RPC client factory)
+    common/                    env.ts, logger.ts
   app/
     src/
       main.tsx                 createRoot + <AppProviders />
-      routes/                  TanStack Router file-based routes
+      routes/                  TanStack Router file-based
         _protected.tsx         pathless gate — redirects when not authenticated
         _guest.tsx             pathless gate — redirects when already authenticated
-      features/<area>/         workflow area (auth, dashboard, …) (≈ application/)
-        <feature>.page.tsx     entry component (`.page` suffix is non-negotiable)
+      features/<area>/         workflow area (≈ application/)
+        <feature>.page.tsx     entry component (`.page` suffix non-negotiable)
         <feature>.layout.tsx   (optional)
-        <feature>.loading.tsx  (optional) → route's pendingComponent
-        <feature>.error.tsx    (optional) → route's errorComponent
-        _components/           private colocated components
-        _forms/                private isolated forms (RHF + zodResolver)
-        _hooks/                private feature-local React hooks
-        _schemas/              private zod schemas
-      adapters/                auth-client, auth-broadcast, query-client, queries/session, storage
+        <feature>.loading.tsx  (optional) → pendingComponent
+        <feature>.error.tsx    (optional) → errorComponent
+        _components/ _forms/ _hooks/ _schemas/   private colocated
+      adapters/                api-client, auth-client, auth-broadcast, query-client, queries/, mutations/
       providers/               provider tree (≈ di/)
-      common/                  zero-business infra (env.ts, components/theme-toggle.tsx)
+      common/                  zero-business infra (env, theme-toggle)
 packages/
+  access-control               BetterAuth access-control SSOT (statements, roles, authorizeRole)
   ddd-kit                      DDD primitives
   drizzle                      DB client + TransactionService
   test                         shared vitest config
@@ -86,425 +78,177 @@ packages/
 3. **No `null` / `undefined` for absence** — use `Option<T>`.
 4. **Value Objects validate via zod** in `protected validate()`.
 5. **Transactions managed in controllers**, passed to use cases.
-6. **All dependencies injected** via inwire DI. No service locators in use cases.
+6. **All dependencies injected via DI**. No service locators in use cases. Routes consume by name (`di.XxxUseCase.execute(...)`); never `new XxxUseCase(...)` at call site (bypasses container, breaks per-test impl swap).
 7. **No barrel `index.ts` files** — import directly.
-8. **Self-documenting code** — no inline comments unless the WHY is non-obvious.
+8. **Self-documenting code** — no inline comments unless WHY is non-obvious.
 9. **Only `get id()` getter on aggregates**. Other props via `entity.get('propName')`.
-10. **`className` is for layout only** — `flex` (default), `w-*`, `h-*`, `mx-auto`, `gap-*`, responsive breakpoints. **`grid` is reserved for true 2D layouts**; `flex flex-col gap-*` for any vertical stack. Colors / typography / radius / shadows / look-defining paddings live in the **theme** (`packages/ui/src/styles/globals.css` `@theme`) or in the shadcn primitive itself (`packages/ui/src/components/ui/*`). Inline overrides like `bg-foo text-bar p-3` = theme drift = no design system.
-11. **Always shadcn first, stay shadcn-pure** — check `@packages/ui/components/ui/*` and the [shadcn registry](https://ui.shadcn.com/docs/components) before custom. **Use the actual slots** — `Card` + `CardHeader` + `CardTitle`, never `<TypographyP className="font-medium">` shoved into `CardContent` (the wrong slot forces hacks like `pt-6`, `space-y-4`). No wrapper variants, no `data-slot="*"` overrides, no inline re-shaping. Adjustments live in the theme or in the primitive file. When you do go custom (last resort), put it in `@packages/ui/components/ui/*`, never inline in a feature.
-12. **Exactly one `<main>` per rendered page**. `routes/__root.tsx` and pathless gates (`_protected.tsx`, `_guest.tsx`) are passthroughs (`component: Outlet` / `component: () => <Outlet />`) — never wrap in landmarks. Each `<feature>.page.tsx` owns its own `<header>` / `<main>` / `<footer>`. Same rule for `<h1>` (one per page) — `TypographyH1` for the hero, `TypographyH2` for sections.
-13. **Zero warnings, zero errors before push**. Husky / lint-staged / commitlint / pre-push / CI must stay green — Biome, knip, jscpd, type-check, all of it. No `--no-verify`. If a warning is genuinely intentional, silence it locally with `/* biome-ignore <rule>: <why> */`. Contract: green `pnpm ci:check`.
-14. **Reusability-first — promote, don't duplicate**. Second occurrence of any pattern (animation, hover, layout, mutation shape) is the trigger. Two destinations: theme-level (`globals.css` for keyframes / utilities) or primitive-level (`packages/ui/components/ui/*` when intrinsic to a component). Once promoted, the call site contains zero cosmetics — only layout per rule 10. Same for logic: if `mutationFn: (input) => api.x.$post({ json: input })` shows up twice, extract a typed helper. Three duplications become twelve before you notice.
-15. **Component props use `interface`, not `type`** — `interface <Component>Props { ... }` above each component, including sub-components in the same file (no inline `({ token }: { token: string })`). Reasons: declaration merging, better IDE hover, codebase consistency. `type` is for unions / intersections / mapped shapes / zod-inferred types (`type SignInInput = z.infer<typeof signInSchema>`).
-16. **`void navigate(...)` in mutation callbacks, not `await`** — `await navigate()` in `useMutation.onSuccess` keeps `isPending: true` during the route transition (beforeLoad + view-transitions + animations), blocking the submit button. `void navigate(...)` is the fire-and-forget that satisfies `no-floating-promises` and resolves the mutation immediately. `await` only when chaining something *after* the navigation lands.
+10. **`className` is for layout only** — `flex` (default), `w-*`, `h-*`, `mx-auto`, `gap-*`, responsive breakpoints. **`grid` reserved for true 2D**; `flex flex-col gap-*` for any vertical stack. Colors / typography / radius / shadows / look-defining paddings live in **theme** (`packages/ui/src/styles/globals.css` `@theme`) or in the primitive itself. Inline `bg-foo text-bar p-3` = theme drift = no design system.
+11. **Always shadcn first, stay shadcn-pure** — check `@packages/ui/components/ui/*` and the [shadcn registry](https://ui.shadcn.com/docs/components) before custom. **Use the actual slots** (`Card` + `CardHeader` + `CardTitle`) — wrong slot forces hacks (`pt-6`, `space-y-4`). No wrapper variants, no `data-slot="*"` overrides, no inline reshape. Adjustments → theme or primitive file. Custom (last resort) lives in `@packages/ui/components/ui/*`, never inline in a feature.
+12. **Exactly one `<main>` per rendered page**. `__root.tsx` and pathless gates are passthroughs (`component: Outlet`) — never wrap in landmarks. Each `<feature>.page.tsx` owns its `<header>` / `<main>` / `<footer>`. Same for `<h1>` (one per page) — `TypographyH1` for hero, `TypographyH2` for sections.
+13. **Zero warnings, zero errors before push**. Husky / lint-staged / commitlint / pre-push / CI must stay green (Biome, knip, jscpd, type-check). No `--no-verify`. Intentional warning → `/* biome-ignore <rule>: <why> */`. Contract: green `pnpm ci:check`.
+14. **Reusability-first — promote, don't duplicate**. Second occurrence is the trigger. Theme-level (keyframes / utilities) or primitive-level (intrinsic to a component). Once promoted, call site has zero cosmetics. Same for logic: `mutationFn: (input) => api.x.$post({ json: input })` twice → extract a typed helper.
+15. **Component props use `interface`, not `type`** — `interface <Component>Props { ... }` above each component (no inline `({ token }: { token: string })`). Reasons: declaration merging, IDE hover, consistency. `type` is for unions / intersections / mapped shapes / zod-inferred (`type X = z.infer<typeof xSchema>`).
+16. **`void navigate(...)` in mutation callbacks, not `await`** — `await` keeps `isPending: true` during route transition (blocks submit). `void navigate(...)` resolves the mutation immediately and satisfies `no-floating-promises`. `await` only when chaining *after* navigation lands.
+17. **Adding a rule — omnipotent or it doesn't belong here.** A rule states a *principle* tied to an architectural property (Clean Architecture layer, type-safety boundary, design-system invariant, security posture) and must survive swapping any library/version/path it references — phrase library-agnostic when possible, only name a tool when it *is* the property (Zod = "validate at boundary"). Always include the **why** (the failure mode the rule prevents) — without it, the rule rots on the first edge case. Promote on second occurrence (rule 14); section-local first, `## Architecture rules` only when crossing sections; if inverse advice, mirror in `## Don't`. Rewrite or delete a rule the moment its property changes — a stale rule is worse than no rule.
 
 ## CQRS
 
 - **Commands** (writes): Controller → Use Case → Aggregate → Repository → EventDispatcher → Handlers
-- **Queries** (reads): Controller → Query (direct ORM access, no use case layer)
+- **Queries** (reads): Controller → Query (direct ORM access, no use case)
 
 ## DI (inwire)
 
-inwire's whole point is **type inference, no declarations**. The builder accumulates types as you `.add()`; `c` in every factory is fully typed against everything registered before. There is no `AppDeps` interface to maintain — `AppDeps = typeof di` is derived after `.build()`.
+**Type inference, no declarations.** Builder accumulates types as you `.add()`; `c` is fully typed against everything registered before — reorder a use-case before its port, `tsc` rejects. Flat container with sections grouped by bounded context (`// uploads`, `// billing`); promote a section to `apps/api/src/di/modules/<context>.module.ts` (`addModule` pattern) only when ≥ 5 use-cases *and* `container.ts` becomes hard to scan.
 
-**Default: flat container with sections** in `apps/api/src/di/container.ts`. Group `add()` calls by bounded context with line comments. Promote to a separate module file only when a bounded context grows large (≥ 5 use-cases of the same domain) and would noticeably bloat `container.ts`:
-
-```typescript
-// apps/api/src/di/container.ts
-import { container } from "inwire";
-import { ResendEmailService } from "../adapters/services/email.service";
-import { S3StorageService } from "../adapters/services/storage.service";
-import { CreateUploadUrlUseCase } from "../application/use-cases/create-upload-url.use-case";
-import { ConfirmUploadUseCase } from "../application/use-cases/confirm-upload.use-case";
-import { CreateDownloadUrlUseCase } from "../application/use-cases/create-download-url.use-case";
-
-export const di = container()
-  // infra
-  .add("IEmailService", () => new ResendEmailService())
-  .add("IStorageService", () => new S3StorageService())
-  // uploads
-  .add("CreateUploadUrlUseCase", (c) => new CreateUploadUrlUseCase(c.IStorageService))
-  .add("ConfirmUploadUseCase", (c) => new ConfirmUploadUseCase(c.IStorageService))
-  .add("CreateDownloadUrlUseCase", (c) => new CreateDownloadUrlUseCase(c.IStorageService))
-  .build();
-
-export type AppDeps = typeof di;
-```
-
-Reorder a call — put a use-case before the port it depends on — and `tsc` rejects: `c.IStorageService` is unknown until the port is registered. Order is enforced by inference, not by hand-declared constraints.
-
-**Rules**:
-
-1. **No declared types until they pay for themselves.** Don't write `interface XxxDeps`, don't write `<T extends { IPort: PortType }>` constraints, don't maintain a central `types.ts`. inwire infers it all. Hand-declaring those types is exactly the boilerplate inwire was built to remove.
+1. **No declared types until they pay for themselves** — no `interface XxxDeps`, no `<T extends { IPort: PortType }>`, no central `types.ts`. Hand-declaring is the boilerplate inwire removes.
 2. **`AppDeps = typeof di`** after `.build()` — derived, never declared.
-3. **Sections by bounded context with line comments** (`// uploads`, `// billing`, `// auth`). When a section reaches ≥ 5 use-cases *and* container.ts becomes hard to scan, extract that section to `apps/api/src/di/modules/<context>.module.ts` using the `addModule` pattern from inwire (see `inwire/examples/04-modules.ts`). At that point, the type constraint on the module *is* the right form — but only because the bounded context has earned its own file.
-4. **Use-cases stay in `application/use-cases/`**, one file per use-case. The DI is *wiring*; the use-case file is the *implementation*.
-5. **Routes consume use-cases by name** (`di.CreateUploadUrlUseCase.execute(...)`). Never `new CreateUploadUrlUseCase(...)` at the call site — bypasses the container and breaks per-test impl swapping via `di.module(...)`.
-6. **No barrel `index.ts`** in `di/`.
+3. **Use-cases stay in `application/use-cases/`** (one file per use-case). DI is *wiring*; the use-case file is *implementation*.
+4. **No barrel `index.ts`** in `di/`.
 
 ## Hono RPC (end-to-end type safety)
 
-The api exports its routes as a type (`AppType`) consumed by the app via `hono/client`. Routes **must be chained** to accumulate types — `app.use` and `app.onError` don't add to the typed schema.
+API exports `AppType`; app consumes via `hono/client`. Routes **must be chained** to accumulate types — `app.use` / `app.onError` don't add to the typed schema. Paths mirror URL (`/uploads/presign` → `api.uploads.presign`); method `$post` / `$get`.
 
-**Two subpath exports from the api package**:
+`apps/api/package.json` has two subpath exports: `.` → `./src/index.ts` (`AppType`, server runtime); `./client` → `./src/client.ts` (`hcWithType`, pre-typed factory). Single client instance lives in `apps/app/src/adapters/api-client.ts`: `hcWithType(baseUrl, { init: { credentials: "include" }, fetch: customFetch })`. Custom fetch injects `X-Request-Id` and is the slot for future global handlers (401 redirect, token refresh, Capacitor Bearer).
 
-```jsonc
-// apps/api/package.json
-"exports": {
-  ".": "./src/index.ts",        // AppType (server runtime imports too)
-  "./client": "./src/client.ts" // hcWithType (frontend only — pre-typed RPC client)
-}
-```
-
-```typescript
-// apps/api/src/index.ts
-const routes = app
-  .get("/health", (c) => c.json({ status: "ok" as const }))
-  .post(
-    "/widgets",
-    zValidator("json", z.object({ name: z.string() })),
-    (c) => c.json({ ok: true as const, name: c.req.valid("json").name }),
-  );
-export type AppType = typeof routes;
-
-// apps/api/src/client.ts — pre-computed RPC client type
-import { hc } from "hono/client";
-import type { AppType } from "./index";
-export type ApiClient = ReturnType<typeof hc<AppType>>;
-export const hcWithType = (
-  ...args: Parameters<typeof hc<AppType>>
-): ApiClient => hc<AppType>(...args);
-```
-
-```typescript
-// apps/app/src/adapters/api-client.ts — single instance, custom fetch interceptor
-import { hcWithType } from "api/client";
-import { env } from "../common/env";
-
-const baseUrl = env.VITE_API_URL.endsWith("/")
-  ? env.VITE_API_URL
-  : `${env.VITE_API_URL}/`;
-
-type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-const customFetch: FetchFn = async (input, init) => {
-  const headers = new Headers(init?.headers);
-  if (!headers.has("X-Request-Id")) {
-    headers.set("X-Request-Id", crypto.randomUUID());
-  }
-  return fetch(input, { ...init, headers });
-};
-
-export const api = hcWithType(baseUrl, {
-  init: { credentials: "include" },
-  fetch: customFetch,
-});
-```
-
-```typescript
-// Mutation factory — adapters/mutations/<verb>.ts
-import { mutationOptions } from "@tanstack/react-query";
-import type { InferRequestType, InferResponseType } from "hono/client";
-import { api } from "../api-client";
-
-const $post = api.widgets.$post;
-type Body = InferRequestType<typeof $post>["json"];
-type Response = InferResponseType<typeof $post, 200>; // status-narrowed
-
-export const createWidgetMutationOptions = mutationOptions({
-  mutationKey: ["widgets", "create"] as const,
-  mutationFn: async (input: Body): Promise<Response> => {
-    const res = await $post({ json: input });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-});
-```
-
-**Non-negotiables**:
-
-- **`hcWithType` exported from `api/client`, not inline `hc<AppType>` in the app** — eliminates per-callsite generic re-inference. `tsc` resolves `ApiClient` once.
-- **Trailing-slash normalize** the `baseUrl` — `hc` drops the last segment of the base when the slash is missing.
-- **Single client instance** with a custom `fetch` — adds `X-Request-Id` per request (correlates with the api `requestId()` middleware), and is the natural slot for future global handlers (401 redirect, token refresh) and for the Capacitor branch (Bearer header from secure storage).
-- **`AbortSignal`**: pass via the per-call second arg → `await $get({}, { init: { signal } })`. TanStack Query's `queryFn`/`mutationFn` receive `signal`; thread it through.
-- **`InferRequestType` / `InferResponseType<typeof $endpoint, 200>`** for sharing request/response shapes — status-narrowed (`200`) so the type is the success-only payload.
-- **Errors stay throw-on-`!res.ok`** — Hono 2026 ships `ApplyGlobalResponse` to widen `InferResponseType` with error shapes, but it does not give a discriminated union you can exhaustively `match`. Don't fake a SOTA you'll regret.
-
-The `api` workspace dep is wired via `apps/api/package.json` `exports`. The app consumes types only — server runtime never bundled. Path segments mirror the URL (`/widgets` → `api.widgets`); method is `$post` / `$get` / etc.
+- **`hcWithType` from `api/client`, not inline `hc<AppType>` in the app** — `tsc` resolves `ApiClient` once, no per-callsite re-inference.
+- **Trailing-slash normalize the `baseUrl`** — `hc` drops the last segment if missing.
+- **`AbortSignal`** via per-call second arg → `await $get({}, { init: { signal } })`. TanStack Query passes `signal`; thread it.
+- **Type sharing**: `InferRequestType<typeof $endpoint>["json"]` + `InferResponseType<typeof $endpoint, 200>` (status-narrowed to success).
+- **Errors stay `throw on !res.ok`** — `ApplyGlobalResponse` widens response types but no discriminated union. Don't fake SOTA.
 
 ## App import direction
 
-`routes/` → `features/` → `adapters/` → `common/`. `providers/` is bootstrap-only. No lateral cross-feature imports. No barrels.
+`routes/` → `features/` → `adapters/` → `common/`. `providers/` bootstrap-only. No cross-feature imports, no barrels.
 
-| Folder | May import from | Must NOT import from |
-|---|---|---|
-| `routes/` | `features/`, `common/` | other features cross-link |
-| `features/<x>/` | `adapters/`, `common/`, `@packages/*` | other `features/`, `routes/`, `providers/` |
-| `adapters/` | `common/` | `features/`, `routes/`, `providers/` |
-| `providers/` | `adapters/`, `common/`, `routeTree.gen.ts` | `features/` |
-| `common/` | (nothing internal) | everything else |
+- `routes/` → `features/`, `common/`
+- `features/<x>/` → `adapters/`, `common/`, `@packages/*` (never other `features/`, `routes/`, `providers/`)
+- `adapters/` → `common/`
+- `providers/` → `adapters/`, `common/`, `routeTree.gen.ts`
+- `common/` → nothing internal
 
 ## App feature anatomy
 
-Symmetry with `apps/api`: `features/` ≈ `application/`, `adapters/` ≈ `adapters/`, `providers/` ≈ `di/`, `common/` ≈ `common/`. Intentionally **no `domain/` on the front** — UI domain is never pure (React deps), so we don't fake it.
+Symmetry with `apps/api`: `features/` ≈ `application/`, `adapters/` ≈ `adapters/`, `providers/` ≈ `di/`, `common/` ≈ `common/`. **No `domain/` on the front** — UI domain is never pure (React deps), don't fake it.
 
-Naming follows **Next.js App Router conventions** — suffix-based files (`<name>.page.tsx`, `<name>.layout.tsx`), `_components/` / `_forms/` / `_hooks/` / `_schemas/` for private folders.
+**Next.js App Router naming**: `<name>.page.tsx`, `<name>.layout.tsx`, `_components/` / `_forms/` / `_hooks/` / `_schemas/` private folders. Files `kebab-case.tsx`; components `PascalCase` named exports; hooks `use-<verb>-<noun>.ts` → `useVerbNoun`; schemas `<noun>.schema.ts` → `<noun>Schema` + `<Noun>Input` (z.infer). The `.page` suffix disambiguates routes / pages / forms / cards. Default to flatten — promote `features/<area>/<feature>/` only when multi-page.
 
-**Default to flatten.** When a feature is mono-page, keep `<feature>.page.tsx` directly under `features/<area>/` rather than a `<feature>/` folder for one file. Promote to `features/<area>/<feature>/` only when it actually grows multi-page (e.g. an onboarding wizard).
+1. Page in `<feature>.page.tsx`. Components in `_components/` (flat — group only when ≥ 5 files share a concern).
+2. Hooks never call `fetch` directly — through `adapters/api-client.ts`.
+3. Schemas are zod with `z.infer` co-located.
+4. **Forms in `_forms/<action>-form.tsx`**, isolated from host (Card / Sheet / Dialog = layout only; form owns RHF state, `zodResolver`, validation, submit). Pages composable, forms reusable across hosts.
+5. Cross-feature reuse not pre-solved — extract to `packages/ui` if presentational, or promote one feature to own it.
 
-**File naming:**
+**Form contract**: `react-hook-form` + `zodResolver` + shadcn `Form`. Always pass `defaultValues` to `useForm` (no flash of uncontrolled). Submit via `form.handleSubmit((values) => mutation.mutate(values))` — never manual `(e) => …`.
 
-- Files: `kebab-case.tsx`. Components export `PascalCase` named (`export function <Feature>Page`).
-- Hooks: `use-<verb>-<noun>.ts`, exporting `useVerbNoun`.
-- Schemas: `<noun>.schema.ts`, exporting `<noun>Schema` and `<Noun>Input` (inferred type).
-- Page entry: `<feature>.page.tsx` — the route file (`routes/<x>.tsx`) is one line of wiring (`createFileRoute → component: <FeaturePage>`). The `.page` suffix is non-negotiable: it disambiguates routes / pages / forms / cards in the same folder.
+**Schema contract — split loose vs strict for the same field.** A field *captured* in one flow (sign-in: transmit, server validates) and *created* in another (sign-up / reset: enforce strength) needs two schemas — validating strength on sign-in locks out users with old passwords who need to log in to *change* them. NIST SP 800-63B 2024 deprecates required special chars; stronger guarantees → `zxcvbn-ts`.
 
-**Rules:**
+**Typography contract**: all text via shadcn typography exports (named, not namespace). Never raw `<h1 className="text-5xl font-bold">`. Custom typography → theme or Typography component itself (rule 10). `className` on Typography reserved for **layout** (`mx-auto max-w-2xl text-balance`); never colors / weights / fonts.
 
-1. The page lives in `<feature>.page.tsx`. Components go in `_components/` (flat — add `_components/<group>/` only when one group has 5+ files).
-2. Hooks **never** call `fetch` directly — they go through `adapters/api-client.ts` (Hono RPC).
-3. Schemas are zod, with `z.infer` exporting the type next to the schema.
-4. **Forms live in `_forms/<action>-form.tsx`**, isolated from their host. The host (Card, Sheet, Dialog…) only does layout; the form owns RHF state, `zodResolver`, validation, submit. Pages stay composable, forms reusable across hosts.
-5. Cross-feature reuse is not pre-solved. When two features need the same `UserCard`, decide then: extract to `packages/ui` if presentational, or promote one feature to own it.
+**Theme & dark mode**: `next-themes` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`). Toggle uses View Transitions API with `prefers-reduced-motion` fallback. View-transition CSS in `globals.css` (theme-level).
 
-**Form contract:**
-
-- `react-hook-form` + `zodResolver` from `@hookform/resolvers/zod` + shadcn `Form` primitives (`Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`).
-- Always pass `defaultValues` to `useForm` (no flash of uncontrolled state).
-- Submit goes through `form.handleSubmit((values) => mutation.mutate(values))` — never a manual `(e) => …`. The deprecated React `FormEvent` type stays out.
-- The form imports its hook (`../_hooks/use-<action>`) and schema (`../_schemas/<thing>.schema`). Never `fetch` directly.
-
-**Schema contract — split loose vs strict for the same field shape.** When a field is *captured* in one flow (sign-in: just transmit, server validates) and *created* in another (sign-up / reset: enforce strength), keep two schemas. Example: `passwordSchema` (`min(1)`) for sign-in, `strongPasswordSchema` (`min(12).max(128)` + lowercase / uppercase / digit) for sign-up + reset. Validating strength on sign-in locks out users with old simple passwords who legitimately need to log in to *change* them. Composition rules stay minimal — NIST SP 800-63B 2024 deprecates required special chars (pushes users to `Pa$$w0rd!`); for stronger guarantees swap the regex set for `zxcvbn-ts` later.
-
-**Typography contract:**
-
-- All text uses shadcn typography exports (`@packages/ui/components/ui/typography`): `TypographyH1/H2/H3/H4`, `TypographyP/Lead/Large/Muted/Small`, `TypographyBlockquote/InlineCode/List`. Named exports, not a namespace.
-- Never raw `<h1 className="text-5xl font-bold">` or `<p className="text-muted-foreground text-sm">` in features. Custom typography belongs in the theme or the Typography component itself (rule 10).
-- `className` on Typography components is reserved for **layout** (e.g. `mx-auto max-w-2xl text-balance`). Never override colors / weights / fonts there.
-
-**Theme & dark mode:** `next-themes` provider in `providers/app-providers.tsx` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`). The toggle (`apps/app/src/common/components/theme-toggle.tsx`) uses View Transitions API for a circle-reveal animation, with `prefers-reduced-motion` fallback. The view-transition CSS lives in `packages/ui/src/styles/globals.css` (theme-level, rule 10).
-
-**Queries / mutations / hooks — three forms, one decision tree.**
-
-TanStack Query options factories (`queryOptions` / `mutationOptions`) compose better than hook wrappers: they're typed, prefetchable in `beforeLoad`, and let the call site override `onSuccess` / `onError` / `staleTime` / `select` per-use. Hook wrappers are reserved for cases where the workflow itself owns side-effects (toast, navigation, broadcast, cache invalidation) that always fire and aren't the call site's concern.
+**Queries / mutations / hooks — decision table.** Options factories compose better than hook wrappers: typed, prefetchable in `beforeLoad`, call site overrides per-use. Hook wrappers earn their keep only when side-effects *always* fire and aren't the call site's concern.
 
 | Case | Where | Form |
 |---|---|---|
-| **Query** (any read) | `adapters/queries/<noun>.ts` | `xxxQueryOptions` factory via `queryOptions(...)`. Consumed via `useQuery(xxxQueryOptions)` and `queryClient.ensureQueryData(xxxQueryOptions)` in `beforeLoad`. |
-| **Mutation, cross-feature or multi-step** (e.g. upload pipeline, signed URL refresh) | `adapters/mutations/<verb>.ts` | `xxxMutationOptions` factory via `mutationOptions(...)`. Consumed via `useMutation(xxxMutationOptions)`. The call site owns side-effects. |
-| **Mutation feature-specific with bundled side-effects** (toast + navigate + invalidate + broadcast) | `features/<x>/_hooks/use-<verb>.ts` | Hook wrapping `useMutation`. The hook owns `onSuccess` / `onError`. Used by exactly one feature. |
-| **Pure React utility** (no API, no workflow — e.g. `usePasskeySupported`, `useDebouncedValue`) | `features/<x>/_hooks/` if scoped, `adapters/` if generic | Plain hook. |
+| **Query** (any read) | `adapters/queries/<noun>.ts` | `xxxQueryOptions` via `queryOptions(...)`. Consumed via `useQuery` + `ensureQueryData` in `beforeLoad`. |
+| **Mutation, cross-feature or multi-step** | `adapters/mutations/<verb>.ts` | `xxxMutationOptions` via `mutationOptions(...)`. Call site owns side-effects. |
+| **Mutation feature-specific with bundled side-effects** (toast + navigate + invalidate + broadcast, every call) | `features/<x>/_hooks/use-<verb>.ts` | Hook wrapping `useMutation`. Owns `onSuccess` / `onError`. Used by exactly one feature. |
+| **Pure React utility** | `features/<x>/_hooks/` if scoped, `adapters/` if generic | Plain hook. |
 
-**Rule**: if a hook does nothing but `return useMutation({ mutationFn })`, it's an indirection — promote to a `mutationOptions` factory. The hook only earns its keep when it bundles side-effects that the call site must not have to remember.
-
-**Cross-feature resource hooks** — when 2+ features need the same `useUser` / `useCart`, extract to `adapters/queries/`. Don't pre-emptively place them there.
+A hook that does only `return useMutation({ mutationFn })` is an indirection — promote to a `mutationOptions` factory. Cross-feature resource hooks extracted to `adapters/queries/` only when 2+ features need them.
 
 ### `mutationOptions` cookbook
 
-**Where**: `apps/app/src/adapters/mutations/<verb-noun>.ts`. Verb is the action (`create-upload`, `delete-account`, `invite-member`); the file name mirrors the backend use-case (e.g. `apps/api/src/application/use-cases/create-upload-url.use-case.ts` ↔ `mutations/create-upload.ts`).
+`adapters/mutations/<verb-noun>.ts`, file mirrors the backend use-case, export `<verbNoun>MutationOptions`. Never prefix with `use-` — these are objects.
 
-**Naming**: file = `<verb-noun>.ts`, export = `<verbNoun>MutationOptions`. Never prefix with `use-` — these are objects, not hooks. The `mutations/` folder makes the role unambiguous.
+1. **Side-effects belong to the call site** — no `toast` / `navigate` / `invalidateQueries` in the factory.
+2. **Spread, don't override**: `useMutation({ ...createXMutationOptions, onSuccess: … })`. Never mutate the exported object.
+3. **`mutationKey` = `[<resource>, <verb>]`** (e.g. `["uploads", "create"]`) — lets `useIsMutating({ mutationKey })` find in-flight mutations.
+4. **Types via `InferRequestType` / `InferResponseType<…, 200>`** + `if (!res.ok) throw` — function signature stays accurate.
+5. **Multi-step workflows go in the factory** (presign → PUT → confirm). Single `mutationFn` returning server-verified output; call site never reasons about intermediate steps.
+6. **`AbortSignal`** — single-call factories thread `init.signal`. Multi-step flows with cleanup typically can't honour cancellation cleanly — document if so.
 
-**Anatomy**:
+**Composition patterns** (rule 11 instances — promote, don't patch). Raw `<a className="text-…">`, `<span className="… rounded-full bg-…">`, `<div className="… rounded-lg border bg-…">` in a feature = skipped slot or duplicated primitive.
 
-```typescript
-// adapters/mutations/create-widget.ts
-import { mutationOptions } from "@tanstack/react-query";
-import type { InferRequestType, InferResponseType } from "hono/client";
-import { api } from "../api-client";
-
-const $post = api.widgets.$post;
-type Body = InferRequestType<typeof $post>["json"];
-type Response = InferResponseType<typeof $post, 200>;
-
-export interface CreateWidgetInput {
-  // Public input shape — translates UI concerns (e.g. a `File`)
-  // into the wire shape (`Body`). Use it as the type the call
-  // site sees, so the factory absorbs presign / multi-step flows.
-  // For trivial pass-throughs, `Body` directly is fine.
-}
-
-async function createWidget(input: CreateWidgetInput): Promise<Response> {
-  const res = await $post({ json: /* … */ });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-export const createWidgetMutationOptions = mutationOptions({
-  mutationKey: ["widgets", "create"] as const,
-  mutationFn: createWidget,
-});
-```
-
-**Consume** — at the call site, the page or component owns the side-effects:
-
-```typescript
-// features/widgets/_components/create-widget-form.tsx
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import { createWidgetMutationOptions } from "../../../adapters/mutations/create-widget";
-import { widgetsQueryOptions } from "../../../adapters/queries/widgets";
-
-export function CreateWidgetForm() {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-
-  const { mutate, isPending } = useMutation({
-    ...createWidgetMutationOptions,
-    onSuccess: async (widget) => {
-      toast.success(`Widget ${widget.name} created`);
-      await queryClient.invalidateQueries({
-        queryKey: widgetsQueryOptions.queryKey,
-      });
-      void navigate({ to: "/widgets/$id", params: { id: widget.id } });
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  return <form onSubmit={form.handleSubmit((v) => mutate(v))}>…</form>;
-}
-```
-
-**Rules**:
-
-1. **Side-effects belong to the call site, not the factory.** No `toast` / `navigate` / `invalidateQueries` inside the `mutationOptions` body. The factory does **only** the network work. Different call sites have different success messages and different post-success destinations — keep them free.
-2. **Spread, don't override.** Compose at the call site with `useMutation({ ...createWidgetMutationOptions, onSuccess: … })`. Never mutate the exported options object.
-3. **`mutationKey`** is `[<resource>, <verb>]` (e.g. `["uploads", "create"]`). Lets `useIsMutating({ mutationKey })` and `queryClient.getMutationCache().findAll({ mutationKey })` find in-flight mutations.
-4. **Types via `InferRequestType` / `InferResponseType<…, 200>`.** The status discriminant (`200`) narrows to the success shape — pair with `if (!res.ok) throw` so the function's signature stays accurate.
-5. **Multi-step workflows go in the factory** (presign → PUT → confirm in `create-upload`). The factory presents a single `mutationFn` that returns server-verified output. The call site never reasons about the intermediate steps.
-6. **Hook only when side-effects are truly bundled** (sign-in: toast + refetch session + broadcast + navigate, every call). If the side-effects vary per call site, factory + per-call override is the better fit.
-7. **`AbortSignal`**: factories that do a single API call thread it via `init.signal`. Multi-step flows with cleanup logic typically can't honour cancellation cleanly — document this in a comment if the factory does not propagate `signal`.
-
-**Composition patterns:**
-
-- **Cards**: use the slots — `Card` + `CardHeader` + `CardTitle` + `CardContent` (+ optional `CardDescription`, `CardFooter`). The primitive already provides `py-6` / `gap-6`; never re-add `pt-6` / `space-y-4` to compensate for a skipped slot.
-- **Numbered / iconic markers** (steps, status pills): `Badge variant="secondary"` with layout classes (`size-6`, `font-mono`). Don't hand-roll `<span className="rounded-full bg-secondary …">`.
-- **Styled links / nav items**: a primitive owns *style*, a router component owns *navigation*. Compose via `asChild`:
-
-  ```tsx
-  <NavLink asChild>
-    <Link to="/dashboard">Dashboard</Link>
-  </NavLink>
-  ```
-
-  `NavLink` (`@packages/ui/components/ui/nav-link.tsx`) holds the muted color + hover; TanStack `<Link>` holds typed routes, hash, active state, prefetch. Same for `<Button asChild><Link …/></Button>`.
-- **List bullets**: lucide icons (`<Dot />`, `<Check />`, `<Minus />`) over custom `<span>`s. Sized via `size-*`, colored via theme tokens.
-
-**Rule of thumb**: raw `<a className="text-…">`, `<span className="… rounded-full bg-…">`, or `<div className="… rounded-lg border bg-…">` in a feature = skipped slot or duplicated primitive — promote, don't patch (rule 14).
+- **Cards**: actual slots (`Card` + `CardHeader` + `CardTitle` + `CardContent` + optional `CardDescription` / `CardFooter` / `CardAction`). Never re-add `pt-6` / `space-y-4` to compensate.
+- **Numbered / iconic markers**: `Badge variant="secondary"` with layout (`size-6`, `font-mono`). Not hand-rolled spans.
+- **Styled links / nav items**: `NavLink` from `@packages/ui/components/ui/nav-link` (variants `plain` / `pill` / `underline`, `active` flag). Primitive owns style, router owns navigation — compose via `asChild` (`<NavLink asChild variant="pill" active={isActive}><Link to="/x">…</Link></NavLink>`, same for `<Button asChild><Link …/></Button>`). Never raw `<a className="text-…">`.
+- **List bullets**: lucide icons over custom spans.
 
 ## Route gates (pathless layouts)
 
-Auth state is enforced by **pathless layouts**, not by per-route `beforeLoad` duplication.
+Auth state enforced by **pathless layouts** (`_protected.tsx`, `_guest.tsx`), not per-route `beforeLoad` duplication. The `_` prefix tells TanStack Router the segment isn't part of the URL — it hosts a shared `beforeLoad`. `__root.tsx` is a passthrough (`Outlet`). Children inherit the gate (`_protected/dashboard.tsx` → `/dashboard`).
 
-```
-routes/
-  __root.tsx                  passthrough (component: Outlet)
-  _protected.tsx              redirects to /sign-in if no session
-  _protected/dashboard.tsx    URL: /dashboard (inherits the gate)
-  _guest.tsx                  redirects to /dashboard if session exists
-  _guest/sign-in.tsx          URL: /sign-in
-  _guest/sign-up.tsx          URL: /sign-up
-```
+**Naming by access *condition*, not feature** — `_protected` = "must be authenticated", `_guest` = "must NOT". Avoid `_auth` (ambiguous: *about* auth vs *requiring* auth).
 
-The `_` prefix tells TanStack Router this segment is not part of the URL — it hosts a shared `beforeLoad`. URL-wise, `_guest/sign-in.tsx` resolves to `/sign-in`.
+**Single source of session truth — TanStack Query, not React state.** Router context only exposes `queryClient`. Gates' `beforeLoad` reads `ensureQueryData(sessionQueryOptions)` (staleTime aligned with `cookieCache.maxAge`). No `useSession()` React bridge, no race.
 
-**Naming**: by access *condition*, not feature. `_protected` = "must be authenticated", `_guest` = "must NOT be authenticated". Antonymic and reads at a glance. Avoid `_auth` (ambiguous: routes *about* auth vs routes *requiring* auth).
+**After auth mutations, push state into the query, then navigate.** Sign-in / verify-email / magic-link / 2FA-verify: `await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey })` (cookie is set; refetch pulls canonical shape). Sign-out: `setQueryData(..., null)` (result known). Then `void navigate({ to })`.
 
-**Single source of session truth — TanStack Query, not React state.** Router context only exposes `queryClient`. Each gate's `beforeLoad` reads via `await context.queryClient.ensureQueryData(sessionQueryOptions)` (`adapters/queries/session.ts`, staleTime 5 min — aligned with BetterAuth `cookieCache.maxAge`). No `useSession()` React bridge, no race between nanostores and `beforeLoad`.
+**Token-consuming pages stay outside the gates** — `/verify-email`, `/reset-password`, `/magic-link`, `/two-factor`. Under `_guest` they'd be 302'd away the moment the token signs the user in. Token-consume effects use a `useRef(false)` guard against StrictMode double-fire (single-use tokens otherwise invalidated by the second invocation in dev).
 
-```ts
-// _protected.tsx
-beforeLoad: async ({ context, location }) => {
-  const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
-  if (!session) throw redirect({ to: "/sign-in", search: { redirect: location.href } });
-  return { user: session.user };
-}
-```
-
-**After auth mutations, push state into the query, then navigate.** Sign-in / verify-email / magic-link / 2FA-verify do `await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey })` (cookie is set; refetch pulls the canonical shape). Sign-out does `queryClient.setQueryData(sessionQueryOptions.queryKey, null)` (result is known, no roundtrip). Then `void navigate({ to: ... })`.
-
-**Token-consuming pages stay outside the gates** — `/verify-email?token=…`, `/reset-password?token=…`, `/magic-link?token=…`, `/two-factor`. Putting them under `_guest` would 302 them away the moment the consumed token signed the user in. They handle their own state. Token-consume effects use a `useRef(false)` guard against React StrictMode double-fire (single-use tokens would otherwise be invalidated by the second invocation in dev).
-
-**Realtime cross-tab sync via `BroadcastChannel`** — `adapters/auth-broadcast.ts` (~15 LoC, native web API, stable since 2017). Auth mutations call `broadcastAuthChange()` which posts `{ type: "session-changed" }` on the `clean-stack-auth` channel. `app-providers.tsx` listens once via `onAuthChange(...)` and on receive does `refetchQueries(['session'])` + `router.invalidate()`. Tab A signs out → tab B (idle on `/dashboard`) instantly transitions to `/sign-in`, no polling, no hard reload, no navigation needed in B. The signal carries no payload — cookie is shared, each tab refetches against live server state, `cookieCache` keeps it cheap. **Use this for any auth state change** (sign-in, sign-out, verify-*, 2FA, future org switch / role change / impersonation — just add a new event type).
+**Realtime cross-tab sync via `BroadcastChannel`** — `adapters/auth-broadcast.ts` (~15 LoC, native, stable since 2017). Mutations call `broadcastAuthChange()`; `app-providers.tsx` listens once and `refetchQueries(['session','active-org','current-membership','orgs'])` + `router.invalidate()`. No payload — cookie is shared, each tab refetches live server state. Use for **any** auth/org state change (sign-in, sign-out, verify-*, 2FA, org switch / create / delete / leave / accept-invitation / role change / future impersonation).
 
 ## Auth (BetterAuth integration)
 
-BetterAuth ships as a **module-level singleton** (`apps/api/src/auth.ts`). Not wrapped in a port/adapter, not registered in inwire — wrapping would only recopy `auth.api.*` and lose the strong typing of `auth.$Infer.*`. Every consumer imports `auth` directly.
+**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in a port/adapter, not registered in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*` typing). Every consumer imports `auth` directly. Client (`adapters/auth-client.ts`): one `createAuthClient` with the same plugin set; session reads via TanStack Query, not the auth-lib nanostore.
 
-**Server pipeline** (in order, in `index.ts`):
+**Server pipeline** (in order, `index.ts`): `requestId()` → `httpLogger` → `secureHeaders()` + `cors()` → `sessionMiddleware` (calls `auth.api.getSession()` once, stores `user` / `session` on context, skips `/api/auth/*`) → `app.on(["GET","POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))` → `app.onError(errorHandler)`. Protected handlers compose `requireAuth` (reads resolved session, throws `HTTPException(401)` if absent). **Never re-call `auth.api.getSession()` per handler.**
 
-1. `requestId()` — seeds `c.var.requestId` for log correlation.
-2. `httpLogger` (hono-pino).
-3. `secureHeaders()`, `cors({ origin: env.CORS_ORIGIN, credentials: true })`.
-4. `sessionMiddleware` (`adapters/middleware/auth.middleware.ts`) — calls `auth.api.getSession()` once per request, stores `user` / `session` on the context. Skips `/api/auth/*`.
-5. Mount `app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))`.
-6. `app.onError(errorHandler)`.
+**Defaults**: `session.cookieCache: { enabled: true, maxAge: 5*60 }` (signature-only auth check between refreshes; DB is source of truth at expiry → instant revoke; keep `maxAge` ≤ 15 min). `bearer()` plugin alongside cookies — web stays cookie-based (httpOnly, XSS-safe), Capacitor uses bearer with secure storage; same session row, transport differs. Cookies: `httpOnly`, `sameSite: "lax"`, `secure: isProd`.
 
-Protected handlers compose `requireAuth` (same file) — reads the resolved session and throws `HTTPException(401)` if absent. **Never re-call `auth.api.getSession()` per handler** — one read per request.
-
-```typescript
-.get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
-```
-
-**Client** (`apps/app/src/adapters/auth-client.ts`): one `createAuthClient` with the same plugin set as the server (`twoFactorClient`, `magicLinkClient`, `passkeyClient`). Consumers import `authClient` directly — no re-exports. Session reads go through TanStack Query (`sessionQueryOptions`), not the BetterAuth nanostore.
-
-**Non-negotiable defaults:**
-
-- **`session.cookieCache: { enabled: true, maxAge: 5 * 60 }`** — auth check is signature-only between refreshes (no DB hit). DB is source of truth at expiry → instant revoke. Keep `maxAge` ≤ 15 min so revocation lag stays acceptable.
-- **`bearer()` plugin** — alongside cookies, enables `Authorization: Bearer <token>`. Web stays cookie-based (httpOnly, XSS-safe); Capacitor / mobile uses bearer with secure storage. Same session row in DB — only transport differs.
-- **Cookies**: `httpOnly: true`, `sameSite: "lax"`, `secure: isProd` in `auth.advanced.defaultCookieAttributes`.
-
-**Email URLs route through the app, not the API.** Every email link points to `${env.APP_URL}/<route>?token=...`. The frontend route consumes the token via the typed client (`authClient.verifyEmail({ query: { token } })`, `authClient.resetPassword({ newPassword, token })`, `authClient.magicLink.verify({ query: { token } })`). Reasons: branded UX (loading / error / redirect); avoids Outlook/Gmail re-autolinking the visible URL text and mangling `?callbackURL=...` (use a short label like "Verify your email", never the full URL, so re-autolinking has nothing to grab). Apply the same pattern when adding new auth-token emails (org invitations, etc.):
-
-```typescript
-sendInvitation: async ({ email, token }) => {
-  const url = `${env.APP_URL}/org/accept-invite?token=${encodeURIComponent(token)}`;
-  await sendEmail({ to: email, subject: "...", html: `<p><a href="${url}">Accept invitation</a></p>` });
-}
-```
+**Email URLs route through the app, not the API** — `${env.APP_URL}/<route>?token=...` (opaque tokens: `verify-email`, `reset-password`, `magic-link`) or `${env.APP_URL}/<route>/<id>` (ID-based flows: `accept-invitation/<id>`). Frontend consumes the token/ID via the typed client. **Why**: branded UX; avoids Outlook/Gmail re-autolinking visible URL text and mangling `?callbackURL=...`. Use a short label, never the full URL. Applies to every auth-token email.
 
 ## Logging & error handling
 
-**No `console.*` in production paths.** All logs go through `pino` (`apps/api/common/logger.ts`): JSON to stdout in prod (Datadog, Loki consume directly), `pino-pretty` single-line in dev. Level: `info` prod, `debug` dev.
+**No `console.*` in production paths** — all logs through `pino` (JSON stdout in prod, `pino-pretty` in dev; `info` prod / `debug` dev). HTTP: `hono-pino` with `referRequestIdKey: "requestId"` — every line carries the same request id; status-driven (`5xx → error`, `4xx → warn`, `2xx/3xx → info`).
 
-**HTTP logger** (`adapters/middleware/logger.middleware.ts`): `hono-pino` with `referRequestIdKey: "requestId"` so every line carries the same request id as the response payload. Status-driven: `5xx → error`, `4xx → warn`, `2xx/3xx → info`.
+**One `app.onError(errorHandler)`, no per-route `try/catch`**: `HTTPException` → `{ error: { code: "HTTP_<status>", message, requestId } }` (logged at `error` only when `status >= 500`). Anything else → `500` `{ error: { code: "INTERNAL_ERROR", message: "Internal Server Error", requestId, stack? } }` (stack only outside production).
 
-**Error handler** (`adapters/middleware/error.middleware.ts`): one `app.onError(errorHandler)`, no per-route `try/catch` for HTTP wrapping.
+**Throwing the right exception is the API.** Domain & application use `Result<T, E>` (no throw); controller translates failures → `HTTPException(<status>, { message })`. The envelope above is the contract for the whole API — never invent a custom one per route.
 
-- `HTTPException` → `{ error: { code: "HTTP_<status>", message, requestId } }`. Logged at `error` only when `status >= 500`.
-- Anything else → `500` `{ error: { code: "INTERNAL_ERROR", message: "Internal Server Error", requestId, stack? } }`. Logged with full error + request context. Stack only outside production.
+## Storage (object-storage-agnostic, S3-compatible)
 
-**Throwing the right exception is the API.** Domain & application use `Result<T, E>` (no throw). At the controller boundary, translate failures to `HTTPException(<status>, { message })`. The handler does the rest. Never invent a custom error envelope per route — the envelope above is the contract for the whole API.
+**Server is blind during the upload** — client PUTs directly to the provider via presigned URL; API only sees `presign` and `confirm`. Three-step flow `presign` → `PUT` → `confirm`; symmetric `POST /uploads/download`. **Why three steps**: providers like R2 don't support Presigned POST policies (no `content-length-range`, verified 2026). Signed `Content-Length` / `Content-Type` block naïve clients but providers don't verify the body — `confirm` (server `HeadObject` + `DeleteObject` on mismatch) is the real enforcement. Full as-built in `docs/HISTORY.md`.
 
-## Storage (R2-first, MinIO for dev)
+1. **Port = pure transport.** `IStorageService` exposes only SDK-level ops (`presignUpload`, `presignDownload`, `headObject`, `deleteObject`, `publicUrlFor`). Zero business rules.
+2. **Use-cases enforce owner-scoped key** `<userId>/<scope>/<uuid>-<filename>`; download + confirm reject keys without prefix `<requestingUserId>/` (`STORAGE_FORBIDDEN`). No `throw` — return `Result<T, StorageError>`.
+3. **Validation at controller boundary** in `application/dto/*.dto.ts` (filename regex, scope regex, size cap, max TTL), consumed via `zValidator`. Use-cases trust their input.
+4. **Routes = thin controllers.** DI resolve → `await execute(...)` → `Result` → HTTP via central `statusFor(error)` switch (403 `STORAGE_FORBIDDEN`, 404 `STORAGE_NOT_FOUND`, 422 `STORAGE_INTEGRITY_FAILED`, 502 `STORAGE_PROVIDER_FAILURE`).
+5. **Provider-agnostic via S3 SDK config**: `region: "auto"`, `forcePathStyle: true`. Boot-time fail-hard if production endpoint is localhost or creds are default. Once a region/jurisdiction is chosen (e.g. R2 EU), buckets typically can't be moved.
+6. **Confirm mandatory**: `HeadObject`s actual size/contentType, deletes on mismatch, returns server-verified `{ key, size, contentType, publicUrl }`. Size permissive (`actual > expected` fails — undershoot OK for client-side compression); content-type strict.
+7. **Multi-step factory chain.** `createUploadMutationOptions` resolves only after `confirm` succeeds — UI never sees "maybe uploaded" intermediate state.
 
-**Server is blind during the upload.** The client `PUT`s **directly** to R2/MinIO using the presigned URL — the API only sees `presign` (issue URL) and `confirm` (verify after). Three-step flow, in order:
+**Phase 2 (deferred until first concrete consumer)**: orphan GC (cron deleting objects with no DB row referencing the key — needs the first business table that stores keys); integration event bus (`IAppEventBus` port, distinct from domain events) when 2+ handlers need `UploadConfirmedEvent` (rule 14).
 
-1. **`POST /uploads/presign`** — auth + Zod (`filename`, `contentType`, `size`, `scope`, `expiresInSeconds?`). `CreateUploadUrlUseCase` clamps TTL to `[STORAGE_PRESIGN_TTL_MIN_SECONDS, STORAGE_PRESIGN_TTL_MAX_SECONDS]`, generates the **owner-scoped key** `<userId>/<scope>/<uuid>-<filename>`, calls `IStorageService.presignUpload`. Adapter signs `content-type` + `content-length` (`signableHeaders`) so the client can't drop them — sending different headers fails with 403 `SignatureDoesNotMatch`. Response includes `expectedSize` + `expectedContentType` (echo of the declared values, used by `confirm`).
-2. **Client `PUT <signed_url>`** — direct to R2, exact `Content-Type` + `Content-Length` headers, file body. Zero proxy through the API.
-3. **`POST /uploads/confirm`** — auth + Zod (`key`, `expectedSize`, `expectedContentType`). `ConfirmUploadUseCase` enforces **owner check** (`key.startsWith("<userId>/")` → 403 `STORAGE_FORBIDDEN`), then `HeadObject` to read real `size`/`contentType`. **Size is permissive** (only fails if `actual > expected` — undershooting is fine, e.g. client-side compression produced a smaller payload than estimated). **Content-type is strict** (must match exactly). On mismatch: `DeleteObject` + 422 `STORAGE_INTEGRITY_FAILED` (delete failure is propagated as `STORAGE_PROVIDER_FAILURE`, never silently swallowed). On success: returns `{ key, size, contentType, publicUrl }` — the only metadata the rest of the app should trust.
+## Organization scoping
 
-**Why three steps**: R2 does not support Presigned POST policies (no `content-length-range` condition, verified 2026). Signed `ContentLength` blocks naïve clients (different declared header → 403) but R2 does not verify the body size against it — `confirm` is the real enforcement. Same logic for content-type.
+1. **`requireOrg` family on every business mutation/query route.** `requireOrg` exposes `c.var.orgId`; `requireOrgPermission({ resource: ["action"] })` gates capabilities; `requireOrgOwnership({ table, idFrom })` validates cross-org access on read-by-id / per-resource mutations. **Why**: cross-org leak is the #1 multi-tenant CVE class. Any handler touching a row with `organizationId` chains the relevant guards.
 
-**Download** (`POST /uploads/download`) — symmetric: auth + Zod, `CreateDownloadUrlUseCase` runs the same owner check, presigns a `GetObjectCommand`, returns `{ url, expiresAt }`.
+2. **List queries on org-scoped tables use `withOrg(table, orgId)`.** Free-form `where(eq(table.organizationId, orgId))` allowed but flagged for promotion on 2nd occurrence. **Why**: missing scope is undetectable in code review without grep.
 
-**Architecture rules specific to this section**:
+3. **Every business table from its first migration owns `organizationId NOT NULL` + FK `organization(id) ON DELETE CASCADE`.** **Why**: post-hoc multi-tenancy (backfill + orphan handling + query rewrite) is the most expensive class of refactor. Never skip — even solo-product today.
 
-1. **Port = pure transport.** `IStorageService` only exposes SDK-level operations (`presignUpload`, `presignDownload`, `headObject`, `deleteObject`, `publicUrlFor`). Zero business rules in the adapter.
-2. **Use-cases = orchestration only.** Key generation, owner check, TTL clamping, integrity verification. No `throw` — return `Result<T, StorageError>`.
-3. **Validation lives in the route's Zod schema** — filename regex (`^[\w\-. ]+$`), scope regex (`^[a-z][a-z0-9-]{0,31}$`), size cap (`STORAGE_MAX_UPLOAD_BYTES`), max TTL. Zod failures become 400 via the centralised error handler. Use-cases trust their input.
-4. **Routes = thin controllers.** Resolve the use-case from the inwire container (`di.CreateUploadUrlUseCase`, `di.ConfirmUploadUseCase`, `di.CreateDownloadUrlUseCase`), `await execute(...)`, map `Result` → HTTP via the central `statusFor(error)` switch. Error mapping: 403 (`STORAGE_FORBIDDEN`), 404 (`STORAGE_NOT_FOUND`), 422 (`STORAGE_INTEGRITY_FAILED`), 502 (`STORAGE_PROVIDER_FAILURE`). The `requireAuth` middleware narrows `c.get("user")` to a non-null `SessionUser` — no manual null guard in the handler.
-5. **R2-first, MinIO is dev convenience.** `S3Client` config: `region: "auto"` (R2's only accepted value), `forcePathStyle: true` (harmless on R2, required for MinIO). Boot-time fail-hard if `NODE_ENV === "production"` and `S3_ENDPOINT` is localhost or creds are default `minioadmin`. R2 prod endpoint: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (or `…eu.r2.cloudflarestorage.com` for EU jurisdiction — once chosen, R2 cannot move the bucket).
-6. **`createUploadMutationOptions` chains all three calls.** The factory (`apps/app/src/adapters/mutations/create-upload.ts`) only resolves after `confirm` succeeds. The UI consumes via `useMutation({ ...createUploadMutationOptions, onSuccess, onError })` and receives server-verified metadata or an explicit error — never a "maybe uploaded" intermediate state. The client PUT explicitly sends `Content-Length: String(file.size)` to match the server-signed header (browsers would inject it anyway, but stating it is the documented contract).
+4. **Org-changing mutations broadcast `broadcastAuthChange()` from the call-site `onSuccess`** (not the factory): `setActive`, `create-org`, `delete-org`, `leave-org`, `transfer-and-leave`, `accept-invitation`, `remove-member`. **Why**: a tab holds stale `activeOrganizationId` up to `cookieCache.maxAge` (5 min) without a signal. Listener refetches `["session", "active-org", "current-membership", "orgs"]`.
 
-**Phase 2 (deferred until first concrete consumer)**:
-- **Orphan GC**: client may crash between `PUT` and `confirm`, leaving an unreferenced object. Add a worker (R2 prod: Cloudflare Worker on a cron; dev: Bun cron) that deletes objects older than X minutes with no DB row referencing the key. Requires the first business table that stores keys (Avatar, Document, …).
-- **Integration event bus**: when 2+ handlers need to react to `UploadConfirmedEvent` (e.g. avatar update + audit log + push notif), promote an `IAppEventBus` port (distinct from domain events — those stay reserved for aggregates). The current single-consumer call from `ConfirmUploadUseCase` is a direct call by design (rule 14: promote on second occurrence).
+5. **Personal org is never special-cased except via `isPersonalOrg(slug)`.** `slug = personal-${orgId}` (UUID v4, collision-free), `name = "Personal"`. No `isPersonal` flag, no metadata branch, no switcher filter — the slug pattern is a *naming convention*, not a *behavior switch*. Single allowed special-case: the helper (front) + lifecycle hooks in `auth.ts` (back) — Personal can't be deleted (`beforeDeleteOrganization` rejects) or left (front hides Leave); removal goes via account deletion (cascades). **Why**: Personal is auto-created on signup tied 1:1 to the user — standalone deletion would orphan them. Branch logic for "personal vs team" elsewhere inflates LOC for cosmetics.
+
+6. **Personal self-heals at every sign-in; non-Personal auto-collapses when last member leaves.** `ensurePersonalOrgFor(userId)` returns existing membership orgId or creates Personal org + member row in a transaction — runs in `databaseHooks.user.create.after` (signup) AND `session.create.before` (back-fills legacy `activeOrganizationId: null` users at next sign-in). `organizationHooks.afterRemoveMember` deletes empty non-Personal orgs (skipped for Personal). Never duplicate the create logic inline; "last member leaves" side-effects always through `afterRemoveMember`, never client-side.
+
+7. **Authorization is capability-based, defined once in `@packages/access-control`.** Package exports `ac`, `roles = { owner, admin, member }`, types `OrgRole` / `OrgPermissions`, predicate `authorizeRole(role, permissions, connector?)`. Server and client wire `organization({ ac, roles })` from the same instance; the `as unknown as AccessControl` cast required by BetterAuth's generic plugin signature stays *inside* the package — call sites stay strict-typed. **Why**: roles + statements duplicated front/back is the most common drift in multi-tenant SaaS. Never hardcode role tuples in feature code — describe the *capability* (`{ organization: ["update"] }`). New resource → extend `statement` + each role policy in the package, done.
+
+8. **Three layers, one predicate**: server `requireOrgPermission(permissions)`, route gate `ensureOrgPermission(permissions)` in `beforeLoad`, UI `<Can requires={...} connector?="OR" fallback?={...}>` backed by `useAuthorization().can()`. Same `OrgPermissions` shape, same roles. **Why**: defense in depth — back enforces, route gate prevents access, UI hides unreachable controls. Children needing permission-aware behavior call `useAuthorization` themselves rather than receiving `canEdit: boolean` props (rule 14 — row owns its own check, page passes data only). Dev-only `<AuthorizationDevTool>` (mounted in `__root.tsx`, tree-shaken in prod) renders the live capability matrix per role.
+
+9. **Per-route capability gates use `ensureOrgPermission`, not nested pathless layouts.** One pathless layout `_org-scope` gates "active org required"; capabilities live per-route in `beforeLoad`. **Why**: stacking `_org-admin` / `_org-owner` / `_can-manage-billing` forces every tier into the directory tree. Per-route helper keeps it flat — each route declares its exact capability, no inheritance, no naming explosion. Personal-only routes (e.g. `/settings/account`) sit outside the gate. Customize via `ensureOrgPermission(perms, { redirectTo })`.
+
+10. **`getActiveMember` / `getFullOrganization` translate `NO_ACTIVE_ORGANIZATION` to `null` at the query layer.** `currentMembershipQueryOptions` and `activeOrgQueryOptions` catch the error code, return `null`. **Why**: BetterAuth treats "no active org" as error, but in our model it's a valid transient state (between orgs, pre-self-heal). Letting it bubble crashes every `ensureQueryData` consumer. New BetterAuth-org-wrapping query → same `code === "NO_ACTIVE_ORGANIZATION" ? null : throw` shape.
+
+11. **Navigation declares `requires: OrgPermissions` + `requiresOrg: boolean`, not roles.** `SETTINGS_TABS` (`contextual-tabs.tsx`) and `NAVIGATION_ROUTES` (`command-palette.tsx`) filter via `useAuthorization().can(requires)` + `hasMembership`. **Why**: visible tab set must match what the gate accepts — same tuple at both ends keeps them in sync. New org-scoped sub-route → declare `requires` + `requiresOrg` at the nav source AND `ensureOrgPermission(...)` on the route file (same tuple).
 
 ## Domain Events
 
-Events are *added* in aggregate methods (`this.addEvent(...)`), NOT dispatched there. Dispatch happens in use cases AFTER successful persistence:
+Events are *added* in aggregate methods (`this.addEvent(...)`), NOT dispatched there. Dispatch in use cases AFTER successful persistence:
 
 ```typescript
 const saveResult = await this.repo.create(aggregate);
@@ -520,13 +264,9 @@ BDD style. One test file per use case under `__TESTS__/`. Mock at the repository
 ## Common patterns
 
 ```typescript
-// Result
 Result.ok(value); Result.fail(error); Result.combine([r1, r2, r3]);
-
-// Option
 Option.some(value); Option.none(); Option.fromNullable(value);
 
-// Aggregate
 class Foo extends Aggregate<IFooProps> {
   get id(): FooId { return FooId.create(this._id); }
   static create(props): Foo {
@@ -536,7 +276,6 @@ class Foo extends Aggregate<IFooProps> {
   }
 }
 
-// Value Object
 class Email extends ValueObject<string> {
   protected validate(v: string): Result<string> {
     return v.includes("@") ? Result.ok(v) : Result.fail("Invalid email");
@@ -546,67 +285,36 @@ class Email extends ValueObject<string> {
 
 ## Turborepo
 
-- `ui: "tui"` in `turbo.json` — daemon auto-managed since v2.x, no flags needed.
-- `globalDependencies`: `biome.json`, `pnpm-workspace.yaml`, `.env*` — modifying these busts every cache.
-- `inputs` scoped per task (build/test/type-check) — README/doc edits do NOT invalidate code caches.
-- `build` declares `with: ["type-check"]` — `pnpm build` runs type-check in parallel for free.
-- `dev`, `test:watch`, `db:studio` are `interruptible: true` — clean ctrl+C kill on next reload.
+`ui: "tui"`; daemon auto-managed since v2.x. `globalDependencies` (`biome.json`, `pnpm-workspace.yaml`, `.env*`) bust every cache. `inputs` scoped per task — README/doc edits do NOT invalidate code caches. `build` declares `with: ["type-check"]` (parallel for free). `dev`, `test:watch`, `db:studio` are `interruptible: true` — clean ctrl+C on next reload.
 
-## Useful scripts
+## Scripts & DB
 
-- `pnpm dev` — Turbo TUI dev (`pnpm dev --filter=api` to filter)
-- `pnpm build` / `test` / `type-check` — Turbo orchestrated
-- `pnpm check` (Biome lint+format) / `fix` (auto-fix) / `ci:check` (CI lint)
-- `pnpm check:duplication` (jscpd) / `check:unused` (knip)
-- `pnpm db:push` / `db:generate` / `db:migrate` / `db:seed` / `db:studio`
-- `pnpm clean` — wipe `node_modules`, `.turbo`, `dist`
-
-## DB
-
-- `docker compose up -d` from repo root — Postgres on `localhost:5433`.
-- Schema in `packages/drizzle/src/schema/*.ts`.
-- After schema change: `pnpm db:push` (dev) or `pnpm db:generate && pnpm db:migrate` (prod-style).
+- `pnpm dev` (Turbo TUI, `--filter=api` to scope) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` (jscpd) · `check:unused` (knip) · `db:push` / `generate` / `migrate` / `seed` / `studio` · `clean`.
+- Postgres on `localhost:5433` via `docker compose up -d`. Schema in `packages/drizzle/src/schema/*.ts`. After schema change: `pnpm db:push` (dev) or `db:generate && db:migrate` (prod-style).
 
 ## Release flow
 
-Two-branch model. **`main` is the released branch — every merge to `main` triggers semantic-release.** `dev` is the integration branch where work accumulates between releases.
+Two-branch model. **`main` = released; `dev` = integration.** Every merge to `main` triggers semantic-release.
 
-- Daily work happens on `dev` (or feature branches PR'd into `dev`). Pushing to `dev` does **not** trigger a release.
-- Shipping is deliberate: open a PR `dev` → `main`, merge it. `release.yml` runs, semantic-release analyzes **all** commits since the last tag and produces one bundled bump + changelog.
-- **`dev` → `main` MUST be a merge commit** (not squash, not rebase). Squash collapses every conventional commit into one, semantic-release would only see one entry. The repo is configured GitHub-side to allow merge commits only.
-- `main` is protected (require PR, no force push, conversation resolution required). If a CI fix is needed during release, do it on `dev` and re-merge.
-- **Don't release on every commit** — wait for a meaningful batch (a feature complete, a coherent set of fixes). Cadence is controlled by *when you merge to main*, not by `.releaserc.json` / `release.yml` (those stay as-is).
-
-```bash
-git checkout dev && git push   # no release
-gh pr create --base main --head dev --title "Release: <theme>"
-# merge via "Create a merge commit" on GitHub UI
-# → release.yml runs, one consolidated tag + changelog drops
-```
+- **Conventional Commits required** (commitlint enforces lower-case subject). Release impact (`.releaserc.json`): `feat` → minor; `fix`/`perf`/`refactor`/`revert`/`build` and `docs(readme)` → patch; `docs`/`style`/`test`/`chore`/`ci` → no release; `BREAKING CHANGE:` footer (or `!` after type) → major. Pick the type for the *release impact you want*, not the file touched.
+- Daily work on `dev` (or feature branches PR'd into `dev`). Pushing to `dev` does **not** release.
+- Shipping = open a PR `dev` → `main`, merge it. semantic-release analyzes all commits since the last tag → one bundled bump + changelog.
+- **`dev` → `main` MUST be a merge commit** (not squash, not rebase) — squash collapses every conventional commit into one, semantic-release would see one entry. GitHub-side configured to allow merge commits only.
+- `main` is protected (require PR, no force push, conversation resolution). CI fix during release → on `dev`, re-merge.
+- **Don't release on every commit** — wait for a meaningful batch. Cadence = when you merge to main.
 
 ## Don't
 
+Anti-patterns specific to this stack — rules above already cover the positive form, this section captures stack-specific landmines and high-stakes security inverses.
+
 - Add business features without first agreeing on the bounded context.
-- Throw in domain or application; use `null` for absence; add `index.ts` barrels; add inline comments that restate what the code does.
 - Reintroduce `@hono/node-server`, `tsx`, `tsc-alias` — the API runs on Bun natively.
 - Pin Postgres back to port 5432 — collides with other local Postgres instances.
-- Break Hono RPC by un-chaining routes (`app.get(...); app.post(...)`) — types accumulate via chaining.
-- Call `fetch` directly in features — use `api` from `adapters/api-client.ts`.
-- Wrap BetterAuth in a port/service or register it in inwire — `auth` is the integration. Import directly.
-- Re-call `auth.api.getSession()` per route handler — `sessionMiddleware` reads it once; `requireAuth` / `c.get("user")` does the rest.
-- Embed the API verification URL in an email — every link points to `${env.APP_URL}/<route>?token=...`, the frontend page consumes via the typed client. Use a short label as link text, never the full URL (email clients re-autolink and corrupt it).
-- Sprinkle `console.log` / `console.error` in handlers — go through `pino` and the centralised error handler.
-- Duplicate `beforeLoad` auth checks per route — host them on a pathless layout (`_protected.tsx` / `_guest.tsx`).
-- Push directly to `main` or merge `dev` → `main` with squash/rebase — squash destroys the conventional-commit history semantic-release reads.
-- Put session data in `router.context` or sync via `useSession()` React boundary — race between nanostores and `beforeLoad`. Read via `ensureQueryData(sessionQueryOptions)`; context only exposes `queryClient`.
-- `await navigate(...)` in `useMutation.onSuccess` — keeps the mutation pending during transition, blocks the submit button. Use `void navigate(...)`.
-- Mutate session-changing flows without calling `broadcastAuthChange()` — other tabs stay stuck on stale data until next navigation.
-- Validate password strength on the **sign-in** form — only on sign-up / reset. Users with legacy weak passwords must still be able to log in to change them.
-- Type component props with `type` — use `interface <Component>Props { ... }`. `type` is for unions / intersections / mapped shapes / zod-inferred types.
-- Consume a single-use token from `useEffect` without a `useRef(false)` guard — StrictMode double-fire would invalidate the token even though the first call succeeded.
-- Pass `redirectTo` / `callbackURL` to BetterAuth client methods when the corresponding `send*` server hook already builds the URL — duplicate dead code that can later silently override the canonical URL.
-- Wrap a one-liner mutation in a custom hook (`useUpload`, `useCreateX`) that only does `return useMutation({ mutationFn })` — promote to a `mutationOptions` factory in `adapters/`. Hook wrappers earn their keep only when bundling side-effects (toast + navigate + invalidate + broadcast) that callers should not have to repeat.
-- Trust the size or content-type a client declares at `presign` time without running `confirm` — the server is blind during the upload (client `PUT`s direct to R2). The signed `Content-Length` only blocks naïve clients; integrity is enforced by `HeadObject` + `DeleteObject` on mismatch. Skipping `confirm` = trusting the client.
-- Skip the owner-prefix check (`key.startsWith("<userId>/")`) in download or confirm use-cases — without it any authenticated user can presign a GET / verify any key in the bucket.
-- Stuff business rules into `IStorageService` (validation, key shape, ACLs) — port stays pure transport. Rules belong in the use-case (orchestration) or the route's Zod schema (input validation).
-- Add a Presigned POST flow to upload to R2 — R2 does not implement POST policies (verified 2026, see ROADMAP). PUT presigned + `confirm` is the correct shape.
+- Push directly to `main` or merge `dev` → `main` with squash/rebase — destroys conventional-commit history.
+- Pass `redirectTo` / `callbackURL` to auth-client methods when the `send*` server hook already builds the URL — duplicate dead code can silently override the canonical URL.
+- Re-implement `auth.api.organization.*` server-side or attach `requireOrgPermission` to plugin endpoints — the plugin owns role checks for `/api/auth/organization/*`. Custom guards apply to **our** business routes only.
+- Add a Presigned POST flow to upload — providers like R2 don't implement POST policies (verified 2026). PUT presigned + `confirm` is the correct shape.
+- Skip the owner-prefix check (`key.startsWith("<userId>/")`) in download/confirm — any authenticated user could otherwise presign a GET / verify any key in the bucket. (Storage rule 2.)
+- Trust the size or content-type a client declares at `presign` without running `confirm` — server is blind during upload. (Storage rule 6.)
+- Skip `requireOrg` on a handler reading/writing rows scoped by `organizationId` — silently accepts requests with no active org. (Org R1.)
+- Allow Personal org deletion via the normal flow — `beforeDeleteOrganization` rejects, front hides the button. Account deletion is the only path. (Org R5.)

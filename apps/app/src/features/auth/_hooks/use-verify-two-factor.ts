@@ -4,12 +4,13 @@ import { toast } from "sonner";
 import { broadcastAuthChange } from "../../../adapters/auth-broadcast";
 import { authClient } from "../../../adapters/auth-client";
 import { sessionQueryOptions } from "../../../adapters/queries/session";
-import type { TwoFactorInput } from "../_schemas/auth.schema";
+import type { TwoFactorInput } from "../../../adapters/schemas/auth.schema";
 
 export function useVerifyTwoFactor(redirectTo?: string) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   return useMutation({
+    mutationKey: ["session", "verify-two-factor"],
     mutationFn: async (input: TwoFactorInput) => {
       const { data, error } = await authClient.twoFactor.verifyTotp({
         code: input.code,

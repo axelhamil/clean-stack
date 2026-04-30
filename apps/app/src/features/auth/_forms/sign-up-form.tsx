@@ -3,8 +3,8 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { type SignUpInput, signUpSchema } from "../../../adapters/schemas/auth.schema";
 import { useSignUp } from "../_hooks/use-sign-up";
-import { type SignUpInput, signUpSchema } from "../_schemas/auth.schema";
 
 export function SignUpForm() {
   const mutation = useSignUp();

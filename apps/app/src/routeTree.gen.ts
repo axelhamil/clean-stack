@@ -16,11 +16,20 @@ import { Route as MagicLinkRouteImport } from './routes/magic-link'
 import { Route as ProtectedRouteImport } from './routes/_protected'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ProtectedDashboardRouteImport } from './routes/_protected/dashboard'
+import { Route as AcceptInvitationInvitationIdRouteImport } from './routes/accept-invitation.$invitationId'
+import { Route as ProtectedShellRouteImport } from './routes/_protected/_shell'
 import { Route as GuestSignUpRouteImport } from './routes/_guest/sign-up'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
 import { Route as GuestForgotPasswordRouteImport } from './routes/_guest/forgot-password'
-import { Route as ProtectedAccountSecurityRouteImport } from './routes/_protected/account.security'
+import { Route as ProtectedShellSettingsRouteImport } from './routes/_protected/_shell/settings'
+import { Route as ProtectedShellDashboardRouteImport } from './routes/_protected/_shell/dashboard'
+import { Route as ProtectedShellSettingsIndexRouteImport } from './routes/_protected/_shell/settings/index'
+import { Route as ProtectedShellSettingsAccountRouteImport } from './routes/_protected/_shell/settings/account'
+import { Route as ProtectedShellSettingsOrgScopeRouteImport } from './routes/_protected/_shell/settings/_org-scope'
+import { Route as ProtectedShellOrgNewRouteImport } from './routes/_protected/_shell/org/new'
+import { Route as ProtectedShellSettingsOrgScopeTeamRouteImport } from './routes/_protected/_shell/settings/_org-scope/team'
+import { Route as ProtectedShellSettingsOrgScopeGeneralRouteImport } from './routes/_protected/_shell/settings/_org-scope/general'
+import { Route as ProtectedShellSettingsOrgScopeBillingRouteImport } from './routes/_protected/_shell/settings/_org-scope/billing'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
@@ -55,9 +64,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProtectedDashboardRoute = ProtectedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const AcceptInvitationInvitationIdRoute =
+  AcceptInvitationInvitationIdRouteImport.update({
+    id: '/accept-invitation/$invitationId',
+    path: '/accept-invitation/$invitationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProtectedShellRoute = ProtectedShellRouteImport.update({
+  id: '/_shell',
   getParentRoute: () => ProtectedRoute,
 } as any)
 const GuestSignUpRoute = GuestSignUpRouteImport.update({
@@ -75,11 +89,55 @@ const GuestForgotPasswordRoute = GuestForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => GuestRoute,
 } as any)
-const ProtectedAccountSecurityRoute =
-  ProtectedAccountSecurityRouteImport.update({
-    id: '/account/security',
-    path: '/account/security',
-    getParentRoute: () => ProtectedRoute,
+const ProtectedShellSettingsRoute = ProtectedShellSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ProtectedShellRoute,
+} as any)
+const ProtectedShellDashboardRoute = ProtectedShellDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => ProtectedShellRoute,
+} as any)
+const ProtectedShellSettingsIndexRoute =
+  ProtectedShellSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => ProtectedShellSettingsRoute,
+  } as any)
+const ProtectedShellSettingsAccountRoute =
+  ProtectedShellSettingsAccountRouteImport.update({
+    id: '/account',
+    path: '/account',
+    getParentRoute: () => ProtectedShellSettingsRoute,
+  } as any)
+const ProtectedShellSettingsOrgScopeRoute =
+  ProtectedShellSettingsOrgScopeRouteImport.update({
+    id: '/_org-scope',
+    getParentRoute: () => ProtectedShellSettingsRoute,
+  } as any)
+const ProtectedShellOrgNewRoute = ProtectedShellOrgNewRouteImport.update({
+  id: '/org/new',
+  path: '/org/new',
+  getParentRoute: () => ProtectedShellRoute,
+} as any)
+const ProtectedShellSettingsOrgScopeTeamRoute =
+  ProtectedShellSettingsOrgScopeTeamRouteImport.update({
+    id: '/team',
+    path: '/team',
+    getParentRoute: () => ProtectedShellSettingsOrgScopeRoute,
+  } as any)
+const ProtectedShellSettingsOrgScopeGeneralRoute =
+  ProtectedShellSettingsOrgScopeGeneralRouteImport.update({
+    id: '/general',
+    path: '/general',
+    getParentRoute: () => ProtectedShellSettingsOrgScopeRoute,
+  } as any)
+const ProtectedShellSettingsOrgScopeBillingRoute =
+  ProtectedShellSettingsOrgScopeBillingRouteImport.update({
+    id: '/billing',
+    path: '/billing',
+    getParentRoute: () => ProtectedShellSettingsOrgScopeRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -91,8 +149,15 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof GuestForgotPasswordRoute
   '/sign-in': typeof GuestSignInRoute
   '/sign-up': typeof GuestSignUpRoute
-  '/dashboard': typeof ProtectedDashboardRoute
-  '/account/security': typeof ProtectedAccountSecurityRoute
+  '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
+  '/dashboard': typeof ProtectedShellDashboardRoute
+  '/settings': typeof ProtectedShellSettingsOrgScopeRouteWithChildren
+  '/org/new': typeof ProtectedShellOrgNewRoute
+  '/settings/account': typeof ProtectedShellSettingsAccountRoute
+  '/settings/': typeof ProtectedShellSettingsIndexRoute
+  '/settings/billing': typeof ProtectedShellSettingsOrgScopeBillingRoute
+  '/settings/general': typeof ProtectedShellSettingsOrgScopeGeneralRoute
+  '/settings/team': typeof ProtectedShellSettingsOrgScopeTeamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -103,8 +168,14 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof GuestForgotPasswordRoute
   '/sign-in': typeof GuestSignInRoute
   '/sign-up': typeof GuestSignUpRoute
-  '/dashboard': typeof ProtectedDashboardRoute
-  '/account/security': typeof ProtectedAccountSecurityRoute
+  '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
+  '/dashboard': typeof ProtectedShellDashboardRoute
+  '/org/new': typeof ProtectedShellOrgNewRoute
+  '/settings': typeof ProtectedShellSettingsIndexRoute
+  '/settings/account': typeof ProtectedShellSettingsAccountRoute
+  '/settings/billing': typeof ProtectedShellSettingsOrgScopeBillingRoute
+  '/settings/general': typeof ProtectedShellSettingsOrgScopeGeneralRoute
+  '/settings/team': typeof ProtectedShellSettingsOrgScopeTeamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,8 +189,17 @@ export interface FileRoutesById {
   '/_guest/forgot-password': typeof GuestForgotPasswordRoute
   '/_guest/sign-in': typeof GuestSignInRoute
   '/_guest/sign-up': typeof GuestSignUpRoute
-  '/_protected/dashboard': typeof ProtectedDashboardRoute
-  '/_protected/account/security': typeof ProtectedAccountSecurityRoute
+  '/_protected/_shell': typeof ProtectedShellRouteWithChildren
+  '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
+  '/_protected/_shell/dashboard': typeof ProtectedShellDashboardRoute
+  '/_protected/_shell/settings': typeof ProtectedShellSettingsRouteWithChildren
+  '/_protected/_shell/org/new': typeof ProtectedShellOrgNewRoute
+  '/_protected/_shell/settings/_org-scope': typeof ProtectedShellSettingsOrgScopeRouteWithChildren
+  '/_protected/_shell/settings/account': typeof ProtectedShellSettingsAccountRoute
+  '/_protected/_shell/settings/': typeof ProtectedShellSettingsIndexRoute
+  '/_protected/_shell/settings/_org-scope/billing': typeof ProtectedShellSettingsOrgScopeBillingRoute
+  '/_protected/_shell/settings/_org-scope/general': typeof ProtectedShellSettingsOrgScopeGeneralRoute
+  '/_protected/_shell/settings/_org-scope/team': typeof ProtectedShellSettingsOrgScopeTeamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,8 +212,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/sign-in'
     | '/sign-up'
+    | '/accept-invitation/$invitationId'
     | '/dashboard'
-    | '/account/security'
+    | '/settings'
+    | '/org/new'
+    | '/settings/account'
+    | '/settings/'
+    | '/settings/billing'
+    | '/settings/general'
+    | '/settings/team'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,8 +231,14 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/sign-in'
     | '/sign-up'
+    | '/accept-invitation/$invitationId'
     | '/dashboard'
-    | '/account/security'
+    | '/org/new'
+    | '/settings'
+    | '/settings/account'
+    | '/settings/billing'
+    | '/settings/general'
+    | '/settings/team'
   id:
     | '__root__'
     | '/'
@@ -158,8 +251,17 @@ export interface FileRouteTypes {
     | '/_guest/forgot-password'
     | '/_guest/sign-in'
     | '/_guest/sign-up'
-    | '/_protected/dashboard'
-    | '/_protected/account/security'
+    | '/_protected/_shell'
+    | '/accept-invitation/$invitationId'
+    | '/_protected/_shell/dashboard'
+    | '/_protected/_shell/settings'
+    | '/_protected/_shell/org/new'
+    | '/_protected/_shell/settings/_org-scope'
+    | '/_protected/_shell/settings/account'
+    | '/_protected/_shell/settings/'
+    | '/_protected/_shell/settings/_org-scope/billing'
+    | '/_protected/_shell/settings/_org-scope/general'
+    | '/_protected/_shell/settings/_org-scope/team'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -170,6 +272,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   TwoFactorRoute: typeof TwoFactorRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  AcceptInvitationInvitationIdRoute: typeof AcceptInvitationInvitationIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -223,11 +326,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_protected/dashboard': {
-      id: '/_protected/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof ProtectedDashboardRouteImport
+    '/accept-invitation/$invitationId': {
+      id: '/accept-invitation/$invitationId'
+      path: '/accept-invitation/$invitationId'
+      fullPath: '/accept-invitation/$invitationId'
+      preLoaderRoute: typeof AcceptInvitationInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected/_shell': {
+      id: '/_protected/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ProtectedShellRouteImport
       parentRoute: typeof ProtectedRoute
     }
     '/_guest/sign-up': {
@@ -251,12 +361,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuestForgotPasswordRouteImport
       parentRoute: typeof GuestRoute
     }
-    '/_protected/account/security': {
-      id: '/_protected/account/security'
-      path: '/account/security'
-      fullPath: '/account/security'
-      preLoaderRoute: typeof ProtectedAccountSecurityRouteImport
-      parentRoute: typeof ProtectedRoute
+    '/_protected/_shell/settings': {
+      id: '/_protected/_shell/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof ProtectedShellSettingsRouteImport
+      parentRoute: typeof ProtectedShellRoute
+    }
+    '/_protected/_shell/dashboard': {
+      id: '/_protected/_shell/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof ProtectedShellDashboardRouteImport
+      parentRoute: typeof ProtectedShellRoute
+    }
+    '/_protected/_shell/settings/': {
+      id: '/_protected/_shell/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof ProtectedShellSettingsIndexRouteImport
+      parentRoute: typeof ProtectedShellSettingsRoute
+    }
+    '/_protected/_shell/settings/account': {
+      id: '/_protected/_shell/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof ProtectedShellSettingsAccountRouteImport
+      parentRoute: typeof ProtectedShellSettingsRoute
+    }
+    '/_protected/_shell/settings/_org-scope': {
+      id: '/_protected/_shell/settings/_org-scope'
+      path: ''
+      fullPath: '/settings'
+      preLoaderRoute: typeof ProtectedShellSettingsOrgScopeRouteImport
+      parentRoute: typeof ProtectedShellSettingsRoute
+    }
+    '/_protected/_shell/org/new': {
+      id: '/_protected/_shell/org/new'
+      path: '/org/new'
+      fullPath: '/org/new'
+      preLoaderRoute: typeof ProtectedShellOrgNewRouteImport
+      parentRoute: typeof ProtectedShellRoute
+    }
+    '/_protected/_shell/settings/_org-scope/team': {
+      id: '/_protected/_shell/settings/_org-scope/team'
+      path: '/team'
+      fullPath: '/settings/team'
+      preLoaderRoute: typeof ProtectedShellSettingsOrgScopeTeamRouteImport
+      parentRoute: typeof ProtectedShellSettingsOrgScopeRoute
+    }
+    '/_protected/_shell/settings/_org-scope/general': {
+      id: '/_protected/_shell/settings/_org-scope/general'
+      path: '/general'
+      fullPath: '/settings/general'
+      preLoaderRoute: typeof ProtectedShellSettingsOrgScopeGeneralRouteImport
+      parentRoute: typeof ProtectedShellSettingsOrgScopeRoute
+    }
+    '/_protected/_shell/settings/_org-scope/billing': {
+      id: '/_protected/_shell/settings/_org-scope/billing'
+      path: '/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof ProtectedShellSettingsOrgScopeBillingRouteImport
+      parentRoute: typeof ProtectedShellSettingsOrgScopeRoute
     }
   }
 }
@@ -275,14 +441,68 @@ const GuestRouteChildren: GuestRouteChildren = {
 
 const GuestRouteWithChildren = GuestRoute._addFileChildren(GuestRouteChildren)
 
+interface ProtectedShellSettingsOrgScopeRouteChildren {
+  ProtectedShellSettingsOrgScopeBillingRoute: typeof ProtectedShellSettingsOrgScopeBillingRoute
+  ProtectedShellSettingsOrgScopeGeneralRoute: typeof ProtectedShellSettingsOrgScopeGeneralRoute
+  ProtectedShellSettingsOrgScopeTeamRoute: typeof ProtectedShellSettingsOrgScopeTeamRoute
+}
+
+const ProtectedShellSettingsOrgScopeRouteChildren: ProtectedShellSettingsOrgScopeRouteChildren =
+  {
+    ProtectedShellSettingsOrgScopeBillingRoute:
+      ProtectedShellSettingsOrgScopeBillingRoute,
+    ProtectedShellSettingsOrgScopeGeneralRoute:
+      ProtectedShellSettingsOrgScopeGeneralRoute,
+    ProtectedShellSettingsOrgScopeTeamRoute:
+      ProtectedShellSettingsOrgScopeTeamRoute,
+  }
+
+const ProtectedShellSettingsOrgScopeRouteWithChildren =
+  ProtectedShellSettingsOrgScopeRoute._addFileChildren(
+    ProtectedShellSettingsOrgScopeRouteChildren,
+  )
+
+interface ProtectedShellSettingsRouteChildren {
+  ProtectedShellSettingsOrgScopeRoute: typeof ProtectedShellSettingsOrgScopeRouteWithChildren
+  ProtectedShellSettingsAccountRoute: typeof ProtectedShellSettingsAccountRoute
+  ProtectedShellSettingsIndexRoute: typeof ProtectedShellSettingsIndexRoute
+}
+
+const ProtectedShellSettingsRouteChildren: ProtectedShellSettingsRouteChildren =
+  {
+    ProtectedShellSettingsOrgScopeRoute:
+      ProtectedShellSettingsOrgScopeRouteWithChildren,
+    ProtectedShellSettingsAccountRoute: ProtectedShellSettingsAccountRoute,
+    ProtectedShellSettingsIndexRoute: ProtectedShellSettingsIndexRoute,
+  }
+
+const ProtectedShellSettingsRouteWithChildren =
+  ProtectedShellSettingsRoute._addFileChildren(
+    ProtectedShellSettingsRouteChildren,
+  )
+
+interface ProtectedShellRouteChildren {
+  ProtectedShellDashboardRoute: typeof ProtectedShellDashboardRoute
+  ProtectedShellSettingsRoute: typeof ProtectedShellSettingsRouteWithChildren
+  ProtectedShellOrgNewRoute: typeof ProtectedShellOrgNewRoute
+}
+
+const ProtectedShellRouteChildren: ProtectedShellRouteChildren = {
+  ProtectedShellDashboardRoute: ProtectedShellDashboardRoute,
+  ProtectedShellSettingsRoute: ProtectedShellSettingsRouteWithChildren,
+  ProtectedShellOrgNewRoute: ProtectedShellOrgNewRoute,
+}
+
+const ProtectedShellRouteWithChildren = ProtectedShellRoute._addFileChildren(
+  ProtectedShellRouteChildren,
+)
+
 interface ProtectedRouteChildren {
-  ProtectedDashboardRoute: typeof ProtectedDashboardRoute
-  ProtectedAccountSecurityRoute: typeof ProtectedAccountSecurityRoute
+  ProtectedShellRoute: typeof ProtectedShellRouteWithChildren
 }
 
 const ProtectedRouteChildren: ProtectedRouteChildren = {
-  ProtectedDashboardRoute: ProtectedDashboardRoute,
-  ProtectedAccountSecurityRoute: ProtectedAccountSecurityRoute,
+  ProtectedShellRoute: ProtectedShellRouteWithChildren,
 }
 
 const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(
@@ -297,6 +517,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   TwoFactorRoute: TwoFactorRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  AcceptInvitationInvitationIdRoute: AcceptInvitationInvitationIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

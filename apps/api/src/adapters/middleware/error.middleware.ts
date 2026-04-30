@@ -1,5 +1,7 @@
+import { AppErrorException, httpStatusFromCode } from "@packages/ddd-kit";
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { env } from "../../../common/env";
 import { logger } from "../../../common/logger";
 
@@ -16,6 +18,17 @@ type ErrorBody = {
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = c.get("requestId");
+
+  if (err instanceof AppErrorException) {
+    const status = httpStatusFromCode(err.code) as ContentfulStatusCode;
+    const body: ErrorBody = {
+      error: { code: err.code, message: err.message, requestId },
+    };
+    if (status >= 500) {
+      logger.error({ err, requestId, path: c.req.path }, err.message);
+    }
+    return c.json(body, status);
+  }
 
   if (err instanceof HTTPException) {
     const status = err.status;
