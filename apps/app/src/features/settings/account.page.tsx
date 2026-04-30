@@ -7,6 +7,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { Input } from "@packages/ui/components/ui/input";
 import { Label } from "@packages/ui/components/ui/label";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { PasskeysCard } from "./_components/passkeys-card";
 import { SessionsCard } from "./_components/sessions-card";
 import { TwoFactorCard } from "./_components/two-factor-card";
@@ -18,7 +19,8 @@ interface AccountPageProps {
 
 export function SettingsAccountPage({ user, sessionToken }: AccountPageProps) {
   return (
-    <div className="flex flex-col gap-6">
+    <main className="flex flex-col gap-6">
+      <TypographyH1 className="sr-only">Account settings</TypographyH1>
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -39,6 +41,6 @@ export function SettingsAccountPage({ user, sessionToken }: AccountPageProps) {
       <PasskeysCard />
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
       <SessionsCard currentSessionToken={sessionToken} />
-    </div>
+    </main>
   );
 }

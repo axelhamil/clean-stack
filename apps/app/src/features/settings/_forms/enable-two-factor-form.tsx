@@ -95,13 +95,15 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3">
-        <QRCodeSVG
-          value={setup.totpURI}
-          size={176}
-          marginSize={4}
-          bgColor="#ffffff"
-          fgColor="#000000"
-        />
+        <div className="rounded-lg bg-white p-3">
+          <QRCodeSVG
+            value={setup.totpURI}
+            size={176}
+            marginSize={4}
+            bgColor="#ffffff"
+            fgColor="#000000"
+          />
+        </div>
         <TypographyMuted className="text-center">
           Scan with your authenticator app, then enter the 6-digit code below.
         </TypographyMuted>

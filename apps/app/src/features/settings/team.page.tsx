@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { Can } from "../../adapters/components/can";
 import { activeOrgQueryOptions } from "../../adapters/queries/active-org";
@@ -33,7 +33,8 @@ export function SettingsTeamPage() {
   const pendingInvitations = invitations.filter((inv) => inv.status === "pending");
 
   return (
-    <div className="flex flex-col gap-6">
+    <main className="flex flex-col gap-6">
+      <TypographyH1 className="sr-only">Team settings</TypographyH1>
       <Can requires={{ invitation: ["create"] }}>
         <Card>
           <CardHeader>
@@ -103,6 +104,6 @@ export function SettingsTeamPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

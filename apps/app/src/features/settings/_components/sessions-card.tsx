@@ -95,7 +95,7 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt }: Sessi
         <ListRowContent>
           <ListRowMeta>
             <TypographySmall>{ua}</TypographySmall>
-            {isCurrent && <Badge variant="default">Current</Badge>}
+            {isCurrent && <Badge variant="secondary">Current</Badge>}
           </ListRowMeta>
           <TypographyMuted>
             {ipAddress ?? "Unknown IP"} · expires {expires}

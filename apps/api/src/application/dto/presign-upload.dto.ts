@@ -15,5 +15,3 @@ export const presignUploadBodySchema = z.object({
     .positive()
     .default(env.STORAGE_PRESIGN_TTL_MIN_SECONDS * 5),
 });
-
-export type PresignUploadInput = z.infer<typeof presignUploadBodySchema>;

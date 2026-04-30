@@ -9,5 +9,3 @@ export const presignDownloadBodySchema = z.object({
     .positive()
     .default(env.STORAGE_PRESIGN_TTL_MIN_SECONDS * 10),
 });
-
-export type PresignDownloadInput = z.infer<typeof presignDownloadBodySchema>;

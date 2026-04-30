@@ -5,5 +5,3 @@ export const confirmUploadBodySchema = z.object({
   expectedSize: z.number().int().positive(),
   expectedContentType: z.string().min(1).max(120),
 });
-
-export type ConfirmUploadInput = z.infer<typeof confirmUploadBodySchema>;
