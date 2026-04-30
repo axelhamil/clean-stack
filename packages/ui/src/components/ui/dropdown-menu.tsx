@@ -125,18 +125,26 @@ function DropdownMenuRadioItem({
   );
 }
 
+interface DropdownMenuLabelProps extends React.ComponentProps<typeof DropdownMenuPrimitive.Label> {
+  inset?: boolean;
+  weight?: "medium" | "normal";
+}
+
 function DropdownMenuLabel({
   className,
   inset,
+  weight = "medium",
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Label> & {
-  inset?: boolean;
-}) {
+}: DropdownMenuLabelProps) {
   return (
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       data-inset={inset}
-      className={cn("px-2 py-1.5 text-sm font-medium data-[inset]:pl-8", className)}
+      className={cn(
+        "px-2 py-1.5 text-sm data-[inset]:pl-8",
+        weight === "medium" ? "font-medium" : "font-normal",
+        className,
+      )}
       {...props}
     />
   );

@@ -10,7 +10,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@packages/ui/components/ui/dropdown-menu";
-import { TypographySmall } from "@packages/ui/components/ui/typography";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { Link } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
 import { type DisplayUser, displayName } from "../../common/display-name";
@@ -36,9 +36,9 @@ export function UserMenu({ user }: UserMenuProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="min-w-56">
-        <DropdownMenuLabel className="font-normal flex flex-col gap-0.5">
+        <DropdownMenuLabel weight="normal" className="flex flex-col gap-0.5">
           <TypographySmall className="truncate">{display}</TypographySmall>
-          <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+          <TypographyMuted className="truncate">{user.email}</TypographyMuted>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
