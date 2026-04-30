@@ -8,28 +8,18 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { toast } from "sonner";
-import { broadcastAuthChange } from "../../adapters/auth-broadcast";
-import { acceptInvitationMutationOptions } from "../../adapters/mutations/accept-invitation";
-import { setActiveOrgMutationOptions } from "../../adapters/mutations/set-active-org";
-import { activeOrgQueryOptions } from "../../adapters/queries/active-org";
-import { orgsListQueryOptions } from "../../adapters/queries/orgs-list";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { sessionQueryOptions } from "../../adapters/queries/session";
+import { useAcceptInvitation } from "./_hooks/use-accept-invitation";
 
 export interface AcceptInvitationPageProps {
   invitationId: string;
 }
 
 export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data: session } = useQuery(sessionQueryOptions);
-  const accept = useMutation(acceptInvitationMutationOptions);
-  const setActive = useMutation(setActiveOrgMutationOptions);
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useAcceptInvitation();
 
   if (!session) {
     return (
@@ -45,26 +35,6 @@ export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps
     );
   }
 
-  const onAccept = async () => {
-    setError(null);
-    try {
-      const { organizationId } = await accept.mutateAsync({ invitationId });
-      if (organizationId) {
-        await setActive.mutateAsync({ organizationId });
-      }
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey }),
-        queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
-        queryClient.refetchQueries({ queryKey: activeOrgQueryOptions.queryKey }),
-      ]);
-      broadcastAuthChange();
-      toast.success("Invitation accepted");
-      void navigate({ to: "/dashboard" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to accept invitation");
-    }
-  };
-
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
       <TypographyH1>Accept invitation</TypographyH1>
@@ -77,15 +47,12 @@ export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Button
-            onClick={() => void onAccept()}
-            disabled={accept.isPending || setActive.isPending}
-          >
+          <Button onClick={() => mutation.mutate({ invitationId })} disabled={mutation.isPending}>
             Accept invitation
           </Button>
-          {error && (
+          {mutation.isError && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{mutation.error.message}</AlertDescription>
             </Alert>
           )}
         </CardContent>
