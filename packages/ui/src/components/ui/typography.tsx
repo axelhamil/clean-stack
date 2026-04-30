@@ -13,7 +13,9 @@ const typographyH1Variants = cva("scroll-m-20 font-extrabold tracking-tight", {
   defaultVariants: { variant: "hero" },
 });
 
-type TypographyH1Props = React.ComponentProps<"h1"> & VariantProps<typeof typographyH1Variants>;
+interface TypographyH1Props
+  extends React.ComponentProps<"h1">,
+    VariantProps<typeof typographyH1Variants> {}
 
 function TypographyH1({ className, variant, ...props }: TypographyH1Props) {
   return (
