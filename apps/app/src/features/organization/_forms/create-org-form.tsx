@@ -9,15 +9,16 @@ import {
   FormMessage,
 } from "@packages/ui/components/ui/form";
 import { Input } from "@packages/ui/components/ui/input";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { broadcastAuthChange } from "../../../adapters/auth-broadcast";
+import { useSetActiveOrg } from "../../../adapters/hooks/use-set-active-org";
 import { createOrgMutationOptions } from "../../../adapters/mutations/create-org";
-import { setActiveOrgMutationOptions } from "../../../adapters/mutations/set-active-org";
-import { orgsListQueryOptions } from "../../../adapters/queries/orgs-list";
-import { type CreateOrgInput, createOrgSchema } from "../_schemas/organization.schema";
+import {
+  type CreateOrgInput,
+  createOrgSchema,
+} from "../../../adapters/schemas/organization.schema";
 
 export interface CreateOrgFormProps {
   onSuccess?: () => void;
@@ -25,28 +26,26 @@ export interface CreateOrgFormProps {
 
 export function CreateOrgForm({ onSuccess }: CreateOrgFormProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const create = useMutation(createOrgMutationOptions);
-  const setActive = useMutation(setActiveOrgMutationOptions);
-
-  const form = useForm<CreateOrgInput>({
-    resolver: zodResolver(createOrgSchema),
-    defaultValues: { name: "", slug: "" },
-  });
-
-  const onSubmit = form.handleSubmit(async (values) => {
-    try {
-      const org = await create.mutateAsync(values);
-      await setActive.mutateAsync({ organizationId: org.id });
-      await queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey });
-      broadcastAuthChange();
+  const { switchOrg, isPending: isSwitching } = useSetActiveOrg();
+  const create = useMutation({
+    ...createOrgMutationOptions,
+    onSuccess: async (org) => {
+      await switchOrg(org.id);
       toast.success("Organization created");
       onSuccess?.();
       void navigate({ to: "/dashboard" });
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Failed to create organization");
-    }
+    },
   });
+
+  const form = useForm<CreateOrgInput>({
+    resolver: zodResolver(createOrgSchema),
+    defaultValues: { name: "" },
+  });
+
+  const onSubmit = form.handleSubmit((values) => create.mutate(values));
 
   return (
     <Form {...form}>
@@ -58,26 +57,13 @@ export function CreateOrgForm({ onSuccess }: CreateOrgFormProps) {
             <FormItem>
               <FormLabel>Name</FormLabel>
               <FormControl>
-                <Input placeholder="Acme" {...field} />
+                <Input placeholder="Acme" autoFocus {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="slug"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Slug</FormLabel>
-              <FormControl>
-                <Input placeholder="acme" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={create.isPending || setActive.isPending}>
+        <Button type="submit" disabled={create.isPending || isSwitching}>
           Create organization
         </Button>
       </form>

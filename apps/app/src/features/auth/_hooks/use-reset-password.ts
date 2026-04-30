@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { authClient } from "../../../adapters/auth-client";
-import type { ResetPasswordInput } from "../_schemas/auth.schema";
+import type { ResetPasswordInput } from "../../../adapters/schemas/auth.schema";
 
 export function useResetPassword(token: string) {
   const navigate = useNavigate();

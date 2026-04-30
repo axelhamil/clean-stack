@@ -3,8 +3,8 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { type MagicLinkInput, magicLinkSchema } from "../../../adapters/schemas/auth.schema";
 import { useMagicLink } from "../_hooks/use-magic-link";
-import { type MagicLinkInput, magicLinkSchema } from "../_schemas/auth.schema";
 
 export function MagicLinkForm() {
   const mutation = useMagicLink();

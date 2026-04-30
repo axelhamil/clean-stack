@@ -48,14 +48,12 @@ export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps
   const onAccept = async () => {
     setError(null);
     try {
-      const data = await accept.mutateAsync({ invitationId });
-      const orgId =
-        (data && "invitation" in data && data.invitation?.organizationId) ||
-        (data && "organizationId" in data && (data as { organizationId?: string }).organizationId);
-      if (orgId) {
-        await setActive.mutateAsync({ organizationId: orgId });
+      const { organizationId } = await accept.mutateAsync({ invitationId });
+      if (organizationId) {
+        await setActive.mutateAsync({ organizationId });
       }
       await Promise.all([
+        queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey }),
         queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
         queryClient.refetchQueries({ queryKey: activeOrgQueryOptions.queryKey }),
       ]);

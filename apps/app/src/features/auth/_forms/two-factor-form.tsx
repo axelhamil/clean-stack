@@ -4,8 +4,8 @@ import { Checkbox } from "@packages/ui/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { type TwoFactorInput, twoFactorSchema } from "../../../adapters/schemas/auth.schema";
 import { useVerifyTwoFactor } from "../_hooks/use-verify-two-factor";
-import { type TwoFactorInput, twoFactorSchema } from "../_schemas/auth.schema";
 
 interface TwoFactorFormProps {
   redirectTo?: string;

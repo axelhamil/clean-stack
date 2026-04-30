@@ -6,23 +6,18 @@ import { broadcastAuthChange } from "../../../adapters/auth-broadcast";
 import { authClient } from "../../../adapters/auth-client";
 import { sessionQueryOptions } from "../../../adapters/queries/session";
 
-interface SignInPasskeyOptions {
-  autoFill?: boolean;
-}
-
 export function useSignInPasskey(redirectTo?: string) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
 
   return useMutation({
-    mutationFn: async (options: SignInPasskeyOptions = {}) => {
+    mutationFn: async () => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       const result = await authClient.signIn.passkey({
-        autoFill: options.autoFill,
         fetchOptions: { signal: controller.signal },
       });
       if (result?.error) {
