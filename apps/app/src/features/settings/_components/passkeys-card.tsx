@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { passkeysQueryOptions } from "../../../adapters/queries/passkeys";
+import { formatDate } from "../../../common/format-date";
 import { AddPasskeyForm } from "../_forms/add-passkey-form";
 import { useDeletePasskey } from "../_hooks/use-delete-passkey";
 
@@ -93,7 +94,7 @@ interface PasskeyRowProps {
 
 function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowProps) {
   const mutation = useDeletePasskey();
-  const created = new Date(createdAt).toLocaleDateString();
+  const created = formatDate(createdAt);
 
   return (
     <ListRow>

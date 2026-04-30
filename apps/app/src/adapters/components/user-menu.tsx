@@ -13,16 +13,17 @@ import {
 import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { Link } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
+import { type DisplayUser, displayName } from "../../common/display-name";
 import { initialsOf } from "../../common/initials";
 import { useSignOut } from "../hooks/use-sign-out";
 
 interface UserMenuProps {
-  user: { name?: string | null; email: string };
+  user: DisplayUser;
 }
 
 export function UserMenu({ user }: UserMenuProps) {
   const signOut = useSignOut();
-  const display = user.name?.trim() || user.email;
+  const display = displayName(user);
 
   return (
     <DropdownMenu>

@@ -6,14 +6,14 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { type DisplayUser, displayName } from "../../common/display-name";
 
 interface DashboardPageProps {
-  user: { name?: string | null; email: string };
+  user: DisplayUser;
 }
 
 export function DashboardPage({ user }: DashboardPageProps) {
-  const display = user.name?.trim() || user.email;
-  const firstName = display.split(" ")[0];
+  const firstName = displayName(user).split(" ")[0];
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAuthorization } from "../../../adapters/hooks/use-authorization";
 import { cancelInvitationMutationOptions } from "../../../adapters/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../adapters/queries/org-invitations";
+import { formatDate } from "../../../common/format-date";
 import { toastError } from "../../../common/toast-error";
 
 export interface InvitationRowProps {
@@ -41,7 +42,7 @@ export function InvitationRow({ invitation, organizationId }: InvitationRowProps
       <ListRowContent>
         <TypographyP>{invitation.email}</TypographyP>
         <TypographyMuted>
-          {invitation.role} · expires {new Date(invitation.expiresAt).toLocaleDateString()}
+          {invitation.role} · expires {formatDate(invitation.expiresAt)}
         </TypographyMuted>
       </ListRowContent>
       <ListRowAction>
