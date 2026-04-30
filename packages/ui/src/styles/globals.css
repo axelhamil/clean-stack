@@ -216,16 +216,23 @@
   [role="link"],
   [role="tab"],
   [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
   [role="option"],
+  [role="combobox"],
   [role="checkbox"],
   [role="radio"],
   [role="switch"],
+  [role="treeitem"],
   summary,
   label[for],
   select:not(:disabled),
-  [data-slot="trigger"]:not(:disabled),
+  [data-slot$="trigger"]:not(:disabled):not([aria-disabled="true"]),
+  [data-slot$="item"]:not(:disabled):not([aria-disabled="true"]),
+  [data-slot$="option"]:not(:disabled):not([aria-disabled="true"]),
   [data-slot="checkbox"]:not(:disabled),
-  [data-slot="switch"]:not(:disabled) {
+  [data-slot="switch"]:not(:disabled),
+  [data-slot="radio-group-item"]:not(:disabled) {
     cursor: pointer;
   }
 
