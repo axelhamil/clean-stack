@@ -7,7 +7,7 @@
  *
  * Tree-shaken in production via `import.meta.env.DEV`.
  */
-import { authorizeRole, STATEMENTS } from "@packages/access-control";
+import { authorizeRole, isPersonalOrg, STATEMENTS } from "@packages/access-control";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
@@ -21,7 +21,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
-import { isPersonalOrg } from "../../common/is-personal-org";
 import { useAuthorization } from "../hooks/use-authorization";
 import { activeOrgQueryOptions } from "../queries/active-org";
 

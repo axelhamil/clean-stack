@@ -1,3 +1,4 @@
+import { isPersonalOrg } from "@packages/access-control";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Card,
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 import { broadcastAuthChange } from "../../adapters/auth-broadcast";
 import { Can } from "../../adapters/components/can";
 import { useAuthorization } from "../../adapters/hooks/use-authorization";
+import { useSetActiveOrg } from "../../adapters/hooks/use-set-active-org";
 import { deleteOrgMutationOptions } from "../../adapters/mutations/delete-org";
 import { leaveOrgMutationOptions } from "../../adapters/mutations/leave-org";
 import { transferAndLeaveMutationOptions } from "../../adapters/mutations/transfer-and-leave";
@@ -25,56 +27,47 @@ import { activeOrgQueryOptions } from "../../adapters/queries/active-org";
 import { currentMembershipQueryOptions } from "../../adapters/queries/current-membership";
 import { orgMembersQueryOptions } from "../../adapters/queries/org-members";
 import { orgsListQueryOptions } from "../../adapters/queries/orgs-list";
-import { isPersonalOrg } from "../../common/is-personal-org";
 import { toastError } from "../../common/toast-error";
 import { TransferLeaveDialog } from "./_components/transfer-leave-dialog";
 import { UpdateOrgForm } from "./_forms/update-org-form";
-import { switchToFirstRemainingOrg } from "./_helpers/switch-to-first-org";
 
 export function SettingsGeneralPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { role } = useAuthorization();
+  const { switchOrg } = useSetActiveOrg();
   const { data: membership } = useQuery(currentMembershipQueryOptions);
   const { data: members = [] } = useQuery(
     org ? orgMembersQueryOptions(org.id) : { ...orgMembersQueryOptions(""), enabled: false },
   );
 
-  const refetchAll = () =>
-    Promise.all([
-      queryClient.refetchQueries({ queryKey: activeOrgQueryOptions.queryKey }),
-      queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
-    ]);
+  const onLeaveSuccess = async () => {
+    const orgs = await queryClient.fetchQuery(orgsListQueryOptions);
+    if (orgs[0]) await switchOrg(orgs[0].id);
+    toast.success("Left organization");
+    void navigate({ to: "/dashboard" });
+  };
 
   const leave = useMutation({
     ...leaveOrgMutationOptions,
-    onSuccess: async () => {
-      await refetchAll();
-      await switchToFirstRemainingOrg(queryClient);
-      broadcastAuthChange();
-      toast.success("Left organization");
-      void navigate({ to: "/dashboard" });
-    },
+    onSuccess: onLeaveSuccess,
     onError: (err) => toastError(err, "Failed to leave"),
   });
 
   const transferAndLeave = useMutation({
     ...transferAndLeaveMutationOptions,
-    onSuccess: async () => {
-      await refetchAll();
-      await switchToFirstRemainingOrg(queryClient);
-      broadcastAuthChange();
-      toast.success("Left organization");
-      void navigate({ to: "/dashboard" });
-    },
+    onSuccess: onLeaveSuccess,
     onError: (err) => toastError(err, "Failed to transfer and leave"),
   });
 
   const remove = useMutation({
     ...deleteOrgMutationOptions,
     onSuccess: async () => {
-      await refetchAll();
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: activeOrgQueryOptions.queryKey }),
+        queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
+      ]);
       broadcastAuthChange();
       toast.success("Organization deleted");
       void navigate({ to: "/dashboard" });
