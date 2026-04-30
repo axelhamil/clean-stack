@@ -3,7 +3,6 @@ export * from "./application/database-operation-error";
 export * from "./application/error-code";
 export * from "./application/input-parse-error";
 export * from "./application/pagination";
-export * from "./application/query-handler";
 export * from "./application/repository";
 // Domain
 export * from "./domain/aggregate";

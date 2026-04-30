@@ -60,6 +60,7 @@ async function dispatchEmail<K extends keyof EmailTemplates>(
   if (result.isFailure) {
     const error = result.getError();
     if (error.code === "EMAIL_PROVIDER_FAILURE") {
+      // BetterAuth hook signature is `async () => void` — no Result propagation possible; throw is the only signal.
       throw new Error(`email send failed (${template}): ${error.message}`);
     }
     logger.warn({ template, to, code: error.code }, "email skipped — transport not configured");
