@@ -7,7 +7,10 @@ export const currentMembershipQueryOptions = queryOptions({
     const { data, error } = await authClient.organization.getActiveMember({
       fetchOptions: { signal },
     });
-    if (error) throw error;
+    if (error) {
+      if (error.code === "NO_ACTIVE_ORGANIZATION") return null;
+      throw error;
+    }
     return data ?? null;
   },
   staleTime: 5 * 60 * 1000,

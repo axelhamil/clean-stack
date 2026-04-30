@@ -3,18 +3,10 @@ import { authClient } from "../auth-client";
 
 export const updateOrgMutationOptions = mutationOptions({
   mutationKey: ["org", "update"] as const,
-  mutationFn: async ({
-    organizationId,
-    name,
-    slug,
-  }: {
-    organizationId: string;
-    name?: string;
-    slug?: string;
-  }) => {
+  mutationFn: async ({ organizationId, name }: { organizationId: string; name?: string }) => {
     const { error } = await authClient.organization.update({
       organizationId,
-      data: { name, slug },
+      data: { name },
     });
     if (error) throw error;
   },
