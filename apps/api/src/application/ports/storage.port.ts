@@ -1,10 +1,11 @@
-import type { Result } from "@packages/ddd-kit";
+import type { AppError, Result } from "@packages/ddd-kit";
 
-export type StorageError =
-  | { code: "STORAGE_FORBIDDEN"; message: string }
-  | { code: "STORAGE_NOT_FOUND"; message: string }
-  | { code: "STORAGE_INTEGRITY_FAILED"; message: string }
-  | { code: "STORAGE_PROVIDER_FAILURE"; message: string };
+export type StorageError = AppError<
+  | "STORAGE_FORBIDDEN"
+  | "STORAGE_NOT_FOUND"
+  | "STORAGE_INTEGRITY_FAILED"
+  | "STORAGE_PROVIDER_FAILURE"
+>;
 
 export interface PresignUploadInput {
   key: string;
