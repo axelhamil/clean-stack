@@ -19,6 +19,7 @@ import {
   type CreateOrgInput,
   createOrgSchema,
 } from "../../../adapters/schemas/organization.schema";
+import { toastError } from "../../../common/toast-error";
 
 export interface CreateOrgFormProps {
   onSuccess?: () => void;
@@ -35,9 +36,7 @@ export function CreateOrgForm({ onSuccess }: CreateOrgFormProps) {
       onSuccess?.();
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to create organization");
-    },
+    onError: (err) => toastError(err, "Failed to create organization"),
   });
 
   const form = useForm<CreateOrgInput>({

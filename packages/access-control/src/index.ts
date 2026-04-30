@@ -55,3 +55,14 @@ export function authorizeRole(
 
 export const ac = _ac as unknown as AccessControl;
 export const roles = _roles;
+
+/**
+ * The single allowed special-case from CLAUDE.md R5 (multi-tenant).
+ *
+ * Personal orgs are auto-created on signup, tied 1:1 to a user account.
+ * Encoded by slug pattern (`personal-${uuid}`); the *check* lives here so
+ * the rest of the codebase never branches on the discriminator directly.
+ */
+export function isPersonalOrg(slug: string): boolean {
+  return slug.startsWith("personal-");
+}

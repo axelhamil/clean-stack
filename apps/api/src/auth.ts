@@ -1,7 +1,7 @@
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
-import { ac, roles } from "@packages/access-control";
+import { ac, isPersonalOrg, roles } from "@packages/access-control";
 import { db, eq, schema } from "@packages/drizzle";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -144,14 +144,14 @@ export const auth = betterAuth({
       },
       organizationHooks: {
         beforeDeleteOrganization: async ({ organization: org }) => {
-          if (org.slug.startsWith("personal-")) {
+          if (isPersonalOrg(org.slug)) {
             throw new Error(
               "Personal organization cannot be deleted. Delete your account instead.",
             );
           }
         },
         afterRemoveMember: async ({ organization: org }) => {
-          if (org.slug.startsWith("personal-")) return;
+          if (isPersonalOrg(org.slug)) return;
           const remaining = await db
             .select({ id: schema.member.id })
             .from(schema.member)

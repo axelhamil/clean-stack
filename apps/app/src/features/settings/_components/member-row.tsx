@@ -18,6 +18,7 @@ import { removeMemberMutationOptions } from "../../../adapters/mutations/remove-
 import { updateMemberRoleMutationOptions } from "../../../adapters/mutations/update-member-role";
 import { activeOrgQueryOptions } from "../../../adapters/queries/active-org";
 import { orgMembersQueryOptions } from "../../../adapters/queries/org-members";
+import { toastError } from "../../../common/toast-error";
 
 export interface MemberRowProps {
   member: {
@@ -47,7 +48,7 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
       broadcastAuthChange();
       toast.success("Role updated");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update role"),
+    onError: (err) => toastError(err, "Failed to update role"),
   });
 
   const remove = useMutation({
@@ -57,7 +58,7 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
       broadcastAuthChange();
       toast.success("Member removed");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to remove member"),
+    onError: (err) => toastError(err, "Failed to remove member"),
   });
 
   return (

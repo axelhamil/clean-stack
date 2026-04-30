@@ -25,6 +25,7 @@ import {
   type InviteMemberInput,
   inviteMemberSchema,
 } from "../../../adapters/schemas/organization.schema";
+import { toastError } from "../../../common/toast-error";
 
 export interface InviteMemberFormProps {
   organizationId: string;
@@ -47,7 +48,7 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
       toast.success(`Invitation sent to ${variables.email}`);
       form.reset();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to send invitation"),
+    onError: (err) => toastError(err, "Failed to send invitation"),
   });
 
   const onSubmit = form.handleSubmit((values) => invite.mutate({ ...values, organizationId }));

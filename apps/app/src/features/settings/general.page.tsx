@@ -7,7 +7,11 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-action-dialog";
-import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import {
+  TypographyH1,
+  TypographyMuted,
+  TypographySmall,
+} from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -22,9 +26,10 @@ import { currentMembershipQueryOptions } from "../../adapters/queries/current-me
 import { orgMembersQueryOptions } from "../../adapters/queries/org-members";
 import { orgsListQueryOptions } from "../../adapters/queries/orgs-list";
 import { isPersonalOrg } from "../../common/is-personal-org";
+import { toastError } from "../../common/toast-error";
 import { TransferLeaveDialog } from "./_components/transfer-leave-dialog";
 import { UpdateOrgForm } from "./_forms/update-org-form";
-import { switchToFirstRemainingOrg } from "./_hooks/switch-to-first-org";
+import { switchToFirstRemainingOrg } from "./_helpers/switch-to-first-org";
 
 export function SettingsGeneralPage() {
   const navigate = useNavigate();
@@ -51,7 +56,7 @@ export function SettingsGeneralPage() {
       toast.success("Left organization");
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to leave"),
+    onError: (err) => toastError(err, "Failed to leave"),
   });
 
   const transferAndLeave = useMutation({
@@ -63,8 +68,7 @@ export function SettingsGeneralPage() {
       toast.success("Left organization");
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Failed to transfer and leave"),
+    onError: (err) => toastError(err, "Failed to transfer and leave"),
   });
 
   const remove = useMutation({
@@ -75,7 +79,7 @@ export function SettingsGeneralPage() {
       toast.success("Organization deleted");
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to delete"),
+    onError: (err) => toastError(err, "Failed to delete"),
   });
 
   if (!org) return <TypographyMuted>No active organization.</TypographyMuted>;
@@ -84,7 +88,8 @@ export function SettingsGeneralPage() {
   const needsTransfer = role === "owner" && owners.length === 1 && members.length > 1;
 
   return (
-    <div className="flex flex-col gap-6">
+    <main className="flex flex-col gap-6">
+      <TypographyH1 className="sr-only">Organization settings</TypographyH1>
       <Can requires={{ organization: ["update"] }}>
         <Card>
           <CardHeader>
@@ -180,6 +185,6 @@ export function SettingsGeneralPage() {
           </Can>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

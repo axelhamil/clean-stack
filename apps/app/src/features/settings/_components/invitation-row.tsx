@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAuthorization } from "../../../adapters/hooks/use-authorization";
 import { cancelInvitationMutationOptions } from "../../../adapters/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../adapters/queries/org-invitations";
+import { toastError } from "../../../common/toast-error";
 
 export interface InvitationRowProps {
   invitation: {
@@ -32,8 +33,7 @@ export function InvitationRow({ invitation, organizationId }: InvitationRowProps
       });
       toast.success("Invitation cancelled");
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Failed to cancel invitation"),
+    onError: (err) => toastError(err, "Failed to cancel invitation"),
   });
 
   return (

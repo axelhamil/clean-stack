@@ -20,6 +20,7 @@ import {
   type UpdateOrgInput,
   updateOrgSchema,
 } from "../../../adapters/schemas/organization.schema";
+import { toastError } from "../../../common/toast-error";
 
 export interface UpdateOrgFormProps {
   organizationId: string;
@@ -44,8 +45,7 @@ export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormPr
       broadcastAuthChange();
       toast.success("Organization updated");
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Failed to update organization"),
+    onError: (err) => toastError(err, "Failed to update organization"),
   });
 
   const onSubmit = form.handleSubmit((values) => update.mutate({ organizationId, ...values }));
