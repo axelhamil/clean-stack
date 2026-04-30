@@ -8,6 +8,7 @@ export function useResetPassword(token: string) {
   const navigate = useNavigate();
 
   return useMutation({
+    mutationKey: ["password", "reset"],
     mutationFn: async (input: ResetPasswordInput) => {
       const { data, error } = await authClient.resetPassword({
         newPassword: input.password,

@@ -9,6 +9,7 @@ export function useDisableTwoFactor() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["2fa", "disable"],
     mutationFn: async (input: PasswordPromptInput) => {
       const { error } = await authClient.twoFactor.disable({
         password: input.password,

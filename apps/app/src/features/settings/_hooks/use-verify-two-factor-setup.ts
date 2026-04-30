@@ -9,6 +9,7 @@ export function useVerifyTwoFactorSetup() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["2fa", "verify-setup"],
     mutationFn: async (input: VerifyTotpSetupInput) => {
       const { error } = await authClient.twoFactor.verifyTotp({
         code: input.code,

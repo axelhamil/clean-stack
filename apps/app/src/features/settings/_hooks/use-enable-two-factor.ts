@@ -14,6 +14,7 @@ export function useEnableTwoFactor() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["2fa", "enable"],
     mutationFn: async (input: PasswordPromptInput): Promise<EnableTwoFactorResult> => {
       const { data, error } = await authClient.twoFactor.enable({
         password: input.password,

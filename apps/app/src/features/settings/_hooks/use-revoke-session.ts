@@ -8,6 +8,7 @@ export function useRevokeSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["sessions", "revoke"],
     mutationFn: async (token: string) => {
       const { error } = await authClient.revokeSession({ token });
       if (error) throw new Error(error.message ?? "Failed to revoke session");

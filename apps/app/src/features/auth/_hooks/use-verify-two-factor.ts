@@ -10,6 +10,7 @@ export function useVerifyTwoFactor(redirectTo?: string) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   return useMutation({
+    mutationKey: ["session", "verify-two-factor"],
     mutationFn: async (input: TwoFactorInput) => {
       const { data, error } = await authClient.twoFactor.verifyTotp({
         code: input.code,

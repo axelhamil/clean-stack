@@ -8,6 +8,7 @@ export function useVerifyMagicLink() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   return useMutation({
+    mutationKey: ["session", "magic-link-verify"],
     mutationFn: async (token: string) => {
       const { data, error } = await authClient.magicLink.verify({
         query: { token },

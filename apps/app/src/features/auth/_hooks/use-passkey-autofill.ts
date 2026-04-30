@@ -30,21 +30,27 @@ export function usePasskeyAutofill({
     abortRef.current = controller;
 
     void (async () => {
-      const result = await authClient.signIn.passkey({
-        autoFill: true,
-        fetchOptions: { signal: controller.signal },
-      });
-      if (controller.signal.aborted) return;
-      if (result?.error) {
-        const message = result.error.message?.toLowerCase() ?? "";
-        if (message.includes("not allowed")) return;
-        toast.error(result.error.message ?? "Passkey sign-in failed");
-        return;
+      try {
+        const result = await authClient.signIn.passkey({
+          autoFill: true,
+          fetchOptions: { signal: controller.signal },
+        });
+        if (controller.signal.aborted) return;
+        if (result?.error) {
+          const message = result.error.message?.toLowerCase() ?? "";
+          if (message.includes("not allowed")) return;
+          toast.error(result.error.message ?? "Passkey sign-in failed");
+          return;
+        }
+        toast.success("Welcome back");
+        await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
+        broadcastAuthChange();
+        void navigate({ to: redirectTo ?? "/" });
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        throw err;
       }
-      toast.success("Welcome back");
-      await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
-      void navigate({ to: redirectTo ?? "/" });
     })();
 
     return () => {

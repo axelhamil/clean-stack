@@ -7,6 +7,7 @@ import type { SignUpInput } from "../../../adapters/schemas/auth.schema";
 export function useSignUp() {
   const navigate = useNavigate();
   return useMutation({
+    mutationKey: ["session", "sign-up"],
     mutationFn: async (input: SignUpInput) => {
       const { data, error } = await authClient.signUp.email({
         email: input.email,

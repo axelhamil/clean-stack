@@ -7,6 +7,7 @@ export function useDeletePasskey() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["passkeys", "delete"],
     mutationFn: async (id: string) => {
       const { error } = await authClient.passkey.deletePasskey({ id });
       if (error) throw new Error(error.message ?? "Failed to delete passkey");

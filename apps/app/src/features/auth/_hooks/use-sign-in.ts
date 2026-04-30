@@ -11,6 +11,7 @@ export function useSignIn(redirectTo?: string) {
   const navigate = useNavigate();
 
   return useMutation({
+    mutationKey: ["session", "sign-in"],
     mutationFn: async (input: SignInInput) => {
       const { data, error } = await authClient.signIn.email({
         email: input.email,

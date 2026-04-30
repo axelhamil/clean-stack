@@ -8,6 +8,7 @@ export function useAddPasskey() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["passkeys", "add"],
     mutationFn: async (input: AddPasskeyInput) => {
       const result = await authClient.passkey.addPasskey({ name: input.name });
       if (result?.error) {

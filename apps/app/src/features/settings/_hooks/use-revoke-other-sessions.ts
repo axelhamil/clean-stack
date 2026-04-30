@@ -8,6 +8,7 @@ export function useRevokeOtherSessions() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["sessions", "revoke-others"],
     mutationFn: async () => {
       const { error } = await authClient.revokeOtherSessions();
       if (error) throw new Error(error.message ?? "Failed to revoke sessions");

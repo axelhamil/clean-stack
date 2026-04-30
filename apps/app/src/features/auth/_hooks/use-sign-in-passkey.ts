@@ -12,6 +12,7 @@ export function useSignInPasskey(redirectTo?: string) {
   const abortRef = useRef<AbortController | null>(null);
 
   return useMutation({
+    mutationKey: ["session", "sign-in-passkey"],
     mutationFn: async () => {
       abortRef.current?.abort();
       const controller = new AbortController();

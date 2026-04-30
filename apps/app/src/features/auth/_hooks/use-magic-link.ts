@@ -5,6 +5,7 @@ import type { MagicLinkInput } from "../../../adapters/schemas/auth.schema";
 
 export function useMagicLink() {
   return useMutation({
+    mutationKey: ["session", "magic-link-request"],
     mutationFn: async (input: MagicLinkInput) => {
       const { data, error } = await authClient.signIn.magicLink({
         email: input.email,

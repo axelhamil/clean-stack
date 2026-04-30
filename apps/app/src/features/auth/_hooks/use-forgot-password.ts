@@ -5,6 +5,7 @@ import type { ForgotPasswordInput } from "../../../adapters/schemas/auth.schema"
 
 export function useForgotPassword() {
   return useMutation({
+    mutationKey: ["password", "forgot"],
     mutationFn: async (input: ForgotPasswordInput) => {
       const { data, error } = await authClient.requestPasswordReset({
         email: input.email,
