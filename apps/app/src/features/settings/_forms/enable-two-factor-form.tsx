@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { BackupCodeList } from "@packages/ui/components/ui/backup-code-list";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Card,
@@ -120,11 +121,7 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
           </CardAction>
         </CardHeader>
         <CardContent>
-          <ul className="grid grid-cols-2 gap-1 font-mono text-xs">
-            {setup.backupCodes.map((code) => (
-              <li key={code}>{code}</li>
-            ))}
-          </ul>
+          <BackupCodeList codes={setup.backupCodes} />
         </CardContent>
       </Card>
 
