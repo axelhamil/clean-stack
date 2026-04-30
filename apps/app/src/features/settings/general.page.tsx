@@ -21,10 +21,10 @@ import { activeOrgQueryOptions } from "../../adapters/queries/active-org";
 import { currentMembershipQueryOptions } from "../../adapters/queries/current-membership";
 import { orgMembersQueryOptions } from "../../adapters/queries/org-members";
 import { orgsListQueryOptions } from "../../adapters/queries/orgs-list";
-import { switchToFirstRemainingOrg } from "../../adapters/utils/switch-to-first-org";
 import { isPersonalOrg } from "../../common/is-personal-org";
 import { TransferLeaveDialog } from "./_components/transfer-leave-dialog";
 import { UpdateOrgForm } from "./_forms/update-org-form";
+import { switchToFirstRemainingOrg } from "./_hooks/switch-to-first-org";
 
 export function SettingsGeneralPage() {
   const navigate = useNavigate();

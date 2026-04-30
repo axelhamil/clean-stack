@@ -257,10 +257,6 @@
   }
 }
 
-@view-transition {
-  navigation: auto;
-}
-
 html.theme-transitioning::view-transition-old(root),
 html.theme-transitioning::view-transition-new(root) {
   animation: none;
@@ -291,6 +287,7 @@ html.theme-transitioning::view-transition-new(root) {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -301,6 +298,7 @@ html.theme-transitioning::view-transition-new(root) {
   from {
     background-position: -200% 0;
   }
+
   to {
     background-position: 200% 0;
   }
@@ -312,6 +310,7 @@ html.theme-transitioning::view-transition-new(root) {
     box-shadow: 0 0 0 0 var(--ring);
     opacity: 0.85;
   }
+
   50% {
     box-shadow: 0 0 0 6px transparent;
     opacity: 1;
@@ -323,6 +322,7 @@ html.theme-transitioning::view-transition-new(root) {
   100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-3px);
   }
@@ -334,6 +334,7 @@ html.theme-transitioning::view-transition-new(root) {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.55;
     transform: scale(0.85);
@@ -343,15 +344,19 @@ html.theme-transitioning::view-transition-new(root) {
 .animate-fade-up {
   animation: fadeUp 0.5s ease-out both;
 }
+
 .animate-fade-up-delay-1 {
   animation: fadeUp 0.5s ease-out 0.08s both;
 }
+
 .animate-fade-up-delay-2 {
   animation: fadeUp 0.5s ease-out 0.16s both;
 }
+
 .animate-fade-up-delay-3 {
   animation: fadeUp 0.5s ease-out 0.24s both;
 }
+
 .animate-fade-up-delay-4 {
   animation: fadeUp 0.5s ease-out 0.32s both;
 }
@@ -379,9 +384,11 @@ html.theme-transitioning::view-transition-new(root) {
 .tap-scale {
   transition: transform 150ms ease-out;
 }
+
 .tap-scale:hover {
   transform: scale(1.1);
 }
+
 .tap-scale:active {
   transform: scale(0.95);
 }
@@ -393,8 +400,9 @@ html.theme-transitioning::view-transition-new(root) {
     box-shadow 200ms ease-out,
     border-color 200ms ease-out;
 }
+
 .hover-lift:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: 0 10px 24px -12px hsl(0 0% 0% / 0.18);
 }
 
@@ -402,8 +410,20 @@ html.theme-transitioning::view-transition-new(root) {
 .hover-arrow__icon {
   transition: transform 200ms ease-out;
 }
+
 .hover-arrow:hover .hover-arrow__icon {
   transform: translateX(3px);
+}
+
+@utility glass-header {
+  background-color: color-mix(in oklab, var(--background) 80%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+@supports (backdrop-filter: blur(8px)) {
+  .glass-header {
+    background-color: color-mix(in oklab, var(--background) 60%, transparent);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

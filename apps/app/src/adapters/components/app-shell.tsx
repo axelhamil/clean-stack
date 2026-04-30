@@ -46,7 +46,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
+      <header className="glass-header sticky top-0 z-30 border-b">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
           <BrandLink asChild>
             <Link to="/dashboard">
