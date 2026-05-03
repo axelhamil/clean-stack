@@ -4,6 +4,7 @@ export * from "./application/error-code";
 export * from "./application/input-parse-error";
 export * from "./application/pagination";
 export * from "./application/repository";
+export * from "./application/scope";
 // Domain
 export * from "./domain/aggregate";
 export * from "./domain/domain-event";

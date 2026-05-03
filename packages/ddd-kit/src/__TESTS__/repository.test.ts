@@ -7,7 +7,10 @@ import {
   Option,
   type PaginatedResult,
   type PaginationParams,
+  RepoScope,
   Result,
+  type ScopedRepository,
+  type ScopeOf,
   UUID,
 } from "../index";
 
@@ -419,6 +422,190 @@ describe("Pagination", () => {
     it("should have correct default values", () => {
       expect(DEFAULT_PAGINATION.page).toBe(1);
       expect(DEFAULT_PAGINATION.limit).toBe(20);
+    });
+  });
+});
+
+interface NoteProps {
+  ownerId: UUID<string>;
+  body: string;
+}
+
+class Note extends Entity<NoteProps> {
+  get ownerId() {
+    return this._props.ownerId;
+  }
+
+  get body() {
+    return this._props.body;
+  }
+
+  static create(props: NoteProps, id?: UUID<string>): Note {
+    return new Note(props, id);
+  }
+}
+
+class MockScopedNoteRepository implements ScopedRepository<Note, ScopeOf<"user">> {
+  private notes: Note[] = [];
+
+  private isOwner(n: Note, scope: ScopeOf<"user">): boolean {
+    return n.ownerId.equals(scope.userId);
+  }
+
+  async create(entity: Note, scope: ScopeOf<"user">): Promise<Result<Note>> {
+    if (!entity.ownerId.equals(scope.userId)) return Result.fail("Owner mismatch");
+    this.notes.push(entity);
+    return Result.ok(entity);
+  }
+
+  async update(entity: Note, scope: ScopeOf<"user">): Promise<Result<Note>> {
+    const i = this.notes.findIndex((n) => n._id.equals(entity._id) && this.isOwner(n, scope));
+    if (i === -1) return Result.fail("Note not found");
+    this.notes[i] = entity;
+    return Result.ok(entity);
+  }
+
+  async delete(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<UUID<string>>> {
+    const i = this.notes.findIndex((n) => n._id.equals(id) && this.isOwner(n, scope));
+    if (i === -1) return Result.fail("Note not found");
+    this.notes.splice(i, 1);
+    return Result.ok(id);
+  }
+
+  async findById(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<Option<Note>>> {
+    const n = this.notes.find((x) => x._id.equals(id) && this.isOwner(x, scope));
+    return Result.ok(Option.fromNullable(n));
+  }
+
+  async findAll(
+    scope: ScopeOf<"user">,
+    pagination?: PaginationParams,
+  ): Promise<Result<PaginatedResult<Note>>> {
+    const filtered = this.notes.filter((n) => this.isOwner(n, scope));
+    const params = pagination ?? DEFAULT_PAGINATION;
+    const start = (params.page - 1) * params.limit;
+    return Result.ok(
+      createPaginatedResult(filtered.slice(start, start + params.limit), params, filtered.length),
+    );
+  }
+
+  async findMany(
+    props: Partial<NoteProps>,
+    scope: ScopeOf<"user">,
+    pagination?: PaginationParams,
+  ): Promise<Result<PaginatedResult<Note>>> {
+    const filtered = this.notes.filter(
+      (n) =>
+        this.isOwner(n, scope) &&
+        Object.entries(props).every(([k, v]) => n._props[k as keyof NoteProps] === v),
+    );
+    const params = pagination ?? DEFAULT_PAGINATION;
+    const start = (params.page - 1) * params.limit;
+    return Result.ok(
+      createPaginatedResult(filtered.slice(start, start + params.limit), params, filtered.length),
+    );
+  }
+
+  async findBy(props: Partial<NoteProps>, scope: ScopeOf<"user">): Promise<Result<Option<Note>>> {
+    const n = this.notes.find(
+      (x) =>
+        this.isOwner(x, scope) &&
+        Object.entries(props).every(([k, v]) => x._props[k as keyof NoteProps] === v),
+    );
+    return Result.ok(Option.fromNullable(n));
+  }
+
+  async exists(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<boolean>> {
+    return Result.ok(this.notes.some((n) => n._id.equals(id) && this.isOwner(n, scope)));
+  }
+
+  async count(scope: ScopeOf<"user">): Promise<Result<number>> {
+    return Result.ok(this.notes.filter((n) => this.isOwner(n, scope)).length);
+  }
+}
+
+describe("ScopedRepository", () => {
+  const alice = new UUID<string>("alice");
+  const bob = new UUID<string>("bob");
+  const aliceScope = RepoScope.user(alice);
+  const bobScope = RepoScope.user(bob);
+
+  let repo: MockScopedNoteRepository;
+
+  beforeEach(() => {
+    repo = new MockScopedNoteRepository();
+  });
+
+  describe("findById()", () => {
+    it("should return Some for the owner", async () => {
+      const note = Note.create({ ownerId: alice, body: "secret" });
+      await repo.create(note, aliceScope);
+
+      const result = await repo.findById(note._id, aliceScope);
+
+      expect(result.getValue().isSome()).toBe(true);
+    });
+
+    it("should return None when scope belongs to another user (no existence leak)", async () => {
+      const note = Note.create({ ownerId: alice, body: "secret" });
+      await repo.create(note, aliceScope);
+
+      const result = await repo.findById(note._id, bobScope);
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
+    });
+  });
+
+  describe("delete()", () => {
+    it("should fail (not found) when scope belongs to another user", async () => {
+      const note = Note.create({ ownerId: alice, body: "secret" });
+      await repo.create(note, aliceScope);
+
+      const result = await repo.delete(note._id, bobScope);
+
+      expect(result.isFailure).toBe(true);
+
+      const stillThere = await repo.findById(note._id, aliceScope);
+      expect(stillThere.getValue().isSome()).toBe(true);
+    });
+  });
+
+  describe("update()", () => {
+    it("should fail when scope belongs to another user", async () => {
+      const note = Note.create({ ownerId: alice, body: "v1" });
+      await repo.create(note, aliceScope);
+
+      const tampered = note.clone({ body: "v2-bob" }) as Note;
+      const result = await repo.update(tampered, bobScope);
+
+      expect(result.isFailure).toBe(true);
+    });
+  });
+
+  describe("findAll() / count() / exists()", () => {
+    it("should isolate per-owner views", async () => {
+      await repo.create(Note.create({ ownerId: alice, body: "a1" }), aliceScope);
+      await repo.create(Note.create({ ownerId: alice, body: "a2" }), aliceScope);
+      await repo.create(Note.create({ ownerId: bob, body: "b1" }), bobScope);
+
+      const aliceList = await repo.findAll(aliceScope);
+      const bobList = await repo.findAll(bobScope);
+      const aliceCount = await repo.count(aliceScope);
+      const bobCount = await repo.count(bobScope);
+
+      expect(aliceList.getValue().pagination.total).toBe(2);
+      expect(bobList.getValue().pagination.total).toBe(1);
+      expect(aliceCount.getValue()).toBe(2);
+      expect(bobCount.getValue()).toBe(1);
+    });
+
+    it("exists() should not leak existence across owners", async () => {
+      const note = Note.create({ ownerId: alice, body: "secret" });
+      await repo.create(note, aliceScope);
+
+      expect((await repo.exists(note._id, aliceScope)).getValue()).toBe(true);
+      expect((await repo.exists(note._id, bobScope)).getValue()).toBe(false);
     });
   });
 });

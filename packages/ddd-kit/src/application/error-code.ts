@@ -1,8 +1,10 @@
 const STATUS_BY_SUFFIX = {
   _UNAUTHORIZED: 401,
+  _REQUIRED: 401,
   _FORBIDDEN: 403,
   _NOT_FOUND: 404,
   _CONFLICT: 409,
+  _BLOCKED: 409,
   _INVALID: 400,
   _INTEGRITY_FAILED: 422,
   _RATE_LIMITED: 429,
@@ -18,6 +20,7 @@ export type ErrorCode = `${Uppercase<string>}${ErrorSuffix}`;
 export interface AppError<Code extends ErrorCode = ErrorCode> {
   code: Code;
   message: string;
+  metadata?: Record<string, unknown>;
 }
 
 export function httpStatusFromCode(code: ErrorCode): ErrorStatus {
@@ -28,10 +31,12 @@ export function httpStatusFromCode(code: ErrorCode): ErrorStatus {
 
 export class AppErrorException extends Error {
   readonly code: ErrorCode;
+  readonly metadata?: Record<string, unknown>;
 
   constructor(error: AppError) {
     super(error.message);
     this.name = "AppErrorException";
     this.code = error.code;
+    this.metadata = error.metadata;
   }
 }
