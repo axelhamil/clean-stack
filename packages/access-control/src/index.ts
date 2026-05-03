@@ -32,11 +32,18 @@ const _member = _ac.newRole({
   organization: ["leave"],
 });
 
-const _roles = { owner: _owner, admin: _admin, member: _member } as const;
+const _orgRoles = ["owner", "admin", "member"] as const;
+type _OrgRole = (typeof _orgRoles)[number];
 
+const _roles = { owner: _owner, admin: _admin, member: _member } as const satisfies Record<
+  _OrgRole,
+  unknown
+>;
+
+export const ORG_ROLES = _orgRoles;
 export const STATEMENTS = statement;
 
-export type OrgRole = keyof typeof _roles;
+export type OrgRole = _OrgRole;
 export type OrgPermissions = {
   [K in keyof typeof statement]?: readonly (typeof statement)[K][number][];
 };
