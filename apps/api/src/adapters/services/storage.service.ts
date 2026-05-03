@@ -1,7 +1,9 @@
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NotFound,
   PutObjectCommand,
   S3Client,
@@ -17,7 +19,10 @@ import type {
   PresignedUrl,
   PresignUploadInput,
   StorageError,
+  UploadObjectInput,
 } from "../../application/ports/storage.port";
+
+const S3_DELETE_BATCH = 1000;
 
 export class S3StorageService implements IStorageService {
   private readonly client: S3Client;
@@ -113,6 +118,63 @@ export class S3StorageService implements IStorageService {
       return Result.ok();
     } catch (e) {
       return this.fail(e, "delete object failed", { key });
+    }
+  }
+
+  async uploadObject(input: UploadObjectInput): Promise<Result<void, StorageError>> {
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: input.key,
+          Body: input.body,
+          ContentType: input.contentType,
+        }),
+      );
+      return Result.ok();
+    } catch (e) {
+      return this.fail(e, "upload object failed", { key: input.key });
+    }
+  }
+
+  async listObjectKeys(prefix: string): Promise<Result<string[], StorageError>> {
+    try {
+      const keys: string[] = [];
+      let continuationToken: string | undefined;
+      do {
+        const res = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }),
+        );
+        for (const obj of res.Contents ?? []) {
+          if (obj.Key) keys.push(obj.Key);
+        }
+        continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+      } while (continuationToken);
+      return Result.ok(keys);
+    } catch (e) {
+      return this.fail(e, "list object keys failed", { prefix });
+    }
+  }
+
+  async deleteObjects(keys: string[]): Promise<Result<void, StorageError>> {
+    if (keys.length === 0) return Result.ok();
+    try {
+      for (let i = 0; i < keys.length; i += S3_DELETE_BATCH) {
+        const batch = keys.slice(i, i + S3_DELETE_BATCH);
+        await this.client.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+          }),
+        );
+      }
+      return Result.ok();
+    } catch (e) {
+      return this.fail(e, "delete objects failed", { count: keys.length });
     }
   }
 

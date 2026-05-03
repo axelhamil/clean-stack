@@ -9,7 +9,7 @@ import { di } from "../di/container";
 
 export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
   .post("/presign", requireAuth, zValidator("json", presignUploadBodySchema), async (c) => {
-    const result = await di.CreateUploadUrlUseCase.execute({
+    const result = await di.UploadService.createUploadUrl({
       ownerId: c.get("user").id,
       ...c.req.valid("json"),
     });
@@ -19,7 +19,7 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
     return c.json(result.getValue());
   })
   .post("/confirm", requireAuth, zValidator("json", confirmUploadBodySchema), async (c) => {
-    const result = await di.ConfirmUploadUseCase.execute({
+    const result = await di.UploadService.confirmUpload({
       ownerId: c.get("user").id,
       ...c.req.valid("json"),
     });
@@ -29,7 +29,7 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
     return c.json(result.getValue());
   })
   .post("/download", requireAuth, zValidator("json", presignDownloadBodySchema), async (c) => {
-    const result = await di.CreateDownloadUrlUseCase.execute({
+    const result = await di.UploadService.createDownloadUrl({
       ownerId: c.get("user").id,
       ...c.req.valid("json"),
     });

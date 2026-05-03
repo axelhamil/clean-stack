@@ -1,18 +1,25 @@
+import { TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
+import { logger } from "../../common/logger";
+import { DrizzleGdprRepository } from "../adapters/repositories/drizzle-gdpr.repository";
 import { ResendEmailService } from "../adapters/services/email.service";
 import { S3StorageService } from "../adapters/services/storage.service";
-import { ConfirmUploadUseCase } from "../application/use-cases/confirm-upload.use-case";
-import { CreateDownloadUrlUseCase } from "../application/use-cases/create-download-url.use-case";
-import { CreateUploadUrlUseCase } from "../application/use-cases/create-upload-url.use-case";
+import { GdprService } from "../application/services/gdpr.service";
+import { UploadService } from "../application/services/upload.service";
 
 export const di = container()
-  // infra
+  // infra (ports)
   .add("IEmailService", () => new ResendEmailService())
   .add("IStorageService", () => new S3StorageService())
-  // uploads
-  .add("CreateUploadUrlUseCase", (c) => new CreateUploadUrlUseCase(c.IStorageService))
-  .add("ConfirmUploadUseCase", (c) => new ConfirmUploadUseCase(c.IStorageService))
-  .add("CreateDownloadUrlUseCase", (c) => new CreateDownloadUrlUseCase(c.IStorageService))
+  .add("ITransactionService", () => new TransactionService())
+  .add("IGdprRepository", () => new DrizzleGdprRepository(logger))
+  // application services (orchestration of ports — no DDD aggregate yet)
+  .add("UploadService", (c) => new UploadService(c.IStorageService))
+  .add(
+    "GdprService",
+    (c) =>
+      new GdprService(c.IGdprRepository, c.IStorageService, c.IEmailService, c.ITransactionService),
+  )
   .build();
 
 export type AppDeps = typeof di;

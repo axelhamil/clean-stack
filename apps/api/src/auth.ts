@@ -2,10 +2,10 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
-import { db, eq, schema } from "@packages/drizzle";
-import { betterAuth } from "better-auth";
+import { and, db, eq, schema } from "@packages/drizzle";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { bearer, magicLink, organization, twoFactor } from "better-auth/plugins";
+import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
 import { env } from "../common/env";
 import { logger } from "../common/logger";
@@ -67,12 +67,20 @@ async function dispatchEmail<K extends keyof EmailTemplates>(
   }
 }
 
-export const auth = betterAuth({
+const authOptions = {
   appName: "clean-stack",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
 
   database: drizzleAdapter(db, { provider: "pg" }),
+
+  user: {
+    additionalFields: {
+      pendingDeletionUntil: { type: "date", required: false, returned: true, input: false },
+      lastExportRequestedAt: { type: "date", required: false, returned: true, input: false },
+      deletedAt: { type: "date", required: false, returned: false, input: false },
+    },
+  },
 
   trustedOrigins: env.CORS_ORIGIN,
 
@@ -211,6 +219,30 @@ export const auth = betterAuth({
       },
     },
   },
+} satisfies BetterAuthOptions;
+
+export const auth = betterAuth({
+  ...authOptions,
+  plugins: [
+    ...authOptions.plugins,
+    customSession(async ({ user, session }) => {
+      if (!session.activeOrganizationId) return { user, session };
+      const [row] = await db
+        .select({ role: schema.member.role })
+        .from(schema.member)
+        .where(
+          and(
+            eq(schema.member.organizationId, session.activeOrganizationId),
+            eq(schema.member.userId, user.id),
+          ),
+        )
+        .limit(1);
+      return {
+        user,
+        session: { ...session, activeOrganizationRole: row?.role ?? null },
+      };
+    }, authOptions),
+  ],
 });
 
 export type SessionUser = typeof auth.$Infer.Session.user;

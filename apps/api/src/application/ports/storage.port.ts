@@ -29,6 +29,12 @@ export interface ObjectMetadata {
   contentType: string;
 }
 
+export interface UploadObjectInput {
+  key: string;
+  body: Uint8Array | string;
+  contentType: string;
+}
+
 export interface IStorageService {
   presignUpload(input: PresignUploadInput): Promise<Result<PresignedUrl, StorageError>>;
 
@@ -37,6 +43,12 @@ export interface IStorageService {
   headObject(key: string): Promise<Result<ObjectMetadata, StorageError>>;
 
   deleteObject(key: string): Promise<Result<void, StorageError>>;
+
+  uploadObject(input: UploadObjectInput): Promise<Result<void, StorageError>>;
+
+  listObjectKeys(prefix: string): Promise<Result<string[], StorageError>>;
+
+  deleteObjects(keys: string[]): Promise<Result<void, StorageError>>;
 
   publicUrlFor(key: string): string;
 }

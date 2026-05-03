@@ -5,6 +5,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "common/**/*"],
+  "include": ["src/**/*", "common/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }

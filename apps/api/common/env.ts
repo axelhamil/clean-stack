@@ -15,10 +15,20 @@ const envSchema = z.object({
   APP_URL: z.url().default("http://localhost:5173"),
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM: z.string().default("onboarding@resend.dev"),
-  RESEND_TPL_VERIFY_EMAIL: z.string().min(1).optional(),
-  RESEND_TPL_RESET_PASSWORD: z.string().min(1).optional(),
-  RESEND_TPL_MAGIC_LINK: z.string().min(1).optional(),
-  RESEND_TPL_ORG_INVITATION: z.string().min(1).optional(),
+  INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
+  INTERNAL_AUTH_LAYERS: z
+    .string()
+    .default("signature")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.enum(["signature", "private-network"])).min(1)),
+  GDPR_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).default(7),
+  GDPR_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().default(24),
+  GDPR_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   S3_ENDPOINT: z.url().default("http://localhost:9000"),
   S3_REGION: z.string().default("auto"),
   S3_BUCKET: z.string().default("clean-stack"),
@@ -39,3 +49,16 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
+
+if (env.NODE_ENV === "production") {
+  if (!env.INTERNAL_AUTH_LAYERS.includes("signature")) {
+    throw new Error(
+      'INTERNAL_AUTH_LAYERS must include "signature" in production. Stacking with "private-network" is recommended on Railway/Fly.',
+    );
+  }
+  if (!env.INTERNAL_SIGNING_KEY || env.INTERNAL_SIGNING_KEY.length < 32) {
+    throw new Error(
+      "INTERNAL_SIGNING_KEY is required in production (min 32 chars). Generate: openssl rand -hex 32",
+    );
+  }
+}
