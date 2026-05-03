@@ -11,5 +11,3 @@ export const requestDeletionBodySchema = z
   .refine((d) => Boolean(d.totpCode || d.password), {
     message: "Provide either a TOTP code or password",
   });
-
-export type RequestAccountDeletionBody = z.infer<typeof requestDeletionBodySchema>;

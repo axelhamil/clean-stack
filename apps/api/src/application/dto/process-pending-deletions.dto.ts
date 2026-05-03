@@ -6,5 +6,3 @@ export const sweepBodySchema = z
     dryRun: z.boolean().optional(),
   })
   .default({});
-
-export type ProcessPendingDeletionsInput = z.infer<typeof sweepBodySchema>;
