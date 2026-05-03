@@ -7,13 +7,23 @@ import {
 } from "@packages/ui/components/ui/card";
 import { Input } from "@packages/ui/components/ui/input";
 import { Label } from "@packages/ui/components/ui/label";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { Link } from "@tanstack/react-router";
+import { DataExportCard } from "./_components/data-export-card";
+import { GdprDeletionCard } from "./_components/gdpr-deletion-card";
 import { PasskeysCard } from "./_components/passkeys-card";
 import { SessionsCard } from "./_components/sessions-card";
 import { TwoFactorCard } from "./_components/two-factor-card";
 
 interface AccountPageProps {
-  user: { name?: string | null; email: string; twoFactorEnabled?: boolean | null };
+  user: {
+    name?: string | null;
+    email: string;
+    twoFactorEnabled?: boolean | null;
+    pendingDeletionUntil?: Date | string | null;
+    lastExportRequestedAt?: Date | string | null;
+  };
   sessionToken: string;
 }
 
@@ -41,6 +51,18 @@ export function SettingsAccountPage({ user, sessionToken }: AccountPageProps) {
       <PasskeysCard />
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
       <SessionsCard currentSessionToken={sessionToken} />
+      <DataExportCard lastExportRequestedAt={user.lastExportRequestedAt} />
+      <GdprDeletionCard
+        pendingDeletionUntil={user.pendingDeletionUntil}
+        twoFactorEnabled={user.twoFactorEnabled === true}
+      />
+      <TypographyMuted>
+        Read our{" "}
+        <NavLink asChild variant="underline">
+          <Link to="/legal/data-rights">data rights policy</Link>
+        </NavLink>{" "}
+        for the full breakdown of what's deleted, anonymized, and retained.
+      </TypographyMuted>
     </main>
   );
 }
