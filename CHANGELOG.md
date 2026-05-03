@@ -1,3 +1,19 @@
+## [1.11.0](https://github.com/axelhamil/clean-stack/compare/v1.10.0...v1.11.0) (2026-05-03)
+
+### Features
+
+* **access-control:** export org_roles tuple for runtime iteration ([b78a9db](https://github.com/axelhamil/clean-stack/commit/b78a9dbd83c51d453a036db598a766a967f65a22))
+* **api:** add gdpr account deletion + data export with grace period sweep ([fd3b4b7](https://github.com/axelhamil/clean-stack/commit/fd3b4b7d74a6577033f3ba921b9cce90212d069f))
+* **app:** add gdpr settings ui + legal data-rights page ([bfcc15d](https://github.com/axelhamil/clean-stack/commit/bfcc15d5155ff439c8b2c84955717b6203e1f93f))
+* **ddd-kit:** add scopedrepository + reposcope primitive ([69f8fdc](https://github.com/axelhamil/clean-stack/commit/69f8fdcde621ea68908268aa7fb5ccc11b85b436))
+* **drizzle:** add gdpr deletion fields + drop unused helpers ([da659a0](https://github.com/axelhamil/clean-stack/commit/da659a0b75d2be51350c38d8d7535437d8ada240))
+* **ui:** add destructive variant to card ([ad18c31](https://github.com/axelhamil/clean-stack/commit/ad18c3197da876c6c95d1c93bd9889084cc758a7))
+
+### Documentation
+
+* add cron + integrations guides, document use-case vs service rule ([f8419dc](https://github.com/axelhamil/clean-stack/commit/f8419dc7180925828a4b0eba5233fb9d1c183161))
+* **roadmap:** add pre-flight ownership gate to gdpr account deletion ([4f3ebc5](https://github.com/axelhamil/clean-stack/commit/4f3ebc580d9e2795688406793b2310a4343c2f75))
+
 ## [1.10.0](https://github.com/axelhamil/clean-stack/compare/v1.9.0...v1.10.0) (2026-04-30)
 
 ### Features
