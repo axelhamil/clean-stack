@@ -21,6 +21,9 @@ export const user = pgTable("user", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  pendingDeletionUntil: timestamp("pending_deletion_until"),
+  deletedAt: timestamp("deleted_at"),
+  lastExportRequestedAt: timestamp("last_export_requested_at"),
 });
 
 export const session = pgTable(

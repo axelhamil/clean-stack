@@ -13,6 +13,7 @@ type ErrorBody = {
     message: string;
     requestId?: string;
     stack?: string;
+    metadata?: Record<string, unknown>;
   };
 };
 
@@ -21,12 +22,17 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
   if (err instanceof AppErrorException) {
     const status = httpStatusFromCode(err.code) as ContentfulStatusCode;
+
     const body: ErrorBody = {
-      error: { code: err.code, message: err.message, requestId },
+      error: {
+        code: err.code,
+        message: err.message,
+        requestId,
+        ...(err.metadata ? { metadata: err.metadata } : {}),
+      },
     };
-    if (status >= 500) {
-      logger.error({ err, requestId, path: c.req.path }, err.message);
-    }
+    if (status >= 500) logger.error({ err, requestId, path: c.req.path }, err.message);
+
     return c.json(body, status);
   }
 
@@ -39,9 +45,8 @@ export const errorHandler: ErrorHandler = (err, c) => {
         requestId,
       },
     };
-    if (status >= 500) {
-      logger.error({ err, requestId, path: c.req.path }, err.message);
-    }
+    if (status >= 500) logger.error({ err, requestId, path: c.req.path }, err.message);
+
     return c.json(body, status);
   }
 

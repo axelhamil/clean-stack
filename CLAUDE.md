@@ -34,7 +34,8 @@ apps/
       domain/                  Aggregates, Entities, Value Objects, Domain Events
       application/
         ports/                 Interfaces (repositories, services)
-        use-cases/             One file per use case
+        use-cases/             One file per use case (orchestrates ≥ 1 aggregate with infra)
+        services/              Pure-infra orchestration (no aggregate yet) — `<Noun>Service` with N methods
         dto/                   Zod schemas (`<verb-noun>.dto.ts`, export `<Noun>Input = z.infer<...>`)
         event-handlers/        Side effects on domain events
       adapters/
@@ -77,8 +78,8 @@ packages/
 2. **No `throw` in domain or application** — return `Result<T, E>`.
 3. **No `null` / `undefined` for absence** — use `Option<T>`.
 4. **Value Objects validate via zod** in `protected validate()`.
-5. **Transactions managed in controllers**, passed to use cases.
-6. **All dependencies injected via DI**. No service locators in use cases. Routes consume by name (`di.XxxUseCase.execute(...)`); never `new XxxUseCase(...)` at call site (bypasses container, breaks per-test impl swap).
+5. **Transactions managed in controllers**, passed to use cases / services.
+6. **All dependencies injected via DI**. No service locators in use cases / services. Routes consume by name (`di.XxxUseCase.execute(...)` or `di.XxxService.method(...)`); never `new XxxUseCase(...)` / `new XxxService(...)` at call site (bypasses container, breaks per-test impl swap).
 7. **No barrel `index.ts` files** — import directly.
 8. **Self-documenting code** — no inline comments unless WHY is non-obvious.
 9. **Only `get id()` getter on aggregates**. Other props via `entity.get('propName')`.
@@ -89,7 +90,9 @@ packages/
 14. **Reusability-first — promote, don't duplicate**. Second occurrence is the trigger. Theme-level (keyframes / utilities) or primitive-level (intrinsic to a component). Once promoted, call site has zero cosmetics. Same for logic: `mutationFn: (input) => api.x.$post({ json: input })` twice → extract a typed helper.
 15. **Component props use `interface`, not `type`** — `interface <Component>Props { ... }` above each component (no inline `({ token }: { token: string })`). Reasons: declaration merging, IDE hover, consistency. `type` is for unions / intersections / mapped shapes / zod-inferred (`type X = z.infer<typeof xSchema>`).
 16. **`void navigate(...)` in mutation callbacks, not `await`** — `await` keeps `isPending: true` during route transition (blocks submit). `void navigate(...)` resolves the mutation immediately and satisfies `no-floating-promises`. `await` only when chaining *after* navigation lands.
-17. **Adding a rule — omnipotent or it doesn't belong here.** A rule states a *principle* tied to an architectural property (Clean Architecture layer, type-safety boundary, design-system invariant, security posture) and must survive swapping any library/version/path it references — phrase library-agnostic when possible, only name a tool when it *is* the property (Zod = "validate at boundary"). Always include the **why** (the failure mode the rule prevents) — without it, the rule rots on the first edge case. Promote on second occurrence (rule 14); section-local first, `## Architecture rules` only when crossing sections; if inverse advice, mirror in `## Don't`. Rewrite or delete a rule the moment its property changes — a stale rule is worse than no rule.
+17. **Use case = orchestrates ≥ 1 aggregate with infra. No aggregate → it's an `application/services/<Noun>Service` with N methods, never a "use case" with `.execute()`.** Use cases live in `application/use-cases/` (one file per use case). Application services live in `application/services/<noun>.service.ts` (one class per bounded concern, methods named after the operation: `requestAccountDeletion`, `confirmUpload`, …); methods may call `this.<other>` directly — never inject a service into another. **Why**: the "use case" label implies a metier intention bound to an aggregate (Clean Architecture / DDD); using it for pure infra orchestration (presign URL, gdpr sweep, billing config lookup) invites pathological inter-injection between use cases and inflates the layer with non-domain code. The decisor is the aggregate, not the I/O count: storage presign + size/owner check is *infra orchestration* (no aggregate); transferring funds between two `Account` aggregates is a *use case* (or a domain service if the rule lives across both). Application service ≠ adapter service: `adapters/services/` = port impl (S3, Resend — pure I/O); `application/services/` = orchestration above ports.
+18. **Owned aggregates use `ScopedRepository<T, TScope>`, never `BaseRepository<T>`.** Every method (`findById`, `delete`, `update`, `findMany`, `exists`, `count`, …) takes `scope: TScope` (`RepoScope.user(...)`, `RepoScope.org(...)`, `RepoScope.userInOrg(...)`); the impl AND-joins the scope into the SQL `WHERE`. **Wrong-owner returns `Option.none()` on reads, `NOT_FOUND` on writes** — never `403`/leak existence. **Why**: middleware-only enforcement (`requireOrgOwnership`, `withOrg`) breaks the moment a use case runs outside Hono (cron, queue, event handler, internal route) — port-level scoping survives every transport. `BaseRepository<T>` reserved for genuinely global aggregates (audit logs, system-wide config). Test decisor: if the row carries `userId` or `organizationId`, it's `ScopedRepository`.
+19. **Adding a rule — omnipotent or it doesn't belong here.** A rule states a *principle* tied to an architectural property (Clean Architecture layer, type-safety boundary, design-system invariant, security posture) and must survive swapping any library/version/path it references — phrase library-agnostic when possible, only name a tool when it *is* the property (Zod = "validate at boundary"). Always include the **why** (the failure mode the rule prevents) — without it, the rule rots on the first edge case. Promote on second occurrence (rule 14); section-local first, `## Architecture rules` only when crossing sections; if inverse advice, mirror in `## Don't`. Rewrite or delete a rule the moment its property changes — a stale rule is worse than no rule.
 
 ## CQRS
 
@@ -102,7 +105,7 @@ packages/
 
 1. **No declared types until they pay for themselves** — no `interface XxxDeps`, no `<T extends { IPort: PortType }>`, no central `types.ts`. Hand-declaring is the boilerplate inwire removes.
 2. **`AppDeps = typeof di`** after `.build()` — derived, never declared.
-3. **Use-cases stay in `application/use-cases/`** (one file per use-case). DI is *wiring*; the use-case file is *implementation*.
+3. **Use cases stay in `application/use-cases/`** (one file per use case); **application services stay in `application/services/`** (one file per service, N methods). DI is *wiring*; the use-case / service file is *implementation*.
 4. **No barrel `index.ts`** in `di/`.
 
 ## Hono RPC (end-to-end type safety)
@@ -224,9 +227,9 @@ Auth state enforced by **pathless layouts** (`_protected.tsx`, `_guest.tsx`), no
 
 ## Organization scoping
 
-1. **`requireOrg` family on every business mutation/query route.** `requireOrg` exposes `c.var.orgId`; `requireOrgPermission({ resource: ["action"] })` gates capabilities; `requireOrgOwnership({ table, idFrom })` validates cross-org access on read-by-id / per-resource mutations. **Why**: cross-org leak is the #1 multi-tenant CVE class. Any handler touching a row with `organizationId` chains the relevant guards.
+1. **Ownership enforced at the port (`ScopedRepository`), not at the route.** `requireOrg` exposes `c.var.orgId` so the controller can build `RepoScope.org(orgId)` and pass it to `di.XxxUseCase.execute(input, scope)`; `requireOrgPermission({ resource: ["action"] })` still gates *capabilities*. **Why**: per-route ownership middleware is bypassed the moment a use case runs outside Hono — cron, queue, event handler, internal route. Port-level scoping (rule 18) survives every transport: cross-org / cross-user leak becomes a compile-time error, not a code-review smell. Routes are responsible for **constructing the scope** from authenticated context; the repo is responsible for **honoring it**.
 
-2. **List queries on org-scoped tables use `withOrg(table, orgId)`.** Free-form `where(eq(table.organizationId, orgId))` allowed but flagged for promotion on 2nd occurrence. **Why**: missing scope is undetectable in code review without grep.
+2. **Queries (CQRS read side) take the same `RepoScope` and AND-join it in `WHERE`.** A query function signature is `(input, scope: RepoScope) => Promise<...>`. **Why**: the rule applies to the read side too — a query that bypasses scope is exactly as dangerous as a repo that does. Promote a `withScope(table, scope)` helper on 2nd occurrence (rule 14) — never as a substitute for the parameter, only as a sugar on top.
 
 3. **Every business table from its first migration owns `organizationId NOT NULL` + FK `organization(id) ON DELETE CASCADE`.** **Why**: post-hoc multi-tenancy (backfill + orphan handling + query rewrite) is the most expensive class of refactor. Never skip — even solo-product today.
 
@@ -259,7 +262,7 @@ aggregate.clearEvents();
 
 ## Testing
 
-BDD style. One test file per use case under `__TESTS__/`. Mock at the repository/port level. Test `Result` / `Option` state transitions.
+BDD style. One test file per use case / service under `__TESTS__/` (services group `describe` per method). Mock at the repository/port level. Test `Result` / `Option` state transitions.
 
 ## Common patterns
 
@@ -281,6 +284,14 @@ class Email extends ValueObject<string> {
     return v.includes("@") ? Result.ok(v) : Result.fail("Invalid email");
   }
 }
+
+// Owned aggregate — scope is part of the port signature (rule 18)
+type NoteScope = ScopeOf<"user-in-org">;
+interface INoteRepository extends ScopedRepository<Note, NoteScope> {}
+
+// Controller builds the scope from authenticated context, never the use case
+const scope = RepoScope.userInOrg(c.var.userId, c.var.orgId);
+const result = await di.UpdateNoteUseCase.execute({ id, body }, scope);
 ```
 
 ## Turborepo
@@ -318,3 +329,6 @@ Anti-patterns specific to this stack — rules above already cover the positive 
 - Trust the size or content-type a client declares at `presign` without running `confirm` — server is blind during upload. (Storage rule 6.)
 - Skip `requireOrg` on a handler reading/writing rows scoped by `organizationId` — silently accepts requests with no active org. (Org R1.)
 - Allow Personal org deletion via the normal flow — `beforeDeleteOrganization` rejects, front hides the button. Account deletion is the only path. (Org R5.)
+- Implement `BaseRepository<T>` for an aggregate that carries `userId` / `organizationId` — middleware is not a substitute for a port-level invariant (rule 18). Use `ScopedRepository<T, ScopeOf<"user"|"org"|"user-in-org">>`.
+- Return `Result.fail("FORBIDDEN")` on wrong-owner reads — leaks existence of rows the caller doesn't own. Reads return `Option.none()`; writes return `NOT_FOUND`. (Rule 17.)
+- Re-create a `requireOrgOwnership` / `withOrg` style helper — removed on purpose (rule 18). Cross-org / cross-user check belongs in the repo, not in middleware or query helpers.

@@ -10,6 +10,28 @@ import type {
   TemplateVariables,
 } from "../../application/ports/email.port";
 
+/**
+ * Resend template IDs.
+ *
+ * Not secrets — just opaque dashboard handles. Edit them here when cloning
+ * the boilerplate. Each entry must point to a template authored in the Resend
+ * dashboard with the variable shape declared in `EmailTemplates`
+ * (apps/api/src/application/ports/email.port.ts).
+ *
+ * Empty string = template not yet configured. Production boot fails hard
+ * on missing IDs; dev logs a warning and drops the email.
+ */
+const TEMPLATE_IDS: Record<keyof EmailTemplates, string> = {
+  verify_email: "",
+  reset_password: "",
+  magic_link: "",
+  org_invitation: "",
+  data_export_ready: "",
+  delete_requested: "",
+  delete_cancelled: "",
+  delete_completed: "",
+};
+
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 const BASE_DELAY_MS = 1000;
@@ -26,19 +48,12 @@ type AttemptOutcome = { ok: true } | { ok: false; status: number; message: strin
 
 export class ResendEmailService implements IEmailService {
   private readonly resend: Resend | null;
-  private readonly templateIds: Record<keyof EmailTemplates, string | undefined>;
 
   constructor() {
     this.resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
-    this.templateIds = {
-      verify_email: env.RESEND_TPL_VERIFY_EMAIL,
-      reset_password: env.RESEND_TPL_RESET_PASSWORD,
-      magic_link: env.RESEND_TPL_MAGIC_LINK,
-      org_invitation: env.RESEND_TPL_ORG_INVITATION,
-    };
 
     const isProd = env.NODE_ENV === "production";
-    const missing = Object.entries(this.templateIds)
+    const missing = Object.entries(TEMPLATE_IDS)
       .filter(([, id]) => !id)
       .map(([key]) => key);
 
@@ -58,7 +73,7 @@ export class ResendEmailService implements IEmailService {
     if (missing.length > 0) {
       logger.warn(
         { missing },
-        "missing RESEND template IDs — emails for these templates will be dropped",
+        "missing RESEND template IDs in TEMPLATE_IDS — emails for these templates will be dropped",
       );
     }
   }
@@ -69,7 +84,7 @@ export class ResendEmailService implements IEmailService {
     variables: EmailTemplates[K] & TemplateVariables,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>> {
-    const templateId = this.templateIds[template];
+    const templateId = TEMPLATE_IDS[template];
     if (!this.resend || !templateId) {
       return Result.fail({
         code: "EMAIL_TRANSPORT_NOT_CONFIGURED",

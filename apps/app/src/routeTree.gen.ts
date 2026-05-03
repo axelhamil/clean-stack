@@ -16,6 +16,7 @@ import { Route as MagicLinkRouteImport } from './routes/magic-link'
 import { Route as ProtectedRouteImport } from './routes/_protected'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LegalDataRightsRouteImport } from './routes/legal.data-rights'
 import { Route as AcceptInvitationInvitationIdRouteImport } from './routes/accept-invitation.$invitationId'
 import { Route as ProtectedShellRouteImport } from './routes/_protected/_shell'
 import { Route as GuestSignUpRouteImport } from './routes/_guest/sign-up'
@@ -62,6 +63,11 @@ const GuestRoute = GuestRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalDataRightsRoute = LegalDataRightsRouteImport.update({
+  id: '/legal/data-rights',
+  path: '/legal/data-rights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcceptInvitationInvitationIdRoute =
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof GuestSignInRoute
   '/sign-up': typeof GuestSignUpRoute
   '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
+  '/legal/data-rights': typeof LegalDataRightsRoute
   '/dashboard': typeof ProtectedShellDashboardRoute
   '/settings': typeof ProtectedShellSettingsOrgScopeRouteWithChildren
   '/org/new': typeof ProtectedShellOrgNewRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof GuestSignInRoute
   '/sign-up': typeof GuestSignUpRoute
   '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
+  '/legal/data-rights': typeof LegalDataRightsRoute
   '/dashboard': typeof ProtectedShellDashboardRoute
   '/org/new': typeof ProtectedShellOrgNewRoute
   '/settings': typeof ProtectedShellSettingsIndexRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/_guest/sign-up': typeof GuestSignUpRoute
   '/_protected/_shell': typeof ProtectedShellRouteWithChildren
   '/accept-invitation/$invitationId': typeof AcceptInvitationInvitationIdRoute
+  '/legal/data-rights': typeof LegalDataRightsRoute
   '/_protected/_shell/dashboard': typeof ProtectedShellDashboardRoute
   '/_protected/_shell/settings': typeof ProtectedShellSettingsRouteWithChildren
   '/_protected/_shell/org/new': typeof ProtectedShellOrgNewRoute
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/accept-invitation/$invitationId'
+    | '/legal/data-rights'
     | '/dashboard'
     | '/settings'
     | '/org/new'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/accept-invitation/$invitationId'
+    | '/legal/data-rights'
     | '/dashboard'
     | '/org/new'
     | '/settings'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/_guest/sign-up'
     | '/_protected/_shell'
     | '/accept-invitation/$invitationId'
+    | '/legal/data-rights'
     | '/_protected/_shell/dashboard'
     | '/_protected/_shell/settings'
     | '/_protected/_shell/org/new'
@@ -273,6 +285,7 @@ export interface RootRouteChildren {
   TwoFactorRoute: typeof TwoFactorRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   AcceptInvitationInvitationIdRoute: typeof AcceptInvitationInvitationIdRoute
+  LegalDataRightsRoute: typeof LegalDataRightsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/data-rights': {
+      id: '/legal/data-rights'
+      path: '/legal/data-rights'
+      fullPath: '/legal/data-rights'
+      preLoaderRoute: typeof LegalDataRightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/accept-invitation/$invitationId': {
@@ -518,6 +538,7 @@ const rootRouteChildren: RootRouteChildren = {
   TwoFactorRoute: TwoFactorRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   AcceptInvitationInvitationIdRoute: AcceptInvitationInvitationIdRoute,
+  LegalDataRightsRoute: LegalDataRightsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

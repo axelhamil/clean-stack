@@ -20,6 +20,7 @@
     "@aws-sdk/client-s3": "^3.1039.0",
     "@aws-sdk/s3-request-presigner": "^3.1039.0",
     "@better-auth/passkey": "^1.6.9",
+    "@better-auth/utils": "^0.4.0",
     "@hono/zod-validator": "^0.7.6",
     "@packages/access-control": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
@@ -28,7 +29,7 @@
     "better-auth": "^1.6.9",
     "hono": "^4.12.15",
     "hono-pino": "^0.10.3",
-    "inwire": "^2.1.7",
+    "inwire": "^2.3.1",
     "pino": "^10.3.1",
     "resend": "^6.12.2",
     "zod": "^4.3.6"

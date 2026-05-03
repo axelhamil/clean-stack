@@ -3,6 +3,21 @@ import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
+const cardVariants = cva(
+  "hover-lift flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
+  {
+    variants: {
+      variant: {
+        default: "",
+        destructive: "border-destructive/40 bg-destructive/5",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  },
+);
+
+interface CardProps extends React.ComponentProps<"div">, VariantProps<typeof cardVariants> {}
+
 const cardTitleVariants = cva("leading-none font-semibold", {
   variants: {
     variant: {
@@ -13,17 +28,8 @@ const cardTitleVariants = cva("leading-none font-semibold", {
   defaultVariants: { variant: "default" },
 });
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card"
-      className={cn(
-        "hover-lift flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
-        className,
-      )}
-      {...props}
-    />
-  );
+function Card({ className, variant, ...props }: CardProps) {
+  return <div data-slot="card" className={cn(cardVariants({ variant }), className)} {...props} />;
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {

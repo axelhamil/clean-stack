@@ -7,6 +7,10 @@ export type EmailTemplates = {
   reset_password: { name: string; resetUrl: string };
   magic_link: { magicUrl: string };
   org_invitation: { inviterName: string; orgName: string; role: string; inviteUrl: string };
+  data_export_ready: { name: string; downloadUrl: string; expiresAt: string };
+  delete_requested: { name: string; cancelUrl: string; expiresAt: string };
+  delete_cancelled: { name: string };
+  delete_completed: { name: string };
 };
 
 export type EmailError =

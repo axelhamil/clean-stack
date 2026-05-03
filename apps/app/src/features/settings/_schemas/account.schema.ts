@@ -22,3 +22,17 @@ export const verifyTotpSetupSchema = z.object({
     .regex(/^\d{6}$/, { message: "Code must be 6 digits" }),
 });
 export type VerifyTotpSetupInput = z.infer<typeof verifyTotpSetupSchema>;
+
+export const requestDeletionWithPasswordSchema = z.object({
+  password: z.string().min(1, { message: "Password is required" }),
+});
+export type RequestDeletionWithPasswordInput = z.infer<typeof requestDeletionWithPasswordSchema>;
+
+export const requestDeletionWithTotpSchema = z.object({
+  totpCode: z
+    .string()
+    .min(6, { message: "Code must be 6 digits" })
+    .max(6, { message: "Code must be 6 digits" })
+    .regex(/^\d{6}$/, { message: "Code must be 6 digits" }),
+});
+export type RequestDeletionWithTotpInput = z.infer<typeof requestDeletionWithTotpSchema>;

@@ -2,7 +2,12 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     "apps/api": {
-      "entry": ["src/di/container.ts", "src/adapters/middleware/*.ts", "common/**/*.ts"],
+      "entry": [
+        "src/di/container.ts",
+        "src/adapters/middleware/*.ts",
+        "common/**/*.ts",
+        "scripts/**/*.ts"
+      ],
       "project": ["**/*.ts"],
       "ignoreDependencies": ["pino-pretty"]
     },
