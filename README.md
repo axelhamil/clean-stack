@@ -35,7 +35,7 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 |---|---|
 | **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
 | **API** | Hono 4 on native `Bun.serve()` (~7 ms cold prod build) |
-| **App** | Vite 8 · React 19 · TanStack Router (file-based, prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
+| **App** | Vite 8 · React 19 · TanStack Router (code-based, prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
 | **Forms** | react-hook-form + `@hookform/resolvers/zod` 4 + shadcn `Form` |
 | **Auth** | BetterAuth + plugins `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
 | **Access control** | `@packages/access-control` SSOT (statements, roles, `authorizeRole`) consumed by server, route gates and UI |
@@ -68,27 +68,31 @@ pnpm dev --filter=app
 
 ## Layout
 
+Vertical slice on both sides. Back: one folder per bounded context with its own DDD layers. Front: code-based routing — features own their routes via `<name>.route.tsx` factories assembled in a single `router.tsx`. No `routes/` folder, no codegen.
+
 ```
 apps/
   api/                       Hono on Bun
     src/
-      domain/                Aggregates, Entities, Value Objects, Domain Events
-      application/           Use cases, ports, DTOs, event handlers
-      adapters/              Middlewares, repositories, services (auth, email, storage)
-      routes/                Hono routes (incl. /api/auth/*, signed webhooks)
-      di/                    inwire container (flat; AppDeps = typeof di)
-  app/                       Vite + React (routes → features → adapters → common)
+      shared/                Cross-cutting: middleware, env, logger
+      modules/<context>/     One folder per bounded context (auth, uploads, organizations, gdpr, …)
+        domain/              Aggregates, Entities, Value Objects, Domain Events
+        application/         Use cases, ports, services, DTOs, event handlers
+        infrastructure/      Drizzle repositories, mappers, port impls (S3, Resend)
+        routes.ts            Hono sub-app
+        module.ts            registerXxx(c, app) — DI .add() chain + app.route() mount
+      di/container.ts        Composition root (chains module registers, exports `c.build()`)
+      auth.ts                BetterAuth singleton
+      index.ts               Server entry — pipeline + module registration list
+  app/                       Vite + React (router.tsx → features → shared)
     src/
-      routes/                TanStack Router file-based
-        _protected.tsx       pure auth gate (passthrough Outlet)
-        _protected/_shell.tsx  shell layout (header, command palette, devtool)
-      features/<x>/          page.tsx + _components/ + _forms/ + _hooks/ + _schemas/
-      adapters/              api-client (Hono RPC), auth-client, auth-broadcast, query-client, queries/, mutations/, hooks/, components/, schemas/, route-helpers/
-      providers/             Provider tree (next-themes, query, router)
-      common/                env, format, theme-toggle, is-personal-org, initials
+      main.tsx               createRoot + <AppProviders />
+      router.tsx             Code-based routing: layouts/gates inline + routeTree assembly
+      features/<x>/          <name>.route.tsx + components/, forms/, hooks/, schemas
+      shared/                Cross-cutting: api/, auth/, components/, env.ts, app-providers.tsx, utils.ts
 packages/
   access-control             BetterAuth access-control SSOT (statements, roles, authorizeRole)
-  ddd-kit                    DDD primitives + AppErrorException
+  ddd-kit                    DDD primitives (Result, Option, Aggregate, ScopedRepository, …)
   drizzle                    DB client + TransactionService + schemas
   test                       Shared Vitest config
   typescript-config          Shared tsconfig presets

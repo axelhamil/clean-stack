@@ -27,50 +27,70 @@ When unclear about a library API / config / "is this still SOTA" — **check doc
 
 ## Layout
 
+Vertical slice (modular monolith). Each bounded context owns its DDD layers; cross-cutting infra lives in `shared/`. *Layout describes the target — migration from the previous horizontal layer-cake is tracked in `ROADMAP.md`. New features land directly in vertical-slice form.*
+
 ```
 apps/
   api/
     src/
-      domain/                  Aggregates, Entities, Value Objects, Domain Events
-      application/
-        ports/                 Interfaces (repositories, services)
-        use-cases/             One file per use case (orchestrates ≥ 1 aggregate with infra)
-        services/              Pure-infra orchestration (no aggregate yet) — `<Noun>Service` with N methods
-        dto/                   Zod schemas (`<verb-noun>.dto.ts`, export `<Noun>Input = z.infer<...>`)
-        event-handlers/        Side effects on domain events
-      adapters/
-        middleware/            Hono middleware (auth, error, logger, rate-limit)
-        services/              External services (email, storage, …)
-        repositories/          Drizzle repositories
-        mappers/               Domain <-> DB
-      routes/                  Hono route registration
-      di/                      inwire container (flat; modules/ only when a context grows)
-      auth.ts                  BetterAuth singleton
-      client.ts                hcWithType (RPC client factory)
-    common/                    env.ts, logger.ts
+      shared/                    Cross-cutting infra (no business)
+        middleware/              auth, error, logger, rate-limit, requireAuth, requireOrg
+        env.ts, logger.ts        Process-level singletons
+      modules/<context>/         One folder per bounded context
+        domain/                  Aggregates, Entities, Value Objects, Domain Events
+        application/
+          ports/                 Interfaces (repositories, services)
+          use-cases/             One file per use case (orchestrates ≥ 1 aggregate with infra)
+          services/              Pure-infra orchestration — `<Noun>Service` with N methods
+          dto/                   Zod schemas (`<verb-noun>.dto.ts`, export `<Noun>Input = z.infer<...>`)
+          event-handlers/        Side effects on domain events
+        infrastructure/
+          repositories/          Drizzle repositories
+          mappers/               Domain ↔ DB
+          services/              External services (S3, Resend) — port impls
+        routes.ts                Hono sub-app (chained route registrations)
+        module.ts                registerXxx(c, app) → DI .add() chain + app.route() mount
+      di/container.ts            Composition root: c = registerAuth(c) … .build()
+      auth.ts                    BetterAuth singleton
+      client.ts                  hcWithType (RPC client factory)
+      index.ts                   Server entry — pipeline + module registration list
   app/
     src/
-      main.tsx                 createRoot + <AppProviders />
-      routes/                  TanStack Router file-based
-        _protected.tsx         pathless gate — redirects when not authenticated
-        _guest.tsx             pathless gate — redirects when already authenticated
-      features/<area>/         workflow area (≈ application/)
-        <feature>.page.tsx     entry component (`.page` suffix non-negotiable)
-        <feature>.layout.tsx   (optional)
-        <feature>.loading.tsx  (optional) → pendingComponent
-        <feature>.error.tsx    (optional) → errorComponent
-        _components/ _forms/ _hooks/ _schemas/   private colocated
-      adapters/                api-client, auth-client, auth-broadcast, query-client, queries/, mutations/
-      providers/               provider tree (≈ di/)
-      common/                  zero-business infra (env, theme-toggle)
+      main.tsx                   createRoot + <AppProviders />
+      router/layouts.tsx         Layouts + gates exports (rootRoute, _guest, _protected, _shell, _org-scope, settings)
+      router.tsx                 Pure assembly: imports feature routes + layouts → routeTree.addChildren(...) → createRouter
+      shared/                    Cross-cutting (no business)
+        api/                     api-client, query-client, queries/, mutations/, errors/
+        auth/                    auth-client, auth-broadcast, can, use-authorization, use-set-active-org, use-sign-out, schemas/
+        components/              Cross-feature UI (app-shell, org-switcher, command-palette, …)
+        app-providers.tsx        Provider tree
+        env.ts                   Validated env
+        utils.ts                 Pure helpers (formatDate, initialsOf, displayName, toastError)
+      features/<feature>/        One folder per sub-domain (NOT per area)
+        <name>.route.tsx         Feature-owned route(s): `export const <name>Route = createRoute({ getParentRoute: () => <parent>, ... })` + co-located Page component (parent imported from `router/layouts`)
+        api/                     queries.ts + mutations.ts (options factories scoped to feature)
+        components/              Feature-private UI
+        forms/                   RHF + zodResolver
+        hooks/                   Feature-private React hooks
+        schemas/                 Zod schemas (flat .schema.ts file when single)
 packages/
   access-control               BetterAuth access-control SSOT (statements, roles, authorizeRole)
   ddd-kit                      DDD primitives
-  drizzle                      DB client + TransactionService
-  test                         shared vitest config
+  drizzle                      DB client + schemas + TransactionService
+  test                         Shared vitest config
   typescript-config            tsconfig presets
   ui                           shadcn/ui components
 ```
+
+**Code-based routing on the front (no `routes/` folder).** TanStack Router's code-based API, canonical pattern: layouts/gates exported from `apps/app/src/router/layouts.tsx` (root, `_guest`, `_protected`, `_shell`, `_org-scope`, settings layout + index); each feature defines its route as a `const` directly importing its parent — `features/<feature>/<name>.route.tsx` does `export const <name>Route = createRoute({ getParentRoute: () => <parent>, ... })`. `apps/app/src/router.tsx` is a pure assembly file (~50 lines): imports layouts + feature routes, builds `routeTree` via `addChildren()`, exports `router`. **Why factory-less**: TanStack's typing requires the parent route reference at call site (not via generic factory) for the route's full path/context to be inferred — `useSearch()` / `useRouteContext()` / `useParams()` called as `<name>Route.useSearch()` get full type-safety from the route hierarchy. Per-feature gain over file-based: feature owns gate, search-schema, beforeLoad, component, params; removing a feature = `trash features/<x>/` + remove its line in `router.tsx` `addChildren`. Codegen-free (no `routeTree.gen.ts`, no Vite plugin watcher), TanStack Start migration is near-zero refactor (Start uses code-based as canonical).
+
+**Library features (zero-route compositional bundles).** Some features exist purely to be composed by route-owning features — they ship components/forms/hooks but no `<x>.route.tsx`. Current examples: `security/` (passkeys + 2FA + sessions cards), `gdpr/` (data export + deletion cards). A *route-owning* feature MAY import from a library feature (e.g. `account/account.route.tsx` composes from `security/` and `gdpr/`); this is the one cross-feature import allowed by rule, because library features are designed for it. Library features themselves never import from other features. **Why**: forces the composition contract to flow downward (route → library), preventing cyclic feature graphs and keeping compositional pages discoverable from a single route file.
+
+**Area = layout route, not folder.** A multi-page UI shell (`/settings/*`) is a layout route in `router.tsx` with sidebar + tabs + `<Outlet />`. Children are feature-owned routes attached via `addChildren`. Never `features/<area>/` mixing area shell with sub-domain code.
+
+**Module boundary (api).** `module.ts` is the only file imported by `apps/api/src/index.ts` + `apps/api/src/di/container.ts`. Within a module, layers import inwards (`infrastructure/` → `application/` → `domain/`). Cross-module communication only via domain events or `shared/`.
+
+**Removability.** `trash modules/<context>/` (api) or `trash features/<feature>/` (app) + remove the `registerXxx(c, app)` line in api `index.ts` / the `<name>Route(parent)` line in `router.tsx` `addChildren` + remove the `export *` line in the schema barrel if the module owned tables. TS error-points the rest. No grep archeology.
 
 ## Architecture rules
 
@@ -101,18 +121,18 @@ packages/
 
 ## DI (inwire)
 
-**Type inference, no declarations.** Builder accumulates types as you `.add()`; `c` is fully typed against everything registered before — reorder a use-case before its port, `tsc` rejects. Flat container with sections grouped by bounded context (`// uploads`, `// billing`); promote a section to `apps/api/src/di/modules/<context>.module.ts` (`addModule` pattern) only when ≥ 5 use-cases *and* `container.ts` becomes hard to scan.
+**Type inference, no declarations.** Builder accumulates types as you `.add()`; `c` is fully typed against everything registered before — reorder a use-case before its port, `tsc` rejects. Composition root (`apps/api/src/di/container.ts`) chains one `registerXxx(c)` per module — each module's `module.ts` owns its `.add(...)` calls. Type inference flows end-to-end through the chain.
 
 1. **No declared types until they pay for themselves** — no `interface XxxDeps`, no `<T extends { IPort: PortType }>`, no central `types.ts`. Hand-declaring is the boilerplate inwire removes.
 2. **`AppDeps = typeof di`** after `.build()` — derived, never declared.
-3. **Use cases stay in `application/use-cases/`** (one file per use case); **application services stay in `application/services/`** (one file per service, N methods). DI is *wiring*; the use-case / service file is *implementation*.
+3. **Use cases stay in `modules/<context>/application/use-cases/`** (one file per use case); **application services stay in `modules/<context>/application/services/`** (one file per service, N methods). DI is *wiring*; the use-case / service file is *implementation*.
 4. **No barrel `index.ts`** in `di/`.
 
 ## Hono RPC (end-to-end type safety)
 
 API exports `AppType`; app consumes via `hono/client`. Routes **must be chained** to accumulate types — `app.use` / `app.onError` don't add to the typed schema. Paths mirror URL (`/uploads/presign` → `api.uploads.presign`); method `$post` / `$get`.
 
-`apps/api/package.json` has two subpath exports: `.` → `./src/index.ts` (`AppType`, server runtime); `./client` → `./src/client.ts` (`hcWithType`, pre-typed factory). Single client instance lives in `apps/app/src/adapters/api-client.ts`: `hcWithType(baseUrl, { init: { credentials: "include" }, fetch: customFetch })`. Custom fetch injects `X-Request-Id` and is the slot for future global handlers (401 redirect, token refresh, Capacitor Bearer).
+`apps/api/package.json` has two subpath exports: `.` → `./src/index.ts` (`AppType`, server runtime); `./client` → `./src/client.ts` (`hcWithType`, pre-typed factory). Single client instance lives in `apps/app/src/shared/api/api-client.ts`: `hcWithType(baseUrl, { init: { credentials: "include" }, fetch: customFetch })`. Custom fetch injects `X-Request-Id` and is the slot for future global handlers (401 redirect, token refresh, Capacitor Bearer).
 
 - **`hcWithType` from `api/client`, not inline `hc<AppType>` in the app** — `tsc` resolves `ApiClient` once, no per-callsite re-inference.
 - **Trailing-slash normalize the `baseUrl`** — `hc` drops the last segment if missing.
@@ -122,25 +142,27 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 ## App import direction
 
-`routes/` → `features/` → `adapters/` → `common/`. `providers/` bootstrap-only. No cross-feature imports, no barrels.
+`router.tsx` → `features/` → `shared/`. Provider tree bootstrapped from `shared/app-providers.tsx`. No cross-feature imports, no barrels.
 
-- `routes/` → `features/`, `common/`
-- `features/<x>/` → `adapters/`, `common/`, `@packages/*` (never other `features/`, `routes/`, `providers/`)
-- `adapters/` → `common/`
-- `providers/` → `adapters/`, `common/`, `routeTree.gen.ts`
-- `common/` → nothing internal
+- `router.tsx` → `router/layouts`, `features/<x>/<x>.route.tsx`, `shared/`
+- `router/layouts.tsx` → `shared/`, `@packages/*` (no feature imports — features import FROM here, not the reverse)
+- `features/<x>/` (route-owning) → `router/layouts`, `shared/`, `@packages/*`, `features/<library-feature>/` (a feature exposing only components/hooks — see below). Never another route-owning feature.
+- `features/<library-feature>/` (zero `<x>.route.tsx` files — e.g. `security/`, `gdpr/`) → `shared/`, `@packages/*`. Designed to be imported by composition routes; never imports from other features.
+- `shared/app-providers.tsx` → `router.tsx`, `shared/api/`, `shared/auth/`
+- `shared/<sub>/` → `shared/<sibling>/`, `shared/env.ts`, `shared/utils.ts` (no upward imports into `features/` / `router.tsx`)
 
 ## App feature anatomy
 
-Symmetry with `apps/api`: `features/` ≈ `application/`, `adapters/` ≈ `adapters/`, `providers/` ≈ `di/`, `common/` ≈ `common/`. **No `domain/` on the front** — UI domain is never pure (React deps), don't fake it.
+Symmetry with `apps/api/src/modules/<context>/`: `features/<feature>/` ≈ a back-end module's slice. **No `domain/` on the front** — UI domain is never pure (React deps), don't fake it. Sub-folders: `api/`, `components/`, `forms/`, `hooks/`. Routes (`<name>.route.tsx`) and feature-private schemas (`<feature>.schema.ts`) sit flat at feature root.
 
-**Next.js App Router naming**: `<name>.page.tsx`, `<name>.layout.tsx`, `_components/` / `_forms/` / `_hooks/` / `_schemas/` private folders. Files `kebab-case.tsx`; components `PascalCase` named exports; hooks `use-<verb>-<noun>.ts` → `useVerbNoun`; schemas `<noun>.schema.ts` → `<noun>Schema` + `<Noun>Input` (z.infer). The `.page` suffix disambiguates routes / pages / forms / cards. Default to flatten — promote `features/<area>/<feature>/` only when multi-page.
+**Naming**: Files `kebab-case.tsx`; components `PascalCase` named exports; hooks `use-<verb>-<noun>.ts` → `useVerbNoun`; schemas `<feature>.schema.ts` → `<noun>Schema` + `<Noun>Input` (z.infer). Routes: `<name>.route.tsx` exporting `<name>Route(parent)` factory + co-located Page component. **No underscore-private folders inside features** — `_components/` is a Next.js App Router convention for *route* files; feature folders aren't routes, the convention doesn't transfer.
 
-1. Page in `<feature>.page.tsx`. Components in `_components/` (flat — group only when ≥ 5 files share a concern).
-2. Hooks never call `fetch` directly — through `adapters/api-client.ts`.
-3. Schemas are zod with `z.infer` co-located.
-4. **Forms in `_forms/<action>-form.tsx`**, isolated from host (Card / Sheet / Dialog = layout only; form owns RHF state, `zodResolver`, validation, submit). Pages composable, forms reusable across hosts.
-5. Cross-feature reuse not pre-solved — extract to `packages/ui` if presentational, or promote one feature to own it.
+1. Routes at feature root: `<name>.route.tsx`. Multi-page features expose multiple route files (`auth/sign-in.route.tsx`, `auth/sign-up.route.tsx`, …). 0-route features (security, gdpr) expose only components composed elsewhere.
+2. Components in `components/` (flat — group only when ≥ 5 files share a concern).
+3. Hooks never call `fetch` directly — through `shared/api/api-client.ts`.
+4. Schemas are zod with `z.infer` co-located. Single-schema features keep flat (`features/<x>/<x>.schema.ts`); promote to `schemas/` subfolder on 2nd schema file (rule 14).
+5. **Forms in `forms/<action>-form.tsx`**, isolated from host (Card / Sheet / Dialog = layout only; form owns RHF state, `zodResolver`, validation, submit). Pages composable, forms reusable across hosts.
+6. Cross-feature reuse not pre-solved — extract to `packages/ui` if presentational, or promote one feature to own it.
 
 **Form contract**: `react-hook-form` + `zodResolver` + shadcn `Form`. Always pass `defaultValues` to `useForm` (no flash of uncontrolled). Submit via `form.handleSubmit((values) => mutation.mutate(values))` — never manual `(e) => …`.
 
@@ -154,16 +176,17 @@ Symmetry with `apps/api`: `features/` ≈ `application/`, `adapters/` ≈ `adapt
 
 | Case | Where | Form |
 |---|---|---|
-| **Query** (any read) | `adapters/queries/<noun>.ts` | `xxxQueryOptions` via `queryOptions(...)`. Consumed via `useQuery` + `ensureQueryData` in `beforeLoad`. |
-| **Mutation, cross-feature or multi-step** | `adapters/mutations/<verb>.ts` | `xxxMutationOptions` via `mutationOptions(...)`. Call site owns side-effects. |
-| **Mutation feature-specific with bundled side-effects** (toast + navigate + invalidate + broadcast, every call) | `features/<x>/_hooks/use-<verb>.ts` | Hook wrapping `useMutation`. Owns `onSuccess` / `onError`. Used by exactly one feature. |
-| **Pure React utility** | `features/<x>/_hooks/` if scoped, `adapters/` if generic | Plain hook. |
+| **Query** scoped to one feature | `features/<x>/api/<noun>.queries.ts` | `xxxQueryOptions` via `queryOptions(...)`. Consumed via `useQuery` + `ensureQueryData` in `beforeLoad`. |
+| **Query cross-feature** | `shared/api/queries/<noun>.ts` | Same shape. Promote on 2nd consumer (rule 14). |
+| **Mutation cross-feature or multi-step** | `shared/api/mutations/<verb>.ts` | `xxxMutationOptions` via `mutationOptions(...)`. Call site owns side-effects. |
+| **Mutation feature-specific with bundled side-effects** (toast + navigate + invalidate + broadcast, every call) | `features/<x>/hooks/use-<verb>.ts` | Hook wrapping `useMutation`. Owns `onSuccess` / `onError`. Used by exactly one feature. |
+| **Pure React utility** | `features/<x>/hooks/` if scoped, `shared/` if generic | Plain hook. |
 
-A hook that does only `return useMutation({ mutationFn })` is an indirection — promote to a `mutationOptions` factory. Cross-feature resource hooks extracted to `adapters/queries/` only when 2+ features need them.
+A hook that does only `return useMutation({ mutationFn })` is an indirection — promote to a `mutationOptions` factory. Cross-feature resource hooks extracted to `shared/api/queries/` only when 2+ features need them.
 
 ### `mutationOptions` cookbook
 
-`adapters/mutations/<verb-noun>.ts`, file mirrors the backend use-case, export `<verbNoun>MutationOptions`. Never prefix with `use-` — these are objects.
+Lives in `features/<x>/api/<verb-noun>.mutation.ts` (feature-scoped) or `shared/api/mutations/<verb-noun>.ts` (cross-feature). File mirrors the backend use-case; export `<verbNoun>MutationOptions`. Never prefix with `use-` — these are objects.
 
 1. **Side-effects belong to the call site** — no `toast` / `navigate` / `invalidateQueries` in the factory.
 2. **Spread, don't override**: `useMutation({ ...createXMutationOptions, onSuccess: … })`. Never mutate the exported object.
@@ -179,9 +202,9 @@ A hook that does only `return useMutation({ mutationFn })` is an indirection —
 - **Styled links / nav items**: `NavLink` from `@packages/ui/components/ui/nav-link` (variants `plain` / `pill` / `underline`, `active` flag). Primitive owns style, router owns navigation — compose via `asChild` (`<NavLink asChild variant="pill" active={isActive}><Link to="/x">…</Link></NavLink>`, same for `<Button asChild><Link …/></Button>`). Never raw `<a className="text-…">`.
 - **List bullets**: lucide icons over custom spans.
 
-## Route gates (pathless layouts)
+## Route gates (layout routes in `router.tsx`)
 
-Auth state enforced by **pathless layouts** (`_protected.tsx`, `_guest.tsx`), not per-route `beforeLoad` duplication. The `_` prefix tells TanStack Router the segment isn't part of the URL — it hosts a shared `beforeLoad`. `__root.tsx` is a passthrough (`Outlet`). Children inherit the gate (`_protected/dashboard.tsx` → `/dashboard`).
+Auth state enforced by **layout routes with `id` (no path)** defined inline in `apps/app/src/router.tsx` — `guestLayout` (id `_guest`), `protectedLayout` (id `_protected`), `shellLayout` (id `_shell`), `orgScopeLayout` (id `_org-scope`). Each owns its `beforeLoad`. Children inherit the gate by being attached via `addChildren` (`shellLayout.addChildren([dashboardRoute(shellLayout), ...])` → `/dashboard` is gated by `_protected` + `_shell`). The `_` prefix on the id is a convention to mark "no path contribution" — TanStack Router treats id-based routes as pathless naturally.
 
 **Naming by access *condition*, not feature** — `_protected` = "must be authenticated", `_guest` = "must NOT". Avoid `_auth` (ambiguous: *about* auth vs *requiring* auth).
 
@@ -189,13 +212,13 @@ Auth state enforced by **pathless layouts** (`_protected.tsx`, `_guest.tsx`), no
 
 **After auth mutations, push state into the query, then navigate.** Sign-in / verify-email / magic-link / 2FA-verify: `await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey })` (cookie is set; refetch pulls canonical shape). Sign-out: `setQueryData(..., null)` (result known). Then `void navigate({ to })`.
 
-**Token-consuming pages stay outside the gates** — `/verify-email`, `/reset-password`, `/magic-link`, `/two-factor`. Under `_guest` they'd be 302'd away the moment the token signs the user in. Token-consume effects use a `useRef(false)` guard against StrictMode double-fire (single-use tokens otherwise invalidated by the second invocation in dev).
+**Token-consuming routes stay outside the gates** — `/verify-email`, `/reset-password`, `/magic-link`, `/two-factor` attach to `rootRoute` directly, not under `guestLayout`. Under `_guest` they'd be 302'd away the moment the token signs the user in. Token-consume effects use a `useRef(false)` guard against StrictMode double-fire (single-use tokens otherwise invalidated by the second invocation in dev).
 
-**Realtime cross-tab sync via `BroadcastChannel`** — `adapters/auth-broadcast.ts` (~15 LoC, native, stable since 2017). Mutations call `broadcastAuthChange()`; `app-providers.tsx` listens once and `refetchQueries(['session','active-org','current-membership','orgs'])` + `router.invalidate()`. No payload — cookie is shared, each tab refetches live server state. Use for **any** auth/org state change (sign-in, sign-out, verify-*, 2FA, org switch / create / delete / leave / accept-invitation / role change / future impersonation).
+**Realtime cross-tab sync via `BroadcastChannel`** — `shared/auth/auth-broadcast.ts` (~15 LoC, native, stable since 2017). Mutations call `broadcastAuthChange()`; `app-providers.tsx` listens once and `refetchQueries(['session','active-org','current-membership','orgs'])` + `router.invalidate()`. No payload — cookie is shared, each tab refetches live server state. Use for **any** auth/org state change (sign-in, sign-out, verify-*, 2FA, org switch / create / delete / leave / accept-invitation / role change / future impersonation).
 
 ## Auth (BetterAuth integration)
 
-**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in a port/adapter, not registered in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*` typing). Every consumer imports `auth` directly. Client (`adapters/auth-client.ts`): one `createAuthClient` with the same plugin set; session reads via TanStack Query, not the auth-lib nanostore.
+**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in a port/adapter, not registered in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*` typing). Every consumer imports `auth` directly. Client (`shared/auth/auth-client.ts`): one `createAuthClient` with the same plugin set; session reads via TanStack Query, not the auth-lib nanostore.
 
 **Server pipeline** (in order, `index.ts`): `requestId()` → `httpLogger` → `secureHeaders()` + `cors()` → `sessionMiddleware` (calls `auth.api.getSession()` once, stores `user` / `session` on context, skips `/api/auth/*`) → `app.on(["GET","POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))` → `app.onError(errorHandler)`. Protected handlers compose `requireAuth` (reads resolved session, throws `HTTPException(401)` if absent). **Never re-call `auth.api.getSession()` per handler.**
 
@@ -217,7 +240,7 @@ Auth state enforced by **pathless layouts** (`_protected.tsx`, `_guest.tsx`), no
 
 1. **Port = pure transport.** `IStorageService` exposes only SDK-level ops (`presignUpload`, `presignDownload`, `headObject`, `deleteObject`, `publicUrlFor`). Zero business rules.
 2. **Use-cases enforce owner-scoped key** `<userId>/<scope>/<uuid>-<filename>`; download + confirm reject keys without prefix `<requestingUserId>/` (`STORAGE_FORBIDDEN`). No `throw` — return `Result<T, StorageError>`.
-3. **Validation at controller boundary** in `application/dto/*.dto.ts` (filename regex, scope regex, size cap, max TTL), consumed via `zValidator`. Use-cases trust their input.
+3. **Validation at controller boundary** in `modules/uploads/application/dto/*.dto.ts` (filename regex, scope regex, size cap, max TTL), consumed via `zValidator`. Use-cases trust their input.
 4. **Routes = thin controllers.** DI resolve → `await execute(...)` → `Result` → HTTP via central `statusFor(error)` switch (403 `STORAGE_FORBIDDEN`, 404 `STORAGE_NOT_FOUND`, 422 `STORAGE_INTEGRITY_FAILED`, 502 `STORAGE_PROVIDER_FAILURE`).
 5. **Provider-agnostic via S3 SDK config**: `region: "auto"`, `forcePathStyle: true`. Boot-time fail-hard if production endpoint is localhost or creds are default. Once a region/jurisdiction is chosen (e.g. R2 EU), buckets typically can't be moved.
 6. **Confirm mandatory**: `HeadObject`s actual size/contentType, deletes on mismatch, returns server-verified `{ key, size, contentType, publicUrl }`. Size permissive (`actual > expected` fails — undershoot OK for client-side compression); content-type strict.
@@ -332,3 +355,7 @@ Anti-patterns specific to this stack — rules above already cover the positive 
 - Implement `BaseRepository<T>` for an aggregate that carries `userId` / `organizationId` — middleware is not a substitute for a port-level invariant (rule 18). Use `ScopedRepository<T, ScopeOf<"user"|"org"|"user-in-org">>`.
 - Return `Result.fail("FORBIDDEN")` on wrong-owner reads — leaks existence of rows the caller doesn't own. Reads return `Option.none()`; writes return `NOT_FOUND`. (Rule 17.)
 - Re-create a `requireOrgOwnership` / `withOrg` style helper — removed on purpose (rule 18). Cross-org / cross-user check belongs in the repo, not in middleware or query helpers.
+- Place feature code in horizontal `domain/` / `application/` / `adapters/` folders at `apps/api/src/` root — features live in `modules/<context>/`. The horizontal layer-cake sprays one bounded context across 4 sibling folders, killing removability and discoverability.
+- Nest sub-domains under area folders (`features/<area>/<feature>/`) on the front — area = route file (TanStack Router shell), feature = top-level `features/<sub-domain>/`. Mixing them turns `<area>/_components/` into a dumping ground.
+- Use underscore-private folders inside `features/<x>/` (`_components/`, `_hooks/`, `_forms/`, `_schemas/`) — that's a Next.js App Router convention for *route* files; feature folders aren't routes, the convention doesn't transfer.
+- Reintroduce TanStack Router file-based plugin (`@tanstack/router-plugin`, `routes/` folder, `routeTree.gen.ts`) — features own their routes via `<name>.route.tsx` + factory; route tree is hand-written in `apps/app/src/router.tsx`. Codegen is the indirection we removed; bringing it back duplicates the source of truth.

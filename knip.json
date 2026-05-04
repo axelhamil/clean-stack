@@ -12,7 +12,7 @@
       "ignoreDependencies": ["pino-pretty"]
     },
     "apps/app": {
-      "entry": ["src/adapters/api-client.ts", "src/adapters/mutations/*.ts"],
+      "entry": ["src/shared/api/api-client.ts", "src/shared/api/mutations/*.ts"],
       "project": ["**/*.ts", "**/*.tsx"]
     },
     "packages/ddd-kit": {

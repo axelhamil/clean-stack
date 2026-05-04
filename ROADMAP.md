@@ -1,10 +1,10 @@
 # ROADMAP
 
-Forward-looking integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `adapters/`, `routes/`, `_hooks/`). DDD stays reserved for the pure business domain (`domain/`, `application/use-cases/`).
+Forward-looking integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `modules/<x>/infrastructure/`, `modules/<x>/routes.ts`, `features/<x>/hooks/`). DDD stays reserved for the pure business domain (`modules/<x>/domain/`, `modules/<x>/application/use-cases/`).
 
 > Already shipped (Auth, Multi-tenant, Email, Storage, App shell): see [`docs/FEATURES.md`](docs/FEATURES.md) for the inventory and [`docs/HISTORY.md`](docs/HISTORY.md) for the full architectural log.
 
-> **Priority order**: 1. **GDPR / CCPA** (in progress — compliance, ships first; boilerplate must be EU-legal day one for any clone). 2. **Feature-folder modularity** (structural refactor; every feature added after must be removable in 15 minutes, not via grep archeology — done before Billing so Billing inherits the contract). 3. Billing. 4. Feature & quota gating. 5. Admin & impersonation. 6. Audit log. 7. i18n. Each section below assumes the ones above it are in place.
+> **Priority order**: 1. **GDPR / CCPA** (compliance, ships first; boilerplate must be EU-legal day one for any clone). 2. **Vertical-slice layout** (structural refactor; every feature added after must be removable in 5 minutes, not via grep archeology — done before Billing so Billing inherits the contract). 3. Billing. 4. Feature & quota gating. 5. Admin & impersonation. 6. Audit log. 7. i18n. Each section below assumes the ones above it are in place.
 
 ---
 
@@ -38,9 +38,9 @@ The constraint **"max 1 free team org per user"** is the only quota gate enforce
 - [ ] Install `@better-auth/stripe` + the `stripe` SDK + `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_BUSINESS` in `apps/api/common/env.ts` (zod-validated)
 - [ ] `apps/api/src/billing/plans.ts` — `PLANS` const, `PlanId` type, `entitlementsForPlan(plan)` helper. Pure config, zero runtime.
 - [ ] `auth.ts`: declare `stripe()` plugin with `subscription: { enabled: true, plans, authorizeReference }`. Webhook auto-mounted at `/api/auth/stripe/webhook`. `databaseHooks.organization.create.after` defaults `metadata.plan = "free"`.
-- [ ] `requireCreateOrg` middleware (`apps/api/src/adapters/middleware/billing.middleware.ts`) composed on `auth.api.organization.create` interceptor — when user already owns ≥ 1 free non-personal org, throw 402.
+- [ ] `requireCreateOrg` middleware (`apps/api/src/modules/billing/infrastructure/middleware/billing.middleware.ts`) composed on `auth.api.organization.create` interceptor — when user already owns ≥ 1 free non-personal org, throw 402.
 - [ ] `requireSeat` middleware composed on org member-invite flow (front route or auth-plugin override).
-- [ ] `useEntitlements()` hook (`apps/app/src/adapters/hooks/use-entitlements.ts`) reading active org + plan from existing queries.
+- [ ] `useEntitlements()` hook (`apps/app/src/features/billing/hooks/use-entitlements.ts`) reading active org + plan from existing queries.
 - [ ] `/settings/billing` UI: current plan, members usage (`X / Y` with progress), `Upgrade to Pro` button → `authClient.subscription.upgrade({ plan, referenceId: orgId })` (opens Stripe Checkout), `Manage billing` button → `authClient.subscription.billingPortal({ referenceId: orgId })`.
 - [ ] **Plan picker dialog** at create-org when user already has 1 free team org — Free disabled with "Upgrade an existing org or pick Pro", Pro / Business actionable. On selection: Stripe Checkout with `referenceId: <orgId>` (org pre-created in `pending` state, plan attached on `subscription.created` webhook).
 - [ ] `<PricingTable />` component (3 tiers, currentPlan highlighted, CTA per tier).
@@ -86,9 +86,9 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 - [ ] **Ban / unban** — `authClient.admin.banUser(id, reason)` revokes all sessions and blocks future sign-in (BetterAuth handles the session invalidation). `unbanUser(id)` symmetric. Reason captured in audit log.
 - [ ] **Force password reset** — `authClient.admin.setUserPassword(id)` invalidates current sessions, sends magic-link via existing Resend template.
 - [ ] Pages in `features/admin/`: `/admin/users` (list, search, filter by org / status / role), `/admin/users/:id` (detail + actions), `/admin/orgs`, `/admin/orgs/:id`.
-- [ ] **Front gate** `routes/_admin.tsx` (pathless layout) — `beforeLoad` checks `session.user.role ∈ ["admin", "support"]`, **else 404, not 403** (don't leak the existence of `/admin/*` to non-admins).
+- [ ] **Front gate** `_admin` layout route inline in `apps/app/src/router.tsx` (id `_admin`, no path) — `beforeLoad` checks `session.user.role ∈ ["admin", "support"]`, **else 404, not 403** (don't leak the existence of `/admin/*` to non-admins).
 - [ ] **Never serve `/admin/*` from the public hostname in production** — separate subdomain (`admin.<APP_DOMAIN>`) or env-flagged. Reduces credential-stuffing surface on a known URL.
-- [ ] No new DDD here — `admin` lives in `features/admin/` (front) + `routes/admin/*` (api), guarded by `requireAdmin`. Same pragmatic shape as gating.
+- [ ] No new DDD here — `admin` lives in `features/admin/` (front) + `modules/admin/` (api), guarded by `requireAdmin`. Same pragmatic shape as gating.
 
 ---
 
@@ -133,47 +133,51 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 
 ---
 
-## Feature-folder modularity — front + back alignment for true removability
+## Vertical-slice layout — front + back alignment for true removability
 
-**Status**: ships **right after GDPR**, before Billing. Foundational refactor — every feature shipped after this section inherits the "removable in 15 minutes" contract; every feature shipped before (auth, multi-tenant, storage, gdpr) is migrated as part of this section.
+**Status**: ships **right after GDPR**, before Billing. Foundational refactor — every feature shipped after inherits the "removable in 5 minutes" contract; every feature shipped before (auth, multi-tenant, storage, gdpr) is migrated as part of this section. **Rule already documented in `CLAUDE.md` `## Layout`** — this section is the migration plan, not the design.
 
-**Why ship before Billing**: clean-stack is cloned to start *any* SaaS. Each clone keeps a different subset (a B2C product won't bill api-keys, a tool won't need members invitations, an internal app won't need marketing legal). If a feature can't be removed cleanly — `trash` one folder + remove a handful of registration lines — the clone diverges fast and the boilerplate's "shipping accelerator" promise breaks. Billing is the next big feature; it must land in a layout that's already removable, otherwise we re-pay the refactor cost on every subsequent feature.
+**Why ship before Billing**: clean-stack is cloned to start *any* SaaS. Each clone keeps a different subset (a B2C product won't bill api-keys, a tool won't need members invitations, an internal app won't need marketing legal). If a *leaf feature* can't be removed cleanly — `trash` one folder + remove a `registerXxx(c, app)` line + remove route imports — the clone diverges fast. Billing is the next big feature; it must land in vertical-slice form, otherwise we re-pay the refactor cost on every subsequent feature.
+
+**Honest scope — what is and isn't removable**:
+
+- ✅ **Leaf bounded contexts** (gdpr, billing, api-keys, audit log, admin): vertical-slice = clean removal.
+- ❌ **Cross-cutting concerns** (auth, multi-tenancy, observability, db, storage): not features, postures. Removing multi-tenancy = re-architecturing every business table's `organizationId`, ditching `ScopedRepository`, the org plugin, access-control, half the UI. No layout fixes that — it's a *clone-time* decision (future `create-clean-stack --no-multi-tenancy` CLI, or branch variants), not a `rm -rf`.
 
 **The two failure modes today**:
 
-1. **Front**: `features/<area>/` mixes *area* (UI zone with shared layout/route — `settings/`, `dashboard/`) and *feature* (functional sub-domain — `account`, `api-keys`, `billing`, `members`). Removing `api-keys` from `features/settings/_components/`, `_forms/`, `_schemas/`, `_hooks/` requires `git grep` archeology.
-2. **Back**: layout is *horizontal* (`domain/`, `application/`, `adapters/`, `routes/` at top level). A bounded context's code is sprayed across 4 sibling folders. Removing GDPR means touching `domain/gdpr*`, `application/use-cases/*-account-deletion*`, `application/dto/*deletion*`, `adapters/repositories/drizzle-gdpr*`, `routes/me.routes.ts`, `routes/internal.routes.ts`, plus DI wiring. No single-folder boundary.
+1. **Front**: `features/<area>/` mixes *area* (UI shell — `settings/`, `dashboard/`) and *feature* (sub-domain — `account`, `api-keys`, `members`). Removing `api-keys` from `features/settings/_components/`, `_forms/`, `_schemas/`, `_hooks/` requires `git grep` archeology.
+2. **Back**: horizontal layout (`domain/`, `application/`, `adapters/`, `routes/` at top level). A bounded context's code is sprayed across 4 sibling folders. Removing GDPR means touching `domain/gdpr*`, `application/use-cases/*-account-deletion*`, `application/dto/*deletion*`, `adapters/repositories/drizzle-gdpr*`, `routes/me.routes.ts`, `routes/internal.routes.ts`, plus DI wiring. No single-folder boundary.
 
-**Decided shape**:
+**Six registration sites, no more** — adding a feature touches **only** these (and removing it untouches them):
 
-- **Area ≠ Feature.** Area = UI zone (`settings/` shell with sidebar + tabs + `<Outlet />`); Feature = functional sub-domain (`account/`, `api-keys/`, `billing/`). One area can host many features; one feature can appear in multiple areas. Areas are themselves features that expose `<Outlet />` instead of content — their only job is the chrome.
-- **Front layout** — `apps/app/src/features/<sub-domain>/` flat, no `_<area>` nesting. Routes import pages from features by name. `features/settings/` becomes pure shell (layout + nav + landing). Settings sub-pages live in their own feature folder (`features/account/`, `features/api-keys/`, `features/members/`, `features/billing/`).
-- **Back layout** — `apps/api/src/features/<context>/{domain,application,adapters,routes.ts,di.ts,schema.ts}/`. Symmetry with front (`apps/api/src/features/api-keys/` ↔ `apps/app/src/features/api-keys/`). Each context owns its DDD slice.
-- **Six registration sites, no more** — adding a feature touches **only** these (and removing it untouches them):
-  1. API DI (`apps/api/src/di/container.ts`) — `c = registerXxxDi(c)`
-  2. API routes (`apps/api/src/index.ts`) — `app.route("/xxx", xxxRoutes)`
-  3. DB schema barrel (`packages/drizzle/src/schema/index.ts`) — `export * from "./xxx"`
-  4. Capability statement (`@packages/access-control`) — extend `statement` + role policies if the feature has permissions
-  5. Front nav source (`SETTINGS_TABS`, `NAVIGATION_ROUTES`) — declare `requires` + `requiresOrg`
-  6. Email template registry (if the feature emits transactional mail)
-- **Removability test (CI gate, deferred phase 2)** — script that picks a feature folder, deletes it, runs `tsc` + `lint` + the registration grep, expects all of: registration lines flagged, type errors localized to feature consumers (none in core), zero leftover `import` from outside the registration sites. Removability becomes a property the boilerplate **proves**, not just claims.
+1. API composition root (`apps/api/src/index.ts`) — `app.route("/xxx", xxxModule.routes)` (or via `registerXxxModule(app)`)
+2. API DI root (`apps/api/src/di/container.ts`) — `c = registerXxx(c)`
+3. DB schema barrel (`packages/drizzle/src/schema/index.ts`) — `export * from "./xxx"`
+4. Capability statement (`@packages/access-control`) — extend `statement` + role policies if the feature has permissions
+5. Front nav source (`SETTINGS_TABS`, `NAVIGATION_ROUTES`) — declare `requires` + `requiresOrg`
+6. Email template registry (if the feature emits transactional mail)
 
-**Migration sequence** (front first — validate convention on UI before pivoting back):
+**Migration sequence** (front first — smaller blast radius, validates naming):
 
-- [ ] **Front step 1 — define the rule in `CLAUDE.md`**: add a section "Areas vs Features" in the App feature anatomy block; document the `<Outlet />` shell pattern; mirror the inverse in `## Don't` ("nest features under areas in `features/<area>/<feature>/` — areas are shells, features live at top level").
-- [ ] **Front step 2 — split `features/settings/`**: extract `account/`, `security/`, `org-settings/` (and any other current settings sub-page) into top-level `features/<sub-domain>/`. Move pages, `_forms/`, `_schemas/`, `_hooks/`, `_components/` under their owning feature. Leave only the layout + nav + landing in `features/settings/`. Update routes under `routes/_protected/_org-scope/settings/` to import from the new feature folders. Update `SETTINGS_TABS` if the entries need re-pointing.
-- [ ] **Front step 3 — apply same split to other multi-feature areas** (`/admin/*` shell when Admin lands, any future grouped area). Validate the convention scales before locking it in.
-- [ ] **Back step 1 — pivot `apps/api/src/` to `features/<context>/`**: introduce `features/auth/`, `features/uploads/`, `features/organizations/`, `features/gdpr/` (post-merge), `features/billing/` (when it lands). Each contains its own `domain/`, `application/`, `adapters/`, `routes.ts`, `di.ts`, `schema.ts`. Move existing files; preserve git history via `git mv`.
-- [ ] **Back step 2 — replace flat DI container with `registerXxxDi(c)` per feature**: `apps/api/src/di/container.ts` becomes a composition root that calls each feature's `register*Di`. Keep inwire's type inference end-to-end — `registerXxxDi` returns the augmented container, parent composes via `.add(...)` chain (rule: no implicit registration, every `.add` is local to its feature's `di.ts`).
-- [ ] **Back step 3 — split DB schema** into `packages/drizzle/src/schema/<context>.ts` files; the barrel `index.ts` re-exports them. Each feature owns its tables. Removing a feature = remove the `export *` line + revert the migration.
-- [ ] **Update `CLAUDE.md` Layout section** to reflect the new structure (front + back). Mirror the two failure modes in `## Don't` ("place feature code in horizontal `application/`/`adapters/` folders — features live in `features/<context>/`").
-- [ ] **Removability dry-run on one feature** (probably `features/uploads/` — smallest, well-bounded) — delete it, run full CI green, document the diff in `docs/HISTORY.md` as the canonical "how to remove a feature" example.
-- [ ] **Removability CI gate (phase 2 — deferred until pattern stabilizes)**: script `scripts/check-removability.ts` that picks a random feature, snapshots, removes, type-checks, restores. Optional weekly cron in CI; promote to PR-blocking once stable.
+- [x] **Step 0 — define the rule** in `CLAUDE.md` `## Layout` + `## App import direction` + `## App feature anatomy` + `## Don't`.
+- [x] **Front step 1 — split `features/settings/`** into top-level `features/<sub-domain>/`. Underscore-private folders dropped. Account composition moved to `features/account/account.route.tsx` (composes `security/` + `gdpr/` library features).
+- [x] **Front step 2 — collapse `adapters/` + `common/` + `providers/` into `shared/`**. `shared/api/`, `shared/auth/`, `shared/components/`, `shared/app-providers.tsx`, `shared/env.ts`, `shared/utils.ts`. 4 sub-folders + 2 root files; lean.
+- [x] **Front step 3 — code-based routing** (Option C). `routes/` folder + `routeTree.gen.ts` + `@tanstack/router-plugin` deleted. Each feature exposes `<name>Route(parent)` factory in `<name>.route.tsx`; `apps/app/src/router.tsx` defines layouts/gates inline + assembles via `addChildren`. Library features (`security/`, `gdpr/`) stay route-less, composed by `account/`. Feature-scoped queries/mutations relocation to `features/<x>/api/` deferred (current `shared/api/queries+mutations/` remains pragmatic until duplication justifies the split).
+- [ ] **Back step 1 — pivot `apps/api/src/` to `modules/<context>/`**: introduce `modules/auth/`, `modules/uploads/`, `modules/organizations/`, `modules/gdpr/`, `modules/email/`. Each contains `domain/`, `application/`, `infrastructure/`, `routes.ts`, `module.ts`. Move existing files via `git mv` to preserve history. Rename `adapters/repositories/`, `adapters/mappers/`, `adapters/services/` → `infrastructure/repositories/`, `infrastructure/mappers/`, `infrastructure/services/` (DDD-canonical naming).
+- [ ] **Back step 2 — extract `shared/`**: `apps/api/src/adapters/middleware/` → `apps/api/src/shared/middleware/`; `apps/api/src/common/` → `apps/api/src/shared/`. Anything that's not a bounded context lives in `shared/`.
+- [ ] **Back step 3 — `module.ts` per context**: each module exports `registerXxx(c, app)` that does both `.add(...)` (DI) and `app.route(...)` (Hono). `apps/api/src/index.ts` calls them in order. `apps/api/src/di/container.ts` is just the build target. No more flat DI sections — registration is local to each module.
+- [ ] **Back step 4 — split DB schema**: `packages/drizzle/src/schema/<context>.ts` files (already largely the case for some — formalize), barrel `index.ts` re-exports. Each module owns its tables. Removing a module = remove the `export *` line + revert the migration.
+- [ ] **Removability dry-run** on the smallest module (probably `gdpr` since fresh in memory, or `uploads` if smaller) — delete it end-to-end, run `pnpm ci:check`, document the diff in `docs/HISTORY.md` as the canonical "how to remove a feature" example.
+- [ ] **Removability CI gate (phase 2 — deferred until pattern stabilizes)**: script `scripts/check-removability.ts` that picks a random module, snapshots, removes, type-checks, restores. Optional weekly cron in CI; promote to PR-blocking once stable.
 
 **Out of scope (deferred — rule 14)**:
 
 - Plugin manifest / runtime registry / dynamic load — explicitly rejected. Static modules with explicit registration achieve removability without the cost of indirection. Revisit only if a clone needs *runtime* feature toggling (different SKUs same codebase), which is a different problem.
-- Splitting `@packages/ui` per feature — the UI package stays shared; feature-folders are an *app-level* concern, not a package-level one.
+- Workspace package per feature (`packages/feature-billing/`) — extra workspace overhead for a benefit (physical boundary) already met by directory + `eslint-plugin-boundaries` (deferred phase 2).
+- `eslint-plugin-boundaries` rules enforcing cross-module isolation — added once the module pattern has settled (premature otherwise; tweaking rules + layout simultaneously is double pain).
+- `create-clean-stack` CLI for clone-time variant selection (no-multi-tenancy, no-storage, etc.) — phase 2 once the boilerplate has 3+ adopters asking for it. README documents the manual variant for now.
+- Splitting `@packages/ui` per feature — the UI package stays shared; module pivot is an *app-level* concern.
 
 ---
 
@@ -317,9 +321,9 @@ apps/site/
 
 ## Cross-cutting rules
 
-1. **No DDD for these integrations** — `adapters/services/*` on the api side, `adapters/*` + `_hooks/*` on the app side. If a concept becomes domain (e.g. a `Subscription` with its own rules), promote it into `domain/` then.
-2. **Env validated by zod** in `apps/api/common/env.ts` and `apps/app/src/common/env.ts`.
-3. **Webhooks**: all under `routes/webhooks/<provider>.ts`, mandatory signature verification before any processing.
+1. **No DDD for these integrations** — `modules/<context>/infrastructure/services/*` on the api side, `features/<x>/hooks/*` + `shared/api/` on the app side. If a concept becomes domain (e.g. a `Subscription` with its own rules), promote it into `modules/<context>/domain/` then.
+2. **Env validated by zod** in `apps/api/common/env.ts` (api side, pending migration to `apps/api/src/shared/env.ts`) and `apps/app/src/shared/env.ts` (app side).
+3. **Webhooks**: live in the owning module's `routes.ts` (`modules/<context>/routes.ts` exposes `POST /webhooks/<provider>`), mandatory signature verification before any processing.
 4. **Secrets**: never committed, `.env.local` (gitignored) + 1Password/Doppler in production.
 
 ---

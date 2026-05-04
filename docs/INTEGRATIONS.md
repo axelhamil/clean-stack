@@ -19,7 +19,7 @@ references them by ID. Each template must exist with the exact variables the
 codebase passes — Resend returns a 422 on mismatch.
 
 Template IDs live in a single hashmap at the top of
-`apps/api/src/adapters/services/email.service.ts` (`TEMPLATE_IDS`). Edit it
+`apps/api/src/modules/email/infrastructure/services/email.service.ts` (`TEMPLATE_IDS`). Edit it
 once when cloning. They aren't secrets — just opaque dashboard handles — so
 keeping them in code is simpler than 8 env vars.
 
@@ -40,7 +40,8 @@ keeping them in code is simpler than 8 env vars.
 
 - **Variable names are case-sensitive** and must match the table above
   exactly. The single source of truth is `EmailTemplates` in
-  `apps/api/src/application/ports/email.port.ts`.
+  `apps/api/src/modules/email/application/ports/email.port.ts` (post-migration ;
+  currently lives in `apps/api/src/application/ports/email.port.ts` until back step 1 lands).
 - **All URLs** point at `APP_URL` (the front), never the API. The server hooks
   build them; the front consumes the token.
 - **Brand the visible label**, never embed the raw URL — Outlook/Gmail
@@ -96,7 +97,7 @@ K8s CronJob, Inngest, BullMQ) are in [`CRON.md`](./CRON.md). Pick by infra:
 
 Each new business job follows the same pattern:
 
-1. Add an internal endpoint under `apps/api/src/routes/internal.routes.ts`.
+1. Add an internal endpoint under `apps/api/src/modules/<context>/routes.ts (internal sub-app)`.
 2. Document it in [`CRON.md`](./CRON.md) and in the table above.
 3. Wire it in your chosen scheduler.
 
@@ -208,7 +209,7 @@ These aren't blockers for launch but pay off quickly:
 ## TL;DR — pre-production checklist
 
 - [ ] 8 Resend templates created with exact variable names; IDs filled in
-      `TEMPLATE_IDS` in `apps/api/src/adapters/services/email.service.ts`
+      `TEMPLATE_IDS` in `apps/api/src/modules/email/infrastructure/services/email.service.ts`
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC) — green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`

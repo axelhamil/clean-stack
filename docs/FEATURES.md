@@ -17,9 +17,9 @@ End-to-end authentication on Bun + Hono, no hacks.
 - **Active sessions** — list & revoke from `/settings/account` (`sessions-card`).
 - **Bearer tokens** alongside cookies — web stays cookie-based (httpOnly, XSS-safe), Capacitor uses bearer.
 - **Session cookie cache** (5 min signature-only check; DB is source of truth at expiry → instant revoke).
-- **Cross-tab sync** via `BroadcastChannel` (`adapters/auth-broadcast.ts`) — sign-in / sign-out / verify / 2FA / org change refetch live in every tab.
+- **Cross-tab sync** via `BroadcastChannel` (`shared/auth/auth-broadcast.ts`) — sign-in / sign-out / verify / 2FA / org change refetch live in every tab.
 - **Token-consuming routes** outside the auth gate (`/verify-email`, `/reset-password`, `/magic-link`, `/two-factor`, `/accept-invitation/$invitationId`) with StrictMode-safe `useRef` guard against single-use token re-fire.
-- **Pathless route gates** (`_protected` / `_guest`) — auth state read once via `ensureQueryData(sessionQueryOptions)` in `beforeLoad`.
+- **Layout route gates** (`_protected` / `_guest`) inline in `apps/app/src/router.tsx` — auth state read once via `ensureQueryData(sessionQueryOptions)` in `beforeLoad`.
 
 Pages shipped: `sign-in`, `sign-up`, `verify-email`, `forgot-password`, `reset-password`, `magic-link`, `two-factor`.
 
@@ -37,7 +37,7 @@ Org-scoped from the very first migration. Migrating single-user → multi-tenant
   - Route gate: `ensureOrgPermission(perms)` in `beforeLoad`.
   - UI: `<Can requires={...} fallback={...}>` + `useAuthorization().can()`.
 - **Owner transfer** — `transferAndLeaveMutationOptions` for last-owner-leaves flow.
-- **Dev-only `<AuthorizationDevTool>`** — live capability matrix per role (mounted in `__root.tsx`, tree-shaken in prod).
+- **Dev-only `<AuthorizationDevTool>`** — live capability matrix per role (mounted by the app shell, tree-shaken in prod).
 - **`NO_ACTIVE_ORGANIZATION` → `null`** at the query layer (transient state, not error).
 
 ## Email — Resend ✅
@@ -56,7 +56,7 @@ Server is blind during the upload — three-step flow `presign` → `PUT` direct
 - **Provider-agnostic** S3 SDK config (`region: "auto"`, `forcePathStyle: true`). Boot-time fail-hard on localhost endpoint or default creds in production.
 - **Owner-scoped keys** — `<userId>/<scope>/<uuid>-<filename>`. Download + confirm reject keys without `<requestingUserId>/` prefix (`STORAGE_FORBIDDEN`).
 - **Confirm mandatory** — server `HeadObject` validates size/contentType, deletes on mismatch, returns server-verified `{ key, size, contentType, publicUrl }`.
-- **Validation at controller** (`application/dto/*.dto.ts`): filename regex, scope regex, size cap, max TTL.
+- **Validation at controller** (`modules/uploads/application/dto/*.dto.ts`): filename regex, scope regex, size cap, max TTL.
 - **Multi-step factory** — `createUploadMutationOptions` resolves only after `confirm` succeeds; UI never sees "maybe uploaded" intermediate state.
 - **Why three steps**: providers like R2 don't support Presigned POST policies (no `content-length-range`, verified 2026). PUT presigned + `confirm` is the correct shape.
 - **Use-cases shipped**: `create-upload-url`, `confirm-upload`, `create-download-url`. Routes: `POST /uploads/presign`, `POST /uploads/confirm`, `POST /uploads/download`.
@@ -72,7 +72,7 @@ Server is blind during the upload — three-step flow `presign` → `PUT` direct
 
 ## App — Vite + React 19 + TanStack ✅
 
-- **TanStack Router** (file-based, prefetch, view transitions).
+- **TanStack Router code-based** — features own their routes via `<name>.route.tsx` factories assembled in a single hand-written `apps/app/src/router.tsx`. No `routes/` folder, no `routeTree.gen.ts`, no Vite plugin watcher; TanStack Start migration is near-zero refactor.
 - **TanStack Query** for all server state — session, active org, current membership, orgs list. Mutations via `mutationOptions` factories (call-site owns side-effects); hook wrappers only when side-effects always fire.
 - **Forms**: `react-hook-form` + `@hookform/resolvers/zod` + shadcn `Form`. Mandatory `defaultValues`, never manual submit handlers.
 - **Schema split** loose vs strict — same field validated differently in capture (sign-in) vs creation (sign-up / reset).
