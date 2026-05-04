@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { CreateOrgForm } from "./_forms/create-org-form";
+import { CreateOrgForm } from "./forms/create-org-form";
 
 export function CreateOrgPage() {
   return (

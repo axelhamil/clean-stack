@@ -1,14 +1,13 @@
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { Link } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { useVerifyEmail } from "./_hooks/use-verify-email";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { useVerifyEmail } from "./hooks/use-verify-email";
 
-interface VerifyEmailPageProps {
-  token?: string;
-}
+const route = getRouteApi("/verify-email");
 
-export function VerifyEmailPage({ token }: VerifyEmailPageProps) {
+export function VerifyEmailPage() {
+  const { token } = route.useSearch();
   return <main>{token ? <ConsumeToken token={token} /> : <CheckInbox />}</main>;
 }
 

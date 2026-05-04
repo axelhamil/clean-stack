@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { EmailRequestForm } from "./_forms/email-request-form";
-import { useForgotPassword } from "./_hooks/use-forgot-password";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { EmailRequestForm } from "./forms/email-request-form";
+import { useForgotPassword } from "./hooks/use-forgot-password";
 
 export function ForgotPasswordPage() {
   const mutation = useForgotPassword();

@@ -1,14 +1,23 @@
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { Link } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { useVerifyMagicLink } from "./_hooks/use-verify-magic-link";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { useVerifyMagicLink } from "./hooks/use-verify-magic-link";
 
-interface MagicLinkPageProps {
+const route = getRouteApi("/magic-link");
+
+export function MagicLinkPage() {
+  const { token } = route.useSearch();
+  if (!token) return null;
+
+  return <ConsumeToken token={token} />;
+}
+
+interface ConsumeTokenProps {
   token: string;
 }
 
-export function MagicLinkPage({ token }: MagicLinkPageProps) {
+function ConsumeToken({ token }: ConsumeTokenProps) {
   const mutation = useVerifyMagicLink();
   const fired = useRef(false);
 

@@ -1,12 +1,13 @@
-import { Link } from "@tanstack/react-router";
-import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { ResetPasswordForm } from "./_forms/reset-password-form";
+import { getRouteApi, Link } from "@tanstack/react-router";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { ResetPasswordForm } from "./forms/reset-password-form";
 
-interface ResetPasswordPageProps {
-  token: string;
-}
+const route = getRouteApi("/reset-password");
 
-export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
+export function ResetPasswordPage() {
+  const { token } = route.useSearch();
+  if (!token) return null;
+
   return (
     <main>
       <AuthShell

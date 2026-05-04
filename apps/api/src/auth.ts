@@ -7,10 +7,10 @@ import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
-import { env } from "../common/env";
-import { logger } from "../common/logger";
-import type { EmailTemplates, TemplateVariables } from "./application/ports/email.port";
-import { di } from "./di/container";
+import { di } from "./container";
+import { env } from "./shared/env";
+import { logger } from "./shared/logger";
+import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
 const isProd = env.NODE_ENV === "production";
 

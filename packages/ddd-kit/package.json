@@ -51,7 +51,6 @@
     }
   },
   "devDependencies": {
-    "@packages/drizzle": "workspace:*",
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "@types/node": "^25.6.0",

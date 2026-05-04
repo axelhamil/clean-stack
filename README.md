@@ -4,7 +4,7 @@
 
 Bun + Hono on the API · Vite + React 19 + TanStack on the app · Drizzle + Postgres at the bottom · DDD-kit for the business domain · BetterAuth + Resend + R2 for the SaaS layer.
 
-See [`docs/FEATURES.md`](docs/FEATURES.md) for what ships today and [`ROADMAP.md`](ROADMAP.md) for what's next (GDPR/CCPA → Billing → Gating → Admin → Audit log → i18n).
+See [`docs/FEATURES.md`](docs/FEATURES.md) for what ships today and [`ROADMAP.md`](ROADMAP.md) for what's next (RGPD/CCPA → Billing → Gating → Admin → Audit log → i18n).
 
 ## Lean by design
 
@@ -35,7 +35,7 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 |---|---|
 | **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
 | **API** | Hono 4 on native `Bun.serve()` (~7 ms cold prod build) |
-| **App** | Vite 8 · React 19 · TanStack Router (file-based, prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
+| **App** | Vite 8 · React 19 · TanStack Router (code-based, route-level code-splitting, intent prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
 | **Forms** | react-hook-form + `@hookform/resolvers/zod` 4 + shadcn `Form` |
 | **Auth** | BetterAuth + plugins `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
 | **Access control** | `@packages/access-control` SSOT (statements, roles, `authorizeRole`) consumed by server, route gates and UI |
@@ -47,19 +47,93 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 | **DI** | inwire (modules per bounded context) |
 | **Theme** | `next-themes` + View Transitions API circle reveal |
 | **Tooling** | pnpm 10 · Turborepo TUI · Biome 2 · Husky · commitlint · semantic-release · knip · jscpd |
-| **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, GDPR/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
+| **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, RGPD/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
 
-## Quick start
+## 5-minute clone tutorial
+
+From zero to your first business feature, end-to-end. Everything below assumes Bun 1.3+, Node 24+, pnpm 10, Docker.
+
+### 1. Bootstrap (60 sec)
 
 ```bash
-git clone https://github.com/axelhamil/clean-stack && cd clean-stack
+git clone https://github.com/axelhamil/clean-stack my-saas && cd my-saas
 pnpm install
-docker compose up -d         # Postgres 17 (port 5433) + MinIO (9000/9001)
-pnpm db:push                 # push schemas (auth + business)
-pnpm dev                     # API + App in parallel (Turbo TUI)
+cp .env.example .env                    # default values work for local dev
+docker compose up -d                    # Postgres 17 (port 5433) + MinIO (9000/9001)
+pnpm db:push                            # apply auth + business schemas
+pnpm dev                                # API on :3000, App on :5173 (Turbo TUI)
 ```
 
-Scoped dev:
+Open `http://localhost:5173` → sign up with any email → BetterAuth creates your user + a Personal org + a session. You're now in the app.
+
+### 2. Adopt the boilerplate (60 sec)
+
+```bash
+# rename the project
+sed -i 's|axelhamil/clean-stack|<your-org>/<your-repo>|g' README.md package.json
+
+# wipe history if you want a fresh start
+rm -rf .git && git init && git add . && git commit -m "init from clean-stack"
+```
+
+### 3. Trim what you don't need (60 sec)
+
+The boilerplate ships features you may not want. Removability is **5 minutes per feature** :
+
+```bash
+# don't need RGPD (e.g. you're not in EU)?
+trash apps/app/src/features/rgpd           # the front bundle (cards, forms, hooks)
+# remove its 2 imports in apps/app/src/features/account/account.page.tsx
+# (TS will scream, just delete the <DataExportCard /> + <RgpdDeletionCard /> lines)
+
+# don't need billing?
+trash apps/app/src/features/billing        # the route disappears
+# remove `billingRoute` from apps/app/src/router.tsx addChildren
+# remove `/settings/billing` entry from SETTINGS_TABS in shared/components/contextual-tabs.tsx
+
+# don't need uploads?
+trash apps/api/src/modules/uploads
+# remove `uploadsModule` registration from apps/api/src/container.ts
+# remove `app.route("/uploads", uploadsRoutes)` from apps/api/src/index.ts
+```
+
+`trash` is `gio trash` (recoverable). `pnpm type-check` will list every consumer of the deleted code — fix until green.
+
+### 4. Add your first business feature (90 sec)
+
+```bash
+# back: a new module
+mkdir -p apps/api/src/modules/notes/{domain,application/{services,ports,dto},infrastructure/{repositories,mappers}}
+# write your aggregate in domain/note.aggregate.ts (use ddd-kit primitives — Aggregate, ValueObject)
+# write port + service + drizzle repo + dto
+# expose `routes.ts` with /api/notes/* + `module.ts` with `defineModule()(...)` (inwire Pinia-style)
+# wire in apps/api/src/container.ts (`.addModule(notesModule)`) and apps/api/src/index.ts (`.route("/notes", notesRoutes)`)
+
+# DB:
+echo "// notes table" >> packages/drizzle/src/schema/notes.ts
+echo "export * from './notes';" >> packages/drizzle/src/schema/index.ts
+pnpm db:push
+
+# front: a new feature folder
+mkdir -p apps/app/src/features/notes/{components,forms,hooks}
+# write notes.route.tsx + co-located NotesPage component
+# wire in apps/app/src/router.tsx (one line in addChildren)
+```
+
+End-to-end typed via Hono RPC: the route file imports `api.notes.$post({...})` and TS knows the input/output shape.
+
+### 5. Ship (30 sec)
+
+```bash
+pnpm ci:check                           # Biome CI mode (pre-push runs the full pipeline: + type-check, knip, jscpd)
+git checkout -b feat/notes
+git add . && git commit -m "feat(api): add notes aggregate + module"
+gh pr create --base dev                 # feat → dev (squash OK) ; dev → main MUST stay a merge commit so semantic-release sees every conventional commit
+```
+
+Total: ~5 min from `git clone` to your first business feature shipped. The stack stays out of the way — you write business logic, everything else is settled.
+
+### Scoped dev (anytime)
 
 ```bash
 pnpm dev --filter=api
@@ -68,27 +142,32 @@ pnpm dev --filter=app
 
 ## Layout
 
+Vertical slice on both sides. Back: one folder per bounded context with its own DDD layers. Front: code-based routing — each feature owns a `<name>.route.tsx` + `<name>.page.tsx` pair (the page is code-split as a lazy chunk). Routes are assembled in a single `apps/app/src/router.tsx`. No `routes/` folder, no codegen.
+
 ```
 apps/
   api/                       Hono on Bun
     src/
-      domain/                Aggregates, Entities, Value Objects, Domain Events
-      application/           Use cases, ports, DTOs, event handlers
-      adapters/              Middlewares, repositories, services (auth, email, storage)
-      routes/                Hono routes (incl. /api/auth/*, signed webhooks)
-      di/                    inwire container (flat; AppDeps = typeof di)
-  app/                       Vite + React (routes → features → adapters → common)
+      shared/                Cross-cutting: middleware, env, logger
+      modules/<context>/     One folder per bounded context (rgpd, uploads, …)
+        domain/              Aggregates, Entities, Value Objects, Domain Events
+        application/         Use cases, ports, services, DTOs, event handlers
+        infrastructure/      Drizzle repositories, mappers, port impls (S3, Resend)
+        routes.ts            Hono sub-app (chained `.route()` accumulates AppType)
+        module.ts            `defineModule()(...)` — inwire Pinia-style DI augmentation
+      container.ts           Composition root (`.add(...)` cross-cutting + `.addModule(...)` per context)
+      auth.ts                BetterAuth singleton
+      index.ts               Server entry — pipeline + module registration list
+  app/                       Vite + React (router.tsx → features → shared)
     src/
-      routes/                TanStack Router file-based
-        _protected.tsx       pure auth gate (passthrough Outlet)
-        _protected/_shell.tsx  shell layout (header, command palette, devtool)
-      features/<x>/          page.tsx + _components/ + _forms/ + _hooks/ + _schemas/
-      adapters/              api-client (Hono RPC), auth-client, auth-broadcast, query-client, queries/, mutations/, hooks/, components/, schemas/, route-helpers/
-      providers/             Provider tree (next-themes, query, router)
-      common/                env, format, theme-toggle, is-personal-org, initials
+      main.tsx               createRoot + <AppProviders />
+      router/layouts.tsx     rootRoute + layout/gate exports (_guest, _protected, _shell, _org-scope, settings)
+      router.tsx             Pure assembly: imports feature routes + layouts → routeTree.addChildren(...) → createRouter
+      features/<x>/          <name>.route.tsx + <name>.page.tsx (code-split chunk) + components/, forms/, hooks/, schema
+      shared/                Cross-cutting: api/, auth/, components/, env.ts, app-providers.tsx, utils.ts
 packages/
   access-control             BetterAuth access-control SSOT (statements, roles, authorizeRole)
-  ddd-kit                    DDD primitives + AppErrorException
+  ddd-kit                    DDD primitives (Result, Option, Aggregate, ScopedRepository, …)
   drizzle                    DB client + TransactionService + schemas
   test                       Shared Vitest config
   typescript-config          Shared tsconfig presets

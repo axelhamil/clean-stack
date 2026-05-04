@@ -6,14 +6,14 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
-import { type DisplayUser, displayName } from "../../common/display-name";
+import { getRouteApi } from "@tanstack/react-router";
+import { displayName } from "../../shared/utils";
 
-interface DashboardPageProps {
-  user: DisplayUser;
-}
+const route = getRouteApi("/_protected/_shell/dashboard");
 
-export function DashboardPage({ user }: DashboardPageProps) {
-  const firstName = displayName(user).split(" ")[0];
+export function DashboardPage() {
+  const { user } = route.useRouteContext();
+  const firstName = displayName(user).split(" ")[0] ?? "";
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">

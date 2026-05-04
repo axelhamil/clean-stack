@@ -9,15 +9,14 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { sessionQueryOptions } from "../../adapters/queries/session";
-import { useAcceptInvitation } from "./_hooks/use-accept-invitation";
+import { getRouteApi, Link } from "@tanstack/react-router";
+import { sessionQueryOptions } from "../../shared/api/queries/session";
+import { useAcceptInvitation } from "./hooks/use-accept-invitation";
 
-export interface AcceptInvitationPageProps {
-  invitationId: string;
-}
+const route = getRouteApi("/accept-invitation/$invitationId");
 
-export function AcceptInvitationPage({ invitationId }: AcceptInvitationPageProps) {
+export function AcceptInvitationPage() {
+  const { invitationId } = route.useParams();
   const { data: session } = useQuery(sessionQueryOptions);
   const mutation = useAcceptInvitation();
 

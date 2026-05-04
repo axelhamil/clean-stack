@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { SignUpForm } from "./_forms/sign-up-form";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { SignUpForm } from "./forms/sign-up-form";
 
 export function SignUpPage() {
   return (

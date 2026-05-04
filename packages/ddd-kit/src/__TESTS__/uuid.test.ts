@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UUID } from "../primitives/uuid";
-import { StubId } from "./stubs/uuidStub";
+import { StubId } from "./stubs/uuid-stub";
 
 describe("UUID", () => {
   describe("constructor", () => {

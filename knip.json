@@ -3,16 +3,18 @@
   "workspaces": {
     "apps/api": {
       "entry": [
-        "src/di/container.ts",
-        "src/adapters/middleware/*.ts",
-        "common/**/*.ts",
-        "scripts/**/*.ts"
+        "src/container.ts",
+        "src/shared/middleware/*.ts",
+        "src/shared/internal-fetch.ts",
+        "src/modules/*/module.ts",
+        "src/modules/*/routes.ts",
+        "src/modules/*/internal.routes.ts"
       ],
       "project": ["**/*.ts"],
       "ignoreDependencies": ["pino-pretty"]
     },
     "apps/app": {
-      "entry": ["src/adapters/api-client.ts", "src/adapters/mutations/*.ts"],
+      "entry": ["src/shared/api/api-client.ts", "src/shared/api/mutations/*.ts"],
       "project": ["**/*.ts", "**/*.tsx"]
     },
     "packages/ddd-kit": {
@@ -20,6 +22,9 @@
       "ignore": ["**/stubs/**"]
     },
     "packages/drizzle": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/access-control": {
       "project": ["src/**/*.ts"]
     },
     "packages/ui": {
@@ -32,7 +37,6 @@
   },
   "ignoreDependencies": [
     "@packages/ddd-kit",
-    "@packages/drizzle",
     "@packages/test",
     "@packages/typescript-config",
     "lint-staged",

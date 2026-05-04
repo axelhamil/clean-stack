@@ -1,18 +1,19 @@
-import { AuthShell } from "./_components/auth-shell";
-import { TwoFactorForm } from "./_forms/two-factor-form";
+import { getRouteApi } from "@tanstack/react-router";
+import { AuthShell } from "./components/auth-shell";
+import { TwoFactorForm } from "./forms/two-factor-form";
 
-interface TwoFactorPageProps {
-  redirectTo?: string;
-}
+const route = getRouteApi("/two-factor");
 
-export function TwoFactorPage({ redirectTo }: TwoFactorPageProps = {}) {
+export function TwoFactorPage() {
+  const { redirect } = route.useSearch();
+
   return (
     <main>
       <AuthShell
         title="Two-factor authentication"
         description="Enter the 6-digit code from your authenticator app."
       >
-        <TwoFactorForm redirectTo={redirectTo} />
+        <TwoFactorForm redirectTo={redirect} />
       </AuthShell>
     </main>
   );

@@ -1,16 +1,15 @@
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { Separator } from "@packages/ui/components/ui/separator";
-import { Link } from "@tanstack/react-router";
-import { AuthShell, AuthShellFooter } from "./_components/auth-shell";
-import { EmailRequestForm } from "./_forms/email-request-form";
-import { SignInForm } from "./_forms/sign-in-form";
-import { useMagicLink } from "./_hooks/use-magic-link";
+import { getRouteApi, Link } from "@tanstack/react-router";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { EmailRequestForm } from "./forms/email-request-form";
+import { SignInForm } from "./forms/sign-in-form";
+import { useMagicLink } from "./hooks/use-magic-link";
 
-interface SignInPageProps {
-  redirectTo?: string;
-}
+const route = getRouteApi("/_guest/sign-in");
 
-export function SignInPage({ redirectTo }: SignInPageProps = {}) {
+export function SignInPage() {
+  const { redirect } = route.useSearch();
   const magicLinkMutation = useMagicLink();
 
   return (
@@ -23,7 +22,7 @@ export function SignInPage({ redirectTo }: SignInPageProps = {}) {
         }
         className="flex flex-col gap-6"
       >
-        <SignInForm redirectTo={redirectTo} />
+        <SignInForm redirectTo={redirect} />
 
         <NavLink asChild className={"w-fit ml-auto"}>
           <Link to="/forgot-password">Forgot password?</Link>
