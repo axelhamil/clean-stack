@@ -2,129 +2,104 @@
 
 Each module is a vertical slice. Removable in minutes via a documented contract. Cross-cutting ports stay in `shared/ports/` with NoOp adapters always shipped, so dropping a module never breaks call sites — they fall through to no-op silently.
 
-This file doubles as the **commercial sheet**: every module is priced individually (à la carte) and bundled into tiers. Pricing is anchored to what other SaaS boilerplates charge in 2026 (ShipFast €199, Makerkit €199-999, Supastarter €299-1499, Bullet Train €999-1499, SaaS Pegasus €295-995). clean-stack sits in the upper half because of the architecture quality (BetterAuth + multi-tenant from day one + DDD-kit + RGPD core + monorepo Turbo + AI-pair sub-CLAUDE.md), but stays grounded — no €15k tag on a 0-business-logic boilerplate.
+This file doubles as a **client-facing value sheet**. Each module is priced as "what a senior dev team would charge to spec, build, test, document, and harden it from scratch on a client engagement." Prices are anchored to French/EU senior-dev daily rates (€600–1 200/day TJM) × the realistic time-to-ship a production-grade, removable, future-proof implementation. They are NOT the price of the boilerplate itself — that's a separate one-time license model (see bottom of file).
 
-## Tier bundles
+**Use case for these prices**: when proposing a project, you can show a line-by-line value breakdown. The client sees that the boilerplate already delivers €X of plumbing on day zero — your invoice is for the remaining business logic, not for re-building auth + multi-tenant + storage from scratch.
 
-| Tier | Price | Includes |
+## Pricing principle
+
+- **Lower bound** = what a competent senior dev / small studio would charge if commissioned to deliver this module **alone** with the same architecture quality (port + adapter, removable, tested, documented).
+- **Upper bound** = what an enterprise consultancy (Theodo, OCTO, Zenika) would invoice for the same scope with formal specs, design reviews, and SOW.
+
+The point isn't to bill these prices — it's to make the value visible. clean-stack's competitive moat is that it ships this stack in hours instead of months.
+
+---
+
+## Shipped modules — value already in the box (v2.0+)
+
+| Module | Value delivered | Notes |
 |---|---|---|
-| **Starter** | **€299** | Core: auth, multi-tenant, access-control, email, storage, RGPD, UI primitives, monorepo tooling, App shell |
-| **Pro** | **€799** | Starter + Observability stack (0.4) + Billing (B.1) |
-| **Business** | **€1499** | Pro + Admin & impersonation (C.3) + Audit log (C.2) + Security perimeter (C.1) + PATs (C.4) + Webhooks (C.5) |
-| **Enterprise** | **€2999** | Business + SSO/SAML/SCIM (C.7) + Status page + SLO dashboards (D.1) + SOC2 readiness docs (D.4) |
+| **Auth complet** (BetterAuth singleton, 2FA, passkeys, magic-link, bearer mobile-ready, email-and-password, mandatory verification, customSession with org role) | **€4 000 – €7 000** | 1-2 weeks senior dev. Includes Bun-native wiring (no Node shim), template-driven email hooks, idempotency keys, `auth.$Infer.Session` typing kept end-to-end. |
+| **Multi-tenant + access-control SSOT** (organization plugin, Personal org auto-creation/self-heal, capability-based predicate mirrored api/route/UI, `requireOrgPermission`, `<Can>`, `useAuthorization`) | **€3 500 – €6 000** | Multi-tenant from day one is the most expensive class of refactor when retrofitted. Already shipped, schema-locked. |
+| **Email** (Resend port + adapter, template registry typed, idempotency keys, retry, provider-side suppression, EU region option documented) | **€1 500 – €2 500** | Includes the SPF/DKIM/DMARC deploy doc + Google/Yahoo Feb 2024 mandates note. |
+| **Storage S3-compatible** (R2 prod / MinIO dev, three-step presign→PUT→confirm, owner-scoped key prefix, server-verified `HeadObject` on confirm, boot-time fail-hard) | **€3 000 – €5 000** | Three-step is non-negotiable on R2 (no Presigned POST). Confirm is the actual enforcement gap that 80% of boilerplates ignore. |
+| **RGPD complet** (Art. 17 erasure with 7-day grace + Art. 20 portability + 2FA-gated deletion + sole-owner preflight check + automated cron sweep + `/legal/data-rights` page Art. 13/14) | **€6 000 – €10 000** | Single most valuable module for EU clientele. The legal + UX + state-machine + cron is ~2-3 weeks of senior work. EU-deployable on signature. |
+| **DDD-kit primitives** (Result, Option, Entity, Aggregate, ValueObject, UUID, WatchedList, BaseRepository, ScopedRepository, RepoScope, IUnitOfWork, BaseDomainEvent, EventDispatcher, AppErrorException) | **€4 000 – €7 000** | 263 vitest cases. Zero external runtime deps. Used by every application layer in the project. |
+| **UI shadcn-pure + theme** (full shadcn registry + custom primitives `NavLink`, `BrandLink`, `TextLink`, `ListRow`, `FormTextField`, `FormCheckboxField`, `DestructiveActionDialog`, `BackupCodeList`, `QrCodeFrame` + view-transitions theme toggle + typography exports) | **€2 500 – €4 000** | Shadcn purity discipline (no `className` color drift, slots respected, `data-slot` on every primitive) is what differentiates a usable design system from a Tailwind soup. |
+| **App shell** (Vite 8 + React 19 + TanStack Router code-based with lazy chunks + intent prefetch + view transitions + AppProviders + pathless gates `_guest`/`_protected`/`_shell`/`_org-scope` + settings layout + command palette ⌘K + org switcher + theme toggle + auth devtool) | **€4 500 – €7 500** | Code-based routing without `routeTree.gen.ts`, the 2-file `lazyRouteComponent` pattern, and the gate hierarchy are 1-2 weeks of work most teams skip and end up with a giant `router.tsx`. |
+| **Monorepo tooling** (pnpm 10 + Turborepo TUI with `with: ["type-check"]` + Biome 2 strict + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push pipeline) | **€2 500 – €4 000** | Setting this up properly takes a week and most projects never bother. Pre-push enforces it; CI is green by construction. |
+| **AI-pair ready** (`CLAUDE.md` root + sub-CLAUDE.md per layer auto-loaded by Claude Code + `docs/HISTORY.md` architectural log + `docs/CRON.md` + `docs/INTEGRATIONS.md` + `docs/FEATURES.md`) | **€2 000 – €4 000** | Unique on the 2026 boilerplate market. The sub-CLAUDE.md system means an AI agent picks up project rules instantly — saves dozens of hours of onboarding/correction across the project lifetime. |
 
-All tiers ship as a single repo. Lifetime updates included up to the next major SemVer (currently v2.x). Commercial license, unlimited projects per buyer.
-
-## À la carte modules
-
-Buy any module standalone if the Starter base is enough but a specific Phase-B/C/D piece is missing. Prices reflect implementation depth + ongoing maintenance, not the 5-min wiring time on the buyer's end.
-
-| Module | Phase | Price | Status |
-|---|---|---|---|
-| Observability stack (Sentry + OTel + Prometheus, removable) | 0.4 | **€149** | planned |
-| Billing (Stripe + customer portal + webhooks idempotents + dunning) | B.1 | **€299** | planned |
-| Feature & quota gating | B.2 | **€99** | planned |
-| Security perimeter (rate-limit + CSP + CSRF) | C.1 | **€149** | planned |
-| Audit log (append-only event trail) | C.2 | **€99** | planned |
-| Admin & impersonation | C.3 | **€199** | planned |
-| API tokens / PATs | C.4 | **€99** | planned |
-| Outbound webhooks (HMAC + retry + replay UI) | C.5 | **€149** | planned |
-| SSO SAML/OIDC + SCIM provisioning | C.7 | **€699** | planned |
-| Status page + Grafana SLO dashboards + alerting | D.1 | **€199** | planned |
-| OpenAPI auto-docs (Scalar UI) | D.2 | **€79** | planned |
-| In-app notification center | D.3 | **€99** | planned |
-| SOC2 Type II readiness checklist | D.4 | **€99** | planned |
-| i18n (TanStack locale routes + Lingui) | E.1 | **€99** | planned |
-| Capacitor mobile shell | F.1 | **€299** | planned |
-| Feature flags (GrowthBook self-hosted) | F.2 | **€99** | planned |
-
-À-la-carte total if every module is bought separately on top of Starter: ~€2 950. Enterprise tier at €2 999 is therefore priced at parity (the bundle premium is the curated stability, not a markup).
+**Subtotal Core (shipped)**: **€33 500 – €57 000** of senior-dev value already in the repo on day zero.
 
 ---
 
-## Shipped modules (in v2.0+)
+## Roadmap modules — committed value to ship
 
-### `auth` — BetterAuth singleton
+Each module ships with the same architecture discipline (vertical slice, port + adapter, removable in minutes). Value-delivered estimates assume the same standard.
 
-- **What ships**: BetterAuth wired natively on Bun + Hono (no Node shim). Plugins enabled: `twoFactor`, `passkey`, `magicLink`, `bearer` (Capacitor-ready), `organization` (multi-tenant), `customSession`. Email-and-password with mandatory verification.
-- **Ports exposed**: none — BetterAuth is a deliberate exception (`auth.ts` singleton imported directly, never wrapped in DI; wrapping recopies `auth.api.*` and loses `auth.$Infer.*`).
-- **External deps**: `better-auth`, `@better-auth/passkey`, `@simplewebauthn/server`, Resend (for email hooks).
-- **Removal contract**: not removable as a unit — auth is the spine. To swap providers (NextAuth, Clerk, Lucia), the swap is documented in `docs/INTEGRATIONS.md`. ~1 day refactor.
+| Phase | Module | Value delivered |
+|---|---|---|
+| 0.2 | **Health probes** (`/livez` + `/readyz` + `/startupz` IETF draft-inadarei format, registry pattern, graceful shutdown wired to readyz, asymmetric cache, self-cancelling timeout) | **€1 500 – €2 500** |
+| 0.3 | **Backups + DR** (daily `pg_dump` cron, R2 lifecycle 30d/1y cold, monthly automated restore-test, `docs/DISASTER-RECOVERY.md` with RPO/RTO, PITR doc, R2 versioning + delete protection) | **€2 500 – €4 000** |
+| 0.4 | **Observability stack** (Sentry api+app removable, OpenTelemetry auto-instrumentation, Prometheus `/metrics`, 3 ports + NoOp default, data scrubbing RGPD, source maps CI, release tracking, EU region option) | **€5 000 – €8 500** |
+| A.1 | **Profile + NIST 800-63B-4 password baseline** (rectification UI, email re-verification flow, avatar upload, HIBP screening, min length 15/8 with MFA, ban complexity rules, ban forced rotation) | **€3 000 – €5 000** |
+| A.2 | **Privacy policy / Terms versioning** (DB schema, version constants, `requireCurrentPolicies` middleware, `/legal/accept` diff view, sign-up inline acceptance) | **€1 500 – €2 500** |
+| A.3 | **Compliance docs bundle** (sub-processor disclosure typed config + page, accessibility statement EAA-conform, DPA template Markdown, DORA annex template Markdown) | **€1 500 – €2 500** |
+| A.4 | **Cookie consent + DDD Consent aggregate** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, 6-month re-prompt, version-stamped consent record, first real Aggregate consumer of `@packages/ddd-kit`) | **€4 500 – €7 500** |
+| A.5 | **Privacy dashboard** (`/settings/privacy` aggregating consent + last export + sessions + data sources + acceptance history) | **€1 500 – €2 500** |
+| A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain coverage, WCAG 2.1 AA gate ≥95 score, 0 a11y violations blocks merge to main) | **€3 000 – €5 000** |
+| B.1 | **Billing Stripe complet** (`@better-auth/stripe`, customer portal, webhooks idempotents, dunning, invoice automation, plan config, seat-based + per-org pricing) | **€7 000 – €12 000** |
+| B.2 | **Feature & quota gating** (config-driven `PLANS`, `useEntitlements()`, `requireFeature()`, `requireSeat()` middleware) | **€1 500 – €2 500** |
+| C.1 | **Security perimeter** (sliding-window rate-limit per IP/user, captcha on auth-burst, strict CSP with nonce, CSRF on non-BetterAuth POST routes) | **€3 000 – €5 000** |
+| C.2 | **Audit log** (append-only event trail, compliance + ops, feeds Admin/RGPD/Billing, SOC2 §CC7.2 + ISO 27001 prerequisite) | **€3 500 – €5 500** |
+| C.3 | **Admin & impersonation** (BetterAuth `admin` plugin, `/admin/*` separate hostname, audit-logged actions, RGPD overrides) | **€3 500 – €5 500** |
+| C.4 | **API tokens / PATs** (`/settings/tokens` UX, scoped + expirable, sha256 + per-row salt, `clean_<base58url-32>` GitHub secret-scanner prefix) | **€2 500 – €4 000** |
+| C.5 | **Outbound webhooks** (HMAC-signed, retry + dead-letter, replay UI, scoped per org, exponential backoff) | **€4 500 – €7 000** |
+| C.6 | **Account recovery codes** (UI for the BetterAuth `twoFactor` codes already supported server-side) | **€500 – €1 000** |
+| C.7 | **SSO SAML/OIDC + SCIM provisioning** (BetterAuth `sso` plugin + SCIM endpoint + audit-logged provisioning events) | **€15 000 – €25 000** |
+| D.1 | **Status page + SLO dashboards + alerting** (Cachet/Astro `status.<domain>`, Grafana SLO dashboards consuming 0.4 `/metrics`, Sentry → Slack/PagerDuty alerts, runbook-linked) | **€4 000 – €7 000** |
+| D.2 | **OpenAPI auto-docs** (`@hono/zod-openapi`, Scalar UI at `/api/docs`, generated from existing route schemas) | **€1 000 – €2 000** |
+| D.3 | **Notification center** (persistent inbox `<Bell />`, `/settings/notifications` preferences, transactional vs marketing per category) | **€3 000 – €5 000** |
+| D.4 | **SOC2 Type II readiness checklist** (mapping shipped controls to `CC6.x`/`CC7.x`/`CC8.x`, Vanta/Drata-ready `docs/SOC2-CHECKLIST.md`) | **€1 500 – €2 500** |
+| E.1 | **i18n** (TanStack locale routes + Lingui, every UI string refactored once, fallback locale logic) | **€3 000 – €5 000** |
+| E.2 | **Marketing site** (Astro 5 + Payload 3 self-hosted, separate deploy, content modeling, blog) | **€5 000 – €8 000** |
+| F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth via secure storage, push channel) | **€4 500 – €7 500** |
+| F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€1 500 – €2 500** |
 
-### `multi-tenant + access-control`
-
-- **What ships**: BetterAuth `organization` plugin + `@packages/access-control` SSOT (statements, roles, `authorizeRole` predicate). Personal org auto-created on signup (1:1 user↔org), self-heals on every sign-in. Capability-based authorization mirrored on api (`requireOrgPermission`), route gates (`ensureOrgPermission`), and UI (`<Can>` + `useAuthorization`).
-- **Ports exposed**: `OrgPermissions` type — same shape on api + app.
-- **External deps**: `better-auth/plugins/organization`.
-- **Removal contract**: drop `organization()` from `auth.ts` plugins; remove `requireOrg` middleware mounts. ~30 min for solo-tenant pivot. Schema rollback documented.
-
-### `email`
-
-- **What ships**: `IEmailService` port in `shared/ports/email.port.ts`, `ResendEmailService` adapter in `shared/services/email.service.ts`. Template registry pattern (typed `EmailTemplates` interface), dashboard-managed templates (no MJML in repo), idempotency keys derived from `template + token-hash`, retry on transient failures. Resend's provider-side suppression list guards IP reputation.
-- **Ports exposed**: `IEmailService.sendTemplate(template, to, vars, opts)`.
-- **External deps**: `resend`.
-- **Removal contract**: swap `ResendEmailService` for `PostmarkEmailService` / `SendgridEmailService` — implement `IEmailService`, register in DI, done. ~1h.
-
-### `storage` (uploads module)
-
-- **What ships**: `IStorageService` port in `shared/ports/storage.port.ts`, `S3StorageService` adapter in `modules/uploads/infrastructure/`. Three-step `presign → PUT → confirm` flow (R2 in prod, MinIO in dev — same SDK). Owner-scoped key prefix `<userId>/<scope>/<uuid>-<filename>`, server-verified `HeadObject` on confirm with delete-on-mismatch. Boot-time fail-hard if prod endpoint is localhost or creds are default.
-- **Ports exposed**: `IStorageService.{presignUpload, presignDownload, headObject, deleteObject, publicUrlFor}`.
-- **External deps**: `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`.
-- **Removal contract**: `trash apps/api/src/modules/uploads` + remove `.addModule(uploadsModule)` + remove `app.route("/uploads", ...)` + remove `<UploadAvatar />` consumer call sites. Front feature isn't shipped yet — only the back module exists. ~10 min.
-
-### `rgpd`
-
-- **What ships**: `modules/rgpd/` full vertical slice. Account export (Art. 20 — JSON archive, signed download URL, 7d link TTL, 24h rate limit) + account deletion (Art. 17 — 7-day grace period, 2FA-gated, sole-owner pre-flight check, automated wipe via internal cron). Front: `<DataExportCard />`, `<RgpdDeletionCard />`, `/legal/data-rights` page (Art. 13/14 transparency).
-- **Ports exposed**: `IRgpdRepository` (internal to module). HMAC `internal-fetch` for cron-triggered sweeps.
-- **External deps**: `IStorageService` (uploads JSON archive), `IEmailService` (download link delivery).
-- **Removal contract**: `trash apps/api/src/modules/rgpd` + `trash apps/app/src/features/rgpd` + remove imports in `account.page.tsx` + drop the 3 RGPD columns in `users` table. ~5 min api side, ~2 min app side, ~1 min schema side.
-
-### `ddd-kit`
-
-- **What ships**: `@packages/ddd-kit` — primitives `Result<T,E>`, `Option<T>`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `WatchedList`, `BaseRepository`, `ScopedRepository`, `RepoScope`, `IUnitOfWork`, `BaseDomainEvent`/`IDomainEvent`, `EventDispatcher`, `AppErrorException`, `AppError`/`ErrorCode`. 263 vitest cases. Zero external runtime deps (zod is `peerDependencies` optional for `UserId`).
-- **Ports exposed**: every primitive listed.
-- **Removal contract**: not removable — it's the type-system foundation. Used by every module application layer.
-
-### `ui` (shadcn-pure)
-
-- **What ships**: `@packages/ui` — full shadcn/ui component set + custom primitives (`NavLink`, `BrandLink`, `TextLink`, `ListRow`, `FormTextField`, `FormCheckboxField`, `DestructiveActionDialog`, `BackupCodeList`, `QrCodeFrame`). Theme via `@theme` in `globals.css`, `data-slot` discipline, no `className` color drift in features. View-transitions-API theme toggle.
-- **Ports exposed**: every component is a JSX export.
-- **External deps**: `radix-ui`, `tailwindcss` 4, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `next-themes`, `sonner`.
-- **Removal contract**: swap component-by-component (e.g. switch to NextUI). Each consumer is a colocated JSX import; ~5 min per replacement family.
-
-### App shell
-
-- **What ships**: `apps/app/` — Vite 8 + React 19 + TanStack Router (code-based, lazy chunks via `lazyRouteComponent`, intent prefetch, view transitions) + TanStack Query + AppProviders. `__root` + pathless gates `_guest`/`_protected`/`_shell`/`_org-scope` + settings layout. Command palette (⌘K), org switcher, theme toggle, authorization devtool (dev-only, tree-shaken in prod), 5-min clone tutorial.
-- **Removal contract**: not removable — it's the front delivery vehicle.
-
-### Monorepo tooling
-
-- **What ships**: pnpm 10 + Turborepo (TUI, `with: ["type-check"]`, `interruptible: true` on dev tasks, `globalDependencies` glob-aware) + Biome 2 (recommended + extras strict, scoped overrides for shadcn-generated only) + Husky (pre-commit lint-staged, commit-msg commitlint, pre-push full pipeline) + commitlint conventional + semantic-release (with `breaking: true` precedence rule) + jscpd (3% threshold) + knip (all workspaces registered).
-- **Removal contract**: drop pnpm workspaces and split into separate repos. ~1 day refactor for a fork that doesn't want the monorepo.
+**Subtotal Roadmap**: **€84 500 – €144 500** of senior-dev value committed.
 
 ---
 
-## Roadmap modules — preview
+## Total value-in-box once roadmap is shipped
 
-Each item below ships with the same architecture discipline (vertical slice, port + adapter, removal contract). Pricing is committed; delivery follows the ROADMAP order.
+**Core + Roadmap = €118 000 – €201 500** of senior-dev value packaged.
 
-The full scope of each phase lives in [`ROADMAP.md`](../ROADMAP.md). This file mirrors only the **commercial split** — what a buyer can purchase à la carte once it lands.
+This is the realistic ceiling. A single buyer who'd commission every module from a French/EU consultancy would spend in this range, possibly 2–3× more if going through Big-4 / tier-1 ESN.
 
-| Module | Removal contract preview |
-|---|---|
-| **Observability** (0.4) | trash `modules/observability/` + remove 1 DI line + remove `/metrics` mount + remove front `Sentry.init` import. Call sites fall through to NoOp impls in `shared/services/`. |
-| **Billing** (B.1) | trash `modules/billing/` + remove webhook route + revert `auth.ts` plugin line. Stripe webhook endpoint disappears; subscriptions table can stay empty or be dropped. |
-| **Audit log** (C.2) | trash `modules/audit/` + remove `IAuditLogger` adapter (NoOp default keeps call sites alive). |
-| **Admin** (C.3) | revert BetterAuth `admin()` plugin line + trash `apps/app/src/features/admin/`. |
-| **PATs** (C.4) | trash `modules/tokens/` + drop `pat` table + remove route. |
-| **Webhooks** (C.5) | trash `modules/webhooks/` + drop `webhook_endpoint` + `webhook_delivery` tables. |
-| **SSO/SCIM** (C.7) | revert `sso()` plugin + trash `modules/scim/` + drop SSO tables. |
-| **Status page** (D.1) | external infra (Cachet/Astro standalone) — disconnect from app entirely. |
-| **OpenAPI docs** (D.2) | drop `@hono/zod-openapi` route schemas; routes stay typed via Hono RPC regardless. |
-| **Notification center** (D.3) | trash `modules/notifications/` + drop `notification` table. |
-| **i18n** (E.1) | revert Lingui plugin + drop locale routes; UI strings stay English-only. |
-| **Capacitor** (F.1) | trash `apps/mobile/`; bearer plugin in `auth.ts` stays (used elsewhere). |
-| **Feature flags** (F.2) | trash `modules/flags/` + remove `useFeatureFlag` consumer call sites (or replace with constant `true`). |
+---
+
+## Future commercial model — boilerplate one-time license
+
+When clean-stack is commercialized as a product (ShipFast / Bullet Train / Makerkit positioning, **not** mission/consulting), the price is a **fraction of the delivered value**, not an hourly rate:
+
+- ShipFast charges €199 against ~€15-20k of value delivered (~1% ratio).
+- Bullet Train charges €1499 against ~€30-50k of value delivered (~3-5%).
+- Makerkit charges €499-999 against ~€20-30k of value delivered (~2-4%).
+
+Applying the same ratio bands to clean-stack's €100k–€200k value delivered:
+
+- **1% floor** (ShipFast-style aggressive entry) → **€999** one-time.
+- **2-3% market median** → **€1 999 – €4 999** one-time, single tier or split into 2-3 tiers (Solo / Team / Enterprise).
+- **5% premium** (Bullet Train upper tier) → **€7 999 – €9 999**, justified only with included support / customization.
+
+**Recommended positioning when launching**: single tier at **€1 999** lifetime license, lifetime updates within current major. Reasoning:
+- Anchors above ShipFast/Makerkit so positioning signals "more complete, more architecturally serious"
+- Stays below Bullet Train's premium tier (clean-stack doesn't include a course or community — yet)
+- Round number, easy to anchor against the €100k+ value delivered ("you save 50× the price on day one")
+- Single tier eliminates "which one do I need" friction — the whole stack is the product
+
+**À la carte module sales** are **not recommended** at the boilerplate-license stage. Clients buying ShipFast want everything; segmenting by module slows the funnel. À la carte makes sense only if a future SaaS-style hosted version of clean-stack ships (B2B platform, not a license).
 
 ---
 
