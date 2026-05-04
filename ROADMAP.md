@@ -70,12 +70,63 @@ F.2. **Feature flags** — GrowthBook self-hosted, decouples deploy from release
 
 ## Health probes — **Phase 0.2**
 
-**Why**: Kubernetes / Railway / Fly.io / Cloudflare Workers / Render all probe `/health` (liveness — process up) and `/ready` (readiness — dependencies reachable). Absence = restart loops, no rolling deploys. 30-min ship.
+**Why**: Kubernetes / Railway / Fly.io / Cloudflare Workers / Render all probe liveness/readiness/startup. Absence = restart loops, no rolling deploys, 502s during deploys. SOTA 2026 = three probes (not two), draft-inadarei response format, graceful shutdown wired to `/readyz`.
 
-- [ ] `GET /health` — returns 200 `{ status: "ok", uptimeMs, version }` from `apps/api/src/shared/routes/health.ts`. **No DB hit** (must succeed even if DB down — liveness is "process up").
-- [ ] `GET /ready` — returns 200 only if (a) DB reachable (`SELECT 1`), (b) R2 reachable (`HeadBucket`), (c) Resend reachable (cached health, refresh every 30s). 503 + structured payload listing failed dependencies otherwise.
-- [ ] Both routes mounted **outside** `requestId` + `requireAuth` (deploy probes don't carry session cookies); kept off the request log to avoid drowning prod logs.
-- [ ] Document expected probe shape in `README.md` deploy section (one example per target: Railway / Fly / Workers).
+**Endpoint shape — convention K8s 2026** (`z` suffix is the official one; `/health` / `/ready` are the legacy names):
+
+- [ ] `GET /livez` — liveness. Returns 200 with `{ status, version, commitSha, buildTime, runtime, uptimeMs }`. **No dependency hit** (a DB outage must NOT restart pods — would cause thundering herd). `commitSha`/`buildTime` injected at build via `GIT_SHA` / `BUILD_TIME` env vars (CI sets them).
+- [ ] `GET /readyz` — readiness. Aggregates registered checks (DB `SELECT 1`, R2 `HeadBucket`, Resend cached health). Returns 200 if all `pass`/`warn`, 503 if any critical check is `fail`.
+- [ ] `GET /startupz` — startup probe (K8s 1.16+). Distinct from liveness so a slow boot (warming caches, DI graph build) doesn't get killed by a tight liveness threshold. Returns 200 once initial bootstrap completes; 503 before.
+
+**Response format — IETF `draft-inadarei-api-health-check-06`** (Datadog / New Relic / Grafana parse it natively):
+
+```json
+{
+  "status": "pass" | "warn" | "fail",
+  "version": "1.11.1",
+  "checks": {
+    "db:postgres": [{ "status": "pass", "time": "2026-05-04T23:00:00Z", "observedValue": 12, "observedUnit": "ms" }],
+    "storage:r2":  [{ "status": "pass", "time": "...", "observedValue": 38, "observedUnit": "ms" }],
+    "email:resend": [{ "status": "warn", "output": "cached, last refresh 25s ago" }]
+  }
+}
+```
+
+- [ ] **Tri-state status** (`pass`/`warn`/`fail`) — non-binary. Resend down + DB up = `warn` + 200 (degraded but functional). DB down = `fail` + 503 (truly unhealthy). Aligns with the draft and avoids the "everything red because Resend hiccup'd" problem.
+- [ ] **Per-check `observedValue` + `observedUnit`** — latency in ms; populates Phase D.1 SLO dashboards for free.
+- [ ] **Prod payload minimal** — outside `NODE_ENV !== "production"`, only the top-level `status` field is returned to avoid leaking infra details (DB host, bucket name in error messages). Full payload in dev/staging.
+
+**Architecture — registry pattern, futureproof**:
+
+- [ ] `apps/api/src/modules/health/` — vertical-slice module. `IHealthCheckRegistry` port (`register(name, fn, { critical: boolean })`); each module registers its own checks at boot (`db.register("db:postgres", probeDb, { critical: true })`). `/readyz` iterates the registry. **Why a module**: when Stripe / Redis / GrowthBook ship, each module adds 1 line to register its check — no edits to the health endpoint.
+- [ ] `IHealthCheckRegistry` exposed to other modules via `shared/ports/health.port.ts` (cross-module port, two consumers minimum: rgpd + uploads register storage health from existing impls).
+
+**Robustness — what kills probes in production**:
+
+- [ ] **Cache positive 30s + cache negative 5s** — healthy result is cached 30s (don't hammer Resend on every PaaS probe, ~6 req/sec); failed result cached only 5s (re-check fast, restore quickly). Asymmetric cache is the SOTA pattern.
+- [ ] **Self-cancelling timeout 5s on `/readyz`** — `Promise.race(check, timeoutFail(5000))`. A probe that hangs blocks rolling deploys.
+- [ ] **No PII in fail payloads** — never return stack traces, hostnames, env-var values, full DB error messages. Just the failed check name + a generic code (`db: down`).
+
+**Graceful shutdown — wired to `/readyz`** (the single most critical zero-downtime piece, and the one most boilerplates skip):
+
+- [ ] On `SIGTERM` (PaaS sends it before kill), set an in-memory `isShuttingDown = true` flag. `/readyz` immediately returns 503 — the LB stops routing new requests to this pod within one probe interval (~5s).
+- [ ] Wait `SHUTDOWN_GRACE_PERIOD_MS` (default 15s — env-tunable per PaaS) for in-flight requests to drain. Then `Bun.serve.stop()` + close DB pool + flush pino transport.
+- [ ] **Why critical**: without this, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
+
+**Phase D.1 prep — Prometheus metrics** (cheap to wire now, expensive to retrofit):
+
+- [ ] `GET /metrics` — `prom-client` exports `up{check="db:postgres"} 1|0` per registered check + `health_check_duration_ms{check}` histogram. ~15 LOC. When D.1 status page lands, it consumes `/metrics` directly — no rework.
+- [ ] Gate `/metrics` behind a shared secret header (`X-Metrics-Token` env var) — prevents random scraping from public internet.
+
+**Mounting + observability**:
+
+- [ ] All three probes (`/livez`, `/readyz`, `/startupz`) and `/metrics` mounted **outside** `requestId` + `httpLogger` + `requireAuth`. Probes don't carry session cookies, and a probe every 5s would drown prod logs (~17 280/day per pod).
+- [ ] Probes excluded from rate-limiting (Phase C.1) — PaaS probe IPs aren't predictable.
+
+**Documentation**:
+
+- [ ] `README.md` deploy section — one config example per target: Railway (`railway.toml` healthchecks), Fly.io (`fly.toml [[checks]]`), Cloudflare Workers (no probes — N/A note), Render (`render.yaml healthCheckPath`), Kubernetes (manifest snippet with `livenessProbe` + `readinessProbe` + `startupProbe`).
+- [ ] `docs/HEALTH-PROBES.md` — registry usage (how to register a check from a new module), draft-inadarei format reference, graceful-shutdown rationale, monitoring integration recipes (Datadog, Grafana).
 
 ---
 
