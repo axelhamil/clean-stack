@@ -4,12 +4,18 @@ User-facing sub-domains (vertical slice). One folder per sub-domain — never pe
 
 Two flavors of feature:
 
-- **Route-owning** (most): exposes one or more `<name>.route.tsx` files at feature root. Each does `export const <name>Route = createRoute({ getParentRoute: () => <parent>, ... })` where `<parent>` is imported from `../../router/layouts` (e.g. `shellLayout`, `guestLayout`, `orgScopeLayout`, `rootRoute`). Search params, route context, params accessed as `<name>Route.useSearch()` / `.useRouteContext()` / `.useParams()` — full TanStack typing flows from the parent. Examples: `auth/`, `billing/`, `dashboard/`, `account/`, `organization/`, `team/`, `invitations/`, `legal/`.
-- **Library** (zero-route compositional bundles): no `<name>.route.tsx`, only components/forms/hooks designed to be composed by a route-owning feature. Examples: `security/` (passkeys + 2FA + sessions cards), `gdpr/` (data export + deletion cards). A route-owning feature MAY import from a library feature; the reverse is forbidden.
+- **Route-owning** (most): exposes a pair `<name>.route.tsx` + `<name>.page.tsx` at feature root for each URL.
+  - `<name>.route.tsx` — the route definition: `export const <name>Route = createRoute({ getParentRoute: () => <parent>, path, beforeLoad, validateSearch, component: lazyRouteComponent(() => import("./<name>.page"), "<Name>Page") })`. Parent imported from `../../router/layouts`. Lightweight, no JSX.
+  - `<name>.page.tsx` — the Page component as a named export. Accesses route context/search/params via `const route = getRouteApi("/full/path/id"); route.useSearch()` etc. Never `import { <name>Route }` from the route file (cycle).
+  - Examples: `auth/sign-in.{route,page}.tsx`, `billing/billing.{route,page}.tsx`, `dashboard/dashboard.{route,page}.tsx`, `account/account.{route,page}.tsx`.
+- **Library** (zero-route compositional bundles): no `.route.tsx` / `.page.tsx`, only components/forms/hooks designed to be composed by a route-owning feature's page. Examples: `security/` (passkeys + 2FA + sessions cards), `gdpr/` (data export + deletion cards). A route-owning page MAY import from a library feature; the reverse is forbidden.
+
+The 2-file route+page split is the price for code-splitting: the bundler only chunks modules reachable solely via dynamic `import()`. Merging would move the page into `router.tsx`'s static graph and bust the lazy chunk. Accept it.
 
 Anatomy (only create sub-folders that earn their place):
 
-- `<name>.route.tsx` — `export const <name>Route = createRoute({...})` + co-located Page component (route-owning features only). Parent imported from `../../router/layouts`.
+- `<name>.route.tsx` — `export const <name>Route = createRoute({..., component: lazyRouteComponent(() => import("./<name>.page"), "<Name>Page") })`. Route-owning features only. Parent imported from `../../router/layouts`.
+- `<name>.page.tsx` — Page component sibling, named export. Access route hooks via `getRouteApi("/path/id")`. Code-split as a separate chunk on build.
 - `<feature>.schema.ts` — feature-private zod schemas (single-schema feature; promote to `schemas/` subfolder on 2nd file)
 - `components/` — feature-private colocated components (one component per file, kebab-case)
 - `forms/` — feature-private isolated forms (RHF + zodResolver + shadcn `Form`). Section components mount them; sections never own form state.

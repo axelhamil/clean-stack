@@ -72,7 +72,9 @@ Server is blind during the upload — three-step flow `presign` → `PUT` direct
 
 ## App — Vite + React 19 + TanStack ✅
 
-- **TanStack Router code-based** — features own their routes via `<name>.route.tsx` factories assembled in a single hand-written `apps/app/src/router.tsx`. No `routes/` folder, no `routeTree.gen.ts`, no Vite plugin watcher; TanStack Start migration is near-zero refactor.
+- **TanStack Router code-based** — features own their routes via `<name>.route.tsx` (route definition) + `<name>.page.tsx` (page component, code-split chunk via `lazyRouteComponent`). Layouts/gates exported from `apps/app/src/router/layouts.tsx`. Routes assembled in a single hand-written `apps/app/src/router.tsx`. No `routes/` folder, no `routeTree.gen.ts`, no Vite plugin watcher. TanStack Start migration is near-zero refactor.
+- **Route-level code-splitting** — each `<name>.page.tsx` ships as a lazy chunk (current floor: ~588 KB initial bundle, individual route chunks 1-43 KB). `defaultPreload: "intent"` triggers prefetch on hover/focus before the click — perceived latency near zero.
+- **Devtools wired** in `app-providers.tsx` behind `import.meta.env.DEV` (TanStack Router devtools + React Query devtools, tree-shaken in prod).
 - **TanStack Query** for all server state — session, active org, current membership, orgs list. Mutations via `mutationOptions` factories (call-site owns side-effects); hook wrappers only when side-effects always fire.
 - **Forms**: `react-hook-form` + `@hookform/resolvers/zod` + shadcn `Form`. Mandatory `defaultValues`, never manual submit handlers.
 - **Schema split** loose vs strict — same field validated differently in capture (sign-in) vs creation (sign-up / reset).

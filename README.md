@@ -35,7 +35,7 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 |---|---|
 | **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
 | **API** | Hono 4 on native `Bun.serve()` (~7 ms cold prod build) |
-| **App** | Vite 8 · React 19 · TanStack Router (code-based, prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
+| **App** | Vite 8 · React 19 · TanStack Router (code-based, route-level code-splitting, intent prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
 | **Forms** | react-hook-form + `@hookform/resolvers/zod` 4 + shadcn `Form` |
 | **Auth** | BetterAuth + plugins `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
 | **Access control** | `@packages/access-control` SSOT (statements, roles, `authorizeRole`) consumed by server, route gates and UI |
@@ -141,7 +141,7 @@ pnpm dev --filter=app
 
 ## Layout
 
-Vertical slice on both sides. Back: one folder per bounded context with its own DDD layers. Front: code-based routing — features own their routes via `<name>.route.tsx` factories assembled in a single `router.tsx`. No `routes/` folder, no codegen.
+Vertical slice on both sides. Back: one folder per bounded context with its own DDD layers. Front: code-based routing — each feature owns a `<name>.route.tsx` + `<name>.page.tsx` pair (the page is code-split as a lazy chunk). Routes are assembled in a single `apps/app/src/router.tsx`. No `routes/` folder, no codegen.
 
 ```
 apps/
@@ -160,8 +160,9 @@ apps/
   app/                       Vite + React (router.tsx → features → shared)
     src/
       main.tsx               createRoot + <AppProviders />
-      router.tsx             Code-based routing: layouts/gates inline + routeTree assembly
-      features/<x>/          <name>.route.tsx + components/, forms/, hooks/, schemas
+      router/layouts.tsx     rootRoute + layout/gate exports (_guest, _protected, _shell, _org-scope, settings)
+      router.tsx             Pure assembly: imports feature routes + layouts → routeTree.addChildren(...) → createRouter
+      features/<x>/          <name>.route.tsx + <name>.page.tsx (code-split chunk) + components/, forms/, hooks/, schema
       shared/                Cross-cutting: api/, auth/, components/, env.ts, app-providers.tsx, utils.ts
 packages/
   access-control             BetterAuth access-control SSOT (statements, roles, authorizeRole)
