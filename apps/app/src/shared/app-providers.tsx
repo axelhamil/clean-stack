@@ -1,6 +1,8 @@
 import { Toaster } from "@packages/ui/components/ui/sonner";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
 import { router } from "../router";
@@ -28,6 +30,12 @@ export function AppProviders() {
         <QueryClientProvider client={queryClient}>
           <RouterProvider router={router} />
           <Toaster richColors closeButton />
+          {import.meta.env.DEV && (
+            <>
+              <TanStackRouterDevtools router={router} position="bottom-left" />
+              <ReactQueryDevtools buttonPosition="bottom-right" />
+            </>
+          )}
         </QueryClientProvider>
       </ThemeProvider>
     </StrictMode>

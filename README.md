@@ -49,17 +49,90 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 | **Tooling** | pnpm 10 · Turborepo TUI · Biome 2 · Husky · commitlint · semantic-release · knip · jscpd |
 | **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, GDPR/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
 
-## Quick start
+## 5-minute clone tutorial
+
+From zero to your first business feature, end-to-end. Everything below assumes Bun 1.3+, Node 24+, pnpm 10, Docker.
+
+### 1. Bootstrap (60 sec)
 
 ```bash
-git clone https://github.com/axelhamil/clean-stack && cd clean-stack
+git clone https://github.com/axelhamil/clean-stack my-saas && cd my-saas
 pnpm install
-docker compose up -d         # Postgres 17 (port 5433) + MinIO (9000/9001)
-pnpm db:push                 # push schemas (auth + business)
-pnpm dev                     # API + App in parallel (Turbo TUI)
+cp .env.example .env                    # default values work for local dev
+docker compose up -d                    # Postgres 17 (port 5433) + MinIO (9000/9001)
+pnpm db:push                            # apply auth + business schemas
+pnpm dev                                # API on :3000, App on :5173 (Turbo TUI)
 ```
 
-Scoped dev:
+Open `http://localhost:5173` → sign up with any email → BetterAuth creates your user + a Personal org + a session. You're now in the app.
+
+### 2. Adopt the boilerplate (60 sec)
+
+```bash
+# rename the project
+sed -i 's|axelhamil/clean-stack|<your-org>/<your-repo>|g' README.md package.json
+
+# wipe history if you want a fresh start
+rm -rf .git && git init && git add . && git commit -m "init from clean-stack"
+```
+
+### 3. Trim what you don't need (60 sec)
+
+The boilerplate ships features you may not want. Removability is **5 minutes per feature** :
+
+```bash
+# don't need GDPR (e.g. you're not in EU)?
+trash apps/app/src/features/gdpr           # the front bundle (cards, forms, hooks)
+# remove its 2 imports in apps/app/src/features/account/account.page.tsx
+# (TS will scream, just delete the <DataExportCard /> + <GdprDeletionCard /> lines)
+
+# don't need billing?
+trash apps/app/src/features/billing        # the route disappears
+# remove `billingRoute` from apps/app/src/router.tsx addChildren
+# remove `/settings/billing` entry from SETTINGS_TABS in shared/components/contextual-tabs.tsx
+
+# don't need uploads?
+trash apps/api/src/application/use-cases/*upload* apps/api/src/adapters/services/storage*
+# remove uploads DI registrations from apps/api/src/di/container.ts
+```
+
+`trash` is `gio trash` (recoverable). `pnpm type-check` will list every consumer of the deleted code — fix until green.
+
+### 4. Add your first business feature (90 sec)
+
+```bash
+# back: a new module
+mkdir -p apps/api/src/modules/notes/{domain,application/{use-cases,ports,dto},infrastructure/{repositories,mappers}}
+# write your aggregate in domain/note.aggregate.ts (use ddd-kit primitives — Aggregate, ValueObject)
+# write port + use-case + drizzle repo + dto
+# expose `routes.ts` with /api/notes/* + `module.ts` with registerNotes(c, app)
+# wire in apps/api/src/di/container.ts and apps/api/src/index.ts (2 lines each)
+
+# DB:
+echo "// notes table" >> packages/drizzle/src/schema/notes.ts
+echo "export * from './notes';" >> packages/drizzle/src/schema/index.ts
+pnpm db:push
+
+# front: a new feature folder
+mkdir -p apps/app/src/features/notes/{components,forms,hooks}
+# write notes.route.tsx + co-located NotesPage component
+# wire in apps/app/src/router.tsx (one line in addChildren)
+```
+
+End-to-end typed via Hono RPC: the route file imports `api.notes.$post({...})` and TS knows the input/output shape.
+
+### 5. Ship (30 sec)
+
+```bash
+pnpm ci:check                           # Biome + type-check + knip + jscpd, all clean
+git checkout -b feat/notes
+git add . && git commit -m "feat(api): add notes aggregate + module"
+gh pr create                            # squashed conventional-commit history → semantic-release picks it up
+```
+
+Total: ~5 min from `git clone` to your first business feature shipped. The stack stays out of the way — you write business logic, everything else is settled.
+
+### Scoped dev (anytime)
 
 ```bash
 pnpm dev --filter=api
