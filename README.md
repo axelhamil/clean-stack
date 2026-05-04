@@ -4,7 +4,7 @@
 
 Bun + Hono on the API · Vite + React 19 + TanStack on the app · Drizzle + Postgres at the bottom · DDD-kit for the business domain · BetterAuth + Resend + R2 for the SaaS layer.
 
-See [`docs/FEATURES.md`](docs/FEATURES.md) for what ships today and [`ROADMAP.md`](ROADMAP.md) for what's next (GDPR/CCPA → Billing → Gating → Admin → Audit log → i18n).
+See [`docs/FEATURES.md`](docs/FEATURES.md) for what ships today and [`ROADMAP.md`](ROADMAP.md) for what's next (RGPD/CCPA → Billing → Gating → Admin → Audit log → i18n).
 
 ## Lean by design
 
@@ -47,7 +47,7 @@ Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billin
 | **DI** | inwire (modules per bounded context) |
 | **Theme** | `next-themes` + View Transitions API circle reveal |
 | **Tooling** | pnpm 10 · Turborepo TUI · Biome 2 · Husky · commitlint · semantic-release · knip · jscpd |
-| **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, GDPR/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
+| **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, RGPD/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
 
 ## 5-minute clone tutorial
 
@@ -81,10 +81,10 @@ rm -rf .git && git init && git add . && git commit -m "init from clean-stack"
 The boilerplate ships features you may not want. Removability is **5 minutes per feature** :
 
 ```bash
-# don't need GDPR (e.g. you're not in EU)?
-trash apps/app/src/features/gdpr           # the front bundle (cards, forms, hooks)
+# don't need RGPD (e.g. you're not in EU)?
+trash apps/app/src/features/rgpd           # the front bundle (cards, forms, hooks)
 # remove its 2 imports in apps/app/src/features/account/account.page.tsx
-# (TS will scream, just delete the <DataExportCard /> + <GdprDeletionCard /> lines)
+# (TS will scream, just delete the <DataExportCard /> + <RgpdDeletionCard /> lines)
 
 # don't need billing?
 trash apps/app/src/features/billing        # the route disappears
@@ -92,8 +92,9 @@ trash apps/app/src/features/billing        # the route disappears
 # remove `/settings/billing` entry from SETTINGS_TABS in shared/components/contextual-tabs.tsx
 
 # don't need uploads?
-trash apps/api/src/application/use-cases/*upload* apps/api/src/adapters/services/storage*
-# remove uploads DI registrations from apps/api/src/di/container.ts
+trash apps/api/src/modules/uploads
+# remove `uploadsModule` registration from apps/api/src/container.ts
+# remove `app.route("/uploads", uploadsRoutes)` from apps/api/src/index.ts
 ```
 
 `trash` is `gio trash` (recoverable). `pnpm type-check` will list every consumer of the deleted code — fix until green.
@@ -102,11 +103,11 @@ trash apps/api/src/application/use-cases/*upload* apps/api/src/adapters/services
 
 ```bash
 # back: a new module
-mkdir -p apps/api/src/modules/notes/{domain,application/{use-cases,ports,dto},infrastructure/{repositories,mappers}}
+mkdir -p apps/api/src/modules/notes/{domain,application/{services,ports,dto},infrastructure/{repositories,mappers}}
 # write your aggregate in domain/note.aggregate.ts (use ddd-kit primitives — Aggregate, ValueObject)
-# write port + use-case + drizzle repo + dto
-# expose `routes.ts` with /api/notes/* + `module.ts` with registerNotes(c, app)
-# wire in apps/api/src/di/container.ts and apps/api/src/index.ts (2 lines each)
+# write port + service + drizzle repo + dto
+# expose `routes.ts` with /api/notes/* + `module.ts` with `defineModule()(...)` (inwire Pinia-style)
+# wire in apps/api/src/container.ts (`.addModule(notesModule)`) and apps/api/src/index.ts (`.route("/notes", notesRoutes)`)
 
 # DB:
 echo "// notes table" >> packages/drizzle/src/schema/notes.ts
@@ -124,10 +125,10 @@ End-to-end typed via Hono RPC: the route file imports `api.notes.$post({...})` a
 ### 5. Ship (30 sec)
 
 ```bash
-pnpm ci:check                           # Biome + type-check + knip + jscpd, all clean
+pnpm ci:check                           # Biome CI mode (pre-push runs the full pipeline: + type-check, knip, jscpd)
 git checkout -b feat/notes
 git add . && git commit -m "feat(api): add notes aggregate + module"
-gh pr create                            # squashed conventional-commit history → semantic-release picks it up
+gh pr create --base dev                 # feat → dev (squash OK) ; dev → main MUST stay a merge commit so semantic-release sees every conventional commit
 ```
 
 Total: ~5 min from `git clone` to your first business feature shipped. The stack stays out of the way — you write business logic, everything else is settled.
@@ -148,13 +149,13 @@ apps/
   api/                       Hono on Bun
     src/
       shared/                Cross-cutting: middleware, env, logger
-      modules/<context>/     One folder per bounded context (auth, uploads, organizations, gdpr, …)
+      modules/<context>/     One folder per bounded context (rgpd, uploads, …)
         domain/              Aggregates, Entities, Value Objects, Domain Events
         application/         Use cases, ports, services, DTOs, event handlers
         infrastructure/      Drizzle repositories, mappers, port impls (S3, Resend)
-        routes.ts            Hono sub-app
-        module.ts            registerXxx(c, app) — DI .add() chain + app.route() mount
-      di/container.ts        Composition root (chains module registers, exports `c.build()`)
+        routes.ts            Hono sub-app (chained `.route()` accumulates AppType)
+        module.ts            `defineModule()(...)` — inwire Pinia-style DI augmentation
+      container.ts           Composition root (`.add(...)` cross-cutting + `.addModule(...)` per context)
       auth.ts                BetterAuth singleton
       index.ts               Server entry — pipeline + module registration list
   app/                       Vite + React (router.tsx → features → shared)

@@ -4,10 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-const emailRequestSchema = z.object({ email: z.email() });
-type EmailRequestInput = z.infer<typeof emailRequestSchema>;
+import { type EmailRequestInput, emailRequestSchema } from "../auth.schema";
 
 interface EmailRequestFormProps {
   mutation: UseMutationResult<unknown, Error, { email: string }>;

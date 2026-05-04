@@ -4,7 +4,7 @@ Shipped phases — full architectural log. The roadmap stays forward-looking; ev
 
 Each section preserves the original task list (now `[x]` for the as-built record) plus the **why** and the **non-obvious decisions** baked into the codebase. New contributors read this to understand *why the code looks like it does*.
 
-> **Note on paths**: file paths in entries below reflect the layout at the time of shipping. The codebase has since migrated to vertical-slice (front: `features/<x>/<x>.route.tsx` + `shared/`, code-based routing via `apps/app/src/router.tsx`; api migration tracked in `ROADMAP.md`). For the current canonical layout see `CLAUDE.md` `## Layout`. The decisions and rationales below stay accurate — only the directory containers moved.
+> **Note on paths**: file paths in entries below reflect the layout at the time of shipping. The codebase has since migrated to vertical-slice on both sides (front: `features/<x>/<x>.route.tsx` + `shared/`, code-based routing via `apps/app/src/router.tsx`; api: `modules/<context>/{application,infrastructure,routes.ts,module.ts}` + `shared/`, inwire `defineModule()` per context). For the current canonical layout see `CLAUDE.md` `## Layout`. The decisions and rationales below stay accurate — only the directory containers moved.
 
 ---
 

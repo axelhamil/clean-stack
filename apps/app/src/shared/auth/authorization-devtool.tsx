@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
@@ -55,7 +56,7 @@ export function AuthorizationDevTool() {
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-xs">
-            {!hasMembership && <p className="text-muted-foreground">No active membership.</p>}
+            {!hasMembership && <TypographyMuted>No active membership.</TypographyMuted>}
             {Object.entries(STATEMENTS).map(([resource, actions]) => (
               <div key={resource} className="flex flex-col gap-1">
                 <div className="font-mono font-medium">{resource}</div>

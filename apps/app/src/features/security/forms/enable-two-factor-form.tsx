@@ -11,6 +11,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
+import { QrCodeFrame } from "@packages/ui/components/ui/qr-code-frame";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { CopyIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -95,15 +96,11 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3">
-        <div className="rounded-lg bg-white p-3">
-          <QRCodeSVG
-            value={setup.totpURI}
-            size={176}
-            marginSize={4}
-            bgColor="#ffffff"
-            fgColor="#000000"
-          />
-        </div>
+        <QrCodeFrame>
+          {/* qrcode.react defaults to black-on-white, which is what we need on QrCodeFrame's
+              fixed white background to keep modules legible across light/dark themes. */}
+          <QRCodeSVG value={setup.totpURI} size={176} marginSize={4} />
+        </QrCodeFrame>
         <TypographyMuted className="text-center">
           Scan with your authenticator app, then enter the 6-digit code below.
         </TypographyMuted>

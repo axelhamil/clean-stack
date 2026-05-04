@@ -31,7 +31,7 @@ keeping them in code is simpler than 8 env vars.
 | `reset_password` | Forgot-password flow | `name`, `resetUrl` |
 | `magic_link` | Passwordless sign-in | `magicUrl` |
 | `org_invitation` | Inviting a member to an organization | `inviterName`, `orgName`, `role`, `inviteUrl` |
-| `data_export_ready` | GDPR data export ready | `name`, `downloadUrl`, `expiresAt` |
+| `data_export_ready` | RGPD data export ready | `name`, `downloadUrl`, `expiresAt` |
 | `delete_requested` | Account-deletion grace started | `name`, `cancelUrl`, `expiresAt` |
 | `delete_cancelled` | User cancelled deletion in time | `name` |
 | `delete_completed` | Account anonymized after grace | `name` |
@@ -75,7 +75,7 @@ endpoints; you wire your own scheduler.
 
 | Endpoint | Recommended cadence | Purpose |
 |---|---|---|
-| `POST /internal/gdpr-sweep` | Daily, e.g. `0 3 * * *` UTC | Wipes accounts whose 7-day grace window has elapsed. Idempotent — safe to over-schedule. |
+| `POST /internal/rgpd-sweep` | Daily, e.g. `0 3 * * *` UTC | Wipes accounts whose 7-day grace window has elapsed. Idempotent — safe to over-schedule. |
 
 All `/internal/*` endpoints are protected by HMAC-signed requests
 (`X-Internal-Signature: t=<unix>,v1=<hex>` over a canonical message — see
@@ -117,7 +117,7 @@ fees, S3 API compatibility verified for the patterns this stack uses — see
 
 - **Create the bucket** in the chosen region/jurisdiction. Once created, R2
   buckets typically can't be moved between jurisdictions — pick the right one
-  for your user base (EU for GDPR-only customers).
+  for your user base (EU for RGPD-only customers).
 - **Generate API credentials** scoped to the bucket (least-privilege: read +
   write + delete + list, no admin).
 - **Disable public access** on the bucket. Public reads happen via
@@ -163,11 +163,11 @@ fast on missing/invalid values.
 - `RESEND_API_KEY`. Template IDs live in `TEMPLATE_IDS` in code (see §1), not env.
 - `S3_*` env vars (see §3).
 
-### GDPR knobs (defaults work)
+### RGPD knobs (defaults work)
 
-- `GDPR_GRACE_PERIOD_DAYS` (default `7`)
-- `GDPR_EXPORT_RATE_LIMIT_HOURS` (default `24`)
-- `GDPR_SWEEP_BATCH_SIZE` (default `50`)
+- `RGPD_GRACE_PERIOD_DAYS` (default `7`)
+- `RGPD_EXPORT_RATE_LIMIT_HOURS` (default `24`)
+- `RGPD_SWEEP_BATCH_SIZE` (default `50`)
 
 ### Optional
 
@@ -198,7 +198,7 @@ These aren't blockers for launch but pay off quickly:
   The stack already emits structured JSON with `requestId`.
 - **Uptime monitoring**: external probe on `GET /ready` (returns 200 once DB
   reachable).
-- **Audit log**: TODO comments in the GDPR use-cases mark the four transition
+- **Audit log**: TODO comments in the RGPD use-cases mark the four transition
   points (`data.export.requested`, `user.delete.{requested,cancelled,completed}`)
   for when the audit-log feature lands.
 - **Stripe customer deletion**: TODO comment in `execute-account-wipe` marks
@@ -216,7 +216,7 @@ These aren't blockers for launch but pay off quickly:
       set per infra (`signature` everywhere, add `private-network` on Railway/Fly)
 - [ ] `BETTER_AUTH_SECRET` generated (≥32 chars)
 - [ ] All env vars set per §4
-- [ ] Cron service chosen and wired to `/internal/gdpr-sweep` (daily)
+- [ ] Cron service chosen and wired to `/internal/rgpd-sweep` (daily)
 - [ ] DB migrations applied; backups verified
 - [ ] `pnpm ci:check` green; smoke test on staging (signup → invite → upload →
       export → request deletion → cancel → expire grace → sweep)

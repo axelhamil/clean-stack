@@ -144,5 +144,5 @@ See [`../ROADMAP.md`](../ROADMAP.md) for the full plan with constraints + extens
 - **Feature & quota gating** — config + middleware layer (no DDD).
 - **Admin & impersonation** — BetterAuth `admin` plugin.
 - **Audit log** — append-only event trail.
-- **GDPR / CCPA** — data deletion + export.
+- **RGPD / CCPA** — data deletion + export.
 - **i18n** — TanStack Router locale routes + typed message catalogs.

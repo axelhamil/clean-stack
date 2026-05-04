@@ -58,8 +58,8 @@ export function TransferLeaveDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Transfer ownership and leave</AlertDialogTitle>
           <AlertDialogDescription>
-            You are the sole owner of <span className="font-semibold">{org.name}</span>. Transfer
-            ownership to another member before leaving.
+            You are the sole owner of <strong>{org.name}</strong>. Transfer ownership to another
+            member before leaving.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col gap-2">

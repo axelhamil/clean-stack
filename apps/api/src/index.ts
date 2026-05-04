@@ -2,19 +2,19 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
-import { env } from "../common/env";
-import { logger } from "../common/logger";
+import { auth } from "./auth";
+import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
+import { rgpdMeRoutes } from "./modules/rgpd/routes";
+import { uploadsRoutes } from "./modules/uploads/routes";
+import { env } from "./shared/env";
+import { logger } from "./shared/logger";
 import {
   type AuthVariables,
   requireAuth,
   sessionMiddleware,
-} from "./adapters/middleware/auth.middleware";
-import { errorHandler } from "./adapters/middleware/error.middleware";
-import { httpLogger } from "./adapters/middleware/logger.middleware";
-import { auth } from "./auth";
-import { internalRoutes } from "./routes/internal.routes";
-import { meRoutes } from "./routes/me.routes";
-import { uploadsRoutes } from "./routes/uploads.routes";
+} from "./shared/middleware/auth.middleware";
+import { errorHandler } from "./shared/middleware/error.middleware";
+import { httpLogger } from "./shared/middleware/logger.middleware";
 
 type AppEnv = {
   Variables: AuthVariables & {
@@ -39,16 +39,16 @@ app.use("*", sessionMiddleware);
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
-app.onError(errorHandler);
-
-app.route("/internal", internalRoutes);
+app.route("/internal", rgpdInternalRoutes);
 
 const routes = app
   .get("/health", (c) => c.json({ status: "ok" as const }))
   .get("/ready", (c) => c.json({ status: "ok" as const }))
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
-  .route("/me", meRoutes)
+  .route("/me", rgpdMeRoutes)
   .route("/uploads", uploadsRoutes);
+
+app.onError(errorHandler);
 
 logger.info({ port: env.PORT, env: env.NODE_ENV }, "api ready");
 

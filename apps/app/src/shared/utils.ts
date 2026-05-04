@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { formatApiError } from "./api/errors/messages";
 
 export interface DisplayUser {
   name?: string | null;
@@ -26,6 +27,19 @@ export function initialsOf(value: string): string {
   );
 }
 
+function rawMessage(err: unknown): string | undefined {
+  if (err instanceof Error) return err.message;
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+  return undefined;
+}
+
 export function toastError(err: unknown, fallback: string): void {
-  toast.error(err instanceof Error ? err.message : fallback);
+  toast.error(formatApiError(err, rawMessage(err) ?? fallback));
 }

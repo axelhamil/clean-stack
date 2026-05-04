@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { toastError } from "../../../shared/utils";
 
 interface UsePasskeyAutofillOptions {
   enabled: boolean;
@@ -39,7 +40,7 @@ export function usePasskeyAutofill({
         if (result?.error) {
           const message = result.error.message?.toLowerCase() ?? "";
           if (message.includes("not allowed")) return;
-          toast.error(result.error.message ?? "Passkey sign-in failed");
+          toastError(result.error, "Passkey sign-in failed");
           return;
         }
         toast.success("Welcome back");

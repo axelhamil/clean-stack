@@ -7,7 +7,7 @@ internal endpoints (`POST /internal/<job>`); you wire your own scheduler.
 
 | Endpoint | Body | What it does |
 |---|---|---|
-| `POST /internal/gdpr-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun }`. |
+| `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun }`. |
 
 ## Authentication
 
@@ -36,21 +36,23 @@ INTERNAL_AUTH_LAYERS=signature
 
 ## Triggering — use the signed-fetch helper
 
-The boilerplate ships `apps/api/scripts/internal-fetch.ts`. Same module the
+The boilerplate ships `apps/api/src/shared/internal-fetch.ts`. Same module the
 caller imports; same canonical-message function the API uses to verify.
 
+**The wrapper script you write** (called `rgpd-sweep.ts` below — name and path are yours; the wiring sections show it under `/app/`, `.github/cron/`, your scheduler's startCommand, etc.). Not part of the API bundle, not checked into `apps/api/`. Lives in whatever repo runs your cron:
+
 ```ts
-// my-cron.ts
-import { signedInternalFetch } from "@apps/api/scripts/internal-fetch";
+// rgpd-sweep.ts (in your scheduler service / GH Actions repo / K8s image)
+import { signedInternalFetch } from "@apps/api/src/shared/internal-fetch";
 
 const res = await signedInternalFetch({
   baseUrl: process.env.INTERNAL_API_URL!,   // https://api.railway.internal:3000
   method: "POST",
-  path: "/internal/gdpr-sweep",
+  path: "/internal/rgpd-sweep",
   body: { dryRun: false },
   signingKey: process.env.INTERNAL_SIGNING_KEY!,
 });
-if (!res.ok) throw new Error(`gdpr-sweep failed: ${res.status} ${await res.text()}`);
+if (!res.ok) throw new Error(`rgpd-sweep failed: ${res.status} ${await res.text()}`);
 ```
 
 For ad-hoc curl in dev, mint a signature with a tiny script — don't try to
@@ -67,20 +69,22 @@ and signs each request. With `INTERNAL_AUTH_LAYERS=signature,private-network`
 you get both barriers active.
 
 ```jsonc
-// railway.json (cron service)
+// railway.json (cron service — own repo / own service)
 {
   "deploy": {
-    "startCommand": "bun apps/api/scripts/cron/gdpr-sweep.ts",
+    "startCommand": "bun rgpd-sweep.ts",
     "cronSchedule": "0 3 * * *"
   }
 }
 ```
 
+`rgpd-sweep.ts` is a one-shot wrapper you write in your scheduler service that imports `signedInternalFetch` and calls `/internal/rgpd-sweep`. Not part of the API bundle.
+
 ### GitHub Actions cron
 
 ```yaml
-# .github/workflows/gdpr-sweep.yml
-name: GDPR sweep
+# .github/workflows/rgpd-sweep.yml
+name: RGPD sweep
 on:
   schedule:
     - cron: "0 3 * * *"
@@ -92,14 +96,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v1
       - run: bun install
-      - run: bun apps/api/scripts/cron/gdpr-sweep.ts
+      - run: bun .github/cron/rgpd-sweep.ts
         env:
           INTERNAL_API_URL: ${{ secrets.API_URL }}
           INTERNAL_SIGNING_KEY: ${{ secrets.INTERNAL_SIGNING_KEY }}
 ```
 
-`apps/api/scripts/cron/gdpr-sweep.ts` is a 10-line wrapper around
-`signedInternalFetch` — drop it next to your scheduler config.
+`.github/cron/rgpd-sweep.ts` is your 10-line wrapper around `signedInternalFetch` — checked into the repo running the cron, not the API.
 
 ### K8s CronJob
 
@@ -109,7 +112,7 @@ Build a small image that includes the script and run it on a schedule:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: gdpr-sweep
+  name: rgpd-sweep
 spec:
   schedule: "0 3 * * *"
   jobTemplate:
@@ -117,9 +120,9 @@ spec:
       template:
         spec:
           containers:
-            - name: gdpr-sweep
+            - name: rgpd-sweep
               image: your-registry/cron-runner:latest
-              command: ["bun", "apps/api/scripts/cron/gdpr-sweep.ts"]
+              command: ["bun", "/app/rgpd-sweep.ts"]
               env:
                 - name: INTERNAL_API_URL
                   value: "http://api.svc.cluster.local:3000"
@@ -141,7 +144,7 @@ lockstep with the verifier.
 
 - **Idempotent**: re-running the sweep within the same minute is safe — rows
   already wiped have `deletedAt IS NOT NULL` and are filtered out.
-- **Batched**: default `batchSize=50` (configurable via `GDPR_SWEEP_BATCH_SIZE`
+- **Batched**: default `batchSize=50` (configurable via `RGPD_SWEEP_BATCH_SIZE`
   env var or per-call body). For large pending queues, schedule the cron
   more frequently rather than raising the batch size.
 - **Failures don't cascade**: a failure on one user is logged and the sweep

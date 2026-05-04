@@ -10,8 +10,8 @@ import { Label } from "@packages/ui/components/ui/label";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { DataExportCard } from "../gdpr/components/data-export-card";
-import { GdprDeletionCard } from "../gdpr/components/gdpr-deletion-card";
+import { DataExportCard } from "../rgpd/components/data-export-card";
+import { RgpdDeletionCard } from "../rgpd/components/rgpd-deletion-card";
 import { PasskeysCard } from "../security/components/passkeys-card";
 import { SessionsCard } from "../security/components/sessions-card";
 import { TwoFactorCard } from "../security/components/two-factor-card";
@@ -45,7 +45,7 @@ export function AccountPage() {
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
       <SessionsCard currentSessionToken={sessionToken} />
       <DataExportCard lastExportRequestedAt={user.lastExportRequestedAt} />
-      <GdprDeletionCard
+      <RgpdDeletionCard
         pendingDeletionUntil={user.pendingDeletionUntil}
         twoFactorEnabled={user.twoFactorEnabled === true}
       />

@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { authClient } from "../../auth/auth-client";
+import { AUTH_QUERY_STALE_TIME_MS } from "../../auth/auth-stale-time";
 
 export const currentMembershipQueryOptions = queryOptions({
   queryKey: ["current-membership"] as const,
@@ -13,5 +14,5 @@ export const currentMembershipQueryOptions = queryOptions({
     }
     return data ?? null;
   },
-  staleTime: 5 * 60 * 1000,
+  staleTime: AUTH_QUERY_STALE_TIME_MS,
 });

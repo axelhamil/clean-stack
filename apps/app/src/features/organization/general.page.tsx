@@ -44,7 +44,13 @@ export function GeneralPage() {
 
   const onLeaveSuccess = async () => {
     const orgs = await queryClient.fetchQuery(orgsListQueryOptions);
-    if (orgs[0]) await switchOrg(orgs[0].id);
+    if (orgs[0]) {
+      await switchOrg(orgs[0].id);
+    } else {
+      // No org left to switch to — `switchOrg` would have broadcasted; do it manually
+      // so other tabs invalidate their stale activeOrganizationId.
+      broadcastAuthChange();
+    }
     toast.success("Left organization");
     void navigate({ to: "/dashboard" });
   };
@@ -133,8 +139,7 @@ export function GeneralPage() {
                     title="Leave organization"
                     description={
                       <>
-                        You will lose access to <span className="font-semibold">{org.name}</span>{" "}
-                        and its resources.
+                        You will lose access to <strong>{org.name}</strong> and its resources.
                       </>
                     }
                     actionLabel="Leave organization"

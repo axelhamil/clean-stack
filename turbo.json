@@ -4,14 +4,15 @@
   "globalDependencies": [
     "biome.json",
     "pnpm-workspace.yaml",
-    ".env",
-    ".env.local",
-    ".env.production"
+    "**/.env",
+    "**/.env.local",
+    "**/.env.production"
   ],
   "globalEnv": ["DATABASE_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "with": ["type-check"],
       "inputs": [
         "src/**",
         "common/**",

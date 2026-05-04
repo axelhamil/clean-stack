@@ -8,7 +8,7 @@ Two flavors of feature:
   - `<name>.route.tsx` — the route definition: `export const <name>Route = createRoute({ getParentRoute: () => <parent>, path, beforeLoad, validateSearch, component: lazyRouteComponent(() => import("./<name>.page"), "<Name>Page") })`. Parent imported from `../../router/layouts`. Lightweight, no JSX.
   - `<name>.page.tsx` — the Page component as a named export. Accesses route context/search/params via `const route = getRouteApi("/full/path/id"); route.useSearch()` etc. Never `import { <name>Route }` from the route file (cycle).
   - Examples: `auth/sign-in.{route,page}.tsx`, `billing/billing.{route,page}.tsx`, `dashboard/dashboard.{route,page}.tsx`, `account/account.{route,page}.tsx`.
-- **Library** (zero-route compositional bundles): no `.route.tsx` / `.page.tsx`, only components/forms/hooks designed to be composed by a route-owning feature's page. Examples: `security/` (passkeys + 2FA + sessions cards), `gdpr/` (data export + deletion cards). A route-owning page MAY import from a library feature; the reverse is forbidden.
+- **Library** (zero-route compositional bundles): no `.route.tsx` / `.page.tsx`, only components/forms/hooks designed to be composed by a route-owning feature's page. Examples: `security/` (passkeys + 2FA + sessions cards), `rgpd/` (data export + deletion cards). A route-owning page MAY import from a library feature; the reverse is forbidden.
 
 The 2-file route+page split is the price for code-splitting: the bundler only chunks modules reachable solely via dynamic `import()`. Merging would move the page into `router.tsx`'s static graph and bust the lazy chunk. Accept it.
 

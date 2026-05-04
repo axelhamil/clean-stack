@@ -47,10 +47,12 @@ function messageFromCode(code: string): string | undefined {
 }
 
 export function formatApiError(err: unknown, fallback: string): string {
-  const code = (err as ApiError).code;
-  if (code) {
-    const message = messageFromCode(code);
-    if (message) return message;
+  if (typeof err === "object" && err !== null) {
+    const code = (err as ApiError).code;
+    if (code) {
+      const message = messageFromCode(code);
+      if (message) return message;
+    }
   }
   return fallback;
 }

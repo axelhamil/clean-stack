@@ -230,9 +230,6 @@ importers:
         specifier: '>=4.0.0'
         version: 4.3.6
     devDependencies:
-      '@packages/drizzle':
-        specifier: workspace:*
-        version: link:../drizzle
       '@packages/test':
         specifier: workspace:*
         version: link:../test
@@ -257,6 +254,9 @@ importers:
 
   packages/drizzle:
     dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../ddd-kit
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2

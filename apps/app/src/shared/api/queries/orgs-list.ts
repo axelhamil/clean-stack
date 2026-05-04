@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { authClient } from "../../auth/auth-client";
+import { AUTH_QUERY_STALE_TIME_MS } from "../../auth/auth-stale-time";
 
 export const orgsListQueryOptions = queryOptions({
   queryKey: ["orgs"] as const,
@@ -10,5 +11,5 @@ export const orgsListQueryOptions = queryOptions({
     if (error) throw error;
     return data ?? [];
   },
-  staleTime: 5 * 60 * 1000,
+  staleTime: AUTH_QUERY_STALE_TIME_MS,
 });

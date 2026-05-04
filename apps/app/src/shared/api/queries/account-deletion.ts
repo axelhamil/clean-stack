@@ -4,7 +4,7 @@ import { api } from "../api-client";
 const $preflight = api.me.delete.preflight.$get;
 
 export const preflightDeletionQueryOptions = queryOptions({
-  queryKey: ["gdpr", "preflight-deletion"] as const,
+  queryKey: ["rgpd", "preflight-deletion"] as const,
   queryFn: async () => {
     const res = await $preflight();
     if (!res.ok) throw new Error(`Preflight failed: HTTP ${res.status}`);

@@ -101,8 +101,8 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
             title="Remove member"
             description={
               <>
-                <span className="font-semibold">{member.user.name ?? member.user.email}</span> will
-                lose access to this organization. This cannot be undone.
+                <strong>{member.user.name ?? member.user.email}</strong> will lose access to this
+                organization. This cannot be undone.
               </>
             }
             actionLabel="Remove member"
