@@ -1,3 +1,30 @@
+## [1.11.1](https://github.com/axelhamil/clean-stack/compare/v1.11.0...v1.11.1) (2026-05-04)
+
+### ⚠ BREAKING CHANGES
+
+* API src layout. `apps/api/src/{adapters,application,domain,
+routes,di}` removed in favor of `src/{modules,shared}` + flat
+`src/container.ts`. `apps/api/{common,scripts}` consolidated under
+`src/shared`. `gdpr`→`rgpd` everywhere. Forks must rewrite imports and DI
+registration (now `defineModule()` + `.addModule()`).
+* **app:** import paths changed across apps/app/src/. Any
+consumer of routes/, adapters/, common/, providers/, or pages/
+sub-folders inside features must update to the new shared/ +
+<feature>.route.tsx layout.
+
+### Performance
+
+* **app:** code-split routes via lazy components, wire devtools, add 5-min tutorial ([65b2234](https://github.com/axelhamil/clean-stack/commit/65b22346703e2ff810e555215b9837abffa4ab47))
+
+### Refactor
+
+* **app:** pivot to vertical-slice + code-based routing ([d596e9d](https://github.com/axelhamil/clean-stack/commit/d596e9d334a17cb37a9fdbd5c3f3fd8b102a6e3d))
+* pivot api+app to vertical-slice modular monolith with audit-grade hygiene ([b8ddc4f](https://github.com/axelhamil/clean-stack/commit/b8ddc4f71edcd9913343a12f0dcdfecab7b0d6d4))
+
+### Documentation
+
+* document the 2-file route+page split, getrouteapi pattern, and devtools wiring ([4c40dcf](https://github.com/axelhamil/clean-stack/commit/4c40dcffa711d807ae87ebcbff9891b0ba0b8f9c))
+
 ## [1.11.0](https://github.com/axelhamil/clean-stack/compare/v1.10.0...v1.11.0) (2026-05-03)
 
 ### Features
