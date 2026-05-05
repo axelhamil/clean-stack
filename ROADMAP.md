@@ -12,10 +12,21 @@ Read top-to-bottom. Each phase assumes the previous is done. Items inside a phas
 
 **Phase 0 — Foundation closeout (blocks Phase B)**
 
+0.0. **Clone-ability bootstrap — URGENT (regression on boilerplate contract)** — surfaced by external feedback on `dev` (issue 2026-05): a fresh clone fails to bootstrap on Linux. The boilerplate's whole promise is "clone → run", so this jumps every other Phase 0 item. Punch list:
+   - [ ] **Root `.env.example` + `pnpm setup` dispatcher** — currently two `.env` files live in `apps/app/` + `apps/api/` with no root pointer. New cloner has no idea where to start. Ship a root `.env.example` documenting both, plus a `pnpm setup` script that copies+dispatches to the right paths. Document the *why* (monorepo isolation of front/back secrets) so the split isn't read as accidental.
+   - [ ] **Minio behind Docker Compose profile `storage`** — Minio binds port 9000 (frequently taken on dev machines, picky about ports) and isn't needed to evaluate the boilerplate. Move it under `profiles: [storage]` in `compose.yaml` so `docker compose up -d` only starts Postgres by default; `docker compose --profile storage up -d` opts into Minio. Make the Minio port env-driven (`MINIO_PORT`, default 9000).
+   - [ ] **README — Docker Compose v2 prereq explicit** — `docker compose` (no hyphen) is v2, shipped since 2021, available on Linux via `docker-compose-plugin` package. `docker-compose` (with hyphen) is the deprecated v1. README must call this out + give the install command per distro (apt/dnf/pacman/brew), otherwise Linux users on stale Docker hit "command not found" and assume the project is Mac-only.
+   - [ ] **`pnpm db:push` Linux repro + fix** — reported failing on a Linux clone, unreproduced on Arch. Need to (1) reproduce on a clean Ubuntu/Debian VM, (2) trace the failure (likely Postgres port `5433` collision, missing `DATABASE_URL`, or Drizzle Kit + Bun interaction), (3) fix root cause + add a smoke check to `pnpm setup` that calls `db:push` and surfaces the exact error.
+   - [ ] **Bootstrap smoke test in CI** — fresh-clone simulation in CI (`docker compose up -d postgres && pnpm install && pnpm setup && pnpm db:push && pnpm dev` headless for 30s, assert API + app respond). Catches every "works on my machine" regression before users hit it. Runs on `ubuntu-latest` (the most-cloned target).
+   - [ ] **`docs/QUICKSTART.md`** — single-page "0 → running app in 5 min" doc, linked from README header. Currently bootstrap knowledge is spread across CLAUDE.md + scattered READMEs; cloner shouldn't need to read sub-CLAUDE.md to start the dev server.
+
+   **Why this jumps the rest of Phase 0**: every other roadmap item assumes a clone that *runs*. Health probes / backups / observability are pointless if the cloner abandons at step 1. Closes the "marche sur ma machine" gap that separates a real boilerplate from a personal repo.
+
 0.1. **Vertical-slice back step 4 — DB schema split** — last residual front of the layout pivot. Today `packages/drizzle/src/schema/auth.ts` bundles auth + multi-tenant + RGPD fields. Split per context before Billing's `subscription` / `payment` tables land in the wrong file. Detailed plan in the *Vertical-slice layout* section below.
-0.2. **`/health` + `/ready` endpoints** — Kubernetes/Railway/Fly/Cloudflare Workers all probe these. 30-min ship; absence blocks every modern PaaS deploy. Detailed in *Health probes* below.
+0.2. **Health probes — `/livez` + `/readyz` + `/startupz`** — three-probe model (K8s 2026 convention, suffix `z`), IETF `draft-inadarei` response format with tri-state pass/warn/fail, registry pattern (vertical-slice module). Wires graceful shutdown to `/readyz` for true zero-downtime deploys. Absence = restart loops, no rolling deploys, 502s during deploys. Detailed in *Health probes* below.
 0.3. **Backups `pg_dump` + restore tested** — `3-2-1` rule (3 copies, 2 medias, 1 offsite), retention 30d, monthly automated restore-test. A backup never tested isn't a backup. Documents `RPO` / `RTO` in `docs/DISASTER-RECOVERY.md`. Detailed in *Backups & DR* below.
-0.4. **Removability dry-run on `rgpd`** — first leaf module to remove end-to-end + restore, validates the contract and feeds `docs/HISTORY.md` with the canonical "remove a feature" diff.
+0.4. **Error tracking + structured logging fan-out (removable observability stack)** — Sentry api+app, OpenTelemetry auto-instrumentation, Prometheus `/metrics`. Architected as **detachable**: cross-cutting ports (`IErrorTracker`/`IMetrics`/`ITracer`) with NoOp adapters always shipped in `shared/services/`, real adapters live in `modules/observability/` (one trash + one DI line removes the lot in 5 min, callers keep working). **Why before Phase A**: every phase A/B/C ships prod code; without Sentry active from day one, you're blind on errors until Phase D.1, six phases away. Detailed in *Error tracking & observability* below.
+0.5. **Removability dry-run on `rgpd`** — first leaf module to remove end-to-end + restore, validates the contract and feeds `docs/HISTORY.md` with the canonical "remove a feature" diff.
 
 **Phase A — Legal + accessibility completeness (close it in one push, never touch again)**
 
@@ -44,12 +55,14 @@ C.5. **Outbound webhooks** — emit events to customer systems (HMAC-signed, ret
 C.6. **Account recovery codes** — BetterAuth `twoFactor` already supports them, UI missing. Quick win, parked here.
 C.7. **SSO SAML/OIDC + SCIM provisioning** — BetterAuth `sso` plugin + SCIM endpoint. **Single biggest enterprise-tier multiplier** ($10-30k client-side per deal). Depends on C.2 (audit) + C.3 (admin) + C.4 (token primitive). Unlocks Enterprise plan in B.
 
-**Phase D — Observability + readiness**
+**Phase D — Customer-facing readiness (the trust + integration layer)**
 
-D.1. **Observability stack + status page** — OpenTelemetry traces, Prometheus `/metrics`, error tracking (GlitchTip self-hosted), public status page (`status.<domain>` — Cachet self-hosted or Astro maison). **First in D** — debugging blind in production is the next failure mode after Phase C ships real customer-facing surfaces; status page is the trust signal that closes enterprise deals.
+> Internal observability (Sentry / OTel / Prom `/metrics`) ships in **Phase 0.4** — not here. Phase D builds the *outward-facing* surfaces on top of accumulated obs data.
+
+D.1. **Status page + SLO dashboards + alerting** — public `status.<domain>` (Cachet self-hosted or Astro maison) + Grafana SLO dashboards (consume Phase 0.4 `/metrics`) + alerting policies (Sentry → Slack/PagerDuty, runbook-linked). **After Phase C** — needs accumulated `/metrics` baselines, audit log for incident timelines, admin for incident creation, customer-facing surfaces (PATs/webhooks) worth monitoring.
 D.2. **OpenAPI schema docs** — auto-generated from Hono routes (`@hono/zod-openapi`), served at `/api/docs` (Scalar UI). Mandatory the day customers integrate via C.4 PATs.
 D.3. **In-app notification center** — persistent inbox (`<Bell />`, `/settings/notifications` preferences, transactional vs marketing per category). Independent of D.1/D.2; can ship in parallel.
-D.4. **SOC2 Type II readiness checklist** (`docs/SOC2-CHECKLIST.md`) — Vanta/Drata-ready: mapping each shipped item (audit log, admin, backups, obs, RGPD, SSO) to the relevant SOC2 controls (`CC6.x` access, `CC7.x` ops, `CC8.x` change mgmt). Pure docs, but signals enterprise-grade.
+D.4. **SOC2 Type II readiness checklist** (`docs/SOC2-CHECKLIST.md`) — Vanta/Drata-ready: mapping each shipped item (audit log, admin, backups, obs from 0.4, RGPD, SSO) to the relevant SOC2 controls (`CC6.x` access, `CC7.x` ops, `CC8.x` change mgmt). Pure docs, but signals enterprise-grade.
 
 **Phase E — International + growth**
 E.1. **i18n** (TanStack Router locale routes + Lingui) — every shipped UI string gets refactored once, so doing this early-in-E means Marketing site (E.2) inherits localized routing patterns.
@@ -70,12 +83,63 @@ F.2. **Feature flags** — GrowthBook self-hosted, decouples deploy from release
 
 ## Health probes — **Phase 0.2**
 
-**Why**: Kubernetes / Railway / Fly.io / Cloudflare Workers / Render all probe `/health` (liveness — process up) and `/ready` (readiness — dependencies reachable). Absence = restart loops, no rolling deploys. 30-min ship.
+**Why**: Kubernetes / Railway / Fly.io / Cloudflare Workers / Render all probe liveness/readiness/startup. Absence = restart loops, no rolling deploys, 502s during deploys. SOTA 2026 = three probes (not two), draft-inadarei response format, graceful shutdown wired to `/readyz`.
 
-- [ ] `GET /health` — returns 200 `{ status: "ok", uptimeMs, version }` from `apps/api/src/shared/routes/health.ts`. **No DB hit** (must succeed even if DB down — liveness is "process up").
-- [ ] `GET /ready` — returns 200 only if (a) DB reachable (`SELECT 1`), (b) R2 reachable (`HeadBucket`), (c) Resend reachable (cached health, refresh every 30s). 503 + structured payload listing failed dependencies otherwise.
-- [ ] Both routes mounted **outside** `requestId` + `requireAuth` (deploy probes don't carry session cookies); kept off the request log to avoid drowning prod logs.
-- [ ] Document expected probe shape in `README.md` deploy section (one example per target: Railway / Fly / Workers).
+**Endpoint shape — convention K8s 2026** (`z` suffix is the official one; `/health` / `/ready` are the legacy names):
+
+- [ ] `GET /livez` — liveness. Returns 200 with `{ status, version, commitSha, buildTime, runtime, uptimeMs }`. **No dependency hit** (a DB outage must NOT restart pods — would cause thundering herd). `commitSha`/`buildTime` injected at build via `GIT_SHA` / `BUILD_TIME` env vars (CI sets them).
+- [ ] `GET /readyz` — readiness. Aggregates registered checks (DB `SELECT 1`, R2 `HeadBucket`, Resend cached health). Returns 200 if all `pass`/`warn`, 503 if any critical check is `fail`.
+- [ ] `GET /startupz` — startup probe (K8s 1.16+). Distinct from liveness so a slow boot (warming caches, DI graph build) doesn't get killed by a tight liveness threshold. Returns 200 once initial bootstrap completes; 503 before.
+
+**Response format — IETF `draft-inadarei-api-health-check-06`** (Datadog / New Relic / Grafana parse it natively):
+
+```json
+{
+  "status": "pass" | "warn" | "fail",
+  "version": "1.11.1",
+  "checks": {
+    "db:postgres": [{ "status": "pass", "time": "2026-05-04T23:00:00Z", "observedValue": 12, "observedUnit": "ms" }],
+    "storage:r2":  [{ "status": "pass", "time": "...", "observedValue": 38, "observedUnit": "ms" }],
+    "email:resend": [{ "status": "warn", "output": "cached, last refresh 25s ago" }]
+  }
+}
+```
+
+- [ ] **Tri-state status** (`pass`/`warn`/`fail`) — non-binary. Resend down + DB up = `warn` + 200 (degraded but functional). DB down = `fail` + 503 (truly unhealthy). Aligns with the draft and avoids the "everything red because Resend hiccup'd" problem.
+- [ ] **Per-check `observedValue` + `observedUnit`** — latency in ms; populates Phase D.1 SLO dashboards for free.
+- [ ] **Prod payload minimal** — outside `NODE_ENV !== "production"`, only the top-level `status` field is returned to avoid leaking infra details (DB host, bucket name in error messages). Full payload in dev/staging.
+
+**Architecture — registry pattern, futureproof**:
+
+- [ ] `apps/api/src/modules/health/` — vertical-slice module. `IHealthCheckRegistry` port (`register(name, fn, { critical: boolean })`); each module registers its own checks at boot (`db.register("db:postgres", probeDb, { critical: true })`). `/readyz` iterates the registry. **Why a module**: when Stripe / Redis / GrowthBook ship, each module adds 1 line to register its check — no edits to the health endpoint.
+- [ ] `IHealthCheckRegistry` exposed to other modules via `shared/ports/health.port.ts` (cross-module port, two consumers minimum: rgpd + uploads register storage health from existing impls).
+
+**Robustness — what kills probes in production**:
+
+- [ ] **Cache positive 30s + cache negative 5s** — healthy result is cached 30s (don't hammer Resend on every PaaS probe, ~6 req/sec); failed result cached only 5s (re-check fast, restore quickly). Asymmetric cache is the SOTA pattern.
+- [ ] **Self-cancelling timeout 5s on `/readyz`** — `Promise.race(check, timeoutFail(5000))`. A probe that hangs blocks rolling deploys.
+- [ ] **No PII in fail payloads** — never return stack traces, hostnames, env-var values, full DB error messages. Just the failed check name + a generic code (`db: down`).
+
+**Graceful shutdown — wired to `/readyz`** (the single most critical zero-downtime piece, and the one most boilerplates skip):
+
+- [ ] On `SIGTERM` (PaaS sends it before kill), set an in-memory `isShuttingDown = true` flag. `/readyz` immediately returns 503 — the LB stops routing new requests to this pod within one probe interval (~5s).
+- [ ] Wait `SHUTDOWN_GRACE_PERIOD_MS` (default 15s — env-tunable per PaaS) for in-flight requests to drain. Then `Bun.serve.stop()` + close DB pool + flush pino transport.
+- [ ] **Why critical**: without this, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
+
+**Phase D.1 prep — Prometheus metrics** (cheap to wire now, expensive to retrofit):
+
+- [ ] `GET /metrics` — `prom-client` exports `up{check="db:postgres"} 1|0` per registered check + `health_check_duration_ms{check}` histogram. ~15 LOC. When D.1 status page lands, it consumes `/metrics` directly — no rework.
+- [ ] Gate `/metrics` behind a shared secret header (`X-Metrics-Token` env var) — prevents random scraping from public internet.
+
+**Mounting + observability**:
+
+- [ ] All three probes (`/livez`, `/readyz`, `/startupz`) and `/metrics` mounted **outside** `requestId` + `httpLogger` + `requireAuth`. Probes don't carry session cookies, and a probe every 5s would drown prod logs (~17 280/day per pod).
+- [ ] Probes excluded from rate-limiting (Phase C.1) — PaaS probe IPs aren't predictable.
+
+**Documentation**:
+
+- [ ] `README.md` deploy section — one config example per target: Railway (`railway.toml` healthchecks), Fly.io (`fly.toml [[checks]]`), Cloudflare Workers (no probes — N/A note), Render (`render.yaml healthCheckPath`), Kubernetes (manifest snippet with `livenessProbe` + `readinessProbe` + `startupProbe`).
+- [ ] `docs/HEALTH-PROBES.md` — registry usage (how to register a check from a new module), draft-inadarei format reference, graceful-shutdown rationale, monitoring integration recipes (Datadog, Grafana).
 
 ---
 
@@ -89,6 +153,97 @@ F.2. **Feature flags** — GrowthBook self-hosted, decouples deploy from release
 - [ ] **`docs/DISASTER-RECOVERY.md`** — RPO (max acceptable data loss = 24h with daily dump, 1h target with PITR enabled), RTO (max acceptable downtime = 1h), runbook for restore (commands, verification steps, rollback decision tree).
 - [ ] **PITR (Point-in-Time Recovery)** documented as prod requirement — Neon/Supabase/managed-Postgres all expose it; self-hosted Postgres needs `wal_level=replica` + `pg_basebackup` + WAL shipping. README deploy section flags this.
 - [ ] **R2 bucket versioning + delete protection** on the backup bucket — guards against accidental `aws s3 rm --recursive`.
+
+---
+
+## Error tracking + structured logging fan-out — **Phase 0.4**
+
+**Why before Phase A**: every phase A/B/C ships prod code. Without Sentry active from day one, you're blind on errors until Phase D.1 — six phases away. The wiring cost today (~2-3h, this phase) is dwarfed by the cost of debugging without traces/breadcrumbs across all of A, B, C. SOTA 2026 boilerplates ship error tracking before customer-facing features, not after.
+
+**Why detachable matters more than which provider**: a clone might want Sentry, GlitchTip self-hosted, Highlight, or no error tracking at all (closed network, classified env). The architecture below makes the provider a 1-line swap and the whole stack a 5-min trash. **Removability is the contract**, providers come and go.
+
+### Architecture — ports + NoOp default + retirable module
+
+The pattern mirrors what's already shipped for `email.port` (Resend swappable) and `storage.port` (R2/MinIO swappable):
+
+```
+apps/api/src/
+  shared/
+    ports/
+      error-tracker.port.ts    IErrorTracker { capture(err, ctx), addBreadcrumb(crumb) }
+      metrics.port.ts          IMetrics { increment, histogram, gauge }
+      tracer.port.ts           ITracer { startSpan, withSpan }
+    services/
+      noop-error-tracker.ts    Always shipped — silent no-op
+      noop-metrics.ts          Always shipped
+      noop-tracer.ts           Always shipped
+  modules/observability/        ← retirable module
+    infrastructure/
+      sentry-error-tracker.ts  @sentry/bun adapter
+      prom-metrics.ts          prom-client adapter
+      otel-tracer.ts           OTel auto-instrumentation
+    routes.ts                  GET /metrics (Prom scrape, gated by X-Metrics-Token)
+    module.ts                  Overrides DI bindings WHEN env vars present
+```
+
+- [ ] **Default container bindings** (in `container.ts`, always present) bind `IErrorTracker`/`IMetrics`/`ITracer` to NoOp impls. Code calling `di.IErrorTracker.capture(err)` works regardless of whether the observability module ships.
+- [ ] **Module overrides bindings conditionally**: `env.SENTRY_DSN` → SentryAdapter, else NoOp. `env.PROM_TOKEN` → PromAdapter, else NoOp. Environment is the toggle, not a feature flag.
+- [ ] **3 ports, not 1 fat `IObservability`** — Sentry/Prom/OTel are independent providers with independent SDKs. Fusing them forces cross-deps between unrelated adapters. SOTA 2026 = 3 ports.
+
+**Removal contract — 5 min, validated as part of this phase**:
+
+1. `trash apps/api/src/modules/observability`
+2. Remove `.addModule(observabilityModule)` from `container.ts` (1 line)
+3. Remove `app.route("/metrics", metricsRoutes)` from `index.ts` (1 line)
+4. `.env`: unset `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `PROM_TOKEN`
+5. Front: `trash apps/app/src/shared/observability/sentry.ts` + remove 1 `Sentry.init()` line from `main.tsx`
+
+All call-sites (`di.IErrorTracker.capture(...)`, `<ErrorBoundary>` in app) keep working — they hit NoOp impls in `shared/services/`. **Zero refactor.** This removal must be exercised in the same phase that ships the observability module — otherwise the contract drifts.
+
+### Sentry — error tracking (api + app)
+
+**API**:
+
+- [ ] `@sentry/bun` SDK (native Bun support since 2024 — no Node shim).
+- [ ] Init in `modules/observability/infrastructure/sentry-error-tracker.ts`. Module-level singleton, **deliberate exception** to DI (same rationale as BetterAuth: wrapping recopies the SDK API and loses typing).
+- [ ] Hook into the existing `errorHandler` middleware: capture `>= 500` only, skip 4xx (operational, not error). Tags auto-populated from Hono context: `requestId`, `userId` (from session), `orgId` (from `c.var.orgId` when present).
+- [ ] **`beforeSend` data scrubbing**: strip `email`, `name`, `Authorization` header, `Cookie` header, full request body. Whitelist-based, not blacklist (default = drop). RGPD-clean — gross differentiator for EU clients.
+- [ ] **Release tracking** ties to `commitSha` injected at build time (already used in `/livez` from Phase 0.2). `Sentry.init({ release: env.GIT_SHA })`. Lets you read a probe in a degraded pod and immediately diff against the previous release in Sentry.
+- [ ] **Source maps upload** at build via CI step — `@sentry/cli sourcemaps upload --release=$GIT_SHA`. Without this, prod stack traces are minified gibberish.
+- [ ] **Sentry EU region option** (`SENTRY_DSN` may point to `*.eu.sentry.io`) documented in `apps/api/.env.example` — RGPD data residency for EU clientele.
+
+**App**:
+
+- [ ] `@sentry/react` + `@sentry/vite-plugin` (auto source maps upload at build).
+- [ ] `apps/app/src/shared/observability/sentry.ts` — stable exported API: `captureError()`, `addBreadcrumb()`. NoOp impl in `noop.ts`, real impl in `sentry.ts` (swap by env: if `VITE_SENTRY_DSN` then real, else noop). Same removal contract.
+- [ ] **ErrorBoundary at router root** (in `__root.tsx` or `<AppProviders />`): captures render errors, displays a fallback, logs to Sentry. TanStack Router error boundary integration handles route-level errors automatically.
+- [ ] **Session replay opt-in** (free up to 50 sessions/month on Sentry SaaS, ~3KB additional bundle). Ship behind a separate env flag (`VITE_SENTRY_REPLAY=true`) so removal is independent. Privacy-first defaults: mask all input, mask all text, redact images.
+
+### Pino transport — structured logging fan-out
+
+- [ ] `@sentry/pino-transport` — every `logger.warn` / `logger.error` becomes a Sentry breadcrumb automatically. Single source of truth for logs; Sentry sees the same trail you see in stdout. **No double-capture** of the same event.
+- [ ] Pino remains the writer for stdout (PaaS log ingestion); Sentry transport runs in parallel. Keep the JSON line format unchanged so existing log parsers don't break.
+
+### OpenTelemetry — distributed tracing
+
+- [ ] `@opentelemetry/sdk-node` (works under Bun since 1.2+) with auto-instrumentation packages: `@opentelemetry/instrumentation-http` (Hono / Bun.serve), `@opentelemetry/instrumentation-pg` (Drizzle pool), `@opentelemetry/instrumentation-fetch` (outbound to Resend / R2 / Stripe later).
+- [ ] **Sentry consumes OTel natively since 2024** — set `tracesSampleRate: 0.1` and Sentry Performance picks up the spans without a second export pipeline. Single provider, two products (errors + performance).
+- [ ] **`traceparent` header propagation api ↔ app** — front injects via fetch interceptor in `api-client.ts`, api reads it in middleware. End-to-end traces from a click in the app to a DB query, gratis.
+- [ ] OTel SDK init lives in `modules/observability/infrastructure/otel-tracer.ts` — imported once at the top of `index.ts` (must run before any other instrumented module). Removing the module = remove the import = OTel disappears entirely.
+
+### Prometheus `/metrics` — for Phase D.1 dashboards
+
+- [ ] `prom-client` exposes histograms + counters via `IMetrics` port adapter.
+- [ ] Default metrics: HTTP request duration histogram (labels: route, method, status), DB query duration (from OTel pg instrumentation, exposed as Prom metric), business counters wired by each module (`registry.increment("rgpd.deletion.requested")`).
+- [ ] **Health checks export their state**: `up{check="db:postgres"} 1|0` from the registry built in Phase 0.2 — Phase D.1 status page reads `/metrics` directly without rework.
+- [ ] **`GET /metrics` mounted in observability module routes**, gated by `X-Metrics-Token` shared secret (env var). Mounted **outside** `requireAuth` (Prom scrapers don't carry sessions) and outside `httpLogger` (no log spam from 5s scrape interval).
+- [ ] Dropped if observability module is removed — and that's fine, no other code consumes `/metrics`.
+
+### Documentation
+
+- [ ] `docs/OBSERVABILITY.md` — port usage (how to capture an error, increment a counter, start a span), removal procedure (the 5-min contract), provider swap recipe (Sentry → GlitchTip self-hosted, drop-in API-compatible), data scrubbing rationale, EU region setup.
+- [ ] `apps/api/.env.example` — `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `PROM_TOKEN` documented with empty defaults (NoOp fallback).
+- [ ] `apps/app/.env.example` — `VITE_SENTRY_DSN`, `VITE_SENTRY_REPLAY`, `VITE_SENTRY_ENVIRONMENT`.
 
 ---
 
@@ -389,7 +544,7 @@ modules/consents/
 - [ ] **CC7.3 Incident response** — runbook in `docs/INCIDENT-RESPONSE.md`, status page (Phase D.1) + audit log + admin tools.
 - [ ] **CC7.4 Recovery from incidents** — backups + restore-tested (Phase 0.3), RPO/RTO documented in `docs/DISASTER-RECOVERY.md`.
 - [ ] **CC8.1 Change management** — semantic-release flow, conventional commits, PR review (CODEOWNERS), CI gates (Biome, knip, jscpd, type-check, Phase A.6 E2E + a11y).
-- [ ] **A.1 Availability** — health probes (Phase 0.2), monitoring (Phase D.1), status page (Phase D.1).
+- [ ] **A.1 Availability** — health probes (Phase 0.2), monitoring + error tracking (Phase 0.4), SLO dashboards + status page (Phase D.1).
 - [ ] **C.1 Confidentiality** — sub-processor list (Phase A.3), DPA (Phase A.3), encryption.
 - [ ] **P.x Privacy** (if SOC2 + Privacy add-on) — RGPD core, consent (A.4), rectification (A.1), erasure cascade.
 
@@ -401,17 +556,15 @@ modules/consents/
 
 ---
 
-## Observability stack + status page — **Phase D.1**
+## Status page + SLO dashboards + alerting — **Phase D.1**
 
-**Why bundled**: traces/metrics/errors give *you* visibility; status page gives *customers* visibility. Both feed off the same incident-detection signal — shipping them together avoids two separate cron/alert configurations. Today the boilerplate has `pino` JSON logs only — first production outage = blind debugging AND no customer-facing comms channel.
+**Why now (after Phase C ships customer-facing surfaces)**: Phase 0.4 already ships error tracking, OTel tracing, Prometheus `/metrics`. What's missing is the **customer-facing trust layer** (public status page) and the **operator-facing aggregation layer** (SLO dashboards + alerting policies). These depend on:
+- Months of `/metrics` data accumulated since Phase 0.4 (so SLO baselines are realistic, not invented)
+- Audit log from Phase C.2 (incident timeline correlation)
+- Admin from Phase C.3 (incident-creation UI in admin)
+- Customer-facing surfaces from Phase C.4 / C.5 (PATs, webhooks — the surfaces customers actually monitor)
 
-### Internal observability
-
-- [ ] **Tracing**: OpenTelemetry SDK (`@opentelemetry/auto-instrumentations-node` for Bun via shim, or native Bun OTel when stable). Hono middleware reads `traceparent` header, propagates. Export to Tempo / Jaeger / Honeycomb (env-driven OTLP endpoint).
-- [ ] **Metrics**: `/metrics` Prometheus endpoint, gated by signed signature like `/internal/*`. Default counters: HTTP requests by status, DB query duration p50/p95/p99, queue depth (when async lands).
-- [ ] **Error tracking**: GlitchTip self-hosted (FOSS Sentry-API-compatible). Hono `app.onError` ships unhandled errors via `@sentry/node` SDK. Ignore `HTTPException` 4xx (operational, not error).
-- [ ] Provider-agnostic via `IObservabilityService` port (no module — pure infra in `shared/services/`).
-- [ ] Default-on in production, opt-in in dev (`OBSERVABILITY_ENABLED=true`).
+Shipping a status page before there are customer integrations is theatre.
 
 ### Public status page
 
@@ -419,11 +572,33 @@ modules/consents/
 
 - [ ] **Cachet self-hosted** (FOSS, PHP — runs on a tiny VPS or Cloudflare container) OR a maison Astro static site (lighter, already aligned with Phase E.2 stack — decide at scaffold time).
 - [ ] `status.<APP_DOMAIN>` subdomain — separate cert, separate deployment, **never** the same host as the app (must stay up when app is down).
-- [ ] **Components tracked**: API (`apps/api` `/health` probe), App (Vite static), DB (cron pings `/ready`), Storage (R2 `HeadBucket`), Email (Resend status mirror).
-- [ ] **Incident workflow** — admin (Phase C.3) creates incident → posts updates → resolves. Audit-logged (Phase C.2).
-- [ ] **External uptime monitor** — UptimeRobot or BetterStack free tier hits `/health` every 60s from 3 regions, posts to status page on failure. Independent of internal obs (avoids "the monitoring is down too" failure mode).
+- [ ] **Components tracked**: API (`/livez` probe from Phase 0.2), App (Vite static), DB (cron pings `/readyz`), Storage (R2 `HeadBucket`), Email (Resend status mirror), Billing (Stripe status mirror once Phase B ships).
+- [ ] **Incident workflow** — admin (Phase C.3) creates incident → posts updates → resolves. Audit-logged (Phase C.2). Tied to Sentry alerts (Phase 0.4) — a Sentry alert can auto-open an incident draft.
+- [ ] **External uptime monitor** — UptimeRobot or BetterStack free tier hits `/livez` every 60s from 3 regions, posts to status page on failure. Independent of internal obs (avoids "the monitoring is down too" failure mode).
 - [ ] **RSS / email subscription** for status updates — Cachet ships this; if maison-Astro, hook into Resend audience.
 - [ ] Linked from `/legal/data-rights` + footer + Phase D.4 SOC2 readiness checklist.
+
+### SLO dashboards (Grafana)
+
+**Why**: Phase 0.4 already exposes `/metrics` Prometheus. Without dashboards on top, the data accumulates blind. SLOs (Service Level Objectives) translate raw metrics into "is the product healthy from a user perspective", which is what alerting fires on.
+
+- [ ] **Grafana self-hosted** (Docker, free) OR Grafana Cloud free tier (10k series). Scrapes `/metrics` from Phase 0.4 + Sentry API (errors). Removable with the same contract as Phase 0.4 — Grafana isn't wired to anything inside the app.
+- [ ] **Default SLO dashboards** shipped as JSON in `docs/grafana/`:
+  - **Availability SLO** — `(1 - errors_5xx / total_requests) * 100`, target 99.9%. Burn-rate alert at 14.4× (1h window) and 6× (6h window) — Google SRE recommended.
+  - **Latency SLO** — p95 < 500ms, p99 < 2s on critical paths (sign-in, dashboard load, settings save). Alert when p95 > target for 5min.
+  - **Error budget** — gauge showing how much budget remains in the rolling 28d window. Cross-team visibility for "are we shipping too fast".
+- [ ] **Per-module dashboards** — each module exports counters (`rgpd.deletion.requested`, `uploads.confirmed`, etc.), dashboards group by module. New module ships with its dashboard JSON in `apps/api/src/modules/<x>/grafana/` (cohérent vertical-slice).
+- [ ] **Removable**: Grafana lives outside the app entirely. Removal = stop the Grafana instance + delete `docs/grafana/`. Nothing in the app depends on it.
+
+### Alerting policies
+
+**Why**: error tracking (Phase 0.4) catches errors; SLO dashboards (above) measure health; **alerting routes both into the right human's pocket at the right escalation level**. Without alerting policies, alerts go to `#alerts` Slack and get muted within a week.
+
+- [ ] **Sentry → Slack/PagerDuty/Discord** integration — already supported by Sentry SaaS, configured via `docs/OBSERVABILITY.md` recipes. P1 (`status: fail` on `/readyz`, `>= 500` error rate spike) → PagerDuty + page on-call. P2 (single 5xx, performance regression) → Slack `#alerts` only.
+- [ ] **Alert routing rules per environment** — staging fires to Slack only (no page); prod fires to PagerDuty. Configured via Sentry projects, not hardcoded.
+- [ ] **Alert deduplication / fingerprinting** — one Sentry issue = one ongoing incident, not 1000 pages. Sentry handles this natively, but document the fingerprint customization (group by `requestId`'s root cause, not by stack frame).
+- [ ] **Runbooks linked from alerts** — every alert message includes a link to `docs/runbooks/<alert-name>.md`. Pre-populate runbooks for the top 5 SLOs (DB down, Sentry overflow, R2 unreachable, Resend down, signup spike). Sentry alert templates support markdown links.
+- [ ] **Alert fatigue audit, monthly** — script reads Sentry alert history, lists alerts that fired but were ignored / muted / quickly resolved. Output → `docs/runbooks/INCIDENT-LOG.md`. Forces pruning.
 
 ---
 
