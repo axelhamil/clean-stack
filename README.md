@@ -24,7 +24,7 @@ Two ways to run it. Pick one.
 
 ### Option A — Native (fastest hot reload)
 
-**Prerequisites** — [Bun 1.3+](https://bun.com/docs/installation), [Node 24+](https://nodejs.org), [pnpm 10](https://pnpm.io/installation), [Docker](https://docs.docker.com/engine/install/) with [Compose v2](https://docs.docker.com/compose/install/).
+**Prerequisites** — [Bun 1.3+](https://bun.com/docs/installation), [Node 24+](https://nodejs.org), [pnpm 10](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
 git clone https://github.com/axelhamil/clean-stack my-saas
@@ -40,16 +40,16 @@ pnpm dev                # API :3000, App :5173
 
 No Bun, no Node, no pnpm on your host. Everything runs in containers (api + app + Postgres) with hot reload via [`compose develop.watch`](https://docs.docker.com/compose/how-tos/file-watch/).
 
-**Prerequisites** — [Docker](https://docs.docker.com/engine/install/) with [Compose v2.22+](https://docs.docker.com/compose/install/) (the `develop.watch` minimum). Follow the official guide for your OS — do not use `apt install docker.io` (Canonical's package, not Docker Inc.).
+**Prerequisites** — [Docker with Compose v2.22+](https://docs.docker.com/compose/install/) (the `develop.watch` minimum). Follow the official guide for your OS — do not use `apt install docker.io` (Canonical's package, not Docker Inc.).
 
 | OS | Official guide |
 |---|---|
 | **macOS** | [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/) |
 | **Windows** | [Docker Desktop for Windows (WSL2)](https://docs.docker.com/desktop/setup/install/windows-install/) |
-| **Debian** | [Install Docker Engine on Debian](https://docs.docker.com/engine/install/debian/) |
-| **Ubuntu** | [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) |
-| **Fedora** | [Install Docker Engine on Fedora](https://docs.docker.com/engine/install/fedora/) |
-| **RHEL / Rocky / Alma** | [Install Docker Engine on RHEL](https://docs.docker.com/engine/install/rhel/) |
+| **Debian** | [Install Docker Compose on Debian](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **Ubuntu** | [Install Docker Compose on Ubuntu](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **Fedora** | [Install Docker Compose on Fedora](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **RHEL / Rocky / Alma** | [Install Docker Compose on RHEL](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
 | **Arch / Manjaro** | [`extra/docker`](https://archlinux.org/packages/extra/x86_64/docker/) + [`extra/docker-compose`](https://archlinux.org/packages/extra/x86_64/docker-compose/) (already v2, no plugin needed) |
 | **NixOS** | [Docker — NixOS Wiki](https://wiki.nixos.org/wiki/Docker) |
 
