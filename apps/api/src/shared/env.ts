@@ -50,7 +50,11 @@ const envSchema = z.object({
   STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
 });
 
-export const env = envSchema.parse(process.env);
+const rawEnv = Object.fromEntries(
+  Object.entries(process.env).map(([k, v]) => [k, v === "" ? undefined : v]),
+);
+
+export const env = envSchema.parse(rawEnv);
 
 if (env.NODE_ENV === "production") {
   if (!env.INTERNAL_AUTH_LAYERS?.includes("signature")) {
