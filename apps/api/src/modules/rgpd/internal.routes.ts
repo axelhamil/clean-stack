@@ -12,7 +12,7 @@ export const rgpdInternalRoutes = new Hono()
   .post("/rgpd-sweep", zValidator("json", sweepBodySchema), async (c) => {
     const body = c.req.valid("json");
     const result = await di.RgpdService.processPendingDeletions({
-      batchSize: body.batchSize ?? env.RGPD_SWEEP_BATCH_SIZE,
+      batchSize: body.batchSize ?? env.RGPD_SWEEP_BATCH_SIZE ?? 50,
       dryRun: body.dryRun,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());

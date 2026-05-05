@@ -30,23 +30,28 @@ export class S3StorageService implements IStorageService {
   private readonly publicUrl: string;
 
   constructor() {
-    this.bucket = env.S3_BUCKET;
-    this.publicUrl = env.S3_PUBLIC_URL.replace(/\/+$/, "");
+    if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {
+      throw new Error(
+        'Storage not configured: set S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY (and start the `storage` compose profile in dev). To run without storage, remove the uploads module and `app.route("/uploads", …)` wiring.',
+      );
+    }
+
+    this.bucket = env.S3_BUCKET ?? "clean-stack";
+    this.publicUrl = (env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "");
 
     if (env.NODE_ENV === "production") {
       const isLocalhost = env.S3_ENDPOINT.includes("localhost");
-      const isDefaultCreds =
-        env.S3_ACCESS_KEY === "minioadmin" || env.S3_SECRET_KEY === "minioadmin";
+      const isDefaultCreds = env.S3_ACCESS_KEY === "dev" || env.S3_SECRET_KEY === "dev";
       if (isLocalhost || isDefaultCreds) {
         throw new Error(
-          "Storage misconfigured in production: S3_ENDPOINT must point to R2 (or another real S3) and credentials must not be default minioadmin",
+          "Storage misconfigured in production: S3_ENDPOINT must point to R2 (or another real S3) and credentials must not be the dev defaults",
         );
       }
     }
 
     this.client = new S3Client({
       endpoint: env.S3_ENDPOINT,
-      region: env.S3_REGION,
+      region: env.S3_REGION ?? "auto",
       credentials: {
         accessKeyId: env.S3_ACCESS_KEY,
         secretAccessKey: env.S3_SECRET_KEY,

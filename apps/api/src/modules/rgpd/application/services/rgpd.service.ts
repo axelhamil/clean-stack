@@ -127,7 +127,7 @@ export class RgpdService {
         return Result.fail({ code: "ACCOUNT_PASSWORD_INVALID", message: "invalid password" });
     }
 
-    const until = new Date(Date.now() + env.RGPD_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+    const until = new Date(Date.now() + (env.RGPD_GRACE_PERIOD_DAYS ?? 7) * 24 * 60 * 60 * 1000);
     const marked = await this.rgpd.markPendingDeletion(input.userId, until);
     if (marked.isFailure) return Result.fail(marked.getError());
 
@@ -344,14 +344,14 @@ export class RgpdService {
 
     const state = stateOpt.unwrap();
 
+    const exportRateLimitHours = env.RGPD_EXPORT_RATE_LIMIT_HOURS ?? 24;
     const minNextRequestAt = state.lastExportRequestedAt.isSome()
-      ? state.lastExportRequestedAt.unwrap().getTime() +
-        env.RGPD_EXPORT_RATE_LIMIT_HOURS * 60 * 60 * 1000
+      ? state.lastExportRequestedAt.unwrap().getTime() + exportRateLimitHours * 60 * 60 * 1000
       : 0;
     if (Date.now() < minNextRequestAt) {
       return Result.fail({
         code: "ACCOUNT_EXPORT_RATE_LIMITED",
-        message: `data export limited to once per ${env.RGPD_EXPORT_RATE_LIMIT_HOURS}h`,
+        message: `data export limited to once per ${exportRateLimitHours}h`,
       });
     }
 
