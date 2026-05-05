@@ -1,3 +1,17 @@
+## [1.11.2](https://github.com/axelhamil/clean-stack/compare/v1.11.1...v1.11.2) (2026-05-05)
+
+### Bug Fixes
+
+* **app:** bind vite preview to 0.0.0.0 + dynamic port for railway ([6f3b37d](https://github.com/axelhamil/clean-stack/commit/6f3b37d70fde4b940e3254b6e531647bc8ade01b))
+
+### Documentation
+
+* **modules:** add commercial sheet with à la carte and tier pricing ([b256ca2](https://github.com/axelhamil/clean-stack/commit/b256ca29b1d50b29ef5d5d1ba4a94e06ee0f1873))
+* **modules:** rebase prices to honest senior-dev tjm reality ([610100e](https://github.com/axelhamil/clean-stack/commit/610100e38176b162fb34d41b53ed89f2875db4d7))
+* **modules:** reframe pricing as client-mission value, defer license model ([53a9f80](https://github.com/axelhamil/clean-stack/commit/53a9f8035f91ba4bcabd66eb0b14c2472bdda657))
+* **roadmap:** add phase 0.4 observability stack + refocus phase d.1 ([8bcfbcf](https://github.com/axelhamil/clean-stack/commit/8bcfbcf7c15b1fe3508864b3236a9ce9d5c12a82))
+* **roadmap:** expand phase 0.2 health probes to 2026 sota scope ([2de2749](https://github.com/axelhamil/clean-stack/commit/2de2749a2b5ccba9ece0109c3615c76918d65d42))
+
 ## [1.11.1](https://github.com/axelhamil/clean-stack/compare/v1.11.0...v1.11.1) (2026-05-04)
 
 ### ⚠ BREAKING CHANGES
