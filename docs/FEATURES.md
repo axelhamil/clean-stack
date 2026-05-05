@@ -49,7 +49,7 @@ Dashboard-managed templates with retry + idempotency. Provider-side suppression 
 - **DNS hardening required** before production: SPF, DKIM (3 CNAMEs from Resend), DMARC. Gmail/Yahoo/Outlook reject unauthenticated bulk senders since 2024-2025. See `README.md` for records.
 - **Boundary-only**: `EmailService` adapter implements `IEmailService` port; failure logs at `warn` if transport not configured (dev), `throw` only on hard provider failure.
 
-## Storage — S3-compatible (Cloudflare R2 prod / MinIO dev) ✅
+## Storage — S3-compatible (Cloudflare R2 prod / SeaweedFS dev, opt-in) ✅
 
 Server is blind during the upload — three-step flow `presign` → `PUT` direct to provider → `confirm`.
 

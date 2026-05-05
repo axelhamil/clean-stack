@@ -108,10 +108,18 @@ server-side, the scheduler is just a trigger.
 
 ## 3. Storage — S3-compatible bucket
 
-Dev uses MinIO (`docker compose up -d` — auto-created). Production uses any
+Dev uses SeaweedFS (opt-in via Docker Compose profile `storage` —
+`docker compose --profile storage up -d`; bucket auto-created by `seaweedfs-init`).
+Host port is random (find it with `docker compose port seaweedfs 8333`); inside
+the compose network it's reachable as `seaweedfs:8333`. Production uses any
 S3-compatible provider. Cloudflare R2 is the recommended default (zero egress
 fees, S3 API compatibility verified for the patterns this stack uses — see
 `HISTORY.md` for the verified-2026 list).
+
+> **Why SeaweedFS over MinIO?** MinIO was archived in April 2026 (maintenance
+> mode + features moved behind enterprise license). SeaweedFS is Apache 2.0,
+> ~96 MB image, single-process in dev (`weed server -s3`), full S3 compat
+> (presigned URLs, multipart). Same SDK, zero code change.
 
 ### Provisioning checklist (production)
 
@@ -132,7 +140,7 @@ fees, S3 API compatibility verified for the patterns this stack uses — see
     the object is intentionally public).
 
 Boot fails hard if `NODE_ENV=production` and the endpoint is `localhost` or
-credentials are the MinIO defaults.
+credentials are the dev defaults (`dev`/`dev`).
 
 ### Optional follow-ups (not yet shipped)
 
@@ -182,7 +190,10 @@ root is the up-to-date template.
 ## 5. Database
 
 - **First-time provisioning**: `pnpm db:push` (dev) or `pnpm db:generate &&
-  pnpm db:migrate` (prod-style — ship migrations as artifacts).
+  pnpm db:migrate` (prod-style — ship migrations as artifacts). `db:push` runs
+  `drizzle-kit push --force` because it executes under Turbo's non-TTY pipe;
+  drizzle-kit's interactive data-loss prompt would otherwise hang. Safe in dev
+  (push is dev-only); prod uses `db:migrate` which doesn't prompt.
 - **Backups**: configured at the managed-Postgres level. Test restore
   procedure before going live — a backup you can't restore is not a backup.
 - **Pool sizing**: defaults match Bun's connection pooling; tune

@@ -21,7 +21,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Auth** (BetterAuth singleton wired Bun-native + 2FA + passkey + magic-link + bearer + customSession + email hooks idempotents) | **€800 – €1 500** | 2-3j |
 | **Multi-tenant + access-control SSOT** (organization plugin, Personal org auto-creation/self-heal, capability-based predicate api/route/UI, `<Can>`, `useAuthorization`, `requireOrgPermission`) | **€1 000 – €1 800** | 3-4j |
 | **Email** (Resend port + adapter, template registry typed, idempotency, retry, EU region option, SPF/DKIM/DMARC deploy doc) | **€400 – €700** | 1j |
-| **Storage S3-compatible** (R2/MinIO, three-step presign→PUT→confirm, owner-scoped key, server-verified `HeadObject` on confirm, boot-time fail-hard) | **€800 – €1 500** | 2j |
+| **Storage S3-compatible** (R2/SeaweedFS, three-step presign→PUT→confirm, owner-scoped key, server-verified `HeadObject` on confirm, boot-time fail-hard) | **€800 – €1 500** | 2j |
 | **RGPD complet** (Art. 17 erasure with 7-day grace + Art. 20 portability + 2FA-gated + sole-owner preflight + automated cron sweep + `/legal/data-rights` Art. 13/14) | **€2 500 – €4 000** | 5-7j |
 | **DDD-kit** (Result, Option, Entity, Aggregate, ValueObject, UUID, WatchedList, BaseRepository, ScopedRepository, IUnitOfWork, BaseDomainEvent, EventDispatcher, AppErrorException, 263 vitest cases) | **€1 500 – €2 500** | 4-5j |
 | **UI shadcn-pure + theme** (full registry + custom primitives `NavLink`, `ListRow`, `FormTextField`, `DestructiveActionDialog`, `BackupCodeList`, `QrCodeFrame`, `BrandLink`, `TextLink` + view-transitions theme toggle + typography exports) | **€600 – €1 200** | 2j |

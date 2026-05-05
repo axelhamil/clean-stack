@@ -130,7 +130,7 @@ export class UploadService {
 
 function clampTtl(seconds: number): number {
   return Math.min(
-    Math.max(seconds, env.STORAGE_PRESIGN_TTL_MIN_SECONDS),
-    env.STORAGE_PRESIGN_TTL_MAX_SECONDS,
+    Math.max(seconds, env.STORAGE_PRESIGN_TTL_MIN_SECONDS ?? 60),
+    env.STORAGE_PRESIGN_TTL_MAX_SECONDS ?? 3600,
   );
 }

@@ -1,220 +1,224 @@
+<div align="center">
+
 # clean-stack
 
-> The SaaS boilerplate that says no. Auth, multi-tenant, email, storage already wired. Fourteen non-negotiable architecture rules. You clone, you write business logic — everything else is settled.
+**The SaaS boilerplate that says no.**
+Auth, multi-tenant, email, storage already wired. You clone, you write business logic — everything else is settled.
 
-Bun + Hono on the API · Vite + React 19 + TanStack on the app · Drizzle + Postgres at the bottom · DDD-kit for the business domain · BetterAuth + Resend + R2 for the SaaS layer.
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Bun](https://img.shields.io/badge/Bun-1.3+-black?logo=bun&logoColor=white)](https://bun.com)
+[![Node](https://img.shields.io/badge/Node-24+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Postgres](https://img.shields.io/badge/Postgres-17-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![semantic-release](https://img.shields.io/badge/release-conventional-e10079?logo=semantic-release&logoColor=white)](https://github.com/semantic-release/semantic-release)
 
-See [`docs/FEATURES.md`](docs/FEATURES.md) for what ships today and [`ROADMAP.md`](ROADMAP.md) for what's next (RGPD/CCPA → Billing → Gating → Admin → Audit log → i18n).
+**Bun + Hono** API · **Vite + React 19 + TanStack** app · **Drizzle + Postgres** · DDD-kit for the domain · BetterAuth + Resend + R2 for the SaaS layer.
 
-## Lean by design
+</div>
 
-Built around the [Lean Startup](https://bpifrance-creation.fr/moment-de-vie/lean-startup) loop (Eric Ries) — **Build → Measure → Learn** — where the bottleneck is *Build*. clean-stack collapses that phase to the only thing your customers pay for: your domain.
+---
 
-- **Build** — auth, billing, multi-tenant, email, storage already wired. Day one ships the feature that tests your hypothesis, not six weeks of foundation.
-- **Measure** — Stripe checkout, signed webhooks, multi-tenant from the very first migration. Real customers, real dollars, week one. No vanity metrics.
-- **Learn** — Clean Architecture isolates your domain. When a hypothesis breaks, you replace use cases — not auth, email, or DI. Pivots stay cheap.
+## Quick start
 
-Ship the smallest thing that tests one hypothesis. Read the signal. Iterate or kill. The stack stays out of the way.
+Two ways to run it. Pick one.
 
-## Why this one
+### Option A — Native (fastest hot reload)
 
-Most SaaS boilerplates ship a half-baked auth you'll rip out, a spaghetti billing layer, and zero opinion on what goes where. **clean-stack** starts from the opposite premise:
+**Prerequisites** — [Bun 1.3+](https://bun.com/docs/installation), [Node 24+](https://nodejs.org), [pnpm 10](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
-- **Real auth, not a demo** — BetterAuth (passkeys, 2FA, magic-link, DB-backed sessions), the first auth that runs natively on Bun + Hono with no hacks.
-- **Multi-tenant from day one** — `organization` plugin, `organizationId` FK on every business table from the very first migration. Migrating single-user → multi-tenant after the fact is hell; the reverse is free.
-- **Capability-based authorization SSOT** — `@packages/access-control` exports `ac`, `roles`, `authorizeRole`. Same predicate enforced server-side (`requireOrgPermission`), at the route gate (`ensureOrgPermission`), and in the UI (`<Can>` + `useAuthorization`).
-- **Resend email** — dashboard-managed templates with retry + idempotency; Resend's own suppression list guards IP reputation (hard bounces & complaints auto-blocked at the edge).
-- **S3-compatible storage** — Cloudflare R2 in production (zero egress fees), MinIO in dev (same API, zero divergence). Owner-scoped keys, three-step presign → PUT → confirm flow.
-- **Pragmatic DDD** — reserved for the business logic you actually charge for. Not for billing, not for auth, not for gating. ~70% less code than going full-DDD.
-- **Zero-warning pipeline** — Biome, knip, jscpd, type-check, commitlint. Fix before push, never `--no-verify`.
-- **AI-pair ready** — A `CLAUDE.md` shipped at the root: architecture, DDD scope, form contracts, banned anti-patterns. Your agent already knows the rules.
+```bash
+git clone https://github.com/axelhamil/clean-stack my-saas
+cd my-saas
+pnpm install
+pnpm bootstrap          # copies .env.example → .env in each workspace
+docker compose up -d    # Postgres on :5433
+pnpm db:push            # apply schema
+pnpm dev                # API :3000, App :5173
+```
+
+### Option B — Fully containerized (Docker only)
+
+No Bun, no Node, no pnpm on your host. Everything runs in containers (api + app + Postgres) with hot reload via [`compose develop.watch`](https://docs.docker.com/compose/how-tos/file-watch/).
+
+**Prerequisites** — [Docker with Compose v2.22+](https://docs.docker.com/compose/install/) (the `develop.watch` minimum). Follow the official guide for your OS — do not use `apt install docker.io` (Canonical's package, not Docker Inc.).
+
+| OS | Official guide |
+|---|---|
+| **macOS** | [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/) |
+| **Windows** | [Docker Desktop for Windows (WSL2)](https://docs.docker.com/desktop/setup/install/windows-install/) |
+| **Debian** | [Install Docker Compose on Debian](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **Ubuntu** | [Install Docker Compose on Ubuntu](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **Fedora** | [Install Docker Compose on Fedora](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **RHEL / Rocky / Alma** | [Install Docker Compose on RHEL](https://docs.docker.com/compose/install/linux/#install-using-the-repository) |
+| **Arch / Manjaro** | [`extra/docker`](https://archlinux.org/packages/extra/x86_64/docker/) + [`extra/docker-compose`](https://archlinux.org/packages/extra/x86_64/docker-compose/) (already v2, no plugin needed) |
+| **NixOS** | [Docker — NixOS Wiki](https://wiki.nixos.org/wiki/Docker) |
+
+> [v1 (`docker-compose`, hyphen) is EOL since June 2023](https://docs.docker.com/compose/migrate/) — always use `docker compose` (space).
+
+```bash
+git clone https://github.com/axelhamil/clean-stack my-saas
+cd my-saas
+bash scripts/bootstrap.sh              # copies .env.example → .env in each workspace
+docker compose up --watch
+# once Postgres is healthy, in another terminal:
+docker compose exec api pnpm db:push
+```
+
+Open [`http://localhost:5173`](http://localhost:5173), sign up with any email, you're in.
+
+---
+
+## Why bother
+
+Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on what goes where. This one starts from the opposite premise.
+
+| | clean-stack |
+|---|---|
+| **Auth** | BetterAuth — passkeys (WebAuthn), 2FA (TOTP + backup codes), magic-link, DB-backed sessions, cross-tab sync via `BroadcastChannel`. Bearer alongside cookies for Capacitor. Native Bun + Hono, no hacks. |
+| **Multi-tenant** | `organizationId` FK on every business table from migration #1 + `ScopedRepository` enforces it at the port. Personal org auto-created on signup, role-based invitations, ownership transfer. Bolting tenancy on later is hell — the reverse is free. |
+| **Authorization** | Capability-based SSOT (`@packages/access-control`). **Same predicate** at server middleware, route `beforeLoad` gate, and `<Can requires={...}>` UI — drift impossible by construction. |
+| **RGPD / CCPA** | Art. 17 erasure + Art. 20 portability shipped: `POST /me/export` (signed 7-day R2 URL, 1/24h rate-limit), `POST /me/delete` (2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in flow). Cron sweep wipes personal data + anonymizes refs. Day-one EU-legal — without this, fines up to 4% of revenue. |
+| **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris — provider swap = one env var. |
+| **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
+| **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
+| **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
+| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
+| **AI-pair ready** | `CLAUDE.md` at the root + per-layer sub-`CLAUDE.md`. Your agent already knows the rules — Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
+| **Zero-warning pipeline** | Husky + lint-staged + commitlint + pre-push CI (Biome, knip, jscpd, type-check). Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
+
+---
+
+## Infrastructure
+
+What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
+
+### Database — Postgres 17
+
+| | |
+|---|---|
+| **Image** | [`postgres:17-alpine`](https://hub.docker.com/_/postgres) |
+| **Host port** | `5433` (deliberately not the default `5432` — avoids collision with a system Postgres) |
+| **In-network** | `postgres:5432` (used by the api container) |
+| **Volume** | `postgres_data` (persistent across `compose down`) |
+| **Healthcheck** | `pg_isready` every 5 s — api waits for healthy before starting |
+| **Schema** | [Drizzle ORM](https://orm.drizzle.team) — sources in `packages/drizzle/src/schema/` |
+
+```bash
+pnpm db:push            # dev — push schema directly (drizzle-kit push --force, non-TTY safe)
+pnpm db:generate        # generate a SQL migration from a schema diff
+pnpm db:migrate         # apply migrations (prod-style — ship as artifacts)
+pnpm db:studio          # browse data in Drizzle Studio
+```
+
+> `db:push` runs with `--force` because Turbo pipes stdout in non-TTY, and drizzle-kit's interactive data-loss prompt would otherwise hang. Safe in dev. Prod uses `db:migrate` which doesn't prompt.
+
+### Storage — S3-compatible (opt-in)
+
+Object storage for uploads. **Off by default** — `docker compose up` only starts Postgres. Turn it on when you need it.
+
+| | |
+|---|---|
+| **Dev image** | [`chrislusf/seaweedfs`](https://github.com/seaweedfs/seaweedfs) — Apache 2.0, ~96 MB ([why not MinIO?](https://docs.docker.com/blog/minio-archived/)) |
+| **Compose profile** | `storage` (off by default) |
+| **Host port** | randomized by Docker (`ports: ["8333"]` — avoids collision with whatever is on `:9000`) |
+| **In-network** | `seaweedfs:8333` (set as `S3_ENDPOINT` for the api) |
+| **Bucket** | `clean-stack` — auto-created on startup by the `seaweedfs-init` sidecar |
+| **Auth** | none required in dev — accepts any access key / secret |
+| **Prod target** | [Cloudflare R2](https://developers.cloudflare.com/r2/) (zero egress fees) — same SDK, swap via `S3_ENDPOINT` + creds |
+
+```bash
+docker compose --profile storage up -d         # start SeaweedFS + bucket init
+docker compose port seaweedfs 8333             # find the random host port
+```
+
+The S3 client is provider-agnostic ([`region: "auto"`, `forcePathStyle: true`](https://orm.drizzle.team/docs)). Anything S3-compatible works: R2, AWS S3, Backblaze B2, Wasabi, Scaleway, Tigris.
+
+### Email — Resend (optional in dev)
+
+Resend is **optional in dev** — without `RESEND_API_KEY`, email sends are logged at `warn` and the app continues. **Required in prod** — boot fails fast otherwise.
+
+| | |
+|---|---|
+| **SDK** | [`resend`](https://resend.com/docs) |
+| **Templates** | dashboard-managed, retry + idempotency, provider-side suppression |
+| **DNS prereq prod** | SPF + DKIM (3 CNAMEs) + DMARC — see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md#email) |
+| **EU region** | supported via `region: "eu-west-1"` in adapter config |
+
+### Containers at a glance
+
+| Service | Image | Port (host) | Profile | Persistent volume |
+|---|---|---|---|---|
+| `postgres` | `postgres:17-alpine` | `5433` | default | `postgres_data` |
+| `api` | built (`apps/api/dev.Dockerfile`) | `3000` | default | — |
+| `app` | built (`apps/app/dev.Dockerfile`) | `5173` | default | — |
+| `seaweedfs` | `chrislusf/seaweedfs` | random (`8333` internal) | `storage` | `seaweedfs_data` |
+| `seaweedfs-init` | `chrislusf/seaweedfs` | — | `storage` | — |
+
+---
+
+## Environment variables
+
+Three `.env` files, on purpose. **Do not collapse them into one at the root** — it's a safety rail, not an oversight.
+
+| File | Holds | Why isolated |
+|---|---|---|
+| `apps/api/.env` | DB password, auth secret, S3 keys, Resend key, RGPD/storage limits | Backend-only — never travels to the browser |
+| `apps/app/.env` | `VITE_API_URL` and other `VITE_*` vars | **Vite inlines `VITE_*` into the client bundle** — these are publicly visible. Splitting prevents a backend secret from ending up in the JS bundle by mistake |
+| `packages/drizzle/.env` | `DATABASE_URL` | Consumed by `drizzle-kit` at migration time (separate process, separate cwd) |
+
+`pnpm bootstrap` (or `bash scripts/bootstrap.sh`) copies each `.env.example` → `.env` if missing. Idempotent — never overwrites.
+
+Only three variables are **required to boot** the api: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
+
+---
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
-| **API** | Hono 4 on native `Bun.serve()` (~7 ms cold prod build) |
-| **App** | Vite 8 · React 19 · TanStack Router (code-based, route-level code-splitting, intent prefetch, view transitions) · TanStack Query · Tailwind 4 · full shadcn/ui |
-| **Forms** | react-hook-form + `@hookform/resolvers/zod` 4 + shadcn `Form` |
-| **Auth** | BetterAuth + plugins `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
-| **Access control** | `@packages/access-control` SSOT (statements, roles, `authorizeRole`) consumed by server, route gates and UI |
-| **Email** | Resend (dashboard templates, retry + idempotency, provider-side suppression) |
-| **Storage** | Cloudflare R2 in prod / MinIO in dev (S3-compatible, presigned URLs) |
-| **DB** | Drizzle ORM + Postgres 17 (port 5433 dedicated) |
-| **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types, no client to write |
-| **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, Entity, ValueObject, DomainEvent, EventDispatcher, QueryHandler, AppErrorException) |
-| **DI** | inwire (modules per bounded context) |
-| **Theme** | `next-themes` + View Transitions API circle reveal |
-| **Tooling** | pnpm 10 · Turborepo TUI · Biome 2 · Husky · commitlint · semantic-release · knip · jscpd |
-| **Roadmap** | Stripe billing, feature/quota gating, admin & impersonation, audit log, RGPD/CCPA, i18n — see [`ROADMAP.md`](ROADMAP.md) |
+| **API** | Hono 4 on native `Bun.serve()` |
+| **App** | Vite 8 · React 19 · TanStack Router/Query · Tailwind 4 · shadcn/ui |
+| **Auth** | BetterAuth + `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
+| **Email** | Resend (typed templates, idempotency, provider-side suppression) |
+| **Storage** | Cloudflare R2 prod · SeaweedFS dev (S3-compatible, opt-in) |
+| **DB** | Drizzle ORM + Postgres 17 |
+| **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types |
+| **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
+| **Tooling** | pnpm 10 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
-## 5-minute clone tutorial
+---
 
-From zero to your first business feature, end-to-end. Everything below assumes Bun 1.3+, Node 24+, pnpm 10, Docker.
+## Documentation
 
-### 1. Bootstrap (60 sec)
+| | |
+|---|---|
+| **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — RGPD/CCPA → Billing → Gating → Admin → Audit → i18n |
+| **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
+| **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
+| **History** | [`docs/HISTORY.md`](docs/HISTORY.md) — design decisions trail |
 
-```bash
-git clone https://github.com/axelhamil/clean-stack my-saas && cd my-saas
-pnpm install
-cp .env.example .env                    # default values work for local dev
-docker compose up -d                    # Postgres 17 (port 5433) + MinIO (9000/9001)
-pnpm db:push                            # apply auth + business schemas
-pnpm dev                                # API on :3000, App on :5173 (Turbo TUI)
-```
-
-Open `http://localhost:5173` → sign up with any email → BetterAuth creates your user + a Personal org + a session. You're now in the app.
-
-### 2. Adopt the boilerplate (60 sec)
-
-```bash
-# rename the project
-sed -i 's|axelhamil/clean-stack|<your-org>/<your-repo>|g' README.md package.json
-
-# wipe history if you want a fresh start
-rm -rf .git && git init && git add . && git commit -m "init from clean-stack"
-```
-
-### 3. Trim what you don't need (60 sec)
-
-The boilerplate ships features you may not want. Removability is **5 minutes per feature** :
-
-```bash
-# don't need RGPD (e.g. you're not in EU)?
-trash apps/app/src/features/rgpd           # the front bundle (cards, forms, hooks)
-# remove its 2 imports in apps/app/src/features/account/account.page.tsx
-# (TS will scream, just delete the <DataExportCard /> + <RgpdDeletionCard /> lines)
-
-# don't need billing?
-trash apps/app/src/features/billing        # the route disappears
-# remove `billingRoute` from apps/app/src/router.tsx addChildren
-# remove `/settings/billing` entry from SETTINGS_TABS in shared/components/contextual-tabs.tsx
-
-# don't need uploads?
-trash apps/api/src/modules/uploads
-# remove `uploadsModule` registration from apps/api/src/container.ts
-# remove `app.route("/uploads", uploadsRoutes)` from apps/api/src/index.ts
-```
-
-`trash` is `gio trash` (recoverable). `pnpm type-check` will list every consumer of the deleted code — fix until green.
-
-### 4. Add your first business feature (90 sec)
-
-```bash
-# back: a new module
-mkdir -p apps/api/src/modules/notes/{domain,application/{services,ports,dto},infrastructure/{repositories,mappers}}
-# write your aggregate in domain/note.aggregate.ts (use ddd-kit primitives — Aggregate, ValueObject)
-# write port + service + drizzle repo + dto
-# expose `routes.ts` with /api/notes/* + `module.ts` with `defineModule()(...)` (inwire Pinia-style)
-# wire in apps/api/src/container.ts (`.addModule(notesModule)`) and apps/api/src/index.ts (`.route("/notes", notesRoutes)`)
-
-# DB:
-echo "// notes table" >> packages/drizzle/src/schema/notes.ts
-echo "export * from './notes';" >> packages/drizzle/src/schema/index.ts
-pnpm db:push
-
-# front: a new feature folder
-mkdir -p apps/app/src/features/notes/{components,forms,hooks}
-# write notes.route.tsx + co-located NotesPage component
-# wire in apps/app/src/router.tsx (one line in addChildren)
-```
-
-End-to-end typed via Hono RPC: the route file imports `api.notes.$post({...})` and TS knows the input/output shape.
-
-### 5. Ship (30 sec)
-
-```bash
-pnpm ci:check                           # Biome CI mode (pre-push runs the full pipeline: + type-check, knip, jscpd)
-git checkout -b feat/notes
-git add . && git commit -m "feat(api): add notes aggregate + module"
-gh pr create --base dev                 # feat → dev (squash OK) ; dev → main MUST stay a merge commit so semantic-release sees every conventional commit
-```
-
-Total: ~5 min from `git clone` to your first business feature shipped. The stack stays out of the way — you write business logic, everything else is settled.
-
-### Scoped dev (anytime)
-
-```bash
-pnpm dev --filter=api
-pnpm dev --filter=app
-```
-
-## Layout
-
-Vertical slice on both sides. Back: one folder per bounded context with its own DDD layers. Front: code-based routing — each feature owns a `<name>.route.tsx` + `<name>.page.tsx` pair (the page is code-split as a lazy chunk). Routes are assembled in a single `apps/app/src/router.tsx`. No `routes/` folder, no codegen.
-
-```
-apps/
-  api/                       Hono on Bun
-    src/
-      shared/                Cross-cutting: middleware, env, logger
-      modules/<context>/     One folder per bounded context (rgpd, uploads, …)
-        domain/              Aggregates, Entities, Value Objects, Domain Events
-        application/         Use cases, ports, services, DTOs, event handlers
-        infrastructure/      Drizzle repositories, mappers, port impls (S3, Resend)
-        routes.ts            Hono sub-app (chained `.route()` accumulates AppType)
-        module.ts            `defineModule()(...)` — inwire Pinia-style DI augmentation
-      container.ts           Composition root (`.add(...)` cross-cutting + `.addModule(...)` per context)
-      auth.ts                BetterAuth singleton
-      index.ts               Server entry — pipeline + module registration list
-  app/                       Vite + React (router.tsx → features → shared)
-    src/
-      main.tsx               createRoot + <AppProviders />
-      router/layouts.tsx     rootRoute + layout/gate exports (_guest, _protected, _shell, _org-scope, settings)
-      router.tsx             Pure assembly: imports feature routes + layouts → routeTree.addChildren(...) → createRouter
-      features/<x>/          <name>.route.tsx + <name>.page.tsx (code-split chunk) + components/, forms/, hooks/, schema
-      shared/                Cross-cutting: api/, auth/, components/, env.ts, app-providers.tsx, utils.ts
-packages/
-  access-control             BetterAuth access-control SSOT (statements, roles, authorizeRole)
-  ddd-kit                    DDD primitives (Result, Option, Aggregate, ScopedRepository, …)
-  drizzle                    DB client + TransactionService + schemas
-  test                       Shared Vitest config
-  typescript-config          Shared tsconfig presets
-  ui                         shadcn/ui + typography + theme tokens + custom primitives (NavLink, BrandLink, TextLink, ListRow, FormTextField, DestructiveActionDialog, BackupCodeList)
-```
-
-## Conventions
-
-Read `CLAUDE.md` for the full ruleset: Result/Option, no null, no throw in domain, CQRS, mandatory DI, strict import direction, theme tokens only, **shadcn-first and shadcn-pure** (use the actual slots — `CardHeader`/`CardTitle`/`CardContent`, never patch with `pt-6` / `space-y-4`; no custom outside the theme or primitive), strict HTML semantics (one `<main>` per page), zero-warning pipeline, DDD scope limited to business logic, reusability-first promotion to theme/primitives, `interface` for component props, `void navigate(...)` in mutation callbacks.
-
-UI composition follows the **`asChild` pattern**: a primitive owns the *style* (e.g. `NavLink` = muted color + hover transition), and TanStack `<Link>` owns the *navigation*. Wire them via `<NavLink asChild><Link to="." hash="x">…</Link></NavLink>`. Never style raw `<a>` tags inside features.
-
-## Email DNS (mandatory before production)
-
-Gmail (Feb 2024), Yahoo (Feb 2024) and Microsoft Outlook (May 2025) all reject unauthenticated bulk senders with `550 5.7.515`. Three records to publish on the sending domain:
-
-- **SPF** — `TXT @  "v=spf1 include:amazonses.com ~all"` (Resend handles the rest).
-- **DKIM** — three CNAME records generated by Resend on domain verification (`Domain Settings → Add domain`).
-- **DMARC** — `TXT _dmarc  "v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com"` to start. Watch the aggregate reports for two weeks, then progress `p=none` → `p=quarantine` → `p=reject` once SPF/DKIM alignment is stable.
-
-For bulk / marketing email (>5k/day, deferred until the first newsletter ships), Gmail/Yahoo/Microsoft additionally require `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) headers and a working `POST /unsubscribe` endpoint. Transactional auth emails (verify, reset, magic-link) are exempt.
-
-Resend's domain-scoped suppression list automatically blocks future sends to hard-bounced or complained addresses — IP reputation is guarded out of the box, no webhook required.
-
-## Roadmap & integrations
-
-`ROADMAP.md` details the implementation of integrations (BetterAuth, Stripe, Resend, R2/MinIO, i18n) with their constraints, schemas and extension points.
+---
 
 ## Scripts
 
 ```bash
-pnpm dev                    # Turbo TUI (all apps)
-pnpm build                  # full build (type-check in parallel via `with`)
-pnpm test                   # all tests (bun test for the api, vitest elsewhere)
-pnpm type-check             # all workspaces
-pnpm check                  # Biome lint + format check
-pnpm fix                    # auto-fix lint/format
-pnpm ci:check               # Biome CI mode (used by pre-push)
-pnpm check:duplication      # jscpd
-pnpm check:unused           # knip
-pnpm db:push                # push schema without a migration (dev)
-pnpm db:generate            # generate a migration
-pnpm db:migrate             # apply migrations (prod-style)
-pnpm db:studio              # Drizzle Studio
-pnpm clean                  # wipe node_modules + .turbo + dist
+pnpm bootstrap          # copy .env.example → .env in each workspace (idempotent)
+pnpm dev                # Turbo TUI (all apps)
+pnpm dev:docker         # containerized dev (compose up --watch)
+pnpm build              # full build with parallel type-check
+pnpm test               # bun test (api) + vitest (rest)
+pnpm ci:check           # pre-push pipeline (Biome, type-check, knip, jscpd)
+pnpm db:push            # dev schema push
+pnpm db:migrate         # prod-style migration
+pnpm db:studio          # Drizzle Studio
 ```
 
-## License
+---
 
-MIT
+<div align="center">
+
+Made by [@axelhamil](https://github.com/axelhamil) · MIT License
+
+</div>

@@ -13,11 +13,11 @@ Read top-to-bottom. Each phase assumes the previous is done. Items inside a phas
 **Phase 0 — Foundation closeout (blocks Phase B)**
 
 0.0. **Clone-ability bootstrap — URGENT (regression on boilerplate contract)** — surfaced by external feedback on `dev` (issue 2026-05): a fresh clone fails to bootstrap on Linux. The boilerplate's whole promise is "clone → run", so this jumps every other Phase 0 item. Punch list:
-   - [ ] **Root `.env.example` + `pnpm setup` dispatcher** — currently two `.env` files live in `apps/app/` + `apps/api/` with no root pointer. New cloner has no idea where to start. Ship a root `.env.example` documenting both, plus a `pnpm setup` script that copies+dispatches to the right paths. Document the *why* (monorepo isolation of front/back secrets) so the split isn't read as accidental.
-   - [ ] **Minio behind Docker Compose profile `storage`** — Minio binds port 9000 (frequently taken on dev machines, picky about ports) and isn't needed to evaluate the boilerplate. Move it under `profiles: [storage]` in `compose.yaml` so `docker compose up -d` only starts Postgres by default; `docker compose --profile storage up -d` opts into Minio. Make the Minio port env-driven (`MINIO_PORT`, default 9000).
-   - [ ] **README — Docker Compose v2 prereq explicit** — `docker compose` (no hyphen) is v2, shipped since 2021, available on Linux via `docker-compose-plugin` package. `docker-compose` (with hyphen) is the deprecated v1. README must call this out + give the install command per distro (apt/dnf/pacman/brew), otherwise Linux users on stale Docker hit "command not found" and assume the project is Mac-only.
-   - [ ] **`pnpm db:push` Linux repro + fix** — reported failing on a Linux clone, unreproduced on Arch. Need to (1) reproduce on a clean Ubuntu/Debian VM, (2) trace the failure (likely Postgres port `5433` collision, missing `DATABASE_URL`, or Drizzle Kit + Bun interaction), (3) fix root cause + add a smoke check to `pnpm setup` that calls `db:push` and surfaces the exact error.
-   - [ ] **Bootstrap smoke test in CI** — fresh-clone simulation in CI (`docker compose up -d postgres && pnpm install && pnpm setup && pnpm db:push && pnpm dev` headless for 30s, assert API + app respond). Catches every "works on my machine" regression before users hit it. Runs on `ubuntu-latest` (the most-cloned target).
+   - [x] **`pnpm bootstrap` dispatcher (May 2026)** — kept the split (`apps/api/.env`, `apps/app/.env`, `packages/drizzle/.env`) on purpose: backend secrets and `VITE_*` browser-bundled vars must live in different files so a `S3_SECRET_KEY` can't accidentally end up in the client bundle. Added `scripts/bootstrap.sh` (idempotent, never overwrites) wired as `pnpm bootstrap`. Renamed away from `pnpm setup` to avoid collision with the pnpm builtin.
+   - [x] **Storage behind Docker Compose profile `storage`** — done (May 2026). Swapped MinIO → SeaweedFS (Apache 2.0, ~96 MB, MinIO archived April 2026). Service + init under `profiles: [storage]`; `docker compose up -d` only starts Postgres by default. Host port for `:8333` is randomized by Docker (`ports: ["8333"]`) to avoid dev-machine conflicts; in-network the API reaches `seaweedfs:8333`.
+   - [x] **README — Docker Compose v2 prereq explicit (May 2026)** — `docker compose` (no hyphen) is v2, available on Linux via `docker-compose-plugin`. README now lists install commands per distro (apt/dnf/pacman) in the prerequisites block.
+   - [x] **`pnpm db:push` Linux fix (May 2026)** — root cause: `drizzle-kit push` is interactive and prompts on data-loss statements. Turbo pipes stdout in non-TTY → drizzle-kit either hangs or crashes silently. drizzle-kit docs explicitly recommend `--force` for CI / non-TTY. Fix: `packages/drizzle/package.json` → `db:push: drizzle-kit push --force`. Safe in dev (db:push is dev-only; prod uses `db:migrate`). drizzle-kit & drizzle-orm already on latest stable (0.31.10 / 0.45.2).
+   - [ ] **Bootstrap smoke test in CI** — fresh-clone simulation in CI (`docker compose up -d postgres && pnpm install && pnpm bootstrap && pnpm db:push && pnpm dev` headless for 30s, assert API + app respond). Catches every "works on my machine" regression before users hit it. Runs on `ubuntu-latest` (the most-cloned target).
    - [ ] **`docs/QUICKSTART.md`** — single-page "0 → running app in 5 min" doc, linked from README header. Currently bootstrap knowledge is spread across CLAUDE.md + scattered READMEs; cloner shouldn't need to read sub-CLAUDE.md to start the dev server.
 
    **Why this jumps the rest of Phase 0**: every other roadmap item assumes a clone that *runs*. Health probes / backups / observability are pointless if the cloner abandons at step 1. Closes the "marche sur ma machine" gap that separates a real boilerplate from a personal repo.
@@ -164,7 +164,7 @@ F.2. **Feature flags** — GrowthBook self-hosted, decouples deploy from release
 
 ### Architecture — ports + NoOp default + retirable module
 
-The pattern mirrors what's already shipped for `email.port` (Resend swappable) and `storage.port` (R2/MinIO swappable):
+The pattern mirrors what's already shipped for `email.port` (Resend swappable) and `storage.port` (R2/SeaweedFS swappable):
 
 ```
 apps/api/src/
@@ -963,7 +963,7 @@ Full architectural log preserved in [`docs/HISTORY.md`](docs/HISTORY.md):
 - **Auth — BetterAuth (end-to-end)** ✅ Phase 1 + Phase 2 (organization plugin)
 - **Multi-tenant — `organization` plugin** ✅ Phase 2 (per-org scoping, invitations, roles, slug auto-gen)
 - **Email — Resend** ✅ Phase 1 (typed templates, idempotency, retry, DNS hardening)
-- **Storage — R2 + MinIO** ✅ Phase 1 (presign / PUT-direct / confirm flow, owner-scoped keys)
+- **Storage — R2 + SeaweedFS** ✅ Phase 1 (presign / PUT-direct / confirm flow, owner-scoped keys)
 - **RGPD core — Art. 17 + Art. 20** ✅ Phase 1 (sync export to R2, 7-day grace deletion, 2FA gate, sole-owner preflight, cancel UX, `/legal/data-rights`) — remaining items in Phase A.6 / dependent on Audit-log + Admin + Billing
 - **Vertical-slice layout** ✅ Front (steps 1-3: feature split, `shared/`, code-based routing) + Back (steps 1-3: `modules/<context>/`, `shared/`, inwire `defineModule`) — back step 4 (DB schema split) outstanding
 - **App shell — top-nav + ⌘K palette** ✅ (sticky header, contextual settings tabs, command palette, custom logo mark)
