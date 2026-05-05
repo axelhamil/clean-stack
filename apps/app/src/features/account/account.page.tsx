@@ -7,11 +7,9 @@ import {
 } from "@packages/ui/components/ui/card";
 import { Input } from "@packages/ui/components/ui/input";
 import { Label } from "@packages/ui/components/ui/label";
-import { NavLink } from "@packages/ui/components/ui/nav-link";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { getRouteApi, Link } from "@tanstack/react-router";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { getRouteApi } from "@tanstack/react-router";
 import { DataExportCard } from "../rgpd/components/data-export-card";
-import { RgpdDeletionCard } from "../rgpd/components/rgpd-deletion-card";
 import { PasskeysCard } from "../security/components/passkeys-card";
 import { SessionsCard } from "../security/components/sessions-card";
 import { TwoFactorCard } from "../security/components/two-factor-card";
@@ -45,17 +43,6 @@ export function AccountPage() {
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
       <SessionsCard currentSessionToken={sessionToken} />
       <DataExportCard lastExportRequestedAt={user.lastExportRequestedAt} />
-      <RgpdDeletionCard
-        pendingDeletionUntil={user.pendingDeletionUntil}
-        twoFactorEnabled={user.twoFactorEnabled === true}
-      />
-      <TypographyMuted>
-        Read our{" "}
-        <NavLink asChild variant="underline">
-          <Link to="/legal/data-rights">data rights policy</Link>
-        </NavLink>{" "}
-        for the full breakdown of what's deleted, anonymized, and retained.
-      </TypographyMuted>
     </main>
   );
 }

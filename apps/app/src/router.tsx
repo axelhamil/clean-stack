@@ -8,6 +8,7 @@ import { signUpRoute } from "./features/auth/sign-up.route";
 import { twoFactorRoute } from "./features/auth/two-factor.route";
 import { verifyEmailRoute } from "./features/auth/verify-email.route";
 import { billingRoute } from "./features/billing/billing.route";
+import { dangerRoute } from "./features/danger/danger.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
 import { dataRightsRoute } from "./features/legal/data-rights.route";
@@ -36,6 +37,7 @@ const routeTree = rootRoute.addChildren([
       settingsLayout.addChildren([
         settingsIndexRoute,
         accountRoute,
+        dangerRoute,
         orgScopeLayout.addChildren([billingRoute, generalRoute, teamRoute]),
       ]),
     ]),
