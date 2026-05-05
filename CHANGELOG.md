@@ -1,3 +1,22 @@
+## [1.13.0](https://github.com/axelhamil/clean-stack/compare/v1.12.0...v1.13.0) (2026-05-05)
+
+### Features
+
+* **app:** split danger zone into dedicated settings tab ([733983d](https://github.com/axelhamil/clean-stack/commit/733983dafe70b42a7303c36545b725294f041ff9))
+* **auth:** log emails to stdout in dev + resend verify on signin ([81dc6f3](https://github.com/axelhamil/clean-stack/commit/81dc6f36e0aed4ce0b4f9a87d2ed7324094af72f))
+
+### Refactor
+
+* **org:** drop betterauth teams plugin and merge settings into one tab ([ec462bc](https://github.com/axelhamil/clean-stack/commit/ec462bc09bbc54f30e580e601cd10625f4a9b92d))
+
+### Build
+
+* **packages:** convert private workspace packages to source-only exports ([8c419cd](https://github.com/axelhamil/clean-stack/commit/8c419cdfc1c8c2b6d62f708cd211adf98bf18fab))
+
+### Documentation
+
+* **claude:** codify internal-packages-no-build as a cross-cutting rule ([30bc918](https://github.com/axelhamil/clean-stack/commit/30bc9189e4afd28cd7f7739b003af7c1ac49ab57))
+
 ## [1.12.0](https://github.com/axelhamil/clean-stack/compare/v1.11.2...v1.12.0) (2026-05-05)
 
 ### Features
