@@ -56,14 +56,14 @@ export class ResendEmailService implements IEmailService {
     }
 
     if (!this.resend) {
-      logger.warn("RESEND_API_KEY not set — emails will be dropped (dev fallback)");
+      logger.warn("RESEND_API_KEY not set — emails will be logged to stdout (dev fallback)");
       return;
     }
 
     if (missing.length > 0) {
       logger.warn(
         { missing },
-        "missing RESEND template IDs in TEMPLATE_IDS — emails for these templates will be dropped",
+        "missing RESEND template IDs — emails for these templates will be logged in dev, dropped otherwise",
       );
     }
   }
@@ -76,6 +76,13 @@ export class ResendEmailService implements IEmailService {
   ): Promise<Result<void, EmailError>> {
     const templateId = TEMPLATE_IDS[template];
     if (!this.resend || !templateId) {
+      if (env.NODE_ENV !== "production") {
+        logger.info(
+          { template, to, variables, idempotencyKey: options?.idempotencyKey },
+          "[email-dev] transport not configured — payload logged",
+        );
+        return Result.ok();
+      }
       return Result.fail({
         code: "EMAIL_TRANSPORT_NOT_CONFIGURED",
         message: `transport missing for template "${template}"`,

@@ -100,6 +100,7 @@ const authOptions = {
 
   emailVerification: {
     sendOnSignUp: true,
+    sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, token }) => {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
