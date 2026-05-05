@@ -16,6 +16,5 @@ export type UpdateOrgInput = z.infer<typeof updateOrgSchema>;
 export const inviteMemberSchema = z.object({
   email: z.email(),
   role: memberRoleSchema,
-  teamId: z.string().optional(),
 });
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;

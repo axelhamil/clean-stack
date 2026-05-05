@@ -3,18 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsup",
     "type-check": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -23,7 +15,6 @@
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
     "better-auth": "^1.6.9",
-    "tsup": "^8.5.1",
     "typescript": "^6.0.3"
   }
 }

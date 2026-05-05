@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -49,21 +50,26 @@ interface PendingStateProps {
 function PendingState({ until }: PendingStateProps) {
   const cancel = useCancelDeletion();
   return (
-    <Card variant="destructive">
+    <Card>
       <CardHeader>
-        <CardTitle variant="destructive" className="flex items-center gap-2">
-          <AlertTriangleIcon className="size-4" />
-          Account deletion scheduled
-        </CardTitle>
+        <CardTitle variant="destructive">Account deletion scheduled</CardTitle>
         <CardDescription>
           Your account is scheduled for deletion on {until.toLocaleString()}. You can cancel any
           time before then.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
+        <Alert variant="destructive">
+          <AlertTriangleIcon />
+          <AlertDescription>
+            After {until.toLocaleDateString()}, your data will be anonymized and cannot be
+            recovered.
+          </AlertDescription>
+        </Alert>
         <Button
           type="button"
           variant="outline"
+          className="self-start"
           disabled={cancel.isPending}
           onClick={() => cancel.mutate()}
         >
@@ -85,17 +91,26 @@ function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Delete account</CardTitle>
+        <CardTitle variant="destructive">Delete account</CardTitle>
         <CardDescription>
           Permanently anonymizes your data after a 7-day grace period. RGPD Art. 17 (right to
           erasure).
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-4">
         {blockingOrgs.length > 0 ? (
           <BlockingOrgsList orgs={blockingOrgs} />
         ) : (
-          <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
+          <>
+            <Alert variant="destructive">
+              <AlertTriangleIcon />
+              <AlertDescription>
+                Deleting your account will anonymize all your data after a 7-day grace period. This
+                action cannot be undone after that period.
+              </AlertDescription>
+            </Alert>
+            <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
+          </>
         )}
       </CardContent>
     </Card>
@@ -117,7 +132,7 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
       toastError(err, "Failed to switch organization");
       return;
     }
-    void navigate({ to: "/settings/general" });
+    void navigate({ to: "/settings/organization" });
   };
 
   return (

@@ -100,6 +100,7 @@ const authOptions = {
 
   emailVerification: {
     sendOnSignUp: true,
+    sendOnSignIn: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, token }) => {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
@@ -146,11 +147,6 @@ const authOptions = {
       ac,
       roles,
       creatorRole: "owner",
-      teams: {
-        enabled: true,
-        maximumTeams: 25,
-        allowRemovingAllTeams: false,
-      },
       organizationHooks: {
         beforeDeleteOrganization: async ({ organization: org }) => {
           if (isPersonalOrg(org.slug)) {

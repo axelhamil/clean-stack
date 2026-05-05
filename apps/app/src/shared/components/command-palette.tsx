@@ -38,7 +38,6 @@ import {
   type LucideIcon,
   Moon,
   Plus,
-  Settings2,
   Sun,
   User,
   Users,
@@ -87,13 +86,11 @@ interface NavigationRoute {
 const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   {
-    to: "/settings/general",
-    label: "Settings — General",
-    icon: Settings2,
-    requires: { organization: ["update"] },
+    to: "/settings/organization",
+    label: "Settings — Organization",
+    icon: Users,
     requiresOrg: true,
   },
-  { to: "/settings/team", label: "Settings — Team", icon: Users, requiresOrg: true },
   {
     to: "/settings/billing",
     label: "Settings — Billing",

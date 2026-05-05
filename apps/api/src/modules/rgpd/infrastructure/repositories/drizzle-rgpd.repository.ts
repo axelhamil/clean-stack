@@ -269,7 +269,6 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
       await tx.delete(schema.account).where(eq(schema.account.userId, userId));
       await tx.delete(schema.twoFactor).where(eq(schema.twoFactor.userId, userId));
       await tx.delete(schema.passkey).where(eq(schema.passkey.userId, userId));
-      await tx.delete(schema.teamMember).where(eq(schema.teamMember.userId, userId));
       await tx.delete(schema.member).where(eq(schema.member.userId, userId));
       await tx.delete(schema.invitation).where(eq(schema.invitation.inviterId, userId));
 
