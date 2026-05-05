@@ -1,5 +1,5 @@
 {
-  "id": "017d4944-83b1-4397-900b-d503a59eaa88",
+  "id": "ba9f58bd-2cc9-44e5-a713-242a857d6b7a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -980,6 +980,24 @@
           "primaryKey": false,
           "notNull": false,
           "default": false
+        },
+        "pending_deletion_until": {
+          "name": "pending_deletion_until",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_export_requested_at": {
+          "name": "last_export_requested_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

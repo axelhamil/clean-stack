@@ -104,6 +104,9 @@ CREATE TABLE "user" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"two_factor_enabled" boolean DEFAULT false,
+	"pending_deletion_until" timestamp,
+	"deleted_at" timestamp,
+	"last_export_requested_at" timestamp,
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
