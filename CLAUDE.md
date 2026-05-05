@@ -42,7 +42,7 @@ Library API/config/SOTA unclear → **check docs first**. Outdated patterns are 
 
 ## Scripts & DB
 
-`pnpm dev` (Turbo TUI, `--filter=api` to scope) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` (jscpd) · `check:unused` (knip) · `db:push`/`generate`/`migrate`/`seed`/`studio` · `clean`. Postgres on `localhost:5433` via `docker compose up -d` (don't pin back to 5432 — collides with system Postgres). After schema change: `pnpm db:push` (dev) or `db:generate && db:migrate` (prod-style). API runs on Bun natively — don't reintroduce `@hono/node-server`/`tsx`/`tsc-alias`.
+`pnpm bootstrap` (copies `.env.example`→`.env` in each workspace, idempotent — `scripts/bootstrap.sh`). `pnpm dev` (Turbo TUI, `--filter=api` to scope) · `dev:docker` (compose up --watch — fully containerized hot reload) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` (jscpd) · `check:unused` (knip) · `db:push`/`generate`/`migrate`/`seed`/`studio` · `clean`. Postgres on `localhost:5433` via `docker compose up -d` (don't pin back to 5432 — collides with system Postgres). Storage opt-in via `docker compose --profile storage up -d` (SeaweedFS, host port random). After schema change: `pnpm db:push` (dev — `drizzle-kit push --force` for non-TTY safety under Turbo) or `db:generate && db:migrate` (prod-style). API runs on Bun natively — don't reintroduce `@hono/node-server`/`tsx`/`tsc-alias`.
 
 ## Release flow
 
