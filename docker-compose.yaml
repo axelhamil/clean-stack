@@ -19,39 +19,110 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: clean-stack-minio
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: clean-stack-seaweedfs
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    command: server -s3 -dir=/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      - "8333"
     volumes:
-      - minio_data:/data
+      - seaweedfs_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8333/"]
       interval: 5s
       timeout: 5s
       retries: 5
+    profiles: ["storage"]
 
-  minio-init:
-    image: minio/mc:latest
-    container_name: clean-stack-minio-init
+  seaweedfs-init:
+    image: chrislusf/seaweedfs:latest
+    container_name: clean-stack-seaweedfs-init
     depends_on:
-      minio:
+      seaweedfs:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb --ignore-existing local/clean-stack;
-      mc anonymous set download local/clean-stack;
-      exit 0;
-      "
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - echo 's3.bucket.create -name clean-stack' | weed shell
+        -master=seaweedfs:9333
+    profiles: ["storage"]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/dev.Dockerfile
+    container_name: clean-stack-api-dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/clean_stack
+      S3_ENDPOINT: http://seaweedfs:8333
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 20s
+      retries: 5
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/api/src
+          target: /repo/apps/api/src
+        - action: sync
+          path: ./packages
+          target: /repo/packages
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+        - action: rebuild
+          path: ./turbo.json
+        - action: rebuild
+          path: ./pnpm-workspace.yaml
+        - action: rebuild
+          path: ./apps/api/package.json
+
+  app:
+    build:
+      context: .
+      dockerfile: apps/app/dev.Dockerfile
+    container_name: clean-stack-app-dev
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/app/src
+          target: /repo/apps/app/src
+        - action: sync
+          path: ./apps/app/index.html
+          target: /repo/apps/app/index.html
+        - action: sync
+          path: ./packages
+          target: /repo/packages
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+        - action: rebuild
+          path: ./turbo.json
+        - action: rebuild
+          path: ./pnpm-workspace.yaml
+        - action: rebuild
+          path: ./apps/app/package.json
 
 volumes:
   postgres_data:
-  minio_data:
+  seaweedfs_data:

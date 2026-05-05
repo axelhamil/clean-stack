@@ -1,0 +1,38 @@
+{
+    auto_https off
+    admin off
+    persist_config off
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
+:{$PORT:80} {
+    root * /srv
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        -Server
+    }
+
+    @assets path /assets/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    @nonAssets not path /assets/*
+    header @nonAssets Cache-Control "no-cache, no-store, must-revalidate"
+
+    handle /health {
+        respond "OK" 200
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
