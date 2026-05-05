@@ -18,6 +18,8 @@
     "db:seed": "turbo db:seed",
     "db:studio": "turbo db:studio",
     "ui:add": "turbo ui:add",
+    "dev:docker": "docker compose up --watch",
+    "bootstrap": "bash scripts/bootstrap.sh",
     "clean": "rm -rf node_modules .turbo apps/*/.turbo packages/*/.turbo apps/api/dist apps/app/dist",
     "prepare": "husky"
   },

@@ -35,6 +35,7 @@
 # Cache
 **/.cache
 **/.tanstack
+**/.pnpm-store
 
 # Claude Code
 .claude/settings.local.json
