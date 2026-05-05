@@ -10,7 +10,7 @@ interface EnsureOrgPermissionOptions {
 
 export function ensureOrgPermission(
   permissions: OrgPermissions,
-  { redirectTo = "/settings/team", connector }: EnsureOrgPermissionOptions = {},
+  { redirectTo = "/settings/organization", connector }: EnsureOrgPermissionOptions = {},
 ) {
   return async ({ context }: { context: { queryClient: QueryClient } }) => {
     const membership = await context.queryClient.ensureQueryData(currentMembershipQueryOptions);

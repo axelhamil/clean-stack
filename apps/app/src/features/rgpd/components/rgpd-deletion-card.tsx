@@ -132,7 +132,7 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
       toastError(err, "Failed to switch organization");
       return;
     }
-    void navigate({ to: "/settings/general" });
+    void navigate({ to: "/settings/organization" });
   };
 
   return (

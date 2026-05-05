@@ -15,8 +15,9 @@ import { Can } from "../../shared/auth/can";
 import { InvitationRow } from "./components/invitation-row";
 import { MemberRow } from "./components/member-row";
 import { InviteMemberForm } from "./forms/invite-member-form";
+import { UpdateOrgForm } from "./forms/update-org-form";
 
-export function TeamPage() {
+export function OrganizationPage() {
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: membership } = useQuery(currentMembershipQueryOptions);
   const { data: members = [] } = useQuery(
@@ -34,7 +35,20 @@ export function TeamPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">Team settings</TypographyH1>
+      <TypographyH1 className="sr-only">Organization settings</TypographyH1>
+
+      <Can requires={{ organization: ["update"] }}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Details</CardTitle>
+            <CardDescription>Rename your organization.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <UpdateOrgForm organizationId={org.id} defaultValues={{ name: org.name }} />
+          </CardContent>
+        </Card>
+      </Can>
+
       <Can requires={{ invitation: ["create"] }}>
         <Card>
           <CardHeader>
@@ -73,19 +87,16 @@ export function TeamPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending invitations</CardTitle>
-          <CardDescription>
-            {pendingInvitations.length === 0
-              ? "No invitations awaiting response."
-              : `${pendingInvitations.length} invitation${pendingInvitations.length === 1 ? "" : "s"} awaiting response.`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {pendingInvitations.length === 0 ? (
-            <TypographyMuted>No invitations.</TypographyMuted>
-          ) : (
+      {pendingInvitations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending invitations</CardTitle>
+            <CardDescription>
+              {pendingInvitations.length} invitation
+              {pendingInvitations.length === 1 ? "" : "s"} awaiting response.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <ul className="flex flex-col divide-y">
               {pendingInvitations.map((inv) => (
                 <InvitationRow
@@ -101,9 +112,9 @@ export function TeamPage() {
                 />
               ))}
             </ul>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </main>
   );
 }

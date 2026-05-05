@@ -12,9 +12,8 @@ import { dangerRoute } from "./features/danger/danger.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
 import { dataRightsRoute } from "./features/legal/data-rights.route";
-import { generalRoute } from "./features/organization/general.route";
 import { newOrgRoute } from "./features/organization/new.route";
-import { teamRoute } from "./features/team/team.route";
+import { organizationRoute } from "./features/organization/organization.route";
 import {
   guestLayout,
   indexRoute,
@@ -38,7 +37,7 @@ const routeTree = rootRoute.addChildren([
         settingsIndexRoute,
         accountRoute,
         dangerRoute,
-        orgScopeLayout.addChildren([billingRoute, generalRoute, teamRoute]),
+        orgScopeLayout.addChildren([billingRoute, organizationRoute]),
       ]),
     ]),
   ]),

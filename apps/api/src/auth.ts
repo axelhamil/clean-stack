@@ -147,11 +147,6 @@ const authOptions = {
       ac,
       roles,
       creatorRole: "owner",
-      teams: {
-        enabled: true,
-        maximumTeams: 25,
-        allowRemovingAllTeams: false,
-      },
       organizationHooks: {
         beforeDeleteOrganization: async ({ organization: org }) => {
           if (isPersonalOrg(org.slug)) {

@@ -1,8 +1,6 @@
-import { authorizeRole, type OrgRole } from "@packages/access-control";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, createRoute, Outlet, redirect } from "@tanstack/react-router";
 import { activeOrgQueryOptions } from "../shared/api/queries/active-org";
-import { currentMembershipQueryOptions } from "../shared/api/queries/current-membership";
 import { sessionQueryOptions } from "../shared/api/queries/session";
 import { AppShell } from "../shared/components/app-shell";
 
@@ -72,15 +70,7 @@ export const settingsIndexRoute = createRoute({
   path: "/",
   beforeLoad: async ({ context }) => {
     const org = await context.queryClient.ensureQueryData(activeOrgQueryOptions);
-    if (!org) throw redirect({ to: "/settings/account" });
-
-    const membership = await context.queryClient.ensureQueryData(currentMembershipQueryOptions);
-    const role = membership?.role as OrgRole | undefined;
-    throw redirect({
-      to: authorizeRole(role, { organization: ["update"] })
-        ? "/settings/general"
-        : "/settings/team",
-    });
+    throw redirect({ to: org ? "/settings/organization" : "/settings/account" });
   },
 });
 

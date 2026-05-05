@@ -14,13 +14,7 @@ interface TabItem {
 }
 
 const SETTINGS_TABS: readonly TabItem[] = [
-  {
-    to: "/settings/general",
-    label: "General",
-    requires: { organization: ["update"] },
-    requiresOrg: true,
-  },
-  { to: "/settings/team", label: "Team", requiresOrg: true },
+  { to: "/settings/organization", label: "Organization", requiresOrg: true },
   {
     to: "/settings/billing",
     label: "Billing",
