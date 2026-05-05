@@ -1,3 +1,21 @@
+## [1.12.0](https://github.com/axelhamil/clean-stack/compare/v1.11.2...v1.12.0) (2026-05-05)
+
+### Features
+
+* **env:** require only db url + auth keys at boot ([1a2f811](https://github.com/axelhamil/clean-stack/commit/1a2f811bf9a8dbd50545d9de956f77d8280d3897))
+* **scripts:** add bootstrap script + rename docker:dev → dev:docker ([09225ff](https://github.com/axelhamil/clean-stack/commit/09225ff58efd1ba67933f9de1ba19e64d72586ed))
+
+### Bug Fixes
+
+* **db:** drizzle-kit push --force for non-tty safety under turbo ([5500316](https://github.com/axelhamil/clean-stack/commit/550031631f44e07256c20dee4c0462eb9fa9477a))
+* **env:** treat empty string env vars as undefined ([d5a3098](https://github.com/axelhamil/clean-stack/commit/d5a30986b29a0acab385ceecefb0611b0202cca0))
+* **turbo:** expand globalenv with wildcards for env passthrough ([5edceb4](https://github.com/axelhamil/clean-stack/commit/5edceb417a80981cf5dffc21d1773ba3c646734e))
+
+### Documentation
+
+* **readme:** merge docker + compose links in prerequisites ([d66af14](https://github.com/axelhamil/clean-stack/commit/d66af14790e4cb2249c5e17b8989dc28233421a4))
+* **readme:** rewrite with two install paths + why-bother + infra ([42ba6a2](https://github.com/axelhamil/clean-stack/commit/42ba6a233b69db9a173860dd4eea8d963894e224)), closes [#21](https://github.com/axelhamil/clean-stack/issues/21)
+
 ## [1.11.2](https://github.com/axelhamil/clean-stack/compare/v1.11.1...v1.11.2) (2026-05-05)
 
 ### Bug Fixes
