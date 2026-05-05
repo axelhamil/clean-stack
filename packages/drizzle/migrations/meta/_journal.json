@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777504632611,
-      "tag": "0000_superb_black_queen",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1777649196333,
-      "tag": "0001_faithful_catseye",
+      "when": 1777991343482,
+      "tag": "0000_init",
       "breakpoints": true
     }
   ]
