@@ -1,3 +1,21 @@
+## [1.14.0](https://github.com/axelhamil/clean-stack/compare/v1.13.0...v1.14.0) (2026-05-07)
+
+### Features
+
+* **access-control:** add audit-log/webhooks resource permissions ([5b7cd22](https://github.com/axelhamil/clean-stack/commit/5b7cd228e59d242db3055cb1054e566f1700c103))
+* **api:** add audit-log + webhooks modules (admin routes + crud + hmac delivery worker) ([809c770](https://github.com/axelhamil/clean-stack/commit/809c770e1d4e93f319302c863fd3aca31ade990a))
+* **api:** add transactional outbox foundation (dispatcher + subscribers + aead + jitter) ([193013d](https://github.com/axelhamil/clean-stack/commit/193013d756ae2fcaf1853128dd8a052deb26d223))
+* **auth:** bridge betterauth events to outbox via 4 lifecycles ([a54da1b](https://github.com/axelhamil/clean-stack/commit/a54da1b8b157e18555840a2f0af1fba8abb1d76f))
+* **ddd-kit:** add event-collector als, on-event factory, uuid v7, iunit-of-work.run ([9f5c9e2](https://github.com/axelhamil/clean-stack/commit/9f5c9e28bb8ec3bc14f6803821b1dd06e179c19a))
+* **drizzle:** add outbox/audit-log/webhooks schemas + uow.run flush handler ([77b4968](https://github.com/axelhamil/clean-stack/commit/77b4968494a788251c448430c5be28d4e00f96d1))
+* **events:** add @packages/events shared catalog ([ead42a8](https://github.com/axelhamil/clean-stack/commit/ead42a820f13a2f835b0bf22b68d1441ce5856e9))
+* **rgpd,uploads:** emit lifecycle events + delete /uploads route ([3f77d4a](https://github.com/axelhamil/clean-stack/commit/3f77d4aea88c9b08db3ffe1f684cfbcfdf581c56))
+
+### Documentation
+
+* roadmap + history + events guide + 2 cross-cutting rules (orm-first, every-state-change-emits) ([becc295](https://github.com/axelhamil/clean-stack/commit/becc295ebef9da77cbb2eb51572cbf44530ba7f9)), closes [#5](https://github.com/axelhamil/clean-stack/issues/5) [#6](https://github.com/axelhamil/clean-stack/issues/6) [#5](https://github.com/axelhamil/clean-stack/issues/5) [#6](https://github.com/axelhamil/clean-stack/issues/6)
+* **roadmap:** mark internal-packages-no-build done + log teams rollback in shipped ([febabe7](https://github.com/axelhamil/clean-stack/commit/febabe79763fed581049a3c7f030090b8e4467f8))
+
 ## [1.13.0](https://github.com/axelhamil/clean-stack/compare/v1.12.0...v1.13.0) (2026-05-05)
 
 ### Features
