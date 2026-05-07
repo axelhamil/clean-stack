@@ -1,6 +1,14 @@
 import { Result } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
+import { CryptoHasher } from "bun";
 import { env } from "../../../../shared/env";
+import { emitEvent } from "../../../../shared/event-emitter";
+import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
+
+function hashKey(key: string): string {
+  return new CryptoHasher("sha256").update(key).digest("hex").slice(0, 16);
+}
 
 export interface CreateUploadUrlInput {
   ownerId: string;
@@ -45,8 +53,16 @@ export interface CreateDownloadUrlOutput {
   expiresAt: string;
 }
 
+export interface DeleteUploadInput {
+  ownerId: string;
+  key: string;
+}
+
 export class UploadService {
-  constructor(private readonly storage: IStorageService) {}
+  constructor(
+    private readonly storage: IStorageService,
+    private readonly outbox: IOutboxRepository,
+  ) {}
 
   async createUploadUrl(
     input: CreateUploadUrlInput,
@@ -61,6 +77,13 @@ export class UploadService {
       expiresInSeconds: ttl,
     });
     if (presigned.isFailure) return Result.fail(presigned.getError());
+
+    await emitEvent(this.outbox, EventTypes.UPLOAD_REQUESTED, "upload", hashKey(key), {
+      userId: input.ownerId,
+      key: hashKey(key),
+      contentType: input.contentType,
+      size: input.size,
+    });
 
     const { url, expiresAt } = presigned.getValue();
     return Result.ok({
@@ -100,12 +123,38 @@ export class UploadService {
       });
     }
 
+    await emitEvent(this.outbox, EventTypes.UPLOAD_CONFIRMED, "upload", hashKey(input.key), {
+      userId: input.ownerId,
+      key: hashKey(input.key),
+      size,
+      contentType,
+    });
+
     return Result.ok({
       key: input.key,
       size,
       contentType,
       publicUrl: this.storage.publicUrlFor(input.key),
     });
+  }
+
+  async deleteUpload(input: DeleteUploadInput): Promise<Result<void, StorageError>> {
+    if (!input.key.startsWith(`${input.ownerId}/`)) {
+      return Result.fail({
+        code: "STORAGE_FORBIDDEN",
+        message: "key does not belong to the requesting owner",
+      });
+    }
+
+    const deleted = await this.storage.deleteObject(input.key);
+    if (deleted.isFailure) return Result.fail(deleted.getError());
+
+    await emitEvent(this.outbox, EventTypes.UPLOAD_DELETED, "upload", hashKey(input.key), {
+      userId: input.ownerId,
+      key: hashKey(input.key),
+    });
+
+    return Result.ok(undefined);
   }
 
   async createDownloadUrl(

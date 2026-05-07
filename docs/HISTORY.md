@@ -128,3 +128,87 @@ Personal org is structurally identical to a team org for every operation except 
 - [x] **`/settings` hub** — single layout (`features/settings/settings.layout.tsx`) renders `Outlet` with the contextual tabs as page nav. Six sub-pages: General, Members, Invitations, Billing (placeholder until Stripe ships), Profile, Security. `/settings` index redirects to `/settings/general`.
 - [x] **One `<main>` per page** — the `Outlet` content wrapper is the page's `<main>` landmark. Sub-pages render plain divs/sections inside.
 - [x] Custom inline-SVG `LogoMark` — two offset rounded squares (front solid, back at 18% opacity), theme-aware via `currentColor` + `var(--background)`. No asset file.
+
+---
+
+## Event-driven foundation — outbox + dispatcher + audit-log + webhooks ✅ May 2026
+
+**Why**: every cloned SaaS needs the same event plumbing — outbox for at-least-once delivery, audit log for compliance (SOC2 §CC7.2 + ISO 27001), outbound webhooks for customer integrations, in-process handlers for side-effects. Building that rail once-for-all unlocks Phases A.4 (consent handlers), C.2 (audit), C.5 (webhooks), C.7 (SSO audit), D.3 (in-app notifs), 0.4 (observability subscribers) — each becomes a 1-line `onEvent(...)` declaration instead of a per-feature plumbing chunk.
+
+**DX contract — zero plumbing post-clone**: a dev cloning the boilerplate writes (1) a 1-line entry in `packages/events/src/event-types.ts`, (2) `aggregate.addEvent(new XEvent(...))` in their domain method, (3) `this.uow.run(async tx => repo.save(agg, tx))` in their use-case. The outbox enqueue happens transparently via `AsyncLocalStorage` event collector + `IUnitOfWork.run()` flush pre-commit. Audit + webhook fan-out automatic if the event is in the retention map. In-process handlers via `onEvent(type, factory)` + 1 inwire `b.add(...)` are auto-discovered at boot (container introspection via `EVENT_HANDLER_SYMBOL` marker). See [`docs/EVENTS.md`](EVENTS.md) for the full DX guide.
+
+### Catalog `@packages/events` (new private package)
+
+- [x] **29 events** covering BetterAuth (user/session/account, organization/member/invitation, MFA/passkey), RGPD (deletion + export transitions), uploads (`hashKey` instead of raw filename for PII).
+- [x] **Zod payload schemas** — typed discriminated union via `PayloadByEventType`.
+- [x] **`RETENTION_MAP`** — per-event `operational` (90d) / `compliance` (7y) / `none`. The audit subscriber reads this directly — no glue.
+
+### `@packages/ddd-kit` extensions
+
+- [x] **`Aggregate.pullDomainEvents()`** — atomic pull-and-clear (replaces the old getter + `clearEvents()` pattern).
+- [x] **`EventCollector`** (AsyncLocalStorage) — per-uow context isolation. Verified via concurrent `Promise.all` test.
+- [x] **`IUnitOfWork.run(cb)`** standardized — wraps Drizzle `db.transaction(...)` + opens ALS context, drains events pre-COMMIT via injected `flushHandler`. **Nested `run()` interdit** — the impl throws `Error("nested IUnitOfWork.run() is not supported")` because Drizzle nested transactions are independent (not savepoints) → events would orphan. Detected via `EventCollector.hasContext()`.
+- [x] **`onEvent(type, factory)`** + `EventHandler<T>` + `EVENT_HANDLER_SYMBOL` (cross-realm via `Symbol.for("clean-stack/event-handler")`). Inline-friendly: `b.add("X", onEvent(EventTypes.X, c => async e => c.IEmailService.send(...)))`.
+- [x] **UUID v7 inline impl** (RFC 9562, no external dep) — replaces v4 in `UUID.create()`. Time-ordered → B-tree locality on insert. Monotonic across milliseconds; **not** strict intra-ms (acceptable for B-tree page-level locality, documented).
+- [x] **`outbox-mapping.domainEventToOutboxRow()`** — converts `IDomainEvent` to outbox row shape with CloudEvents 1.0 metadata envelope (`specversion`, `source`, `subject`, `traceparent`, `datacontenttype`).
+
+### `@packages/drizzle` schemas + run flush
+
+- [x] **3 new schemas** — `outbox_event` (UUID v7 PK, partial index `WHERE dispatched_at IS NULL`, CloudEvents metadata jsonb), `audit_log` (5 indexes for filter combos, `prev_hash`/`hash` columns posed for tamper-evidence), `webhook_endpoint` + `webhook_delivery` (FK CASCADE org, FK RESTRICT outbox_event, idempotency_key UNIQUE, partial pending index).
+- [x] **`TransactionService.run()`** — implements `IUnitOfWork.run` with `flushHandler` injected at construction time (container.ts wires it to `outbox.enqueue`). Sets `idle_in_transaction_session_timeout = '30s'` via `SET LOCAL` to protect against zombie workers.
+- [x] **`trackEventsOnSuccess(result, aggregate)`** helper — repos call this in their `save`/`create` impl to push aggregate events into the ALS collector. Without it, events stay buffered on the aggregate and are silently lost.
+
+### Shared infra
+
+- [x] **`OutboxDispatcher`** (`apps/api/src/shared/services/outbox-dispatcher.service.ts`) — in-process Bun worker. Dedicated `pg.Client` for `LISTEN outbox_event` + reconnect with exponential backoff + 30s poll fallback. `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 50` drain (multi-instance ready). Built-in subscribers (audit + webhook fanout) run inside the dispatch TX (atomic with `markDispatched`); user `onEvent(...)` handlers run **post-commit** in a separate loop (best-effort, isolated). `pg_notify` trigger ensured idempotently at boot via `CREATE OR REPLACE TRIGGER` (Postgres 14+ atomic). Container introspection auto-wires user handlers via `Object.entries(di)` + `EVENT_HANDLER_SYMBOL` filter.
+- [x] **Built-in subscribers** — `AuditEventSubscriber` writes audit row idempotently via deterministic ID `audit-${event.id}` (ON CONFLICT DO NOTHING). `WebhookFanoutSubscriber` enqueues `webhook_delivery` rows with `eventTypes ? <type>` ARRAY match AND `organizationId = event.organizationId`. **Multi-tenant safety**: events with `organizationId = null` (platform-level: USER_CREATED, USER_SIGNED_IN) skip the webhook fanout entirely — never broadcast across tenants. Verified runtime.
+- [x] **AEAD secret crypto** (`shared/aead.ts`) — `@noble/ciphers` v2 XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key from `WEBHOOK_MASTER_KEY` (32-byte hex). Webhook secrets encrypted at rest, plaintext returned **once** at endpoint creation (Stripe-style).
+- [x] **Decorrelated jitter** (`shared/jitter.ts`) — AWS Architecture Blog formula: `min(cap, random(base, lastDelay × 3))`. `BASE = 1000ms`, `CAP = 12h`, `MAX_ATTEMPTS = 5`. Retry paliers ~1m / 5m / 30m / 2h / 12h, dead-letter after 5 attempts.
+- [x] **Ports** `IOutboxRepository` + `IAuditPort` in `shared/ports/`. Cross-cutting (consumed by 2+ contexts). Drizzle impls in `shared/services/`.
+- [x] **`emitEvent(outbox, ...)` shared helper** (`shared/event-emitter.ts`) — used by BetterAuth bridge, RGPD service, UploadService instead of duplicated private `emit` methods.
+- [x] **`recordAudit(deps, entry, tx?)` shared helper** (`shared/audit-recorder.ts`) — for service-level transitions without aggregate (RGPD-style). Aggregate-driven contexts use `AuditEventSubscriber` automatic — no direct call.
+
+### BetterAuth bridge (`apps/api/src/auth.ts`) — 21 unique events emitted automatically (23 emit sites; USER_PASSWORD_CHANGED + ORG_MEMBER_JOINED each have 2)
+
+3 voies SOTA combinées :
+
+- **`databaseHooks`** (TX-bound, captures all flows including non-HTTP) — USER_CREATED (`user.create.after`), USER_SIGNED_IN (`session.create.after`), USER_SIGNED_OUT (`session.delete.after`), USER_ACCOUNT_UNLINKED (`account.delete.after`, skip credential).
+- **`hooks.after` + `createAuthMiddleware`** (path-based, plugin events not exposed in `databaseHooks`) — filter `if (ctx.context.returned instanceof APIError) return` to skip on 4xx/5xx (plugin events fire even on errors otherwise). Paths: `/two-factor/{enable,disable}`, `/passkey/verify-registration` (lookup latest passkey for userId), `/passkey/delete-passkey` (body.id), `/verify-email`, `/change-password`, `/link-social` (lookup latest non-credential account < 5s ago to avoid re-link false-positives).
+- **Native callbacks** — `emailAndPassword.{sendResetPassword,onPasswordReset}` (USER_PASSWORD_RESET_REQUESTED + USER_PASSWORD_CHANGED), `magicLink.sendMagicLink` (USER_MAGIC_LINK_REQUESTED).
+- **`organizationHooks`** (org plugin) — afterCreateOrganization (ORG_CREATED), afterUpdateOrganization, afterDeleteOrganization, afterAddMember + **afterAcceptInvitation** (both emit ORG_MEMBER_JOINED — the two lifecycles are independent in BetterAuth, missing the second drops every member who joins via invite), afterRemoveMember, afterUpdateMemberRole, afterCreateInvitation (ORG_MEMBER_INVITED), afterCancelInvitation.
+- **RGPD service** — USER_DELETION_{REQUESTED,CANCELLED}, USER_DELETED, USER_EXPORT_{REQUESTED,COMPLETED} (payload: `storageKey`, **never** the presigned URL — security).
+- **UploadService** — UPLOAD_REQUESTED + UPLOAD_CONFIRMED + UPLOAD_DELETED (`DELETE /uploads`, ownership-gated by `key.startsWith(\`${ownerId}/\`)`; payload: `hashKey(key)` sha256-truncated, **never** the raw filename — PII).
+- Race window BetterAuth COMMIT ↔ outbox enqueue documented as accepted (no 2PC available). For SOC2 reconciliation: cron `SELECT u.id FROM "user" u LEFT JOIN outbox_event o ON o.aggregate_id = u.id AND o.event_type = 'user.created' WHERE o.id IS NULL`.
+
+### Built-in modules
+
+- [x] **`modules/audit-log/`** — `AuditQueryService.listForOrg(orgId, filters)` (orgId always from session, never query string), `GET /admin/audit-log` (gated `requireOrgPermission({ auditLog: ["read"] })`), `POST /internal/audit-log-purge` (cron sweep operational rows).
+- [x] **`modules/webhooks/`** — full CRUD `/settings/webhooks` (gated `requireOrgPermission({ webhooks: ["read"|"write"] })`), `WebhookDeliveryWorker` with **claim window pattern** (claim batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + 30s)`, fetch HTTP outside TX, update status in fresh TX) — prevents lock starvation under sustained load. HMAC signing format `t=<unix>,v1=<hex-sha256>` (Stripe-style), header `x-webhook-signature`. Idempotency-key `<eventId>:<endpointId>` (UNIQUE). Replay endpoint creates fresh delivery row.
+
+### Lifecycle
+
+- [x] **Boot** — `OutboxDispatcher.start(di)` + `WebhookDeliveryWorker.start()` in `apps/api/src/index.ts`. `EventCollector.setOutOfContextLogger` wired to pino warn (DX: events emitted outside `uow.run()` log a warning instead of disappearing silently).
+- [x] **SIGTERM/SIGINT** — `Promise.all([stopWithTimeout(webhookWorker), stopWithTimeout(outboxDispatcher)])` parallel shutdown (each worker has 25s timeout, fits in K8s 30s `terminationGracePeriodSeconds`).
+
+### Permissions
+
+- [x] **`@packages/access-control`** extended — `auditLog: ["read"]` and `webhooks: ["read","write"]` added to `STATEMENTS`. Owner + admin get both, member gets neither.
+
+### Tests + smoke runtime
+
+- [x] **Unit tests** — `event-collector.test.ts` (ALS isolation between concurrent contexts), `aggregate.test.ts` (`pullDomainEvents` atomic), `jitter.test.ts` (bounds + dead-letter math), `aead.test.ts` (encrypt/decrypt round-trip + sub-key determinism + ciphertext tampering rejection), `hmac-signer.test.ts` (Stripe-format signature + verify round-trip + stale timestamp window).
+- [x] **Smoke runtime** — signup via `/api/auth/sign-up/email` → `outbox_event` row dispatched in <1s → `audit_log` row written with `audit-${eventId}` deterministic ID + retention compliance + extractActor heuristic OK. Endpoint registration → `org.updated` trigger → `webhook_delivery` row created + delivery attempt fail (URL fake) + retry attempts=2 (decorrelated jitter in action). Multi-tenant: events with `organizationId = null` skip fanout (verified).
+
+### Decisions clés (non-obvious, locked-in by code)
+
+1. **`databaseHooks` for core models, `hooks.after` for plugin events** — confirmed by reading BetterAuth v1.6.9 source (Context7). Plugin tables (`twoFactor`, `passkey`) not exposed in `databaseHooks`. `hooks.after` requires `APIError` instance check (not `"error" in returned` — that pattern misses APIError instances thrown by handlers).
+2. **Built-in subscribers (audit + webhook fanout) run inside dispatch TX, user handlers run post-commit** — atomic for the rail, best-effort for handlers. A user handler throwing doesn't fail `markDispatched`. A built-in subscriber throwing rolls back the entire batch (retried at next drain).
+3. **No nested `IUnitOfWork.run`** — Drizzle nested `db.transaction()` opens independent TXs (not savepoints). Events from inner `run` would persist in outbox even if outer rolls back (orphan). Hard guard via `EventCollector.hasContext()` throw.
+4. **`organizationId = null` skips webhook fanout** — platform-level events (USER_CREATED, USER_SIGNED_IN) emit without an org context. Without this skip, cross-tenant data leak (every tenant's webhook receives every signup of every other tenant).
+5. **AEAD secret stored, plaintext returned once** — Stripe pattern. Master key `WEBHOOK_MASTER_KEY` (32 hex bytes) required at boot in production (env validation throws). Per-org sub-key via `HKDF-SHA256(masterKey, salt: undefined, info: "webhook-secret:${orgId}")`.
+6. **Claim window pattern in delivery worker** — fetch HTTP outside TX (otherwise 50 deliveries × 30s timeout = 25min TX, kills connection pool). Claim window = `BATCH_SIZE × FETCH_TIMEOUT + 30s buffer`. Idempotency-key on receiver side prevents double-POST if worker crashes mid-fetch.
+7. **`hashKey(rawKey)` in UPLOAD events** — sha256-truncated to 16 chars. Raw filename stays only in S3 + the user's session (never in audit_log/webhooks). PII compliance.
+8. **`onPasswordReset` + `/change-password` both emit `USER_PASSWORD_CHANGED`** — different flows (reset via email vs. logged-in change), single event type. Receiver dedupes if needed.
+9. **Tamper-evidence deferred** — `prev_hash`/`hash` columns posed in `audit_log`, calc gated by `AUDIT_TAMPER_EVIDENCE` env flag (off). Implementation choice (Merkle batch vs. row-lock hash chain) parked until SOC2 audit demands.
+10. **3 rounds of multi-agent review** — round 1 found 20 issues fixed, round 2 found 13 issues (3 invalidated round 1 fixes, fixed), round 3 found 1 HIGH (`stopWithTimeout` séquentiel → `Promise.all`) + 1 MEDIUM (`break` on stopping in post-commit loop) fixed. Smoke runtime then validated end-to-end.
+11. **End-to-end QA pass found 2 real bugs + drove the ORM-first rule.** A 36-test harness exercising every event via real HTTP (signup → outbox → audit_log → webhook_delivery → HMAC-signed POST received) caught: (a) `ORG_MEMBER_JOINED` silently missing on `acceptInvitation` because BetterAuth routes it through `organizationHooks.afterAcceptInvitation` — a separate lifecycle from `afterAddMember` (which only fires for direct adds, not invites); (b) `UPLOAD_DELETED` declared in the catalog but never emitted (orphan event). Both fixed: dual-hook wiring + `DELETE /uploads` route with ownership guard. Then the same QA pass exposed several `sql\`...\`` raw fragments in services where Drizzle has typed helpers (`arrayContains`, `isNull`, `inArray`, `.for("update", { skipLocked: true })`) — codified as **cross-cutting rule #5** (ORM-first; raw SQL only for what the ORM doesn't model: DDL, `SET LOCAL`, server `now()`, atomic `${col} + 1` per Drizzle docs). 8 conversions, 4 raw fragments justified, all type-safe column refs preserved.

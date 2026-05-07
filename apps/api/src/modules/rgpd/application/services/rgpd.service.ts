@@ -1,7 +1,10 @@
 import { type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
 import { env } from "../../../../shared/env";
+import { emitEvent } from "../../../../shared/event-emitter";
 import { logger } from "../../../../shared/logger";
 import type { IEmailService } from "../../../../shared/ports/email.port";
+import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -69,6 +72,7 @@ export class RgpdService {
     private readonly storage: IStorageService,
     private readonly email: IEmailService,
     private readonly transactions: IUnitOfWork<ITransaction>,
+    private readonly outbox: IOutboxRepository,
   ) {}
 
   async preflightAccountDeletion(
@@ -131,6 +135,11 @@ export class RgpdService {
     const marked = await this.rgpd.markPendingDeletion(input.userId, until);
     if (marked.isFailure) return Result.fail(marked.getError());
 
+    await emitEvent(this.outbox, EventTypes.USER_DELETION_REQUESTED, "user", input.userId, {
+      userId: input.userId,
+      pendingDeletionUntil: until,
+    });
+
     const cancelUrl = `${env.APP_URL}/settings/account`;
     const sent = await this.email.sendTemplate(
       "delete_requested",
@@ -172,6 +181,10 @@ export class RgpdService {
 
     const cleared = await this.rgpd.clearPendingDeletion(input.userId);
     if (cleared.isFailure) return Result.fail(cleared.getError());
+
+    await emitEvent(this.outbox, EventTypes.USER_DELETION_CANCELLED, "user", input.userId, {
+      userId: input.userId,
+    });
 
     const sent = await this.email.sendTemplate(
       "delete_cancelled",
@@ -236,6 +249,11 @@ export class RgpdService {
         message: "wipe transaction failed",
       });
     }
+
+    await emitEvent(this.outbox, EventTypes.USER_DELETED, "user", input.userId, {
+      userId: input.userId,
+      deletedAt: new Date(),
+    });
 
     // Storage cleanup is post-tx: object storage isn't transactional, so we accept
     // the tradeoff. A crash here leaves orphaned blobs but the DB row is already
@@ -355,6 +373,10 @@ export class RgpdService {
       });
     }
 
+    await emitEvent(this.outbox, EventTypes.USER_EXPORT_REQUESTED, "user", input.userId, {
+      userId: input.userId,
+    });
+
     const payloadResult = await this.rgpd.collectUserDataForExport(input.userId);
     if (payloadResult.isFailure) return Result.fail(payloadResult.getError());
     const payload = payloadResult.getValue();
@@ -375,6 +397,12 @@ export class RgpdService {
 
     const touched = await this.rgpd.touchExportRequestedAt(input.userId);
     if (touched.isFailure) return Result.fail(touched.getError());
+
+    await emitEvent(this.outbox, EventTypes.USER_EXPORT_COMPLETED, "user", input.userId, {
+      userId: input.userId,
+      storageKey: key,
+      expiresAt: new Date(presigned.getValue().expiresAt),
+    });
 
     const sent = await this.email.sendTemplate(
       "data_export_ready",

@@ -22,6 +22,12 @@ export abstract class Aggregate<T> extends Entity<T> implements IAggregate {
     this._domainEvents = [];
   }
 
+  public pullDomainEvents(): IDomainEvent[] {
+    const drained = [...this._domainEvents];
+    this._domainEvents = [];
+    return drained;
+  }
+
   protected addEvent(event: IDomainEvent): void {
     this._domainEvents.push(event);
   }

@@ -1,0 +1,24 @@
+{
+  "name": "@packages/events",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@packages/typescript-config": "workspace:*",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

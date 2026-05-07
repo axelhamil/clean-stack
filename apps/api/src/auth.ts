@@ -2,13 +2,16 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
-import { and, db, eq, schema } from "@packages/drizzle";
+import { and, db, desc, eq, schema } from "@packages/drizzle";
+import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
 import { di } from "./container";
 import { env } from "./shared/env";
+import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
@@ -46,6 +49,18 @@ async function ensurePersonalOrgFor(userId: string): Promise<string> {
     });
   });
   return orgId;
+}
+
+async function emit<TPayload>(
+  eventType: EventType,
+  aggregateType: string,
+  aggregateId: string,
+  payload: TPayload,
+  organizationId?: string | null,
+): Promise<void> {
+  await emitEvent(di.IOutboxRepository, eventType, aggregateType, aggregateId, payload, {
+    organizationId,
+  });
 }
 
 async function dispatchEmail<K extends keyof EmailTemplates>(
@@ -89,12 +104,19 @@ const authOptions = {
     requireEmailVerification: true,
     sendResetPassword: async ({ user, token }) => {
       const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+      await emit(EventTypes.USER_PASSWORD_RESET_REQUESTED, "user", user.id, {
+        userId: user.id,
+        email: user.email,
+      });
       await dispatchEmail(
         "reset_password",
         user.email,
         { name: user.name ?? "", resetUrl },
         tokenIdempotencyKey("reset-password", token),
       );
+    },
+    onPasswordReset: async ({ user }) => {
+      await emit(EventTypes.USER_PASSWORD_CHANGED, "user", user.id, { userId: user.id });
     },
   },
 
@@ -134,6 +156,7 @@ const authOptions = {
     magicLink({
       sendMagicLink: async ({ email, token }) => {
         const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;
+        await emit(EventTypes.USER_MAGIC_LINK_REQUESTED, "user", email, { email });
         await dispatchEmail(
           "magic_link",
           email,
@@ -155,7 +178,65 @@ const authOptions = {
             );
           }
         },
-        afterRemoveMember: async ({ organization: org }) => {
+        afterCreateOrganization: async ({ organization: org, member }) => {
+          if (isPersonalOrg(org.slug)) return;
+          await emit(
+            EventTypes.ORG_CREATED,
+            "organization",
+            org.id,
+            {
+              organizationId: org.id,
+              ownerUserId: member.userId,
+              slug: org.slug,
+              name: org.name,
+            },
+            org.id,
+          );
+        },
+        afterUpdateOrganization: async ({ organization: org }) => {
+          if (!org) return;
+          await emit(
+            EventTypes.ORG_UPDATED,
+            "organization",
+            org.id,
+            {
+              organizationId: org.id,
+              changes: { name: org.name, slug: org.slug, logo: org.logo },
+            },
+            org.id,
+          );
+        },
+        afterDeleteOrganization: async ({ organization: org }) => {
+          if (isPersonalOrg(org.slug)) return;
+          await emit(
+            EventTypes.ORG_DELETED,
+            "organization",
+            org.id,
+            { organizationId: org.id },
+            org.id,
+          );
+        },
+        afterAddMember: async ({ member, organization: org }) => {
+          await emit(
+            EventTypes.ORG_MEMBER_JOINED,
+            "member",
+            member.id,
+            {
+              organizationId: org.id,
+              userId: member.userId,
+              role: member.role,
+            },
+            org.id,
+          );
+        },
+        afterRemoveMember: async ({ member, organization: org }) => {
+          await emit(
+            EventTypes.ORG_MEMBER_REMOVED,
+            "member",
+            member.id,
+            { organizationId: org.id, userId: member.userId },
+            org.id,
+          );
           if (isPersonalOrg(org.slug)) return;
           const remaining = await db
             .select({ id: schema.member.id })
@@ -165,6 +246,60 @@ const authOptions = {
           if (remaining.length === 0) {
             await db.delete(schema.organization).where(eq(schema.organization.id, org.id));
           }
+        },
+        afterUpdateMemberRole: async ({ member, previousRole, organization: org }) => {
+          await emit(
+            EventTypes.ORG_MEMBER_ROLE_CHANGED,
+            "member",
+            member.id,
+            {
+              organizationId: org.id,
+              userId: member.userId,
+              previousRole,
+              newRole: member.role,
+            },
+            org.id,
+          );
+        },
+        afterCreateInvitation: async ({ invitation, organization: org }) => {
+          await emit(
+            EventTypes.ORG_MEMBER_INVITED,
+            "invitation",
+            invitation.id,
+            {
+              organizationId: org.id,
+              invitationId: invitation.id,
+              email: invitation.email,
+              role: invitation.role ?? "member",
+              inviterUserId: invitation.inviterId,
+            },
+            org.id,
+          );
+        },
+        afterCancelInvitation: async ({ invitation, organization: org }) => {
+          await emit(
+            EventTypes.ORG_INVITATION_CANCELLED,
+            "invitation",
+            invitation.id,
+            { organizationId: org.id, invitationId: invitation.id },
+            org.id,
+          );
+        },
+        // `afterAddMember` only fires for direct adds (org-create creator, signup auto-personal-org).
+        // BetterAuth routes invitation acceptance through `afterAcceptInvitation` — without this,
+        // every member who joins via invite would be invisible to the outbox.
+        afterAcceptInvitation: async ({ member, organization: org }) => {
+          await emit(
+            EventTypes.ORG_MEMBER_JOINED,
+            "member",
+            member.id,
+            {
+              organizationId: org.id,
+              userId: member.userId,
+              role: member.role,
+            },
+            org.id,
+          );
         },
       },
       sendInvitationEmail: async ({ id, email, role, inviter, organization: org }) => {
@@ -184,6 +319,81 @@ const authOptions = {
     }),
   ],
 
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.context.returned instanceof APIError) return;
+      const path = ctx.path;
+      const userId = ctx.context.session?.user.id;
+      if (!userId) return;
+
+      if (path === "/two-factor/enable") {
+        await emit(EventTypes.USER_MFA_ENABLED, "user", userId, { userId });
+        return;
+      }
+      if (path === "/two-factor/disable") {
+        await emit(EventTypes.USER_MFA_DISABLED, "user", userId, { userId });
+        return;
+      }
+      if (path === "/passkey/verify-registration") {
+        const [latest] = await db
+          .select({ id: schema.passkey.id, deviceType: schema.passkey.deviceType })
+          .from(schema.passkey)
+          .where(eq(schema.passkey.userId, userId))
+          .orderBy(desc(schema.passkey.createdAt))
+          .limit(1);
+        if (latest) {
+          await emit(EventTypes.USER_PASSKEY_ADDED, "user", userId, {
+            userId,
+            passkeyId: latest.id,
+            deviceType: latest.deviceType ?? undefined,
+          });
+        }
+        return;
+      }
+      if (path === "/passkey/delete-passkey") {
+        const body = ctx.body as Record<string, unknown> | undefined;
+        const passkeyId = body?.id;
+        if (typeof passkeyId === "string") {
+          await emit(EventTypes.USER_PASSKEY_REMOVED, "user", userId, { userId, passkeyId });
+        }
+        return;
+      }
+      if (path === "/verify-email") {
+        const email = ctx.context.session?.user.email;
+        if (email) {
+          await emit(EventTypes.USER_EMAIL_VERIFIED, "user", userId, { userId, email });
+        }
+        return;
+      }
+      if (path === "/change-password") {
+        await emit(EventTypes.USER_PASSWORD_CHANGED, "user", userId, { userId });
+        return;
+      }
+      if (path === "/link-social") {
+        const [latest] = await db
+          .select({
+            id: schema.account.id,
+            providerId: schema.account.providerId,
+            accountId: schema.account.accountId,
+            createdAt: schema.account.createdAt,
+          })
+          .from(schema.account)
+          .where(eq(schema.account.userId, userId))
+          .orderBy(desc(schema.account.createdAt))
+          .limit(1);
+        const recentEnough = latest?.createdAt && Date.now() - latest.createdAt.getTime() < 5_000;
+        if (latest && latest.providerId !== "credential" && recentEnough) {
+          await emit(EventTypes.USER_ACCOUNT_LINKED, "account", latest.id, {
+            userId,
+            providerId: latest.providerId,
+            accountId: latest.accountId,
+          });
+        }
+        return;
+      }
+    }),
+  },
+
   databaseHooks: {
     user: {
       create: {
@@ -194,6 +404,11 @@ const authOptions = {
             logger.error({ err, userId: user.id }, "personal-org creation failed at signup");
             throw err;
           }
+          await emit(EventTypes.USER_CREATED, "user", user.id, {
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+          });
         },
       },
     },
@@ -211,6 +426,34 @@ const authOptions = {
             );
             throw err;
           }
+        },
+        after: async (session) => {
+          await emit(EventTypes.USER_SIGNED_IN, "session", session.id, {
+            userId: session.userId,
+            sessionId: session.id,
+            ipAddress: session.ipAddress ?? undefined,
+            userAgent: session.userAgent ?? undefined,
+          });
+        },
+      },
+      delete: {
+        after: async (session) => {
+          await emit(EventTypes.USER_SIGNED_OUT, "session", session.id, {
+            userId: session.userId,
+            sessionId: session.id,
+          });
+        },
+      },
+    },
+    account: {
+      delete: {
+        after: async (account) => {
+          if (account.providerId === "credential") return;
+          await emit(EventTypes.USER_ACCOUNT_UNLINKED, "account", account.id, {
+            userId: account.userId,
+            providerId: account.providerId,
+            accountId: account.accountId,
+          });
         },
       },
     },

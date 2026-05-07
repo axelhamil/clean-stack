@@ -5,12 +5,16 @@ Loaded when working inside `apps/api/src/shared/`. Cross-cutting infra placement
 ## What lives here
 
 - `middleware/` — auth, error, logger, internal-signature, private-network, org, internal-layers (env-gate composing internal middlewares for `/internal/*`)
-- `ports/` — cross-context port interfaces (consumed by 2+ contexts, OR pure transport)
-- `services/` — cross-context port impls (when no module owns the impl)
+- `ports/` — cross-context port interfaces (consumed by 2+ contexts, OR pure transport). Currently: `email.port`, `storage.port`, `outbox.port`, `audit.port`.
+- `services/` — cross-context port impls. Currently: `ResendEmailService`, `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `OutboxDispatcher` (LISTEN/NOTIFY worker), `AuditEventSubscriber` + `WebhookFanoutSubscriber` (built-in outbox subscribers).
 - `env.ts`, `logger.ts` — process-level singletons
 - `internal-signature.ts` — HMAC primitives (canonicalize/sign/verify)
 - `internal-fetch.ts` — `signedInternalFetch`, importable by external schedulers (cron workers, GH Actions) calling `/internal/*`
-- `transaction.ts` — `type ITransaction = Transaction` (Drizzle alias). Type-only swap-point exception to "no infra in app layer" rule. Opaque-branded `ITransaction` would force `as unknown as Transaction` everywhere (worse).
+- `transaction.ts` — `type ITransaction = Transaction` (Drizzle alias). Type-only swap-point exception to "no infra in app layer" rule.
+- `event-emitter.ts` — `emitEvent(outbox, ...)` helper for code that emits events outside an aggregate flow (BetterAuth bridge, RGPD service, uploads). Use this instead of `outbox.enqueue` directly to keep the source/scope shape consistent.
+- `aead.ts` — XChaCha20-Poly1305 encrypt/decrypt + HKDF per-org sub-key for webhook secrets at rest.
+- `jitter.ts` — decorrelated jitter math (used by outbox dispatcher + webhook delivery worker for retry backoff).
+- `audit-recorder.ts` — `recordAudit(deps, entry, tx?)` helper for service-level transitions without aggregate (e.g. RGPD). For aggregate-driven contexts the `AuditEventSubscriber` writes from the outbox — no direct call needed.
 
 ## Port placement decisor — `shared/ports/` vs `modules/<x>/application/ports/`
 

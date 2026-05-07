@@ -13,5 +13,5 @@ declare module "inwire" {
 export const uploadsModule = defineModule()((b) =>
   b
     .add("IStorageService", (): IStorageService => new S3StorageService())
-    .add("UploadService", (c) => new UploadService(c.IStorageService)),
+    .add("UploadService", (c) => new UploadService(c.IStorageService, c.IOutboxRepository)),
 );
