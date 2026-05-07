@@ -11,6 +11,8 @@ const statement = {
   ...defaultStatements,
   organization: ["update", "delete", "leave"],
   billing: ["read", "manage"],
+  auditLog: ["read"],
+  webhooks: ["read", "write"],
 } as const;
 
 const _ac = createAccessControl(statement);
@@ -19,12 +21,16 @@ const _owner = _ac.newRole({
   ...ownerAc.statements,
   organization: ["update", "delete", "leave"],
   billing: ["read", "manage"],
+  auditLog: ["read"],
+  webhooks: ["read", "write"],
 });
 
 const _admin = _ac.newRole({
   ...adminAc.statements,
   organization: ["update", "leave"],
   billing: ["read"],
+  auditLog: ["read"],
+  webhooks: ["read", "write"],
 });
 
 const _member = _ac.newRole({
