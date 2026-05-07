@@ -15,6 +15,13 @@
       "when": 1778012580591,
       "tag": "0001_brown_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778164337178,
+      "tag": "0002_ambitious_husk",
+      "breakpoints": true
     }
   ]
 }
