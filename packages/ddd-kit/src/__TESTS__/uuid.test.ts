@@ -90,12 +90,22 @@ describe("UUID", () => {
   });
 
   describe("generation", () => {
-    it("should generate valid UUID v4 format", () => {
+    it("should generate valid UUID v7 format (time-ordered)", () => {
       const uuid = new UUID<string>();
 
       expect(uuid.value).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       );
+    });
+
+    it("should generate UUIDs ordered across millisecond boundaries", async () => {
+      const a = new UUID<string>().value;
+      await new Promise((r) => setTimeout(r, 5));
+      const b = new UUID<string>().value;
+      await new Promise((r) => setTimeout(r, 5));
+      const c = new UUID<string>().value;
+      expect(a < b).toBe(true);
+      expect(b < c).toBe(true);
     });
 
     it("should generate unique UUIDs", () => {
