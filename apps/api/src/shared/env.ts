@@ -7,7 +7,7 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url(),
   BETTER_AUTH_SECRET: z.string().min(32),
 
-  NODE_ENV: z.enum(["development", "production", "test"]).optional(),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().optional(),
   CORS_ORIGIN: z
     .string()
@@ -48,6 +48,14 @@ const envSchema = z.object({
   STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().optional(),
   STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().optional(),
   STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
+  WEBHOOK_MASTER_KEY: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/i, "WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)")
+    .optional(),
+  AUDIT_TAMPER_EVIDENCE: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
 });
 
 const rawEnv = Object.fromEntries(
@@ -65,6 +73,11 @@ if (env.NODE_ENV === "production") {
   if (!env.INTERNAL_SIGNING_KEY || env.INTERNAL_SIGNING_KEY.length < 32) {
     throw new Error(
       "INTERNAL_SIGNING_KEY is required in production (min 32 chars). Generate: openssl rand -hex 32",
+    );
+  }
+  if (!env.WEBHOOK_MASTER_KEY) {
+    throw new Error(
+      "WEBHOOK_MASTER_KEY is required in production (64 hex chars). Generate: openssl rand -hex 32",
     );
   }
 }
