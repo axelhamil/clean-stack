@@ -172,6 +172,18 @@ Only three variables are **required to boot** the api: `DATABASE_URL`, `BETTER_A
 
 ---
 
+## Deployment
+
+The api ships an **always-on event-driven rail** (transactional outbox + Postgres `LISTEN/NOTIFY` dispatcher + webhook delivery worker, all in-process). Two deployment shapes follow from this:
+
+✅ **Compatible** — Railway, Fly.io, Render, Coolify, dedicated VM, Kubernetes/EKS/GKE/AKS. Anywhere the api process stays alive between requests.
+
+🟡 **Compatible with `min_instances ≥ 1`** — Google Cloud Run, AWS App Runner, Azure Container Apps. They scale-to-zero by default; with zero replicas the dispatcher dies and `outbox_event` rows pile up unhandled. **Pin minimum 1 instance** (Cloud Run: `--min-instances=1`) and you're fine.
+
+❌ **Incompatible without re-wiring** — Vercel Functions, Netlify Functions, AWS Lambda, Cloudflare Workers, edge runtimes generally. Functions terminate after the response, killing `LISTEN`. To go serverless, swap the in-process dispatcher for a cron-triggered drain endpoint or an external queue (Inngest, QStash, SQS) — see [`docs/EVENTS.md`](docs/EVENTS.md#deployment-requirements) for the workaround. Edge runtimes also can't run the Postgres LISTEN client at all — keep the api on a regular runtime; if you need edge for specific endpoints, split them into a separate service.
+
+---
+
 ## Stack
 
 | Layer | Choice |

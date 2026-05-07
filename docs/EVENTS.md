@@ -2,6 +2,29 @@
 
 Clean-stack ships a transactional outbox + dispatcher + audit/webhook subscribers. **You never touch the rail.** You declare events and handlers; the rest is automatic.
 
+## Deployment requirements
+
+The dispatcher is an **in-process Bun worker** holding a persistent `pg.Client` connection on `LISTEN outbox_event`. The webhook delivery worker uses a `setInterval` poll. Both die when the api process dies. This shapes where the api can run.
+
+| Platform shape | Status | Notes |
+|---|---|---|
+| Railway, Fly.io, Render, Coolify, dedicated VM, K8s | ✅ Just works | Process stays alive; LISTEN persists across requests. |
+| Cloud Run, App Runner, Azure Container Apps | 🟡 Set `min_instances ≥ 1` | Default scale-to-zero kills the worker. With one always-warm replica, behaves like the row above. |
+| Vercel Functions, Netlify Functions, AWS Lambda | ❌ Re-wire required | Functions terminate after the response. The outbox table will fill up; no one drains it. |
+| Cloudflare Workers, edge runtimes | ❌ Not viable | No Node.js process model + no `pg` client. Even with rewiring, no in-process worker lives long enough. |
+
+**Symptom of mis-deployment**: the api answers requests, `outbox_event` rows accumulate (visible in any Postgres client), `audit_log` and `webhook_delivery` stay empty. Cause: dispatcher never ran or died between requests.
+
+### Going serverless — three paths
+
+If you must ship on serverless functions, the rail still works — you swap the dispatcher only:
+
+1. **Cron-triggered drain** (lowest effort). Expose a protected `POST /internal/drain-outbox` (gated by the same HMAC layer as `/internal/rgpd-sweep`) that runs one batch of `findPendingBatch` + subscribers. Trigger every 1-5 min via Vercel Cron / GitHub Actions / Inngest scheduled function. **Trade-off**: latency floor = cron interval (1 min on Vercel free, 30 s on Inngest).
+2. **External queue** (lowest latency). Replace `outbox.enqueue()` with a push to SQS / Inngest / QStash inside the same TX (XA-style two-phase, or accept the well-known race window). The queue invokes a serverless function per message.
+3. **Hybrid** (most pragmatic). Keep the api serverless, deploy a tiny worker container alongside (Railway/Fly, ~5 €/mo) running the existing `OutboxDispatcher` + `WebhookDeliveryWorker`. Pointing it at the same `DATABASE_URL` is enough; no other code changes.
+
+The audit/webhook subscribers, the catalogue, the `uow.run` flush — all unchanged in any path. Only `OutboxDispatcher` swaps.
+
 ## Mental model
 
 ```
