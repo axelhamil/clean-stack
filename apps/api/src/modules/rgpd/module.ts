@@ -22,6 +22,7 @@ export const rgpdModule = defineModule()((b) =>
           c.IStorageService,
           c.IEmailService,
           c.ITransactionService,
+          c.IOutboxRepository,
         ),
     ),
 );

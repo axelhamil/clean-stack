@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { confirmUploadBodySchema } from "./application/dto/confirm-upload.dto";
+import { deleteUploadBodySchema } from "./application/dto/delete-upload.dto";
 import { presignDownloadBodySchema } from "./application/dto/presign-download.dto";
 import { presignUploadBodySchema } from "./application/dto/presign-upload.dto";
 
@@ -37,4 +38,14 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
 
     return c.json(result.getValue());
+  })
+  .delete("/", requireAuth, zValidator("json", deleteUploadBodySchema), async (c) => {
+    const result = await di.UploadService.deleteUpload({
+      ownerId: c.get("user").id,
+      ...c.req.valid("json"),
+    });
+
+    if (result.isFailure) throw new AppErrorException(result.getError());
+
+    return c.json({ ok: true as const });
   });
