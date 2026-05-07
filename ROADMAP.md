@@ -1,84 +1,145 @@
 # ROADMAP
 
-Forward-looking integrations, **all SOTA 2026**, **outside DDD** (pragmatic layer: `modules/<x>/infrastructure/`, `modules/<x>/routes.ts`, `features/<x>/hooks/`). DDD stays reserved for the pure business domain (`modules/<x>/domain/`, `modules/<x>/application/use-cases/`).
+Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserved for pure business domain). Already-shipped work is logged in [`docs/HISTORY.md`](docs/HISTORY.md) ; current inventory in [`docs/FEATURES.md`](docs/FEATURES.md).
 
-> **Boilerplate completeness target**: a clone of `clean-stack` should ship any SaaS without re-coding plumbing. Anything below this line that isn't `[x]` is friction the cloner inherits.
+> **Boilerplate target**: clone → ship any SaaS without re-coding plumbing. Anything below that isn't `[x]` is friction the cloner inherits.
 
-> Already shipped (Auth, Multi-tenant, Email, Storage, App shell, RGPD core, Vertical-slice layout): see [`docs/FEATURES.md`](docs/FEATURES.md) for the inventory and [`docs/HISTORY.md`](docs/HISTORY.md) for the full architectural log.
+---
 
-## Priority phases — ship-any-SaaS punch list
+## ✅ Already shipped (key milestones)
 
-Read top-to-bottom. Each phase assumes the previous is done. Items inside a phase can ship in parallel. Order reflects: (1) blocking dependencies, (2) SOTA-2026 non-negotiables (RGPD + EAA + Google/Yahoo email mandates + NIST SP 800-63B-4 + DORA contractual readiness) clustered upfront so a clone is **EU+US deployable** end-to-end before any business-feature work, (3) ops surfaces (health/backups/audit/admin) before customer-facing surfaces (PATs/webhooks).
+| Milestone | When | Surface |
+|---|---|---|
+| Auth (BetterAuth) | — | sign-in/up, MFA, passkey, magic-link, bearer, customSession, email hooks idempotents |
+| Multi-tenant + access-control SSOT | — | organization plugin, Personal org self-heal, capability-based predicate front+back, `<Can>` |
+| Email (Resend port + adapter) | — | template registry typed, idempotency, retry, EU region option |
+| Storage S3-compatible (R2/SeaweedFS) | — | three-step presign→PUT→confirm, owner-scoped key, server-verified `HeadObject` |
+| RGPD core (Art. 17 + Art. 20) | — | 7-day grace, 2FA-gated, sole-owner preflight, cron sweep, `/legal/data-rights` |
+| App shell + ⌘K palette | — | top-nav, contextual settings tabs, view-transitions theme, command palette |
+| Vertical-slice layout (front + back) | — | features/<x>/<x>.{route,page}.tsx + modules/<x>/{application,infrastructure,routes,module}.ts |
+| Clone-ability bootstrap (`pnpm bootstrap` + Docker compose v2 + Linux fixes + source-only packages) | May 2026 | `pnpm bootstrap` script, SeaweedFS profile `storage`, db:push --force, internal packages source-only |
+| **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 29 events emitted automatically (21 BetterAuth bridge + 5 RGPD + 3 uploads) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry). See dedicated section below + [`docs/EVENTS.md`](docs/EVENTS.md). |
 
-**Phase 0 — Foundation closeout (blocks Phase B)**
+---
 
-0.0. **Clone-ability bootstrap — URGENT (regression on boilerplate contract)** — surfaced by external feedback on `dev` (issue 2026-05): a fresh clone fails to bootstrap on Linux. The boilerplate's whole promise is "clone → run", so this jumps every other Phase 0 item. Punch list:
-   - [x] **`pnpm bootstrap` dispatcher (May 2026)** — kept the split (`apps/api/.env`, `apps/app/.env`, `packages/drizzle/.env`) on purpose: backend secrets and `VITE_*` browser-bundled vars must live in different files so a `S3_SECRET_KEY` can't accidentally end up in the client bundle. Added `scripts/bootstrap.sh` (idempotent, never overwrites) wired as `pnpm bootstrap`. Renamed away from `pnpm setup` to avoid collision with the pnpm builtin.
-   - [x] **Storage behind Docker Compose profile `storage`** — done (May 2026). Swapped MinIO → SeaweedFS (Apache 2.0, ~96 MB, MinIO archived April 2026). Service + init under `profiles: [storage]`; `docker compose up -d` only starts Postgres by default. Host port for `:8333` is randomized by Docker (`ports: ["8333"]`) to avoid dev-machine conflicts; in-network the API reaches `seaweedfs:8333`.
-   - [x] **README — Docker Compose v2 prereq explicit (May 2026)** — `docker compose` (no hyphen) is v2, available on Linux via `docker-compose-plugin`. README now lists install commands per distro (apt/dnf/pacman) in the prerequisites block.
-   - [x] **`pnpm db:push` Linux fix (May 2026)** — root cause: `drizzle-kit push` is interactive and prompts on data-loss statements. Turbo pipes stdout in non-TTY → drizzle-kit either hangs or crashes silently. drizzle-kit docs explicitly recommend `--force` for CI / non-TTY. Fix: `packages/drizzle/package.json` → `db:push: drizzle-kit push --force`. Safe in dev (db:push is dev-only; prod uses `db:migrate`). drizzle-kit & drizzle-orm already on latest stable (0.31.10 / 0.45.2).
-   - [x] **Internal packages ship source, not build artifacts (May 2026)** — private workspace packages (consumed only in-monorepo) now expose `src/` directly via `exports`; no `main`/`types` pointing at emitted output, no build step, no `dist/`. **Why**: file-watchers in dev (container sync, IDE, native watchers) almost always exclude generated directories — a build step at startup made every source change produce a stale runtime artifact until manual rebuild, forcing "rebuild image after each schema/types change" friction on cloners. Source types are also more accurate than emitted `.d.ts`, and modern bundlers inline workspace deps from source at app build time. Exception: packages explicitly designed for npm publishing keep their pipeline. Codified as cross-cutting rule 4 in root `CLAUDE.md` so future package additions default-correctly.
-   - [ ] **Bootstrap smoke test in CI** — fresh-clone simulation in CI (`docker compose up -d postgres && pnpm install && pnpm bootstrap && pnpm db:push && pnpm dev` headless for 30s, assert API + app respond). Catches every "works on my machine" regression before users hit it. Runs on `ubuntu-latest` (the most-cloned target).
-   - [ ] **`docs/QUICKSTART.md`** — single-page "0 → running app in 5 min" doc, linked from README header. Currently bootstrap knowledge is spread across CLAUDE.md + scattered READMEs; cloner shouldn't need to read sub-CLAUDE.md to start the dev server.
+## 🚧 Priority — read top-to-bottom
 
-   **Why this jumps the rest of Phase 0**: every other roadmap item assumes a clone that *runs*. Health probes / backups / observability are pointless if the cloner abandons at step 1. Closes the "marche sur ma machine" gap that separates a real boilerplate from a personal repo.
+Each phase assumes the previous done. Items inside a phase parallelizable. Order: (1) blocking deps, (2) SOTA-2026 non-negotiables (RGPD/EAA/Google-Yahoo email/NIST 800-63B-4/DORA) clustered upfront for EU+US deployability, (3) ops surfaces before customer-facing.
 
-0.1. **Vertical-slice back step 4 — DB schema split** — last residual front of the layout pivot. Today `packages/drizzle/src/schema/auth.ts` bundles auth + multi-tenant + RGPD fields. Split per context before Billing's `subscription` / `payment` tables land in the wrong file. Detailed plan in the *Vertical-slice layout* section below.
-0.2. **Health probes — `/livez` + `/readyz` + `/startupz`** — three-probe model (K8s 2026 convention, suffix `z`), IETF `draft-inadarei` response format with tri-state pass/warn/fail, registry pattern (vertical-slice module). Wires graceful shutdown to `/readyz` for true zero-downtime deploys. Absence = restart loops, no rolling deploys, 502s during deploys. Detailed in *Health probes* below.
-0.3. **Backups `pg_dump` + restore tested** — `3-2-1` rule (3 copies, 2 medias, 1 offsite), retention 30d, monthly automated restore-test. A backup never tested isn't a backup. Documents `RPO` / `RTO` in `docs/DISASTER-RECOVERY.md`. Detailed in *Backups & DR* below.
-0.4. **Error tracking + structured logging fan-out (removable observability stack)** — Sentry api+app, OpenTelemetry auto-instrumentation, Prometheus `/metrics`. Architected as **detachable**: cross-cutting ports (`IErrorTracker`/`IMetrics`/`ITracer`) with NoOp adapters always shipped in `shared/services/`, real adapters live in `modules/observability/` (one trash + one DI line removes the lot in 5 min, callers keep working). **Why before Phase A**: every phase A/B/C ships prod code; without Sentry active from day one, you're blind on errors until Phase D.1, six phases away. Detailed in *Error tracking & observability* below.
-0.5. **Removability dry-run on `rgpd`** — first leaf module to remove end-to-end + restore, validates the contract and feeds `docs/HISTORY.md` with the canonical "remove a feature" diff.
+### Phase 0 — Foundation closeout (blocks Phase B)
 
-**Phase A — Legal + accessibility completeness (close it in one push, never touch again)**
+| # | Item | Status |
+|---|---|---|
+| 0.0 | Clone-ability bootstrap | **5/7 done** — remaining: CI smoke test + `docs/QUICKSTART.md` |
+| 0.1 | DB schema split per context (currently `auth.ts` bundles auth + multi-tenant + RGPD) | TODO — before Billing |
+| 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | TODO — graceful shutdown wired to `/readyz` for zero-downtime deploys |
+| 0.3 | Backups `pg_dump` + restore tested (3-2-1 rule, 30d retention, monthly automated restore-test) | TODO — RPO/RTO in `docs/DISASTER-RECOVERY.md` |
+| 0.4 | Sentry + OpenTelemetry + Prometheus `/metrics` (3 detachable ports + NoOp default) | TODO — subscribers now trivial via `onEvent` (event-driven foundation) |
+| 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
 
-> RGPD core (Art. 17 erasure + Art. 20 portability + 7-day grace + 2FA + preflight sole-owner gate + `/legal/data-rights`) **shipped**. The items below close the legal + accessibility surface so a clone is EU-deployable (RGPD + EAA + ePrivacy + NIS2/DORA contractual) AND inclusive end-to-end. **Filed-away after Phase A** — nothing in subsequent phases revisits legal.
+### Phase A — Legal + accessibility completeness
 
-A.1. **Right to rectification UI + NIST 800-63B-4 password baseline** (`/settings/profile` + auth hardening) — Art. 16 GDPR rectification (BetterAuth backend already supports it, missing UI only) **bundled** with the SOTA password upgrades: min length 15 chars (8 with MFA), HIBP screening (Have I Been Pwned compromised list) at sign-up + change, ban complexity rules + forced rotation. **Quick win first** — closes 2 non-negotiables in one push; profile fields are `disabled` placeholders today.
-A.2. **Privacy policy / Terms versioning** — Art. 7 GDPR, prove what user accepted at version T. Foundation for re-acceptance gate; cookie consent (A.4) consumes the policy version. Ship before A.3 (dashboard composes its acceptance card) and A.4 (consent invalidates on version bump).
-A.3. **Compliance docs bundle** — `/legal/sub-processors` page (Art. 28 GDPR — typed config) + `/legal/accessibility` declaration (EAA Art. 14 — mandatory since June 28 2025) + `docs/legal/DPA-template.md` (every EU client demands a DPA at signature) + `docs/legal/DORA-annex-template.md` (mandatory contractual annex for any fintech/insurance client since Jan 17 2025). Pure config + Markdown — ~3h total, blocks zero deal afterwards.
-A.4. **Cookie consent + Consent management** — biggest item; first real boilerplate module with an Aggregate (proves `@packages/ddd-kit` works). Depends on A.2 (policy version stamped on consent record). CNIL/EDPB-conform: same-prominence reject button, granular categories, `Sec-GPC: 1` / `DNT: 1` auto-decline, 6-month re-prompt cooldown.
-A.5. **Privacy dashboard** (`/settings/privacy`) — UX hub aggregating consent (A.4) + last export + sessions + data sources (A.3) + acceptance history (A.2). Pure refactor over existing cards (currently scattered in `/settings/account`). Last because it composes everything above.
-A.6. **End-to-end gates — Playwright + Lighthouse a11y CI** — closes regression-proof gates on (1) the full legal chain (sign up → consent → rectify → export → delete → grace → wipe), (2) **WCAG 2.1 AA via Lighthouse CI** (EAA non-negotiable since June 28 2025 — score >95 + 0 a11y violations blocks merge to `main`). Without these gates, deletion silently leaves orphans and accessibility regressions ship invisibly.
+> RGPD core shipped. Below = closure of EU-deployability surface (RGPD + EAA + ePrivacy + NIS2/DORA contractual). **Filed away after Phase A** — nothing later revisits legal.
 
-**Phase B — Monetization**
-B.1. **Billing** (`@better-auth/stripe`) — depends on Phase 0 (clean DB schema split) so Stripe tables don't bloat `auth.ts`. Customer portal + webhooks idempotents + dunning + invoice automation.
-B.2. **Feature & quota gating** — guards layer above Billing (extension pattern, not a new system).
+- **A.1** Right to rectification UI (Art. 16) + NIST 800-63B-4 password (15 chars min / 8 with MFA, HIBP screening, ban complexity rules)
+- **A.2** Privacy policy / Terms versioning (Art. 7) — foundation for A.4 + A.5
+- **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA + DORA annex templates
+- **A.4** Cookie consent + Consent management — first real Aggregate consumer of `@packages/ddd-kit`. CNIL/EDPB-conform.
+- **A.5** Privacy dashboard `/settings/privacy` — UX hub aggregating A.2/A.3/A.4 + RGPD cards
+- **A.6** E2E gates — Playwright (full legal chain) + Lighthouse a11y CI (WCAG 2.1 AA, EAA non-negotiable depuis 28 juin 2025)
 
-**Phase C — Security perimeter & operations**
+### Phase B — Monetization
 
-> Order chosen so each item de-risks the next: security perimeter (rate-limit + CSP + CSRF) before exposing any new public surface; audit log before admin (admin actions are the #1 audited target); admin before tokens (tokens need admin revocation); tokens before webhooks (both consume the same scoping primitive); SSO/SCIM last because it depends on the audit log + admin.
+- **B.1** Billing via `@better-auth/stripe` — customer portal + webhooks idempotents + dunning. Depends on 0.1.
+- **B.2** Feature & quota gating — config + middleware (no DDD).
 
-C.1. **Security perimeter — rate-limit + CSP + CSRF** — bundled hardening: `requireRateLimit` sliding-window middleware (per IP/user, captcha on auth-burst), strict Content-Security-Policy with nonce (no `unsafe-inline`), explicit CSRF protection on POST routes outside BetterAuth. Currently every public endpoint (sign-in, forgot-password, magic-link) is unprotected; CSP is `secureHeaders()`-default which is permissive.
-C.2. **Audit log** — append-only event trail (compliance + ops). Feeds Admin (every action audited), RGPD (deletion state-machine transitions, currently `pino`-only), Billing (subscription lifecycle). Ship before Admin so Admin actions are audited from day one, not retrofitted. SOC2 §CC7.2 + ISO 27001 prerequisite.
-C.3. **Admin & impersonation** (BetterAuth `admin` plugin) — debugging + ban + read-only support. Depends on C.2. Unlocks RGPD admin overrides.
-C.4. **API tokens / Personal Access Tokens** — `/settings/tokens` UX, scoped + expirable, hashed storage (sha256 + per-row salt), `clean_<base58url-32>` prefix for GitHub secret-scanner. Depends on C.1 (per-token rate-limit) and C.3 (admin revocation).
-C.5. **Outbound webhooks** — emit events to customer systems (HMAC-signed, retry+dead-letter, replay UI). Reuses C.4's scoping primitive and C.1's rate-limit shape.
-C.6. **Account recovery codes** — BetterAuth `twoFactor` already supports them, UI missing. Quick win, parked here.
-C.7. **SSO SAML/OIDC + SCIM provisioning** — BetterAuth `sso` plugin + SCIM endpoint. **Single biggest enterprise-tier multiplier** ($10-30k client-side per deal). Depends on C.2 (audit) + C.3 (admin) + C.4 (token primitive). Unlocks Enterprise plan in B.
+### Phase C — Security perimeter & operations
 
-**Phase D — Customer-facing readiness (the trust + integration layer)**
+> Event-driven foundation shipped → **C.2 and C.5 reduced to front UI only**.
 
-> Internal observability (Sentry / OTel / Prom `/metrics`) ships in **Phase 0.4** — not here. Phase D builds the *outward-facing* surfaces on top of accumulated obs data.
+- **C.1** Security perimeter — rate-limit (sliding-window per IP/user, captcha auth-burst), strict CSP nonce (no `unsafe-inline`), CSRF on non-BetterAuth POST
+- **C.2** Audit log **front UI** — `/admin/audit-log` page (filters + expand metadata diff). API + write-path shipped via event-driven.
+- **C.3** Admin & impersonation (BetterAuth `admin` plugin) — depends on C.2 audited
+- **C.4** API tokens / PATs — `/settings/tokens`, scoped + expirable, sha256 + per-row salt, `clean_<base58url-32>` prefix for GitHub secret-scanner
+- **C.5** Webhooks **front UI** + `webhook.test` event — `/settings/webhooks` page + public event catalog. API + worker shipped via event-driven.
+- **C.6** Account recovery codes UI — BetterAuth backend already supports
+- **C.7** SSO SAML/OIDC + SCIM (BetterAuth `sso` + SCIM endpoint) — biggest enterprise multiplier. Audit integration trivial via `onEvent`.
 
-D.1. **Status page + SLO dashboards + alerting** — public `status.<domain>` (Cachet self-hosted or Astro maison) + Grafana SLO dashboards (consume Phase 0.4 `/metrics`) + alerting policies (Sentry → Slack/PagerDuty, runbook-linked). **After Phase C** — needs accumulated `/metrics` baselines, audit log for incident timelines, admin for incident creation, customer-facing surfaces (PATs/webhooks) worth monitoring.
-D.2. **OpenAPI schema docs** — auto-generated from Hono routes (`@hono/zod-openapi`), served at `/api/docs` (Scalar UI). Mandatory the day customers integrate via C.4 PATs.
-D.3. **In-app notification center** — persistent inbox (`<Bell />`, `/settings/notifications` preferences, transactional vs marketing per category). Independent of D.1/D.2; can ship in parallel.
-D.4. **SOC2 Type II readiness checklist** (`docs/SOC2-CHECKLIST.md`) — Vanta/Drata-ready: mapping each shipped item (audit log, admin, backups, obs from 0.4, RGPD, SSO) to the relevant SOC2 controls (`CC6.x` access, `CC7.x` ops, `CC8.x` change mgmt). Pure docs, but signals enterprise-grade.
+### Phase D — Customer-facing readiness
 
-**Phase E — International + growth**
-E.1. **i18n** (TanStack Router locale routes + Lingui) — every shipped UI string gets refactored once, so doing this early-in-E means Marketing site (E.2) inherits localized routing patterns.
-E.2. **Marketing site** (Astro 5 + Payload 3, self-hosted) — deferred until public launch trigger; independent of every Phase A-D item, so a clone can scaffold it any time.
+- **D.1** Status page + SLO dashboards + alerting (Cachet/Astro + Grafana consuming 0.4 `/metrics` + Sentry → Slack/PagerDuty)
+- **D.2** OpenAPI auto-docs (`@hono/zod-openapi` + Scalar UI at `/api/docs`)
+- **D.3** In-app notification center — `<Bell />` + `/settings/notifications`. **Handler = 1-line `onEvent(...)` via event-driven foundation.**
+- **D.4** SOC2 Type II checklist — mapping shipped items to controls
 
-**Phase F — Mobile + extension**
-F.1. **Capacitor mobile shell** — `apps/mobile/` wrapping `apps/app` build, bearer auth (BetterAuth `bearer()` plugin already enabled). Depends on C.4 PATs (token storage) and D.3 notifications (push channel).
-F.2. **Feature flags** — GrowthBook self-hosted, decouples deploy from release. Independent — can ship anywhere F+, parked here because pre-PMF the value is low.
+### Phase E — International + growth
 
-**Cross-cutting (ship the day the consumer lands, not before)**:
-- **One-click unsubscribe RFC 8058** on every marketing email (Resend supports `List-Unsubscribe-Post` header). Ship the day the first marketing/lifecycle template lands. Transactional emails exempt. Google/Yahoo enforce since Feb 2024, escalated to permanent rejection Nov 2025.
-- **Email auth ops (SPF + DKIM + DMARC `p=reject`)** — config DNS, not code. Documented as deploy prereq in `README.md` + `apps/api/.env.example` once Resend is wired (already shipped — confirm doc is in place).
-- **NIS2 readiness checklist** (`docs/NIS2-CHECKLIST.md`) — when a clone passes ≥50 employees or €10M revenue, becomes "important entity" (Annexe II: cloud, SaaS, marketplace). Incident reporting 24h/72h/1-month obligations. Pure ops doc, no code, but referenced in README.
+- **E.1** i18n (TanStack Router locale routes + Lingui)
+- **E.2** Marketing site (Astro 5 + Payload 3, self-hosted)
 
-**Out of scope (won't ship)**: HIPAA-specific tooling (product-specific), real-time WebSocket/SSE bus (depends on product), third-party app marketplace (too product-specific), A/B testing framework (deferred until product-market fit), IAB TCF v2.2 (heavy ad-tech, skip until ad-tech use case demands it).
+### Phase F — Mobile + extension
+
+- **F.1** Capacitor mobile shell — depends on C.4 PATs + D.3 notifications
+- **F.2** Feature flags (GrowthBook self-hosted)
+
+### Cross-cutting (ship at first consumer)
+
+- One-click unsubscribe RFC 8058 (Resend `List-Unsubscribe-Post`) — first marketing template lands
+- Email auth (SPF + DKIM + DMARC `p=reject`) — DNS, doc only
+- NIS2 readiness checklist — when clone passes ≥50 employees / €10M revenue
+
+### Out of scope
+
+HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B testing framework, IAB TCF v2.2.
+
+---
+
+## Event-driven foundation — **shipped**
+
+**Why**: every cloned SaaS needs the same event plumbing — outbox for at-least-once delivery, audit log for compliance, webhooks for customer integrations, in-process handlers for side-effects. Building that rail once-for-all unlocks Phases C.2 (audit), C.5 (webhooks), A.4 (consent handlers), D.3 (in-app notifs), C.7 (SSO audit) and the observability port subscribers (Phase 0.4) — each becomes a 1-line `onEvent(...)` declaration instead of a per-feature plumbing chunk.
+
+**DX contract — zero plumbing post-clone**: a dev cloning the boilerplate writes (1) a 1-line entry in `packages/events/src/event-types.ts` for a new event type, (2) `aggregate.addEvent(new XEvent(...))` in their domain method, (3) `this.uow.run(async tx => repo.save(agg, tx))` in their use-case — outbox enqueue happens transparently via `AsyncLocalStorage` event collector + `IUnitOfWork.run()` flush pre-commit. Audit trail and webhook fan-out are automatic for any event in the retention map. In-process handlers declared via `onEvent(type, factory)` + 1 inwire `b.add(...)` are auto-discovered at boot (container introspection via `EVENT_HANDLER_SYMBOL` marker).
+
+**Shipped surface**:
+
+- [x] **Outbox table** `outbox_event` (UUID v7 PK for B-tree locality + time ordering, partial index `WHERE dispatched_at IS NULL`, CloudEvents 1.0 metadata envelope) + Postgres `LISTEN/NOTIFY` trigger ensured at boot (`pg_notify` queued until COMMIT — visibility-safe).
+- [x] **`OutboxDispatcher`** (in-process Bun worker, dedicated `pg.Client` for LISTEN + reconnect with backoff + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 50` drain — multi-instance ready). Container introspection auto-wires user-defined `EventHandler<T>` bindings.
+- [x] **Built-in subscribers** (`AuditEventSubscriber` writes audit row idempotently via deterministic `audit-${event.id}`, `WebhookFanoutSubscriber` enqueues `webhook_delivery` rows scoped by `organizationId` + `eventTypes` array match).
+- [x] **`@packages/events`** — central catalog (29 events covering BetterAuth user/session/account, organization/member/invitation, RGPD deletion/export, uploads), Zod payloads per event, `RETENTION_MAP` (operational/compliance/none).
+- [x] **`@packages/ddd-kit` primitives**: `Aggregate.pullDomainEvents()` atomic, `EventCollector` ALS, `IUnitOfWork.run(cb)` standardized (flushes ALS to outbox via `flushHandler` injected in `TransactionService`), `onEvent(type, factory)` + `EVENT_HANDLER_SYMBOL` for inwire-discovered handlers, UUID v7 primitive (replaces v4 default in `UUID.create()`).
+- [x] **AEAD secret crypto** for webhook secrets: `@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key from `WEBHOOK_MASTER_KEY` (32-byte hex env var). `@noble/hashes` v2.
+- [x] **Decorrelated jitter backoff** (AWS Architecture Blog spec) for outbox + webhook retries; dead-letter after 5 attempts; total window ~12h.
+- [x] **BetterAuth bridge** (`apps/api/src/auth.ts`) — **21 unique events emitted automatically** (13 user + 8 org, 23 emit sites — USER_PASSWORD_CHANGED + ORG_MEMBER_JOINED each fire from 2 paths), 3 voies SOTA combinées :
+  - `databaseHooks` (TX-bound, captures all flows including non-HTTP) — `user.create.after` (USER_CREATED), `session.create.after` (USER_SIGNED_IN), `session.delete.after` (USER_SIGNED_OUT), `account.delete.after` (USER_ACCOUNT_UNLINKED, skip credential).
+  - `hooks.after` + `createAuthMiddleware` (path-based, plugin events) avec filter `if (ctx.context.returned instanceof APIError) return` — `/two-factor/{enable,disable}` (USER_MFA_ENABLED/DISABLED), `/passkey/verify-registration` (USER_PASSKEY_ADDED, lookup latest), `/passkey/delete-passkey` (USER_PASSKEY_REMOVED, body.id), `/verify-email` (USER_EMAIL_VERIFIED), `/change-password` (USER_PASSWORD_CHANGED), `/link-social` (USER_ACCOUNT_LINKED, lookup latest non-credential account < 5s).
+  - Native callbacks — `emailAndPassword.{sendResetPassword,onPasswordReset}` (USER_PASSWORD_RESET_REQUESTED + USER_PASSWORD_CHANGED), `magicLink.sendMagicLink` (USER_MAGIC_LINK_REQUESTED).
+  - `organizationHooks` (org plugin) — `afterCreateOrganization` (ORG_CREATED), `afterUpdateOrganization` (ORG_UPDATED), `afterDeleteOrganization` (ORG_DELETED), `afterAddMember` (ORG_MEMBER_JOINED — direct add only) **+** `afterAcceptInvitation` (ORG_MEMBER_JOINED — invitation accept; the two lifecycles are independent in BetterAuth and both must be wired), `afterRemoveMember` (ORG_MEMBER_REMOVED), `afterUpdateMemberRole` (ORG_MEMBER_ROLE_CHANGED), `afterCreateInvitation` (ORG_MEMBER_INVITED), `afterCancelInvitation` (ORG_INVITATION_CANCELLED).
+  - **RGPD service** — USER_DELETION_{REQUESTED,CANCELLED}, USER_DELETED, USER_EXPORT_{REQUESTED,COMPLETED} (payload: `storageKey`, jamais l'URL presigned — security).
+  - **UploadService** — UPLOAD_REQUESTED + UPLOAD_CONFIRMED (payload: `hashKey(key)` sha256-truncated, jamais le filename brut — PII).
+  - Race window BetterAuth COMMIT ↔ outbox enqueue acceptée et documentée (pas de 2PC).
+- [x] **Multi-tenant safety**: events avec `organizationId = null` (platform: USER_CREATED, USER_SIGNED_IN, etc.) skippent le webhook fanout — never broadcast across tenants. Validé runtime via smoke test (signup → user.created → audit row écrite, fanout subscriber early return).
+- [x] **Lifecycle**: `OutboxDispatcher.start()` + `WebhookDeliveryWorker.start()` at boot in `apps/api/src/index.ts`; SIGTERM/SIGINT graceful drain.
+- [x] **Tests**: `event-collector.test.ts` (ALS isolation between concurrent contexts), `aggregate.test.ts` extension (`pullDomainEvents` atomic), `jitter.test.ts` (bounds + dead-letter), `aead.test.ts` (encrypt/decrypt round-trip + sub-key determinism + ciphertext tampering rejection), `hmac-signer.test.ts` (Stripe-format signature + verify round-trip + stale timestamp window).
+
+**Remaining — front UI pages** (back is shipped, ~12-15h app-side total):
+
+- [ ] **`/admin/audit-log`** page (Phase C.2) — table read-only avec filtres (actor, action, target, dateRange, action prefix), pagination cursor, expand row → JSON viewer pour `metadata`. Permission `auditLog: ["read"]` (owner/admin). API ready: `di.AuditQueryService.listForOrg(orgId, filters)`. **Estimation: ~3-4h.**
+- [ ] **`/settings/webhooks`** page (Phase C.5) — CRUD endpoints + create-secret-shown-once dialog modal + list deliveries par endpoint avec status filter + replay button + dead-letter view. Permission `webhooks: ["read","write"]` (owner/admin). API ready: `POST/GET/PATCH/DELETE /settings/webhooks/*`. **Estimation: ~6-8h.**
+- [ ] **Public event catalog page** (Phase C.5 companion) — `/docs/events` ou `/legal/event-types` enumerating les 29 events emitted with their Zod payload schemas. Pas de gating. Source: `packages/events/event-types.ts` + `payloads.ts`. **Estimation: ~2h.**
+
+**Remaining — backend mineur**:
+
+- [ ] **`webhook.test` event type** — sent on endpoint creation, surfaces "is the URL reachable" feedback in UI. ~30min after the front page lands.
+- [ ] **Tamper-evidence audit hash chain** — columns posées (`prevHash`/`hash`), calc gated by `AUDIT_TAMPER_EVIDENCE=false` env flag. Implementation deferred until SOC2 audit demands (Merkle batch ou hash chain row-lock).
+- [ ] **Phase 0.4 observability subscribers** (Sentry/OTel/Prom) — trivial 1-line `onEvent(...)` additions when those modules land.
+- [ ] **`USER_EMAIL_VERIFIED`** path edge case: `ctx.context.session?.user.id` peut être `null` si auto-sign-in pas encore propagé. Skip silencieux actuellement. Workaround propre : extraire userId du verification token (BetterAuth API not exposed publicly today — check v1.7+).
+- [x] **`UPLOAD_DELETED`** event + `DELETE /uploads` route shipped. Ownership-gated (`key.startsWith(\`${ownerId}/\`)` → 403 sinon), emit après `storage.deleteObject()` succès, payload utilise `hashKey(key)` (PII-safe).
+
+**Setup checklist post-clone** (pour le cloner):
+
+1. `pnpm db:push` après premier clone (créé les 4 nouvelles tables + indexes).
+2. `WEBHOOK_MASTER_KEY` dans `apps/api/.env` (32 hex bytes; `openssl rand -hex 32`). Required en prod, vérifié au boot.
+3. (Optionnel) `AUDIT_TAMPER_EVIDENCE=false` (défaut). Flip à `true` quand SOC2 audit demande hash chain.
 
 ---
 
@@ -475,20 +536,22 @@ modules/consents/
 
 ## Outbound webhooks — **Phase C.5**
 
-**Why**: customer integrations need real-time event delivery from the SaaS. Polling is dead. Standard B2B primitive — every Stripe / Linear / GitHub clone has it. Currently absent.
+**Status**: **API + worker shipped** via event-driven foundation. UI front (`/settings/webhooks`) and `webhook.test` event remain.
+
+**Why**: customer integrations need real-time event delivery from the SaaS. Polling is dead. Standard B2B primitive — every Stripe / Linear / GitHub clone has it.
 
 **Decided shape**:
-- **HMAC-SHA256 signing** with rotatable per-endpoint secret. Same canonical-message format as `internal-signature.ts` (reuse).
-- **Retry policy**: exponential backoff 1m, 5m, 30m, 2h, 12h, then dead-letter after 5 attempts. Total window ~14h.
-- **Idempotency-Key per delivery** = `<eventId>:<endpointId>` so retries are safe customer-side.
-- **Dead-letter visible in UI** — `/settings/webhooks/<id>/deliveries` shows failed + retry/resend button.
-- **Replay** — pick a delivered event, re-send to current endpoint.
+- **HMAC-SHA256 signing** with rotatable per-endpoint secret. AEAD-encrypted at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per-org sub-key from `WEBHOOK_MASTER_KEY` env var).
+- **Retry policy**: decorrelated jitter (AWS spec, `apps/api/src/shared/jitter.ts`) on paliers ~1m/5m/30m/2h/12h, then dead-letter after 5 attempts. Total window ~14h.
+- **Idempotency-Key per delivery** = `<eventId>:<endpointId>` (UNIQUE constraint) so retries are safe customer-side.
+- **Dead-letter visible in API** — `GET /settings/webhooks/:id/deliveries?status=dead_letter`. UI page deferred.
+- **Replay** — `POST /settings/webhooks/:id/deliveries/:deliveryId/replay` re-enqueues with fresh idempotency key.
 
-- [ ] DB schema `webhook_endpoint(id, organizationId FK, url, secret, eventTypes jsonb, status: "active"|"paused"|"disabled", createdAt)` + `webhook_delivery(id, endpointId, eventType, payload jsonb, requestHeaders, responseStatus, responseBody, attemptCount, deliveredAt nullable, failedAt nullable, nextAttemptAt nullable)`.
-- [ ] Dispatcher: when a domain event matches an endpoint's `eventTypes`, enqueue a delivery row (`pending`). Cron worker (`/internal/webhooks-dispatch`) consumes pending + due-for-retry, fetches with HMAC, updates delivery row.
+- [x] DB schema `webhook_endpoint(id, organizationId FK CASCADE, url, secretCipher, eventTypes text[], enabled, createdAt, updatedAt)` + `webhook_delivery(id, endpointId FK CASCADE, outboxEventId FK RESTRICT, eventType, payload jsonb, status: pending|success|failed|dead_letter, attempts, nextAttemptAt, lastError, lastResponseStatus, idempotencyKey UNIQUE, createdAt)`.
+- [x] Dispatcher: `WebhookFanoutSubscriber` (built-in outbox subscriber, hard-coded in `OutboxDispatcher`) — for each dispatched outbox event, queries enabled endpoints WHERE `eventTypes` matches AND `organizationId` scope-matches, INSERT N `webhook_delivery` rows with `ON CONFLICT (idempotencyKey) DO NOTHING`. Independent `WebhookDeliveryWorker` (poll 5s, `FOR UPDATE SKIP LOCKED LIMIT 50`) drains pending + retry-due deliveries, decrypts secret via AEAD, signs HMAC `t=<unix>,v1=<hex>` (Stripe-style), POSTs with 30s timeout, updates status with decorrelated jitter.
 - [ ] `webhook.test` event type — sent on endpoint creation, surfaces immediate "is the URL reachable" feedback in UI.
-- [ ] `/settings/webhooks` UI — list + create + edit + delete + view deliveries + replay. Owner/admin org permission only.
-- [ ] Public `<EventTypesTable />` page enumerating all events the SaaS emits (`user.created`, `subscription.upgraded`, `data.export.requested`, …).
+- [ ] `/settings/webhooks` UI front — list + create + edit + delete + view deliveries + replay. **API ready** at `apps/api/src/modules/webhooks/routes.ts` (gated `requireOrgPermission({ webhooks: ["read"|"write"] })`). Plaintext secret returned **once** at creation (Stripe-style).
+- [ ] Public `<EventTypesTable />` page enumerating all events the SaaS emits — read from `packages/events/src/event-types.ts` (29 events catalogued).
 
 **Deferred**:
 - Webhook proxy (Svix-style) for managed reliability — host-it-yourself first, evaluate Svix when delivery volume passes 10k/day.
@@ -725,16 +788,18 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 
 ## Audit log — append-only event trail — **Phase C.2**
 
+**Status**: **API + write-path shipped** via event-driven foundation. Admin UI page (`/admin/audit-log`) remains in Phase A admin section. Tamper-evidence intentionally deferred (columns posed, flag off).
+
 **Why**: compliance (SOC2 §CC7.2, RGPD Art. 30, ISO 27001) requires a tamper-evident trail of who did what when. Operational value too — debugging "who changed this user's email at 3am" without `git log`-style detective work. Append-only, scoped by org, never mutated after write.
 
-- [ ] Drizzle schema `audit_log`: `id`, `organizationId` (FK, **nullable** for platform-level events like impersonation), `actorId`, `actorType` (`user` | `admin` | `system`), `action` (snake_case verb, e.g. `user.ban`, `subscription.upgrade`, `org.member.invite`, `data.export.requested`), `targetType` + `targetId` (soft FK, no DB constraint — survives delete), `metadata` (`jsonb`: diff before/after, reason, IP, UA), `createdAt`. **No `updatedAt` / `deletedAt`** — append-only is the contract.
-- [ ] **Helper `recordAudit(deps, { action, target, metadata })`** injected via inwire, called **explicitly** from use-cases on state-changing ops. No global ORM hook — rule 6 (explicit DI > magic) applies; magic hooks fire on internal background ops too and pollute the trail.
-- [ ] **Phase-1 audited actions (mandatory)**: every `auth.admin.*` (impersonate start/stop, ban, unban, password reset), `subscription.*` (upgrade, cancel, plan change, payment failure), `organization.*` (create, member invite/remove/role change, owner transfer), `user.delete*` (request, cancel, complete — cf RGPD section), `data.export.*`.
-- [ ] **Retention** driven by an enum column `retention` on the row. `operational` (90d, debug-grade) vs `compliance` (7y, auth/billing/RGPD-relevant). Cron purges expired `operational` rows; `compliance` rows are immutable for the legal period.
-- [ ] Indexes: `(organizationId, createdAt DESC)` + `(actorId, createdAt DESC)` cover the two main read paths.
-- [ ] Page `/admin/audit-log` (admin only, gated by `_admin.tsx`) with filters (actor, action, target, range). Each row expandable to show `metadata` diff.
-- [ ] **Tamper-evidence (deferred phase 2)** — `prevHash` column chaining each row's hash to the previous one. Detects DB tampering; not crypto-strong but raises the bar. Promote when SOC2 audit demands it (rule 14).
-- [ ] **Cross-cutting rule extension**: any new use-case that mutates `user`, `organization`, `subscription`, `member`, `invitation` MUST call `recordAudit(...)` in the same transaction as the write. Reviewer checklist item.
+- [x] Drizzle schema `audit_log`: `id`, `organizationId` (FK, **nullable** for platform-level events like impersonation), `actorId`, `actorType` (`user` | `admin` | `system`), `action` (snake_case verb, e.g. `user.ban`, `subscription.upgrade`, `org.member.invite`, `data.export.requested`), `targetType` + `targetId` (soft FK, no DB constraint — survives delete), `metadata` (`jsonb`: diff before/after, reason, IP, UA), `createdAt`. **No `updatedAt` / `deletedAt`** — append-only is the contract.
+- [x] **Helper `recordAudit(deps, { action, target, metadata })`** in `apps/api/src/shared/audit-recorder.ts` for service-level transitions; for aggregate-driven contexts the `AuditEventSubscriber` (built-in outbox subscriber, hard-coded in dispatcher) writes the row idempotently from the outbox event — zero plumbing post-clone.
+- [x] **Phase-1 audited actions** — auto-emitted from BetterAuth hooks (`user.created`, `user.signed_in`, `user.account.linked`, `org.*`, `org.member.*`, `org.invitation.*`) + RGPD service (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`). Catalog declared in `packages/events/src/event-types.ts` (29 events).
+- [x] **Retention** driven by `retention` enum column (`operational` 90d / `compliance` 7y) — mapping in `packages/events/src/retention-map.ts`. Cron `POST /internal/audit-log-purge` sweeps expired `operational` rows.
+- [x] Indexes: `(actorId, occurredAt DESC)`, `(targetType, targetId)`, `(action, occurredAt DESC)`, `(organizationId, occurredAt DESC)`, `(retention, occurredAt)` cover the main read paths + purge.
+- [ ] Page `/admin/audit-log` (admin only, gated by `_admin.tsx`) with filters (actor, action, target, range). Each row expandable to show `metadata` diff. **API ready** — `GET /admin/audit-log` (gated `requireOrgPermission({ auditLog: ["read"] })`).
+- [ ] **Tamper-evidence (deferred phase 2)** — `prevHash`/`hash` columns posed in schema; calculation off behind `AUDIT_TAMPER_EVIDENCE=false` env flag. Promote when SOC2 audit demands it (rule 14).
+- [x] **Cross-cutting rule extension**: replaced by zero-plumbing event-driven model — any aggregate emitting a domain event in `EventTypes` catalog with retention `operational|compliance` is auto-audited via `AuditEventSubscriber`. Service-level transitions without aggregate use `recordAudit` helper or emit the event directly via `IOutboxRepository.enqueue`.
 
 ---
 
@@ -757,7 +822,7 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 
 - [ ] **E2E Playwright gate** (Phase A.6) — sign up → upload avatar → request export → fetch export → request delete → simulate grace expiry → verify every `userId` reference is gone or anonymized. Without this gate, deletion silently leaves orphans and the compliance claim is theatre.
 - [ ] **Admin overrides** (depends on Phase C.9 admin plugin) — `/admin/users/:id` triggers export-on-behalf (audited `data.export.requested` `actorType: admin`); cannot cancel a user's deletion without a documented `metadata.reason`.
-- [ ] **Audit-log integration** (depends on Phase C.10) — every state transition (`requested`, `cancelled`, `grace_expired`, `completed`) calls `recordAudit(...)` with `retention: compliance`. Currently logged via `pino` only.
+- [x] **Audit-log integration** — every state transition emits an event via outbox (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`); `AuditEventSubscriber` writes the audit row with `retention: compliance` from the catalog. Pino logging retained for ops debugging (different concern).
 - [ ] **Stripe customer cleanup** (depends on Phase B.7 Billing) — wipe Stripe customer via the BetterAuth Stripe plugin during deletion; refund/proration policy is a billing-config decision.
 
 ---

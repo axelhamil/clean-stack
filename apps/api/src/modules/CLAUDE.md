@@ -39,22 +39,48 @@ modules/<context>/
 | `Aggregate<TProps>` | Business concept with invariants, identity, lifecycle, emits domain events. Infra orchestration is NOT an aggregate. |
 | `Entity<TProps>` | Inside an aggregate, child with identity but no independent lifecycle. |
 | `ValueObject<T>` | Typed primitive with validation: `Email`, `Money`, `Slug`. |
-| `DomainEvent`+`EventDispatcher`+`WatchedList` | Aggregate emits on state change; handlers react in same module or cross. |
+| `DomainEvent`+`onEvent`+`EventCollector` | Aggregate emits on state change (`addEvent`); flushed to outbox automatically by `uow.run()`; handlers via `onEvent(type, factory)` auto-discovered by dispatcher. See `docs/EVENTS.md`. |
 | `BaseRepository<T>` | Genuinely global aggregate (audit logs, system config). Rare. |
 | `ScopedRepository<T, TScope>` | Owned aggregate carrying `userId`/`organizationId`. Default for any business table. |
 
 **Decisor "do I need an Aggregate?"**: rule fits in `array.includes()`/`count(*)`/config lookup → infra orchestration, stay flat. Entity has invariant only it can enforce (`<Aggregate>.canCancel()` checks multiple props) → aggregate. SQL counts are not invariants.
 
-## Domain Events
+## Domain Events (zero-plumbing rail)
 
-Events *added* in aggregate methods (`this.addEvent(...)`), NOT dispatched there. Dispatch in use cases AFTER successful persistence:
+Events *added* in aggregate methods (`this.addEvent(...)`), then **automatically** flushed into the outbox by `IUnitOfWork.run()`. The use case writes ZERO event-dispatch code:
 
 ```typescript
-const saveResult = await this.repo.create(aggregate);
-if (saveResult.isFailure) return Result.fail(saveResult.getError());
-await this.eventDispatcher.dispatchAll(aggregate.domainEvents);
-aggregate.clearEvents();
+async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
+  return this.uow.run(async (tx) => {
+    const order = Order.place(input);          // addEvent(OrderPlaced) inside
+    return this.repo.save(order, tx);           // pulled into ALS collector
+  });
+  // → outbox_event INSERT happens HERE, in the same TX, before COMMIT
+  // → audit_log + webhook_delivery rows written by built-in subscribers
+}
 ```
+
+**Hard rules**:
+- `uow.run()` cannot be nested (Drizzle nested TX = independent TX, not savepoints — events would leak orphan). `TransactionService.run()` throws if `EventCollector.hasContext()` is already true.
+- Repos must call `trackEventsOnSuccess(result, aggregate)` (helper in `@packages/drizzle`) inside their `save`/`create` impl, otherwise events stay on the aggregate buffer and are silently lost.
+- `addEvent()` outside `uow.run()` = events lost (warning logged in dev via `EventCollector.setOutOfContextLogger`).
+
+**Subscribers built-in** to the dispatcher (no glue): `AuditEventSubscriber` (writes `audit_log` if event in `RETENTION_MAP`) + `WebhookFanoutSubscriber` (creates `webhook_delivery` rows for matching org-scoped endpoints).
+
+**User-defined handlers** via `onEvent(type, factory)` + inwire binding — auto-discovered at boot via `EVENT_HANDLER_SYMBOL`:
+
+```typescript
+b.add(
+  "NotifyCustomerOnOrderPlaced",
+  onEvent(EventTypes.ORDER_PLACED, (c) => async (event) => {
+    await c.IEmailService.sendTemplate("order_confirmed", ...);
+  }),
+)
+```
+
+User handlers run **post-commit** (best-effort, isolated). Built-in subscribers run **inside the dispatch TX** (atomic with `markDispatched`).
+
+See `docs/EVENTS.md` for full DX guide + retention map + BetterAuth bridge specifics.
 
 ## Testing
 

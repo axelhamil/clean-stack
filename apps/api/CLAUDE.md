@@ -95,6 +95,19 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 **Phase 2 (deferred until first concrete consumer)**: orphan GC; integration event bus (`IAppEventBus`, distinct from domain events) when 2+ handlers need an upload-confirmed event.
 
+## Events (transactional outbox)
+
+`IUnitOfWork.run(cb)` opens an `EventCollector` (AsyncLocalStorage). `repo.save(agg, tx)` wraps `trackEventsOnSuccess(result, agg)` to push pulled domain events into the collector. Pre-COMMIT, the UoW flushes them via `outbox.enqueue` in the same TX → atomicity. Post-COMMIT, Postgres `pg_notify` wakes `OutboxDispatcher` which fans out to built-in subscribers (audit, webhook fanout) inside the dispatch TX, then to user-defined `onEvent(...)` handlers post-commit (best-effort, isolated).
+
+**BetterAuth → outbox bridge** lives in `auth.ts` (the documented exception). Two paths:
+- **`databaseHooks` for core models** (user/session/account/verification) — TX-bound, captures all flows including non-HTTP. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.
+- **`hooks.after` + `createAuthMiddleware` for plugin events** (twoFactor, passkey, email-verified, password-changed, link-social) — path-based, only voie viable since plugin tables aren't exposed in `databaseHooks`. Filter `if (ctx.context.returned instanceof APIError) return` is critical (otherwise events fire on 4xx).
+- **Native callbacks** — `emailAndPassword.{sendResetPassword,onPasswordReset}`, `magicLink.sendMagicLink` for the corresponding events.
+
+`organizationHooks` (org plugin) covers all org/member/invitation events.
+
+**Hard rules**: `uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints — guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning logged via `EventCollector.setOutOfContextLogger`). See `docs/EVENTS.md` for full spec.
+
 ## Organization scoping (server)
 
 1. **Ownership at port (`ScopedRepository`), not route.** `requireOrg` exposes `c.var.orgId`; controller builds `RepoScope.org(orgId)` and passes to `di.XxxUseCase.execute(input, scope)`; `requireOrgPermission({ resource: ["action"] })` still gates *capabilities*. Routes **construct** scope; repo **honors** it. Skipping `requireOrg` on a handler reading/writing rows scoped by `organizationId` silently accepts requests with no active org.

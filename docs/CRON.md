@@ -152,5 +152,17 @@ lockstep with the verifier.
   `errorCode` for follow-up.
 - **Observability**: each invocation logs through `pino` at `info` (with
   counts) on success and `warn` on partial failure.
+
+## Other internal cron endpoints
+
+Same `internalLayers` (HMAC + optional private network) gate, same `signedInternalFetch` pattern from your scheduler.
+
+### `POST /internal/audit-log-purge` — sweep operational audit rows
+
+Purges audit log entries with `retention='operational'` older than N days. `retention='compliance'` rows are immutable (7 years).
+
+Body: `{ olderThanDays?: number, dryRun?: boolean }` (default 90 days, dryRun off). Response: `{ deleted: number, dryRun: boolean, cutoff: <ISO> }`.
+
+Schedule: daily at 3:30 (avoid overlap with RGPD sweep). Same scheduler patterns (Railway/Fly/GitHub Actions/Kubernetes/Inngest) as `/internal/rgpd-sweep` above.
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken — fix that, not the window.

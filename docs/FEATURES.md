@@ -136,6 +136,19 @@ Primitives for the business domain only (rule: never DDD for billing / auth / ga
 - **Single `app.onError(errorHandler)`** — `HTTPException` → `{ error: { code, message, requestId } }`. No per-route try/catch.
 - **Request ID** propagated via `X-Request-Id` header; every log line carries it.
 
+## Event-driven foundation ✅
+
+Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing post-clone** — the dev declares an event in `packages/events`, calls `addEvent()` in their aggregate, runs the use case via `uow.run()` and the rest is automatic (audit log row, webhook fanout to subscribed clients, in-process handlers via `onEvent(...)` auto-discovered through inwire).
+
+- **Outbox**: `outbox_event` table, UUID v7 PK, partial index on pending rows, `pg_notify` trigger ensured idempotently at boot (`CREATE OR REPLACE TRIGGER`).
+- **Dispatcher**: in-process Bun worker, dedicated `pg.Client` LISTEN + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers run inside the dispatch TX (atomic), user `onEvent` handlers post-commit (isolated).
+- **Audit log** (`audit_log`, SOC2 §CC7.2 / ISO 27001) — append-only, retention `operational` (90d) vs `compliance` (7y) driven by `RETENTION_MAP`. Tamper-evidence columns posed (`prev_hash`/`hash`), calc gated by env flag.
+- **Outbound webhooks** (`webhook_endpoint` + `webhook_delivery`) — HMAC-SHA256 signed (`t=<ts>,v1=<hex>` Stripe-style), AEAD-encrypted secrets at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per org). Decorrelated jitter retry (1m/5m/30m/2h/12h paliers), dead-letter after 5 attempts, replay endpoint. Claim window pattern in delivery worker — fetch HTTP outside TX, no lock starvation.
+- **BetterAuth bridge** (`auth.ts`) emits 21 unique events automatically (13 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3 → **29 events total**.
+- **Catalog `@packages/events`** — 29 events with Zod payloads + `RETENTION_MAP`, partagés api+app+future workers.
+
+See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
+
 ## Roadmap (not yet shipped)
 
 See [`../ROADMAP.md`](../ROADMAP.md) for the full plan with constraints + extension points.
@@ -143,6 +156,7 @@ See [`../ROADMAP.md`](../ROADMAP.md) for the full plan with constraints + extens
 - **Billing** — Stripe via `@better-auth/stripe` (customer portal, subscriptions, signed webhooks, customer = per organization).
 - **Feature & quota gating** — config + middleware layer (no DDD).
 - **Admin & impersonation** — BetterAuth `admin` plugin.
-- **Audit log** — append-only event trail.
-- **RGPD / CCPA** — data deletion + export.
+- **Front UI for audit log + webhooks** — API ready, app-side pages remain.
+- **Tamper-evidence audit hash chain** — columns posed, calc deferred until SOC2 audit demands.
+- **Phase 0.4 observability subscribers** (Sentry/OTel/Prom) — trivial `onEvent` additions when those modules land.
 - **i18n** — TanStack Router locale routes + typed message catalogs.
