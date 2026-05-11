@@ -17,4 +17,6 @@ RUN pnpm --filter "@packages/*" run build
 
 EXPOSE 3000
 
-CMD ["pnpm", "turbo", "dev", "--filter=api"]
+ENV MIGRATIONS_FOLDER=packages/drizzle/migrations
+
+CMD ["sh", "-c", "bun apps/api/src/migrate.ts && pnpm turbo dev --filter=api"]

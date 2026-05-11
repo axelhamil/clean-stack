@@ -161,7 +161,7 @@ If your event is in `RETENTION_MAP` with `operational` or `compliance`:
 
 ## Setup checklist post-clone
 
-1. `pnpm db:push` (creates `outbox_event`, `audit_log`, `webhook_endpoint`, `webhook_delivery`)
+1. Tables (`outbox_event`, `audit_log`, `webhook_endpoint`, `webhook_delivery`) are created automatically — the api runs `drizzle migrate` at boot before `OutboxDispatcher.start()` (`apps/api/src/migrate.ts`). In native dev, `pnpm db:migrate` once before `pnpm dev` if you skipped Docker.
 2. Set env vars in `apps/api/.env`:
    - `WEBHOOK_MASTER_KEY=<64 hex chars>` — generate via `openssl rand -hex 32` (required in production)
    - `AUDIT_TAMPER_EVIDENCE=false` — leave off; flip to `true` only when SOC2 audit demands hash chain
