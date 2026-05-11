@@ -9,8 +9,9 @@
   },
   "scripts": {
     "dev": "bun --hot src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target bun --minify",
-    "start": "bun dist/index.js",
+    "build": "bun build src/index.ts src/migrate.ts --outdir dist --target bun --minify",
+    "migrate": "bun src/migrate.ts",
+    "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --pass-with-no-tests",
     "test:watch": "bun test --watch --pass-with-no-tests",

@@ -32,7 +32,7 @@ cd my-saas
 pnpm install
 pnpm bootstrap          # copies .env.example → .env in each workspace
 docker compose up -d    # Postgres on :5433
-pnpm db:push            # apply schema
+pnpm db:migrate         # apply migrations
 pnpm dev                # API :3000, App :5173
 ```
 
@@ -59,9 +59,7 @@ No Bun, no Node, no pnpm on your host. Everything runs in containers (api + app 
 git clone https://github.com/axelhamil/clean-stack my-saas
 cd my-saas
 bash scripts/bootstrap.sh              # copies .env.example → .env in each workspace
-docker compose up --watch
-# once Postgres is healthy, in another terminal:
-docker compose exec api pnpm db:push
+docker compose up --watch              # api runs migrations on boot, then starts
 ```
 
 Open [`http://localhost:5173`](http://localhost:5173), sign up with any email, you're in.

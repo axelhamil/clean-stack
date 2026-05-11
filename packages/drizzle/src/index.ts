@@ -16,6 +16,7 @@ export {
   or,
   sql,
 } from "drizzle-orm";
+export { migrate } from "drizzle-orm/node-postgres/migrator";
 export type { AnyPgTable } from "drizzle-orm/pg-core";
 export { type DbClient, db, type Transaction } from "./config";
 export { trackEventsOnSuccess } from "./repositories/track-events";
