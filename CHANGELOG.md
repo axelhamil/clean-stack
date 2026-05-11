@@ -1,3 +1,14 @@
+## [1.14.1](https://github.com/axelhamil/clean-stack/compare/v1.14.0...v1.14.1) (2026-05-11)
+
+### Bug Fixes
+
+* **api:** run migrations on boot before outbox dispatcher start ([07633c5](https://github.com/axelhamil/clean-stack/commit/07633c5779d31cc043e73825b1ff61123b3ee69d)), closes [#29](https://github.com/axelhamil/clean-stack/issues/29)
+* **ui:** add missing tailwindcss dep to packages/ui ([1d56aba](https://github.com/axelhamil/clean-stack/commit/1d56abae6553e72102552d5fddbf316888c91a68))
+
+### Documentation
+
+* **events:** document deployment requirements + serverless compat ([0bed85a](https://github.com/axelhamil/clean-stack/commit/0bed85a06a2f41e72b639f2ad87b2cb8327e0d7c))
+
 ## [1.14.0](https://github.com/axelhamil/clean-stack/compare/v1.13.0...v1.14.0) (2026-05-07)
 
 ### Features
