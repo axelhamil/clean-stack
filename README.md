@@ -31,7 +31,7 @@ git clone https://github.com/axelhamil/clean-stack my-saas
 cd my-saas
 pnpm install
 pnpm bootstrap          # copies .env.example → .env in each workspace
-docker compose up -d    # Postgres on :5433
+docker compose up postgres -d   # only Postgres on :5433 (api/app run natively below)
 pnpm db:migrate         # apply migrations
 pnpm dev                # API :3000, App :5173
 ```
@@ -112,7 +112,7 @@ pnpm db:studio          # browse data in Drizzle Studio
 
 ### Storage — S3-compatible (opt-in)
 
-Object storage for uploads. **Off by default** — `docker compose up` only starts Postgres. Turn it on when you need it.
+Object storage for uploads. **Off by default** — the `storage` profile is opt-in. Turn it on when you need it.
 
 | | |
 |---|---|
