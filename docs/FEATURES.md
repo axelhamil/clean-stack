@@ -113,7 +113,7 @@ Primitives for the business domain only (rule: never DDD for billing / auth / ga
 
 ## Database — Drizzle + Postgres 17 ✅
 
-- **Postgres on `localhost:5433`** (dedicated port, no clash with other local instances) via `docker compose up -d`.
+- **Postgres on `localhost:5433`** (dedicated port, no clash with other local instances) via `docker compose up postgres -d`.
 - **Schemas** in `packages/drizzle/src/schema/*.ts` — auth tables, organization tables.
 - **`TransactionService`** — controllers manage transactions and pass to use cases.
 - **`withOrg(table, orgId)` helper** for org-scoped list queries (rule: org-scoped tables NEVER queried without it).
