@@ -1,3 +1,13 @@
+## [1.14.2](https://github.com/axelhamil/clean-stack/compare/v1.14.1...v1.14.2) (2026-05-11)
+
+### Build
+
+* **deps:** bump pnpm 10.33.2 to 11.0.9 + approve esbuild ([6d1cf4c](https://github.com/axelhamil/clean-stack/commit/6d1cf4ce88460d7b1db9d4df5a691ff843acb0b0))
+
+### Documentation
+
+* pin `docker compose up postgres -d` for native dev ([34188a6](https://github.com/axelhamil/clean-stack/commit/34188a6bd52a2540a89f327e7c5da9cd21a5ad0a))
+
 ## [1.14.1](https://github.com/axelhamil/clean-stack/compare/v1.14.0...v1.14.1) (2026-05-11)
 
 ### Bug Fixes
