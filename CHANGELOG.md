@@ -1,3 +1,13 @@
+## [1.14.3](https://github.com/axelhamil/clean-stack/compare/v1.14.2...v1.14.3) (2026-05-15)
+
+### Bug Fixes
+
+* **ddd-kit:** point package entry to src/ in monorepo, dist/ only at publish ([80cac58](https://github.com/axelhamil/clean-stack/commit/80cac586a8dc2e03afc3d1b5a258a8bcd872a1ca))
+
+### Build
+
+* **api:** drop redundant @packages/* prebuild from dev image ([2043b0d](https://github.com/axelhamil/clean-stack/commit/2043b0db7636775d2f5cfdda6f30ec5162d90d69))
+
 ## [1.14.2](https://github.com/axelhamil/clean-stack/compare/v1.14.1...v1.14.2) (2026-05-11)
 
 ### Build
