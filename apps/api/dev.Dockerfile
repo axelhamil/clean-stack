@@ -13,8 +13,6 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY --from=pruner /repo/out/full/ ./
 
-RUN pnpm --filter "@packages/*" run build
-
 EXPOSE 3000
 
 ENV MIGRATIONS_FOLDER=packages/drizzle/migrations
