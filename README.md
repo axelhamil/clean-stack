@@ -18,6 +18,10 @@ Auth, multi-tenant, email, storage already wired. You clone, you write business 
 
 ---
 
+> **Status — work in progress.** This boilerplate is under active iteration. No support guarantee, no SLA on issues. "Doesn't work on my machine" reports without (a) a fresh-clone repro following [Quick start](#quick-start) to the letter, and (b) the output of `pnpm -v && bun -v && docker compose version`, will be closed without comment. Drive-by lectures on tooling choices ("`docker compose` doesn't exist on Linux", "your stack is broken because my distro is from 2019", …) are not feedback — they're noise, and they get the same treatment.
+
+---
+
 ## Quick start
 
 Two ways to run it. Pick one.
