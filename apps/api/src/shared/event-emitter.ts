@@ -1,6 +1,6 @@
 import type { IDomainEvent } from "@packages/ddd-kit";
+import type { Transaction } from "@packages/drizzle";
 import type { EventType } from "@packages/events";
-import { logger } from "./logger";
 import type { IOutboxRepository } from "./ports/outbox.port";
 
 const SOURCE = "app/api";
@@ -17,6 +17,7 @@ export async function emitEvent<TPayload>(
   aggregateId: string,
   payload: TPayload,
   opts: EmitOptions = {},
+  tx?: Transaction,
 ): Promise<void> {
   const event: IDomainEvent<TPayload> = {
     eventType,
@@ -24,14 +25,14 @@ export async function emitEvent<TPayload>(
     aggregateId,
     payload,
   };
-  try {
-    await outbox.enqueue([event], {
+  await outbox.enqueue(
+    [event],
+    {
       source: SOURCE,
       aggregateType,
       organizationId: opts.organizationId,
       traceparent: opts.traceparent,
-    });
-  } catch (err) {
-    logger.error({ err, eventType, aggregateId }, "outbox enqueue failed");
-  }
+    },
+    tx,
+  );
 }
