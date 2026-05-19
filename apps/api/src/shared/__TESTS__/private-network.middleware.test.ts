@@ -7,7 +7,7 @@ mock.module("hono/bun", () => ({
   getConnInfo: () => ({ remote: { address: mockedAddress } }),
 }));
 
-const { requirePrivateNetwork } = await import("../middleware/private-network.middleware");
+const { requirePrivateNetwork } = await import("../internal-routes/private-network.middleware");
 
 async function statusFor(address: string): Promise<number> {
   mockedAddress = address;

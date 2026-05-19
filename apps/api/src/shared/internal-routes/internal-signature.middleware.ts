@@ -8,7 +8,7 @@ import {
   SIGNATURE_HEADER,
   sign,
   verify,
-} from "../internal-signature";
+} from "./internal-signature";
 
 export const requireInternalSignature = createMiddleware(async (c, next) => {
   const key = env.INTERNAL_SIGNING_KEY;

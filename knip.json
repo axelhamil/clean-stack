@@ -5,7 +5,7 @@
       "entry": [
         "src/container.ts",
         "src/shared/middleware/*.ts",
-        "src/shared/internal-fetch.ts",
+        "src/shared/internal-routes/internal-fetch.ts",
         "src/modules/*/module.ts",
         "src/modules/*/routes.ts",
         "src/modules/*/internal.routes.ts"

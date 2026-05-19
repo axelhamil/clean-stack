@@ -36,14 +36,14 @@ INTERNAL_AUTH_LAYERS=signature
 
 ## Triggering — use the signed-fetch helper
 
-The boilerplate ships `apps/api/src/shared/internal-fetch.ts`. Same module the
+The boilerplate ships `apps/api/src/shared/internal-routes/internal-fetch.ts`. Same module the
 caller imports; same canonical-message function the API uses to verify.
 
 **The wrapper script you write** (called `rgpd-sweep.ts` below — name and path are yours; the wiring sections show it under `/app/`, `.github/cron/`, your scheduler's startCommand, etc.). Not part of the API bundle, not checked into `apps/api/`. Lives in whatever repo runs your cron:
 
 ```ts
 // rgpd-sweep.ts (in your scheduler service / GH Actions repo / K8s image)
-import { signedInternalFetch } from "@apps/api/src/shared/internal-fetch";
+import { signedInternalFetch } from "@apps/api/src/shared/internal-routes/internal-fetch";
 
 const res = await signedInternalFetch({
   baseUrl: process.env.INTERNAL_API_URL!,   // https://api.railway.internal:3000

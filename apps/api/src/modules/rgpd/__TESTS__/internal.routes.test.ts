@@ -7,7 +7,7 @@ import {
   canonicalize,
   SIGNATURE_HEADER,
   sign,
-} from "../../../shared/internal-signature";
+} from "../../../shared/internal-routes/internal-signature";
 import { errorHandler } from "../../../shared/middleware/error.middleware";
 
 type SweepOutput = {

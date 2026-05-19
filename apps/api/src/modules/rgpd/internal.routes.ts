@@ -4,7 +4,7 @@ import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { env } from "../../shared/env";
-import { internalLayers } from "../../shared/middleware/internal-layers";
+import { internalLayers } from "../../shared/internal-routes/internal-layers";
 import { sweepBodySchema } from "./application/dto/process-pending-deletions.dto";
 
 export const rgpdInternalRoutes = new Hono()
