@@ -1,3 +1,13 @@
+## [1.14.4](https://github.com/axelhamil/clean-stack/compare/v1.14.3...v1.14.4) (2026-05-19)
+
+### Bug Fixes
+
+* **events:** make event emitter tx-aware and atomic with rgpd writes ([12b8f74](https://github.com/axelhamil/clean-stack/commit/12b8f74ec0fa0eb3a60cc1c56e863a3dd47bbe66))
+
+### Documentation
+
+* **readme:** add WIP status notice + issue policy ([3058f4b](https://github.com/axelhamil/clean-stack/commit/3058f4bdf3fe5b55831d0c3b2240676f6cfdde4b))
+
 ## [1.14.3](https://github.com/axelhamil/clean-stack/compare/v1.14.2...v1.14.3) (2026-05-15)
 
 ### Bug Fixes
