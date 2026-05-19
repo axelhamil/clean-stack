@@ -132,13 +132,21 @@ export class RgpdService {
     }
 
     const until = new Date(Date.now() + (env.RGPD_GRACE_PERIOD_DAYS ?? 7) * 24 * 60 * 60 * 1000);
-    const marked = await this.rgpd.markPendingDeletion(input.userId, until);
-    if (marked.isFailure) return Result.fail(marked.getError());
-
-    await emitEvent(this.outbox, EventTypes.USER_DELETION_REQUESTED, "user", input.userId, {
-      userId: input.userId,
-      pendingDeletionUntil: until,
+    const txResult = await this.transactions.run(async (tx) => {
+      const marked = await this.rgpd.markPendingDeletion(input.userId, until, tx);
+      if (marked.isFailure) return marked;
+      await emitEvent(
+        this.outbox,
+        EventTypes.USER_DELETION_REQUESTED,
+        "user",
+        input.userId,
+        { userId: input.userId, pendingDeletionUntil: until },
+        {},
+        tx,
+      );
+      return Result.ok<void, RgpdError>(undefined);
     });
+    if (txResult.isFailure) return Result.fail(txResult.getError());
 
     const cancelUrl = `${env.APP_URL}/settings/account`;
     const sent = await this.email.sendTemplate(
@@ -179,12 +187,21 @@ export class RgpdService {
       });
     const pendingUntil = state.pendingDeletionUntil.unwrap();
 
-    const cleared = await this.rgpd.clearPendingDeletion(input.userId);
-    if (cleared.isFailure) return Result.fail(cleared.getError());
-
-    await emitEvent(this.outbox, EventTypes.USER_DELETION_CANCELLED, "user", input.userId, {
-      userId: input.userId,
+    const txResult = await this.transactions.run(async (tx) => {
+      const cleared = await this.rgpd.clearPendingDeletion(input.userId, tx);
+      if (cleared.isFailure) return cleared;
+      await emitEvent(
+        this.outbox,
+        EventTypes.USER_DELETION_CANCELLED,
+        "user",
+        input.userId,
+        { userId: input.userId },
+        {},
+        tx,
+      );
+      return Result.ok<void, RgpdError>(undefined);
     });
+    if (txResult.isFailure) return Result.fail(txResult.getError());
 
     const sent = await this.email.sendTemplate(
       "delete_cancelled",
@@ -228,9 +245,20 @@ export class RgpdService {
 
     let wipeOutput: ExecuteWipeOutput;
     try {
-      const inner = await this.transactions.startTransaction(async (trx) =>
-        this.rgpd.executeWipe(input.userId, trx),
-      );
+      const inner = await this.transactions.run(async (trx) => {
+        const wipe = await this.rgpd.executeWipe(input.userId, trx);
+        if (wipe.isFailure) return wipe;
+        await emitEvent(
+          this.outbox,
+          EventTypes.USER_DELETED,
+          "user",
+          input.userId,
+          { userId: input.userId, deletedAt: new Date() },
+          {},
+          trx,
+        );
+        return wipe;
+      });
       if (inner.isFailure) {
         logger.error(
           { userId: input.userId, code: inner.getError().code },
@@ -249,11 +277,6 @@ export class RgpdService {
         message: "wipe transaction failed",
       });
     }
-
-    await emitEvent(this.outbox, EventTypes.USER_DELETED, "user", input.userId, {
-      userId: input.userId,
-      deletedAt: new Date(),
-    });
 
     // Storage cleanup is post-tx: object storage isn't transactional, so we accept
     // the tradeoff. A crash here leaves orphaned blobs but the DB row is already
@@ -395,14 +418,25 @@ export class RgpdService {
     });
     if (presigned.isFailure) return Result.fail(presigned.getError());
 
-    const touched = await this.rgpd.touchExportRequestedAt(input.userId);
-    if (touched.isFailure) return Result.fail(touched.getError());
-
-    await emitEvent(this.outbox, EventTypes.USER_EXPORT_COMPLETED, "user", input.userId, {
-      userId: input.userId,
-      storageKey: key,
-      expiresAt: new Date(presigned.getValue().expiresAt),
+    const txResult = await this.transactions.run(async (tx) => {
+      const touched = await this.rgpd.touchExportRequestedAt(input.userId, tx);
+      if (touched.isFailure) return touched;
+      await emitEvent(
+        this.outbox,
+        EventTypes.USER_EXPORT_COMPLETED,
+        "user",
+        input.userId,
+        {
+          userId: input.userId,
+          storageKey: key,
+          expiresAt: new Date(presigned.getValue().expiresAt),
+        },
+        {},
+        tx,
+      );
+      return Result.ok<void, RgpdError>(undefined);
     });
+    if (txResult.isFailure) return Result.fail(txResult.getError());
 
     const sent = await this.email.sendTemplate(
       "data_export_ready",
