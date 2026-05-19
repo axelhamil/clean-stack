@@ -36,6 +36,24 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 | 0.3 | Backups `pg_dump` + restore tested (3-2-1 rule, 30d retention, monthly automated restore-test) | TODO — RPO/RTO in `docs/DISASTER-RECOVERY.md` |
 | 0.4 | Sentry + OpenTelemetry + Prometheus `/metrics` (3 detachable ports + NoOp default) | TODO — subscribers now trivial via `onEvent` (event-driven foundation) |
 | 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
+| 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | TODO — see expanded scope below |
+
+#### 0.6 — Retention sweeps (cleanup the event-driven foundation)
+
+**Why**: the event-driven foundation creates rows in three tables that grow unboundedly today. `outbox_event` accumulates every dispatched event forever (the row has zero downstream value once `dispatched_at IS NOT NULL` — audit/webhook are independent durables). `audit_log` has a `retention` column wired at INSERT (`retentionFor(eventType)`) but no consumer purges according to it — a SOC2 auditor will flag rows older than their declared retention policy. `webhook_delivery` keeps every `success`/`dead_letter` row indefinitely. Symptom in prod after 12 months: `pg_dump` size dominated by transient pipeline rows, slow `count(*)` analytics, retention policy declared but not enforced (compliance risk).
+
+**Pattern**: reuse the `rgpd.service.processPendingDeletions` shape — internal route gated by `internalLayers` (HMAC), callable from any external cron (Vercel Cron / GitHub Actions / Inngest). One route per sweep, idempotent, dry-run friendly.
+
+- [ ] **`POST /internal/sweep-outbox`** — `DELETE FROM outbox_event WHERE dispatched_at IS NOT NULL AND dispatched_at < now() - interval '<OUTBOX_RETENTION_DAYS>'` (default 7 days, env-configurable). Batch with `LIMIT` to avoid long-running TX. Logs `{ deleted: N }`. Trigger: hourly.
+- [ ] **`POST /internal/sweep-audit-log`** — per-retention enforcement. For each `retention` value in the catalog (`30d`, `1y`, `7y`, `none`), `DELETE FROM audit_log WHERE retention = '<X>' AND occurred_at < now() - <duration>`. Rows with `retention = 'none'` purged aggressively (e.g. 7d operational window). Batched, idempotent. Trigger: daily.
+- [ ] **`POST /internal/sweep-webhook-delivery`** — `DELETE FROM webhook_delivery WHERE status IN ('success','dead_letter') AND created_at < now() - interval '<WEBHOOK_DELIVERY_RETENTION_DAYS>'` (default 30 days). Pending/failed rows kept for retry. Trigger: daily.
+- [ ] **Env knobs**: `OUTBOX_RETENTION_DAYS=7`, `WEBHOOK_DELIVERY_RETENTION_DAYS=30`, `AUDIT_LOG_NONE_RETENTION_DAYS=7` — defaults sane, all overridable per deployment.
+- [ ] **Docs**: `docs/EVENTS.md` § Retention — explain who consumes which column (`retention` in audit_log → audit sweep; nothing in outbox → uniform global sweep) + the cron registration recipe.
+- [ ] **Optional dry-run mode**: `?dryRun=true` returns the rowcount that *would* be deleted, no mutation. Reuses the existing RGPD pattern.
+
+**Decisor "global vs per-row retention"**: outbox uses a **uniform global policy** (every dispatched row is jetable after the same window — debug window only); audit_log uses **per-row policy** via the column (compliance demands differ per event type). Don't generalize one shape onto the other.
+
+**Estimation**: ~3 hours (3 routes ~30 LOC each + 1 cron config + 1 doc paragraph). Unblocks: SOC2/ISO27001 deployment readiness, predictable storage growth, `pg_dump` size control (relates to Phase 0.3 backups).
 
 ### Phase A — Legal + accessibility completeness
 
