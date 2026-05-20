@@ -2,7 +2,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { di } from "../../container";
-import { internalLayers } from "../../shared/middleware/internal-layers";
+import { internalLayers } from "../../shared/internal-routes/internal-layers";
 import { purgeAuditBodySchema } from "./application/dto/purge-audit.dto";
 
 export const auditLogInternalRoutes = new Hono()

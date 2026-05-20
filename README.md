@@ -5,7 +5,6 @@
 **The SaaS boilerplate that says no.**
 Auth, multi-tenant, email, storage already wired. You clone, you write business logic — everything else is settled.
 
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Bun](https://img.shields.io/badge/Bun-1.3+-black?logo=bun&logoColor=white)](https://bun.com)
 [![Node](https://img.shields.io/badge/Node-24+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -211,6 +210,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **What's next** | [`ROADMAP.md`](ROADMAP.md) — RGPD/CCPA → Billing → Gating → Admin → Audit → i18n |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
+| **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
 | **History** | [`docs/HISTORY.md`](docs/HISTORY.md) — design decisions trail |
 
 ---
@@ -233,6 +233,6 @@ pnpm db:studio          # Drizzle Studio
 
 <div align="center">
 
-Made by [@axelhamil](https://github.com/axelhamil) · MIT License
+Made by [Axel Hamilcaro](https://axelhamilcaro.com) · © 2026-present — All rights reserved
 
 </div>

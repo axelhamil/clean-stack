@@ -7,12 +7,11 @@ Hono on Bun, Clean Architecture + DDD, vertical-slice modules, inwire DI, Better
 ```
 apps/api/src/
   shared/                       Cross-cutting infra (no business) — see src/shared/CLAUDE.md
-    middleware/                 auth, error, logger, internal-signature, private-network, org, internal-layers (env-gate for `/internal/*`)
+    middleware/                 Cross-cutting Hono middlewares: auth, error, logger, org
+    internal-routes/            Everything that gates `/internal/*` (cron, internal callers): `internal-signature` (HMAC primitives), `internal-signature.middleware` (server verify), `private-network.middleware` (loopback/RFC1918 gate), `internal-layers` (env-driven composer of the two), `internal-fetch` (client-side signed-fetch helper).
     ports/                      Cross-context port interfaces
     services/                   Cross-context port impls (when no module owns the impl)
     env.ts, logger.ts           Process-level singletons
-    internal-signature.ts       HMAC primitives (canonicalize/sign/verify)
-    internal-fetch.ts           Client-side counterpart, importable by external schedulers calling `/internal/*`
     transaction.ts              `type ITransaction = Transaction` — single swap-point exception
   modules/<context>/            See src/modules/CLAUDE.md for layered rules
   container.ts                  Composition root (flat at `src/`): `.add()` for cross-cutting + `.addModule()` per context, then `.build()`.
