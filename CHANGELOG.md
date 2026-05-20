@@ -1,3 +1,15 @@
+## [1.14.5](https://github.com/axelhamil/clean-stack/compare/v1.14.4...v1.14.5) (2026-05-20)
+
+### Refactor
+
+* **api:** regroup /internal/* concern under shared/internal-routes/ ([18073bc](https://github.com/axelhamil/clean-stack/commit/18073bc128f3464fd9d485303fc0e458698a18a2))
+
+### Documentation
+
+* **events:** add event pipeline visual walkthrough ([41b334c](https://github.com/axelhamil/clean-stack/commit/41b334c7614352bc4daeb6162982b183b7c44af4))
+* log event pipeline doc + event emitter tx-aware hardening ([12fefd3](https://github.com/axelhamil/clean-stack/commit/12fefd3ce9a2372f8f776838fd23dbca794c0518))
+* **roadmap:** add phase 0.6 retention sweeps for event-driven tables ([4012e95](https://github.com/axelhamil/clean-stack/commit/4012e9592291c90796622104e6b152fa9f194a80))
+
 ## [1.14.4](https://github.com/axelhamil/clean-stack/compare/v1.14.3...v1.14.4) (2026-05-19)
 
 ### Bug Fixes
