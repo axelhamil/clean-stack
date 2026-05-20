@@ -5,7 +5,6 @@
 **The SaaS boilerplate that says no.**
 Auth, multi-tenant, email, storage already wired. You clone, you write business logic — everything else is settled.
 
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Bun](https://img.shields.io/badge/Bun-1.3+-black?logo=bun&logoColor=white)](https://bun.com)
 [![Node](https://img.shields.io/badge/Node-24+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -234,6 +233,6 @@ pnpm db:studio          # Drizzle Studio
 
 <div align="center">
 
-Made by [@axelhamil](https://github.com/axelhamil) · MIT License
+Made by [Axel Hamilcaro](https://axelhamilcaro.com) · © 2026-present — All rights reserved
 
 </div>
