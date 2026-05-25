@@ -1,3 +1,9 @@
+## [1.16.0](https://github.com/axelhamil/clean-stack/compare/v1.15.0...v1.16.0) (2026-05-25)
+
+### Features
+
+* **retention:** add internal sweep routes for outbox, audit_log, webhook_delivery ([261d2fc](https://github.com/axelhamil/clean-stack/commit/261d2fcbd61cd2088eeb63ae6dc58ef22917c330)), closes [#6](https://github.com/axelhamil/clean-stack/issues/6)
+
 ## [1.15.0](https://github.com/axelhamil/clean-stack/compare/v1.14.5...v1.15.0) (2026-05-25)
 
 ### Features
