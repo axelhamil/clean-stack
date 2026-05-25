@@ -1,10 +1,10 @@
-import { zValidator } from "@hono/zod-validator";
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { zV } from "../../shared/validator";
 import { createEndpointBodySchema } from "./application/dto/create-endpoint.dto";
 import { listDeliveriesQuerySchema } from "./application/dto/list-deliveries.dto";
 import { updateEndpointBodySchema } from "./application/dto/update-endpoint.dto";
@@ -24,7 +24,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     requireAuth,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
-    zValidator("json", createEndpointBodySchema),
+    zV("json", createEndpointBodySchema),
     async (c) => {
       const orgId = c.get("orgId");
       const body = c.req.valid("json");
@@ -46,7 +46,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     requireAuth,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
-    zValidator("json", updateEndpointBodySchema),
+    zV("json", updateEndpointBodySchema),
     async (c) => {
       const orgId = c.get("orgId");
       const id = c.req.param("id");
@@ -80,7 +80,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     requireAuth,
     requireOrg,
     requireOrgPermission({ webhooks: ["read"] }),
-    zValidator("query", listDeliveriesQuerySchema),
+    zV("query", listDeliveriesQuerySchema),
     async (c) => {
       const orgId = c.get("orgId");
       const endpointId = c.req.param("id");

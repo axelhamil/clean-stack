@@ -86,7 +86,7 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 1. **Port = pure transport.** Storage port exposes only SDK ops (`presignUpload`, `presignDownload`, `headObject`, `deleteObject`, `publicUrlFor`). Zero business rules.
 2. **Use-cases enforce owner-scoped key** `<userId>/<scope>/<uuid>-<filename>`; download+confirm reject keys without the requester's `<userId>/` prefix (`*_FORBIDDEN`). Skipping this lets any authenticated user presign a GET / verify any key. No `throw` — return `Result<T, <Domain>Error>`.
-3. **Validation at controller boundary** in DTOs (filename regex, scope regex, size cap, max TTL), via `zValidator`. Use-cases trust input.
+3. **Validation at controller boundary** in DTOs (filename regex, scope regex, size cap, max TTL), via `zV` (shared wrapper of `@hono/zod-validator` that throws `HTTPException(400)` on failure so the 400 doesn't pollute the response union type). Use-cases trust input.
 4. **Routes = thin controllers.** DI resolve → `await execute(...)` → `Result` → HTTP via central `statusFor(error)` switch keyed off `*_FORBIDDEN`/`*_NOT_FOUND`/`*_INTEGRITY_FAILED`/`*_PROVIDER_FAILURE` (403/404/422/502).
 5. **Provider-agnostic via S3 SDK config**: `region: "auto"`, `forcePathStyle: true`. Boot-time fail-hard if production endpoint is localhost or creds are default.
 6. **Confirm mandatory**: `HeadObject`s actual size/contentType, deletes on mismatch, returns server-verified `{ key, size, contentType, publicUrl }`. Size permissive (`actual > expected` fails); content-type strict. Trusting client-declared values without `confirm` is the enforcement gap.

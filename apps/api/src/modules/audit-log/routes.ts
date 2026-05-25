@@ -1,8 +1,8 @@
-import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { zV } from "../../shared/validator";
 import { listAuditEventsQuerySchema } from "./application/dto/list-audit-events.dto";
 
 export const auditLogRoutes = new Hono<{ Variables: AuthVariables & { orgId: string } }>().get(
@@ -10,7 +10,7 @@ export const auditLogRoutes = new Hono<{ Variables: AuthVariables & { orgId: str
   requireAuth,
   requireOrg,
   requireOrgPermission({ auditLog: ["read"] }),
-  zValidator("query", listAuditEventsQuerySchema),
+  zV("query", listAuditEventsQuerySchema),
   async (c) => {
     const orgId = c.get("orgId");
     const filters = c.req.valid("query");
