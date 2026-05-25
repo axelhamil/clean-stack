@@ -40,6 +40,8 @@ export interface IStorageService {
 
   presignDownload(input: PresignDownloadInput): Promise<Result<PresignedUrl, StorageError>>;
 
+  headBucket(): Promise<Result<void, StorageError>>;
+
   headObject(key: string): Promise<Result<ObjectMetadata, StorageError>>;
 
   deleteObject(key: string): Promise<Result<void, StorageError>>;

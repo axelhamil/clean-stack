@@ -60,6 +60,9 @@ const envSchema = z.object({
   AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
   WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  GIT_SHA: z.string().optional(),
+  BUILD_TIME: z.string().optional(),
+  SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),
 });
 
 const rawEnv = Object.fromEntries(
