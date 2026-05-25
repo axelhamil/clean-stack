@@ -32,6 +32,7 @@ mock.module("@aws-sdk/client-s3", () => ({
   PutObjectCommand: commandFactory("PutObject"),
   GetObjectCommand: commandFactory("GetObject"),
   HeadObjectCommand: commandFactory("HeadObject"),
+  HeadBucketCommand: commandFactory("HeadBucket"),
   DeleteObjectCommand: commandFactory("DeleteObject"),
   DeleteObjectsCommand: commandFactory("DeleteObjects"),
   ListObjectsV2Command: commandFactory("ListObjectsV2"),

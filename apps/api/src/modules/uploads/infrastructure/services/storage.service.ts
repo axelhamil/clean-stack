@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   NotFound,
@@ -98,6 +99,15 @@ export class S3StorageService implements IStorageService {
       });
     } catch (e) {
       return this.fail(e, "presign download failed", { key: input.key });
+    }
+  }
+
+  async headBucket(): Promise<Result<void, StorageError>> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      return Result.ok();
+    } catch (e) {
+      return this.fail(e, "head bucket failed", { bucket: this.bucket });
     }
   }
 

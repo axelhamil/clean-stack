@@ -2,6 +2,7 @@ import type { IUnitOfWork } from "@packages/ddd-kit";
 import { TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
 import { auditLogModule } from "./modules/audit-log/module";
+import { healthModule } from "./modules/health/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
@@ -53,6 +54,7 @@ export const di = container()
         connectionString: env.DATABASE_URL,
       }),
   )
+  .addModule(healthModule)
   .addModule(uploadsModule)
   .addModule(rgpdModule)
   .addModule(auditLogModule)

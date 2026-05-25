@@ -1,11 +1,12 @@
 // `/internal/sweep-audit-log` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
-import { zValidator } from "@hono/zod-validator";
+
 import type { AuditRetention } from "@packages/drizzle";
 import { and, auditLogSchema, db, eq, inArray, lt, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
 import { env } from "../env";
+import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
@@ -107,7 +108,7 @@ async function sweepBucket(
 
 export const sweepAuditLogRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
-  .post("/sweep-audit-log", zValidator("json", sweepAuditLogBodySchema), async (c) => {
+  .post("/sweep-audit-log", zV("json", sweepAuditLogBodySchema), async (c) => {
     const body = c.req.valid("json") as SweepAuditLogBody;
     const batchSize = body.batchSize ?? 5000;
     const dryRun = body.dryRun ?? false;

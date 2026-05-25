@@ -31,8 +31,8 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 | # | Item | Status |
 |---|---|---|
 | 0.0 | Clone-ability bootstrap | **5/7 done** — remaining: CI smoke test + `docs/QUICKSTART.md` |
-| 0.1 | DB schema split per context (currently `auth.ts` bundles auth + multi-tenant + RGPD) | TODO — before Billing |
-| 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | TODO — graceful shutdown wired to `/readyz` for zero-downtime deploys |
+| 0.1 | DB schema split per context (`auth.ts` → `auth.ts` + `multi-tenant.ts`) | DONE — BetterAuth-owned tables stay in `auth.ts`; `organization`/`member`/`invitation` extracted to `multi-tenant.ts`. RGPD = 3 cols on `user` (BetterAuth-owned), inline. Combined `schema` re-export preserves call sites (zero refactor). |
+| 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | DONE — `modules/health/` + `IHealthCheckRegistry` (cache asym 30s/5s, timeout 5s, tri-state agg), `OnInit`+`preload()` self-registering probes (db critical via health, storage non-critical via `uploads`), `SIGTERM`-driven `lifecycleState` flip + `SHUTDOWN_GRACE_PERIOD_MS` window, payload minimal en prod, mount hors middleware. Docs: [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) (recipes Railway/Fly/Render/K8s/Cloud Run). |
 | 0.3 | Backups `pg_dump` + restore tested (3-2-1 rule, 30d retention, monthly automated restore-test) | TODO — RPO/RTO in `docs/DISASTER-RECOVERY.md` |
 | 0.4 | Sentry + OpenTelemetry + Prometheus `/metrics` (3 detachable ports + NoOp default) | TODO — subscribers now trivial via `onEvent` (event-driven foundation) |
 | 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
@@ -167,9 +167,9 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Endpoint shape — convention K8s 2026** (`z` suffix is the official one; `/health` / `/ready` are the legacy names):
 
-- [ ] `GET /livez` — liveness. Returns 200 with `{ status, version, commitSha, buildTime, runtime, uptimeMs }`. **No dependency hit** (a DB outage must NOT restart pods — would cause thundering herd). `commitSha`/`buildTime` injected at build via `GIT_SHA` / `BUILD_TIME` env vars (CI sets them).
-- [ ] `GET /readyz` — readiness. Aggregates registered checks (DB `SELECT 1`, R2 `HeadBucket`, Resend cached health). Returns 200 if all `pass`/`warn`, 503 if any critical check is `fail`.
-- [ ] `GET /startupz` — startup probe (K8s 1.16+). Distinct from liveness so a slow boot (warming caches, DI graph build) doesn't get killed by a tight liveness threshold. Returns 200 once initial bootstrap completes; 503 before.
+- [x] `GET /livez` — liveness. Returns 200 with `{ status, version, commitSha, buildTime, runtime, uptimeMs }`. **No dependency hit** (a DB outage must NOT restart pods — would cause thundering herd). `commitSha`/`buildTime` injected at build via `GIT_SHA` / `BUILD_TIME` env vars (CI sets them).
+- [x] `GET /readyz` — readiness. Aggregates registered checks (DB `SELECT 1`, R2 `HeadBucket`). Returns 200 if all `pass`/`warn`, 503 if any critical check is `fail`.
+- [x] `GET /startupz` — startup probe (K8s 1.16+). Distinct from liveness so a slow boot (warming caches, DI graph build) doesn't get killed by a tight liveness threshold. Returns 200 once initial bootstrap completes; 503 before.
 
 **Response format — IETF `draft-inadarei-api-health-check-06`** (Datadog / New Relic / Grafana parse it natively):
 
@@ -185,26 +185,26 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 }
 ```
 
-- [ ] **Tri-state status** (`pass`/`warn`/`fail`) — non-binary. Resend down + DB up = `warn` + 200 (degraded but functional). DB down = `fail` + 503 (truly unhealthy). Aligns with the draft and avoids the "everything red because Resend hiccup'd" problem.
-- [ ] **Per-check `observedValue` + `observedUnit`** — latency in ms; populates Phase D.1 SLO dashboards for free.
-- [ ] **Prod payload minimal** — outside `NODE_ENV !== "production"`, only the top-level `status` field is returned to avoid leaking infra details (DB host, bucket name in error messages). Full payload in dev/staging.
+- [x] **Tri-state status** (`pass`/`warn`/`fail`) — non-binary. Resend down + DB up = `warn` + 200 (degraded but functional). DB down = `fail` + 503 (truly unhealthy). Aligns with the draft and avoids the "everything red because Resend hiccup'd" problem.
+- [x] **Per-check `observedValue` + `observedUnit`** — latency in ms; populates Phase D.1 SLO dashboards for free.
+- [x] **Prod payload minimal** — outside `NODE_ENV !== "production"`, only the top-level `status` + per-check `status` are returned to avoid leaking infra details (DB host, bucket name in error messages). Full payload in dev/staging.
 
 **Architecture — registry pattern, futureproof**:
 
-- [ ] `apps/api/src/modules/health/` — vertical-slice module. `IHealthCheckRegistry` port (`register(name, fn, { critical: boolean })`); each module registers its own checks at boot (`db.register("db:postgres", probeDb, { critical: true })`). `/readyz` iterates the registry. **Why a module**: when Stripe / Redis / GrowthBook ship, each module adds 1 line to register its check — no edits to the health endpoint.
-- [ ] `IHealthCheckRegistry` exposed to other modules via `shared/ports/health.port.ts` (cross-module port, two consumers minimum: rgpd + uploads register storage health from existing impls).
+- [x] `apps/api/src/modules/health/` — vertical-slice module. `IHealthCheckRegistry` port (`register(name, fn, { critical: boolean })`); each module owner-of-infra ships an `XxxHealthProbe implements OnInit` class that self-registers when `di.preload()` fires at boot (inwire `OnInit` interface, duck-typed). `/readyz` iterates the registry. **Why per-module class**: removability — `trash modules/billing` removes the binding + the probe in one shot, no orphan registration code.
+- [x] `IHealthCheckRegistry` exposed to other modules via `shared/ports/health.port.ts` (cross-module port; current consumers: `modules/health` for db probe, `modules/uploads` for storage probe via `StorageHealthProbe`).
 
 **Robustness — what kills probes in production**:
 
-- [ ] **Cache positive 30s + cache negative 5s** — healthy result is cached 30s (don't hammer Resend on every PaaS probe, ~6 req/sec); failed result cached only 5s (re-check fast, restore quickly). Asymmetric cache is the SOTA pattern.
-- [ ] **Self-cancelling timeout 5s on `/readyz`** — `Promise.race(check, timeoutFail(5000))`. A probe that hangs blocks rolling deploys.
-- [ ] **No PII in fail payloads** — never return stack traces, hostnames, env-var values, full DB error messages. Just the failed check name + a generic code (`db: down`).
+- [x] **Cache positive 30s + cache negative 5s** — healthy result is cached 30s (don't hammer Resend on every PaaS probe, ~6 req/sec); failed result cached only 5s (re-check fast, restore quickly). Asymmetric cache is the SOTA pattern.
+- [x] **Self-cancelling timeout 5s on `/readyz`** — `Promise.race(check, timeoutFail(5000))`. A probe that hangs blocks rolling deploys.
+- [x] **No PII in fail payloads** — never return stack traces, hostnames, env-var values, full DB error messages. Just the failed check name + a generic code (`bucket unreachable`, `timeout >5000ms`).
 
 **Graceful shutdown — wired to `/readyz`** (the single most critical zero-downtime piece, and the one most boilerplates skip):
 
-- [ ] On `SIGTERM` (PaaS sends it before kill), set an in-memory `isShuttingDown = true` flag. `/readyz` immediately returns 503 — the LB stops routing new requests to this pod within one probe interval (~5s).
-- [ ] Wait `SHUTDOWN_GRACE_PERIOD_MS` (default 15s — env-tunable per PaaS) for in-flight requests to drain. Then `Bun.serve.stop()` + close DB pool + flush pino transport.
-- [ ] **Why critical**: without this, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
+- [x] On `SIGTERM`/`SIGINT`, `lifecycleState.signalShutdown()` flips the flag. `/readyz` immediately returns 503 (`status: "fail", output: "shutting down"`) — the LB stops routing new requests within one probe interval (~5s).
+- [x] Wait `SHUTDOWN_GRACE_PERIOD_MS` (default `15000`, env-tunable per PaaS) for in-flight requests to drain. Then stop the outbox dispatcher + webhook delivery worker (existing `stopWithTimeout` 25s safety net).
+- [x] **Why critical**: without this, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
 
 **Phase D.1 prep — Prometheus metrics** (cheap to wire now, expensive to retrofit):
 
@@ -213,13 +213,13 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Mounting + observability**:
 
-- [ ] All three probes (`/livez`, `/readyz`, `/startupz`) and `/metrics` mounted **outside** `requestId` + `httpLogger` + `requireAuth`. Probes don't carry session cookies, and a probe every 5s would drown prod logs (~17 280/day per pod).
-- [ ] Probes excluded from rate-limiting (Phase C.1) — PaaS probe IPs aren't predictable.
+- [x] All three probes (`/livez`, `/readyz`, `/startupz`) mounted **outside** `requestId` + `httpLogger` + `cors` + `sessionMiddleware`. Probes don't carry session cookies, and a probe every 5s would drown prod logs (~17 280/day per pod).
+- [ ] Probes to be excluded from rate-limiting when Phase C.1 lands — PaaS probe IPs aren't predictable. (Currently no rate-limit, so nothing to wire today.)
 
 **Documentation**:
 
-- [ ] `README.md` deploy section — one config example per target: Railway (`railway.toml` healthchecks), Fly.io (`fly.toml [[checks]]`), Cloudflare Workers (no probes — N/A note), Render (`render.yaml healthCheckPath`), Kubernetes (manifest snippet with `livenessProbe` + `readinessProbe` + `startupProbe`).
-- [ ] `docs/HEALTH-PROBES.md` — registry usage (how to register a check from a new module), draft-inadarei format reference, graceful-shutdown rationale, monitoring integration recipes (Datadog, Grafana).
+- [x] `README.md` deploy section — pointer to `docs/HEALTH-PROBES.md` (per-PaaS recipes Railway, Fly, Render, K8s, Cloud Run; Vercel/Lambda flagged N/A as the api is non-serverless).
+- [x] `docs/HEALTH-PROBES.md` — endpoint table, response shape, tri-state aggregation table, registry usage with worked `StripeHealthProbe` example, graceful-shutdown sequence, env vars, monitoring integrations (Datadog/Grafana/Sentry).
 
 ---
 
@@ -881,7 +881,7 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 - [x] **Back step 1 — pivot `apps/api/src/` to `modules/<context>/`**: `modules/uploads/`, `modules/rgpd/` shipped (auth + organizations stay at `apps/api/src/auth.ts` — BetterAuth singleton, no DDD). Each contains `application/{dto,services,ports for module-private interfaces}` + `infrastructure/{services,repositories}` + `routes.ts` (where applicable) + `module.ts`. `adapters/` removed; `infrastructure/` is the DDD-canonical naming. **`modules/email/` deliberately not created** — email is pure infra (no domain, no use cases, no routes), lives in `shared/services/email.service.ts` consuming `shared/ports/email.port.ts` (rule "shared kernel" in CLAUDE.md).
 - [x] **Back step 2 — extract `shared/`**: `apps/api/src/shared/{middleware,ports,services}/` + process-level singletons at the root. Cross-context port interfaces (`IStorageService`, `IEmailService`) live in `shared/ports/`; cross-context impls (`ResendEmailService`) in `shared/services/`. The composed env-driven gate for `/internal/*` lives in `shared/internal-routes/internal-layers.ts` (single source — any future module exposing `/internal/*` consumes the same `internalLayers`); the whole `/internal/*` concern (signature primitives + middlewares + signed-fetch client) is grouped under `shared/internal-routes/`. `common/` deleted.
 - [x] **Back step 3 — `module.ts` per context (split form)**: each `module.ts` defines an inwire `defineModule()` (typed prerequisites local to the module). `di/container.ts` chains `.addModule(emailModule).addModule(uploadsModule).addModule(rgpdModule)`. Routes stay in `routes.ts` / `internal.routes.ts` and are imported by `index.ts` directly — splitting DI from routes avoids a `module.ts → routes.ts → di/container.ts → module.ts` cycle (Biome `noImportCycles` flagged it; the SOTA is to keep DI wiring and route mounting on separate import graphs).
-- [ ] **Back step 4 — split DB schema**: today `packages/drizzle/src/schema/auth.ts` is the single file (auth + multi-tenant + rgpd fields all bundled). Split into `packages/drizzle/src/schema/<context>.ts` (auth, organization, uploads when keys land in DB, rgpd, …), barrel `index.ts` re-exports. Each module owns its tables. Removing a module = remove the `export *` line + revert the migration. Last front of the vertical-slice migration; ship before Phase B (Billing) so the new `subscription` / `payment` tables land in their own file from day one.
+- [x] **Back step 4 — split DB schema**: `packages/drizzle/src/schema/auth.ts` → `auth.ts` (BetterAuth-owned: user/session/account/verification/twoFactor/passkey) + `multi-tenant.ts` (organization/member/invitation). RGPD fields stay on `user` (BetterAuth-owned column extensions). Combined `schema` namespace re-export preserved in `src/index.ts` → zero call-site change. New billing tables will land in `packages/drizzle/src/schema/billing.ts` from day one.
 - [ ] **Removability dry-run** on the smallest module (probably `rgpd` since fresh in memory, or `uploads` if smaller) — delete it end-to-end, run `pnpm ci:check`, document the diff in `docs/HISTORY.md` as the canonical "how to remove a feature" example.
 - [ ] **Removability CI gate (phase 2 — deferred until pattern stabilizes)**: script `scripts/check-removability.ts` that picks a random module, snapshots, removes, type-checks, restores. Optional weekly cron in CI; promote to PR-blocking once stable.
 
