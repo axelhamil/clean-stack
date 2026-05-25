@@ -1,3 +1,9 @@
+## [1.17.1](https://github.com/axelhamil/clean-stack/compare/v1.17.0...v1.17.1) (2026-05-25)
+
+### Bug Fixes
+
+* **db:** inline literals in webhook_delivery partial index predicate ([daf588b](https://github.com/axelhamil/clean-stack/commit/daf588b4df1903dab7c2a2258e37e35691a93d54))
+
 ## [1.17.0](https://github.com/axelhamil/clean-stack/compare/v1.16.0...v1.17.0) (2026-05-25)
 
 ### Features
