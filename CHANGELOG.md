@@ -1,3 +1,13 @@
+## [1.17.0](https://github.com/axelhamil/clean-stack/compare/v1.16.0...v1.17.0) (2026-05-25)
+
+### Features
+
+* **health:** add /livez /readyz /startupz probes with graceful shutdown ([a749325](https://github.com/axelhamil/clean-stack/commit/a7493256219516457b53fa52f6b0e064cde38c0b))
+
+### Refactor
+
+* **db:** split drizzle schema into auth + multi-tenant contexts ([5526e70](https://github.com/axelhamil/clean-stack/commit/5526e706cf0aaa44047259396612e388b0787803))
+
 ## [1.16.0](https://github.com/axelhamil/clean-stack/compare/v1.15.0...v1.16.0) (2026-05-25)
 
 ### Features
