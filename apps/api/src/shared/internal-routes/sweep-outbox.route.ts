@@ -1,10 +1,11 @@
 // `/internal/sweep-outbox` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
-import { zValidator } from "@hono/zod-validator";
+
 import { and, db, inArray, isNotNull, lt, outboxSchema, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
 import { env } from "../env";
+import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
@@ -64,7 +65,7 @@ async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
 
 export const sweepOutboxRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
-  .post("/sweep-outbox", zValidator("json", sweepOutboxBodySchema), async (c) => {
+  .post("/sweep-outbox", zV("json", sweepOutboxBodySchema), async (c) => {
     const body = c.req.valid("json") as SweepOutboxBody;
     const batchSize = body.batchSize ?? 5000;
     const dryRun = body.dryRun ?? false;
