@@ -21,8 +21,14 @@ export type { AnyPgTable } from "drizzle-orm/pg-core";
 export { type DbClient, db, type Transaction } from "./config";
 export { trackEventsOnSuccess } from "./repositories/track-events";
 export type { AuditActorType, AuditRetention } from "./schema/audit-log";
+
+import * as authSchema from "./schema/auth";
+import * as multiTenantSchema from "./schema/multi-tenant";
+
 export * as auditLogSchema from "./schema/audit-log";
-export * as schema from "./schema/auth";
+export * as authSchema from "./schema/auth";
+export * as multiTenantSchema from "./schema/multi-tenant";
+export const schema = { ...authSchema, ...multiTenantSchema };
 export type { OutboxEventMetadata } from "./schema/outbox";
 export * as outboxSchema from "./schema/outbox";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
