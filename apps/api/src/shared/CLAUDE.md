@@ -11,6 +11,7 @@ Loaded when working inside `apps/api/src/shared/`. Cross-cutting infra placement
   - `private-network.middleware.ts` — RFC1918/loopback gate (`requirePrivateNetwork`)
   - `internal-layers.ts` — env-driven composer (`INTERNAL_AUTH_LAYERS`) — modules use `internalLayers` as one spread
   - `internal-fetch.ts` — client-side `signedInternalFetch`, importable by external schedulers calling `/internal/*`
+  - `sweep-<table>.route.ts` — cross-cutting retention sweeps (no single module owner). Module-scoped cron endpoints stay in `modules/<x>/internal.routes.ts` (e.g. `rgpd/`); cross-cutting infra purges (`outbox_event`, `audit_log`, `webhook_delivery`) live here.
 - `ports/` — cross-context port interfaces (consumed by 2+ contexts, OR pure transport). Currently: `email.port`, `storage.port`, `outbox.port`, `audit.port`.
 - `services/` — cross-context port impls. Currently: `ResendEmailService`, `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `OutboxDispatcher` (LISTEN/NOTIFY worker), `AuditEventSubscriber` + `WebhookFanoutSubscriber` (built-in outbox subscribers).
 - `env.ts`, `logger.ts` — process-level singletons
@@ -35,3 +36,4 @@ Decisor = *who consumes the port*, not where the impl lives.
 - Creating `modules/<x>/` when a context has only an infra adapter (no domain, no use-cases, no aggregate, no DTO, no routes) — that's *shared kernel infra*, not a bounded context. Live in `shared/ports/`+`shared/services/`. Test: removing the "module" leaves only `module.ts`+a single port impl → not a module.
 - Importing a port from another module's `application/ports/` — exactly the cross-module coupling `shared/ports/` exists to prevent. Promote first.
 - Letting a `shared/ports/` port become orphan after removing its only remaining consumer → demote back to a module's `application/ports/` or delete. Shared kernel always has ≥ 2 consumers OR is cross-cutting infra.
+- `mock.module("@packages/drizzle", ...)` in a test file that exposes only a partial subset of exports — bun runs `*.test.ts` files in parallel and `mock.module` leaks across the process, so the partial mock will surface as `SyntaxError: Export named 'X' not found` in *another* test that imports `X` legitimately. **Always expose the superset** of `@packages/drizzle` exports used by the entire test suite (`db`, `outboxSchema`, `auditLogSchema`, `webhooksSchema`, `inArray`, `eq`, `lt`, `isNotNull`, `and`, `sql`, …) even if your current test only uses two of them.

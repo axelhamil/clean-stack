@@ -3,6 +3,9 @@ import { Hono } from "hono";
 
 let nextRoleRows: Array<{ role: string }> = [];
 
+// Mock exposes the full surface of `@packages/drizzle` (not just `db`/`eq`/`and`) to keep
+// `bun test` stable when running in parallel — other suites import `outboxSchema`, `auditLogSchema`,
+// `webhooksSchema`, etc., and bun's `mock.module` leaks across files.
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => ({
@@ -13,7 +16,14 @@ mock.module("@packages/drizzle", () => ({
   },
   eq: () => ({}),
   and: () => ({}),
+  isNotNull: () => ({}),
+  lt: () => ({}),
+  inArray: () => ({}),
+  sql: () => ({}),
   schema: { member: { role: {}, organizationId: {}, userId: {} } },
+  outboxSchema: { outboxEvent: {} },
+  auditLogSchema: { auditLog: {} },
+  webhooksSchema: { webhookDelivery: {} },
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");
