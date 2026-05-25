@@ -28,6 +28,9 @@ export const EventTypes = {
   UPLOAD_REQUESTED: "upload.requested",
   UPLOAD_CONFIRMED: "upload.confirmed",
   UPLOAD_DELETED: "upload.deleted",
+  WEBHOOK_ENDPOINT_CREATED: "webhook.endpoint.created",
+  WEBHOOK_ENDPOINT_UPDATED: "webhook.endpoint.updated",
+  WEBHOOK_ENDPOINT_DELETED: "webhook.endpoint.deleted",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

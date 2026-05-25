@@ -15,10 +15,9 @@
   "exports": {
     "./globals.css": "./src/styles/globals.css",
     "./styles/globals.css": "./src/styles/globals.css",
-    "./libs/*": "./src/libs/*",
+    "./libs/*.js": "./src/libs/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
-    "./components/ui/*": "./src/components/ui/*.tsx",
-    "./index": "./src/index.ts"
+    "./components/ui/*": "./src/components/ui/*.tsx"
   },
   "peerDependencies": {
     "@hookform/resolvers": "^5.2.2",

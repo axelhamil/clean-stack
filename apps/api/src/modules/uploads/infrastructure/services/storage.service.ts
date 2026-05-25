@@ -40,7 +40,9 @@ export class S3StorageService implements IStorageService {
     this.publicUrl = (env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "");
 
     if (env.NODE_ENV === "production") {
-      const isLocalhost = env.S3_ENDPOINT.includes("localhost");
+      const host = env.S3_ENDPOINT.toLowerCase();
+      const isLocalhost =
+        host.includes("localhost") || host.includes("127.0.0.1") || host.includes("[::1]");
       const isDefaultCreds = env.S3_ACCESS_KEY === "dev" || env.S3_SECRET_KEY === "dev";
       if (isLocalhost || isDefaultCreds) {
         throw new Error(

@@ -126,8 +126,8 @@ export class WebhookDeliveryWorker {
       return;
     }
 
-    const masterKey = this.deps.masterKey();
-    if (!masterKey) {
+    const masterKeyOpt = this.deps.masterKey();
+    if (masterKeyOpt.isNone()) {
       await db.transaction(async (tx) =>
         this.markFailed(delivery, "WEBHOOK_MASTER_KEY missing", null, tx),
       );
@@ -136,7 +136,7 @@ export class WebhookDeliveryWorker {
 
     let secret: string;
     try {
-      const subKey = deriveOrgSubKey(masterKey, endpointAndOrg.organizationId);
+      const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), endpointAndOrg.organizationId);
       secret = decryptSecret(endpointAndOrg.secretCipher, subKey);
     } catch (err) {
       this.deps.logger.error(

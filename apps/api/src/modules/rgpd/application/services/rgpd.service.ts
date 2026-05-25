@@ -396,10 +396,6 @@ export class RgpdService {
       });
     }
 
-    await emitEvent(this.outbox, EventTypes.USER_EXPORT_REQUESTED, "user", input.userId, {
-      userId: input.userId,
-    });
-
     const payloadResult = await this.rgpd.collectUserDataForExport(input.userId);
     if (payloadResult.isFailure) return Result.fail(payloadResult.getError());
     const payload = payloadResult.getValue();
@@ -421,6 +417,15 @@ export class RgpdService {
     const txResult = await this.transactions.run(async (tx) => {
       const touched = await this.rgpd.touchExportRequestedAt(input.userId, tx);
       if (touched.isFailure) return touched;
+      await emitEvent(
+        this.outbox,
+        EventTypes.USER_EXPORT_REQUESTED,
+        "user",
+        input.userId,
+        { userId: input.userId },
+        {},
+        tx,
+      );
       await emitEvent(
         this.outbox,
         EventTypes.USER_EXPORT_COMPLETED,

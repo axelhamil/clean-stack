@@ -3,14 +3,14 @@ import type { Control, FieldPath, FieldValues } from "react-hook-form";
 import { Checkbox } from "./checkbox";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "./form";
 
-type FormCheckboxFieldProps<
+interface FormCheckboxFieldProps<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>,
-> = {
+> extends Omit<ComponentProps<typeof Checkbox>, "name" | "checked" | "onCheckedChange"> {
   control: Control<TFieldValues>;
   name: TName;
   label: string;
-} & Omit<ComponentProps<typeof Checkbox>, "name" | "checked" | "onCheckedChange">;
+}
 
 export function FormCheckboxField<
   TFieldValues extends FieldValues,

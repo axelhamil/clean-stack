@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { keySchema } from "./_key";
 
 export const confirmUploadBodySchema = z.object({
-  key: z.string().min(1).max(512),
+  key: keySchema,
   expectedSize: z.number().int().positive(),
   expectedContentType: z.string().min(1).max(120),
 });

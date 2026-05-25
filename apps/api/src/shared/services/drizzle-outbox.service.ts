@@ -10,9 +10,32 @@ import {
   sql,
   type Transaction,
 } from "@packages/drizzle";
+import { PayloadByEventType } from "@packages/events";
 import type { IOutboxRepository, OutboxEnqueueScope, OutboxRecord } from "../ports/outbox.port";
 
 const oe = outboxSchema.outboxEvent;
+
+function assertPayloadValid(event: IDomainEvent): void {
+  const schema = (
+    PayloadByEventType as Record<
+      string,
+      {
+        safeParse: (
+          v: unknown,
+        ) => { success: true } | { success: false; error: { message: string } };
+      }
+    >
+  )[event.eventType];
+  if (!schema) {
+    throw new Error(`outbox: unknown event type "${event.eventType}" (not in PayloadByEventType)`);
+  }
+  const parsed = schema.safeParse(event.payload);
+  if (!parsed.success) {
+    throw new Error(
+      `outbox: payload validation failed for "${event.eventType}": ${parsed.error.message}`,
+    );
+  }
+}
 
 export class DrizzleOutboxRepository implements IOutboxRepository {
   async enqueue(
@@ -21,6 +44,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
     tx?: Transaction,
   ): Promise<void> {
     if (events.length === 0) return;
+    for (const event of events) assertPayloadValid(event);
     const exec = tx ?? db;
     const rows = events.map((event) =>
       domainEventToOutboxRow(event, {

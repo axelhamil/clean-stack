@@ -100,11 +100,14 @@ export const OrgCreatedPayload = OrgRef.extend({
 export type OrgCreatedPayload = z.infer<typeof OrgCreatedPayload>;
 
 export const OrgUpdatedPayload = OrgRef.extend({
+  actorUserId: z.string(),
   changes: z.record(z.string(), z.unknown()),
 });
 export type OrgUpdatedPayload = z.infer<typeof OrgUpdatedPayload>;
 
-export const OrgDeletedPayload = OrgRef;
+export const OrgDeletedPayload = OrgRef.extend({
+  actorUserId: z.string().nullable(),
+});
 export type OrgDeletedPayload = z.infer<typeof OrgDeletedPayload>;
 
 export const OrgMemberInvitedPayload = OrgRef.extend({
@@ -122,16 +125,19 @@ export const OrgMemberJoinedPayload = OrgRef.extend({
 export type OrgMemberJoinedPayload = z.infer<typeof OrgMemberJoinedPayload>;
 
 export const OrgInvitationCancelledPayload = OrgRef.extend({
+  actorUserId: z.string(),
   invitationId: z.string(),
 });
 export type OrgInvitationCancelledPayload = z.infer<typeof OrgInvitationCancelledPayload>;
 
 export const OrgMemberRemovedPayload = OrgRef.extend({
+  actorUserId: z.string(),
   userId: z.string(),
 });
 export type OrgMemberRemovedPayload = z.infer<typeof OrgMemberRemovedPayload>;
 
 export const OrgMemberRoleChangedPayload = OrgRef.extend({
+  actorUserId: z.string(),
   userId: z.string(),
   previousRole: z.string(),
   newRole: z.string(),
@@ -159,6 +165,28 @@ export const UploadDeletedPayload = z.object({
   key: z.string(),
 });
 export type UploadDeletedPayload = z.infer<typeof UploadDeletedPayload>;
+
+export const WebhookEndpointCreatedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+  url: z.string().url(),
+  eventTypes: z.array(z.string()),
+  enabled: z.boolean(),
+});
+export type WebhookEndpointCreatedPayload = z.infer<typeof WebhookEndpointCreatedPayload>;
+
+export const WebhookEndpointUpdatedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+  changes: z.record(z.string(), z.unknown()),
+});
+export type WebhookEndpointUpdatedPayload = z.infer<typeof WebhookEndpointUpdatedPayload>;
+
+export const WebhookEndpointDeletedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+});
+export type WebhookEndpointDeletedPayload = z.infer<typeof WebhookEndpointDeletedPayload>;
 
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
@@ -190,4 +218,7 @@ export const PayloadByEventType = {
   [EventTypes.UPLOAD_REQUESTED]: UploadRequestedPayload,
   [EventTypes.UPLOAD_CONFIRMED]: UploadConfirmedPayload,
   [EventTypes.UPLOAD_DELETED]: UploadDeletedPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_CREATED]: WebhookEndpointCreatedPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
 } as const;

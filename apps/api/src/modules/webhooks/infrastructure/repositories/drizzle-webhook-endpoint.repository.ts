@@ -1,9 +1,11 @@
+import { Option, Result } from "@packages/ddd-kit";
 import { and, db, eq, type Transaction, webhooksSchema } from "@packages/drizzle";
 import type {
   CreateEndpointArgs,
   IWebhookEndpointRepository,
   UpdateEndpointArgs,
   WebhookEndpointRecord,
+  WebhookRepoError,
 } from "../../application/ports/webhook-endpoint.port";
 
 const we = webhooksSchema.webhookEndpoint;
@@ -22,7 +24,10 @@ function toRecord(row: typeof we.$inferSelect): WebhookEndpointRecord {
 }
 
 export class DrizzleWebhookEndpointRepository implements IWebhookEndpointRepository {
-  async create(args: CreateEndpointArgs, tx?: Transaction): Promise<WebhookEndpointRecord> {
+  async create(
+    args: CreateEndpointArgs,
+    tx?: Transaction,
+  ): Promise<Result<WebhookEndpointRecord, WebhookRepoError>> {
     const exec = tx ?? db;
     const [row] = await exec
       .insert(we)
@@ -35,11 +40,15 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
         enabled: args.enabled,
       })
       .returning();
-    if (!row) throw new Error("webhook endpoint insert returned no row");
-    return toRecord(row);
+    if (!row)
+      return Result.fail({
+        code: "WEBHOOK_PERSISTENCE_PROVIDER_FAILURE",
+        message: "webhook endpoint insert returned no row",
+      });
+    return Result.ok(toRecord(row));
   }
 
-  async update(args: UpdateEndpointArgs, tx?: Transaction): Promise<WebhookEndpointRecord | null> {
+  async update(args: UpdateEndpointArgs, tx?: Transaction): Promise<Option<WebhookEndpointRecord>> {
     const exec = tx ?? db;
     const update: Partial<typeof we.$inferInsert> = {};
     if (args.url !== undefined) update.url = args.url;
@@ -50,7 +59,7 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
       .set(update)
       .where(and(eq(we.id, args.id), eq(we.organizationId, args.organizationId)))
       .returning();
-    return row ? toRecord(row) : null;
+    return Option.fromNullable(row).map(toRecord);
   }
 
   async delete(id: string, organizationId: string, tx?: Transaction): Promise<boolean> {
@@ -62,13 +71,13 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     return Boolean(row);
   }
 
-  async findById(id: string, organizationId: string): Promise<WebhookEndpointRecord | null> {
+  async findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>> {
     const [row] = await db
       .select()
       .from(we)
       .where(and(eq(we.id, id), eq(we.organizationId, organizationId)))
       .limit(1);
-    return row ? toRecord(row) : null;
+    return Option.fromNullable(row).map(toRecord);
   }
 
   async listByOrg(organizationId: string): Promise<WebhookEndpointRecord[]> {

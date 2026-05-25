@@ -1,5 +1,6 @@
 import { z } from "zod";
+import { keySchema } from "./_key";
 
 export const deleteUploadBodySchema = z.object({
-  key: z.string().min(1).max(512),
+  key: keySchema,
 });

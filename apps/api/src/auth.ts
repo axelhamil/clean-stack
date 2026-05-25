@@ -2,7 +2,7 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
-import { and, db, desc, eq, schema } from "@packages/drizzle";
+import { and, db, desc, eq, schema, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -47,6 +47,14 @@ async function ensurePersonalOrgFor(userId: string): Promise<string> {
       role: "owner",
       createdAt: now,
     });
+    await emit(
+      EventTypes.ORG_MEMBER_JOINED,
+      "member",
+      memberId,
+      { organizationId: orgId, userId, role: "owner" },
+      orgId,
+      tx,
+    );
   });
   return orgId;
 }
@@ -57,10 +65,17 @@ async function emit<TPayload>(
   aggregateId: string,
   payload: TPayload,
   organizationId?: string | null,
+  tx?: Transaction,
 ): Promise<void> {
-  await emitEvent(di.IOutboxRepository, eventType, aggregateType, aggregateId, payload, {
-    organizationId,
-  });
+  await emitEvent(
+    di.IOutboxRepository,
+    eventType,
+    aggregateType,
+    aggregateId,
+    payload,
+    { organizationId },
+    tx,
+  );
 }
 
 async function dispatchEmail<K extends keyof EmailTemplates>(
@@ -193,7 +208,7 @@ const authOptions = {
             org.id,
           );
         },
-        afterUpdateOrganization: async ({ organization: org }) => {
+        afterUpdateOrganization: async ({ organization: org, user }) => {
           if (!org) return;
           await emit(
             EventTypes.ORG_UPDATED,
@@ -201,18 +216,19 @@ const authOptions = {
             org.id,
             {
               organizationId: org.id,
+              actorUserId: user.id,
               changes: { name: org.name, slug: org.slug, logo: org.logo },
             },
             org.id,
           );
         },
-        afterDeleteOrganization: async ({ organization: org }) => {
+        afterDeleteOrganization: async ({ organization: org, user }) => {
           if (isPersonalOrg(org.slug)) return;
           await emit(
             EventTypes.ORG_DELETED,
             "organization",
             org.id,
-            { organizationId: org.id },
+            { organizationId: org.id, actorUserId: user.id },
             org.id,
           );
         },
@@ -229,12 +245,12 @@ const authOptions = {
             org.id,
           );
         },
-        afterRemoveMember: async ({ member, organization: org }) => {
+        afterRemoveMember: async ({ member, user, organization: org }) => {
           await emit(
             EventTypes.ORG_MEMBER_REMOVED,
             "member",
             member.id,
-            { organizationId: org.id, userId: member.userId },
+            { organizationId: org.id, actorUserId: user.id, userId: member.userId },
             org.id,
           );
           if (isPersonalOrg(org.slug)) return;
@@ -244,16 +260,27 @@ const authOptions = {
             .where(eq(schema.member.organizationId, org.id))
             .limit(1);
           if (remaining.length === 0) {
-            await db.delete(schema.organization).where(eq(schema.organization.id, org.id));
+            await db.transaction(async (tx) => {
+              await tx.delete(schema.organization).where(eq(schema.organization.id, org.id));
+              await emit(
+                EventTypes.ORG_DELETED,
+                "organization",
+                org.id,
+                { organizationId: org.id, actorUserId: user.id },
+                org.id,
+                tx,
+              );
+            });
           }
         },
-        afterUpdateMemberRole: async ({ member, previousRole, organization: org }) => {
+        afterUpdateMemberRole: async ({ member, previousRole, user, organization: org }) => {
           await emit(
             EventTypes.ORG_MEMBER_ROLE_CHANGED,
             "member",
             member.id,
             {
               organizationId: org.id,
+              actorUserId: user.id,
               userId: member.userId,
               previousRole,
               newRole: member.role,
@@ -276,12 +303,16 @@ const authOptions = {
             org.id,
           );
         },
-        afterCancelInvitation: async ({ invitation, organization: org }) => {
+        afterCancelInvitation: async ({ invitation, cancelledBy, organization: org }) => {
           await emit(
             EventTypes.ORG_INVITATION_CANCELLED,
             "invitation",
             invitation.id,
-            { organizationId: org.id, invitationId: invitation.id },
+            {
+              organizationId: org.id,
+              actorUserId: cancelledBy.id,
+              invitationId: invitation.id,
+            },
             org.id,
           );
         },

@@ -1,4 +1,4 @@
-import { uuidv7 } from "@packages/ddd-kit";
+import { Option, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   db,
@@ -64,14 +64,14 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     return { items, nextCursor };
   }
 
-  async findById(id: string, organizationId: string): Promise<WebhookDeliveryRecord | null> {
+  async findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>> {
     const [row] = await db
       .select({ d: wd })
       .from(wd)
       .innerJoin(we, eq(wd.endpointId, we.id))
       .where(and(eq(wd.id, id), eq(we.organizationId, organizationId)))
       .limit(1);
-    return row ? toRecord(row.d) : null;
+    return Option.fromNullable(row).map((r) => toRecord(r.d));
   }
 
   async updateStatus(id: string, update: DeliveryUpdate, tx: Transaction): Promise<void> {
@@ -107,10 +107,11 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     deliveryId: string,
     organizationId: string,
     tx?: Transaction,
-  ): Promise<WebhookDeliveryRecord | null> {
+  ): Promise<Option<WebhookDeliveryRecord>> {
     const exec = tx ?? db;
-    const existing = await this.findById(deliveryId, organizationId);
-    if (!existing) return null;
+    const existingOpt = await this.findById(deliveryId, organizationId);
+    if (existingOpt.isNone()) return Option.none();
+    const existing = existingOpt.unwrap();
     const [row] = await exec
       .insert(wd)
       .values({
@@ -125,6 +126,6 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
         idempotencyKey: `replay:${uuidv7()}`,
       })
       .returning();
-    return row ? toRecord(row) : null;
+    return Option.fromNullable(row).map(toRecord);
   }
 }
