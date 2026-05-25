@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/axelhamil/clean-stack/compare/v1.14.5...v1.15.0) (2026-05-25)
+
+### Features
+
+* **audit:** enforce actor identification + runtime payload validation ([ccb3006](https://github.com/axelhamil/clean-stack/commit/ccb3006f4046f56ceb9140f0bb1c275f57fbb74b)), closes [#7](https://github.com/axelhamil/clean-stack/issues/7)
+
 ## [1.14.5](https://github.com/axelhamil/clean-stack/compare/v1.14.4...v1.14.5) (2026-05-20)
 
 ### Refactor
