@@ -1,4 +1,5 @@
 import { createOTP } from "@better-auth/utils/otp";
+import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { and, db, eq, gt, inArray, isNull, like, lte, not, or, schema } from "@packages/drizzle";
 import { symmetricDecrypt, verifyPassword as verifyHash } from "better-auth/crypto";
@@ -51,7 +52,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           and(
             eq(schema.member.userId, userId),
             eq(schema.member.role, "owner"),
-            not(like(schema.organization.slug, "personal-%")),
+            not(like(schema.organization.slug, PERSONAL_ORG_SLUG_LIKE_PATTERN)),
             eq(
               invoker.$count(
                 schema.member,
@@ -284,7 +285,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
                 and(
                   inArray(schema.organization.id, userOrgIds),
                   or(
-                    like(schema.organization.slug, "personal-%"),
+                    like(schema.organization.slug, PERSONAL_ORG_SLUG_LIKE_PATTERN),
                     eq(
                       tx.$count(
                         schema.member,

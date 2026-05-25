@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { isNull } from "drizzle-orm";
 import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export type OutboxEventMetadata = {
@@ -28,7 +28,7 @@ export const outboxEvent = pgTable(
   (table) => [
     index("outbox_event_pending_idx")
       .on(table.nextAttemptAt, table.occurredAt)
-      .where(sql`dispatched_at IS NULL`),
+      .where(isNull(table.dispatchedAt)),
     index("outbox_event_type_idx").on(table.eventType),
     index("outbox_event_aggregate_idx").on(table.aggregateType, table.aggregateId),
   ],

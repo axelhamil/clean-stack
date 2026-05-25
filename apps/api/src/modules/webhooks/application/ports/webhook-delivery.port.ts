@@ -1,3 +1,4 @@
+import type { Option } from "@packages/ddd-kit";
 import type { ITransaction } from "../../../../shared/transaction";
 
 export type WebhookDeliveryStatus = "pending" | "success" | "failed" | "dead_letter";
@@ -37,12 +38,12 @@ export interface IWebhookDeliveryRepository {
   list(
     args: ListDeliveriesArgs,
   ): Promise<{ items: WebhookDeliveryRecord[]; nextCursor: string | null }>;
-  findById(id: string, organizationId: string): Promise<WebhookDeliveryRecord | null>;
+  findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>>;
   updateStatus(id: string, update: DeliveryUpdate, tx: ITransaction): Promise<void>;
   findPendingBatch(limit: number, tx: ITransaction): Promise<WebhookDeliveryRecord[]>;
   enqueueReplay(
     deliveryId: string,
     organizationId: string,
     tx?: ITransaction,
-  ): Promise<WebhookDeliveryRecord | null>;
+  ): Promise<Option<WebhookDeliveryRecord>>;
 }

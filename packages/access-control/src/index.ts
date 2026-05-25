@@ -76,6 +76,9 @@ export const roles = _roles;
  * Encoded by slug pattern (`personal-${uuid}`); the *check* lives here so
  * the rest of the codebase never branches on the discriminator directly.
  */
+export const PERSONAL_ORG_SLUG_PREFIX = "personal-";
+export const PERSONAL_ORG_SLUG_LIKE_PATTERN = `${PERSONAL_ORG_SLUG_PREFIX}%`;
+
 export function isPersonalOrg(slug: string): boolean {
-  return slug.startsWith("personal-");
+  return slug.startsWith(PERSONAL_ORG_SLUG_PREFIX);
 }

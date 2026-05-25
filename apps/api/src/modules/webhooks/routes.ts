@@ -30,6 +30,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const body = c.req.valid("json");
       const result = await di.WebhooksService.createEndpoint({
         organizationId: orgId,
+        actorUserId: c.get("user").id,
         url: body.url,
         eventTypes: body.eventTypes,
         enabled: body.enabled,
@@ -53,10 +54,11 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const result = await di.WebhooksService.updateEndpoint({
         id,
         organizationId: orgId,
+        actorUserId: c.get("user").id,
         ...body,
       });
-      if (!result) throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const { secretCipher: _s, ...rest } = result;
+      if (result.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const { secretCipher: _s, ...rest } = result.unwrap();
       return c.json(rest);
     },
   )
@@ -68,7 +70,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     async (c) => {
       const orgId = c.get("orgId");
       const id = c.req.param("id");
-      const deleted = await di.WebhooksService.deleteEndpoint(id, orgId);
+      const deleted = await di.WebhooksService.deleteEndpoint(id, orgId, c.get("user").id);
       if (!deleted) throw new HTTPException(404, { message: "Webhook endpoint not found" });
       return c.json({ deleted: true });
     },
@@ -83,7 +85,8 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const orgId = c.get("orgId");
       const endpointId = c.req.param("id");
       const endpoint = await di.WebhooksService.findEndpoint(endpointId, orgId);
-      if (!endpoint) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      if (endpoint.isNone())
+        throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const filters = c.req.valid("query");
       const page = await di.WebhooksService.listDeliveries({
         endpointId,
@@ -108,10 +111,12 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const endpointId = c.req.param("id");
       const deliveryId = c.req.param("deliveryId");
       const endpoint = await di.WebhooksService.findEndpoint(endpointId, orgId);
-      if (!endpoint) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      if (endpoint.isNone())
+        throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const replayed = await di.WebhooksService.replayDelivery(deliveryId, orgId);
-      if (!replayed) throw new HTTPException(404, { message: "Webhook delivery not found" });
-      const { payload: _p, ...rest } = replayed;
+      if (replayed.isNone())
+        throw new HTTPException(404, { message: "Webhook delivery not found" });
+      const { payload: _p, ...rest } = replayed.unwrap();
       return c.json(rest, 201);
     },
   );

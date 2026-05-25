@@ -6,9 +6,10 @@ import type { OutboxSubscriber } from "./outbox-subscriber";
 
 function extractActor(event: OutboxRecord): { id: string | null; type: AuditActorType } {
   const p = event.payload as Record<string, unknown> | null | undefined;
-  if (p && typeof p.userId === "string") return { id: p.userId, type: "user" };
   if (p && typeof p.actorUserId === "string") return { id: p.actorUserId, type: "user" };
   if (p && typeof p.inviterUserId === "string") return { id: p.inviterUserId, type: "user" };
+  if (p && typeof p.ownerUserId === "string") return { id: p.ownerUserId, type: "user" };
+  if (p && typeof p.userId === "string") return { id: p.userId, type: "user" };
   return { id: null, type: "system" };
 }
 

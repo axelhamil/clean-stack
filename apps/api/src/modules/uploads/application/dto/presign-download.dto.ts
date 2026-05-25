@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { env } from "../../../../shared/env";
+import { keySchema } from "./_key";
 
 export const presignDownloadBodySchema = z.object({
-  key: z.string().min(1).max(512),
+  key: keySchema,
   expiresInSeconds: z
     .number()
     .int()

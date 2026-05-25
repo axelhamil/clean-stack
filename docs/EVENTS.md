@@ -64,7 +64,8 @@ export const EventTypes = {
 ```ts
 export const OrderPlacedPayload = z.object({
   orderId: z.string(),
-  userId: z.string(),
+  userId: z.string(),       // subject (whose order)
+  actorUserId: z.string(),  // who placed it — REQUIRED when actor ≠ subject (admin places on behalf, system bot, etc.)
   total: z.number().positive(),
 });
 export type OrderPlacedPayload = z.infer<typeof OrderPlacedPayload>;
@@ -72,6 +73,8 @@ export type OrderPlacedPayload = z.infer<typeof OrderPlacedPayload>;
 // don't forget to add it to PayloadByEventType at the bottom
 [EventTypes.ORDER_PLACED]: OrderPlacedPayload,
 ```
+
+> **Actor identification (rule #7 of root CLAUDE.md).** `AuditEventSubscriber.extractActor` scans the payload for the actor in priority order: `actorUserId` → `inviterUserId` → `ownerUserId` → `userId`. **`userId` is the subject, not the actor by default.** When the actor differs from the subject (admin kicks member, system cron processes deletion, owner changes someone else's role), `actorUserId` must be a separate, NOT NULL field. Self-actor flows (sign-in, MFA toggle, self-deletion) can rely on `userId` alone. A row landing in `audit_log` with `actor_type="system"` should be the exception, not a default — the runtime guard at `enqueue` catches a missing/wrong-shape payload, but it can't catch a *semantically* missing actor: that's on the schema author.
 
 **Step 3** — set retention in `packages/events/src/retention-map.ts`:
 
@@ -204,7 +207,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **29 events automatically** (21 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **32 events automatically** (21 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`). Source of truth: `packages/events/src/event-types.ts`.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -237,11 +240,25 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 ### Via UploadService
 - `UPLOAD_REQUESTED` · `UPLOAD_CONFIRMED` · `UPLOAD_DELETED` (payload uses `hashKey(key)` — sha256 truncated, never the raw filename — PII protection)
 
+### Via WebhooksService
+- `WEBHOOK_ENDPOINT_CREATED` · `WEBHOOK_ENDPOINT_UPDATED` · `WEBHOOK_ENDPOINT_DELETED` (payload carries `actorUserId` propagated from the HTTP boundary — `c.get("user").id`)
+
+## Payload validation guarantee
+
+Every `outbox.enqueue(...)` call validates each event against `PayloadByEventType[eventType]` via Zod `safeParse` **before** the INSERT. A failure throws, which rolls back the surrounding TX (UoW or BetterAuth hook). **Why**: the audit trail is only as good as the payloads it stores — a missing `actorUserId`, an extra field, a wrong type silently corrupts compliance. Failing the mutation forces the bug to surface at the call site, atomically (the business write and the bad event are rejected together, never half-applied).
+
+Symptoms when this guard fires:
+- `outbox: unknown event type "X"` — emitter passed an event type not registered in `PayloadByEventType` (forgot step 2 of "How to emit").
+- `outbox: payload validation failed for "X": ...` — payload shape drifted from the Zod schema (typo, missing required field, wrong type). The Zod error message points to the offending key.
+
+The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée — covers `emitEvent(...)` helper and aggregate-driven flushes uniformly).
+
 ## Hard rules
 
 - **`uow.run()` cannot be nested.** Drizzle nested `db.transaction()` opens independent TXs (not savepoints). The `TransactionService.run()` throws if `EventCollector.hasContext()` is already true. Refactor your code to a single outer `uow.run()`.
 - **`addEvent()` outside `uow.run()` = events lost.** The `EventCollector` ALS context is created by `uow.run()`. If you emit events in code that doesn't go through `uow.run()`, they stay on the aggregate buffer and never reach the outbox. A dev-mode warning is logged via `EventCollector.setOutOfContextLogger()` (wired in `apps/api/src/index.ts`).
 - **Built-in subscriber failures roll back the dispatch.** Audit writer or webhook fanout throwing → the entire batch's TX rolls back, events retried at next drain with backoff. Make sure built-in subscribers stay deterministic.
+- **Payloads validated at enqueue.** A payload that doesn't match its Zod schema in `PayloadByEventType` throws inside the outbox `INSERT`, rolling back the surrounding TX. The business write fails with the bad payload — never apply one without the other.
 
 ## Known limitations
 
@@ -257,7 +274,7 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (29 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (32 events) |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |

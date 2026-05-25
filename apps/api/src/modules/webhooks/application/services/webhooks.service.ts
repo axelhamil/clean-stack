@@ -1,6 +1,9 @@
 import { Buffer } from "node:buffer";
-import { type AppError, type IUnitOfWork, Result, uuidv7 } from "@packages/ddd-kit";
+import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
+import { emitEvent } from "../../../../shared/event-emitter";
+import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
   IWebhookDeliveryRepository,
@@ -9,43 +12,47 @@ import type {
 import type {
   IWebhookEndpointRepository,
   WebhookEndpointRecord,
+  WebhookRepoError,
 } from "../ports/webhook-endpoint.port";
 
 export type WebhookSecretGenerator = () => string;
-export type MasterKeyProvider = () => Uint8Array | null;
+export type MasterKeyProvider = () => Option<Uint8Array>;
 
 export type WebhookConfigError = AppError<"WEBHOOK_MASTER_KEY_UNAVAILABLE">;
+export type WebhookServiceError = WebhookConfigError | WebhookRepoError;
 
 export class WebhooksService {
   constructor(
     private readonly endpoints: IWebhookEndpointRepository,
     private readonly deliveries: IWebhookDeliveryRepository,
     private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly outbox: IOutboxRepository,
     private readonly masterKey: MasterKeyProvider,
     private readonly secretGen: WebhookSecretGenerator = defaultSecretGenerator,
   ) {}
 
   async createEndpoint(args: {
     organizationId: string;
+    actorUserId: string;
     url: string;
     eventTypes: string[];
     enabled: boolean;
   }): Promise<
-    Result<{ endpoint: WebhookEndpointRecord; plaintextSecret: string }, WebhookConfigError>
+    Result<{ endpoint: WebhookEndpointRecord; plaintextSecret: string }, WebhookServiceError>
   > {
-    const masterKey = this.masterKey();
-    if (!masterKey) {
+    const masterKeyOpt = this.masterKey();
+    if (masterKeyOpt.isNone()) {
       return Result.fail({
         code: "WEBHOOK_MASTER_KEY_UNAVAILABLE",
         message: "WEBHOOK_MASTER_KEY env var is not configured (64 hex chars)",
       });
     }
-    const subKey = deriveOrgSubKey(masterKey, args.organizationId);
+    const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), args.organizationId);
     const plaintextSecret = this.secretGen();
     const secretCipher = encryptSecret(plaintextSecret, subKey);
 
-    const endpoint = await this.uow.run(async (tx) =>
-      this.endpoints.create(
+    const created = await this.uow.run(async (tx) => {
+      const result = await this.endpoints.create(
         {
           id: uuidv7(),
           organizationId: args.organizationId,
@@ -55,31 +62,87 @@ export class WebhooksService {
           enabled: args.enabled,
         },
         tx,
-      ),
-    );
+      );
+      if (result.isFailure) return result;
+      const endpoint = result.getValue();
+      await emitEvent(
+        this.outbox,
+        EventTypes.WEBHOOK_ENDPOINT_CREATED,
+        "webhook_endpoint",
+        endpoint.id,
+        {
+          organizationId: endpoint.organizationId,
+          actorUserId: args.actorUserId,
+          endpointId: endpoint.id,
+          url: endpoint.url,
+          eventTypes: endpoint.eventTypes,
+          enabled: endpoint.enabled,
+        },
+        { organizationId: endpoint.organizationId },
+        tx,
+      );
+      return result;
+    });
+    if (created.isFailure) return Result.fail(created.getError());
 
-    return Result.ok({ endpoint, plaintextSecret });
+    return Result.ok({ endpoint: created.getValue(), plaintextSecret });
   }
 
   async updateEndpoint(args: {
     id: string;
     organizationId: string;
+    actorUserId: string;
     url?: string;
     eventTypes?: string[];
     enabled?: boolean;
-  }): Promise<WebhookEndpointRecord | null> {
-    return this.uow.run(async (tx) => this.endpoints.update(args, tx));
+  }): Promise<Option<WebhookEndpointRecord>> {
+    return this.uow.run(async (tx) => {
+      const updated = await this.endpoints.update(args, tx);
+      if (updated.isNone()) return updated;
+      const changes: Record<string, unknown> = {};
+      if (args.url !== undefined) changes.url = args.url;
+      if (args.eventTypes !== undefined) changes.eventTypes = args.eventTypes;
+      if (args.enabled !== undefined) changes.enabled = args.enabled;
+      await emitEvent(
+        this.outbox,
+        EventTypes.WEBHOOK_ENDPOINT_UPDATED,
+        "webhook_endpoint",
+        args.id,
+        {
+          organizationId: args.organizationId,
+          actorUserId: args.actorUserId,
+          endpointId: args.id,
+          changes,
+        },
+        { organizationId: args.organizationId },
+        tx,
+      );
+      return updated;
+    });
   }
 
-  async deleteEndpoint(id: string, organizationId: string): Promise<boolean> {
-    return this.uow.run(async (tx) => this.endpoints.delete(id, organizationId, tx));
+  async deleteEndpoint(id: string, organizationId: string, actorUserId: string): Promise<boolean> {
+    return this.uow.run(async (tx) => {
+      const deleted = await this.endpoints.delete(id, organizationId, tx);
+      if (!deleted) return false;
+      await emitEvent(
+        this.outbox,
+        EventTypes.WEBHOOK_ENDPOINT_DELETED,
+        "webhook_endpoint",
+        id,
+        { organizationId, actorUserId, endpointId: id },
+        { organizationId },
+        tx,
+      );
+      return true;
+    });
   }
 
   async listEndpoints(organizationId: string): Promise<WebhookEndpointRecord[]> {
     return this.endpoints.listByOrg(organizationId);
   }
 
-  async findEndpoint(id: string, organizationId: string): Promise<WebhookEndpointRecord | null> {
+  async findEndpoint(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>> {
     return this.endpoints.findById(id, organizationId);
   }
 
@@ -96,7 +159,7 @@ export class WebhooksService {
   async replayDelivery(
     deliveryId: string,
     organizationId: string,
-  ): Promise<WebhookDeliveryRecord | null> {
+  ): Promise<Option<WebhookDeliveryRecord>> {
     return this.uow.run(async (tx) =>
       this.deliveries.enqueueReplay(deliveryId, organizationId, tx),
     );
@@ -110,11 +173,11 @@ function defaultSecretGenerator(): string {
 }
 
 export function masterKeyProvider(hex: string | undefined): MasterKeyProvider {
-  if (!hex) return () => null;
-  let cached: Uint8Array | null = null;
+  if (!hex) return () => Option.none();
+  let cached: Option<Uint8Array> | null = null;
   return () => {
     if (cached) return cached;
-    cached = masterKeyFromHex(hex);
+    cached = Option.some(masterKeyFromHex(hex));
     return cached;
   };
 }

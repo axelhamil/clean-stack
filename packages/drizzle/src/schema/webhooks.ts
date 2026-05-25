@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { inArray, relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -60,7 +60,7 @@ export const webhookDelivery = pgTable(
     uniqueIndex("webhook_delivery_idempotency_uidx").on(table.idempotencyKey),
     index("webhook_delivery_pending_idx")
       .on(table.nextAttemptAt)
-      .where(sql`status IN ('pending', 'failed')`),
+      .where(inArray(table.status, ["pending", "failed"])),
     index("webhook_delivery_endpoint_idx").on(table.endpointId),
     index("webhook_delivery_event_idx").on(table.outboxEventId),
   ],
