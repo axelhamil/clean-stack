@@ -5,13 +5,15 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
 import { di } from "./container";
-import { auditLogInternalRoutes } from "./modules/audit-log/internal.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { env } from "./shared/env";
+import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
+import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
+import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
 import {
   type AuthVariables,
@@ -45,7 +47,9 @@ app.use("*", sessionMiddleware);
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/internal", rgpdInternalRoutes);
-app.route("/internal", auditLogInternalRoutes);
+app.route("/internal", sweepOutboxRoutes);
+app.route("/internal", sweepAuditLogRoutes);
+app.route("/internal", sweepWebhookDeliveryRoutes);
 
 const routes = app
   .get("/health", (c) => c.json({ status: "ok" as const }))

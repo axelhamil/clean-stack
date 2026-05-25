@@ -56,6 +56,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "true"),
+  OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+  AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
 });
 
 const rawEnv = Object.fromEntries(

@@ -157,12 +157,11 @@ lockstep with the verifier.
 
 Same `internalLayers` (HMAC + optional private network) gate, same `signedInternalFetch` pattern from your scheduler.
 
-### `POST /internal/audit-log-purge` — sweep operational audit rows
+### `POST /internal/sweep-{outbox,audit-log,webhook-delivery}` — retention sweeps
 
-Purges audit log entries with `retention='operational'` older than N days. `retention='compliance'` rows are immutable (7 years).
+Three endpoints purge the derived tables of the event pipeline. Defaults: outbox 7d, audit_log operational 90d / compliance 365d, webhook_delivery 30d (`success` + `dead_letter` only — `pending`/`failed` never purged). All take `{ batchSize?: 1–50000, dryRun?: boolean }`.
 
-Body: `{ olderThanDays?: number, dryRun?: boolean }` (default 90 days, dryRun off). Response: `{ deleted: number, dryRun: boolean, cutoff: <ISO> }`.
+Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix, env knobs, and a full GitHub Actions recipe.
 
-Schedule: daily at 3:30 (avoid overlap with RGPD sweep). Same scheduler patterns (Railway/Fly/GitHub Actions/Kubernetes/Inngest) as `/internal/rgpd-sweep` above.
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken — fix that, not the window.

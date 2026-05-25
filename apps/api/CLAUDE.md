@@ -105,7 +105,11 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 `organizationHooks` (org plugin) covers all org/member/invitation events.
 
-**Hard rules**: `uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints — guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning logged via `EventCollector.setOutOfContextLogger`). See `docs/EVENTS.md` for full spec.
+**Hard rules**: `uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints — guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning logged via `EventCollector.setOutOfContextLogger`).
+
+**Retention**: derived pipeline tables (`outbox_event`, `audit_log`, `webhook_delivery`) grow unbounded — purged by HMAC-gated `/internal/sweep-*` routes (`shared/internal-routes/sweep-*.route.ts`), driven by env knobs `OUTBOX_RETENTION_DAYS` / `AUDIT_LOG_{OPERATIONAL,COMPLIANCE}_RETENTION_DAYS` / `WEBHOOK_DELIVERY_RETENTION_DAYS`. Triggered by external cron in strict order (FK `ON DELETE RESTRICT`): webhook → audit → outbox. The sweep itself emits no event (rule §6 exception — see `/CLAUDE.md`).
+
+See `docs/EVENTS.md` for full spec, retention matrix, and cron recipe.
 
 ## Organization scoping (server)
 

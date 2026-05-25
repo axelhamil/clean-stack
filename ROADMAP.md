@@ -18,7 +18,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | App shell + ⌘K palette | — | top-nav, contextual settings tabs, view-transitions theme, command palette |
 | Vertical-slice layout (front + back) | — | features/<x>/<x>.{route,page}.tsx + modules/<x>/{application,infrastructure,routes,module}.ts |
 | Clone-ability bootstrap (`pnpm bootstrap` + Docker compose v2 + Linux fixes + source-only packages) | May 2026 | `pnpm bootstrap` script, SeaweedFS profile `storage`, db:push --force, internal packages source-only |
-| **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 29 events emitted automatically (21 BetterAuth bridge + 5 RGPD + 3 uploads) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry). See dedicated section below + [`docs/EVENTS.md`](docs/EVENTS.md) (DX guide) + [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) (visual walkthrough). |
+| **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 29 events emitted automatically (21 BetterAuth bridge + 5 RGPD + 3 uploads) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry) + retention sweeps (3 `/internal/sweep-*` routes, SOTA 2026 defaults). See dedicated section below + [`docs/EVENTS.md`](docs/EVENTS.md) (DX guide + retention matrix) + [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) (visual walkthrough). |
 
 ---
 
@@ -36,7 +36,7 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 | 0.3 | Backups `pg_dump` + restore tested (3-2-1 rule, 30d retention, monthly automated restore-test) | TODO — RPO/RTO in `docs/DISASTER-RECOVERY.md` |
 | 0.4 | Sentry + OpenTelemetry + Prometheus `/metrics` (3 detachable ports + NoOp default) | TODO — subscribers now trivial via `onEvent` (event-driven foundation) |
 | 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
-| 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | TODO — see expanded scope below |
+| 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | DONE — 3 routes `/internal/sweep-*`, SOTA 2026 defaults, GH Actions recipe in `docs/EVENTS.md` |
 
 #### 0.6 — Retention sweeps (cleanup the event-driven foundation)
 
@@ -44,12 +44,12 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 
 **Pattern**: reuse the `rgpd.service.processPendingDeletions` shape — internal route gated by `internalLayers` (HMAC), callable from any external cron (Vercel Cron / GitHub Actions / Inngest). One route per sweep, idempotent, dry-run friendly.
 
-- [ ] **`POST /internal/sweep-outbox`** — `DELETE FROM outbox_event WHERE dispatched_at IS NOT NULL AND dispatched_at < now() - interval '<OUTBOX_RETENTION_DAYS>'` (default 7 days, env-configurable). Batch with `LIMIT` to avoid long-running TX. Logs `{ deleted: N }`. Trigger: hourly.
-- [ ] **`POST /internal/sweep-audit-log`** — per-retention enforcement. For each `retention` value in the catalog (`30d`, `1y`, `7y`, `none`), `DELETE FROM audit_log WHERE retention = '<X>' AND occurred_at < now() - <duration>`. Rows with `retention = 'none'` purged aggressively (e.g. 7d operational window). Batched, idempotent. Trigger: daily.
-- [ ] **`POST /internal/sweep-webhook-delivery`** — `DELETE FROM webhook_delivery WHERE status IN ('success','dead_letter') AND created_at < now() - interval '<WEBHOOK_DELIVERY_RETENTION_DAYS>'` (default 30 days). Pending/failed rows kept for retry. Trigger: daily.
-- [ ] **Env knobs**: `OUTBOX_RETENTION_DAYS=7`, `WEBHOOK_DELIVERY_RETENTION_DAYS=30`, `AUDIT_LOG_NONE_RETENTION_DAYS=7` — defaults sane, all overridable per deployment.
-- [ ] **Docs**: `docs/EVENTS.md` § Retention — explain who consumes which column (`retention` in audit_log → audit sweep; nothing in outbox → uniform global sweep) + the cron registration recipe.
-- [ ] **Optional dry-run mode**: `?dryRun=true` returns the rowcount that *would* be deleted, no mutation. Reuses the existing RGPD pattern.
+- [x] **`POST /internal/sweep-outbox`** — `DELETE FROM outbox_event WHERE dispatched_at IS NOT NULL AND dispatched_at < now() - interval '<OUTBOX_RETENTION_DAYS>'` (default **7 days** — NServiceBus / industry consensus debug window). Batched (5000 rows / iter, `FOR UPDATE SKIP LOCKED`), idempotent.
+- [x] **`POST /internal/sweep-audit-log`** — iterates over the two real retention buckets in `RETENTION_MAP` (`operational` 90d / `compliance` 365d, env-configurable). `retention = 'none'` rows never reach the DB — `AuditEventSubscriber` skips uncatalogued events.
+- [x] **`POST /internal/sweep-webhook-delivery`** — `DELETE FROM webhook_delivery WHERE status IN ('success','dead_letter') AND created_at < now() - interval '<WEBHOOK_DELIVERY_RETENTION_DAYS>'` (default **30 days** — Stripe/GitHub/Hookdeck convergence). `pending`/`failed` rows never purged (worker-death signal / active retry).
+- [x] **Env knobs**: `OUTBOX_RETENTION_DAYS=7`, `WEBHOOK_DELIVERY_RETENTION_DAYS=30`, `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS=90`, `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS=365` (SOC2 ≥ 12 months baseline). All in `apps/api/src/shared/env.ts` + `.env.example`.
+- [x] **Docs**: `docs/EVENTS.md` § Retention — matrix (table / knob / default / filter / conformance source), order-matters note (FK RESTRICT: webhook → audit → outbox), GitHub Actions cron recipe via `signedInternalFetch`. Legacy `/internal/audit-log-purge` removed — superset coverage by `sweep-audit-log`.
+- [x] **Dry-run mode**: body `{ dryRun: true }` returns the rowcount that *would* be deleted, no mutation. Same pattern as RGPD sweep.
 
 **Decisor "global vs per-row retention"**: outbox uses a **uniform global policy** (every dispatched row is jetable after the same window — debug window only); audit_log uses **per-row policy** via the column (compliance demands differ per event type). Don't generalize one shape onto the other.
 
@@ -815,7 +815,7 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 - [x] **Phase-1 audited actions** — auto-emitted from BetterAuth hooks (`user.created`, `user.signed_in`, `user.account.linked`, `org.*`, `org.member.*`, `org.invitation.*`) + RGPD service (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`) + uploads service (`upload.{requested,confirmed,deleted}`) + webhooks service (`webhook.endpoint.{created,updated,deleted}`). Catalog declared in `packages/events/src/event-types.ts` (32 events).
 - [x] **Actor identification** (rule #7 of `/CLAUDE.md`) — every state-change payload carries the user who triggered it under a recognized key (`actorUserId` canonical when actor ≠ subject, `inviterUserId`/`ownerUserId`/`userId` for self-actor flows). `actor_type="system"` is the explicit exception (cron, cascade), not a silent default.
 - [x] **Runtime payload validation at outbox enqueue** — `DrizzleOutboxRepository.enqueue` parses each event against `PayloadByEventType[eventType]` via Zod `safeParse` and throws on mismatch, rolling back the surrounding TX. Catches missing required fields (e.g. `actorUserId`), wrong types, and unknown event types at the call site — before the row lands in `outbox_event` and before any side effect (audit_log, webhook_delivery).
-- [x] **Retention** driven by `retention` enum column (`operational` 90d / `compliance` 7y) — mapping in `packages/events/src/retention-map.ts`. Cron `POST /internal/audit-log-purge` sweeps expired `operational` rows.
+- [x] **Retention** driven by `retention` enum column (`operational` 90d / `compliance` 365d) — mapping in `packages/events/src/retention-map.ts`. Cron `POST /internal/sweep-audit-log` sweeps both buckets per env knobs (see Phase 0.6).
 - [x] Indexes: `(actorId, occurredAt DESC)`, `(targetType, targetId)`, `(action, occurredAt DESC)`, `(organizationId, occurredAt DESC)`, `(retention, occurredAt)` cover the main read paths + purge.
 - [ ] Page `/admin/audit-log` (admin only, gated by `_admin.tsx`) with filters (actor, action, target, range). Each row expandable to show `metadata` diff. **API ready** — `GET /admin/audit-log` (gated `requireOrgPermission({ auditLog: ["read"] })`).
 - [ ] **Tamper-evidence (deferred phase 2)** — `prevHash`/`hash` columns posed in schema; calculation off behind `AUDIT_TAMPER_EVIDENCE=false` env flag. Promote when SOC2 audit demands it (rule 14).

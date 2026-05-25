@@ -40,5 +40,4 @@ export type AuditPage = {
 export interface IAuditPort {
   record(entry: AuditEntry, tx?: ITransaction): Promise<AuditRecord>;
   list(filters: AuditFilters, tx?: ITransaction): Promise<AuditPage>;
-  purgeOperationalOlderThan(cutoff: Date, tx?: ITransaction): Promise<number>;
 }

@@ -162,6 +162,78 @@ If your event is in `RETENTION_MAP` with `operational` or `compliance`:
 
 > **Multi-tenant safety**: events with `organizationId = null` (platform-level: `user.created`, `user.signed_in`, etc.) **skip webhook fanout entirely** — never broadcast across tenants.
 
+## Retention
+
+Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC), called by an external cron via `signedInternalFetch`. Defaults reflect SOTA 2026 research, configurable via env knobs.
+
+| Table | Knob | Default | Filter | Conformance source |
+|---|---|---|---|---|
+| `outbox_event` | `OUTBOX_RETENTION_DAYS` | **7d** | `dispatched_at IS NOT NULL AND dispatched_at < cutoff` | NServiceBus / industry consensus 2025 — debug window |
+| `audit_log` (operational) | `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS` | **90d** | `retention = 'operational' AND occurred_at < cutoff` | SOC2 minimum-safe (operational logs); RGPD minimisation |
+| `audit_log` (compliance) | `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS` | **365d** | `retention = 'compliance' AND occurred_at < cutoff` | SOC2 Type II ≥ 12 months; PCI-DSS 10.7; NIS2 baseline |
+| `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` | Stripe / GitHub / Hookdeck convergence |
+
+Notes:
+- **`pending` and `failed` webhook deliveries are NEVER purged automatically** — they signal worker death or active retry. A `pending` row stale > 24h must page on-call, not be cleaned up.
+- **`retention = 'none'`** rows never reach the DB. `AuditEventSubscriber` returns early when `retentionFor(eventType) === "none"` — uncatalogued events are never written.
+
+### Endpoints
+
+- `POST /internal/sweep-outbox` — body `{ batchSize?: 1–50000 (default 5000), dryRun?: boolean }` → `{ deleted, durationMs, dryRun, batchCount }`
+- `POST /internal/sweep-audit-log` — same body → `{ deletedPerBucket: { operational, compliance }, durationMs, dryRun }`
+- `POST /internal/sweep-webhook-delivery` — same body → `{ deleted, durationMs, dryRun, batchCount }`
+
+Each endpoint runs a batched `DELETE ... WHERE id IN (SELECT id ... ORDER BY <ts> LIMIT N FOR UPDATE SKIP LOCKED)` inside a transaction with `SET LOCAL statement_timeout = '5s'`, `lock_timeout = '500ms'`, `idle_in_transaction_session_timeout = '10s'`. Loops until 0 rows; hard-capped at 1000 batches per call.
+
+### Order matters (FK constraint)
+
+`webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`. The cron must run sweeps in this order:
+
+1. `POST /internal/sweep-webhook-delivery` — frees terminal deliveries
+2. `POST /internal/sweep-audit-log` — independent
+3. `POST /internal/sweep-outbox` — last, otherwise `outbox_event` rows still referenced by undeleted deliveries trigger an FK violation
+
+### Cron recipe (GitHub Actions example)
+
+```yaml
+# .github/workflows/sweep.yml
+name: nightly retention sweep
+on:
+  schedule:
+    - cron: "17 3 * * *"  # 03:17 UTC daily, off-peak
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun run scripts/sweep.ts
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          INTERNAL_SIGNING_KEY: ${{ secrets.INTERNAL_SIGNING_KEY }}
+```
+
+```ts
+// scripts/sweep.ts — invokes the three sweeps in order via signedInternalFetch
+import { signedInternalFetch } from "../apps/api/src/shared/internal-routes/internal-fetch";
+
+const base = process.env.API_URL!;
+const key = process.env.INTERNAL_SIGNING_KEY!;
+const body = JSON.stringify({ dryRun: false });
+
+for (const path of [
+  "/internal/sweep-webhook-delivery",
+  "/internal/sweep-audit-log",
+  "/internal/sweep-outbox",
+]) {
+  const res = await signedInternalFetch(`${base}${path}`, { method: "POST", body }, key);
+  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  console.log(path, await res.json());
+}
+```
+
+For Vercel Cron, expose `/api/cron/sweep` that does the same chain server-side and protect it with `Authorization: Bearer ${CRON_SECRET}` per Vercel's pattern; the route then calls `signedInternalFetch` internally.
+
 ## Setup checklist post-clone
 
 1. Tables (`outbox_event`, `audit_log`, `webhook_endpoint`, `webhook_delivery`) are created automatically — the api runs `drizzle migrate` at boot before `OutboxDispatcher.start()` (`apps/api/src/migrate.ts`). In native dev, `pnpm db:migrate` once before `pnpm dev` if you skipped Docker.
@@ -172,7 +244,7 @@ If your event is in `RETENTION_MAP` with `operational` or `compliance`:
 ## Operational endpoints
 
 - `GET /admin/audit-log` — list audit events for active org. Permission: `auditLog: ["read"]`. `organizationId` always derived from session, never query string.
-- `POST /internal/audit-log-purge` — sweep `operational` rows older than N days. Body: `{ olderThanDays?: number, dryRun?: boolean }`. Internal-gated (HMAC signature + optional private network).
+- `POST /internal/sweep-{outbox,audit-log,webhook-delivery}` — retention sweeps (see § Retention above). Internal-gated (HMAC signature + optional private network).
 - `GET/POST/PATCH/DELETE /settings/webhooks` — manage endpoints. Permission: `webhooks: ["read"|"write"]`. Plaintext secret returned **once at creation** (Stripe-style), never re-exposed.
 - `GET /settings/webhooks/:id/deliveries` — list deliveries with status filter (`?status=pending|success|failed|dead_letter`).
 - `POST /settings/webhooks/:id/deliveries/:deliveryId/replay` — re-enqueue a past delivery with fresh idempotency key.

@@ -100,13 +100,4 @@ export class DrizzleAuditRepository implements IAuditPort {
     const nextCursor = hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null;
     return { items, nextCursor };
   }
-
-  async purgeOperationalOlderThan(cutoff: Date, tx?: Transaction): Promise<number> {
-    const exec = tx ?? db;
-    const al = auditLogSchema.auditLog;
-    const result = await exec
-      .delete(al)
-      .where(and(eq(al.retention, "operational"), lt(al.occurredAt, cutoff)));
-    return result.rowCount ?? 0;
-  }
 }
