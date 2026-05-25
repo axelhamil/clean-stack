@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     command: server -s3 -dir=/data
     ports:
-      - "8333"
+      - "8333:8333"
     volumes:
       - seaweedfs_data:/data
     healthcheck:
@@ -63,7 +63,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/livez"]
       interval: 30s
       timeout: 3s
       start_period: 20s
