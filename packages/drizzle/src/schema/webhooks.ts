@@ -9,7 +9,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { organization } from "./auth";
+import { organization } from "./multi-tenant";
 import { outboxEvent } from "./outbox";
 
 export const WEBHOOK_DELIVERY_STATUSES = ["pending", "success", "failed", "dead_letter"] as const;

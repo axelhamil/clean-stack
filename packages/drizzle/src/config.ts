@@ -4,11 +4,13 @@ import type { ExtractTablesWithRelations } from "drizzle-orm/relations";
 import { Pool } from "pg";
 import * as auditLogSchema from "./schema/audit-log";
 import * as authSchema from "./schema/auth";
+import * as multiTenantSchema from "./schema/multi-tenant";
 import * as outboxSchema from "./schema/outbox";
 import * as webhooksSchema from "./schema/webhooks";
 
 const schema = {
   ...authSchema,
+  ...multiTenantSchema,
   ...outboxSchema,
   ...auditLogSchema,
   ...webhooksSchema,
