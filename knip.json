@@ -14,7 +14,11 @@
       "ignoreDependencies": ["pino-pretty"]
     },
     "apps/app": {
-      "entry": ["src/shared/api/api-client.ts", "src/shared/api/mutations/*.ts"],
+      "entry": [
+        "src/shared/api/api-client.ts",
+        "src/shared/api/mutations/*.ts",
+        "src/shared/api/queries/*.ts"
+      ],
       "project": ["**/*.ts", "**/*.tsx"]
     },
     "packages/ddd-kit": {
@@ -36,7 +40,6 @@
     }
   },
   "ignoreDependencies": [
-    "@packages/ddd-kit",
     "@packages/test",
     "@packages/typescript-config",
     "lint-staged",

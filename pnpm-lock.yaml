@@ -141,9 +141,6 @@ importers:
       '@packages/access-control':
         specifier: workspace:*
         version: link:../../packages/access-control
-      '@packages/ddd-kit':
-        specifier: workspace:*
-        version: link:../../packages/ddd-kit
       '@packages/ui':
         specifier: workspace:*
         version: link:../../packages/ui

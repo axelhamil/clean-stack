@@ -8,13 +8,11 @@ export function TwoFactorPage() {
   const { redirect } = route.useSearch();
 
   return (
-    <main>
-      <AuthShell
-        title="Two-factor authentication"
-        description="Enter the 6-digit code from your authenticator app."
-      >
-        <TwoFactorForm redirectTo={redirect} />
-      </AuthShell>
-    </main>
+    <AuthShell
+      title="Two-factor authentication"
+      description="Enter the 6-digit code from your authenticator app."
+    >
+      <TwoFactorForm redirectTo={redirect} />
+    </AuthShell>
   );
 }

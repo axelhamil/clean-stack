@@ -49,5 +49,5 @@ Anatomy (only create sub-folders that earn their place):
 - Husky / lint-staged / commit-msg / pre-push / `pnpm ci:check` must run **clean** before pushing — no warnings, no errors.
 - Never bypass with `--no-verify`. If a Biome warning is genuinely intentional (a11y `!important`, regex with intentional duplication, etc.), silence it with a targeted ignore + reason: `/* biome-ignore <rule>: <why> */`. Never disable rules globally.
 
-May import from: `router/layouts`, `shared/`, `@packages/ui`, `@packages/ddd-kit`, `features/<library-feature>/` (route-owning features only).
+May import from: `router/layouts`, `shared/`, `@packages/ui`, `features/<library-feature>/` (route-owning features only).
 Must NOT import from: other route-owning `features/`, `router.tsx`.

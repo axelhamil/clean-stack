@@ -22,7 +22,7 @@ interface AuthShellProps {
 
 export function AuthShell({ title, description, children, footer, className }: AuthShellProps) {
   return (
-    <div className="relative flex min-h-dvh items-center justify-center">
+    <main className="relative flex min-h-dvh items-center justify-center">
       <ThemeToggle className="absolute top-4 right-4" />
 
       <Card className="w-full max-w-sm">
@@ -36,7 +36,7 @@ export function AuthShell({ title, description, children, footer, className }: A
 
         {footer && <CardFooter>{footer}</CardFooter>}
       </Card>
-    </div>
+    </main>
   );
 }
 

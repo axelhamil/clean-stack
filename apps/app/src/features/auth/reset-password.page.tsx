@@ -9,19 +9,17 @@ export function ResetPasswordPage() {
   if (!token) return null;
 
   return (
-    <main>
-      <AuthShell
-        title="Set a new password"
-        description="Choose a new password for your account."
-        footer={
-          <AuthShellFooter
-            lead="Changed your mind?"
-            link={<Link to="/sign-in">Back to sign in</Link>}
-          />
-        }
-      >
-        <ResetPasswordForm token={token} />
-      </AuthShell>
-    </main>
+    <AuthShell
+      title="Set a new password"
+      description="Choose a new password for your account."
+      footer={
+        <AuthShellFooter
+          lead="Changed your mind?"
+          link={<Link to="/sign-in">Back to sign in</Link>}
+        />
+      }
+    >
+      <ResetPasswordForm token={token} />
+    </AuthShell>
   );
 }

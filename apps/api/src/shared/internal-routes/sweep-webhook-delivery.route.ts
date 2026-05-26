@@ -3,24 +3,12 @@
 import { and, db, inArray, lt, sql, webhooksSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
-import { z } from "zod";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
-
-const MAX_BATCHES = 1000;
-const INTER_BATCH_SLEEP_MS = 50;
-
-const sweepWebhookDeliveryBodySchema = z
-  .object({
-    batchSize: z.number().int().min(1).max(50000).optional(),
-    dryRun: z.boolean().optional(),
-  })
-  .default({});
-
-type SweepWebhookDeliveryBody = z.infer<typeof sweepWebhookDeliveryBodySchema>;
 
 const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
 
@@ -56,54 +44,14 @@ async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
 
 export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
-  .post("/sweep-webhook-delivery", zV("json", sweepWebhookDeliveryBodySchema), async (c) => {
-    const body = c.req.valid("json") as SweepWebhookDeliveryBody;
-    const batchSize = body.batchSize ?? 5000;
-    const dryRun = body.dryRun ?? false;
-    const retentionDays = env.WEBHOOK_DELIVERY_RETENTION_DAYS;
-    const logger = c.var.logger;
-
-    logger.info({ retentionDays, batchSize, dryRun }, "sweep-webhook-delivery started");
-
-    const startMs = Date.now();
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-
-    if (dryRun) {
-      const deleted = await countEligible(cutoff);
-      const durationMs = Date.now() - startMs;
-      logger.info({ deleted, durationMs, batchCount: 0, dryRun }, "sweep-webhook-delivery done");
-      return c.json({ deleted, durationMs, dryRun, batchCount: 0 });
-    }
-
-    let totalDeleted = 0;
-    let batchCount = 0;
-
-    while (batchCount < MAX_BATCHES) {
-      const deletedInBatch = await purgeBatch(cutoff, batchSize);
-
-      totalDeleted += deletedInBatch;
-      batchCount++;
-
-      if (deletedInBatch === 0) break;
-
-      if (batchCount < MAX_BATCHES) {
-        // biome-ignore lint/correctness/noUndeclaredVariables: Bun global available at runtime
-        await Bun.sleep(INTER_BATCH_SLEEP_MS);
-      }
-    }
-
-    if (batchCount >= MAX_BATCHES) {
-      logger.warn(
-        { batchCount: MAX_BATCHES },
-        "sweep-webhook-delivery hit batch cap — stopping early",
-      );
-    }
-
-    const durationMs = Date.now() - startMs;
-    logger.info(
-      { deleted: totalDeleted, durationMs, batchCount, dryRun },
-      "sweep-webhook-delivery done",
-    );
-
-    return c.json({ deleted: totalDeleted, durationMs, dryRun, batchCount });
+  .post("/sweep-webhook-delivery", zV("json", sweepBodySchema), async (c) => {
+    const response = await runRetentionSweep({
+      body: c.req.valid("json") as SweepBody,
+      retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
+      purgeBatch,
+      countEligible,
+      logger: c.var.logger,
+      label: "sweep-webhook-delivery",
+    });
+    return c.json(response);
   });

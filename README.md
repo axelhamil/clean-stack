@@ -5,19 +5,13 @@
 **The SaaS boilerplate that says no.**
 Auth, multi-tenant, email, storage already wired. You clone, you write business logic — everything else is settled.
 
-[![Bun](https://img.shields.io/badge/Bun-1.3+-black?logo=bun&logoColor=white)](https://bun.com)
-[![Node](https://img.shields.io/badge/Node-24+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Postgres](https://img.shields.io/badge/Postgres-17-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![semantic-release](https://img.shields.io/badge/release-conventional-e10079?logo=semantic-release&logoColor=white)](https://github.com/semantic-release/semantic-release)
-
 **Bun + Hono** API · **Vite + React 19 + TanStack** app · **Drizzle + Postgres** · DDD-kit for the domain · BetterAuth + Resend + R2 for the SaaS layer.
 
 </div>
 
 ---
 
-> **Status — work in progress.** This boilerplate is under active iteration. No support guarantee, no SLA on issues. Setup issues are accepted only with (a) a fresh-clone repro following [Quick start](#quick-start) step-by-step, and (b) the output of `pnpm -v && bun -v && docker compose version`. Reports missing either will be closed without comment. Bug reports — with a minimal repro, expected vs. actual behavior, and the same tooling-version dump — are very welcome.
+> **Status — work in progress.** This boilerplate is under active iteration. No support, no SLA, no public issue queue.
 
 ---
 
@@ -121,7 +115,7 @@ Object storage for uploads. **Off by default** — the `storage` profile is opt-
 |---|---|
 | **Dev image** | [`chrislusf/seaweedfs`](https://github.com/seaweedfs/seaweedfs) — Apache 2.0, ~96 MB ([why not MinIO?](https://docs.docker.com/blog/minio-archived/)) |
 | **Compose profile** | `storage` (off by default) |
-| **Host port** | randomized by Docker (`ports: ["8333"]` — avoids collision with whatever is on `:9000`) |
+| **Host port** | pinned to `8333` (`ports: ["8333:8333"]`) |
 | **In-network** | `seaweedfs:8333` (set as `S3_ENDPOINT` for the api) |
 | **Bucket** | `clean-stack` — auto-created on startup by the `seaweedfs-init` sidecar |
 | **Auth** | none required in dev — accepts any access key / secret |
@@ -129,7 +123,6 @@ Object storage for uploads. **Off by default** — the `storage` profile is opt-
 
 ```bash
 docker compose --profile storage up -d         # start SeaweedFS + bucket init
-docker compose port seaweedfs 8333             # find the random host port
 ```
 
 The S3 client is provider-agnostic ([`region: "auto"`, `forcePathStyle: true`](https://orm.drizzle.team/docs)). Anything S3-compatible works: R2, AWS S3, Backblaze B2, Wasabi, Scaleway, Tigris.
@@ -152,7 +145,7 @@ Resend is **optional in dev** — without `RESEND_API_KEY`, email sends are logg
 | `postgres` | `postgres:17-alpine` | `5433` | default | `postgres_data` |
 | `api` | built (`apps/api/dev.Dockerfile`) | `3000` | default | — |
 | `app` | built (`apps/app/dev.Dockerfile`) | `5173` | default | — |
-| `seaweedfs` | `chrislusf/seaweedfs` | random (`8333` internal) | `storage` | `seaweedfs_data` |
+| `seaweedfs` | `chrislusf/seaweedfs` | `8333` | `storage` | `seaweedfs_data` |
 | `seaweedfs-init` | `chrislusf/seaweedfs` | — | `storage` | — |
 
 ---

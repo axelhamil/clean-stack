@@ -4,24 +4,12 @@ import type { AuditRetention } from "@packages/drizzle";
 import { and, auditLogSchema, db, eq, inArray, lt, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
-import { z } from "zod";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { runBatchedSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
-
-const MAX_BATCHES = 1000;
-const INTER_BATCH_SLEEP_MS = 50;
-
-const sweepAuditLogBodySchema = z
-  .object({
-    batchSize: z.number().int().min(1).max(50000).optional(),
-    dryRun: z.boolean().optional(),
-  })
-  .default({});
-
-type SweepAuditLogBody = z.infer<typeof sweepAuditLogBodySchema>;
 
 const { auditLog } = auditLogSchema;
 
@@ -60,56 +48,10 @@ async function purgeBatch(
   });
 }
 
-async function sweepBucket(
-  bucket: AuditRetention,
-  cutoff: Date,
-  batchSize: number,
-  dryRun: boolean,
-  logger: PinoLogger,
-): Promise<number> {
-  if (dryRun) {
-    return countEligible(bucket, cutoff);
-  }
-
-  let total = 0;
-  let batchCount = 0;
-
-  while (batchCount < MAX_BATCHES) {
-    let deletedInBatch: number;
-    try {
-      deletedInBatch = await purgeBatch(bucket, cutoff, batchSize);
-    } catch (err) {
-      logger.error(
-        { err, bucket, batchCount },
-        "sweep-audit-log batch failed — stopping sweep for this bucket",
-      );
-      break;
-    }
-    total += deletedInBatch;
-    batchCount++;
-
-    if (deletedInBatch === 0) break;
-
-    if (batchCount < MAX_BATCHES) {
-      // biome-ignore lint/correctness/noUndeclaredVariables: Bun is a runtime global
-      await Bun.sleep(INTER_BATCH_SLEEP_MS);
-    }
-  }
-
-  if (batchCount >= MAX_BATCHES) {
-    logger.warn(
-      { bucket, batchCount: MAX_BATCHES },
-      "sweep-audit-log hit batch cap — stopping early",
-    );
-  }
-
-  return total;
-}
-
 export const sweepAuditLogRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
-  .post("/sweep-audit-log", zV("json", sweepAuditLogBodySchema), async (c) => {
-    const body = c.req.valid("json") as SweepAuditLogBody;
+  .post("/sweep-audit-log", zV("json", sweepBodySchema), async (c) => {
+    const body = c.req.valid("json") as SweepBody;
     const batchSize = body.batchSize ?? 5000;
     const dryRun = body.dryRun ?? false;
     const logger = c.var.logger;
@@ -139,20 +81,25 @@ export const sweepAuditLogRoutes = new Hono<HonoEnv>()
     // Sequential to avoid saturating the Drizzle connection pool: each bucket may loop hundreds
     // of batched transactions, and running both buckets in parallel halves the headroom for prod traffic
     // sharing the same pool.
-    const operational = await sweepBucket(
-      "operational",
-      cutoffs.operational,
-      batchSize,
-      dryRun,
-      logger,
-    );
-    const compliance = await sweepBucket(
-      "compliance",
-      cutoffs.compliance,
-      batchSize,
-      dryRun,
-      logger,
-    );
+    const sweepBucket = (bucket: AuditRetention) =>
+      runBatchedSweep({
+        purgeBatch: (size) => purgeBatch(bucket, cutoffs[bucket], size),
+        countEligible: () => countEligible(bucket, cutoffs[bucket]),
+        batchSize,
+        dryRun,
+        logger,
+        label: `sweep-audit-log:${bucket}`,
+        onBatchError: (err) => {
+          logger.error(
+            { err, bucket },
+            "sweep-audit-log batch failed — stopping sweep for this bucket",
+          );
+          return "break";
+        },
+      });
+
+    const { deleted: operational } = await sweepBucket("operational");
+    const { deleted: compliance } = await sweepBucket("compliance");
 
     const deletedPerBucket = { operational, compliance };
     const durationMs = Date.now() - startMs;

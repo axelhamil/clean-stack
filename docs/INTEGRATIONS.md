@@ -110,9 +110,8 @@ server-side, the scheduler is just a trigger.
 
 Dev uses SeaweedFS (opt-in via Docker Compose profile `storage` —
 `docker compose --profile storage up -d`; bucket auto-created by `seaweedfs-init`).
-Host port is random (find it with `docker compose port seaweedfs 8333`); inside
-the compose network it's reachable as `seaweedfs:8333`. Production uses any
-S3-compatible provider. Cloudflare R2 is the recommended default (zero egress
+Host port is pinned to `8333`; inside the compose network it's reachable as
+`seaweedfs:8333`. Production uses any S3-compatible provider. Cloudflare R2 is the recommended default (zero egress
 fees, S3 API compatibility verified for the patterns this stack uses — see
 `HISTORY.md` for the verified-2026 list).
 
@@ -207,8 +206,8 @@ These aren't blockers for launch but pay off quickly:
 
 - **Error tracking**: pipe `pino` errors to Sentry / Axiom / Better Stack.
   The stack already emits structured JSON with `requestId`.
-- **Uptime monitoring**: external probe on `GET /ready` (returns 200 once DB
-  reachable).
+- **Uptime monitoring**: external probe on `GET /readyz` (returns 200 once DB
+  reachable). `/livez` is the liveness counterpart (no external deps).
 - **Audit log**: TODO comments in the RGPD use-cases mark the four transition
   points (`data.export.requested`, `user.delete.{requested,cancelled,completed}`)
   for when the audit-log feature lands.

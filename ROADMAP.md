@@ -30,7 +30,6 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 
 | # | Item | Status |
 |---|---|---|
-| 0.0 | Clone-ability bootstrap | **5/7 done** — remaining: CI smoke test + `docs/QUICKSTART.md` |
 | 0.1 | DB schema split per context (`auth.ts` → `auth.ts` + `multi-tenant.ts`) | DONE — BetterAuth-owned tables stay in `auth.ts`; `organization`/`member`/`invitation` extracted to `multi-tenant.ts`. RGPD = 3 cols on `user` (BetterAuth-owned), inline. Combined `schema` re-export preserves call sites (zero refactor). |
 | 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | DONE — `modules/health/` + `IHealthCheckRegistry` (cache asym 30s/5s, timeout 5s, tri-state agg), `OnInit`+`preload()` self-registering probes (db critical via health, storage non-critical via `uploads`), `SIGTERM`-driven `lifecycleState` flip + `SHUTDOWN_GRACE_PERIOD_MS` window, payload minimal en prod, mount hors middleware. Docs: [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) (recipes Railway/Fly/Render/K8s/Cloud Run). |
 | 0.3 | Backups `pg_dump` + restore tested (3-2-1 rule, 30d retention, monthly automated restore-test) | TODO — RPO/RTO in `docs/DISASTER-RECOVERY.md` |

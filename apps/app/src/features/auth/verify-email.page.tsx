@@ -8,7 +8,7 @@ const route = getRouteApi("/verify-email");
 
 export function VerifyEmailPage() {
   const { token } = route.useSearch();
-  return <main>{token ? <ConsumeToken token={token} /> : <CheckInbox />}</main>;
+  return token ? <ConsumeToken token={token} /> : <CheckInbox />;
 }
 
 interface ConsumeTokenProps {

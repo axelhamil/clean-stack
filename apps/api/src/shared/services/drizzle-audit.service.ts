@@ -1,4 +1,4 @@
-import { uuidv7 } from "@packages/ddd-kit";
+import { Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   auditLogSchema,
@@ -12,8 +12,10 @@ import {
   lte,
   type Transaction,
 } from "@packages/drizzle";
+import { createDbFailure } from "../db-failure";
 import type {
   AuditEntry,
+  AuditError,
   AuditFilters,
   AuditPage,
   AuditRecord,
@@ -22,35 +24,40 @@ import type {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
+const fail = createDbFailure("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
 
 export class DrizzleAuditRepository implements IAuditPort {
-  async record(entry: AuditEntry, tx?: Transaction): Promise<AuditRecord> {
+  async record(entry: AuditEntry, tx?: Transaction): Promise<Result<AuditRecord, AuditError>> {
     const exec = tx ?? db;
     const id = uuidv7();
     const occurredAt = new Date();
-    await exec.insert(auditLogSchema.auditLog).values({
-      id,
-      actorId: entry.actorId,
-      actorType: entry.actorType,
-      organizationId: entry.organizationId,
-      action: entry.action,
-      targetType: entry.targetType,
-      targetId: entry.targetId,
-      metadata: entry.metadata,
-      requestId: entry.requestId ?? null,
-      retention: entry.retention,
-      occurredAt,
-    });
-    return {
-      id,
-      occurredAt,
-      prevHash: null,
-      hash: null,
-      ...entry,
-    };
+    try {
+      await exec.insert(auditLogSchema.auditLog).values({
+        id,
+        actorId: entry.actorId,
+        actorType: entry.actorType,
+        organizationId: entry.organizationId,
+        action: entry.action,
+        targetType: entry.targetType,
+        targetId: entry.targetId,
+        metadata: entry.metadata,
+        requestId: entry.requestId ?? null,
+        retention: entry.retention,
+        occurredAt,
+      });
+      return Result.ok({
+        id,
+        occurredAt,
+        prevHash: null,
+        hash: null,
+        ...entry,
+      });
+    } catch (e) {
+      return fail(e, "audit record failed");
+    }
   }
 
-  async list(filters: AuditFilters, tx?: Transaction): Promise<AuditPage> {
+  async list(filters: AuditFilters, tx?: Transaction): Promise<Result<AuditPage, AuditError>> {
     const exec = tx ?? db;
     const limit = Math.min(filters.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
     const al = auditLogSchema.auditLog;
@@ -74,30 +81,34 @@ export class DrizzleAuditRepository implements IAuditPort {
     }
     const where = conds.length > 0 ? and(...conds) : undefined;
 
-    const rows = await exec
-      .select()
-      .from(al)
-      .where(where)
-      .orderBy(desc(al.occurredAt))
-      .limit(limit + 1);
+    try {
+      const rows = await exec
+        .select()
+        .from(al)
+        .where(where)
+        .orderBy(desc(al.occurredAt))
+        .limit(limit + 1);
 
-    const hasMore = rows.length > limit;
-    const items = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
-      id: r.id,
-      actorId: r.actorId,
-      actorType: r.actorType,
-      organizationId: r.organizationId,
-      action: r.action,
-      targetType: r.targetType,
-      targetId: r.targetId,
-      metadata: r.metadata,
-      requestId: r.requestId ?? undefined,
-      retention: r.retention,
-      occurredAt: r.occurredAt,
-      prevHash: r.prevHash,
-      hash: r.hash,
-    }));
-    const nextCursor = hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null;
-    return { items, nextCursor };
+      const hasMore = rows.length > limit;
+      const items = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
+        id: r.id,
+        actorId: r.actorId,
+        actorType: r.actorType,
+        organizationId: r.organizationId,
+        action: r.action,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        metadata: r.metadata,
+        requestId: r.requestId ?? undefined,
+        retention: r.retention,
+        occurredAt: r.occurredAt,
+        prevHash: r.prevHash,
+        hash: r.hash,
+      }));
+      const nextCursor = hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null;
+      return Result.ok({ items, nextCursor });
+    } catch (e) {
+      return fail(e, "audit list failed");
+    }
   }
 }

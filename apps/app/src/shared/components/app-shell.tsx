@@ -1,10 +1,10 @@
 import { BrandLink } from "@packages/ui/components/ui/brand-link";
 import { Button } from "@packages/ui/components/ui/button";
+import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
 import { LogoMark } from "../../shared/components/logo-mark";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
@@ -23,20 +23,16 @@ const PRIMARY_NAV = [
   { to: "/settings", label: "Settings" },
 ] as const;
 
-function useShortcutLabel(): string {
-  const [label, setLabel] = useState("Ctrl K");
-
-  useEffect(() => {
-    const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-    setLabel(isMac ? "⌘ K" : "Ctrl K");
-  }, []);
-
-  return label;
+function isApplePlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent ?? "";
+  return /Mac|iPhone|iPad|iPod/.test(ua);
 }
+
+const SHORTCUT_LABEL = isApplePlatform() ? "⌘ K" : "Ctrl K";
 
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const shortcut = useShortcutLabel();
 
   const fireCommandPalette = () => {
     window.dispatchEvent(
@@ -83,9 +79,7 @@ export function AppShell({ user, children }: AppShellProps) {
             >
               <Search className="size-4" />
               <span>Search...</span>
-              <kbd className="ml-2 rounded border bg-muted px-1.5 py-0.5 text-xs font-medium">
-                {shortcut}
-              </kbd>
+              <KeyboardShortcut className="ml-2">{SHORTCUT_LABEL}</KeyboardShortcut>
             </Button>
 
             <Button
