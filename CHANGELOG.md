@@ -1,3 +1,13 @@
+## [1.17.2](https://github.com/axelhamil/clean-stack/compare/v1.17.1...v1.17.2) (2026-05-26)
+
+### Refactor
+
+* enforce result/option contracts and promote shared helpers ([6faad36](https://github.com/axelhamil/clean-stack/commit/6faad3613fa594c28eae9fdf3df9488bc69d89a7))
+
+### Documentation
+
+* drop phase 0.0 and align with seaweedfs port pin ([e1cad25](https://github.com/axelhamil/clean-stack/commit/e1cad254ebe4605fcabd7eb845323b32bc79546b))
+
 ## [1.17.1](https://github.com/axelhamil/clean-stack/compare/v1.17.0...v1.17.1) (2026-05-25)
 
 ### Bug Fixes
