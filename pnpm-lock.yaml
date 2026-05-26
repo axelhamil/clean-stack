@@ -96,8 +96,8 @@ importers:
         specifier: ^0.10.3
         version: 0.10.3(hono@4.12.22)(pino@10.3.1)
       inwire:
-        specifier: ^2.3.2
-        version: 2.3.2
+        specifier: ^3.0.0
+        version: 3.0.0
       pg:
         specifier: ^8.21.0
         version: 8.21.0
@@ -4102,8 +4102,8 @@ packages:
     resolution: {integrity: sha512-IBTdIkzZNOpqm7q3dRqJvMaldXjDHWkEDfrwGEQTs5eaQMWV+djAhR+wahyNNMAa+qpbDUhBMVt4ZKNwpPm7xQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
 
-  inwire@2.3.2:
-    resolution: {integrity: sha512-nePomCMVPsOqLO2FTJgc1DldifgooTNHkInzw+R/FQa2XZEXNIbIb1frg6XJbmimBL80+bbYX1PEafHBwZG01A==}
+  inwire@3.0.0:
+    resolution: {integrity: sha512-7klfURvDP4r64uMu51M8eF5jeSQgH/VUmdwUMcT8eBiX6lF8FKpy3vBFVe1+3OoN27PtVzvn4TZ0/jmNx9nqwg==}
 
   is-arrayish@0.2.1:
     resolution: {integrity: sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg==}
@@ -9167,7 +9167,7 @@ snapshots:
 
   ini@6.0.0: {}
 
-  inwire@2.3.2: {}
+  inwire@3.0.0: {}
 
   is-arrayish@0.2.1: {}
 
