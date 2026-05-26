@@ -36,8 +36,15 @@ export interface IWebhookEndpointRepository {
     args: CreateEndpointArgs,
     tx?: ITransaction,
   ): Promise<Result<WebhookEndpointRecord, WebhookRepoError>>;
-  update(args: UpdateEndpointArgs, tx?: ITransaction): Promise<Option<WebhookEndpointRecord>>;
-  delete(id: string, organizationId: string, tx?: ITransaction): Promise<boolean>;
+  update(
+    args: UpdateEndpointArgs,
+    tx?: ITransaction,
+  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
+  delete(
+    id: string,
+    organizationId: string,
+    tx?: ITransaction,
+  ): Promise<Result<boolean, WebhookRepoError>>;
   findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>>;
-  listByOrg(organizationId: string): Promise<WebhookEndpointRecord[]>;
+  listByOrg(organizationId: string): Promise<Result<WebhookEndpointRecord[], WebhookRepoError>>;
 }

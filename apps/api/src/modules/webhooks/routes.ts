@@ -14,9 +14,10 @@ type Vars = AuthVariables & { orgId: string };
 export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .get("/", requireAuth, requireOrg, requireOrgPermission({ webhooks: ["read"] }), async (c) => {
     const orgId = c.get("orgId");
-    const items = await di.WebhooksService.listEndpoints(orgId);
+    const result = await di.WebhooksService.listEndpoints(orgId);
+    if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({
-      items: items.map(({ secretCipher: _s, ...rest }) => rest),
+      items: result.getValue().map(({ secretCipher: _s, ...rest }) => rest),
     });
   })
   .post(
@@ -57,8 +58,10 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
         actorUserId: c.get("user").id,
         ...body,
       });
-      if (result.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const { secretCipher: _s, ...rest } = result.unwrap();
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const opt = result.getValue();
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const { secretCipher: _s, ...rest } = opt.unwrap();
       return c.json(rest);
     },
   )
@@ -70,8 +73,10 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     async (c) => {
       const orgId = c.get("orgId");
       const id = c.req.param("id");
-      const deleted = await di.WebhooksService.deleteEndpoint(id, orgId, c.get("user").id);
-      if (!deleted) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const result = await di.WebhooksService.deleteEndpoint(id, orgId, c.get("user").id);
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      if (!result.getValue())
+        throw new HTTPException(404, { message: "Webhook endpoint not found" });
       return c.json({ deleted: true });
     },
   )
@@ -88,16 +93,25 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       if (endpoint.isNone())
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const filters = c.req.valid("query");
-      const page = await di.WebhooksService.listDeliveries({
+      const result = await di.WebhooksService.listDeliveries({
         endpointId,
         organizationId: orgId,
         status: filters.status,
         limit: filters.limit,
         cursor: filters.cursor,
       });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const page = result.getValue();
       return c.json({
-        items: page.items.map(({ payload: _p, ...rest }) => rest),
-        nextCursor: page.nextCursor,
+        items: page.items.map(
+          ({ payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest }) => ({
+            ...rest,
+            nextAttemptAt: nextAttemptAt.toNull(),
+            lastError: lastError.toNull(),
+            lastResponseStatus: lastResponseStatus.toNull(),
+          }),
+        ),
+        nextCursor: page.nextCursor.toNull(),
       });
     },
   )
@@ -113,10 +127,19 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const endpoint = await di.WebhooksService.findEndpoint(endpointId, orgId);
       if (endpoint.isNone())
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const replayed = await di.WebhooksService.replayDelivery(deliveryId, orgId);
-      if (replayed.isNone())
-        throw new HTTPException(404, { message: "Webhook delivery not found" });
-      const { payload: _p, ...rest } = replayed.unwrap();
-      return c.json(rest, 201);
+      const result = await di.WebhooksService.replayDelivery(deliveryId, orgId);
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const opt = result.getValue();
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });
+      const { payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest } = opt.unwrap();
+      return c.json(
+        {
+          ...rest,
+          nextAttemptAt: nextAttemptAt.toNull(),
+          lastError: lastError.toNull(),
+          lastResponseStatus: lastResponseStatus.toNull(),
+        },
+        201,
+      );
     },
   );

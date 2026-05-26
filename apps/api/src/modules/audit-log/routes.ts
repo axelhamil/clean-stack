@@ -1,3 +1,4 @@
+import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
@@ -14,7 +15,7 @@ export const auditLogRoutes = new Hono<{ Variables: AuthVariables & { orgId: str
   async (c) => {
     const orgId = c.get("orgId");
     const filters = c.req.valid("query");
-    const page = await di.AuditQueryService.listForOrg(orgId, {
+    const result = await di.AuditQueryService.listForOrg(orgId, {
       actorId: filters.actorId,
       targetType: filters.targetType,
       targetId: filters.targetId,
@@ -24,6 +25,7 @@ export const auditLogRoutes = new Hono<{ Variables: AuthVariables & { orgId: str
       limit: filters.limit,
       cursor: filters.cursor,
     });
-    return c.json(page);
+    if (result.isFailure) throw new AppErrorException(result.getError());
+    return c.json(result.getValue());
   },
 );

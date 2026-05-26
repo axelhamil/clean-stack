@@ -92,7 +92,7 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt }: Sessi
   return (
     <ListRow>
       <ListRowMedia>
-        <MonitorIcon className="size-5 text-muted-foreground" />
+        <MonitorIcon />
         <ListRowContent>
           <ListRowMeta>
             <TypographySmall>{ua}</TypographySmall>

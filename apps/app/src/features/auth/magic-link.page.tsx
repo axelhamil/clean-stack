@@ -28,16 +28,12 @@ function ConsumeToken({ token }: ConsumeTokenProps) {
     mutation.mutate(token);
   }, [token, mutation.mutate]);
 
+  if (mutation.isError) return <MagicLinkError message={mutation.error.message} />;
+
   return (
-    <main>
-      {mutation.isError ? (
-        <MagicLinkError message={mutation.error.message} />
-      ) : (
-        <AuthShell title="Signing you in…" description="One moment.">
-          <TypographyMuted>Verifying your link.</TypographyMuted>
-        </AuthShell>
-      )}
-    </main>
+    <AuthShell title="Signing you in…" description="One moment.">
+      <TypographyMuted>Verifying your link.</TypographyMuted>
+    </AuthShell>
   );
 }
 

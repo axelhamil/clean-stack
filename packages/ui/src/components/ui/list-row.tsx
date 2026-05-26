@@ -16,7 +16,10 @@ function ListRowMedia({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="list-row-media"
-      className={cn("flex items-center gap-3", className)}
+      className={cn(
+        "flex items-center gap-3 [&>svg:first-child]:size-5 [&>svg:first-child]:text-muted-foreground",
+        className,
+      )}
       {...props}
     />
   );

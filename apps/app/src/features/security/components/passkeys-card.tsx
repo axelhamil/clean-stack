@@ -99,7 +99,7 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowPro
   return (
     <ListRow>
       <ListRowMedia>
-        <KeyRoundIcon className="size-5 text-muted-foreground" />
+        <KeyRoundIcon />
         <ListRowContent>
           <TypographySmall>{name ?? "Unnamed passkey"}</TypographySmall>
           <ListRowMeta>

@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import { db, eq, sql, webhooksSchema } from "@packages/drizzle";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../../../../shared/jitter";
@@ -68,21 +69,35 @@ export class WebhookDeliveryWorker {
   private async drainBatch(): Promise<number> {
     const claimed = await db.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
-      const rows = await this.deps.deliveries.findPendingBatch(BATCH_SIZE, tx);
+      const pending = await this.deps.deliveries.findPendingBatch(BATCH_SIZE, tx);
+      if (pending.isFailure) {
+        this.deps.logger.error(
+          { err: pending.getError() },
+          "webhook delivery findPendingBatch failed",
+        );
+        return [];
+      }
+      const rows = pending.getValue();
       if (rows.length === 0) return rows;
       const claimUntil = new Date(Date.now() + CLAIM_WINDOW_MS);
       for (const r of rows) {
-        await this.deps.deliveries.updateStatus(
+        const upd = await this.deps.deliveries.updateStatus(
           r.id,
           {
             status: r.status,
             attempts: r.attempts,
-            nextAttemptAt: claimUntil,
+            nextAttemptAt: Option.some(claimUntil),
             lastError: r.lastError,
             lastResponseStatus: r.lastResponseStatus,
           },
           tx,
         );
+        if (upd.isFailure) {
+          this.deps.logger.error(
+            { err: upd.getError(), deliveryId: r.id },
+            "webhook delivery claim updateStatus failed",
+          );
+        }
       }
       return rows;
     });
@@ -98,7 +113,7 @@ export class WebhookDeliveryWorker {
           "webhook delivery process threw",
         );
         await db
-          .transaction(async (tx) => this.markFailed(delivery, errMsg, null, tx))
+          .transaction(async (tx) => this.markFailed(delivery, errMsg, Option.none(), tx))
           .catch((e) =>
             this.deps.logger.error({ err: e, deliveryId: delivery.id }, "markFailed failed"),
           );
@@ -111,17 +126,23 @@ export class WebhookDeliveryWorker {
     const endpointAndOrg = await this.findEndpointWithOrg(delivery.endpointId);
     if (!endpointAndOrg) {
       await db.transaction(async (tx) => {
-        await this.deps.deliveries.updateStatus(
+        const upd = await this.deps.deliveries.updateStatus(
           delivery.id,
           {
             status: "dead_letter",
             attempts: delivery.attempts + 1,
-            nextAttemptAt: null,
-            lastError: "endpoint not found or disabled",
-            lastResponseStatus: null,
+            nextAttemptAt: Option.none(),
+            lastError: Option.some("endpoint not found or disabled"),
+            lastResponseStatus: Option.none(),
           },
           tx,
         );
+        if (upd.isFailure) {
+          this.deps.logger.error(
+            { err: upd.getError(), deliveryId: delivery.id },
+            "webhook delivery dead-letter updateStatus failed",
+          );
+        }
       });
       return;
     }
@@ -129,7 +150,7 @@ export class WebhookDeliveryWorker {
     const masterKeyOpt = this.deps.masterKey();
     if (masterKeyOpt.isNone()) {
       await db.transaction(async (tx) =>
-        this.markFailed(delivery, "WEBHOOK_MASTER_KEY missing", null, tx),
+        this.markFailed(delivery, "WEBHOOK_MASTER_KEY missing", Option.none(), tx),
       );
       return;
     }
@@ -144,7 +165,7 @@ export class WebhookDeliveryWorker {
         "webhook secret decryption failed",
       );
       await db.transaction(async (tx) =>
-        this.markFailed(delivery, "secret decryption failed", null, tx),
+        this.markFailed(delivery, "secret decryption failed", Option.none(), tx),
       );
       return;
     }
@@ -158,8 +179,8 @@ export class WebhookDeliveryWorker {
     const ts = Math.floor(Date.now() / 1000);
     const signature = await signWebhookPayload(rawBody, secret, ts);
 
-    let responseStatus: number | null = null;
-    let errorMessage: string | null = null;
+    let responseStatus: Option<number> = Option.none();
+    let errorMessage: Option<string> = Option.none();
     const ctrl = new AbortController();
     const timeoutHandle = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
     try {
@@ -175,29 +196,37 @@ export class WebhookDeliveryWorker {
         body: rawBody,
         signal: ctrl.signal,
       });
-      responseStatus = res.status;
-      if (!res.ok) errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+      responseStatus = Option.some(res.status);
+      if (!res.ok) errorMessage = Option.some(`HTTP ${res.status}: ${res.statusText}`);
     } catch (err) {
-      errorMessage = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      errorMessage = Option.some(
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      );
     } finally {
       clearTimeout(timeoutHandle);
     }
 
     await db.transaction(async (tx) => {
-      if (errorMessage) {
-        await this.markFailed(delivery, errorMessage, responseStatus, tx);
+      if (errorMessage.isSome()) {
+        await this.markFailed(delivery, errorMessage.unwrap(), responseStatus, tx);
       } else {
-        await this.deps.deliveries.updateStatus(
+        const upd = await this.deps.deliveries.updateStatus(
           delivery.id,
           {
             status: "success",
             attempts: delivery.attempts + 1,
-            nextAttemptAt: null,
-            lastError: null,
+            nextAttemptAt: Option.none(),
+            lastError: Option.none(),
             lastResponseStatus: responseStatus,
           },
           tx,
         );
+        if (upd.isFailure) {
+          this.deps.logger.error(
+            { err: upd.getError(), deliveryId: delivery.id },
+            "webhook delivery success updateStatus failed",
+          );
+        }
       }
     });
   }
@@ -205,23 +234,29 @@ export class WebhookDeliveryWorker {
   private async markFailed(
     delivery: WebhookDeliveryRecord,
     error: string,
-    responseStatus: number | null,
+    responseStatus: Option<number>,
     tx: Parameters<IWebhookDeliveryRepository["updateStatus"]>[2],
   ): Promise<void> {
     const newAttempts = delivery.attempts + 1;
     const { date } = nextAttemptAt(newAttempts, expectedDelayFromAttempts(newAttempts));
     const status: "failed" | "dead_letter" = date === null ? "dead_letter" : "failed";
-    await this.deps.deliveries.updateStatus(
+    const upd = await this.deps.deliveries.updateStatus(
       delivery.id,
       {
         status,
         attempts: newAttempts,
-        nextAttemptAt: date,
-        lastError: error,
+        nextAttemptAt: Option.fromNullable(date),
+        lastError: Option.some(error),
         lastResponseStatus: responseStatus,
       },
       tx,
     );
+    if (upd.isFailure) {
+      this.deps.logger.error(
+        { err: upd.getError(), deliveryId: delivery.id },
+        "webhook delivery markFailed updateStatus failed",
+      );
+    }
   }
 
   private async findEndpointWithOrg(endpointId: string) {

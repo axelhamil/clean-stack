@@ -1,5 +1,6 @@
-import type { Option } from "@packages/ddd-kit";
+import type { Option, Result } from "@packages/ddd-kit";
 import type { ITransaction } from "../../../../shared/transaction";
+import type { WebhookRepoError } from "./webhook-endpoint.port";
 
 export type WebhookDeliveryStatus = "pending" | "success" | "failed" | "dead_letter";
 
@@ -11,9 +12,9 @@ export type WebhookDeliveryRecord = {
   payload: unknown;
   status: WebhookDeliveryStatus;
   attempts: number;
-  nextAttemptAt: Date | null;
-  lastError: string | null;
-  lastResponseStatus: number | null;
+  nextAttemptAt: Option<Date>;
+  lastError: Option<string>;
+  lastResponseStatus: Option<number>;
   idempotencyKey: string;
   createdAt: Date;
 };
@@ -29,21 +30,31 @@ export type ListDeliveriesArgs = {
 export type DeliveryUpdate = {
   status: WebhookDeliveryStatus;
   attempts: number;
-  nextAttemptAt: Date | null;
-  lastError: string | null;
-  lastResponseStatus: number | null;
+  nextAttemptAt: Option<Date>;
+  lastError: Option<string>;
+  lastResponseStatus: Option<number>;
+};
+
+export type DeliveryPage = {
+  items: WebhookDeliveryRecord[];
+  nextCursor: Option<string>;
 };
 
 export interface IWebhookDeliveryRepository {
-  list(
-    args: ListDeliveriesArgs,
-  ): Promise<{ items: WebhookDeliveryRecord[]; nextCursor: string | null }>;
+  list(args: ListDeliveriesArgs): Promise<Result<DeliveryPage, WebhookRepoError>>;
   findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>>;
-  updateStatus(id: string, update: DeliveryUpdate, tx: ITransaction): Promise<void>;
-  findPendingBatch(limit: number, tx: ITransaction): Promise<WebhookDeliveryRecord[]>;
+  updateStatus(
+    id: string,
+    update: DeliveryUpdate,
+    tx: ITransaction,
+  ): Promise<Result<void, WebhookRepoError>>;
+  findPendingBatch(
+    limit: number,
+    tx: ITransaction,
+  ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
   enqueueReplay(
     deliveryId: string,
     organizationId: string,
     tx?: ITransaction,
-  ): Promise<Option<WebhookDeliveryRecord>>;
+  ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>>;
 }

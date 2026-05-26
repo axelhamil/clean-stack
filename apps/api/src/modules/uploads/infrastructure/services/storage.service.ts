@@ -11,8 +11,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Result } from "@packages/ddd-kit";
+import { createDbFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
-import { logger } from "../../../../shared/logger";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -24,6 +24,7 @@ import type {
 } from "../../../../shared/ports/storage.port";
 
 const S3_DELETE_BATCH = 1000;
+const fail = createDbFailure("STORAGE_PROVIDER_FAILURE");
 
 export class S3StorageService implements IStorageService {
   private readonly client: S3Client;
@@ -80,7 +81,7 @@ export class S3StorageService implements IStorageService {
         expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000).toISOString(),
       });
     } catch (e) {
-      return this.fail(e, "presign upload failed", { key: input.key });
+      return fail(e, "presign upload failed", { key: input.key });
     }
   }
 
@@ -98,7 +99,7 @@ export class S3StorageService implements IStorageService {
         expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000).toISOString(),
       });
     } catch (e) {
-      return this.fail(e, "presign download failed", { key: input.key });
+      return fail(e, "presign download failed", { key: input.key });
     }
   }
 
@@ -107,7 +108,7 @@ export class S3StorageService implements IStorageService {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return Result.ok();
     } catch (e) {
-      return this.fail(e, "head bucket failed", { bucket: this.bucket });
+      return fail(e, "head bucket failed", { bucket: this.bucket });
     }
   }
 
@@ -125,7 +126,7 @@ export class S3StorageService implements IStorageService {
           message: `object "${key}" not found`,
         });
       }
-      return this.fail(e, "head object failed", { key });
+      return fail(e, "head object failed", { key });
     }
   }
 
@@ -134,7 +135,7 @@ export class S3StorageService implements IStorageService {
       await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
       return Result.ok();
     } catch (e) {
-      return this.fail(e, "delete object failed", { key });
+      return fail(e, "delete object failed", { key });
     }
   }
 
@@ -150,7 +151,7 @@ export class S3StorageService implements IStorageService {
       );
       return Result.ok();
     } catch (e) {
-      return this.fail(e, "upload object failed", { key: input.key });
+      return fail(e, "upload object failed", { key: input.key });
     }
   }
 
@@ -173,7 +174,7 @@ export class S3StorageService implements IStorageService {
       } while (continuationToken);
       return Result.ok(keys);
     } catch (e) {
-      return this.fail(e, "list object keys failed", { prefix });
+      return fail(e, "list object keys failed", { prefix });
     }
   }
 
@@ -191,17 +192,11 @@ export class S3StorageService implements IStorageService {
       }
       return Result.ok();
     } catch (e) {
-      return this.fail(e, "delete objects failed", { count: keys.length });
+      return fail(e, "delete objects failed", { count: keys.length });
     }
   }
 
   publicUrlFor(key: string): string {
     return `${this.publicUrl}/${key}`;
-  }
-
-  private fail(e: unknown, msg: string, ctx: Record<string, unknown>): Result<never, StorageError> {
-    const message = e instanceof Error ? e.message : "unknown error";
-    logger.error({ err: e, ...ctx }, msg);
-    return Result.fail({ code: "STORAGE_PROVIDER_FAILURE", message });
   }
 }

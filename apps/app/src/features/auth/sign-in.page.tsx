@@ -13,29 +13,27 @@ export function SignInPage() {
   const magicLinkMutation = useMagicLink();
 
   return (
-    <main>
-      <AuthShell
-        title="Sign in"
-        description="Welcome back. Enter your details to continue."
-        footer={
-          <AuthShellFooter lead="No account yet?" link={<Link to="/sign-up">Create one</Link>} />
-        }
-        className="flex flex-col gap-6"
-      >
-        <SignInForm redirectTo={redirect} />
+    <AuthShell
+      title="Sign in"
+      description="Welcome back. Enter your details to continue."
+      footer={
+        <AuthShellFooter lead="No account yet?" link={<Link to="/sign-up">Create one</Link>} />
+      }
+      className="flex flex-col gap-6"
+    >
+      <SignInForm redirectTo={redirect} />
 
-        <NavLink asChild className={"w-fit ml-auto"}>
-          <Link to="/forgot-password">Forgot password?</Link>
-        </NavLink>
+      <NavLink asChild className="ml-auto w-fit">
+        <Link to="/forgot-password">Forgot password?</Link>
+      </NavLink>
 
-        <Separator />
-        <EmailRequestForm
-          mutation={magicLinkMutation}
-          submitLabel="Email me a magic link"
-          pendingLabel="Sending…"
-          buttonVariant="outline"
-        />
-      </AuthShell>
-    </main>
+      <Separator />
+      <EmailRequestForm
+        mutation={magicLinkMutation}
+        submitLabel="Email me a magic link"
+        pendingLabel="Sending…"
+        buttonVariant="outline"
+      />
+    </AuthShell>
   );
 }

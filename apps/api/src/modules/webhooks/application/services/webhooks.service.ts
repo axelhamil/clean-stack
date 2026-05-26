@@ -6,6 +6,7 @@ import { emitEvent } from "../../../../shared/event-emitter";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
+  DeliveryPage,
   IWebhookDeliveryRepository,
   WebhookDeliveryRecord,
 } from "../ports/webhook-delivery.port";
@@ -95,10 +96,12 @@ export class WebhooksService {
     url?: string;
     eventTypes?: string[];
     enabled?: boolean;
-  }): Promise<Option<WebhookEndpointRecord>> {
+  }): Promise<Result<Option<WebhookEndpointRecord>, WebhookServiceError>> {
     return this.uow.run(async (tx) => {
       const updated = await this.endpoints.update(args, tx);
-      if (updated.isNone()) return updated;
+      if (updated.isFailure) return updated;
+      const opt = updated.getValue();
+      if (opt.isNone()) return updated;
       const changes: Record<string, unknown> = {};
       if (args.url !== undefined) changes.url = args.url;
       if (args.eventTypes !== undefined) changes.eventTypes = args.eventTypes;
@@ -121,10 +124,15 @@ export class WebhooksService {
     });
   }
 
-  async deleteEndpoint(id: string, organizationId: string, actorUserId: string): Promise<boolean> {
+  async deleteEndpoint(
+    id: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<Result<boolean, WebhookServiceError>> {
     return this.uow.run(async (tx) => {
       const deleted = await this.endpoints.delete(id, organizationId, tx);
-      if (!deleted) return false;
+      if (deleted.isFailure) return deleted;
+      if (!deleted.getValue()) return deleted;
       await emitEvent(
         this.outbox,
         EventTypes.WEBHOOK_ENDPOINT_DELETED,
@@ -134,11 +142,13 @@ export class WebhooksService {
         { organizationId },
         tx,
       );
-      return true;
+      return deleted;
     });
   }
 
-  async listEndpoints(organizationId: string): Promise<WebhookEndpointRecord[]> {
+  async listEndpoints(
+    organizationId: string,
+  ): Promise<Result<WebhookEndpointRecord[], WebhookServiceError>> {
     return this.endpoints.listByOrg(organizationId);
   }
 
@@ -152,14 +162,14 @@ export class WebhooksService {
     status?: WebhookDeliveryRecord["status"];
     limit?: number;
     cursor?: string;
-  }) {
+  }): Promise<Result<DeliveryPage, WebhookServiceError>> {
     return this.deliveries.list(args);
   }
 
   async replayDelivery(
     deliveryId: string,
     organizationId: string,
-  ): Promise<Option<WebhookDeliveryRecord>> {
+  ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
     return this.uow.run(async (tx) =>
       this.deliveries.enqueueReplay(deliveryId, organizationId, tx),
     );

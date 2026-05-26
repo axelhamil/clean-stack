@@ -14,7 +14,6 @@
     "@better-auth/passkey": "^1.6.11",
     "@hookform/resolvers": "^5.4.0",
     "@packages/access-control": "workspace:*",
-    "@packages/ddd-kit": "workspace:*",
     "@packages/ui": "workspace:*",
     "@tanstack/react-query": "^5.100.14",
     "@tanstack/react-router": "^1.170.8",

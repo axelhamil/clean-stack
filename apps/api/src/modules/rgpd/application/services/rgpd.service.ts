@@ -344,6 +344,9 @@ export class RgpdService {
     const failed: Array<{ userId: string; errorCode: string }> = [];
 
     for (const row of batch) {
+      // Paranoia guard: executeAccountWipe contractually returns Result and never throws.
+      // The catch exists only so one buggy iteration cannot abort the whole batch sweep.
+      // If WIPE_UNCAUGHT ever surfaces in logs, it signals a broken Result-contract in the call stack.
       try {
         const res = await this.executeAccountWipe({ userId: row.userId });
         if (res.isSuccess) {
@@ -354,7 +357,10 @@ export class RgpdService {
       } catch (e) {
         const message = e instanceof Error ? e.message : "unknown";
         failed.push({ userId: row.userId, errorCode: "WIPE_UNCAUGHT" });
-        logger.error({ err: e, userId: row.userId, message }, "wipe threw uncaught error");
+        logger.error(
+          { err: e, userId: row.userId, message },
+          "wipe threw uncaught error — Result contract violated",
+        );
       }
     }
 
