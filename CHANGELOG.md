@@ -1,3 +1,15 @@
+## [1.19.0](https://github.com/axelhamil/clean-stack/compare/v1.18.0...v1.19.0) (2026-05-27)
+
+### Features
+
+* **deploy:** ship phase 0.7 railway reference deploy ([272da6b](https://github.com/axelhamil/clean-stack/commit/272da6b997c58fc7fd942263f7924a5b90c61d7c))
+
+### Documentation
+
+* log phase 0.4 in history and reclassify tele subscribers todo ([dac078b](https://github.com/axelhamil/clean-stack/commit/dac078b62e49f1a0e75bb13f9220222d98ee7c11))
+* **roadmap:** add phase 0.7 railway reference deploy ([54ab561](https://github.com/axelhamil/clean-stack/commit/54ab561c73a41c775f013871fec5745ea35afeae))
+* **roadmap:** close phase 0.5 with removability runbook from rgpd dry-run ([6934e0e](https://github.com/axelhamil/clean-stack/commit/6934e0e7bc0a7297e1a5a9893d8de09f74c852c9))
+
 ## [1.18.0](https://github.com/axelhamil/clean-stack/compare/v1.17.2...v1.18.0) (2026-05-27)
 
 ### Features
