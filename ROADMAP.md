@@ -32,7 +32,7 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 |---|---|---|
 | 0.1 | DB schema split per context (`auth.ts` → `auth.ts` + `multi-tenant.ts`) | DONE — BetterAuth-owned tables stay in `auth.ts`; `organization`/`member`/`invitation` extracted to `multi-tenant.ts`. RGPD = 3 cols on `user` (BetterAuth-owned), inline. Combined `schema` re-export preserves call sites (zero refactor). |
 | 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | DONE — `modules/health/` + `IHealthCheckRegistry` (cache asym 30s/5s, timeout 5s, tri-state agg), `OnInit`+`preload()` self-registering probes (db critical via health, storage non-critical via `uploads`), `SIGTERM`-driven `lifecycleState` flip + `SHUTDOWN_GRACE_PERIOD_MS` window, payload minimal en prod, mount hors middleware. Docs: [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) (recipes Railway/Fly/Render/K8s/Cloud Run). |
-| 0.3 | Backups `pg_dump` + restore tested (3-2-1 rule, 30d retention, monthly automated restore-test) | TODO — RPO/RTO in `docs/DISASTER-RECOVERY.md` |
+| 0.3 | Backups + disaster recovery (PITR-first, portable `pg_dump` export as fallback, restore runbook) | DONE — doc-only deliverable in `docs/DISASTER-RECOVERY.md`. No backup code shipped (intentional: managed Postgres providers do this better; `pgBackRest` unmaintained since 2026). Covers PITR setup per provider (Railway/Neon/Supabase/RDS/Fly/self-hosted), restore runbook, weekly portable export recipes (GH Actions/Railway/K8s), monthly restore-test recipe, lifecycle + versioning. |
 | 0.4 | Sentry + OpenTelemetry + Prometheus `/metrics` (3 detachable ports + NoOp default) | TODO — subscribers now trivial via `onEvent` (event-driven foundation) |
 | 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
 | 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | DONE — 3 routes `/internal/sweep-*`, SOTA 2026 defaults, GH Actions recipe in `docs/EVENTS.md` |
@@ -222,16 +222,18 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 ---
 
-## Backups + disaster recovery — **Phase 0.3**
+## Backups + disaster recovery — **Phase 0.3** ✅ May 2026
 
 **Why**: a backup never tested isn't a backup. SOC2 §A.1 + ISO 27001 A.12.3 prerequisite; client-side trust signal. SaaS-killer if the first prod incident reveals the dump is corrupt.
 
-- [ ] **Daily `pg_dump` cron** → R2 bucket `<R2_BACKUP_BUCKET>/postgres/<YYYY-MM-DD>.sql.gz`. Signed via existing `internal-fetch` HMAC. Retention 30 days (lifecycle rule on R2). **3-2-1 rule**: 3 copies (live + R2 + monthly cold), 2 medias (live DB + R2), 1 offsite (R2 in different region from app DB).
-- [ ] **R2 lifecycle policy** — daily retained 30d, monthly snapshots retained 1y in cold-storage class (Glacier-equivalent, ~$0.01/GB/month).
-- [ ] **Monthly automated restore-test** — cron spins ephemeral Postgres on port `5436`, restores latest dump, runs `pnpm db:smoke` (read-only count check on every table), reports to status page. Failure = page on-call.
-- [ ] **`docs/DISASTER-RECOVERY.md`** — RPO (max acceptable data loss = 24h with daily dump, 1h target with PITR enabled), RTO (max acceptable downtime = 1h), runbook for restore (commands, verification steps, rollback decision tree).
-- [ ] **PITR (Point-in-Time Recovery)** documented as prod requirement — Neon/Supabase/managed-Postgres all expose it; self-hosted Postgres needs `wal_level=replica` + `pg_basebackup` + WAL shipping. README deploy section flags this.
-- [ ] **R2 bucket versioning + delete protection** on the backup bucket — guards against accidental `aws s3 rm --recursive`.
+**Why doc-only, no code shipped**: SOTA 2026 closed the case — every managed Postgres provider (Railway, Neon, Supabase, AWS RDS, Fly) ships PITR one-click with sub-minute RPO. `pgBackRest` is unmaintained since 2026. A custom cron `pg_dump` route inside the API would duplicate what the platform already does, add `postgresql-client` to the Docker image, and introduce streaming / OOM / timeout failure modes that the cloneur inherits for zero value. clean-stack ships infrastructure that's cross-cutting (audit, webhooks, RGPD, observability), not DBA tooling.
+
+- [x] **`docs/DISASTER-RECOVERY.md`** — full DR doc: RPO/RTO targets (1–5 min with PITR / 7 d fallback), 3-2-1 rule applied, PITR setup per provider, restore runbook (provision ephemeral target, download, restore, smoke-check snippet, roll-forward vs in-place vs side decision tree).
+- [x] **PITR-first guidance** — per-provider pointers (Railway add-on, Neon branches, Supabase add-on, RDS automated, Fly volume snapshots, self-hosted WAL-G). pgBackRest flagged unmaintained.
+- [x] **Weekly portable `pg_dump` export** — copy-paste recipes for GitHub Actions, Railway Cron, and K8s CronJob. Streams `pg_dump | gzip | aws s3 cp -` (no OOM, multipart auto), targets a `backups/postgres/<ISO>.sql.gz` prefix in the existing S3 bucket. Uses a **read-only** Postgres role per CI-secret-leak best practice.
+- [x] **Monthly automated restore-test** — GitHub Actions workflow recipe: spawns Postgres `services.postgres:17-alpine` on port `5436`, downloads latest dump, restores, runs an inline `psql count(*)` smoke check, fails loud. Cloneur copy-pastes.
+- [x] **Lifecycle + versioning** — `aws s3api put-bucket-lifecycle-configuration` snippet (expire weekly exports 30 d, transition monthly snapshots to cold storage 1 y), `put-bucket-versioning` snippet, MFA-delete note. Caveats documented for R2 (no GLACIER → use STANDARD_IA) and SeaweedFS (partial lifecycle support).
+- [x] **README pointer** — `## Deployment` section links to `docs/DISASTER-RECOVERY.md` alongside `HEALTH-PROBES.md`.
 
 ---
 

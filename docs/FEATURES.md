@@ -136,6 +136,16 @@ Primitives for the business domain only (rule: never DDD for billing / auth / ga
 - **Single `app.onError(errorHandler)`** — `HTTPException` → `{ error: { code, message, requestId } }`. No per-route try/catch.
 - **Request ID** propagated via `X-Request-Id` header; every log line carries it.
 
+## Disaster recovery ✅ (doc-only)
+
+PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway one-click) — primary defense. clean-stack ships no backup code on purpose: SOTA 2026 closed the case (pgBackRest unmaintained, providers ship PITR sub-minute RPO).
+
+- **`docs/DISASTER-RECOVERY.md`** — RPO/RTO targets, 3-2-1 rule applied, PITR setup per provider, restore runbook, lifecycle + versioning snippets.
+- **Weekly portable `pg_dump` export** — copy-paste recipes for GitHub Actions, Railway Cron, and K8s CronJob. Streams `pg_dump | gzip | aws s3 cp -` (no OOM). Targets `backups/postgres/<ISO>.sql.gz` in the existing S3 bucket. Read-only Postgres role mandated.
+- **Monthly automated restore-test** — GitHub Actions workflow recipe spawns Postgres `:17-alpine`, downloads latest, restores, runs inline `psql count(*)` smoke check, fails loud.
+
+See [`./DISASTER-RECOVERY.md`](./DISASTER-RECOVERY.md).
+
 ## Event-driven foundation ✅
 
 Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing post-clone** — the dev declares an event in `packages/events`, calls `addEvent()` in their aggregate, runs the use case via `uow.run()` and the rest is automatic (audit log row, webhook fanout to subscribed clients, in-process handlers via `onEvent(...)` auto-discovered through inwire).
