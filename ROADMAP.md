@@ -148,7 +148,7 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 - [ ] **`webhook.test` event type** — sent on endpoint creation, surfaces "is the URL reachable" feedback in UI. ~30min after the front page lands.
 - [ ] **Tamper-evidence audit hash chain** — columns posées (`prevHash`/`hash`), calc gated by `AUDIT_TAMPER_EVIDENCE=false` env flag. Implementation deferred until SOC2 audit demands (Merkle batch ou hash chain row-lock).
-- [ ] **Phase 0.4 observability subscribers** (Sentry/OTel/Prom) — trivial 1-line `onEvent(...)` additions when those modules land.
+- [ ] **Domain-event → telemetry subscribers** (Sentry breadcrumb / OTel span attr / Prom counter per event-type) — trivial 1-line `onEvent(...)` additions. Sentry capture on 5xx already wired via `IInstrumentation` (Phase 0.4); OTel + Prom land with Phase D.1 Grafana consumer.
 - [ ] **`USER_EMAIL_VERIFIED`** path edge case: `ctx.context.session?.user.id` peut être `null` si auto-sign-in pas encore propagé. Skip silencieux actuellement. Workaround propre : extraire userId du verification token (BetterAuth API not exposed publicly today — check v1.7+).
 - [x] **`UPLOAD_DELETED`** event + `DELETE /uploads` route shipped. Ownership-gated (`key.startsWith(\`${ownerId}/\`)` → 403 sinon), emit après `storage.deleteObject()` succès, payload utilise `hashKey(key)` (PII-safe).
 
