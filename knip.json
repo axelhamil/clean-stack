@@ -8,7 +8,8 @@
         "src/shared/internal-routes/internal-fetch.ts",
         "src/modules/*/module.ts",
         "src/modules/*/routes.ts",
-        "src/modules/*/internal.routes.ts"
+        "src/modules/*/internal.routes.ts",
+        "src/cron/*.ts"
       ],
       "project": ["**/*.ts"],
       "ignoreDependencies": ["pino-pretty"]

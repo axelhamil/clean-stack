@@ -193,46 +193,21 @@ Each endpoint runs a batched `DELETE ... WHERE id IN (SELECT id ... ORDER BY <ts
 2. `POST /internal/sweep-audit-log` — independent
 3. `POST /internal/sweep-outbox` — last, otherwise `outbox_event` rows still referenced by undeleted deliveries trigger an FK violation
 
-### Cron recipe (GitHub Actions example)
+### Cron chain entrypoint
 
-```yaml
-# .github/workflows/sweep.yml
-name: nightly retention sweep
-on:
-  schedule:
-    - cron: "17 3 * * *"  # 03:17 UTC daily, off-peak
-jobs:
-  sweep:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun run scripts/sweep.ts
-        env:
-          API_URL: ${{ secrets.API_URL }}
-          INTERNAL_SIGNING_KEY: ${{ secrets.INTERNAL_SIGNING_KEY }}
+The chained sweep runner lives at `apps/api/src/cron/sweep.ts` — single source of truth, bundled by `bun build` into `dist/cron/sweep.js`. Reads `API_URL` and `INTERNAL_SIGNING_KEY` from env, hits the three endpoints in FK order, exits non-zero on first failure.
+
+Runtime invocation (the same binary works in any orchestrator):
+
+```bash
+API_URL=https://api.example.com \
+INTERNAL_SIGNING_KEY=<hex32+> \
+  bun dist/cron/sweep.js
 ```
 
-```ts
-// scripts/sweep.ts — invokes the three sweeps in order via signedInternalFetch
-import { signedInternalFetch } from "../apps/api/src/shared/internal-routes/internal-fetch";
+**Railway Cron** (reference deploy — see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)) configures this via `infra/railway/cron.toml`: `startCommand = "bun dist/cron/sweep.js"`, `cronSchedule = "17 3 * * *"`, `restartPolicyType = "NEVER"`. The cron service reuses the api Docker image — no extra Dockerfile.
 
-const base = process.env.API_URL!;
-const key = process.env.INTERNAL_SIGNING_KEY!;
-const body = JSON.stringify({ dryRun: false });
-
-for (const path of [
-  "/internal/sweep-webhook-delivery",
-  "/internal/sweep-audit-log",
-  "/internal/sweep-outbox",
-]) {
-  const res = await signedInternalFetch(`${base}${path}`, { method: "POST", body }, key);
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
-  console.log(path, await res.json());
-}
-```
-
-For Vercel Cron, expose `/api/cron/sweep` that does the same chain server-side and protect it with `Authorization: Bearer ${CRON_SECRET}` per Vercel's pattern; the route then calls `signedInternalFetch` internally.
+For other orchestrators (Fly Machines `--schedule`, Render Cron Job, Cloud Scheduler → Cloud Run job, K8s CronJob), point the entrypoint at the same `bun dist/cron/sweep.js` command and pass the two env vars. The signature primitives (`signedInternalFetch` with object input — see `apps/api/src/shared/internal-routes/internal-fetch.ts`) are platform-agnostic.
 
 ## Setup checklist post-clone
 

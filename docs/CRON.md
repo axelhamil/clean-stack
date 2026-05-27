@@ -161,7 +161,7 @@ Same `internalLayers` (HMAC + optional private network) gate, same `signedIntern
 
 Three endpoints purge the derived tables of the event pipeline. Defaults: outbox 7d, audit_log operational 90d / compliance 365d, webhook_delivery 30d (`success` + `dead_letter` only — `pending`/`failed` never purged). All take `{ batchSize?: 1–50000, dryRun?: boolean }`.
 
-Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix, env knobs, and a full GitHub Actions recipe.
+Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix and env knobs. Reference cron entrypoint chaining the three in order: `apps/api/src/cron/sweep.ts` (bundled to `dist/cron/sweep.js`). Wire it via the wiring options above — Railway Cron is the reference deploy (see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)).
 
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken — fix that, not the window.
