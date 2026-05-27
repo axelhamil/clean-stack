@@ -13,6 +13,6 @@ watchPatterns = [
 
 [deploy]
 cronSchedule = "17 3 * * *"
-startCommand = "bun dist/cron/sweep.js"
+startCommand = "bun apps/api/src/cron/sweep.ts"
 restartPolicyType = "NEVER"
 

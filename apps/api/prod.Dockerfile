@@ -3,32 +3,23 @@ WORKDIR /repo
 COPY . .
 RUN npx -y turbo@2.9.6 prune api --docker
 
-FROM node:24.15.0-alpine AS builder
-COPY --from=oven/bun:1.3.6-alpine /usr/local/bin/bun /usr/local/bin/bun
-RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+FROM oven/bun:1.3.6-alpine AS runner
+RUN apk add --no-cache wget nodejs npm
+RUN npm install -g pnpm@10.33.2
+
 WORKDIR /repo
 
 COPY --from=pruner /repo/out/json/ ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts --prod
 
 COPY --from=pruner /repo/out/full/ ./
 
-RUN cd apps/api && bun build src/index.ts src/migrate.ts src/cron/sweep.ts --outdir dist --target bun --minify
+ENV MIGRATIONS_FOLDER=/repo/packages/drizzle/migrations
+ENV NODE_ENV=production
 
-FROM oven/bun:1.3.6-alpine AS runner
-WORKDIR /app
-
-RUN apk add --no-cache wget
-
-COPY --from=builder --chown=bun:bun /repo/apps/api/dist /app/dist
-COPY --from=builder --chown=bun:bun /repo/packages/drizzle/migrations /app/migrations
-
-ENV MIGRATIONS_FOLDER=/app/migrations
-
-USER bun
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- "http://localhost:${PORT:-3000}/livez" || exit 1
 
-CMD ["sh", "-c", "bun dist/migrate.js && bun dist/index.js"]
+CMD ["sh", "-c", "bun apps/api/src/migrate.ts && bun apps/api/src/index.ts"]
