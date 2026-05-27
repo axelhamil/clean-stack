@@ -16,10 +16,10 @@ ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 RUN test -n "$VITE_API_URL" || (echo "ERROR: --build-arg VITE_API_URL is required (e.g. https://api.example.com)" && exit 1)
 
-RUN pnpm --filter "@packages/*" run build
 RUN pnpm --filter app exec vite build
 
 FROM caddy:2.11-alpine AS runner
+RUN apk add --no-cache wget
 COPY apps/app/Caddyfile /etc/caddy/Caddyfile
 COPY --from=builder /repo/apps/app/dist /srv
 

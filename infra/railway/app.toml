@@ -1,0 +1,18 @@
+"$schema" = "https://railway.com/railway.schema.json"
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/app/prod.Dockerfile"
+watchPatterns = [
+  "apps/app/**",
+  "packages/ui/**",
+  "packages/access-control/**",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 10
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
