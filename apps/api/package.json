@@ -29,6 +29,7 @@
     "@packages/ddd-kit": "workspace:*",
     "@packages/drizzle": "workspace:*",
     "@packages/events": "workspace:*",
+    "@sentry/bun": "^10.54.0",
     "@simplewebauthn/server": "^13.3.0",
     "better-auth": "^1.6.11",
     "hono": "^4.12.22",

@@ -8,7 +8,8 @@ import {
   SIGNATURE_HEADER,
   sign,
 } from "../../../shared/internal-routes/internal-signature";
-import { errorHandler } from "../../../shared/middleware/error.middleware";
+import { NoOpInstrumentation } from "../../../shared/middleware/../services/noop-instrumentation";
+import { createErrorHandler } from "../../../shared/middleware/error.middleware";
 
 type SweepOutput = {
   processed: number;
@@ -41,7 +42,7 @@ function makeApp() {
     c.set("requestId", "req-test");
     await next();
   });
-  app.onError(errorHandler);
+  app.onError(createErrorHandler(new NoOpInstrumentation()));
   app.route("/internal", rgpdInternalRoutes);
   return app;
 }

@@ -9,6 +9,7 @@ import type {
   SendTemplateOptions,
   TemplateVariables,
 } from "../ports/email.port";
+import type { IInstrumentation } from "../ports/instrumentation.port";
 
 // Resend dashboard handles — fill when cloning. Empty = transport not configured (prod boots fail-hard, dev drops with a warn).
 const TEMPLATE_IDS: Record<keyof EmailTemplates, string> = {
@@ -39,7 +40,7 @@ type AttemptOutcome = { ok: true } | { ok: false; status: number; message: strin
 export class ResendEmailService implements IEmailService {
   private readonly resend: Resend | null;
 
-  constructor() {
+  constructor(private readonly instrumentation: IInstrumentation) {
     this.resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
     const isProd = env.NODE_ENV === "production";
@@ -69,6 +70,18 @@ export class ResendEmailService implements IEmailService {
   }
 
   async sendTemplate<K extends keyof EmailTemplates>(
+    template: K,
+    to: string,
+    variables: EmailTemplates[K] & TemplateVariables,
+    options?: SendTemplateOptions,
+  ): Promise<Result<void, EmailError>> {
+    return this.instrumentation.startSpan(
+      { name: "ResendEmailService > sendTemplate", op: "function", attributes: { template } },
+      () => this.sendTemplateInner(template, to, variables, options),
+    );
+  }
+
+  private async sendTemplateInner<K extends keyof EmailTemplates>(
     template: K,
     to: string,
     variables: EmailTemplates[K] & TemplateVariables,
@@ -152,17 +165,31 @@ export class ResendEmailService implements IEmailService {
     if (!this.resend) {
       return { ok: false, status: 0, message: "resend client not initialized" };
     }
-    try {
-      const { error } = await this.resend.emails.send(payload);
-      if (!error) return { ok: true };
-      const status = (error as { statusCode?: number }).statusCode ?? 500;
-      return { ok: false, status, message: error.message ?? "unknown" };
-    } catch (e) {
-      return {
-        ok: false,
-        status: 0,
-        message: e instanceof Error ? e.message : "network error",
-      };
-    }
+    return this.instrumentation.startSpan(
+      {
+        name: "POST https://api.resend.com/emails",
+        op: "http.client",
+        attributes: { "http.method": "POST", "http.host": "api.resend.com" },
+      },
+      async () => {
+        if (!this.resend) {
+          return { ok: false, status: 0, message: "resend client not initialized" } as const;
+        }
+        try {
+          const { error } = await this.resend.emails.send(payload);
+          if (!error) return { ok: true } as const;
+          const status = (error as { statusCode?: number }).statusCode ?? 500;
+          if (status >= 500) this.instrumentation.capture(error);
+          return { ok: false, status, message: error.message ?? "unknown" } as const;
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return {
+            ok: false,
+            status: 0,
+            message: e instanceof Error ? e.message : "network error",
+          } as const;
+        }
+      },
+    );
   }
 }

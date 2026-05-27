@@ -44,6 +44,7 @@ mock.module("@aws-sdk/s3-request-presigner", () => ({
 }));
 
 const { S3StorageService } = await import("../infrastructure/services/storage.service");
+const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
 describe("S3StorageService (custom logic only)", () => {
   let service: InstanceType<typeof S3StorageService>;
@@ -52,7 +53,7 @@ describe("S3StorageService (custom logic only)", () => {
     nextSendOutcome = () => Promise.resolve({});
     listPages = [];
     lastSendCount = 0;
-    service = new S3StorageService();
+    service = new S3StorageService(new NoOpInstrumentation());
   });
 
   it("should map NotFound to STORAGE_NOT_FOUND but other errors to STORAGE_PROVIDER_FAILURE (error discriminator)", async () => {
@@ -87,5 +88,129 @@ describe("S3StorageService (custom logic only)", () => {
     const batched = await service.deleteObjects(keys);
     expect(batched.isSuccess).toBe(true);
     expect(lastSendCount).toBe(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // presignUpload
+  // -------------------------------------------------------------------------
+  it("presignUpload happy path → returns signed URL + expiresAt", async () => {
+    const result = await service.presignUpload({
+      key: "user-1/uploads/uuid-filename.png",
+      contentType: "image/png",
+      size: 1024,
+      expiresInSeconds: 300,
+    });
+    expect(result.isSuccess).toBe(true);
+    const val = result.getValue();
+    expect(val.url).toBe("https://signed.example/url");
+    expect(typeof val.expiresAt).toBe("string");
+    // expiresAt should be a future ISO date
+    expect(new Date(val.expiresAt).getTime()).toBeGreaterThan(Date.now() - 1000);
+  });
+
+  it("presignUpload failure → STORAGE_PROVIDER_FAILURE", async () => {
+    nextSendOutcome = () => Promise.reject(new Error("signer error"));
+    // getSignedUrl will throw; we override the mock inline
+    mock.module("@aws-sdk/s3-request-presigner", () => ({
+      getSignedUrl: async () => {
+        throw new Error("signer error");
+      },
+    }));
+    // Re-instantiate service so it picks up new mock
+    const svc = new S3StorageService(new NoOpInstrumentation());
+    const result = await svc.presignUpload({
+      key: "user-1/file.png",
+      contentType: "image/png",
+      size: 512,
+      expiresInSeconds: 300,
+    });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
+    // Restore
+    mock.module("@aws-sdk/s3-request-presigner", () => ({
+      getSignedUrl: async () => "https://signed.example/url",
+    }));
+  });
+
+  // -------------------------------------------------------------------------
+  // presignDownload
+  // -------------------------------------------------------------------------
+  it("presignDownload happy path → returns signed URL", async () => {
+    const result = await service.presignDownload({
+      key: "user-1/uploads/uuid-filename.png",
+      expiresInSeconds: 60,
+    });
+    expect(result.isSuccess).toBe(true);
+    expect(result.getValue().url).toBe("https://signed.example/url");
+  });
+
+  it("presignDownload failure → STORAGE_PROVIDER_FAILURE", async () => {
+    mock.module("@aws-sdk/s3-request-presigner", () => ({
+      getSignedUrl: async () => {
+        throw new Error("presign download error");
+      },
+    }));
+    const svc = new S3StorageService(new NoOpInstrumentation());
+    const result = await svc.presignDownload({
+      key: "user-1/file.png",
+      expiresInSeconds: 60,
+    });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
+    mock.module("@aws-sdk/s3-request-presigner", () => ({
+      getSignedUrl: async () => "https://signed.example/url",
+    }));
+  });
+
+  // -------------------------------------------------------------------------
+  // uploadObject
+  // -------------------------------------------------------------------------
+  it("uploadObject happy path → ok", async () => {
+    nextSendOutcome = () => Promise.resolve({});
+    const result = await service.uploadObject({
+      key: "user-1/avatar.png",
+      body: new Uint8Array([1, 2, 3]),
+      contentType: "image/png",
+    });
+    expect(result.isSuccess).toBe(true);
+    expect(lastSendCount).toBe(1);
+  });
+
+  it("uploadObject failure → STORAGE_PROVIDER_FAILURE", async () => {
+    nextSendOutcome = () => Promise.reject(new Error("put failed"));
+    const result = await service.uploadObject({
+      key: "user-1/avatar.png",
+      body: new Uint8Array([1]),
+      contentType: "image/png",
+    });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
+  });
+
+  // -------------------------------------------------------------------------
+  // deleteObject
+  // -------------------------------------------------------------------------
+  it("deleteObject happy path → ok", async () => {
+    nextSendOutcome = () => Promise.resolve({});
+    const result = await service.deleteObject("user-1/file.png");
+    expect(result.isSuccess).toBe(true);
+    expect(lastSendCount).toBe(1);
+  });
+
+  it("deleteObject failure → STORAGE_PROVIDER_FAILURE", async () => {
+    nextSendOutcome = () => Promise.reject(new Error("delete failed"));
+    const result = await service.deleteObject("user-1/file.png");
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
+  });
+
+  // -------------------------------------------------------------------------
+  // publicUrlFor
+  // -------------------------------------------------------------------------
+  it("publicUrlFor returns concatenated public URL + key", () => {
+    // publicUrl is built from env.S3_PUBLIC_URL which is undefined in test → empty string
+    // So publicUrlFor("key") = "/key"
+    const url = service.publicUrlFor("user-1/avatar.png");
+    expect(url).toContain("user-1/avatar.png");
   });
 });

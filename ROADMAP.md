@@ -33,7 +33,7 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 | 0.1 | DB schema split per context (`auth.ts` → `auth.ts` + `multi-tenant.ts`) | DONE — BetterAuth-owned tables stay in `auth.ts`; `organization`/`member`/`invitation` extracted to `multi-tenant.ts`. RGPD = 3 cols on `user` (BetterAuth-owned), inline. Combined `schema` re-export preserves call sites (zero refactor). |
 | 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | DONE — `modules/health/` + `IHealthCheckRegistry` (cache asym 30s/5s, timeout 5s, tri-state agg), `OnInit`+`preload()` self-registering probes (db critical via health, storage non-critical via `uploads`), `SIGTERM`-driven `lifecycleState` flip + `SHUTDOWN_GRACE_PERIOD_MS` window, payload minimal en prod, mount hors middleware. Docs: [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) (recipes Railway/Fly/Render/K8s/Cloud Run). |
 | 0.3 | Backups + disaster recovery (PITR-first, portable `pg_dump` export as fallback, restore runbook) | DONE — doc-only deliverable in `docs/DISASTER-RECOVERY.md`. No backup code shipped (intentional: managed Postgres providers do this better; `pgBackRest` unmaintained since 2026). Covers PITR setup per provider (Railway/Neon/Supabase/RDS/Fly/self-hosted), restore runbook, weekly portable export recipes (GH Actions/Railway/K8s), monthly restore-test recipe, lifecycle + versioning. |
-| 0.4 | Sentry + OpenTelemetry + Prometheus `/metrics` (3 detachable ports + NoOp default) | TODO — subscribers now trivial via `onEvent` (event-driven foundation) |
+| 0.4 | Error tracking minimal (Sentry api + app, RGPD scrubbing, pino breadcrumbs) | DONE — Sentry only. OTel + Prom `/metrics` **deferred to Phase D.1** after SOTA 2026 audit (Bun OTel auto-instrumentation manual, prom-client without Grafana consumer = code mort). See [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md). |
 | 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
 | 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | DONE — 3 routes `/internal/sweep-*`, SOTA 2026 defaults, GH Actions recipe in `docs/EVENTS.md` |
 
@@ -237,94 +237,68 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 ---
 
-## Error tracking + structured logging fan-out — **Phase 0.4**
+## Error tracking — **Phase 0.4** ✅ May 2026 (Sentry only)
 
-**Why before Phase A**: every phase A/B/C ships prod code. Without Sentry active from day one, you're blind on errors until Phase D.1 — six phases away. The wiring cost today (~2-3h, this phase) is dwarfed by the cost of debugging without traces/breadcrumbs across all of A, B, C. SOTA 2026 boilerplates ship error tracking before customer-facing features, not after.
+**Why before Phase A**: every phase A/B/C ships prod code. Without Sentry active from day one, you're blind on errors until Phase D.1 — six phases away. The ~3h wiring cost is dwarfed by the cost of debugging without traces/breadcrumbs across all of A, B, C.
 
-**Why detachable matters more than which provider**: a clone might want Sentry, GlitchTip self-hosted, Highlight, or no error tracking at all (closed network, classified env). The architecture below makes the provider a 1-line swap and the whole stack a 5-min trash. **Removability is the contract**, providers come and go.
+**Why Sentry-only, not the original 3-in-1 (Sentry + OTel + Prom)**: SOTA 2026 re-audit (échéance May 2026) invalidated the bundled scope :
 
-### Architecture — ports + NoOp default + retirable module
+- `@sentry/bun` v9.x+ is still **beta** (regressions récentes), but errors are immediate-value and Sentry SDK gracefully handles uninit state — fragility acceptable.
+- **OTel under Bun 1.3+** = manual instrumentation for `Bun.serve()` (auto broken). `@hono/otel` + `@kubiks/otel-drizzle` exist but wiring (~200 LOC) buys zero value before a Grafana/Tempo/Jaeger consumer (Phase D.1). Bun likely ships native OTel — waiting avoids a refactor.
+- **`prom-client` `/metrics`** = SOTA confirmed (Julius Volz native > OTel push) but exposing without Grafana scrape = code mort jusqu'à D.1.
+- **`pinoIntegration`** is now native in the Sentry SDK (v10.18+), replacing the deprecated `@sentry/pino-transport` community package.
 
-The pattern mirrors what's already shipped for `email.port` (Resend swappable) and `storage.port` (R2/SeaweedFS swappable):
+OTel + Prom + `/metrics` are **deferred to Phase D.1** when status page + Grafana scaffold gives them a consumer. Cohérent avec la décision Phase 0.3 (ship infra cross-cutting *avec consommateur*, pas du wiring spéculatif).
+
+### Shipped surface
 
 ```
-apps/api/src/
-  shared/
-    ports/
-      error-tracker.port.ts    IErrorTracker { capture(err, ctx), addBreadcrumb(crumb) }
-      metrics.port.ts          IMetrics { increment, histogram, gauge }
-      tracer.port.ts           ITracer { startSpan, withSpan }
-    services/
-      noop-error-tracker.ts    Always shipped — silent no-op
-      noop-metrics.ts          Always shipped
-      noop-tracer.ts           Always shipped
-  modules/observability/        ← retirable module
-    infrastructure/
-      sentry-error-tracker.ts  @sentry/bun adapter
-      prom-metrics.ts          prom-client adapter
-      otel-tracer.ts           OTel auto-instrumentation
-    routes.ts                  GET /metrics (Prom scrape, gated by X-Metrics-Token)
-    module.ts                  Overrides DI bindings WHEN env vars present
+apps/api/src/shared/
+  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb }
+  services/
+    noop-instrumentation.ts            Always-bound default — silent passthrough
+    sentry-instrumentation.ts          @sentry/bun adapter (startSpan + captureException + addBreadcrumb)
+    sentry-init.ts                     Module-load side-effect Sentry.init() if SENTRY_DSN
+
+apps/api/src/container.ts              Conditional binding: SentryInstrumentation if DSN, else NoOpInstrumentation
+
+apps/app/src/shared/observability/
+  sentry.ts                            Init + captureError/addBreadcrumb/ErrorBoundary (default consumer)
+  noop.ts                              Swap target for removal (1-line import swap in app-providers.tsx)
 ```
 
-- [ ] **Default container bindings** (in `container.ts`, always present) bind `IErrorTracker`/`IMetrics`/`ITracer` to NoOp impls. Code calling `di.IErrorTracker.capture(err)` works regardless of whether the observability module ships.
-- [ ] **Module overrides bindings conditionally**: `env.SENTRY_DSN` → SentryAdapter, else NoOp. `env.PROM_TOKEN` → PromAdapter, else NoOp. Environment is the toggle, not a feature flag.
-- [ ] **3 ports, not 1 fat `IObservability`** — Sentry/Prom/OTel are independent providers with independent SDKs. Fusing them forces cross-deps between unrelated adapters. SOTA 2026 = 3 ports.
+- [x] **Single `IInstrumentation` port** (combine startSpan + capture + addBreadcrumb) bound via inwire DI — same Pinia-style pattern as `IEmailService`/`IStorageService`. Injected via constructor into every I/O-bound class (no service-locator, no module-level singleton). `c.IInstrumentation` is always present ; binding picks NoOp or Sentry based on `env.SENTRY_DSN`.
+- [x] **Repo / service spans applied** to `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `ResendEmailService`, `DrizzleRgpdRepository`, `S3StorageService`, `DrizzleWebhookEndpointRepository`, `DrizzleWebhookDeliveryRepository`, `AuditQueryService`. Lazar pattern : outer span `{ name: "Class > method" }`, inner span `{ name: query.toSQL().sql, op: "db.query", attributes: { "db.system.name": "postgresql" } }` on `query.execute()` / `client.send()` / `fetch()`. catch + `this.instrumentation.capture(err)` + `return Result.fail(...)` (or rethrow for non-Result methods).
+- [x] **`@sentry/bun` SDK** init via side-effect `import "./shared/services/sentry-init"` placed as the first import of `apps/api/src/index.ts` (order matters: hooks async-hooks before pino/Hono/Drizzle).
+- [x] **`createErrorHandler(instrumentation)` factory** in `error.middleware.ts` — called once in `index.ts` after `di.build()` as `app.onError(createErrorHandler(di.IInstrumentation))`. Captures `>= 500` for `AppErrorException` + `HTTPException` + unhandled, tags `{ requestId, userId, orgId, path, method }`. 4xx skipped. Factory pattern avoids any future cycle between middleware and container.
+- [x] **`beforeSend` scrubbing** whitelist-based (default = drop): `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email` / `username` / `ip_address`. RGPD-clean.
+- [x] **Release tracking** via `env.GIT_SHA` (already injected by Phase 0.2 for `/livez`).
+- [x] **`Sentry.pinoIntegration()`** wired in `Sentry.init({ integrations: [...] })` — every `logger.warn` / `logger.error` auto-becomes a breadcrumb on the next captured event. Pino's stdout JSON line format unchanged.
+- [x] **Sentry EU region** — DSN can target `*.eu.sentry.io` for RGPD residency.
+- [x] **App side** — `@sentry/react` init in `shared/observability/sentry.ts`, `<Sentry.ErrorBoundary>` wraps the provider tree in `app-providers.tsx` with a fallback UI.
+- [x] **`@sentry/vite-plugin`** in `apps/app/vite.config.ts` — uploads sourcemaps at build when CI sets `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT`. No-op otherwise.
+- [x] **Env**: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` (api) + `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_GIT_SHA` (app). All optional ; empty = NoOp.
+- [x] **Knip protection** — `noop.ts` + `sentry.ts` listed as `entry` in `knip.json` (boilerplate-symmetry pattern, like `shared/api/{queries,mutations}/*`).
+- [x] **Docs** — [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) covers setup, instrumentation pattern, manual capture API, removability runbook, provider swap recipe (Sentry → GlitchTip / Highlight, DSN-compatible), deferred section, EU residency.
 
-**Removal contract — 5 min, validated as part of this phase**:
+### Removability — flip one binding
 
-1. `trash apps/api/src/modules/observability`
-2. Remove `.addModule(observabilityModule)` from `container.ts` (1 line)
-3. Remove `app.route("/metrics", metricsRoutes)` from `index.ts` (1 line)
-4. `.env`: unset `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `PROM_TOKEN`
-5. Front: `trash apps/app/src/shared/observability/sentry.ts` + remove 1 `Sentry.init()` line from `main.tsx`
+The whole Sentry stack is one DI binding plus one side-effect import. The call sites (`this.instrumentation.capture(...)`, `this.instrumentation.startSpan(...)`, `<ErrorBoundary>`) never change — they resolve to NoOp.
 
-All call-sites (`di.IErrorTracker.capture(...)`, `<ErrorBoundary>` in app) keep working — they hit NoOp impls in `shared/services/`. **Zero refactor.** This removal must be exercised in the same phase that ships the observability module — otherwise the contract drifts.
+1. Edit `apps/api/src/container.ts` → replace the `IInstrumentation` factory by `() => new NoOpInstrumentation()`. `trash apps/api/src/shared/services/sentry-{init,instrumentation}.ts`. Remove the `import "./shared/services/sentry-init"` line from `index.ts`.
+2. In `apps/app/src/shared/app-providers.tsx`, swap `from "./observability/sentry"` to `from "./observability/noop"`. `trash apps/app/src/shared/observability/sentry.ts`.
+3. Remove the `@sentry/vite-plugin` block from `vite.config.ts`.
+4. `pnpm remove @sentry/bun --filter=api && pnpm remove @sentry/react @sentry/vite-plugin --filter=app`
+5. Unset env vars.
 
-### Sentry — error tracking (api + app)
+All call sites keep working via NoOp. **Zero refactor.** `pnpm ci:check && pnpm type-check && pnpm test` stay green.
 
-**API**:
+### Deferred to Phase D.1
 
-- [ ] `@sentry/bun` SDK (native Bun support since 2024 — no Node shim).
-- [ ] Init in `modules/observability/infrastructure/sentry-error-tracker.ts`. Module-level singleton, **deliberate exception** to DI (same rationale as BetterAuth: wrapping recopies the SDK API and loses typing).
-- [ ] Hook into the existing `errorHandler` middleware: capture `>= 500` only, skip 4xx (operational, not error). Tags auto-populated from Hono context: `requestId`, `userId` (from session), `orgId` (from `c.var.orgId` when present).
-- [ ] **`beforeSend` data scrubbing**: strip `email`, `name`, `Authorization` header, `Cookie` header, full request body. Whitelist-based, not blacklist (default = drop). RGPD-clean — gross differentiator for EU clients.
-- [ ] **Release tracking** ties to `commitSha` injected at build time (already used in `/livez` from Phase 0.2). `Sentry.init({ release: env.GIT_SHA })`. Lets you read a probe in a degraded pod and immediately diff against the previous release in Sentry.
-- [ ] **Source maps upload** at build via CI step — `@sentry/cli sourcemaps upload --release=$GIT_SHA`. Without this, prod stack traces are minified gibberish.
-- [ ] **Sentry EU region option** (`SENTRY_DSN` may point to `*.eu.sentry.io`) documented in `apps/api/.env.example` — RGPD data residency for EU clientele.
-
-**App**:
-
-- [ ] `@sentry/react` + `@sentry/vite-plugin` (auto source maps upload at build).
-- [ ] `apps/app/src/shared/observability/sentry.ts` — stable exported API: `captureError()`, `addBreadcrumb()`. NoOp impl in `noop.ts`, real impl in `sentry.ts` (swap by env: if `VITE_SENTRY_DSN` then real, else noop). Same removal contract.
-- [ ] **ErrorBoundary at router root** (in `__root.tsx` or `<AppProviders />`): captures render errors, displays a fallback, logs to Sentry. TanStack Router error boundary integration handles route-level errors automatically.
-- [ ] **Session replay opt-in** (free up to 50 sessions/month on Sentry SaaS, ~3KB additional bundle). Ship behind a separate env flag (`VITE_SENTRY_REPLAY=true`) so removal is independent. Privacy-first defaults: mask all input, mask all text, redact images.
-
-### Pino transport — structured logging fan-out
-
-- [ ] `@sentry/pino-transport` — every `logger.warn` / `logger.error` becomes a Sentry breadcrumb automatically. Single source of truth for logs; Sentry sees the same trail you see in stdout. **No double-capture** of the same event.
-- [ ] Pino remains the writer for stdout (PaaS log ingestion); Sentry transport runs in parallel. Keep the JSON line format unchanged so existing log parsers don't break.
-
-### OpenTelemetry — distributed tracing
-
-- [ ] `@opentelemetry/sdk-node` (works under Bun since 1.2+) with auto-instrumentation packages: `@opentelemetry/instrumentation-http` (Hono / Bun.serve), `@opentelemetry/instrumentation-pg` (Drizzle pool), `@opentelemetry/instrumentation-fetch` (outbound to Resend / R2 / Stripe later).
-- [ ] **Sentry consumes OTel natively since 2024** — set `tracesSampleRate: 0.1` and Sentry Performance picks up the spans without a second export pipeline. Single provider, two products (errors + performance).
-- [ ] **`traceparent` header propagation api ↔ app** — front injects via fetch interceptor in `api-client.ts`, api reads it in middleware. End-to-end traces from a click in the app to a DB query, gratis.
-- [ ] OTel SDK init lives in `modules/observability/infrastructure/otel-tracer.ts` — imported once at the top of `index.ts` (must run before any other instrumented module). Removing the module = remove the import = OTel disappears entirely.
-
-### Prometheus `/metrics` — for Phase D.1 dashboards
-
-- [ ] `prom-client` exposes histograms + counters via `IMetrics` port adapter.
-- [ ] Default metrics: HTTP request duration histogram (labels: route, method, status), DB query duration (from OTel pg instrumentation, exposed as Prom metric), business counters wired by each module (`registry.increment("rgpd.deletion.requested")`).
-- [ ] **Health checks export their state**: `up{check="db:postgres"} 1|0` from the registry built in Phase 0.2 — Phase D.1 status page reads `/metrics` directly without rework.
-- [ ] **`GET /metrics` mounted in observability module routes**, gated by `X-Metrics-Token` shared secret (env var). Mounted **outside** `requireAuth` (Prom scrapers don't carry sessions) and outside `httpLogger` (no log spam from 5s scrape interval).
-- [ ] Dropped if observability module is removed — and that's fine, no other code consumes `/metrics`.
-
-### Documentation
-
-- [ ] `docs/OBSERVABILITY.md` — port usage (how to capture an error, increment a counter, start a span), removal procedure (the 5-min contract), provider swap recipe (Sentry → GlitchTip self-hosted, drop-in API-compatible), data scrubbing rationale, EU region setup.
-- [ ] `apps/api/.env.example` — `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `PROM_TOKEN` documented with empty defaults (NoOp fallback).
-- [ ] `apps/app/.env.example` — `VITE_SENTRY_DSN`, `VITE_SENTRY_REPLAY`, `VITE_SENTRY_ENVIRONMENT`.
+- **OpenTelemetry tracing** — `@hono/otel` + `@kubiks/otel-drizzle` recipes when Grafana/Tempo/Jaeger arrives, or sooner if a debug incident demands distributed traces.
+- **`prom-client` `/metrics`** — health check registry from Phase 0.2 already exports `up{check}` state ; drop-in 30 LOC route + `X-Metrics-Token` gate when D.1 status page scrapes.
+- **Sentry Performance** (`tracesSampleRate > 0`) — coupled to OTel deferral (Sentry consumes OTel spans natively).
+- **Session Replay** — privacy-first config + separate `VITE_SENTRY_REPLAY=true` flag, post-audit.
 
 ---
 
@@ -641,8 +615,13 @@ modules/consents/
 
 ## Status page + SLO dashboards + alerting — **Phase D.1**
 
-**Why now (after Phase C ships customer-facing surfaces)**: Phase 0.4 already ships error tracking, OTel tracing, Prometheus `/metrics`. What's missing is the **customer-facing trust layer** (public status page) and the **operator-facing aggregation layer** (SLO dashboards + alerting policies). These depend on:
-- Months of `/metrics` data accumulated since Phase 0.4 (so SLO baselines are realistic, not invented)
+**Why now (after Phase C ships customer-facing surfaces)**: Phase 0.4 shipped Sentry error tracking only ; OTel tracing + Prometheus `/metrics` were deferred here so they wire alongside their consumer (Grafana). What's needed at D.1 :
+
+1. **Add OTel tracing** — `@hono/otel` + `@kubiks/otel-drizzle` (~150 LOC). Sentry consumes OTel spans natively, so `SENTRY_TRACES_SAMPLE_RATE` can finally bump > 0. `traceparent` header propagation api ↔ app (fetch interceptor in `api-client.ts`). Re-evaluate Bun native OTel availability before wiring.
+2. **Add Prometheus `/metrics`** — `prom-client` adapter + `GET /metrics` route gated by `X-Metrics-Token`, mounted outside `requireAuth` + `httpLogger`. Health check registry from Phase 0.2 already exports `up{check}` state.
+3. **Customer-facing trust layer** (public status page) and **operator-facing aggregation layer** (SLO dashboards + alerting policies). These depend on:
+
+- Months of `/metrics` data accumulated *after* this phase wires it (so SLO baselines are realistic)
 - Audit log from Phase C.2 (incident timeline correlation)
 - Admin from Phase C.3 (incident-creation UI in admin)
 - Customer-facing surfaces from Phase C.4 / C.5 (PATs, webhooks — the surfaces customers actually monitor)

@@ -135,6 +135,7 @@ Primitives for the business domain only (rule: never DDD for billing / auth / ga
 - **`pino`** + **`hono-pino`** — JSON in prod, `pino-pretty` in dev. `info` prod / `debug` dev. Status-driven HTTP log level (`5xx` → `error`, `4xx` → `warn`).
 - **Single `app.onError(errorHandler)`** — `HTTPException` → `{ error: { code, message, requestId } }`. No per-route try/catch.
 - **Request ID** propagated via `X-Request-Id` header; every log line carries it.
+- **Sentry error tracking** (Phase 0.4) — `@sentry/bun` (api) + `@sentry/react` (app), NoOp without `SENTRY_DSN`. `errorHandler` captures `>= 500` automatically with `requestId/userId/orgId/path/method` tags ; `<Sentry.ErrorBoundary>` wraps the app provider tree. RGPD-clean scrubbing (whitelist drop of `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address`). `pinoIntegration` turns every `logger.warn|error` into a breadcrumb. `@sentry/vite-plugin` uploads source maps in CI when `SENTRY_AUTH_TOKEN`+`SENTRY_ORG`+`SENTRY_PROJECT` set. OTel + Prometheus `/metrics` deferred to Phase D.1 (Bun OTel manual + no Grafana consumer yet). See [`./OBSERVABILITY.md`](./OBSERVABILITY.md).
 
 ## Disaster recovery ✅ (doc-only)
 

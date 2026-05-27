@@ -1,16 +1,28 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { errorHandler } from "../middleware/error.middleware";
+import { createErrorHandler } from "../middleware/error.middleware";
+import type { IInstrumentation } from "../ports/instrumentation.port";
 
-function makeApp() {
+function makeSpy() {
+  const captureSpy = mock(() => {});
+  const instrumentation: IInstrumentation = {
+    capture: captureSpy,
+    startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
+    addBreadcrumb: () => {},
+  };
+  return { captureSpy, instrumentation };
+}
+
+function makeApp(instrumentation?: IInstrumentation) {
+  const { instrumentation: fallback } = makeSpy();
   const app = new Hono<{ Variables: { requestId: string } }>();
   app.use("*", async (c, next) => {
     c.set("requestId", "req-test-123");
     await next();
   });
-  app.onError(errorHandler);
+  app.onError(createErrorHandler(instrumentation ?? fallback));
   return app;
 }
 
@@ -58,5 +70,114 @@ describe("errorHandler", () => {
     expect(body.error.code).toBe("INTERNAL_ERROR");
     expect(body.error.message).toBe("Internal Server Error");
     expect(typeof body.error.stack).toBe("string");
+  });
+
+  describe("capture spy — 500 errors", () => {
+    it("calls capture on AppErrorException with _PROVIDER_FAILURE suffix (5xx)", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const err = new AppErrorException({
+        code: "STORAGE_PROVIDER_FAILURE",
+        message: "s3 down",
+      });
+      const app = makeApp(instrumentation).get("/", () => {
+        throw err;
+      });
+      await app.request("/");
+      expect(captureSpy).toHaveBeenCalledWith(
+        err,
+        expect.objectContaining({
+          requestId: "req-test-123",
+          path: "/",
+          method: "GET",
+          userId: undefined,
+          orgId: undefined,
+        }),
+      );
+    });
+
+    it("calls capture on HTTPException 500", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const err = new HTTPException(500, { message: "gateway fail" });
+      const app = makeApp(instrumentation).get("/", () => {
+        throw err;
+      });
+      await app.request("/");
+      expect(captureSpy).toHaveBeenCalledWith(
+        err,
+        expect.objectContaining({
+          requestId: "req-test-123",
+          path: "/",
+          method: "GET",
+          userId: undefined,
+          orgId: undefined,
+        }),
+      );
+    });
+
+    it("calls capture on raw Error (unhandled)", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const err = new Error("unexpected");
+      const app = makeApp(instrumentation).get("/", () => {
+        throw err;
+      });
+      await app.request("/");
+      expect(captureSpy).toHaveBeenCalledWith(
+        err,
+        expect.objectContaining({
+          requestId: "req-test-123",
+          path: "/",
+          method: "GET",
+          userId: undefined,
+          orgId: undefined,
+        }),
+      );
+    });
+  });
+
+  describe("capture spy — 4xx errors (no capture)", () => {
+    it("does NOT call capture on HTTPException 400", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const app = makeApp(instrumentation).get("/", () => {
+        throw new HTTPException(400, { message: "bad request" });
+      });
+      await app.request("/");
+      expect(captureSpy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call capture on HTTPException 401", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const app = makeApp(instrumentation).get("/", () => {
+        throw new HTTPException(401, { message: "unauthorized" });
+      });
+      await app.request("/");
+      expect(captureSpy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call capture on HTTPException 403", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const app = makeApp(instrumentation).get("/", () => {
+        throw new HTTPException(403, { message: "forbidden" });
+      });
+      await app.request("/");
+      expect(captureSpy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call capture on AppErrorException with _NOT_FOUND suffix", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const app = makeApp(instrumentation).get("/", () => {
+        throw new AppErrorException({ code: "STORAGE_NOT_FOUND", message: "not found" });
+      });
+      await app.request("/");
+      expect(captureSpy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call capture on AppErrorException with _FORBIDDEN suffix", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const app = makeApp(instrumentation).get("/", () => {
+        throw new AppErrorException({ code: "STORAGE_FORBIDDEN", message: "forbidden" });
+      });
+      await app.request("/");
+      expect(captureSpy).not.toHaveBeenCalled();
+    });
   });
 });

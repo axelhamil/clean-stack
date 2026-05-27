@@ -52,6 +52,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@sentry/cli",
       "@swc/core",
       "esbuild",
       "sharp"

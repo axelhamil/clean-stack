@@ -26,11 +26,11 @@ export const webhooksModule = defineModule()((b) =>
   b
     .add(
       "IWebhookEndpointRepository",
-      (): IWebhookEndpointRepository => new DrizzleWebhookEndpointRepository(),
+      (c): IWebhookEndpointRepository => new DrizzleWebhookEndpointRepository(c.IInstrumentation),
     )
     .add(
       "IWebhookDeliveryRepository",
-      (): IWebhookDeliveryRepository => new DrizzleWebhookDeliveryRepository(),
+      (c): IWebhookDeliveryRepository => new DrizzleWebhookDeliveryRepository(c.IInstrumentation),
     )
     .add("WebhookMasterKey", () => masterKeyProvider(env.WEBHOOK_MASTER_KEY))
     .add(
@@ -42,6 +42,7 @@ export const webhooksModule = defineModule()((b) =>
           c.ITransactionService,
           c.IOutboxRepository,
           c.WebhookMasterKey,
+          c.IInstrumentation,
         ),
     )
     .add(
@@ -51,6 +52,7 @@ export const webhooksModule = defineModule()((b) =>
           deliveries: c.IWebhookDeliveryRepository,
           masterKey: c.WebhookMasterKey,
           logger,
+          instrumentation: c.IInstrumentation,
         }),
     ),
 );

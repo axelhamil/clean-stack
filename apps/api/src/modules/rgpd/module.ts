@@ -13,7 +13,7 @@ declare module "inwire" {
 
 export const rgpdModule = defineModule()((b) =>
   b
-    .add("IRgpdRepository", () => new DrizzleRgpdRepository(logger))
+    .add("IRgpdRepository", (c) => new DrizzleRgpdRepository(logger, c.IInstrumentation))
     .add(
       "RgpdService",
       (c) =>
@@ -23,6 +23,7 @@ export const rgpdModule = defineModule()((b) =>
           c.IEmailService,
           c.ITransactionService,
           c.IOutboxRepository,
+          c.IInstrumentation,
         ),
     ),
 );

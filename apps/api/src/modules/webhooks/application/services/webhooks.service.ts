@@ -3,6 +3,7 @@ import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packag
 import { EventTypes } from "@packages/events";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
 import { emitEvent } from "../../../../shared/event-emitter";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -29,6 +30,7 @@ export class WebhooksService {
     private readonly uow: IUnitOfWork<ITransaction>,
     private readonly outbox: IOutboxRepository,
     private readonly masterKey: MasterKeyProvider,
+    private readonly instrumentation: IInstrumentation,
     private readonly secretGen: WebhookSecretGenerator = defaultSecretGenerator,
   ) {}
 
@@ -41,52 +43,57 @@ export class WebhooksService {
   }): Promise<
     Result<{ endpoint: WebhookEndpointRecord; plaintextSecret: string }, WebhookServiceError>
   > {
-    const masterKeyOpt = this.masterKey();
-    if (masterKeyOpt.isNone()) {
-      return Result.fail({
-        code: "WEBHOOK_MASTER_KEY_UNAVAILABLE",
-        message: "WEBHOOK_MASTER_KEY env var is not configured (64 hex chars)",
-      });
-    }
-    const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), args.organizationId);
-    const plaintextSecret = this.secretGen();
-    const secretCipher = encryptSecret(plaintextSecret, subKey);
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > createEndpoint", op: "function" },
+      async () => {
+        const masterKeyOpt = this.masterKey();
+        if (masterKeyOpt.isNone()) {
+          return Result.fail({
+            code: "WEBHOOK_MASTER_KEY_UNAVAILABLE",
+            message: "WEBHOOK_MASTER_KEY env var is not configured (64 hex chars)",
+          });
+        }
+        const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), args.organizationId);
+        const plaintextSecret = this.secretGen();
+        const secretCipher = encryptSecret(plaintextSecret, subKey);
 
-    const created = await this.uow.run(async (tx) => {
-      const result = await this.endpoints.create(
-        {
-          id: uuidv7(),
-          organizationId: args.organizationId,
-          url: args.url,
-          secretCipher,
-          eventTypes: args.eventTypes,
-          enabled: args.enabled,
-        },
-        tx,
-      );
-      if (result.isFailure) return result;
-      const endpoint = result.getValue();
-      await emitEvent(
-        this.outbox,
-        EventTypes.WEBHOOK_ENDPOINT_CREATED,
-        "webhook_endpoint",
-        endpoint.id,
-        {
-          organizationId: endpoint.organizationId,
-          actorUserId: args.actorUserId,
-          endpointId: endpoint.id,
-          url: endpoint.url,
-          eventTypes: endpoint.eventTypes,
-          enabled: endpoint.enabled,
-        },
-        { organizationId: endpoint.organizationId },
-        tx,
-      );
-      return result;
-    });
-    if (created.isFailure) return Result.fail(created.getError());
+        const created = await this.uow.run(async (tx) => {
+          const result = await this.endpoints.create(
+            {
+              id: uuidv7(),
+              organizationId: args.organizationId,
+              url: args.url,
+              secretCipher,
+              eventTypes: args.eventTypes,
+              enabled: args.enabled,
+            },
+            tx,
+          );
+          if (result.isFailure) return result;
+          const endpoint = result.getValue();
+          await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_ENDPOINT_CREATED,
+            "webhook_endpoint",
+            endpoint.id,
+            {
+              organizationId: endpoint.organizationId,
+              actorUserId: args.actorUserId,
+              endpointId: endpoint.id,
+              url: endpoint.url,
+              eventTypes: endpoint.eventTypes,
+              enabled: endpoint.enabled,
+            },
+            { organizationId: endpoint.organizationId },
+            tx,
+          );
+          return result;
+        });
+        if (created.isFailure) return Result.fail(created.getError());
 
-    return Result.ok({ endpoint: created.getValue(), plaintextSecret });
+        return Result.ok({ endpoint: created.getValue(), plaintextSecret });
+      },
+    );
   }
 
   async updateEndpoint(args: {
@@ -97,31 +104,35 @@ export class WebhooksService {
     eventTypes?: string[];
     enabled?: boolean;
   }): Promise<Result<Option<WebhookEndpointRecord>, WebhookServiceError>> {
-    return this.uow.run(async (tx) => {
-      const updated = await this.endpoints.update(args, tx);
-      if (updated.isFailure) return updated;
-      const opt = updated.getValue();
-      if (opt.isNone()) return updated;
-      const changes: Record<string, unknown> = {};
-      if (args.url !== undefined) changes.url = args.url;
-      if (args.eventTypes !== undefined) changes.eventTypes = args.eventTypes;
-      if (args.enabled !== undefined) changes.enabled = args.enabled;
-      await emitEvent(
-        this.outbox,
-        EventTypes.WEBHOOK_ENDPOINT_UPDATED,
-        "webhook_endpoint",
-        args.id,
-        {
-          organizationId: args.organizationId,
-          actorUserId: args.actorUserId,
-          endpointId: args.id,
-          changes,
-        },
-        { organizationId: args.organizationId },
-        tx,
-      );
-      return updated;
-    });
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > updateEndpoint", op: "function" },
+      async () =>
+        this.uow.run(async (tx) => {
+          const updated = await this.endpoints.update(args, tx);
+          if (updated.isFailure) return updated;
+          const opt = updated.getValue();
+          if (opt.isNone()) return updated;
+          const changes: Record<string, unknown> = {};
+          if (args.url !== undefined) changes.url = args.url;
+          if (args.eventTypes !== undefined) changes.eventTypes = args.eventTypes;
+          if (args.enabled !== undefined) changes.enabled = args.enabled;
+          await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_ENDPOINT_UPDATED,
+            "webhook_endpoint",
+            args.id,
+            {
+              organizationId: args.organizationId,
+              actorUserId: args.actorUserId,
+              endpointId: args.id,
+              changes,
+            },
+            { organizationId: args.organizationId },
+            tx,
+          );
+          return updated;
+        }),
+    );
   }
 
   async deleteEndpoint(
@@ -129,31 +140,41 @@ export class WebhooksService {
     organizationId: string,
     actorUserId: string,
   ): Promise<Result<boolean, WebhookServiceError>> {
-    return this.uow.run(async (tx) => {
-      const deleted = await this.endpoints.delete(id, organizationId, tx);
-      if (deleted.isFailure) return deleted;
-      if (!deleted.getValue()) return deleted;
-      await emitEvent(
-        this.outbox,
-        EventTypes.WEBHOOK_ENDPOINT_DELETED,
-        "webhook_endpoint",
-        id,
-        { organizationId, actorUserId, endpointId: id },
-        { organizationId },
-        tx,
-      );
-      return deleted;
-    });
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > deleteEndpoint", op: "function" },
+      async () =>
+        this.uow.run(async (tx) => {
+          const deleted = await this.endpoints.delete(id, organizationId, tx);
+          if (deleted.isFailure) return deleted;
+          if (!deleted.getValue()) return deleted;
+          await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_ENDPOINT_DELETED,
+            "webhook_endpoint",
+            id,
+            { organizationId, actorUserId, endpointId: id },
+            { organizationId },
+            tx,
+          );
+          return deleted;
+        }),
+    );
   }
 
   async listEndpoints(
     organizationId: string,
   ): Promise<Result<WebhookEndpointRecord[], WebhookServiceError>> {
-    return this.endpoints.listByOrg(organizationId);
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > listEndpoints", op: "function" },
+      () => this.endpoints.listByOrg(organizationId),
+    );
   }
 
   async findEndpoint(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>> {
-    return this.endpoints.findById(id, organizationId);
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > findEndpoint", op: "function" },
+      () => this.endpoints.findById(id, organizationId),
+    );
   }
 
   async listDeliveries(args: {
@@ -163,15 +184,20 @@ export class WebhooksService {
     limit?: number;
     cursor?: string;
   }): Promise<Result<DeliveryPage, WebhookServiceError>> {
-    return this.deliveries.list(args);
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > listDeliveries", op: "function" },
+      () => this.deliveries.list(args),
+    );
   }
 
   async replayDelivery(
     deliveryId: string,
     organizationId: string,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
-    return this.uow.run(async (tx) =>
-      this.deliveries.enqueueReplay(deliveryId, organizationId, tx),
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > replayDelivery", op: "function" },
+      async () =>
+        this.uow.run(async (tx) => this.deliveries.enqueueReplay(deliveryId, organizationId, tx)),
     );
   }
 }

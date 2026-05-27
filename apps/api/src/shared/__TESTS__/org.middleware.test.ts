@@ -3,9 +3,8 @@ import { Hono } from "hono";
 
 let nextRoleRows: Array<{ role: string }> = [];
 
-// Mock exposes the full surface of `@packages/drizzle` (not just `db`/`eq`/`and`) to keep
-// `bun test` stable when running in parallel — other suites import `outboxSchema`, `auditLogSchema`,
-// `webhooksSchema`, etc., and bun's `mock.module` leaks across files.
+// Mock exposes the FULL surface of @packages/drizzle — superset rule (see shared/CLAUDE.md):
+// mock.module leaks across parallel bun processes; partial mocks cause "Export not found" in others.
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => ({
@@ -15,15 +14,31 @@ mock.module("@packages/drizzle", () => ({
     }),
   },
   eq: () => ({}),
-  and: () => ({}),
+  and: (..._args: unknown[]) => ({}),
+  or: (..._args: unknown[]) => ({}),
+  isNull: () => ({}),
   isNotNull: () => ({}),
   lt: () => ({}),
+  lte: () => ({}),
+  gt: () => ({}),
+  gte: () => ({}),
+  not: () => ({}),
+  desc: () => ({}),
+  like: () => ({}),
   inArray: () => ({}),
-  sql: () => ({}),
+  count: () => ({}),
+  arrayContains: () => ({}),
+  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
+    raw: () => ({}),
+  }),
   schema: { member: { role: {}, organizationId: {}, userId: {} } },
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   webhooksSchema: { webhookDelivery: {} },
+  multiTenantSchema: {},
+  authSchema: {},
+  TransactionService: class {},
+  trackEventsOnSuccess: () => {},
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");

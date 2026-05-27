@@ -63,6 +63,9 @@ const envSchema = z.object({
   GIT_SHA: z.string().optional(),
   BUILD_TIME: z.string().optional(),
   SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),
+  SENTRY_DSN: z.url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
 });
 
 const rawEnv = Object.fromEntries(
