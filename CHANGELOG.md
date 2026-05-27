@@ -1,3 +1,13 @@
+## [1.18.0](https://github.com/axelhamil/clean-stack/compare/v1.17.2...v1.18.0) (2026-05-27)
+
+### Features
+
+* **observability:** ship phase 0.4 sentry with iinstrumentation port ([3d4ed30](https://github.com/axelhamil/clean-stack/commit/3d4ed302b479e7d3caf1b301f528c705d491466a))
+
+### Documentation
+
+* ship phase 0.3 disaster recovery (doc-only, pitr-first) ([2ac7a85](https://github.com/axelhamil/clean-stack/commit/2ac7a856fd63ba8ec2a63e85c214015a95923488))
+
 ## [1.17.2](https://github.com/axelhamil/clean-stack/compare/v1.17.1...v1.17.2) (2026-05-26)
 
 ### Refactor
