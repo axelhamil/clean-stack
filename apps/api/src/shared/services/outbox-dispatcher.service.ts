@@ -3,6 +3,7 @@ import { db, sql } from "@packages/drizzle";
 import { Client } from "pg";
 import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../jitter";
 import type { Logger } from "../logger";
+import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository, OutboxRecord } from "../ports/outbox.port";
 import type { OutboxSubscriber } from "./outbox-subscriber";
 
@@ -17,6 +18,7 @@ export type OutboxDispatcherDeps = {
   builtInSubscribers: OutboxSubscriber[];
   logger: Logger;
   connectionString: string;
+  instrumentation: IInstrumentation;
 };
 
 function expectedDelayFromAttempts(currentAttempts: number): number {
@@ -52,8 +54,11 @@ export class OutboxDispatcher {
   private stopping = false;
   private reconnectBackoff = RECONNECT_BACKOFF_MS;
   private userHandlers: Map<string, EventHandler[]> = new Map();
+  private readonly instrumentation: IInstrumentation;
 
-  constructor(private readonly deps: OutboxDispatcherDeps) {}
+  constructor(private readonly deps: OutboxDispatcherDeps) {
+    this.instrumentation = deps.instrumentation;
+  }
 
   async start(diLike?: Record<string, unknown>): Promise<void> {
     this.stopping = false;
@@ -90,19 +95,24 @@ export class OutboxDispatcher {
   }
 
   private async ensureNotifyTrigger(): Promise<void> {
-    await db.execute(sql`
-      CREATE OR REPLACE FUNCTION outbox_notify() RETURNS trigger AS $$
-      BEGIN
-        PERFORM pg_notify('outbox_event', NEW.id);
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql
-    `);
-    await db.execute(sql`
-      CREATE OR REPLACE TRIGGER outbox_notify_trigger
-      AFTER INSERT ON outbox_event
-      FOR EACH ROW EXECUTE FUNCTION outbox_notify()
-    `);
+    return this.instrumentation.startSpan(
+      { name: "OutboxDispatcher > ensureNotifyTrigger" },
+      async () => {
+        await db.execute(sql`
+          CREATE OR REPLACE FUNCTION outbox_notify() RETURNS trigger AS $$
+          BEGIN
+            PERFORM pg_notify('outbox_event', NEW.id);
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql
+        `);
+        await db.execute(sql`
+          CREATE OR REPLACE TRIGGER outbox_notify_trigger
+          AFTER INSERT ON outbox_event
+          FOR EACH ROW EXECUTE FUNCTION outbox_notify()
+        `);
+      },
+    );
   }
 
   private async connectListener(): Promise<void> {
@@ -134,6 +144,7 @@ export class OutboxDispatcher {
       this.reconnectBackoff = RECONNECT_BACKOFF_MS;
       this.deps.logger.debug("outbox listener connected");
     } catch (err) {
+      this.instrumentation.capture(err);
       this.deps.logger.warn({ err }, "outbox listener initial connect failed");
       client.removeAllListeners();
       await client.end().catch(() => {});
@@ -154,59 +165,76 @@ export class OutboxDispatcher {
     if (this.stopping || this.draining) return;
     this.draining = true;
     try {
-      let drainedSize: number;
-      do {
-        drainedSize = await this.drainBatch();
-      } while (drainedSize === BATCH_SIZE && !this.stopping);
+      return await this.instrumentation.startSpan(
+        { name: "OutboxDispatcher > triggerDrain" },
+        async () => {
+          let drainedSize: number;
+          do {
+            drainedSize = await this.drainBatch();
+          } while (drainedSize === BATCH_SIZE && !this.stopping);
+        },
+      );
     } finally {
       this.draining = false;
     }
   }
 
   private async drainBatch(): Promise<number> {
-    const dispatched = await db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '30s'`);
-      const events = await this.deps.outbox.findPendingBatch(BATCH_SIZE, tx);
-      const ok: OutboxRecord[] = [];
-      for (const event of events) {
-        try {
-          for (const sub of this.deps.builtInSubscribers) {
-            await sub.handle(event, tx);
-          }
-          await this.deps.outbox.markDispatched(event.id, tx);
-          ok.push(event);
-        } catch (err) {
-          const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-          this.deps.logger.error(
-            { err, eventId: event.id, eventType: event.eventType },
-            "outbox event built-in subscriber failed",
-          );
-          const { date } = nextAttemptAt(
-            event.attempts + 1,
-            expectedDelayFromAttempts(event.attempts + 1),
-          );
-          await this.deps.outbox.markFailed(event.id, errMsg, date, tx);
-        }
-      }
-      return { dispatched: ok, total: events.length };
-    });
+    return this.instrumentation.startSpan({ name: "OutboxDispatcher > drainBatch" }, async () => {
+      const dispatched = await this.instrumentation.startSpan(
+        {
+          name: "db.transaction",
+          op: "db.transaction",
+          attributes: { "db.system.name": "postgresql" },
+        },
+        () =>
+          db.transaction(async (tx) => {
+            await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '30s'`);
+            const events = await this.deps.outbox.findPendingBatch(BATCH_SIZE, tx);
+            const ok: OutboxRecord[] = [];
+            for (const event of events) {
+              try {
+                for (const sub of this.deps.builtInSubscribers) {
+                  await sub.handle(event, tx);
+                }
+                await this.deps.outbox.markDispatched(event.id, tx);
+                ok.push(event);
+              } catch (err) {
+                const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+                this.instrumentation.capture(err);
+                this.deps.logger.error(
+                  { err, eventId: event.id, eventType: event.eventType },
+                  "outbox event built-in subscriber failed",
+                );
+                const { date } = nextAttemptAt(
+                  event.attempts + 1,
+                  expectedDelayFromAttempts(event.attempts + 1),
+                );
+                await this.deps.outbox.markFailed(event.id, errMsg, date, tx);
+              }
+            }
+            return { dispatched: ok, total: events.length };
+          }),
+      );
 
-    for (const event of dispatched.dispatched) {
-      if (this.stopping) break;
-      const handlers = this.userHandlers.get(event.eventType) ?? [];
-      if (handlers.length === 0) continue;
-      const domainEvent = recordToDomainEvent(event);
-      for (const h of handlers) {
-        try {
-          await h.handle(domainEvent);
-        } catch (err) {
-          this.deps.logger.error(
-            { err, eventId: event.id, eventType: event.eventType, handlerType: event.eventType },
-            "outbox user handler threw (event already dispatched, handler is best-effort)",
-          );
+      for (const event of dispatched.dispatched) {
+        if (this.stopping) break;
+        const handlers = this.userHandlers.get(event.eventType) ?? [];
+        if (handlers.length === 0) continue;
+        const domainEvent = recordToDomainEvent(event);
+        for (const h of handlers) {
+          try {
+            await h.handle(domainEvent);
+          } catch (err) {
+            this.instrumentation.capture(err);
+            this.deps.logger.error(
+              { err, eventId: event.id, eventType: event.eventType, handlerType: event.eventType },
+              "outbox user handler threw (event already dispatched, handler is best-effort)",
+            );
+          }
         }
       }
-    }
-    return dispatched.total;
+      return dispatched.total;
+    });
   }
 }

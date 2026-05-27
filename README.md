@@ -178,6 +178,10 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 **Health probes** — three endpoints (`/livez`, `/readyz`, `/startupz`) following K8s 2026 convention + IETF `draft-inadarei` format, with tri-state aggregation (pass/warn/fail) and `SIGTERM`-driven graceful shutdown. Per-PaaS recipes (Railway, Fly, Render, K8s, Cloud Run) in [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md).
 
+**Disaster recovery** — PITR-first (delegated to your managed Postgres provider), with copy-paste recipes for a weekly portable `pg_dump` export and a monthly automated restore-test. RPO/RTO targets, restore runbook, lifecycle + versioning snippets in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
+
+**Observability** — error tracking via Sentry on api + app, RGPD-clean payload scrubbing by default, pino integration for log breadcrumbs, NoOp without `SENTRY_DSN`. OpenTelemetry tracing and Prometheus `/metrics` are deferred to Phase D.1 (managed alongside dashboards). Port usage, removability runbook, provider swap recipe (GlitchTip / Highlight) in [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
+
 ---
 
 ## Stack
@@ -207,6 +211,8 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) — endpoints, registry, graceful shutdown, per-PaaS recipes |
+| **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md) — PITR-first, restore runbook, weekly export + monthly restore-test recipes |
+| **Observability** | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) — Sentry api+app, RGPD scrubbing, removability runbook, provider swap recipe |
 | **History** | [`docs/HISTORY.md`](docs/HISTORY.md) — design decisions trail |
 
 ---

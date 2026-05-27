@@ -1,3 +1,5 @@
+import "./shared/services/sentry-init";
+
 import { EventCollector } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -21,7 +23,7 @@ import {
   requireAuth,
   sessionMiddleware,
 } from "./shared/middleware/auth.middleware";
-import { errorHandler } from "./shared/middleware/error.middleware";
+import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
 import { lifecycleState } from "./shared/shutdown";
 
@@ -62,7 +64,7 @@ const routes = app
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/webhooks", webhooksRoutes);
 
-app.onError(errorHandler);
+app.onError(createErrorHandler(di.IInstrumentation));
 
 EventCollector.setOutOfContextLogger((msg, meta) => logger.warn(meta ?? {}, msg));
 

@@ -17,7 +17,9 @@
       "entry": [
         "src/shared/api/api-client.ts",
         "src/shared/api/mutations/*.ts",
-        "src/shared/api/queries/*.ts"
+        "src/shared/api/queries/*.ts",
+        "src/shared/observability/noop.ts",
+        "src/shared/observability/sentry.ts"
       ],
       "project": ["**/*.ts", "**/*.tsx"]
     },

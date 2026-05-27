@@ -13,6 +13,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Result } from "@packages/ddd-kit";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -25,13 +26,14 @@ import type {
 
 const S3_DELETE_BATCH = 1000;
 const fail = createDbFailure("STORAGE_PROVIDER_FAILURE");
+const httpAttrs = { "http.method": "POST", "rpc.system": "aws-api" } as const;
 
 export class S3StorageService implements IStorageService {
   private readonly client: S3Client;
   private readonly bucket: string;
   private readonly publicUrl: string;
 
-  constructor() {
+  constructor(private readonly instrumentation: IInstrumentation) {
     if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {
       throw new Error(
         'Storage not configured: set S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY (and start the `storage` compose profile in dev). To run without storage, remove the uploads module and `app.route("/uploads", …)` wiring.',
@@ -65,135 +67,197 @@ export class S3StorageService implements IStorageService {
   }
 
   async presignUpload(input: PresignUploadInput): Promise<Result<PresignedUrl, StorageError>> {
-    try {
-      const command = new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: input.key,
-        ContentType: input.contentType,
-        ContentLength: input.size,
-      });
-      const url = await getSignedUrl(this.client, command, {
-        expiresIn: input.expiresInSeconds,
-        signableHeaders: new Set(["content-type", "content-length"]),
-      });
-      return Result.ok({
-        url,
-        expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000).toISOString(),
-      });
-    } catch (e) {
-      return fail(e, "presign upload failed", { key: input.key });
-    }
+    return this.instrumentation.startSpan(
+      { name: "S3StorageService > presignUpload" },
+      async () => {
+        try {
+          const command = new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: input.key,
+            ContentType: input.contentType,
+            ContentLength: input.size,
+          });
+          const url = await this.instrumentation.startSpan(
+            { name: "s3:PutObject (presign)", op: "http.client", attributes: httpAttrs },
+            () =>
+              getSignedUrl(this.client, command, {
+                expiresIn: input.expiresInSeconds,
+                signableHeaders: new Set(["content-type", "content-length"]),
+              }),
+          );
+          return Result.ok({
+            url,
+            expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000).toISOString(),
+          });
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "presign upload failed", { key: input.key });
+        }
+      },
+    );
   }
 
   async presignDownload(input: PresignDownloadInput): Promise<Result<PresignedUrl, StorageError>> {
-    try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: input.key,
-      });
-      const url = await getSignedUrl(this.client, command, {
-        expiresIn: input.expiresInSeconds,
-      });
-      return Result.ok({
-        url,
-        expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000).toISOString(),
-      });
-    } catch (e) {
-      return fail(e, "presign download failed", { key: input.key });
-    }
+    return this.instrumentation.startSpan(
+      { name: "S3StorageService > presignDownload" },
+      async () => {
+        try {
+          const command = new GetObjectCommand({
+            Bucket: this.bucket,
+            Key: input.key,
+          });
+          const url = await this.instrumentation.startSpan(
+            { name: "s3:GetObject (presign)", op: "http.client", attributes: httpAttrs },
+            () => getSignedUrl(this.client, command, { expiresIn: input.expiresInSeconds }),
+          );
+          return Result.ok({
+            url,
+            expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000).toISOString(),
+          });
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "presign download failed", { key: input.key });
+        }
+      },
+    );
   }
 
   async headBucket(): Promise<Result<void, StorageError>> {
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-      return Result.ok();
-    } catch (e) {
-      return fail(e, "head bucket failed", { bucket: this.bucket });
-    }
+    return this.instrumentation.startSpan({ name: "S3StorageService > headBucket" }, async () => {
+      try {
+        await this.instrumentation.startSpan(
+          { name: "s3:HeadBucket", op: "http.client", attributes: httpAttrs },
+          () => this.client.send(new HeadBucketCommand({ Bucket: this.bucket })),
+        );
+        return Result.ok();
+      } catch (e) {
+        this.instrumentation.capture(e);
+        return fail(e, "head bucket failed", { bucket: this.bucket });
+      }
+    });
   }
 
   async headObject(key: string): Promise<Result<ObjectMetadata, StorageError>> {
-    try {
-      const res = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
-      return Result.ok({
-        size: res.ContentLength ?? 0,
-        contentType: res.ContentType ?? "application/octet-stream",
-      });
-    } catch (e) {
-      if (e instanceof NotFound) {
-        return Result.fail({
-          code: "STORAGE_NOT_FOUND",
-          message: `object "${key}" not found`,
+    return this.instrumentation.startSpan({ name: "S3StorageService > headObject" }, async () => {
+      try {
+        const res = await this.instrumentation.startSpan(
+          { name: "s3:HeadObject", op: "http.client", attributes: httpAttrs },
+          () => this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key })),
+        );
+        return Result.ok({
+          size: res.ContentLength ?? 0,
+          contentType: res.ContentType ?? "application/octet-stream",
         });
+      } catch (e) {
+        if (e instanceof NotFound) {
+          return Result.fail({
+            code: "STORAGE_NOT_FOUND",
+            message: `object "${key}" not found`,
+          });
+        }
+        this.instrumentation.capture(e);
+        return fail(e, "head object failed", { key });
       }
-      return fail(e, "head object failed", { key });
-    }
+    });
   }
 
   async deleteObject(key: string): Promise<Result<void, StorageError>> {
-    try {
-      await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
-      return Result.ok();
-    } catch (e) {
-      return fail(e, "delete object failed", { key });
-    }
+    return this.instrumentation.startSpan({ name: "S3StorageService > deleteObject" }, async () => {
+      try {
+        await this.instrumentation.startSpan(
+          { name: "s3:DeleteObject", op: "http.client", attributes: httpAttrs },
+          () => this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key })),
+        );
+        return Result.ok();
+      } catch (e) {
+        this.instrumentation.capture(e);
+        return fail(e, "delete object failed", { key });
+      }
+    });
   }
 
   async uploadObject(input: UploadObjectInput): Promise<Result<void, StorageError>> {
-    try {
-      await this.client.send(
-        new PutObjectCommand({
-          Bucket: this.bucket,
-          Key: input.key,
-          Body: input.body,
-          ContentType: input.contentType,
-        }),
-      );
-      return Result.ok();
-    } catch (e) {
-      return fail(e, "upload object failed", { key: input.key });
-    }
+    return this.instrumentation.startSpan({ name: "S3StorageService > uploadObject" }, async () => {
+      try {
+        await this.instrumentation.startSpan(
+          { name: "s3:PutObject", op: "http.client", attributes: httpAttrs },
+          () =>
+            this.client.send(
+              new PutObjectCommand({
+                Bucket: this.bucket,
+                Key: input.key,
+                Body: input.body,
+                ContentType: input.contentType,
+              }),
+            ),
+        );
+        return Result.ok();
+      } catch (e) {
+        this.instrumentation.capture(e);
+        return fail(e, "upload object failed", { key: input.key });
+      }
+    });
   }
 
   async listObjectKeys(prefix: string): Promise<Result<string[], StorageError>> {
-    try {
-      const keys: string[] = [];
-      let continuationToken: string | undefined;
-      do {
-        const res = await this.client.send(
-          new ListObjectsV2Command({
-            Bucket: this.bucket,
-            Prefix: prefix,
-            ContinuationToken: continuationToken,
-          }),
-        );
-        for (const obj of res.Contents ?? []) {
-          if (obj.Key) keys.push(obj.Key);
+    return this.instrumentation.startSpan(
+      { name: "S3StorageService > listObjectKeys" },
+      async () => {
+        try {
+          const keys: string[] = [];
+          let continuationToken: string | undefined;
+          do {
+            const res = await this.instrumentation.startSpan(
+              { name: "s3:ListObjectsV2", op: "http.client", attributes: httpAttrs },
+              () =>
+                this.client.send(
+                  new ListObjectsV2Command({
+                    Bucket: this.bucket,
+                    Prefix: prefix,
+                    ContinuationToken: continuationToken,
+                  }),
+                ),
+            );
+            for (const obj of res.Contents ?? []) {
+              if (obj.Key) keys.push(obj.Key);
+            }
+            continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+          } while (continuationToken);
+          return Result.ok(keys);
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "list object keys failed", { prefix });
         }
-        continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
-      } while (continuationToken);
-      return Result.ok(keys);
-    } catch (e) {
-      return fail(e, "list object keys failed", { prefix });
-    }
+      },
+    );
   }
 
   async deleteObjects(keys: string[]): Promise<Result<void, StorageError>> {
     if (keys.length === 0) return Result.ok();
-    try {
-      for (let i = 0; i < keys.length; i += S3_DELETE_BATCH) {
-        const batch = keys.slice(i, i + S3_DELETE_BATCH);
-        await this.client.send(
-          new DeleteObjectsCommand({
-            Bucket: this.bucket,
-            Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
-          }),
-        );
-      }
-      return Result.ok();
-    } catch (e) {
-      return fail(e, "delete objects failed", { count: keys.length });
-    }
+    return this.instrumentation.startSpan(
+      { name: "S3StorageService > deleteObjects" },
+      async () => {
+        try {
+          for (let i = 0; i < keys.length; i += S3_DELETE_BATCH) {
+            const batch = keys.slice(i, i + S3_DELETE_BATCH);
+            await this.instrumentation.startSpan(
+              { name: "s3:DeleteObjects", op: "http.client", attributes: httpAttrs },
+              () =>
+                this.client.send(
+                  new DeleteObjectsCommand({
+                    Bucket: this.bucket,
+                    Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+                  }),
+                ),
+            );
+          }
+          return Result.ok();
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "delete objects failed", { count: keys.length });
+        }
+      },
+    );
   }
 
   publicUrlFor(key: string): string {

@@ -165,3 +165,7 @@ Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery
 
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken — fix that, not the window.
+
+## Not an internal endpoint — Postgres backups
+
+The weekly `pg_dump` portable export and monthly restore-test are scheduled crons too, but **not** API endpoints. They run outside the API process (your scheduler invokes `pg_dump` directly against the DB, streams to S3). See [`./DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md) — copy-paste recipes for GitHub Actions, Railway Cron, and K8s CronJob, plus the restore runbook. PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway).

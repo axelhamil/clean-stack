@@ -76,9 +76,23 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 **No `console.*` in production paths** — all logs through `pino` (JSON stdout in prod, `pino-pretty` in dev). HTTP: `hono-pino` with `referRequestIdKey: "requestId"`; status-driven (`5xx→error`, `4xx→warn`, `2xx/3xx→info`).
 
-**One `app.onError(errorHandler)`, no per-route `try/catch`**: `HTTPException` → `{ error: { code: "HTTP_<status>", message, requestId } }` (logged at `error` only when `status >= 500`). Else → `500` `{ error: { code: "INTERNAL_ERROR", message: "Internal Server Error", requestId, stack? } }` (stack only outside production).
+**One `app.onError(...)`, no per-route `try/catch`**: error middleware is a factory `createErrorHandler(instrumentation)` called once in `index.ts` after `di.build()` → `app.onError(createErrorHandler(di.IInstrumentation))`. **Why factory**: middlewares importing `di` directly from `container.ts` would silently risk a runtime cycle if any module ever imported back into `shared/middleware/` — the factory takes the dep as a parameter and stays cycle-immune. Envelope: `HTTPException` → `{ error: { code: "HTTP_<status>", message, requestId } }` (logged at `error` only when `status >= 500`). Else → `500` `{ error: { code: "INTERNAL_ERROR", message: "Internal Server Error", requestId, stack? } }` (stack only outside production).
 
 **Throwing the right exception is the API.** Domain & application use `Result<T, E>` (no throw); controller translates failures → `HTTPException(<status>, { message })`. Envelope above is the API contract — never invent custom per route.
+
+## Observability (`IInstrumentation` — Phase 0.4)
+
+**Single port, DI everywhere.** `IInstrumentation` (`shared/ports/instrumentation.port.ts`) combines `startSpan` + `capture` + `addBreadcrumb` — one interface, one constructor injection. Default impl `NoOpInstrumentation`; Sentry impl `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set (binding in `container.ts`). **No module-level singleton, no service-locator** — every I/O-bound class (repos, S3, Resend) receives `IInstrumentation` via constructor exactly like `IEmailService` / `IStorageService`. Sentry SDK init is the one exception: side-effect `import "./shared/services/sentry-init"` as the first import of `index.ts` (must hook async-hooks before pino/Hono/Drizzle attach).
+
+**Repo / service instrumentation pattern** (Lazar-inspired, see [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)):
+- **Outer span** wraps the method body: `{ name: "ClassName > methodName" }`. No `op`, no attributes.
+- **Inner span** wraps only `query.execute()` / `client.send()` / `fetch()`: `{ name: query.toSQL().sql, op: "db.query", attributes: { "db.system.name": "postgresql" } }` (or `op: "http.client"` for HTTP).
+- **`const exec = tx ?? db`** stays outside the `startSpan` callback (Lazar convention — pure cosmetic, but keeps the span chrono honest).
+- **catch + `this.instrumentation.capture(err)` + return-or-rethrow**: methods returning `Promise<Result<T, E>>` capture + `return Result.fail(...)`; methods returning `Promise<T>` capture + rethrow. Never swallow.
+- **Multi-query methods** (e.g. `executeWipe` with 7+ statements): outer span only — inner spans become noise.
+- **Don't call sibling-repo methods that themselves open spans from inside a span** — inline the query instead, otherwise the inner spans become orphaned siblings rather than children in Sentry's trace tree.
+
+OTel + Prometheus `/metrics` are deferred to Phase D.1 (no consumer yet). The spans already shipped via `IInstrumentation.startSpan` will be reused when `SENTRY_TRACES_SAMPLE_RATE > 0` lands.
 
 ## Storage (object-storage-agnostic, S3-compatible)
 

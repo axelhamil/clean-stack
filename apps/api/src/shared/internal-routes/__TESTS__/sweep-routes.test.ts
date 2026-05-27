@@ -1,13 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { Hono } from "hono";
-import { errorHandler } from "../../middleware/error.middleware";
+import { NoOpInstrumentation } from "../../middleware/../services/noop-instrumentation";
+import { createErrorHandler } from "../../middleware/error.middleware";
 import { sweepAuditLogRoutes } from "../sweep-audit-log.route";
 import { sweepOutboxRoutes } from "../sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "../sweep-webhook-delivery.route";
 
 function makeApp(routes: Hono) {
   const app = new Hono();
-  app.onError(errorHandler);
+  app.onError(createErrorHandler(new NoOpInstrumentation()));
   app.route("/internal", routes);
   return app;
 }

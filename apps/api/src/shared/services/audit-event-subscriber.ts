@@ -1,6 +1,7 @@
 import type { AuditActorType } from "@packages/drizzle";
 import { auditLogSchema, type Transaction } from "@packages/drizzle";
 import { retentionFor } from "@packages/events";
+import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { OutboxRecord } from "../ports/outbox.port";
 import type { OutboxSubscriber } from "./outbox-subscriber";
 
@@ -16,26 +17,43 @@ function extractActor(event: OutboxRecord): { id: string | null; type: AuditActo
 export class AuditEventSubscriber implements OutboxSubscriber {
   readonly name = "audit";
 
-  async handle(event: OutboxRecord, tx: Transaction): Promise<void> {
-    const retention = retentionFor(event.eventType);
-    if (retention === "none") return;
+  constructor(private readonly instrumentation: IInstrumentation) {}
 
-    const actor = extractActor(event);
-    await tx
-      .insert(auditLogSchema.auditLog)
-      .values({
-        id: `audit-${event.id}`,
-        actorId: actor.id,
-        actorType: actor.type,
-        organizationId: event.organizationId,
-        action: event.eventType,
-        targetType: event.aggregateType,
-        targetId: event.aggregateId,
-        metadata: event.payload as Record<string, unknown>,
-        requestId: event.metadata.traceparent ?? null,
-        retention,
-        occurredAt: event.occurredAt,
-      })
-      .onConflictDoNothing({ target: auditLogSchema.auditLog.id });
+  async handle(event: OutboxRecord, tx: Transaction): Promise<void> {
+    return this.instrumentation.startSpan({ name: "AuditEventSubscriber > handle" }, async () => {
+      try {
+        const retention = retentionFor(event.eventType);
+        if (retention === "none") return;
+
+        const actor = extractActor(event);
+        const query = tx
+          .insert(auditLogSchema.auditLog)
+          .values({
+            id: `audit-${event.id}`,
+            actorId: actor.id,
+            actorType: actor.type,
+            organizationId: event.organizationId,
+            action: event.eventType,
+            targetType: event.aggregateType,
+            targetId: event.aggregateId,
+            metadata: event.payload as Record<string, unknown>,
+            requestId: event.metadata.traceparent ?? null,
+            retention,
+            occurredAt: event.occurredAt,
+          })
+          .onConflictDoNothing({ target: auditLogSchema.auditLog.id });
+        await this.instrumentation.startSpan(
+          {
+            name: query.toSQL().sql,
+            op: "db.query",
+            attributes: { "db.system.name": "postgresql" },
+          },
+          () => query.execute(),
+        );
+      } catch (err) {
+        this.instrumentation.capture(err);
+        throw err;
+      }
+    });
   }
 }

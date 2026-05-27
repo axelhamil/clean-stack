@@ -8,5 +8,5 @@ declare module "inwire" {
 }
 
 export const auditLogModule = defineModule()((b) =>
-  b.add("AuditQueryService", (c) => new AuditQueryService(c.IAuditPort)),
+  b.add("AuditQueryService", (c) => new AuditQueryService(c.IAuditPort, c.IInstrumentation)),
 );

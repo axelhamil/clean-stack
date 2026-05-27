@@ -12,8 +12,8 @@ Loaded when working inside `apps/api/src/shared/`. Cross-cutting infra placement
   - `internal-layers.ts` — env-driven composer (`INTERNAL_AUTH_LAYERS`) — modules use `internalLayers` as one spread
   - `internal-fetch.ts` — client-side `signedInternalFetch`, importable by external schedulers calling `/internal/*`
   - `sweep-<table>.route.ts` — cross-cutting retention sweeps (no single module owner). Module-scoped cron endpoints stay in `modules/<x>/internal.routes.ts` (e.g. `rgpd/`); cross-cutting infra purges (`outbox_event`, `audit_log`, `webhook_delivery`) live here.
-- `ports/` — cross-context port interfaces (consumed by 2+ contexts, OR pure transport). Currently: `email.port`, `storage.port`, `outbox.port`, `audit.port`.
-- `services/` — cross-context port impls. Currently: `ResendEmailService`, `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `OutboxDispatcher` (LISTEN/NOTIFY worker), `AuditEventSubscriber` + `WebhookFanoutSubscriber` (built-in outbox subscribers).
+- `ports/` — cross-context port interfaces (consumed by 2+ contexts, OR pure transport). Currently: `email.port`, `storage.port`, `outbox.port`, `audit.port`, `instrumentation.port` (`IInstrumentation` — startSpan + capture + addBreadcrumb, Phase 0.4).
+- `services/` — cross-context port impls. Currently: `ResendEmailService`, `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `OutboxDispatcher` (LISTEN/NOTIFY worker), `AuditEventSubscriber` + `WebhookFanoutSubscriber` (built-in outbox subscribers), `NoOpInstrumentation` + `SentryInstrumentation` (+ `sentry-init.ts` side-effect for SDK init).
 - `env.ts`, `logger.ts` — process-level singletons
 - `transaction.ts` — `type ITransaction = Transaction` (Drizzle alias). Type-only swap-point exception to "no infra in app layer" rule.
 - `event-emitter.ts` — `emitEvent(outbox, ...)` helper for code that emits events outside an aggregate flow (BetterAuth bridge, RGPD service, uploads). Use this instead of `outbox.enqueue` directly to keep the source/scope shape consistent.
