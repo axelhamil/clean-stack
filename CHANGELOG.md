@@ -1,3 +1,9 @@
+## [1.19.1](https://github.com/axelhamil/clean-stack/compare/v1.19.0...v1.19.1) (2026-05-27)
+
+### Bug Fixes
+
+* **deploy:** run api from ts source instead of bundling ([31a7c3b](https://github.com/axelhamil/clean-stack/commit/31a7c3beeac7244dc60c515e1da5adcfc1eb87d9))
+
 ## [1.19.0](https://github.com/axelhamil/clean-stack/compare/v1.18.0...v1.19.0) (2026-05-27)
 
 ### Features
