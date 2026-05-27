@@ -36,6 +36,7 @@ Each phase assumes the previous done. Items inside a phase parallelizable. Order
 | 0.4 | Error tracking minimal (Sentry api + app, RGPD scrubbing, pino breadcrumbs) | DONE — Sentry only. OTel + Prom `/metrics` **deferred to Phase D.1** after SOTA 2026 audit (Bun OTel auto-instrumentation manual, prom-client without Grafana consumer = code mort). See [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md). |
 | 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | TODO |
 | 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | DONE — 3 routes `/internal/sweep-*`, SOTA 2026 defaults, GH Actions recipe in `docs/EVENTS.md` |
+| 0.7 | Railway reference deploy (api + app + Postgres + storage + cron sweeps, env baseline, `main` → auto-deploy, PR preview env) | TODO — closes Phase 0 by proving the boilerplate ships end-to-end on the provider that 0.2/0.3/0.6 already document. Unblocks B.1 (Stripe webhooks = public endpoint) + D.1 (status page consumer). |
 
 #### 0.6 — Retention sweeps (cleanup the event-driven foundation)
 
@@ -299,6 +300,66 @@ All call sites keep working via NoOp. **Zero refactor.** `pnpm ci:check && pnpm 
 - **`prom-client` `/metrics`** — health check registry from Phase 0.2 already exports `up{check}` state ; drop-in 30 LOC route + `X-Metrics-Token` gate when D.1 status page scrapes.
 - **Sentry Performance** (`tracesSampleRate > 0`) — coupled to OTel deferral (Sentry consumes OTel spans natively).
 - **Session Replay** — privacy-first config + separate `VITE_SENTRY_REPLAY=true` flag, post-audit.
+
+---
+
+## Railway reference deploy — **Phase 0.7**
+
+**Why**: clean-stack mentionne Railway partout (recettes 0.2 health probes, 0.3 disaster recovery, 0.6 sweeps via cron) sans qu'aucun cloneur n'ait jamais vérifié que le boilerplate déploie réellement de bout en bout. Friction max — tu clones, tu tombes sur 3 docs qui assument Railway, mais aucun `railway.json` ni `Dockerfile` validés. Phase 0 reste ouverte tant que ce gap existe.
+
+**Why now (blocks)**: B.1 Stripe Billing exige un endpoint public HTTPS pour `/api/auth/stripe/webhook` (sans deploy live, B.1 est testable seulement en local via Stripe CLI → couvre 0 du flow réel). D.1 status page consomme `/livez` + `/readyz` + Sentry release tracking d'une cible prod réelle. Tester sur Railway avant d'attaquer B/D évite de découvrir un blocker plateforme (cold start Bun, healthcheck timeout, secrets sync) au moment où tu codes du métier.
+
+**Why Railway (vs Fly/Render/Cloud Run)**: déjà l'hypothèse implicite des docs Phase 0 (PITR add-on documenté, Cron services natifs pour les sweeps, secrets dashboard cohérent avec `env.ts` typé). Switch tard = trivial (Dockerfile portable + GH workflow paramétrable) ; switch tôt avant un premier deploy = perte de temps.
+
+### Goal (livrable principal = deploy live)
+
+- **`api.<APP_DOMAIN>` répond `/livez` 200** avec `git_sha`, `/readyz` aggregé (db + storage), `/startupz` post-init.
+- **`app.<APP_DOMAIN>` sert le bundle Vite** avec `VITE_API_URL=https://api.<APP_DOMAIN>`, CORS cohérent côté api.
+- **Postgres managé Railway** (add-on officiel), PITR activé, `DATABASE_URL` injecté.
+- **SeaweedFS swap → Cloudflare R2** (Railway n'a pas de S3 natif ; R2 = même API, free egress, `STORAGE_*` env déjà prêts). Bucket privé, lifecycle d'expiration RGPD aligné `docs/DISASTER-RECOVERY.md`.
+- **Sentry reçoit des erreurs réelles** (DSN api + DSN app set en prod, release tag = `GIT_SHA`).
+- **3 cron sweeps actifs** (Railway Cron service par sweep, ou un seul service multi-cron + GH Actions fallback) — hits `/internal/sweep-*` via `signedInternalFetch`.
+- **Resend en mode live** (clé prod, domaine vérifié SPF+DKIM+DMARC, region EU).
+
+### Tasks
+
+- [ ] **`Dockerfile` prod multi-stage** à la racine — stage `base` (Bun 1.3-alpine) → `deps` (`pnpm install --frozen-lockfile --filter api... --filter @packages/*`) → `build` (`pnpm --filter api build`) → `runtime` (copy `dist/`, `bun run dist/index.js`, expose `PORT`, healthcheck `curl -f http://localhost:$PORT/livez`). App = `Dockerfile.app` séparé (Vite build → nginx-alpine static serve). **Decisor Dockerfile vs Nixpacks**: Dockerfile gagne — Nixpacks détecte Bun mais ne sait pas piloter Turbo + workspace pnpm proprement, et le multi-stage caching de Docker est reproductible localement (`docker build .` mirror du build CI).
+- [ ] **`railway.json`** checked-in (racine repo) — déclare 2 services (`api`, `app`), 1 add-on Postgres, region EU (Amsterdam — RGPD), healthchecks pointant `/livez` (api) et `/` (app), restart policy `ON_FAILURE` max 3.
+- [ ] **`apps/api/src/shared/env.ts`** audité — toute var prod (`DATABASE_URL`, `STORAGE_*`, `SENTRY_DSN`, `INTERNAL_HMAC_SECRET`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `OUTBOX_RETENTION_DAYS`, etc.) listée dans `.env.example` avec un commentaire `# REQUIRED IN PROD` si applicable. Source de vérité unique pour la sync vers Railway dashboard.
+- [ ] **`.github/workflows/deploy.yml`** — déclenché sur push `main` après semantic-release tag, appelle Railway deploy webhook avec `GIT_SHA=${{ github.sha }}`. Skip si commit `[skip ci]` (cohérent avec semantic-release `chore(release)`).
+- [ ] **3 cron sweeps configurés** sur Railway Cron (ou GH Actions fallback `.github/workflows/sweep-*.yml`) — `0 3 * * *` (outbox, daily 3am UTC), `0 4 * * 0` (audit-log, weekly Sunday), `0 5 * * *` (webhook-delivery, daily 5am UTC). Tous via `signedInternalFetch` (HMAC `INTERNAL_HMAC_SECRET`).
+- [ ] **Domaine + TLS** — `api.<APP_DOMAIN>` + `app.<APP_DOMAIN>` via Railway custom domains (Let's Encrypt auto). `APP_DOMAIN` à choisir (placeholder dans la doc, `clean-stack.app` proposé si dispo).
+- [ ] **`docs/DEPLOY-RAILWAY.md`** — runbook complet : créer projet → link Postgres → set env vars (table de mapping `.env.example` ↔ Railway dashboard) → connect GH repo → premier deploy → vérifier `/livez`/`/readyz` → activer PITR → set up cron services → vérifier première erreur Sentry. Section "removability runbook" pour swap Railway → Fly/Render.
+- [ ] **Smoke-test post-deploy** documenté dans le runbook : sign-up via UI → vérifier email Resend → créer org → upload fichier (vérifier R2) → trigger un événement RGPD (vérifier outbox row + audit_log row) → check Sentry release apparaît. Si un step échoue, deploy = non validé.
+
+### Artefacts repo (résumé)
+
+```
+Dockerfile                              api prod multi-stage
+Dockerfile.app                          app static build + nginx
+railway.json                            services + add-on Postgres + region EU
+.github/workflows/deploy.yml            push main → Railway webhook
+.github/workflows/sweep-outbox.yml      cron fallback (si Railway Cron indispo)
+.github/workflows/sweep-audit-log.yml
+.github/workflows/sweep-webhook-delivery.yml
+docs/DEPLOY-RAILWAY.md                  runbook complet + removability
+.env.example                            audit COMPLET avec markers `# REQUIRED IN PROD`
+```
+
+### Decisor "Railway Cron vs GH Actions cron"
+
+Préférer **Railway Cron** quand dispo (cohérent avec le déploiement, secrets partagés, logs unifiés). **Fallback GH Actions** si le plan Railway de l'utilisateur n'inclut pas Cron services (plan Hobby actuel = limité), ou si le cloneur veut découpler le cron de l'infra deploy. Les deux pattern shipped en doc pour zero-friction.
+
+### Out of scope (defer)
+
+- **PR preview environments** (Railway PR Environments) — DX cool, conso non-triviale, à activer quand Phase A.6 Playwright CI consomme un endpoint éphémère par PR.
+- **Multi-region failover** — pertinent à partir de 10K MAU, pas avant.
+- **Blue-green / canary deploys** — Railway rolling deploy par défaut suffit jusqu'à D.1.
+- **Terraform / OpenTofu IaC** — `railway.json` natif suffit ; Terraform = sur-engineering pour 2 services.
+
+### Estimation
+
+~6h (1h Dockerfile + railway.json, 1h env audit + sync, 1h deploy + DNS + TLS, 1h cron config, 1h smoke-test end-to-end, 1h `docs/DEPLOY-RAILWAY.md`).
 
 ---
 
