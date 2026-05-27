@@ -218,6 +218,30 @@ Personal org is structurally identical to a team org for every operation except 
 
 ---
 
+## Observability — Sentry with IInstrumentation port ✅ Phase 0.4 · May 2026
+
+**Why**: errors silently swallowed in `catch + Result.fail(...)` blocks were the #1 source of "no idea why it broke in prod" in the boilerplate. SOC2 §CC7.3 + ISO 27001 A.16.1 require monitored incident detection — without an error-tracking rail the cloneur had to retrofit Sentry per-service. The SOTA-2026 audit landed on **Sentry only**: OTel sub-Bun 1.3+ requires manual `Bun.serve()` instrumentation and Prometheus `/metrics` is dead code until a Grafana consumer exists.
+
+**Pattern (Lazar-inspired, port-first)**: single `IInstrumentation` port (`startSpan` + `capture` + `addBreadcrumb`) injected via inwire DI. `NoOpInstrumentation` by default, `SentryInstrumentation` swaps in when `SENTRY_DSN` is set — single binding flip in `container.ts`, zero refactor at call sites. Every I/O class (repos, S3, Resend, subscribers, dispatcher, workers) receives the port via constructor and follows the same shape: outer span per public method, inner span per `query.execute()` / `fetch()` / `client.send()` (with OTel SemConv 1.27+ attributes `db.system.name: "postgresql"` + `op: db.query` / `db.transaction` / `http.client` / `function`), catch + capture + return-or-rethrow.
+
+- [x] **`apps/api/src/shared/ports/instrumentation.port.ts`** — single 30-line port. No `Result<>` (telemetry is fire-and-forget, never blocking). Sentry SDK init via side-effect `import "./shared/services/sentry-init"` as the first line of `index.ts` (hooks async-hooks before pino/Hono/Drizzle attach).
+- [x] **Pino → Sentry breadcrumb bridge** via `Sentry.pinoIntegration()` (SDK v10.18+ native, replaces deprecated `@sentry/pino-transport`).
+- [x] **`beforeSend` scrub whitelist** — drops `email`, `username`, `ip_address`, `cookie/Cookie`, `authorization/Authorization`, `x-csrf-token`, `query_string`, `data`. Preserves innocent headers (`content-type`). RGPD-clean by default + `sendDefaultPii: false`. Sentry UI Data Scrubber (Settings → Security & Privacy) documented as defense-in-depth.
+- [x] **Front (`@sentry/react`)** — `Sentry.ErrorBoundary` wraps the router with shadcn `AppErrorFallback`, React 19 `createRoot` receives `onUncaughtError` / `onCaughtError` / `onRecoverableError` handlers from `Sentry.reactErrorHandler()`. `@sentry/vite-plugin` gated on `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` (CI-only); `sourcemap: "hidden"` (uploadable but not view-source leakable).
+- [x] **154 tests** — every repo / service / subscriber / worker covered. Mocks of `@packages/drizzle` + `@packages/events` expose the **complete superset** of exports in every file (bun:test `mock.module` leaks globally → partial mocks surface as `SyntaxError: Export named 'X' not found` in unrelated parallel test files). Anti-pattern documented in `apps/api/src/shared/CLAUDE.md`.
+- [x] **`docs/OBSERVABILITY.md`** — full doc: port usage, Lazar instrumentation pattern (outer/inner span), removability runbook (5 steps: trash module + remove `.addModule()` + unset DSN = NoOp everywhere, zero refactor), provider swap recipe (Sentry → GlitchTip self-hosted, drop-in DSN), Sentry UI scrubber, **deferred section** (OTel + Prometheus + Session Replay + `tracesSampleRate>0` all wait for Phase D.1 Grafana consumer).
+- [x] **Root rule §8** — "Every I/O method declares a span; every catch surfaces the error to telemetry." Omnipotent rule with `Test before merging`: every public I/O method calls `this.instrumentation.startSpan(...)` or has a documented reason not to (multi-query exception like `executeWipe`).
+
+### Decisions (Phase 0.4)
+
+1. **Single merged port** (vs Lazar's two separate `IInstrumentationService` + `ICrashReporterService`). Justification: in this codebase both surfaces consume the same `Sentry` global, splitting forces double-wiring at every call site for zero portability gain.
+2. **Sentry-only, OTel + Prometheus deferred to D.1.** Bun OTel auto-instrumentation requires manual `Bun.serve()` wiring (not stable until Bun 1.4); `prom-client` without Grafana scrape = code mort. Same anti-NIH principle as Phase 0.3: ship infra cross-cutting only when a consumer exists.
+3. **`SentryInstrumentation` constructor-injected, NOT module-level singleton.** Mirrors the `IEmailService` / `IStorageService` pattern; respects the "no service-locator" rule. Sentry SDK *init* remains a side-effect import (the SDK detains global state — wrapping that init would just recopy `Sentry.*` and lose typings).
+4. **`createErrorHandler(instrumentation)` factory pattern for `error.middleware`.** Middlewares importing `di` directly from `container.ts` would risk a runtime cycle if any module imported back into `shared/middleware/`. Factory takes the dep as a parameter, called once in `index.ts` after `di.build()` — cycle-immune.
+5. **NoOp + Sentry surfaces stay symmetric.** `apps/app/src/shared/observability/{noop,sentry}.ts` export identical signatures (`captureError`, `addBreadcrumb`, `ErrorBoundary`, `reactErrorHandler`). `noop.ts` listed as `knip` entry so it never goes stale. Swap = single import path change; no runtime alias gymnastics.
+
+---
+
 ## Disaster recovery — PITR-first, doc-only deliverable ✅ Phase 0.3 · May 2026
 
 **Why**: SOC2 §A.1 + ISO 27001 A.12.3 require a tested backup/restore policy. clean-stack had none — a cloneur in prod had to improvise. The original roadmap entry expected a `pg_dump` cron route in the API; SOTA 2026 audit reversed that decision.

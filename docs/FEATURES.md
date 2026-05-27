@@ -169,5 +169,5 @@ See [`../ROADMAP.md`](../ROADMAP.md) for the full plan with constraints + extens
 - **Admin & impersonation** — BetterAuth `admin` plugin.
 - **Front UI for audit log + webhooks** — API ready, app-side pages remain.
 - **Tamper-evidence audit hash chain** — columns posed, calc deferred until SOC2 audit demands.
-- **Phase 0.4 observability subscribers** (Sentry/OTel/Prom) — trivial `onEvent` additions when those modules land.
+- **Domain-event → telemetry subscribers** (Sentry breadcrumb / OTel span attr / Prom counter per event-type) — trivial `onEvent(...)` additions. Sentry capture on 5xx errors already wired via `IInstrumentation` (Phase 0.4); OTel + Prom subscribers land with Phase D.1 Grafana consumer.
 - **i18n** — TanStack Router locale routes + typed message catalogs.
