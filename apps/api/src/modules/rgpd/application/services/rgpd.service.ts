@@ -285,6 +285,17 @@ export class RgpdService {
               {},
               trx,
             );
+            for (const orgId of wipe.getValue().deletedOrgIds ?? []) {
+              await emitEvent(
+                this.outbox,
+                EventTypes.ORG_DELETED,
+                "organization",
+                orgId,
+                { organizationId: orgId, actorUserId: input.userId },
+                { organizationId: orgId },
+                trx,
+              );
+            }
             return wipe;
           });
           if (inner.isFailure) {

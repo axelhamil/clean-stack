@@ -2,7 +2,7 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
-import { and, db, desc, eq, schema, type Transaction } from "@packages/drizzle";
+import { and, db, desc, eq, schema, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -22,22 +22,41 @@ function tokenIdempotencyKey(template: string, token: string): string {
   return `${template}/${hash}`;
 }
 
-async function ensurePersonalOrgFor(userId: string): Promise<string> {
-  const [existing] = await db
-    .select({ id: schema.member.organizationId })
-    .from(schema.member)
-    .where(eq(schema.member.userId, userId))
-    .limit(1);
-  if (existing) return existing.id;
+interface SignupUser {
+  email: string;
+  name: string;
+}
 
-  const orgId = crypto.randomUUID();
-  const memberId = crypto.randomUUID();
-  const now = new Date();
-  await db.transaction(async (tx) => {
+async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Promise<string> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+
+    const [existing] = await tx
+      .select({ id: schema.member.organizationId })
+      .from(schema.member)
+      .where(eq(schema.member.userId, userId))
+      .limit(1);
+    if (existing) {
+      if (signupUser)
+        await emit(
+          EventTypes.USER_CREATED,
+          "user",
+          userId,
+          { userId, email: signupUser.email, name: signupUser.name },
+          null,
+          tx,
+        );
+      return existing.id;
+    }
+
+    const orgId = crypto.randomUUID();
+    const memberId = crypto.randomUUID();
+    const slug = `personal-${orgId}`;
+    const now = new Date();
     await tx.insert(schema.organization).values({
       id: orgId,
       name: "Personal",
-      slug: `personal-${orgId}`,
+      slug,
       createdAt: now,
     });
     await tx.insert(schema.member).values({
@@ -48,6 +67,14 @@ async function ensurePersonalOrgFor(userId: string): Promise<string> {
       createdAt: now,
     });
     await emit(
+      EventTypes.ORG_CREATED,
+      "organization",
+      orgId,
+      { organizationId: orgId, ownerUserId: userId, slug, name: "Personal" },
+      orgId,
+      tx,
+    );
+    await emit(
       EventTypes.ORG_MEMBER_JOINED,
       "member",
       memberId,
@@ -55,8 +82,17 @@ async function ensurePersonalOrgFor(userId: string): Promise<string> {
       orgId,
       tx,
     );
+    if (signupUser)
+      await emit(
+        EventTypes.USER_CREATED,
+        "user",
+        userId,
+        { userId, email: signupUser.email, name: signupUser.name },
+        null,
+        tx,
+      );
+    return orgId;
   });
-  return orgId;
 }
 
 async function emit<TPayload>(
@@ -254,24 +290,26 @@ const authOptions = {
             org.id,
           );
           if (isPersonalOrg(org.slug)) return;
-          const remaining = await db
-            .select({ id: schema.member.id })
-            .from(schema.member)
-            .where(eq(schema.member.organizationId, org.id))
-            .limit(1);
-          if (remaining.length === 0) {
-            await db.transaction(async (tx) => {
-              await tx.delete(schema.organization).where(eq(schema.organization.id, org.id));
-              await emit(
-                EventTypes.ORG_DELETED,
-                "organization",
-                org.id,
-                { organizationId: org.id, actorUserId: user.id },
-                org.id,
-                tx,
-              );
-            });
-          }
+          await db.transaction(async (tx) => {
+            const deleted = await tx
+              .delete(schema.organization)
+              .where(
+                and(
+                  eq(schema.organization.id, org.id),
+                  eq(tx.$count(schema.member, eq(schema.member.organizationId, org.id)), 0),
+                ),
+              )
+              .returning({ id: schema.organization.id });
+            if (deleted.length === 0) return;
+            await emit(
+              EventTypes.ORG_DELETED,
+              "organization",
+              org.id,
+              { organizationId: org.id, actorUserId: user.id },
+              org.id,
+              tx,
+            );
+          });
         },
         afterUpdateMemberRole: async ({ member, previousRole, user, organization: org }) => {
           await emit(
@@ -430,16 +468,11 @@ const authOptions = {
       create: {
         after: async (user) => {
           try {
-            await ensurePersonalOrgFor(user.id);
+            await ensurePersonalOrgFor(user.id, { email: user.email, name: user.name });
           } catch (err) {
             logger.error({ err, userId: user.id }, "personal-org creation failed at signup");
             throw err;
           }
-          await emit(EventTypes.USER_CREATED, "user", user.id, {
-            userId: user.id,
-            email: user.email,
-            name: user.name,
-          });
         },
       },
     },

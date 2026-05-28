@@ -210,10 +210,12 @@ function defaultSecretGenerator(): string {
 
 export function masterKeyProvider(hex: string | undefined): MasterKeyProvider {
   if (!hex) return () => Option.none();
-  let cached: Option<Uint8Array> | null = null;
+  let loaded = false;
+  let cached: Option<Uint8Array> = Option.none();
   return () => {
-    if (cached) return cached;
+    if (loaded) return cached;
     cached = Option.some(masterKeyFromHex(hex));
+    loaded = true;
     return cached;
   };
 }

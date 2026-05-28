@@ -90,17 +90,22 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findById" },
       async () => {
-        const query = db
-          .select({ d: wd })
-          .from(wd)
-          .innerJoin(we, eq(wd.endpointId, we.id))
-          .where(and(eq(wd.id, id), eq(we.organizationId, organizationId)))
-          .limit(1);
-        const [row] = await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
-        return Option.fromNullable(row).map((r) => toRecord(r.d));
+        try {
+          const query = db
+            .select({ d: wd })
+            .from(wd)
+            .innerJoin(we, eq(wd.endpointId, we.id))
+            .where(and(eq(wd.id, id), eq(we.organizationId, organizationId)))
+            .limit(1);
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Option.fromNullable(row).map((r) => toRecord(r.d));
+        } catch (e) {
+          this.instrumentation.capture(e);
+          throw e;
+        }
       },
     );
   }

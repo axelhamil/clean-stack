@@ -50,7 +50,7 @@ export function usePasskeyAutofill({
       } catch (err) {
         if (controller.signal.aborted) return;
         if (err instanceof DOMException && err.name === "AbortError") return;
-        throw err;
+        toastError(err, "Passkey sign-in failed");
       }
     })();
 

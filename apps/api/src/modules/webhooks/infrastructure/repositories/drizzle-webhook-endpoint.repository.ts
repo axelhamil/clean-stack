@@ -130,16 +130,21 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > findById" },
       async () => {
-        const query = db
-          .select()
-          .from(we)
-          .where(and(eq(we.id, id), eq(we.organizationId, organizationId)))
-          .limit(1);
-        const [row] = await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
-        return Option.fromNullable(row).map(toRecord);
+        try {
+          const query = db
+            .select()
+            .from(we)
+            .where(and(eq(we.id, id), eq(we.organizationId, organizationId)))
+            .limit(1);
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Option.fromNullable(row).map(toRecord);
+        } catch (e) {
+          this.instrumentation.capture(e);
+          throw e;
+        }
       },
     );
   }

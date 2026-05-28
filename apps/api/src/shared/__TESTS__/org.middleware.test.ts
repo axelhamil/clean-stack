@@ -9,7 +9,10 @@ mock.module("@packages/drizzle", () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => Promise.resolve(nextRoleRows),
+        where: () =>
+          Object.assign(Promise.resolve(nextRoleRows), {
+            limit: () => Promise.resolve(nextRoleRows),
+          }),
       }),
     }),
   },

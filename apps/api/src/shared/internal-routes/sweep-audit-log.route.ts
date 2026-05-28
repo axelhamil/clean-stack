@@ -1,7 +1,7 @@
 // `/internal/sweep-audit-log` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import type { AuditRetention } from "@packages/drizzle";
-import { and, auditLogSchema, db, eq, inArray, lt, sql } from "@packages/drizzle";
+import { and, auditLogSchema, count, db, eq, inArray, lt, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
@@ -15,10 +15,10 @@ const { auditLog } = auditLogSchema;
 
 async function countEligible(bucket: AuditRetention, cutoff: Date): Promise<number> {
   const rows = await db
-    .select({ count: sql<string>`count(*)` })
+    .select({ count: count() })
     .from(auditLog)
     .where(and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff)));
-  return Number(rows[0]?.count ?? 0);
+  return rows[0]?.count ?? 0;
 }
 
 async function purgeBatch(

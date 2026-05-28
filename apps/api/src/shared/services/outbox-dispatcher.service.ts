@@ -13,14 +13,6 @@ const RECONNECT_BACKOFF_MS = 1_000;
 const RECONNECT_MAX_BACKOFF_MS = 30_000;
 const NOTIFY_CHANNEL = "outbox_event";
 
-export type OutboxDispatcherDeps = {
-  outbox: IOutboxRepository;
-  builtInSubscribers: OutboxSubscriber[];
-  logger: Logger;
-  connectionString: string;
-  instrumentation: IInstrumentation;
-};
-
 function expectedDelayFromAttempts(currentAttempts: number): number {
   return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
 }
@@ -54,11 +46,14 @@ export class OutboxDispatcher {
   private stopping = false;
   private reconnectBackoff = RECONNECT_BACKOFF_MS;
   private userHandlers: Map<string, EventHandler[]> = new Map();
-  private readonly instrumentation: IInstrumentation;
 
-  constructor(private readonly deps: OutboxDispatcherDeps) {
-    this.instrumentation = deps.instrumentation;
-  }
+  constructor(
+    private readonly outbox: IOutboxRepository,
+    private readonly builtInSubscribers: OutboxSubscriber[],
+    private readonly logger: Logger,
+    private readonly connectionString: string,
+    private readonly instrumentation: IInstrumentation,
+  ) {}
 
   async start(diLike?: Record<string, unknown>): Promise<void> {
     this.stopping = false;
@@ -67,10 +62,10 @@ export class OutboxDispatcher {
     await this.connectListener();
     this.pollTimer = setInterval(() => {
       this.triggerDrain().catch((err) =>
-        this.deps.logger.error({ err }, "outbox drain failed (poll tick)"),
+        this.logger.error({ err }, "outbox drain failed (poll tick)"),
       );
     }, POLL_INTERVAL_MS);
-    this.deps.logger.info("outbox dispatcher started");
+    this.logger.info("outbox dispatcher started");
     void this.triggerDrain();
   }
 
@@ -84,33 +79,38 @@ export class OutboxDispatcher {
       try {
         await this.listenClient.end();
       } catch (err) {
-        this.deps.logger.warn({ err }, "outbox listener end failed");
+        this.logger.warn({ err }, "outbox listener end failed");
       }
       this.listenClient = null;
     }
     while (this.draining) {
       await new Promise((r) => setTimeout(r, 50));
     }
-    this.deps.logger.info("outbox dispatcher stopped");
+    this.logger.info("outbox dispatcher stopped");
   }
 
   private async ensureNotifyTrigger(): Promise<void> {
     return this.instrumentation.startSpan(
       { name: "OutboxDispatcher > ensureNotifyTrigger" },
       async () => {
-        await db.execute(sql`
-          CREATE OR REPLACE FUNCTION outbox_notify() RETURNS trigger AS $$
-          BEGIN
-            PERFORM pg_notify('outbox_event', NEW.id);
-            RETURN NEW;
-          END;
-          $$ LANGUAGE plpgsql
-        `);
-        await db.execute(sql`
-          CREATE OR REPLACE TRIGGER outbox_notify_trigger
-          AFTER INSERT ON outbox_event
-          FOR EACH ROW EXECUTE FUNCTION outbox_notify()
-        `);
+        try {
+          await db.execute(sql`
+            CREATE OR REPLACE FUNCTION outbox_notify() RETURNS trigger AS $$
+            BEGIN
+              PERFORM pg_notify('outbox_event', NEW.id);
+              RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql
+          `);
+          await db.execute(sql`
+            CREATE OR REPLACE TRIGGER outbox_notify_trigger
+            AFTER INSERT ON outbox_event
+            FOR EACH ROW EXECUTE FUNCTION outbox_notify()
+          `);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          throw err;
+        }
       },
     );
   }
@@ -118,22 +118,22 @@ export class OutboxDispatcher {
   private async connectListener(): Promise<void> {
     if (this.stopping) return;
     const client = new Client({
-      connectionString: this.deps.connectionString,
+      connectionString: this.connectionString,
       keepAlive: true,
       keepAliveInitialDelayMillis: 30_000,
     });
     client.on("notification", () => {
       this.triggerDrain().catch((err) =>
-        this.deps.logger.error({ err }, "outbox drain failed (notify)"),
+        this.logger.error({ err }, "outbox drain failed (notify)"),
       );
     });
     client.on("error", (err: Error) => {
-      this.deps.logger.warn({ err }, "outbox listener error, will reconnect");
+      this.logger.warn({ err }, "outbox listener error, will reconnect");
       this.scheduleReconnect();
     });
     client.on("end", () => {
       if (this.stopping) return;
-      this.deps.logger.warn("outbox listener ended, will reconnect");
+      this.logger.warn("outbox listener ended, will reconnect");
       this.scheduleReconnect();
     });
 
@@ -142,10 +142,10 @@ export class OutboxDispatcher {
       await client.query(`LISTEN ${NOTIFY_CHANNEL}`);
       this.listenClient = client;
       this.reconnectBackoff = RECONNECT_BACKOFF_MS;
-      this.deps.logger.debug("outbox listener connected");
+      this.logger.debug("outbox listener connected");
     } catch (err) {
       this.instrumentation.capture(err);
-      this.deps.logger.warn({ err }, "outbox listener initial connect failed");
+      this.logger.warn({ err }, "outbox listener initial connect failed");
       client.removeAllListeners();
       await client.end().catch(() => {});
       this.scheduleReconnect();
@@ -187,34 +187,40 @@ export class OutboxDispatcher {
           op: "db.transaction",
           attributes: { "db.system.name": "postgresql" },
         },
-        () =>
-          db.transaction(async (tx) => {
-            await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '30s'`);
-            const events = await this.deps.outbox.findPendingBatch(BATCH_SIZE, tx);
-            const ok: OutboxRecord[] = [];
-            for (const event of events) {
-              try {
-                for (const sub of this.deps.builtInSubscribers) {
-                  await sub.handle(event, tx);
+        async () => {
+          try {
+            return await db.transaction(async (tx) => {
+              await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '30s'`);
+              const events = await this.outbox.findPendingBatch(BATCH_SIZE, tx);
+              const ok: OutboxRecord[] = [];
+              for (const event of events) {
+                try {
+                  for (const sub of this.builtInSubscribers) {
+                    await sub.handle(event, tx);
+                  }
+                  await this.outbox.markDispatched(event.id, tx);
+                  ok.push(event);
+                } catch (err) {
+                  const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+                  this.instrumentation.capture(err);
+                  this.logger.error(
+                    { err, eventId: event.id, eventType: event.eventType },
+                    "outbox event built-in subscriber failed",
+                  );
+                  const { date } = nextAttemptAt(
+                    event.attempts + 1,
+                    expectedDelayFromAttempts(event.attempts + 1),
+                  );
+                  await this.outbox.markFailed(event.id, errMsg, date, tx);
                 }
-                await this.deps.outbox.markDispatched(event.id, tx);
-                ok.push(event);
-              } catch (err) {
-                const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-                this.instrumentation.capture(err);
-                this.deps.logger.error(
-                  { err, eventId: event.id, eventType: event.eventType },
-                  "outbox event built-in subscriber failed",
-                );
-                const { date } = nextAttemptAt(
-                  event.attempts + 1,
-                  expectedDelayFromAttempts(event.attempts + 1),
-                );
-                await this.deps.outbox.markFailed(event.id, errMsg, date, tx);
               }
-            }
-            return { dispatched: ok, total: events.length };
-          }),
+              return { dispatched: ok, total: events.length };
+            });
+          } catch (err) {
+            this.instrumentation.capture(err);
+            throw err;
+          }
+        },
       );
 
       for (const event of dispatched.dispatched) {
@@ -227,7 +233,7 @@ export class OutboxDispatcher {
             await h.handle(domainEvent);
           } catch (err) {
             this.instrumentation.capture(err);
-            this.deps.logger.error(
+            this.logger.error(
               { err, eventId: event.id, eventType: event.eventType, handlerType: event.eventType },
               "outbox user handler threw (event already dispatched, handler is best-effort)",
             );

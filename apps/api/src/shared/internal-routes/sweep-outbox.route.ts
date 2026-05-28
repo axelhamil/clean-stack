@@ -1,6 +1,6 @@
 // `/internal/sweep-outbox` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, db, inArray, isNotNull, lt, outboxSchema, sql } from "@packages/drizzle";
+import { and, count, db, inArray, isNotNull, lt, outboxSchema, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
@@ -12,7 +12,7 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 
 async function countEligible(cutoff: Date): Promise<number> {
   const rows = await db
-    .select({ count: sql<string>`count(*)` })
+    .select({ count: count() })
     .from(outboxSchema.outboxEvent)
     .where(
       and(
@@ -20,7 +20,7 @@ async function countEligible(cutoff: Date): Promise<number> {
         lt(outboxSchema.outboxEvent.dispatchedAt, cutoff),
       ),
     );
-  return Number(rows[0]?.count ?? 0);
+  return rows[0]?.count ?? 0;
 }
 
 async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {

@@ -55,7 +55,8 @@ async function resolveRole(
   const [row] = await db
     .select({ role: schema.member.role })
     .from(schema.member)
-    .where(and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, userId)));
+    .where(and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, userId)))
+    .limit(1);
   return parseRole(row?.role);
 }
 

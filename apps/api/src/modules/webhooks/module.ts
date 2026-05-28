@@ -48,11 +48,11 @@ export const webhooksModule = defineModule()((b) =>
     .add(
       "WebhookDeliveryWorker",
       (c) =>
-        new WebhookDeliveryWorker({
-          deliveries: c.IWebhookDeliveryRepository,
-          masterKey: c.WebhookMasterKey,
+        new WebhookDeliveryWorker(
+          c.IWebhookDeliveryRepository,
+          c.WebhookMasterKey,
           logger,
-          instrumentation: c.IInstrumentation,
-        }),
+          c.IInstrumentation,
+        ),
     ),
 );

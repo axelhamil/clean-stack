@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useState } from "react";
-import { initialsOf } from "../../shared/utils";
+import { initialsOf, toastError } from "../../shared/utils";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
@@ -30,8 +30,12 @@ export function OrgSwitcher() {
   const handleSwitch = async (organizationId: string) => {
     setOpen(false);
     if (organizationId === activeOrg?.id) return;
-    await switchOrg(organizationId);
-
+    try {
+      await switchOrg(organizationId);
+    } catch (err) {
+      toastError(err, "Failed to switch organization");
+      return;
+    }
     void navigate({ to: "/dashboard" });
   };
 

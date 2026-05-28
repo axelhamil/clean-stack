@@ -7,7 +7,6 @@ export * from "./application/scope";
 export * from "./application/transaction";
 export * from "./domain/aggregate";
 export * from "./domain/domain-event";
-export * from "./domain/domain-exception";
 export * from "./domain/entity";
 export * from "./domain/user-id";
 export * from "./domain/value-object";

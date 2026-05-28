@@ -1,6 +1,6 @@
 // `/internal/sweep-webhook-delivery` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, db, inArray, lt, sql, webhooksSchema } from "@packages/drizzle";
+import { and, count, db, inArray, lt, sql, webhooksSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
@@ -15,10 +15,10 @@ const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
 async function countEligible(cutoff: Date): Promise<number> {
   const wd = webhooksSchema.webhookDelivery;
   const rows = await db
-    .select({ count: sql<string>`count(*)` })
+    .select({ count: count() })
     .from(wd)
     .where(and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)));
-  return Number(rows[0]?.count ?? 0);
+  return rows[0]?.count ?? 0;
 }
 
 async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {

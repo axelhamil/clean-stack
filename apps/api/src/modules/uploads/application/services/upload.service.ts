@@ -1,14 +1,17 @@
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { CryptoHasher } from "bun";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
 
-function hashKey(key: string): string {
-  return new CryptoHasher("sha256").update(key).digest("hex").slice(0, 16);
+async function hashKey(key: string): Promise<string> {
+  const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16);
 }
 
 export interface CreateUploadUrlInput {
@@ -83,9 +86,10 @@ export class UploadService {
         });
         if (presigned.isFailure) return Result.fail(presigned.getError());
 
-        await emitEvent(this.outbox, EventTypes.UPLOAD_REQUESTED, "upload", hashKey(key), {
+        const hashedKey = await hashKey(key);
+        await emitEvent(this.outbox, EventTypes.UPLOAD_REQUESTED, "upload", hashedKey, {
           userId: input.ownerId,
-          key: hashKey(key),
+          key: hashedKey,
           contentType: input.contentType,
           size: input.size,
         });
@@ -133,9 +137,10 @@ export class UploadService {
           });
         }
 
-        await emitEvent(this.outbox, EventTypes.UPLOAD_CONFIRMED, "upload", hashKey(input.key), {
+        const hashedKey = await hashKey(input.key);
+        await emitEvent(this.outbox, EventTypes.UPLOAD_CONFIRMED, "upload", hashedKey, {
           userId: input.ownerId,
-          key: hashKey(input.key),
+          key: hashedKey,
           size,
           contentType,
         });
@@ -164,9 +169,10 @@ export class UploadService {
         const deleted = await this.storage.deleteObject(input.key);
         if (deleted.isFailure) return Result.fail(deleted.getError());
 
-        await emitEvent(this.outbox, EventTypes.UPLOAD_DELETED, "upload", hashKey(input.key), {
+        const hashedKey = await hashKey(input.key);
+        await emitEvent(this.outbox, EventTypes.UPLOAD_DELETED, "upload", hashedKey, {
           userId: input.ownerId,
-          key: hashKey(input.key),
+          key: hashedKey,
         });
 
         return Result.ok(undefined);
