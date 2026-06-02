@@ -265,6 +265,28 @@ Personal org is structurally identical to a team org for every operation except 
 
 ---
 
+## Health probes — `/livez` · `/readyz` · `/startupz` ✅ Phase 0.2
+
+**Why**: K8s / Railway / Fly / Render all probe liveness/readiness/startup; absence = restart loops + 502s during deploys. SOTA 2026 = three probes, IETF `draft-inadarei` response format, graceful shutdown wired to `/readyz`. Full per-PaaS recipes in [`docs/HEALTH-PROBES.md`](HEALTH-PROBES.md).
+
+- [x] `modules/health/` vertical slice + `IHealthCheckRegistry` (`shared/ports/health.port.ts`). Each infra-owning module ships an `XxxHealthProbe implements OnInit` that self-registers at `di.preload()` — `trash` the module removes its probe in one shot, no orphan.
+- [x] `/livez` liveness, **no dependency hit** (a DB outage must not restart pods → thundering herd). `/readyz` aggregates checks (db `SELECT 1` critical, storage `HeadBucket` non-critical), tri-state `pass`/`warn`/`fail` → 200 unless a critical check fails (503). `/startupz` shields a slow boot from a tight liveness threshold.
+- [x] Asymmetric cache (positive 30s / negative 5s) + self-cancelling 5s timeout on `/readyz`. Mounted **outside** requestId/httpLogger/cors/session middleware (probes carry no cookies; ~17k hits/day/pod would drown logs).
+- [x] **Graceful shutdown** — `SIGTERM` flips `lifecycleState` → `/readyz` returns 503 within one probe interval (LB drains), waits `SHUTDOWN_GRACE_PERIOD_MS` (15s default), then stops the workers. Without it: intermittent 502s on every deploy.
+- [x] **Prod-validation hardening (Jun 2026)** — `/livez` + `/startupz` payloads trimmed to `{status, uptimeMs}`; build metadata (`version`/`commitSha`/`runtime`) moved behind `/internal/build-info` (HMAC-gated). Public probes were an info-disclosure vector (version fingerprinting + exact-source mapping for private clones). See the Railway closeout below.
+
+---
+
+## Removability dry-run — first leaf removed end-to-end ✅ Phase 0.5 · May 2026
+
+**Why**: the vertical-slice contract claims "a leaf feature is removable in 5 minutes". Until one was actually removed end-to-end, that was theory. Runbook + worked example + edge cases in [`docs/REMOVABILITY.md`](REMOVABILITY.md).
+
+- [x] Removed `modules/rgpd` end-to-end in a throwaway worktree: **46 files touched, −2980 LOC net**, 3 `DROP COLUMN` migration. All 6 gates green (`type-check`, `ci:check`, `check:unused`, `check:duplication`, `build`, `test` baseline-preserving).
+- [x] **4 surprises captured** — a 3rd RGPD column missed by the initial cartography, a transitively-dead `throwApiError` helper, a dangling knip pattern, pre-existing test fails unrelated to the removal. Contract holds: TS error-points the rest.
+- [x] **6-axis checklist** codified (schema barrel, DI `.addModule()` + `app.route()`, access-control statements, front nav, email templates) — the canonical "how to remove a feature".
+
+---
+
 ## Railway reference deploy — config-as-code SOTA 2026 ✅ Phase 0.7 · May 2026
 
 **Why**: clean-stack mentionnait Railway dans 3 docs (`HEALTH-PROBES.md`, `DISASTER-RECOVERY.md`, `EVENTS.md`) mais aucun cloneur n'avait jamais validé le boilerplate de bout en bout. Le projet Railway existant tombait sur Nixpacks par défaut (pas de `railway.toml`) et ne savait pas piloter le monorepo pnpm + Bun. Phase 0 ne pouvait pas être fermée avec ce gap.
@@ -289,3 +311,21 @@ Personal org is structurally identical to a team org for every operation except 
 5. **Pas de `preDeployCommand` pour la migration (Railway-spécifique).** Garde le pattern `CMD migrate && start` portable (marche sur Fly, K8s, Cloud Run sans modif). `preDeployCommand` est une optimisation Railway (1 migration par deploy au lieu d'1 par restart de container) — vaut le coup quand la suite scale > 5 réplicas ; sur 1 réplique le cost est nul. Defer to operational phase.
 6. **Pas de `numReplicas = 1` explicite.** Première itération avait `numReplicas = 1` dans `[deploy]` — invalid : ce champ n'existe que sous `[deploy.multiRegionConfig.<region>]` (Railway docs 2026). Retiré ; default Railway = 1 réplique implicitement.
 7. **Pas de GH Actions deploy workflow.** Railway watch `main` nativement + `watchPatterns` par service = zero glue nécessaire. Première itération avait un `.github/workflows/deploy.yml` matrix qui hit les Deploy Webhooks Railway — retiré après audit (double-deploy avec le watch natif, secrets GH supplémentaires, viole single-source). Le pattern webhook reste utile pour deploys cross-service ordonnés (defer si jamais nécessaire en phase opérationnelle).
+
+
+### Prod-validation closeout (Jun 2026) — live on `main`, release 1.19.2
+
+The config-as-code shipped (above) but no one had run it end-to-end. Bringing the reference deploy actually green on Railway surfaced a **stack of prod-boot traps**, each masking the next (a failed deploy only reveals the next layer). All fixed (PR #50/#51 → `main`); api + app verified live.
+
+- [x] **`NODE_ENV` override trap.** A Railway service var `NODE_ENV=development` *overrode* the Dockerfile `ENV NODE_ENV=production` (service vars beat Dockerfile `ENV` at runtime). In dev mode the logger loads `pino-pretty` — a devDependency absent from the `--prod` install → instant boot crash (`unable to determine transport target for "pino-pretty"`). Fix: set `NODE_ENV=production` explicitly, or leave it unset (the Dockerfile wins). Never `development` in prod.
+- [x] **`WEBHOOK_MASTER_KEY` unset** → `env.ts` prod guard threw at boot. Generated + set.
+- [x] **`@packages/access-control` declared `better-auth` as `peer`/`devDependency`, not a `dependency`.** A workspace package that imports a lib in its *runtime* source must declare it under `dependencies`, else `pnpm install --prod` skips it and the import is unresolved in the pruned image (`Cannot find module 'better-auth/plugins/access'`). Compiles in dev (hoisting + devDeps present), breaks only in the pruned prod image. Moved to `dependencies`.
+- [x] **Email + storage threw at boot.** `di.preload()` is eager, so `ResendEmailService` and `S3StorageService` are constructed at startup and fail-hard'd when unconfigured. Changed to **warn-and-degrade**: email logs-not-delivers, storage swaps to a `NoOpStorageService` (returns `STORAGE_PROVIDER_FAILURE`; `/readyz` reports `storage:s3` as a non-critical warn). The API now boots without Resend/R2; those features stay inert until configured. **Reverses the Phase 1 email "boot-time fail-hard in production" decision** — right for a configured SaaS, wrong for a clonable boilerplate that must boot before the cloner wires Resend.
+- [x] **`app` service Start Command override.** A leftover Railway Start Command `pnpm --filter app start` *replaced* the Dockerfile Caddy `CMD` in the `caddy:2.11-alpine` runner (no Node/pnpm) → the container exits instantly with **zero logs**, the healthcheck never passes, the deploy fails silently and reads as a phantom. Cleared the override so the Dockerfile `caddy run` CMD applies.
+- [x] **Cross-site cookies.** `app` and `api` sit on different `*.up.railway.app` hosts = different sites (`up.railway.app` is a public suffix). BetterAuth session cookie set to `sameSite: isProd ? "none" : "lax"` so it survives the cross-site credentialed `fetch`. Custom domain under one shared parent (`api.x.com` + `app.x.com`) → `lax` works and is preferable; documented in `DEPLOY-RAILWAY.md` §8.
+- [x] **Docs hardened for cloners** — `docs/DEPLOY-RAILWAY.md` gained §0 (boot traps + fail-hard-vs-degrade matrix), §8 (cookie strategy by domain topology), §9 (probe info-disclosure note), §12 (troubleshooting matrix with every trap above).
+
+**Lessons (locked in):**
+1. **`railway up` deploys local working-tree code; a variable change / *Redeploy* / git push rebuilds from the connected branch.** During the fix loop `railway up` was the only way to test uncommitted code; a mid-fix variable change rebuilt from `main` (no fixes yet) and re-crashed — confirming the model. Once merged, GitHub-integrated deploys took over and went green.
+2. **`RAILWAY_GIT_COMMIT_SHA` only populates on branch deploys**, not `railway up`. `GIT_SHA`/`BUILD_TIME` show `unknown` under `railway up`; set them to the Railway reference vars (`${{RAILWAY_GIT_COMMIT_SHA}}`) so build-info tracks the deployed commit.
+3. **A multi-service deploy fails one layer at a time.** Each ~3-minute build only reveals the *next* boot trap. Pre-scan for the whole class (eager-preloaded constructors that throw, peer-deps imported at runtime, dashboard overrides) instead of one-fix-per-deploy.

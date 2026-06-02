@@ -127,9 +127,9 @@ docker compose --profile storage up -d         # start SeaweedFS + bucket init
 
 The S3 client is provider-agnostic ([`region: "auto"`, `forcePathStyle: true`](https://orm.drizzle.team/docs)). Anything S3-compatible works: R2, AWS S3, Backblaze B2, Wasabi, Scaleway, Tigris.
 
-### Email — Resend (optional in dev)
+### Email — Resend (optional)
 
-Resend is **optional in dev** — without `RESEND_API_KEY`, email sends are logged at `warn` and the app continues. **Required in prod** — boot fails fast otherwise.
+Resend is **optional everywhere** — without `RESEND_API_KEY` (or with unconfigured template IDs), email sends are logged at `warn` and the app boots normally; verification, magic-link, password-reset and org-invitation mails simply don't deliver. Wire it before relying on any email flow in prod.
 
 | | |
 |---|---|
@@ -176,6 +176,8 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 ❌ **Incompatible without re-wiring** — Vercel Functions, Netlify Functions, AWS Lambda, Cloudflare Workers, edge runtimes generally. Functions terminate after the response, killing `LISTEN`. To go serverless, swap the in-process dispatcher for a cron-triggered drain endpoint or an external queue (Inngest, QStash, SQS) — see [`docs/EVENTS.md`](docs/EVENTS.md#deployment-requirements) for the workaround. Edge runtimes also can't run the Postgres LISTEN client at all — keep the api on a regular runtime; if you need edge for specific endpoints, split them into a separate service.
 
+**Reference deploy (Railway)** — a prod-validated config-as-code runbook for the 3 services (api + app + cron) + Postgres + R2: env baseline, per-service `infra/railway/*.toml`, the boot-trap gotchas hit in practice (`NODE_ENV` override, app start-command, cross-site cookies), cookie strategy by domain topology, and a provider-swap section (Fly / Render / Cloud Run — Dockerfiles are portable). See [`docs/DEPLOY-RAILWAY.md`](docs/DEPLOY-RAILWAY.md).
+
 **Health probes** — three endpoints (`/livez`, `/readyz`, `/startupz`) following K8s 2026 convention + IETF `draft-inadarei` format, with tri-state aggregation (pass/warn/fail) and `SIGTERM`-driven graceful shutdown. Per-PaaS recipes (Railway, Fly, Render, K8s, Cloud Run) in [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md).
 
 **Disaster recovery** — PITR-first (delegated to your managed Postgres provider), with copy-paste recipes for a weekly portable `pg_dump` export and a monthly automated restore-test. RPO/RTO targets, restore runbook, lifecycle + versioning snippets in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
@@ -206,13 +208,14 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | | |
 |---|---|
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — RGPD/CCPA → Billing → Gating → Admin → Audit → i18n |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅ complete; next: Legal + a11y (Phase A) → Billing → Gating → Admin → Audit |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) — endpoints, registry, graceful shutdown, per-PaaS recipes |
 | **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md) — PITR-first, restore runbook, weekly export + monthly restore-test recipes |
 | **Observability** | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) — Sentry api+app, RGPD scrubbing, removability runbook, provider swap recipe |
+| **Deploy (Railway)** | [`docs/DEPLOY-RAILWAY.md`](docs/DEPLOY-RAILWAY.md) — config-as-code runbook, boot-trap gotchas, cookie topology, provider swap |
 | **History** | [`docs/HISTORY.md`](docs/HISTORY.md) — design decisions trail |
 
 ---
