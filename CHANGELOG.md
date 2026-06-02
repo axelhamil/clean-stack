@@ -1,3 +1,15 @@
+## [1.19.2](https://github.com/axelhamil/clean-stack/compare/v1.19.1...v1.19.2) (2026-06-02)
+
+### Bug Fixes
+
+* close audit findings across rgpd, auth races, webhook telemetry ([c22bf07](https://github.com/axelhamil/clean-stack/commit/c22bf0745c9405b2171ed71e39f8a262fb0a3aec))
+* **deploy:** resilient prod boot, cross-site cookies, gated build-info ([88f5ba0](https://github.com/axelhamil/clean-stack/commit/88f5ba0f4a98746ea53530775f5915f9b556a4ef))
+
+### Documentation
+
+* **deploy:** document railway boot traps, degradation and cookie topology ([bc86e74](https://github.com/axelhamil/clean-stack/commit/bc86e74522accb4dd321458f7b893281327b0742))
+* **roadmap:** flag phase 0.7 prod validation in-progress (healthcheck fail) ([8851f11](https://github.com/axelhamil/clean-stack/commit/8851f1198cc6ed2b75478d3c5a010d4786712d99))
+
 ## [1.19.1](https://github.com/axelhamil/clean-stack/compare/v1.19.0...v1.19.1) (2026-05-27)
 
 ### Bug Fixes
