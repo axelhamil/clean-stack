@@ -9,12 +9,11 @@
   "scripts": {
     "type-check": "tsc --noEmit"
   },
-  "peerDependencies": {
-    "better-auth": "^1.6.9"
+  "dependencies": {
+    "better-auth": "^1.6.11"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
-    "better-auth": "^1.6.11",
     "typescript": "^6.0.3"
   }
 }

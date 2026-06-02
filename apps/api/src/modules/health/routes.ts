@@ -5,15 +5,16 @@ import type { AggregatedReport, HealthStatus } from "../../shared/ports/health.p
 import { lifecycleState } from "../../shared/shutdown";
 
 const startedAt = Date.now();
+const uptimeMs = () => Date.now() - startedAt;
 
 const httpStatusFor = (status: HealthStatus): 200 | 503 => (status === "fail" ? 503 : 200);
 
-const baseInfo = () => ({
+export const buildInfo = () => ({
   version: env.GIT_SHA?.slice(0, 12) ?? "unknown",
   commitSha: env.GIT_SHA ?? "unknown",
   buildTime: env.BUILD_TIME ?? "unknown",
   runtime: `bun/${process.versions.bun ?? "unknown"}`,
-  uptimeMs: Date.now() - startedAt,
+  uptimeMs: uptimeMs(),
 });
 
 const stripSensitive = (report: AggregatedReport): AggregatedReport => {
@@ -31,7 +32,7 @@ const stripSensitive = (report: AggregatedReport): AggregatedReport => {
 };
 
 export const healthRoutes = new Hono()
-  .get("/livez", (c) => c.json({ status: "pass" as HealthStatus, ...baseInfo() }, 200))
+  .get("/livez", (c) => c.json({ status: "pass" as HealthStatus, uptimeMs: uptimeMs() }, 200))
   .get("/readyz", async (c) => {
     if (lifecycleState.isShuttingDown()) {
       return c.json({ status: "fail" as HealthStatus, output: "shutting down" }, 503);
@@ -43,5 +44,5 @@ export const healthRoutes = new Hono()
     if (!lifecycleState.isStarted()) {
       return c.json({ status: "fail" as HealthStatus, output: "starting" }, 503);
     }
-    return c.json({ status: "pass" as HealthStatus, ...baseInfo() }, 200);
+    return c.json({ status: "pass" as HealthStatus, uptimeMs: uptimeMs() }, 200);
   });

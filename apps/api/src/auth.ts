@@ -197,7 +197,7 @@ const authOptions = {
     defaultCookieAttributes: {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
+      sameSite: isProd ? "none" : "lax",
     },
   },
 
