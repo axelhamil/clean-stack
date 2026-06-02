@@ -6,6 +6,8 @@ import type { SignInInput } from "../../../shared/auth/auth.schema";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
 
+const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
+
 export function useSignIn(redirectTo?: string) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -21,8 +23,10 @@ export function useSignIn(redirectTo?: string) {
 
       if (error) {
         const code = error.code ?? "";
-        if (code === "EMAIL_NOT_VERIFIED" || /verif/i.test(error.message ?? ""))
+        if (code === "EMAIL_NOT_VERIFIED" || /verif/i.test(error.message ?? "")) {
           void navigate({ to: "/verify-email" });
+          throw new Error(EMAIL_NOT_VERIFIED_REDIRECT);
+        }
 
         throw new Error(error.message ?? "Sign-in failed");
       }
@@ -40,6 +44,9 @@ export function useSignIn(redirectTo?: string) {
 
       void navigate({ to: redirectTo ?? "/" });
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => {
+      if (err.message === EMAIL_NOT_VERIFIED_REDIRECT) return;
+      toast.error(err.message);
+    },
   });
 }

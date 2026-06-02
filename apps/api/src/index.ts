@@ -8,6 +8,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
 import { di } from "./container";
 import { auditLogRoutes } from "./modules/audit-log/routes";
+import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
@@ -52,6 +53,7 @@ app.use("*", sessionMiddleware);
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
+app.route("/internal", healthInternalRoutes);
 app.route("/internal", rgpdInternalRoutes);
 app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);

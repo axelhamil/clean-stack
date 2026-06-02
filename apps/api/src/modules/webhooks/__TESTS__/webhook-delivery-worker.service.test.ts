@@ -195,13 +195,12 @@ describe("WebhookDeliveryWorker", () => {
   // -------------------------------------------------------------------------
   it("start() puis stop() s'arrête proprement sans boucle bloquante", async () => {
     const fakeDeliveries = makeFakeDeliveries([]);
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.some(new Uint8Array(32)),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
-      instrumentation: new NoOpInstrumentation(),
-    });
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.some(new Uint8Array(32)),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
 
     await worker.start();
     await new Promise((r) => setTimeout(r, 20));
@@ -217,13 +216,12 @@ describe("WebhookDeliveryWorker", () => {
     globalThis.fetch = (async () =>
       new Response(null, { status: 200, statusText: "OK" })) as unknown as typeof fetch;
 
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.some(new Uint8Array(32)),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
-      instrumentation: new NoOpInstrumentation(),
-    });
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.some(new Uint8Array(32)),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
 
     await runDrain(worker);
 
@@ -246,13 +244,12 @@ describe("WebhookDeliveryWorker", () => {
       return new Response(null, { status: 200 });
     }) as unknown as typeof fetch;
 
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.some(new Uint8Array(32)),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
-      instrumentation: new NoOpInstrumentation(),
-    });
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.some(new Uint8Array(32)),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
 
     await runDrain(worker);
 
@@ -272,13 +269,12 @@ describe("WebhookDeliveryWorker", () => {
         statusText: "Internal Server Error",
       })) as unknown as typeof fetch;
 
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.some(new Uint8Array(32)),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
-      instrumentation: new NoOpInstrumentation(),
-    });
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.some(new Uint8Array(32)),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
 
     await runDrain(worker);
 
@@ -308,13 +304,12 @@ describe("WebhookDeliveryWorker", () => {
       throw new DOMException("The operation was aborted", "AbortError");
     }) as unknown as typeof fetch;
 
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.some(new Uint8Array(32)),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.some(new Uint8Array(32)),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
       instrumentation,
-    });
+    );
 
     await runDrain(worker);
 
@@ -333,13 +328,12 @@ describe("WebhookDeliveryWorker", () => {
     dbTransactionResult = [];
     const fakeDeliveries = makeFakeDeliveries();
 
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.some(new Uint8Array(32)),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
-      instrumentation: new NoOpInstrumentation(),
-    });
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.some(new Uint8Array(32)),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
 
     await runDrain(worker);
 
@@ -355,13 +349,12 @@ describe("WebhookDeliveryWorker", () => {
   it("masterKey absent → delivery marquée failed ou dead_letter", async () => {
     const fakeDeliveries = makeFakeDeliveries();
 
-    const worker = new WebhookDeliveryWorker({
-      deliveries:
-        fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      masterKey: () => Option.none(),
-      logger: makeLogger() as unknown as import("../../../shared/logger").Logger,
-      instrumentation: new NoOpInstrumentation(),
-    });
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      () => Option.none(),
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
 
     await runDrain(worker);
 

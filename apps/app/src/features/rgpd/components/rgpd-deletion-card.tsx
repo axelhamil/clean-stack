@@ -86,7 +86,6 @@ interface ActiveStateProps {
 
 function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
   const preflight = useQuery(preflightDeletionQueryOptions);
-  const blockingOrgs = preflight.data?.blockingOrgs ?? [];
 
   return (
     <Card>
@@ -98,8 +97,17 @@ function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {blockingOrgs.length > 0 ? (
-          <BlockingOrgsList orgs={blockingOrgs} />
+        {preflight.isPending ? (
+          <TypographyMuted>Checking account status…</TypographyMuted>
+        ) : preflight.isError ? (
+          <Alert variant="destructive">
+            <AlertTriangleIcon />
+            <AlertDescription>
+              Could not verify account status. Refresh the page and try again.
+            </AlertDescription>
+          </Alert>
+        ) : preflight.data.blockingOrgs.length > 0 ? (
+          <BlockingOrgsList orgs={preflight.data.blockingOrgs} />
         ) : (
           <>
             <Alert variant="destructive">

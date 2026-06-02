@@ -59,13 +59,13 @@ export const di = container()
   .add(
     "OutboxDispatcher",
     (c) =>
-      new OutboxDispatcher({
-        outbox: c.IOutboxRepository,
-        builtInSubscribers: [c.AuditEventSubscriber, c.WebhookFanoutSubscriber],
+      new OutboxDispatcher(
+        c.IOutboxRepository,
+        [c.AuditEventSubscriber, c.WebhookFanoutSubscriber],
         logger,
-        connectionString: env.DATABASE_URL,
-        instrumentation: c.IInstrumentation,
-      }),
+        env.DATABASE_URL,
+        c.IInstrumentation,
+      ),
   )
   .addModule(healthModule)
   .addModule(uploadsModule)

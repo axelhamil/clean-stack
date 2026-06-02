@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
+import { toastError } from "../../shared/utils";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useAuthorization } from "../auth/use-authorization";
@@ -218,7 +219,7 @@ function useEntryShortcuts(groups: CommandGroupConfig[]) {
         for (const entry of group.items) {
           if (entry.shortcut?.match(e)) {
             e.preventDefault();
-            void entry.run();
+            Promise.resolve(entry.run()).catch((err) => toastError(err, "Action failed"));
             return;
           }
         }
@@ -241,7 +242,7 @@ export function CommandPalette() {
 
   const selectEntry = (entry: CommandEntry) => () => {
     setOpen(false);
-    void entry.run();
+    Promise.resolve(entry.run()).catch((err) => toastError(err, "Action failed"));
   };
 
   return (

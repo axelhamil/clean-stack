@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
 import type { IEmailService } from "../../../shared/ports/email.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { IStorageService } from "../../../shared/ports/storage.port";
@@ -382,6 +383,42 @@ describe("RgpdService", () => {
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
       expect(result.getValue().storageKeysDeleted).toBe(2);
+    });
+
+    it("emits ORG_DELETED for every organization destroyed in the wipe (RGPD audit completeness)", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const enqueued: Array<{ eventType: string; aggregateId: string }> = [];
+      const spyOutbox: IOutboxRepository = {
+        enqueue: async (events) => {
+          for (const e of events)
+            enqueued.push({ eventType: e.eventType, aggregateId: e.aggregateId });
+        },
+        findPendingBatch: async () => [],
+        markDispatched: async () => {},
+        markFailed: async () => {},
+      };
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        spyOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(enqueued.some((e) => e.eventType === EventTypes.USER_DELETED)).toBe(true);
+      const orgDeleted = enqueued
+        .filter((e) => e.eventType === EventTypes.ORG_DELETED)
+        .map((e) => e.aggregateId)
+        .sort();
+      expect(orgDeleted).toEqual(["org_personal", "org_solo"]);
     });
 
     it("returns success no-op when user is already deleted", async () => {

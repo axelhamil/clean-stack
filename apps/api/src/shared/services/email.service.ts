@@ -11,7 +11,7 @@ import type {
 } from "../ports/email.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 
-// Resend dashboard handles — fill when cloning. Empty = transport not configured (prod boots fail-hard, dev drops with a warn).
+// Resend dashboard handles — fill when cloning. Empty = transport not configured (boots with a warn, emails logged not delivered).
 const TEMPLATE_IDS: Record<keyof EmailTemplates, string> = {
   verify_email: "",
   reset_password: "",
@@ -43,28 +43,19 @@ export class ResendEmailService implements IEmailService {
   constructor(private readonly instrumentation: IInstrumentation) {
     this.resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
-    const isProd = env.NODE_ENV === "production";
     const missing = Object.entries(TEMPLATE_IDS)
       .filter(([, id]) => !id)
       .map(([key]) => key);
 
-    if (isProd && (!this.resend || missing.length > 0)) {
-      throw new Error(
-        `Email service misconfigured in production: ${
-          !this.resend ? "RESEND_API_KEY missing" : `template IDs missing: ${missing.join(", ")}`
-        }`,
-      );
-    }
-
     if (!this.resend) {
-      logger.warn("RESEND_API_KEY not set — emails will be logged to stdout (dev fallback)");
+      logger.warn("RESEND_API_KEY not set — emails will be logged to stdout, not delivered");
       return;
     }
 
     if (missing.length > 0) {
       logger.warn(
         { missing },
-        "missing RESEND template IDs — emails for these templates will be logged in dev, dropped otherwise",
+        "missing RESEND template IDs — emails for these templates will be logged, not delivered",
       );
     }
   }
