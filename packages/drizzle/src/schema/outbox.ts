@@ -6,6 +6,7 @@ export type OutboxEventMetadata = {
   source: string;
   subject?: string;
   traceparent?: string;
+  requestId?: string;
   datacontenttype: "application/json";
 };
 

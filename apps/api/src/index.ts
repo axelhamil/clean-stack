@@ -27,6 +27,7 @@ import {
 } from "./shared/middleware/auth.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
+import { runWithRequestContext } from "./shared/request-context";
 import { lifecycleState } from "./shared/shutdown";
 
 type AppEnv = {
@@ -40,6 +41,7 @@ const app = new Hono<AppEnv>();
 app.route("/", healthRoutes);
 
 app.use("*", requestId());
+app.use("*", (c, next) => runWithRequestContext({ requestId: c.get("requestId") }, next));
 app.use("*", httpLogger);
 app.use("*", secureHeaders());
 app.use(
