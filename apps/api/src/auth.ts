@@ -309,7 +309,7 @@ const authOptions = {
             org.id,
           );
         },
-        afterAddMember: async ({ member, organization: org }) => {
+        afterAddMember: async ({ member, user, organization: org }) => {
           await emit(
             EventTypes.ORG_MEMBER_JOINED,
             "member",
@@ -318,6 +318,7 @@ const authOptions = {
               organizationId: org.id,
               userId: member.userId,
               role: member.role,
+              actorUserId: user.id !== member.userId ? user.id : undefined,
             },
             org.id,
           );

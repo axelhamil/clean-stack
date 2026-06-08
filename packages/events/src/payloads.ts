@@ -131,6 +131,7 @@ export type OrgMemberInvitedPayload = z.infer<typeof OrgMemberInvitedPayload>;
 export const OrgMemberJoinedPayload = OrgRef.extend({
   userId: z.string(),
   role: z.string(),
+  actorUserId: z.string().optional(),
 });
 export type OrgMemberJoinedPayload = z.infer<typeof OrgMemberJoinedPayload>;
 
