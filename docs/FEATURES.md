@@ -103,6 +103,20 @@ Server is blind during the upload — three-step flow `presign` → `PUT` direct
 - **Why three steps**: providers like R2 don't support Presigned POST policies (no `content-length-range`, verified 2026). PUT presigned + `confirm` is the correct shape.
 - **Use-cases shipped**: `create-upload-url`, `confirm-upload`, `create-download-url`. Routes: `POST /uploads/presign`, `POST /uploads/confirm`, `POST /uploads/download`.
 
+## RGPD / CCPA — erasure (Art. 17) + portability (Art. 20) ✅
+
+Deletion + export cascade built before Billing/Audit so every future feature inherits the contract. A clone deployed to EU users is compliant day one.
+
+- **Export** — `POST /me/export`, auth-gated, sync (walks the user's tables, uploads JSON to R2, emails a signed 7-day URL via Resend). Rate-limited 1/24h per user.
+- **Delete** — `POST /me/delete`, 2FA-required + server-side sole-owner preflight re-check + **7-day soft-delete grace**. Cron `/internal/rgpd/process-pending-deletions` (HMAC-signed) wipes personal data (email, name, sessions, passkeys, MFA, R2 avatars) and **anonymizes** `member` rows (`userId → null`, tombstone email) so org audit trails stay intact.
+- **Pre-flight gate** — `GET /me/delete/preflight` lists sole-owner non-personal orgs blocking deletion; UI shows per-row Transfer/Leave CTAs, Delete button disabled until cleared. No implicit auto-transfer (consent).
+- **Cancel UX** — sign-in during the grace window prompts cancel/continue; clears `pendingDeletionUntil`.
+- **Soft-delete confined to RGPD** — `deletedAt` + `pendingDeletionUntil` are the only soft-delete columns; everything else hard-deletes.
+- **Public `/legal/data-rights`** — lists what's deleted vs anonymized vs retained per legal basis.
+- **Events** — `user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}` → `compliance` audit trail.
+
+Frontend cards (`features/rgpd/`): `DataExportCard`, `RgpdDeletionCard` (+ preflight blocking list), cancel dialog. See [`HISTORY.md`](./HISTORY.md) for decisions.
+
 ## API — Hono on Bun ✅
 
 - **Native `Bun.serve()`** (no `@hono/node-server`) — `bun build` for prod (~7 ms cold), `bun --hot` for dev.

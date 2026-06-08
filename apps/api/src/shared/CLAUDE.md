@@ -19,7 +19,6 @@ Loaded when working inside `apps/api/src/shared/`. Cross-cutting infra placement
 - `event-emitter.ts` — `emitEvent(outbox, ...)` helper for code that emits events outside an aggregate flow (BetterAuth bridge, RGPD service, uploads). Use this instead of `outbox.enqueue` directly to keep the source/scope shape consistent.
 - `aead.ts` — XChaCha20-Poly1305 encrypt/decrypt + HKDF per-org sub-key for webhook secrets at rest.
 - `jitter.ts` — decorrelated jitter math (used by outbox dispatcher + webhook delivery worker for retry backoff).
-- `audit-recorder.ts` — `recordAudit(deps, entry, tx?)` helper for service-level transitions without aggregate (e.g. RGPD). For aggregate-driven contexts the `AuditEventSubscriber` writes from the outbox — no direct call needed.
 
 ## Port placement decisor — `shared/ports/` vs `modules/<x>/application/ports/`
 

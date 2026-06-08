@@ -46,7 +46,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | A.1 | **Profile + NIST 800-63B-4 password baseline** (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15/8 with MFA, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
 | A.2 | **Privacy policy / Terms versioning** (DB schema, version constants, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
 | A.3 | **Compliance docs bundle** (sub-processor disclosure, accessibility statement EAA, DPA template, DORA annex template) | **€400 – €800** | 1j |
-| A.4 | **Cookie consent + DDD Consent aggregate** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped record, first real Aggregate consumer) | **€2 000 – €3 500** | 4-5j |
+| A.4 | **Cookie consent + consent management** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped `consent_record` — infra, not DDD) | **€1 200 – €2 000** | 2-3j |
 | A.5 | **Privacy dashboard** (`/settings/privacy` aggregating consent + last export + sessions + data sources + acceptance history) | **€600 – €1 000** | 1-2j |
 | A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain, WCAG 2.1 AA gate ≥95) | **€1 200 – €2 000** | 3j |
 | B.1 | **Billing Stripe complet** (`@better-auth/stripe`, customer portal, webhooks idempotents, dunning, invoice automation, plan config) | **€3 000 – €5 000** | 6-8j |

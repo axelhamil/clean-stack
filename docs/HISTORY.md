@@ -70,6 +70,10 @@ Personal org is structurally identical to a team org for every operation except 
 - [x] **`NO_ACTIVE_ORGANIZATION` translated to `null`** — `currentMembershipQueryOptions` and `activeOrgQueryOptions` catch BetterAuth's error code and return `null`. "No active org" is a valid transient state in our model (between orgs, pre-self-heal); letting the error bubble crashes any consumer that calls `ensureQueryData`.
 - [x] **`broadcastAuthChange()` extended to org events** — `setActive`, `create-org`, `delete-org`, `leave-org`, `transfer-and-leave`, `accept-invitation`, `remove-member` all call the broadcast in their `onSuccess` (call site, not factory). Listener already refetches `["session", "active-org", "current-membership", "orgs"]`. Cross-tab consistency under the 5-min `cookieCache.maxAge` window.
 
+### May 2026 cleanup — dropped the `teams` sub-plugin
+
+- [x] **Removed the BetterAuth `teams` sub-plugin.** Grouping-only (no team-scoped roles or statements) added UX surface for ~zero value at this stage. Re-enables in two lines if a clear use-case emerges. Settings collapsed from a General/Members/Teams split to a single `Organization` tab with section-level `<Can>` gates per role.
+
 ---
 
 ## Email — Resend (dashboard templates) ✅ Phase 1
@@ -116,6 +120,29 @@ Personal org is structurally identical to a team org for every operation except 
 
 ---
 
+## RGPD / CCPA — data deletion (Art. 17) + export (Art. 20) ✅ Phase 1
+
+**Why**: clean-stack is a boilerplate cloned to start any SaaS. A clone deployed to EU users without Art. 17 (right to erasure) + Art. 20 (data portability) is illegal day one — fines up to 4 % of revenue. The cascade was built **before** Billing / Audit-log / Admin landed so every future feature inherits the deletion contract rather than retrofitting it. Lives in `apps/api/src/modules/rgpd/` (vertical slice — service + drizzle repo + public + internal routes) and `apps/app/src/features/rgpd/` (cards + forms + hooks). Shipped commits `fd3b4b7`, `bfcc15d`, `da659a0`.
+
+- [x] **Export endpoint** `POST /me/export` — auth-gated, **sync** (walks the user's tables in-request, uploads the JSON bundle to R2, emails a signed 7-day URL via Resend `RESEND_TPL_DATA_EXPORT_*`). Rate-limited 1/24h per user via `lastExportRequestedAt`. The presigned URL is **never** put in an event payload — events carry only `storageKey` (security).
+- [x] **Pre-flight ownership gate** `GET /me/delete/preflight` — returns the sole-owner non-personal orgs that block deletion. UI at `/settings/account` renders the blocking list with per-row `Transfer ownership` / `Leave org` CTAs; the `Delete account` button stays disabled while the list is non-empty. **Auto-transfer rejected on principle** — no implicit refiling of legal/billing responsibility onto a member without consent (mirrors the Personal-org deletion posture).
+- [x] **Delete endpoint** `POST /me/delete` — auth + **2FA-required** (BetterAuth `twoFactor`) + server-side preflight re-check (409 `ACCOUNT_DELETION_BLOCKED` if a sole-owner org appeared between read and submit) + **7-day soft-delete grace**. Cron `POST /internal/rgpd/process-pending-deletions` (HMAC-signed) sweeps expired requests, wipes personal data (email, name, sessions, passkeys, MFA factors, R2 avatars) and anonymizes `member` rows (`userId → null`, `email → deleted-<uuid>@anonymized.local`).
+- [x] **Cancel-deletion UX** — signing in during the grace window prompts a cancel/continue dialog; cancel clears `pendingDeletionUntil`.
+- [x] **Soft-delete confined to RGPD** — `user.deletedAt` + `user.pendingDeletionUntil` are the **only** soft-delete columns in the codebase (rule 14 — no creep elsewhere; everything else is hard-delete).
+- [x] **Public `/legal/data-rights` page** — linked from `/settings/account`, lists what's deleted vs anonymized vs retained per legal basis.
+- [x] **Audit-log integration** — every state transition emits an outbox event (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`); `AuditEventSubscriber` writes the audit row with `compliance` retention. Pino logging retained for ops debugging (different concern).
+
+**Decisions (non-obvious, locked-in by code)**:
+
+1. **Soft-delete grace, not immediate wipe** — Art. 17 allows a reasonable processing window. The 7-day grace doubles as a self-service "I changed my mind" path (cancel on sign-in) and a safety net against account-takeover-then-delete attacks. The cron is the only thing that hard-wipes.
+2. **Anonymize `member`, don't cascade-delete it** — deleting the `member` row would corrupt org audit trails ("who invited whom"). Setting `userId → null` + a tombstone email keeps referential history intact while removing the PII link. The org's other members see "deleted user", not a broken page.
+3. **Sole-owner preflight is server-authoritative, re-checked at submit** — the UI gate is UX; the `POST /me/delete` handler re-runs the preflight inside the request so a race (org ownership changing between page-load and click) can't orphan an org without an owner.
+4. **2FA gate on a destructive irreversible action** — account deletion reuses the BetterAuth `twoFactor` challenge, consistent with the "step-up auth on irreversible ops" posture.
+
+**Remaining** (tracked in their dependent phases, not here): E2E Playwright deletion-cascade gate (A.6), admin export-on-behalf + deletion overrides (C.3), Stripe customer cleanup during wipe (B.1).
+
+---
+
 ## App shell — top-nav + ⌘K command palette ✅
 
 **Why**: sidebar SaaS shells are the 2010-2024 standard, but the SOTA 2026 wave (Vercel, Linear web, Resend, Trigger.dev) consolidated on top-nav + global ⌘K palette. Less chrome, better mobile, keyboard-first power-users.
@@ -139,7 +166,7 @@ Personal org is structurally identical to a team org for every operation except 
 
 ### Catalog `@packages/events` (new private package)
 
-- [x] **29 events** covering BetterAuth (user/session/account, organization/member/invitation, MFA/passkey), RGPD (deletion + export transitions), uploads (`hashKey` instead of raw filename for PII).
+- [x] **29 events at foundation** (grown to **35** as later phases added webhook-endpoint ×3, profile-updated + email-change-requested ×2, policy-accepted ×1) covering BetterAuth (user/session/account, organization/member/invitation, MFA/passkey), RGPD (deletion + export transitions), uploads (`hashKey` instead of raw filename for PII).
 - [x] **Zod payload schemas** — typed discriminated union via `PayloadByEventType`.
 - [x] **`RETENTION_MAP`** — per-event `operational` (90d) / `compliance` (7y) / `none`. The audit subscriber reads this directly — no glue.
 
@@ -166,7 +193,7 @@ Personal org is structurally identical to a team org for every operation except 
 - [x] **Decorrelated jitter** (`shared/jitter.ts`) — AWS Architecture Blog formula: `min(cap, random(base, lastDelay × 3))`. `BASE = 1000ms`, `CAP = 12h`, `MAX_ATTEMPTS = 5`. Retry paliers ~1m / 5m / 30m / 2h / 12h, dead-letter after 5 attempts.
 - [x] **Ports** `IOutboxRepository` + `IAuditPort` in `shared/ports/`. Cross-cutting (consumed by 2+ contexts). Drizzle impls in `shared/services/`.
 - [x] **`emitEvent(outbox, ...)` shared helper** (`shared/event-emitter.ts`) — used by BetterAuth bridge, RGPD service, UploadService instead of duplicated private `emit` methods.
-- [x] **`recordAudit(deps, entry, tx?)` shared helper** (`shared/audit-recorder.ts`) — for service-level transitions without aggregate (RGPD-style). Aggregate-driven contexts use `AuditEventSubscriber` automatic — no direct call.
+- [x] **Service-level audit via `emitEvent` → `AuditEventSubscriber`** — code without an aggregate (RGPD, uploads, BetterAuth bridge) emits its event through the `emitEvent` helper; the subscriber writes the `audit_log` row from the outbox. The outbox event *is* the audit primitive — there is no separate `recordAudit` helper.
 
 ### BetterAuth bridge (`apps/api/src/auth.ts`) — 21 unique events emitted automatically (23 emit sites; USER_PASSWORD_CHANGED + ORG_MEMBER_JOINED each have 2)
 
@@ -392,7 +419,7 @@ The config-as-code shipped (above) but no one had run it end-to-end. Bringing th
 
 ### Backend module `apps/api/src/modules/policies/` — compliance infra, not DDD
 
-- [x] **Not DDD** — no aggregate, no domain events on a Value Object. Mirrors the `audit-log` module shape: a thin service over a port-backed store. A.4 (Cookie consent) will be the first real DDD aggregate in the boilerplate.
+- [x] **Not DDD** — no aggregate, no domain events on a Value Object. Mirrors the `audit-log` module shape: a thin service over a port-backed store. A.4 (Cookie consent) is the **same class** — its expiry/withdrawal/scope rules reduce to date comparisons + `includes()` + the same `version ===`, so it ships as infra too. The boilerplate ships **zero aggregates**; `@packages/ddd-kit/Aggregate` is a published-lib surface that waits for the cloner's real product domain.
 - [x] `IPolicyAcceptanceStore` port (module-private) + `DrizzlePolicyAcceptanceStore` — fully instrumented per rule §8 (outer span wrapping the method, inner span on `query.execute()`, `catch + instrumentation.capture`).
 - [x] `PolicyAcceptanceService` — `accept(userId, types, ipAddress?)` writes N rows + emits N events atomically in one `uow.run` TX. `getStatus(userId)` returns `Record<PolicyType, { current, acceptedVersion }>`. `getStaleTypes(userId)` returns only the types where the latest accepted version differs from the current. `hasAcceptedCurrent(userId)` is the gate predicate.
 - [x] Routes: `POST /me/policies/accept` (body `{ types?: PolicyType[] }` — omit to accept all stale), `GET /me/policies`. Both require auth. Mounted in `index.ts` `routes` chain.
@@ -427,6 +454,6 @@ Drop real legal text in `policies.config.tsx`. When a policy changes, bump the r
 
 1. **`@packages/policies` as SSOT, not a front-only config.** The version string must be the same on the API (gate: is this version current?), the front (display + sign-up checkbox), and the DB schema (enum values). A front-only config means the API has a hardcoded constant elsewhere — drift. A shared package eliminates the sync requirement entirely.
 2. **Append-only `policy_acceptance`, not an upsert.** Compliance requires the full history of when each version was accepted. An upsert destroys past evidence. The gate reads the latest row per `(userId, policyType)` via the DESC index — equivalent to an upsert for the gate predicate, with the full trail preserved.
-3. **Not DDD.** The acceptance rule is `latestAcceptedVersion === currentVersion` — a comparison, not an invariant that requires aggregate lifecycle protection. Using an aggregate here would be the OpenUp anti-pattern (rule §test décisif: if the rule fits in a comparison, it's infra). A.4 (Cookie consent, with expiry/withdrawal/scope invariants) is where `@packages/ddd-kit/Aggregate` earns its keep.
+3. **Not DDD.** The acceptance rule is `latestAcceptedVersion === currentVersion` — a comparison, not an invariant that requires aggregate lifecycle protection. Using an aggregate here would be the OpenUp anti-pattern (rule §test décisif: if the rule fits in a comparison, it's infra). **A.4 (Cookie consent) is the same call** — `isActive = withdrawnAt == null && expiresAt > now && policyVersion == current` is a WHERE clause, scope is `includes()`, validity/cooldown are date math; it ships as infra too. The boilerplate ships **zero aggregates** — `@packages/ddd-kit/Aggregate` earns its keep only once the cloner adds real product domain.
 4. **`/verify-email` hook, not `/sign-up/email`** — see deviation note above. The key insight: the gate-predicate (front `_shell`) is the primary enforcement; the hook is best-effort plus defense-in-depth for the sign-up path specifically.
 5. **`requireCurrentPolicies` composable, not global default.** Mounting it globally on all authenticated routes would make every current API call return 409 for a stale user — too aggressive. The UX re-acceptance gate is the live enforcement. The middleware is opt-in for future business routes that need hard server-side gating.

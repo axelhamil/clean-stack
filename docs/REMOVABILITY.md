@@ -93,7 +93,7 @@ Total clock time end-to-end (including the cartography pass, axis-by-axis edits,
 ### What you do NOT touch (worth naming)
 
 - `apps/api/src/shared/event-emitter.ts` — `emitEvent()` is shared infrastructure used by uploads + BetterAuth bridge too. Stays.
-- `apps/api/src/shared/audit-recorder.ts` — `recordAudit()` is the audit primitive, not RGPD-specific. Stays.
+- `apps/api/src/shared/services/audit-event-subscriber.ts` — the audit primitive (outbox event → `audit_log` row) is not RGPD-specific. Stays.
 - `docs/HISTORY.md` mentions of RGPD — historical record, preserve.
 - `docs/OBSERVABILITY.md` "RGPD-clean by default" — generic GDPR-compliance phrasing, not module-specific. Stays.
 - Sentry `beforeSend` scrubbing — generic privacy hygiene, not RGPD-module-owned. Stays.
