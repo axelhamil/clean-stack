@@ -21,6 +21,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 29 events emitted automatically (21 BetterAuth bridge + 5 RGPD + 3 uploads) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry) + retention sweeps (3 `/internal/sweep-*` routes, SOTA 2026 defaults). See [`docs/EVENTS.md`](docs/EVENTS.md) (DX guide + retention matrix) + [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) (visual walkthrough). |
 | **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -39,7 +40,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 > RGPD core shipped. Below = closure of EU-deployability surface (RGPD + EAA + ePrivacy + NIS2/DORA contractual). **Filed away after Phase A** — nothing later revisits legal.
 
 - **A.1** Right to rectification UI (Art. 16) + NIST 800-63B-4 password ✅ COMPLETE (Jun 2026) — `ProfileCard` (name/email/avatar) + `ChangePasswordCard` + HIBP k-anonymity + min 15 + ban-list. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
-- **A.2** Privacy policy / Terms versioning (Art. 7) — foundation for A.4 + A.5
+- **A.2** Privacy policy / Terms versioning (Art. 7) ✅ COMPLETE (Jun 2026) — `@packages/policies` SSOT + `policy_acceptance` table + `/legal/accept` gate + `requireCurrentPolicies` + `user.policy.accepted`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA + DORA annex templates
 - **A.4** Cookie consent + Consent management — first real Aggregate consumer of `@packages/ddd-kit`. CNIL/EDPB-conform.
 - **A.5** Privacy dashboard `/settings/privacy` — UX hub aggregating A.2/A.3/A.4 + RGPD cards
@@ -118,12 +119,12 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Why second**: foundational for A.4 (consent stamps the policy version) and A.5 (privacy dashboard surfaces acceptance history). Art. 7 §1 RGPD — "the controller shall be able to demonstrate that the data subject has consented". Requires logging WHICH version was accepted. Current boilerplate has zero versioning.
 
-- [ ] DB schema `policy_acceptance(userId, policyType: "privacy"|"terms", policyVersion, acceptedAt, ipAddress)` — append-only.
-- [ ] `apps/app/src/features/legal/policies.config.ts` — `PRIVACY_VERSION = "2026-01-15"`, `TERMS_VERSION = "2026-01-15"`. Bump triggers re-acceptance.
-- [ ] `requireCurrentPolicies` middleware — if user's latest accepted version < current, return 409 with re-acceptance gate URL. Front route gate redirects to `/legal/accept` blocking modal.
-- [ ] `/legal/accept` page — diff view (what changed since previous version), accept button writes `policy_acceptance` row.
-- [ ] Sign-up flow: accept current versions inline (checkbox + link).
-- [ ] Audit-log entry on each acceptance (`compliance` retention) — deferred until Phase C.2 lands.
+- [x] DB schema `policy_acceptance(userId, policyType: "privacy"|"terms", policyVersion, acceptedAt, ipAddress)` — append-only.
+- [x] `@packages/policies` — `POLICY_VERSIONS` (both `"2026-01-15"`), `POLICY_TYPES`, `POLICY_CHANGELOG`. Single SSOT imported by api, app, and `@packages/drizzle`. Bump triggers re-acceptance.
+- [x] `requireCurrentPolicies` middleware — if user's latest accepted version < current, return 409 with re-acceptance gate URL. Front `_shell` `beforeLoad` redirects to `/legal/accept`.
+- [x] `/legal/accept` page — diff view (what changed since previous version), accept button writes `policy_acceptance` rows. Outside `_shell` to avoid redirect loop.
+- [x] Sign-up flow: `acceptedPolicies: z.literal(true)` checkbox + links to public policy pages. Acceptance recorded server-side at the `/verify-email` after-hook (idempotent — stale types only). See as-built deviation note in [`docs/HISTORY.md`](docs/HISTORY.md).
+- [ ] Audit-log entry on each acceptance UI (`compliance` retention, event IS emitted) — front audit-log display deferred until Phase C.2 lands.
 
 ---
 

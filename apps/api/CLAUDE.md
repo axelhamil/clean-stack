@@ -126,6 +126,15 @@ OTel + Prometheus `/metrics` are deferred to Phase D.1 (no consumer yet). The sp
 
 See `docs/EVENTS.md` for full spec, retention matrix, and cron recipe.
 
+## Policy versioning (`modules/policies/` — Phase A.2)
+
+Compliance infra, not DDD. Records which policy version each user accepted and when. Mirrors the `audit-log` module shape.
+
+- **`@packages/policies`** is the SSOT (`POLICY_VERSIONS`, `POLICY_TYPES`, `POLICY_CHANGELOG`, `POLICY_URLS`). Source-only package. Bump the version string here → every consumer (API gate, front sign-up, `@packages/drizzle` enum) sees the change at compile time. `POLICY_URLS` is the swap point for hosting the full policy text externally (marketing site / CMS) instead of in-app.
+- **`PolicyAcceptanceService`** — `accept(userId, types, ipAddress?)` writes N rows + emits N `user.policy.accepted` events (retention `compliance`) atomically in one `uow.run` TX — on any insert failure it throws to force a full rollback (no partial acceptance), then returns `Result.fail`. `getStaleTypes(userId)` drives the gate. `DrizzlePolicyAcceptanceStore` is fully §8-instrumented (outer + inner spans + capture); the service itself only `capture`s in its catch (orchestration, no span).
+- **`requireCurrentPolicies`** (`shared/middleware/policy.middleware.ts`) — composable, **not mounted globally**. Throws `HTTPException(409)` when any policy is stale. The `_shell` `beforeLoad` redirect is the live UX gate; this middleware is defense-in-depth for future business routes.
+- **Sign-up acceptance via `/verify-email` hook** — `PolicyAcceptanceService.accept` is called from the BetterAuth `/verify-email` after-hook in `auth.ts` (idempotent via `getStaleTypes`) AND from `POST /me/policies/accept`. Not at `/sign-up/email`: that route has no session yet and returns a synthetic user on duplicate-email. See `docs/HISTORY.md` Phase A.2 for the full deviation note.
+
 ## Organization scoping (server)
 
 1. **Ownership at port (`ScopedRepository`), not route.** `requireOrg` exposes `c.var.orgId`; controller builds `RepoScope.org(orgId)` and passes to `di.XxxUseCase.execute(input, scope)`; `requireOrgPermission({ resource: ["action"] })` still gates *capabilities*. Routes **construct** scope; repo **honors** it. Skipping `requireOrg` on a handler reading/writing rows scoped by `organizationId` silently accepts requests with no active org.

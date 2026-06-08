@@ -374,3 +374,59 @@ The config-as-code shipped (above) but no one had run it end-to-end. Bringing th
 1. **`railway up` deploys local working-tree code; a variable change / *Redeploy* / git push rebuilds from the connected branch.** During the fix loop `railway up` was the only way to test uncommitted code; a mid-fix variable change rebuilt from `main` (no fixes yet) and re-crashed — confirming the model. Once merged, GitHub-integrated deploys took over and went green.
 2. **`RAILWAY_GIT_COMMIT_SHA` only populates on branch deploys**, not `railway up`. `GIT_SHA`/`BUILD_TIME` show `unknown` under `railway up`; set them to the Railway reference vars (`${{RAILWAY_GIT_COMMIT_SHA}}`) so build-info tracks the deployed commit.
 3. **A multi-service deploy fails one layer at a time.** Each ~3-minute build only reveals the *next* boot trap. Pre-scan for the whole class (eager-preloaded constructors that throw, peer-deps imported at runtime, dashboard overrides) instead of one-fix-per-deploy.
+
+---
+
+## Privacy / Terms versioning ✅ Phase A.2 · Jun 2026
+
+**Why**: Art. 7 §1 RGPD — "the controller shall be able to demonstrate that the data subject has consented". Demonstrability requires recording *which version* was accepted and *when*. The boilerplate had zero versioning — a cloner shipping a policy update had no way to re-prompt users or produce compliance evidence. This phase closes that gap and lays the foundation for A.4 (consent stamps the policy version) and A.5 (privacy dashboard shows acceptance history).
+
+### Shared package `@packages/policies` — version SSOT
+
+- [x] **Source-only package** mirroring `@packages/access-control` (no build, `exports` points at `src/`). Exports `POLICY_TYPES` (`["privacy","terms"]`), `PolicyType`, `POLICY_VERSIONS` (`Record<PolicyType,string>`, both `"2026-01-15"`), `POLICY_CHANGELOG`, `PolicyChangelogEntry`. Imported by `apps/api` (gate + service), `apps/app` (sign-up form + page render), and `@packages/drizzle` (schema enum). **Single place to bump a version** — every consumer sees the change at compile time.
+
+### DB — `policy_acceptance` table
+
+- [x] Append-only table `policy_acceptance` (`packages/drizzle/src/schema/policies.ts`): `id, userId (FK user ON DELETE CASCADE), policyType, policyVersion, ipAddress (nullable), acceptedAt` + composite index `(userId, policyType, acceptedAt DESC)`. Migration `0005_sudden_leo.sql`.
+- [x] **Two-layer compliance trail**: this table is the live gate evidence (fast lookup of latest accepted version per type); the durable 7-year compliance trail lives in `audit_log` via the `user.policy.accepted` event (`compliance` retention).
+
+### Backend module `apps/api/src/modules/policies/` — compliance infra, not DDD
+
+- [x] **Not DDD** — no aggregate, no domain events on a Value Object. Mirrors the `audit-log` module shape: a thin service over a port-backed store. A.4 (Cookie consent) will be the first real DDD aggregate in the boilerplate.
+- [x] `IPolicyAcceptanceStore` port (module-private) + `DrizzlePolicyAcceptanceStore` — fully instrumented per rule §8 (outer span wrapping the method, inner span on `query.execute()`, `catch + instrumentation.capture`).
+- [x] `PolicyAcceptanceService` — `accept(userId, types, ipAddress?)` writes N rows + emits N events atomically in one `uow.run` TX. `getStatus(userId)` returns `Record<PolicyType, { current, acceptedVersion }>`. `getStaleTypes(userId)` returns only the types where the latest accepted version differs from the current. `hasAcceptedCurrent(userId)` is the gate predicate.
+- [x] Routes: `POST /me/policies/accept` (body `{ types?: PolicyType[] }` — omit to accept all stale), `GET /me/policies`. Both require auth. Mounted in `index.ts` `routes` chain.
+- [x] `requireCurrentPolicies` middleware (`apps/api/src/shared/middleware/policy.middleware.ts`) — throws `HTTPException(409)` when any policy is stale. **Composable, not mounted globally by default** — there are no business routes yet; this is defense-in-depth for future routes. The live UX gate (the `_shell` `beforeLoad` redirect) is the primary enforcement today.
+
+### Event `user.policy.accepted` — event catalogue grows from 34 to 35
+
+- [x] Self-actor payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. `userId` resolves as the actor via `AuditEventSubscriber.extractActor` (self-actor: the subject accepted for themselves). Emitted from `PolicyAcceptanceService.accept` — fired from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path), and (2) the `POST /me/policies/accept` route (explicit re-acceptance).
+
+### As-built deviation: acceptance recorded at `/verify-email`, not `/sign-up/email`
+
+The original plan proposed recording acceptance at the `/sign-up/email` route. This was changed during implementation for two reasons:
+
+1. **No session at sign-up.** With `requireEmailVerification: true`, `/sign-up/email` has no session yet — reading a reliable `userId` from the response is unsafe because BetterAuth returns a *synthetic user* on duplicate-email attempts (anti-enumeration). The `userId` in the response is not guaranteed to be the just-created user.
+2. **`/verify-email` is the natural idempotent boundary.** This route fires exactly when the user proves ownership of their email address. The session `userId` is reliable. Using `getStaleTypes(userId)` makes the call naturally idempotent — a user who re-verifies after an email change is a no-op because they already accepted the current version.
+
+**Safety net**: the front `_shell` `beforeLoad` gate redirects any authenticated user with stale policies to `/legal/accept` regardless of which auth path they used (social login, magic link, or future SSO). This ensures the re-acceptance gate catches any edge case that bypasses the `auth.ts` hook.
+
+### Frontend `apps/app/src/features/legal/`
+
+- [x] **Sign-up form** — `signUpSchema` gained a required `acceptedPolicies: z.literal(true)` checkbox; its links to the two public pages open in a new tab so a misclick doesn't wipe the entered form. Acceptance is non-optional at sign-up; the server records it at `/verify-email`.
+- [x] **Public pages** `/legal/privacy-policy` + `/legal/terms` — placeholder legal content keyed by version string, shared `PolicyDocView` component, `policies.config.tsx` registry + `getChangesSince` helper for the diff view.
+- [x] **Acceptance gate** `/legal/accept` — under `_protected`, **outside `_shell`** to avoid a redirect loop. **Adapts to context**: a brand-new user with no prior acceptance (the magic-link / social sign-up path, where no checkbox was ever shown) sees a "Before you get started" welcome + a link to read each full policy; a returning user whose accepted version is stale sees an "Updated policies" header + the per-version changelog diff (`getChangesSince`). One Accept button either way; on success navigates to the originally intended route. This is what makes the magic-link sign-up path both legally explicit (affirmative accept, version+IP+timestamp recorded) and UX-clean (no confusing "what changed" on a first acceptance).
+- [x] **`_shell` `beforeLoad`** — calls `policiesQueryOptions` (fresh) and redirects to `/legal/accept?redirect=<current>` when any type is stale. This is the primary UX enforcement layer.
+- [x] `shared/api/queries/policies.ts` (`policiesQueryOptions`), `shared/api/mutations/accept-policies.ts`, `hooks/use-accept-policies.ts`.
+
+### How a cloner uses it
+
+Drop real legal text in `policies.config.tsx`. When a policy changes, bump the relevant string in `@packages/policies/src/versions.ts` and add a `POLICY_CHANGELOG` entry with a summary of changes. All authenticated users are re-prompted on next visit automatically — the `_shell` gate picks up the new version on the next query invalidation.
+
+### Decisions
+
+1. **`@packages/policies` as SSOT, not a front-only config.** The version string must be the same on the API (gate: is this version current?), the front (display + sign-up checkbox), and the DB schema (enum values). A front-only config means the API has a hardcoded constant elsewhere — drift. A shared package eliminates the sync requirement entirely.
+2. **Append-only `policy_acceptance`, not an upsert.** Compliance requires the full history of when each version was accepted. An upsert destroys past evidence. The gate reads the latest row per `(userId, policyType)` via the DESC index — equivalent to an upsert for the gate predicate, with the full trail preserved.
+3. **Not DDD.** The acceptance rule is `latestAcceptedVersion === currentVersion` — a comparison, not an invariant that requires aggregate lifecycle protection. Using an aggregate here would be the OpenUp anti-pattern (rule §test décisif: if the rule fits in a comparison, it's infra). A.4 (Cookie consent, with expiry/withdrawal/scope invariants) is where `@packages/ddd-kit/Aggregate` earns its keep.
+4. **`/verify-email` hook, not `/sign-up/email`** — see deviation note above. The key insight: the gate-predicate (front `_shell`) is the primary enforcement; the hook is best-effort plus defense-in-depth for the sign-up path specifically.
+5. **`requireCurrentPolicies` composable, not global default.** Mounting it globally on all authenticated routes would make every current API call return 409 for a stale user — too aggressive. The UX re-acceptance gate is the live enforcement. The middleware is opt-in for future business routes that need hard server-side gating.

@@ -6,6 +6,31 @@ For the as-built rationale (decisions, alternatives ruled out, security notes), 
 
 ---
 
+## Privacy policy / Terms versioning ✅ Phase A.2
+
+RGPD Art. 7 demonstrability — records which version each user accepted and when. Foundation for A.4 (consent stamps the policy version) and A.5 (privacy dashboard shows acceptance history).
+
+**Shared SSOT** (`@packages/policies`): `POLICY_TYPES`, `POLICY_VERSIONS` (both currently `"2026-01-15"`), `POLICY_CHANGELOG`. Source-only package imported by api, app, and `@packages/drizzle`. Bump a version string here → all users re-prompted automatically.
+
+**DB** (`packages/drizzle/src/schema/policies.ts`): append-only `policy_acceptance` table — `userId, policyType, policyVersion, ipAddress, acceptedAt`. Index on `(userId, policyType, acceptedAt DESC)` for fast gate lookups. Durable 7-year trail lives in `audit_log` via the compliance event.
+
+**Backend module** (`apps/api/src/modules/policies/`): compliance infra, not DDD.
+- `PolicyAcceptanceService` — `accept` writes N rows + emits N `user.policy.accepted` events in one `uow.run` TX. `getStaleTypes` is the gate predicate.
+- Routes: `POST /me/policies/accept` (body `{ types?: PolicyType[] }` — omit to accept all stale), `GET /me/policies`.
+- `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — returns 409 when any policy is stale. **Composable, not mounted globally** — the `_shell` redirect is the live enforcement; this is opt-in defense-in-depth for future business routes.
+
+**Sign-up acceptance**: recorded server-side at the BetterAuth `/verify-email` after-hook (idempotent via `getStaleTypes`), not at `/sign-up/email`. Reason: `/sign-up/email` has no session yet and returns a synthetic user on duplicate-email; `/verify-email` has a reliable session `userId`. See [`HISTORY.md`](./HISTORY.md) for the full deviation note.
+
+**Frontend** (`apps/app/src/features/legal/`):
+- Sign-up `acceptedPolicies` checkbox (`z.boolean().refine`) linking to the policies via `<PolicyLink>` (new tab, so a misclick doesn't wipe the form).
+- Public `/legal/privacy-policy` + `/legal/terms` pages — placeholder content keyed by version, `PolicyDocView` component, `policies.config.tsx` + `getChangesSince` helper.
+- Acceptance gate `/legal/accept` (under `_protected`, outside `_shell`) — adapts: first-time user (magic-link/social, no checkbox shown) sees a "Before you get started" welcome; a returning user with a stale version sees the changelog diff. One Accept button. `_shell` `beforeLoad` redirects here when any policy is stale (fail-open if the policies endpoint errors).
+- **Hosting-agnostic content**: the full policy text ships in-app as placeholder, but every link resolves `POLICY_URLS` from `@packages/policies`. Hosting the real policies on a marketing site/CMS is a **one-line swap** there (point the URL external, delete the in-app pages) — the versioning + acceptance machinery is untouched.
+
+**Event**: `user.policy.accepted` — self-actor, `compliance` retention. Brings the catalogue to **35 events**.
+
+---
+
 ## Profile editing + NIST 800-63B-4 password baseline ✅ Phase A.1
 
 GDPR Art. 16 rectification surface + SOTA-2026 password policy, both wired into the existing `/settings/account` page.
@@ -172,8 +197,8 @@ Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing p
 - **Dispatcher**: in-process Bun worker, dedicated `pg.Client` LISTEN + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers run inside the dispatch TX (atomic), user `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`, SOC2 §CC7.2 / ISO 27001) — append-only, retention `operational` (90d) vs `compliance` (7y) driven by `RETENTION_MAP`. Tamper-evidence columns posed (`prev_hash`/`hash`), calc gated by env flag.
 - **Outbound webhooks** (`webhook_endpoint` + `webhook_delivery`) — HMAC-SHA256 signed (`t=<ts>,v1=<hex>` Stripe-style), AEAD-encrypted secrets at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per org). Decorrelated jitter retry (1m/5m/30m/2h/12h paliers), dead-letter after 5 attempts, replay endpoint. Claim window pattern in delivery worker — fetch HTTP outside TX, no lock starvation.
-- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3 → **34 events total**.
-- **Catalog `@packages/events`** — 34 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
+- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`) → **35 events total**.
+- **Catalog `@packages/events`** — 35 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
 
 See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
 
