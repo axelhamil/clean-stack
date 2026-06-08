@@ -3,6 +3,14 @@ import type { Transaction } from "@packages/drizzle";
 import type { EventType } from "@packages/events";
 import type { IOutboxRepository } from "./ports/outbox.port";
 
+/**
+ * Emits a domain event directly to the outbox, bypassing the aggregate/UoW path.
+ *
+ * Use this for code that runs outside an aggregate flow — BetterAuth lifecycle
+ * hooks, RGPD service, upload confirm — where there is no aggregate to call
+ * `addEvent()` on. The call site is responsible for passing the active
+ * transaction (`tx`) when the emit must be atomic with a surrounding write.
+ */
 const SOURCE = "app/api";
 
 export type EmitOptions = {

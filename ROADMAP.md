@@ -20,6 +20,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | Clone-ability bootstrap (`pnpm bootstrap` + Docker compose v2 + Linux fixes + source-only packages) | May 2026 | `pnpm bootstrap` script, SeaweedFS profile `storage`, db:push --force, internal packages source-only |
 | **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 29 events emitted automatically (21 BetterAuth bridge + 5 RGPD + 3 uploads) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry) + retention sweeps (3 `/internal/sweep-*` routes, SOTA 2026 defaults). See [`docs/EVENTS.md`](docs/EVENTS.md) (DX guide + retention matrix) + [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) (visual walkthrough). |
 | **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -37,7 +38,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 > RGPD core shipped. Below = closure of EU-deployability surface (RGPD + EAA + ePrivacy + NIS2/DORA contractual). **Filed away after Phase A** — nothing later revisits legal.
 
-- **A.1** Right to rectification UI (Art. 16) + NIST 800-63B-4 password (15 chars min / 8 with MFA, HIBP screening, ban complexity rules)
+- **A.1** Right to rectification UI (Art. 16) + NIST 800-63B-4 password ✅ COMPLETE (Jun 2026) — `ProfileCard` (name/email/avatar) + `ChangePasswordCard` + HIBP k-anonymity + min 15 + ban-list. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.2** Privacy policy / Terms versioning (Art. 7) — foundation for A.4 + A.5
 - **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA + DORA annex templates
 - **A.4** Cookie consent + Consent management — first real Aggregate consumer of `@packages/ddd-kit`. CNIL/EDPB-conform.
@@ -96,20 +97,20 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Rectification (Art. 16) tasks**:
 
-- [ ] `/settings/profile` page — edit name, email (with re-verification flow), avatar (upload via existing `uploads` module).
-- [ ] Form: RHF + zodResolver, `name` (max 100), `email` (re-verify on change — BetterAuth auto-handles email verification challenge), avatar (`<UploadAvatar />` reusing presign+confirm flow from `uploads`).
-- [ ] On email change: BetterAuth sends new verification mail, old email invalidated until new one verified, UI shows "Pending email change to X" badge.
-- [ ] Replace the `disabled` placeholders currently in `features/account/account.page.tsx` with active fields, keep the page composition (security cards stay below).
-- [ ] Audit-log entry: `user.profile.updated` with diff metadata (deferred — depends on Phase C.2).
+- [x] `ProfileCard` in `/settings/account` — edit name, email (with re-verification flow), avatar (upload via existing `uploads` module).
+- [x] Form: RHF + zodResolver, `name` (max 100), `email` (re-verify on change — BetterAuth `user.changeEmail`, confirmation sent to the **current** address), avatar reusing presign+confirm flow.
+- [x] On email change: BetterAuth sends confirmation to the current email, new address pending verification. `user.changeEmail.enabled: true` + new `change_email` template.
+- [x] Replaced the `disabled` placeholders in `features/account/account.page.tsx` with `ProfileCard` + `ChangePasswordCard`; security cards (Passkeys/2FA/Sessions/DataExport) stay below.
+- [ ] Audit-log entry: `user.profile.updated` UI in `/admin/audit-log` (deferred — depends on Phase C.2; the event is emitted, the front display is C.2).
 
 **Password baseline (NIST SP 800-63B-4)**:
 
-- [ ] **Min length 15 chars** for single-factor accounts, **8 chars** acceptable when MFA enrolled. BetterAuth `password.minLength` defaults to 8 — bump to 15, with override path post-MFA enrollment.
-- [ ] **HIBP screening** at sign-up + password change — `k-anonymity` API (`https://api.pwnedpasswords.com/range/<sha1[:5]>`), reject if hash suffix matches. Wrap in `IPasswordBreachService` port (provider-agnostic) + `HibpPasswordBreachService` impl in `shared/services/`.
-- [ ] **Ban complexity rules** — confirm BetterAuth doesn't enforce uppercase/symbol requirements. NIST 800-63B-4 §3.1.1.2 says `SHALL NOT` impose complexity.
-- [ ] **Ban forced rotation** — confirm no scheduled "your password is N months old, change it" prompt. Rotation only on compromise (auto-trigger on HIBP match at next login or admin-initiated reset).
-- [ ] **Phishing-resistant MFA = passkeys** (already shipped via `passkey()` plugin — gold standard per NIST 800-63B-4). Document in `/settings/security` UI as the recommended method, ahead of TOTP.
-- [ ] **Block sequential / contextual / common passwords** — additional NIST recommendation: reject `email-local-part`, `name`, `<service-name>2026`. Wire a list-banned-tokens check (~20 LOC, no external service).
+- [x] **Min length 15 chars** — `emailAndPassword.minPasswordLength: 15` in `auth.ts`. **15 everywhere** (the 8-with-MFA is a permission, not an obligation — we don't lower the floor post-MFA enrollment).
+- [x] **HIBP screening** at sign-up + password change + reset — `k-anonymity` API (`https://api.pwnedpasswords.com/range/<sha1[:5]>`, `Add-Padding` header), reject if hash suffix matches. Port `IPasswordBreachService` + `HibpPasswordBreachService` impl in `shared/services/`. **Fail-open** if HIBP unreachable (timeout configurable via `HIBP_TIMEOUT_MS`, default 3000 ms).
+- [x] **Ban complexity rules** — `strongPasswordSchema` updated: min 15, **no uppercase/digit/symbol regex**. NIST 800-63B-4 §3.1.1.2 `SHALL NOT` impose complexity.
+- [x] **Ban forced rotation** — no scheduled rotation prompt. Rotation only on HIBP-triggered compromise.
+- [ ] **Phishing-resistant MFA = passkeys** (already shipped via `passkey()` plugin). Document in `/settings/security` UI as the recommended method, ahead of TOTP.
+- [x] **Block contextual / common passwords** — `findPasswordViolation()` helper (`shared/password-policy.ts`) bans email-local-part, name, app name, ~20 common passwords. Validated at `hooks.before` on sign-up / reset / change.
 
 ---
 

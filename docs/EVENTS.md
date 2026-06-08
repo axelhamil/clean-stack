@@ -254,7 +254,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **32 events automatically** (21 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **34 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`). Source of truth: `packages/events/src/event-types.ts`.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -270,12 +270,14 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 - `USER_PASSKEY_REMOVED` — `path === "/passkey/delete-passkey"` + body.id
 - `USER_EMAIL_VERIFIED` — `path === "/verify-email"` (skipped if session not yet active — limitation)
 - `USER_PASSWORD_CHANGED` — `path === "/change-password"`
+- `USER_PROFILE_UPDATED` — `path === "/update-user"`. Payload: `{ userId, changes }` (field-level diff).
 - `USER_ACCOUNT_LINKED` — `path === "/link-social"` + lookup latest non-credential account created < 5s ago
 
 ### Via BetterAuth callbacks (native)
 - `USER_PASSWORD_RESET_REQUESTED` — `emailAndPassword.sendResetPassword`
 - `USER_PASSWORD_CHANGED` — `emailAndPassword.onPasswordReset`
 - `USER_MAGIC_LINK_REQUESTED` — `magicLink.sendMagicLink`
+- `USER_EMAIL_CHANGE_REQUESTED` — `user.changeEmail.sendChangeEmailConfirmation`. Payload: `{ userId, newEmail }`. Confirmation sent to the **current** address.
 
 ### Via `organizationHooks` (org plugin)
 - `ORG_CREATED` (afterCreateOrganization) · `ORG_UPDATED` · `ORG_DELETED` · `ORG_MEMBER_INVITED` (afterCreateInvitation) · `ORG_INVITATION_CANCELLED` · `ORG_MEMBER_REMOVED` (afterRemoveMember) · `ORG_MEMBER_ROLE_CHANGED` (afterUpdateMemberRole)
@@ -321,7 +323,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (32 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (34 events) |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |
@@ -333,5 +335,5 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
 | `apps/api/src/shared/jitter.ts` | Decorrelated jitter math |
 | `apps/api/src/shared/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
-| `apps/api/src/auth.ts` | BetterAuth bridge (21 events: 13 user + 8 org) |
+| `apps/api/src/auth.ts` | BetterAuth bridge (23 events: 15 user + 8 org) |
 | `apps/api/src/modules/{audit-log,webhooks}/` | Built-in modules (admin routes + worker) |

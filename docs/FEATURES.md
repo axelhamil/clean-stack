@@ -6,6 +6,23 @@ For the as-built rationale (decisions, alternatives ruled out, security notes), 
 
 ---
 
+## Profile editing + NIST 800-63B-4 password baseline ✅ Phase A.1
+
+GDPR Art. 16 rectification surface + SOTA-2026 password policy, both wired into the existing `/settings/account` page.
+
+**Profile editing** (`features/account/account.page.tsx` — `ProfileCard`):
+- Edit display name (max 80 chars) + email (re-verification via BetterAuth `user.changeEmail`, confirmation sent to the **current** address) + avatar (three-step presign→PUT→confirm via `createUploadMutationOptions`, with client-side `image/*` + 5 MB guard).
+- Pending email change badge visible until the new address is verified.
+- `ChangePasswordCard` — standalone card for password update, below the profile fields. Passkeys/2FA/Sessions/DataExport cards remain unchanged.
+
+**Password baseline (NIST SP 800-63B-4)**:
+- **Min 15 chars** everywhere (`emailAndPassword.minPasswordLength: 15`). No MFA exception — 15 is universal.
+- **No complexity rules** — `strongPasswordSchema` (`shared/auth/auth.schema.ts`) is `min(15).max(128)` only; uppercase/digit/symbol regexes removed. Applied to sign-up + password-reset flows.
+- **HIBP breach screening** at sign-up / password-change / reset — k-anonymity SHA-1 prefix (`api.pwnedpasswords.com/range/<sha1[:5]>`, `Add-Padding` header). Port `IPasswordBreachService` + `HibpPasswordBreachService` (`shared/services/`). Timeout configurable via `HIBP_TIMEOUT_MS` (default 3000 ms). **Fail-open** — HIBP outage never blocks auth.
+- **Contextual ban-list** (`shared/password-policy.ts`, `findPasswordViolation()`) — bans email local-part, display name, and app name. Zero I/O, pure-compute. Common passwords are left to HIBP (no redundant inline list). The full policy is wrapped in a testable `validatePassword()` (length-guard → ban-list → HIBP); the BetterAuth `hooks.before` is a one-line caller.
+- **Field UX (NIST-aligned)** — `FormTextField` ships a show/hide reveal toggle + a per-field hint on every new-password input (sign-up / reset / change). Server policy errors (breach / ban / wrong current password) render inline on the field, not as a toast.
+- Validation via `auth.ts` `hooks.before` on `/sign-up/email`, `/reset-password`, `/change-password` (returns `APIError` 422).
+
 ## Auth — BetterAuth ✅
 
 End-to-end authentication on Bun + Hono, no hacks.
@@ -155,8 +172,8 @@ Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing p
 - **Dispatcher**: in-process Bun worker, dedicated `pg.Client` LISTEN + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers run inside the dispatch TX (atomic), user `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`, SOC2 §CC7.2 / ISO 27001) — append-only, retention `operational` (90d) vs `compliance` (7y) driven by `RETENTION_MAP`. Tamper-evidence columns posed (`prev_hash`/`hash`), calc gated by env flag.
 - **Outbound webhooks** (`webhook_endpoint` + `webhook_delivery`) — HMAC-SHA256 signed (`t=<ts>,v1=<hex>` Stripe-style), AEAD-encrypted secrets at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per org). Decorrelated jitter retry (1m/5m/30m/2h/12h paliers), dead-letter after 5 attempts, replay endpoint. Claim window pattern in delivery worker — fetch HTTP outside TX, no lock starvation.
-- **BetterAuth bridge** (`auth.ts`) emits 21 unique events automatically (13 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3 → **29 events total**.
-- **Catalog `@packages/events`** — 29 events with Zod payloads + `RETENTION_MAP`, partagés api+app+future workers.
+- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3 → **34 events total**.
+- **Catalog `@packages/events`** — 34 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
 
 See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
 

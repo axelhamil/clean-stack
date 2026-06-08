@@ -313,6 +313,51 @@ Personal org is structurally identical to a team org for every operation except 
 7. **Pas de GH Actions deploy workflow.** Railway watch `main` nativement + `watchPatterns` par service = zero glue nécessaire. Première itération avait un `.github/workflows/deploy.yml` matrix qui hit les Deploy Webhooks Railway — retiré après audit (double-deploy avec le watch natif, secrets GH supplémentaires, viole single-source). Le pattern webhook reste utile pour deploys cross-service ordonnés (defer si jamais nécessaire en phase opérationnelle).
 
 
+---
+
+## Right to rectification (Art. 16) + NIST 800-63B-4 ✅ Phase A.1 · Jun 2026
+
+**Why**: two non-negotiables bundled in one push. Art. 16 GDPR requires a working edit-profile surface (BetterAuth back-end already supports it; the boilerplate only exposed disabled placeholders). NIST SP 800-63B-4 final (August 2025) is the SOTA password baseline — minimum length 15, HIBP breach screening, no complexity rules. Both touch the same surface (`/settings/account` + auth flows); shipping together avoids a second round-trip.
+
+### Back-end
+
+- [x] **`user.profile.updated`** event (`USER_PROFILE_UPDATED`, retention `compliance`) — emitted in `auth.ts` via `hooks.after` on path `/update-user`. Payload: `{ userId, changes }` (field-level diff).
+- [x] **`user.email.change_requested`** event (`USER_EMAIL_CHANGE_REQUESTED`, retention `compliance`) — emitted in the `user.changeEmail.sendChangeEmailConfirmation` callback. Payload: `{ userId, newEmail }`.
+- [x] **`IPasswordBreachService` port** (`shared/ports/password-breach.port.ts`) + **`HibpPasswordBreachService`** impl (`shared/services/`) — HIBP k-anonymity (`api.pwnedpasswords.com/range/<sha1[:5]>`, `Add-Padding` header, timeout `HIBP_TIMEOUT_MS` default 3000 ms). Instrumented (span `http.client`). **Fail-open** on network error — breach check failure is captured and logged but never blocks the user.
+- [x] **`findPasswordViolation()` + `validatePassword()` helpers** (`shared/password-policy.ts`) — pure, unit-testable. `findPasswordViolation` bans email-local-part, display name, and app name (`clean-stack` / `cleanstack`). `validatePassword` adds the length-guard (skips HIBP below `MIN_PASSWORD_LENGTH`) then the breach check, returning the first violation or `null`. The inline ~20 common-password list was dropped — HIBP already covers every common password, so it was dead weight.
+- [x] **`auth.ts` changes** — `emailAndPassword.minPasswordLength: MIN_PASSWORD_LENGTH`; `hooks.before` calls `validatePassword(...)` on `/sign-up/email`, `/reset-password`, `/change-password` (throws `APIError` 422 on violation); `user.changeEmail.enabled: true` + confirmation sent to the **current** address (not the new one) + `change_email` email template; `databaseHooks.user.update.after` clears `pendingEmail` and emits `user.profile.updated { changes: { email } }` once the new address becomes effective.
+- [x] **`pendingEmail` field** — nullable `pending_email` column (`packages/drizzle/src/schema/auth.ts`, migration `0004`) exposed as a BetterAuth additionalField (`returned: true, input: false`). Set in `sendChangeEmailConfirmation`, cleared on effective change — drives the front "pending change" badge.
+- [x] **Container + env** — `IPasswordBreachService` binding in `container.ts`; `HIBP_TIMEOUT_MS` in `env.ts`.
+- [x] **Tests** — `hibp-password-breach.service.test.ts` (k-anonymity, found/not-found, network-error fail-open, non-ok response) + `password-policy.test.ts` (`findPasswordViolation` + `validatePassword`: length-guard skips HIBP, contextual ban, breach hit, fail-open).
+
+### Front-end
+
+- [x] **`ProfileCard`** — replaces the dead Card with two disabled inputs in `features/account/account.page.tsx`. Edits `name` + `email` (confirmation to current address; a `<Badge>` "Pending change to X" renders while `user.pendingEmail` is set) + avatar upload via the existing `createUploadMutationOptions` (presign → PUT → confirm), with a client-side type (`image/*`) + size (5 MB) guard and **filename sanitization** (accents stripped / invalid chars → `-`, to satisfy the server `^[\w\-. ]+$` contract) before upload. See [`docs/STORAGE.md`](STORAGE.md) for the key layout.
+- [x] **`ChangePasswordCard`** — standalone card below `ProfileCard`, inline with existing Passkeys/2FA/Sessions/DataExport cards.
+- [x] **`strongPasswordSchema`** (`shared/auth/auth.schema.ts`) — updated to `min(15)`, **all complexity regexes removed** (NIST `SHALL NOT` impose complexity). Applied to sign-up + reset flows as well.
+- [x] **Password field UX (NIST-aligned)** — `FormTextField` (`@packages/ui`) gained a **show/hide reveal toggle** (NIST 800-63B-4 §3.1.1.2 recommends letting users reveal the password) + an optional `description` slot. Every new-password input (sign-up, reset, change) carries the hint *"At least 15 characters. Avoid passwords exposed in known data breaches."* Server-side policy rejections (HIBP breach, contextual ban, wrong current password) surface **inline on the offending field** via `form.setError` — routed to `currentPassword` vs `newPassword` by the message — instead of a transient toast.
+
+### Decisions
+
+1. **15 chars everywhere, no MFA exception** — the 8-with-MFA floor is a NIST *permission*, not an obligation. Implementing the two-tier would add session-state coupling to the password validator with zero security benefit at this scale. Simpler to hold 15 universally.
+2. **HIBP fail-open** — breach-check failure (network, timeout) is captured via `IInstrumentation.capture()` but never blocks auth. Rationale: a transient HIBP outage must not prevent users from signing up or resetting. The risk of accepting one pwned password during a 3-second HIBP blip is lower than locking out all sign-ups.
+3. **Validation via `hooks.before`, not `password.hash` override** — `password.hash` intercepts only hashing; `hooks.before` intercepts at the route level before any BetterAuth processing. This cleanly separates validation (policy) from hashing (crypto), and avoids reproducing BetterAuth's internal scrypt call.
+4. **`user.changeEmail` confirmation to the current address** — confirms the current owner is aware of the change before the new address takes effect. BetterAuth auto-handles the verification challenge to the new address. The `change_email` template is new.
+5. **No `/settings/profile` page** — rectification fields live in `/settings/account` (the existing page). A dedicated `/settings/profile` tab is reserved for Phase A.5 (Privacy dashboard). Splitting now would fragment UX without a composing container.
+6. **Password policy extracted to a pure `validatePassword()`** — the security-critical logic (length guard + contextual ban + HIBP) can't be unit-tested inside a BetterAuth hook (hooks aren't testable in isolation), so it lives in `password-policy.ts` and the hook is a one-line caller. The inline common-password list was removed as redundant with HIBP. Schema change shipped as migration `0004` via `db:generate && db:migrate` (never `db:push` for a committed change — push bypasses `__drizzle_migrations` and desyncs the migrate trail).
+
+### Change-email flow (2-step, BetterAuth)
+
+`user.changeEmail` runs a **two-confirmation** flow — neither the request nor the first click mutates `user.email`:
+
+1. **Request** — `authClient.changeEmail({ newEmail, callbackURL })` → `POST /change-email` (fresh-session gated). Our `sendChangeEmailConfirmation` hook sets `pendingEmail = newEmail`, emits `user.email.change_requested`, and mails the **current** address a confirmation link.
+2. **Confirm (current address)** — the link hits `GET /api/auth/verify-email?token=…` (a `change-email-confirmation` JWT). BetterAuth mints a second token and mails the **new** address a verification link. Email still unchanged; redirects to `callbackURL`.
+3. **Verify (new address)** — the second link (`change-email-verification` JWT) is what flips `user.email` to the new value (`emailVerified: true`). This fires `databaseHooks.user.update.after`, where we clear `pendingEmail` and emit `user.profile.updated { changes: { email } }`. The front "pending change" badge clears on the next session refetch.
+
+**Mail links point at the API** (`baseURL/verify-email`), not the app front — for this one auth mail the click *is* the state transition (BetterAuth applies it server-side), then redirects to `callbackURL` (we pass `/settings/account`). The other auth mails (reset, magic-link, verify) route through the app because the front consumes their token. Storage/key conventions for the avatar upload are documented in [`docs/STORAGE.md`](STORAGE.md).
+
+---
+
 ### Prod-validation closeout (Jun 2026) — live on `main`, release 1.19.2
 
 The config-as-code shipped (above) but no one had run it end-to-end. Bringing the reference deploy actually green on Railway surfaced a **stack of prod-boot traps**, each masking the next (a failed deploy only reveals the next layer). All fixed (PR #50/#51 → `main`); api + app verified live.

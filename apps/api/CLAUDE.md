@@ -16,6 +16,7 @@ apps/api/src/
   modules/<context>/            See src/modules/CLAUDE.md for layered rules
   container.ts                  Composition root (flat at `src/`): `.add()` for cross-cutting + `.addModule()` per context, then `.build()`.
   auth.ts                       BetterAuth singleton — **deliberate exception** to modules/ rule (config-as-code, lib owns model). Routes auto-mount via plugin (`/api/auth/*`).
+  auth-queries.ts               Typed Drizzle data-access for the bridge — plain functions (no port/DI/aggregate; auth is not domain), `tx?` to join bridge transactions. Keeps `auth.ts` config + event-wiring only, never inline `db.*`.
   client.ts, index.ts           `hcWithType` factory / server entry (chained `.route()` preserves `AppType`)
 ```
 
@@ -62,7 +63,7 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 ## Auth (BetterAuth integration, server)
 
-**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly.
+**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **No inline `db.*` in `auth.ts`** — the SQL the hooks/bridge need lives in `auth-queries.ts` as typed Drizzle functions (`tx?`-aware to join the same transaction). This is data-access separation, **not** DDD: no repository class, no port, no DI — auth is infra, not domain.
 
 **Server pipeline** (in order, `index.ts`): `requestId()` → `httpLogger` → `secureHeaders()`+`cors()` → `sessionMiddleware` (calls `auth.api.getSession()` once, stores `user`/`session` on context, skips `/api/auth/*`) → `app.on(["GET","POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))` → `app.onError(errorHandler)`. Protected handlers compose `requireAuth`. **Never re-call `auth.api.getSession()` per handler.**
 
