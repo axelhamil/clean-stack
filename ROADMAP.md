@@ -377,7 +377,7 @@ Shipping a status page before there are customer integrations is theatre.
 
 ### SLO dashboards (Grafana)
 
-**Why**: Phase 0.4 already exposes `/metrics` Prometheus. Without dashboards on top, the data accumulates blind. SLOs (Service Level Objectives) translate raw metrics into "is the product healthy from a user perspective", which is what alerting fires on.
+**Why**: D.1 wires Prometheus `/metrics` (deferred from 0.4, which shipped Sentry only — see step 2 above). Without dashboards on top, the accumulated metrics stay blind. SLOs (Service Level Objectives) translate raw metrics into "is the product healthy from a user perspective", which is what alerting fires on.
 
 - [ ] **Grafana self-hosted** (Docker, free) OR Grafana Cloud free tier (10k series). Scrapes `/metrics` from Phase 0.4 + Sentry API (errors). Removable with the same contract as Phase 0.4 — Grafana isn't wired to anything inside the app.
 - [ ] **Default SLO dashboards** shipped as JSON in `docs/grafana/`:

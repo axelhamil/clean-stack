@@ -19,7 +19,7 @@ references them by ID. Each template must exist with the exact variables the
 codebase passes — Resend returns a 422 on mismatch.
 
 Template IDs live in a single hashmap at the top of
-`apps/api/src/modules/email/infrastructure/services/email.service.ts` (`TEMPLATE_IDS`). Edit it
+`apps/api/src/shared/services/email.service.ts` (`TEMPLATE_IDS`). Edit it
 once when cloning. They aren't secrets — just opaque dashboard handles — so
 keeping them in code is simpler than 8 env vars.
 
@@ -40,8 +40,7 @@ keeping them in code is simpler than 8 env vars.
 
 - **Variable names are case-sensitive** and must match the table above
   exactly. The single source of truth is `EmailTemplates` in
-  `apps/api/src/modules/email/application/ports/email.port.ts` (post-migration ;
-  currently lives in `apps/api/src/application/ports/email.port.ts` until back step 1 lands).
+  `apps/api/src/shared/ports/email.port.ts`.
 - **All URLs** point at `APP_URL` (the front), never the API. The server hooks
   build them; the front consumes the token.
 - **Brand the visible label**, never embed the raw URL — Outlook/Gmail
@@ -204,22 +203,20 @@ root is the up-to-date template.
 
 These aren't blockers for launch but pay off quickly:
 
-- **Error tracking**: pipe `pino` errors to Sentry / Axiom / Better Stack.
-  The stack already emits structured JSON with `requestId`.
 - **Uptime monitoring**: external probe on `GET /readyz` (returns 200 once DB
   reachable). `/livez` is the liveness counterpart (no external deps).
-- **Audit log**: TODO comments in the RGPD use-cases mark the four transition
-  points (`data.export.requested`, `user.delete.{requested,cancelled,completed}`)
-  for when the audit-log feature lands.
-- **Stripe customer deletion**: TODO comment in `execute-account-wipe` marks
-  the hook point for when `@better-auth/stripe` is wired.
+- **Stripe customer deletion**: when `@better-auth/stripe` lands (Phase B.1),
+  wire the customer cleanup into `RgpdService.executeAccountWipe` — same TX as
+  the rest of the wipe. (Error tracking + the RGPD audit trail are already
+  shipped: Sentry in Phase 0.4, and every RGPD transition auto-audits via the
+  outbox `AuditEventSubscriber` — no TODO hooks left in the service.)
 
 ---
 
 ## TL;DR — pre-production checklist
 
 - [ ] 8 Resend templates created with exact variable names; IDs filled in
-      `TEMPLATE_IDS` in `apps/api/src/modules/email/infrastructure/services/email.service.ts`
+      `TEMPLATE_IDS` in `apps/api/src/shared/services/email.service.ts`
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC) — green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`
