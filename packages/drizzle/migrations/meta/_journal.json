@@ -43,6 +43,13 @@
       "when": 1780944953700,
       "tag": "0005_sudden_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780955625954,
+      "tag": "0006_motionless_patriot",
+      "breakpoints": true
     }
   ]
 }

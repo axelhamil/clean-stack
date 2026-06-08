@@ -1,5 +1,4 @@
 import { POLICY_TYPES } from "@packages/policies";
-import { sql } from "drizzle-orm";
 import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
@@ -19,7 +18,7 @@ export const policyAcceptance = pgTable(
     index("policy_acceptance_user_type_time_idx").on(
       table.userId,
       table.policyType,
-      sql`${table.acceptedAt} DESC`,
+      table.acceptedAt.desc(),
     ),
   ],
 );
