@@ -63,6 +63,8 @@ export class S3StorageService implements IStorageService {
         secretAccessKey: env.S3_SECRET_KEY,
       },
       forcePathStyle: env.S3_FORCE_PATH_STYLE,
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
   }
 
