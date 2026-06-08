@@ -84,6 +84,78 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 
 ---
 
+## Features
+
+Everything wired today, and the build order for what's next. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
+
+### Shipped
+
+**Auth & identity**
+- Email + password (required verification + reset), magic-link, passkeys (WebAuthn), 2FA (TOTP + backup codes)
+- Active-session list & revoke · bearer tokens alongside cookies · 5-min session cookie cache · cross-tab sync (`BroadcastChannel`)
+- NIST SP 800-63B password baseline — min 15, HIBP k-anonymity breach check (fail-open), contextual ban-list, no forced complexity
+
+**Multi-tenant & authorization**
+- `organization` plugin — Personal org auto-heal, team orgs, email invitations, role-based members, ownership transfer
+- Capability-based authorization SSOT (`@packages/access-control`) — same predicate at server middleware, route `beforeLoad` gate, and `<Can>` UI
+
+**Legal / compliance (GDPR)**
+- Art. 7 — privacy/terms versioning + re-acceptance gate (`@packages/policies`, `/legal/accept`)
+- Art. 16 — rectification (profile, email-change, password)
+- Art. 17 — erasure (2FA-gated, 7-day grace, sole-owner preflight, cron wipe + ref anonymization)
+- Art. 20 — portability (signed 7-day R2 export, 1/24h throttle)
+
+**Storage & email**
+- Direct uploads — three-step presign → PUT → confirm, owner-scoped keys (R2 / S3 / B2 / Wasabi / Tigris)
+- Transactional email (Resend) — typed templates, idempotency, provider-side suppression
+
+**Event-driven core & transactions** — *the hard distributed-systems part, already solved*
+- Transactional outbox — domain events persisted in the **same DB transaction** as the state change (`IUnitOfWork.run()` + `EventCollector` AsyncLocalStorage) → no event ever lost, none emitted for a rolled-back write (the dual-write problem, solved)
+- Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout), user `onEvent(...)` handlers isolated post-commit
+- **35 typed events**, append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay), `X-Request-Id` correlation
+- **Zero plumbing post-clone** — declare the event in `@packages/events` → `addEvent()` in the aggregate → run via `uow.run()`; the audit row, webhook fanout, and in-process handlers (auto-discovered via inwire) come for free
+- Internal `/internal/*` endpoints — HMAC-signed, optional private-network layer
+
+**Architecture & conventions** — *the part that keeps shipping fast sustainable*
+- Clean Architecture + DDD **enforced by structure** — layers import inward, modules never import each other (only via domain events / shared ports), each module removable by a documented contract (`trash` + line delete, `tsc` points to the rest)
+- **8 cross-cutting rules**, each tied to an architectural property with its *why* — every state change emits a typed event (audit + webhooks opt-out, not opt-in) · every I/O method spans + captures (no silent prod failure) · every event payload names its actor (RGPD forensic trail) · internal packages ship source not artifacts · ORM-first, raw SQL only where the ORM can't model it
+- **DDD scoped to the business domain only** — never billing / auth / gating / quotas (config + middleware suffices); the discipline that cut ~70% of code vs full-DDD plumbing (lesson learned the hard way)
+- **Domain & repo rules** — no `throw` in domain/application (`Result`), no `null` for absence (`Option`), value objects validated via zod, aggregates expose only `get id()`; ownership enforced at the port (`ScopedRepository` scopes `organizationId`/`userId` across HTTP, cron, queue, events — wrong owner leaks nothing)
+- **Rules live next to the code** — root + per-layer `CLAUDE.md`, recursively auto-loaded; conventions are executable guardrails for AI agents and humans, not tribal knowledge
+
+**Building blocks**
+- DDD-kit (`@packages/ddd-kit`) — `Result` / `Option`, `Entity` / `Aggregate` / `ValueObject` (zod-validated) / `UUID` / `DomainEvent`, `BaseRepository` / `ScopedRepository` / `IUnitOfWork`
+- Vertical-slice modular monolith — `modules/<context>/{domain,application,infrastructure}` + per-feature front slices
+- CQRS (commands via use-cases, queries direct to Drizzle) · inwire DI (type-inference container, no declared interfaces)
+- Drizzle + Postgres 17 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
+
+**Frontend & UI**
+- App shell — sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
+- TanStack Router code-based 2-file pattern (`route` + lazy `page`) — no codegen, no `routeTree.gen.ts`, near-zero TanStack Start migration
+- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~588 KB, route chunks 1–43 KB)
+- TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
+- shadcn-pure UI kit (`@packages/ui`) — typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
+
+**Infra, ops & DX**
+- Hono RPC end-to-end types (`hcWithType`) · `pino` logging with single error envelope · CQRS error contract
+- Health probes (`/livez` `/readyz` `/startupz`) + graceful shutdown · Sentry error tracking (RGPD-scrubbed, NoOp without DSN)
+- Disaster-recovery runbook (PITR-first) · Railway reference deploy (config-as-code)
+- `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
+- Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
+
+### Roadmap
+
+Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
+
+- **M1 — Deploy-safe & legal** · rate-limit + strict CSP + CSRF (unified Hono middleware; BetterAuth built-in disabled, Sentinel threat model self-hosted) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
+- **M2 — Revenue** · billing via `@better-auth/stripe` (per-org customer, portal, dunning) · feature & quota gating (config + middleware, no DDD)
+- **M3 — Finish half-shipped UIs** · audit-log front · webhooks front + `webhook.test` · recovery-codes UI · privacy dashboard
+- **M4 — Operate** · admin & impersonation (BetterAuth `admin` plugin) · API tokens / PATs (eval `@better-auth/api-key`) · OpenAPI docs (Scalar) · in-app notifications
+- **M5 — Quality & compliance gates** · Playwright e2e (full legal chain) + Lighthouse a11y CI · SOC2 Type II checklist · status page + SLO dashboards + OTel/Prometheus
+- **M6 — Enterprise & reach** · SSO SAML/OIDC + SCIM (BetterAuth `sso`) · i18n (TanStack locale routes + Lingui; `@better-auth/i18n` for auth errors) · Capacitor mobile · feature flags · marketing site
+
+---
+
 ## Infrastructure
 
 What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
