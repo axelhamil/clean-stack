@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, createRoute, Outlet, redirect } from "@tanstack/react-router";
 import { activeOrgQueryOptions } from "../shared/api/queries/active-org";
+import { policiesQueryOptions } from "../shared/api/queries/policies";
 import { sessionQueryOptions } from "../shared/api/queries/session";
 import { AppShell } from "../shared/components/app-shell";
 
@@ -43,6 +44,14 @@ export const protectedLayout = createRoute({
 export const shellLayout = createRoute({
   getParentRoute: () => protectedLayout,
   id: "_shell",
+  beforeLoad: async ({ context, location }) => {
+    const policies = await context.queryClient
+      .ensureQueryData(policiesQueryOptions)
+      .catch(() => null);
+    if (policies && Object.values(policies).some((p) => !p.current)) {
+      throw redirect({ to: "/legal/accept", search: { redirect: location.href } });
+    }
+  },
   component: ShellLayout,
 });
 

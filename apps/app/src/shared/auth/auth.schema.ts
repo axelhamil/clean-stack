@@ -29,6 +29,9 @@ export const signUpSchema = z.object({
   name: nameSchema,
   email: z.email(),
   password: strongPasswordSchema,
+  acceptedPolicies: z
+    .boolean()
+    .refine((v) => v, { message: "You must accept the Privacy Policy and Terms" }),
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
