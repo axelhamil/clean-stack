@@ -22,8 +22,8 @@ export function useSignInPasskey(redirectTo?: string) {
         fetchOptions: { signal: controller.signal },
       });
       if (result?.error) {
-        if (result.error.message?.toLowerCase().includes("not allowed"))
-          throw new Error("Cancelled");
+        const msg = result.error.message?.toLowerCase() ?? "";
+        if (msg.includes("not allowed") || msg.includes("cancel")) throw new Error("Cancelled");
         throw new Error(result.error.message ?? "Passkey sign-in failed");
       }
     },
