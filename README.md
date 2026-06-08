@@ -75,6 +75,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **RGPD / CCPA** | Art. 17 erasure + Art. 20 portability shipped: `POST /me/export` (signed 7-day R2 URL, 1/24h rate-limit), `POST /me/delete` (2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in flow). Cron sweep wipes personal data + anonymizes refs. Day-one EU-legal — without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris — provider swap = one env var. |
 | **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
+| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **35 typed events** auto-emitted on every state change, append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter). Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
@@ -208,7 +209,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | | |
 |---|---|
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅ complete; next: Legal + a11y (Phase A) → Billing → Gating → Admin → Audit |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅; build order: M1 security perimeter + consent → M2 billing → M3 finish audit/webhooks/recovery UI → M4 admin + PATs → M5 e2e/a11y gates → M6 SSO/i18n/mobile |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |

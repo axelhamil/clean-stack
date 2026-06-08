@@ -9,6 +9,7 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 - **Payload scrubbing** RGPD-clean by default — `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address` are stripped before transmission.
 - **Pino integration** — every `logger.warn` / `logger.error` becomes a Sentry breadcrumb attached to the next captured event. Single source of truth for logs.
 - **Repository / service spans** — every Drizzle repo, S3, Resend method is wrapped with a Sentry span (`startSpan`) for distributed tracing. `tracesSampleRate=0` by default keeps overhead near zero; flip > 0 in Phase D.1 once a tracing backend consumes them.
+- **Request correlation across the stack** — each request's `X-Request-Id` (Hono `requestId()`) flows through an `AsyncLocalStorage` context (`shared/request-context.ts`) and is stamped onto every emitted event (`outbox_event.metadata.requestId`) → copied into `audit_log.request_id`. The same id tags the pino logs and the Sentry event, so an audit entry, its logs, and its error all join on one key — even for events emitted deep inside a BetterAuth hook where the Hono `c` isn't in scope.
 - **Release tracking** ties to `GIT_SHA` injected at CI build (shared with the `/livez` payload from Phase 0.2).
 - **NoOp by default** — without `SENTRY_DSN`, zero telemetry leaves the host. Binary on/off via env.
 
