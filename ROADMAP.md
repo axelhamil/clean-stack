@@ -226,18 +226,29 @@ modules/consents/
 
 ### Rate limiting + abuse prevention
 
+**Relation to BetterAuth** (default-to-the-lib has a boundary here):
+- BetterAuth ships a **built-in `rateLimit`** (OSS, default-on in prod) — but it only guards `/api/auth/*`. Our business routes (uploads, `/me/*`, future writes) need the same protection under one envelope, so we **own a single Hono middleware** mounted `app.use("*")` **before** the BetterAuth handler. Since `/api/auth/*` flows through Hono first, it covers auth routes too → **disable BetterAuth's built-in** (`rateLimit: { enabled: false }`) for a single source of truth, one 429 envelope, §8-instrumented store.
+- BetterAuth's **Sentinel** plugin (`@better-auth/infra`) does all this + credential-stuffing / impossible-travel / bot+geo-blocking / free-trial-abuse — but it's an **API-key-bound paid cloud SaaS** (Better Auth Infrastructure), which conflicts with the self-hosted / zero-mandatory-SaaS rule. **We mine its threat model (below), never the dependency.**
+
 **Decided shape**:
-- **Sliding window** (not token bucket — simpler, no over/under-charge edge cases at boundaries).
-- **Storage**: Postgres (existing infra) via `drizzle-orm` `@packages/drizzle/src/services/rate-limit.service.ts`. Redis only if/when scale demands it (rule 14, second-occurrence trigger).
+- **Sliding window** (not token bucket — simpler, no over/under-charge edge cases at boundaries). Wrap `hono-rate-limiter` (battle-tested) rather than hand-roll the window math.
+- **Store behind a port** (`IRateLimitStore`, instrumented §8) — in-memory for dev/single-replica; **Redis via the same `secondaryStorage` BetterAuth's plugins consume** the moment you run **2+ replicas** (per-instance in-memory under-counts → Redis mandatory, not optional). Postgres `rate_limit_window` is the no-Redis fallback (shared across replicas, write-per-request cost).
 - **Per-route policy**: `requireRateLimit({ key: (c) => c.var.userId ?? c.req.header("CF-Connecting-IP"), windows: [{ ms: 60_000, max: 60 }, { ms: 3600_000, max: 600 }] })` — multi-window stack, fails fast on tightest.
-- **Always responds 429 with `Retry-After`**, never 5xx.
+- **Always responds 429 with `Retry-After`** via the central `app.onError` envelope, never 5xx.
 - **Auth-burst surface** (sign-in / forgot-password / verify-email submit / 2FA submit / magic-link request): tighter window — `5/15min/IP` baseline.
 
-- [ ] Middleware `apps/api/src/shared/middleware/rate-limit.middleware.ts` + factory.
-- [ ] DB table `rate_limit_window(key, windowStart, count)` with composite PK `(key, windowStart)` and TTL cleanup cron (sweep older than longest window).
-- [ ] Compose on auth-burst routes via BetterAuth's `additionalRoutes` hook (or override).
+- [ ] Disable BetterAuth built-in `rateLimit` (`{ enabled: false }`) — replaced by the unified Hono middleware.
+- [ ] Middleware `apps/api/src/shared/middleware/rate-limit.middleware.ts` (factory) mounted `app.use("*")` before the BetterAuth handler; wraps `hono-rate-limiter` + `IRateLimitStore` (memory default, Redis impl swappable — `IInstrumentation` NoOp→Sentry pattern).
+- [ ] Store backend at scaffold: in-memory (single replica) → Redis `secondaryStorage` (2+ replicas, mandatory) → or Postgres `rate_limit_window(key, windowStart, count)` PK `(key, windowStart)` + TTL sweep.
 - [ ] Captcha hook (Turnstile / hCaptcha free tier — provider-agnostic via `ICaptchaService` port) — invoked when `requireRateLimit` enters "near-cap" state (>80% of window). Optional, env-flagged.
 - [ ] Front error UX: 429 toast with countdown using `Retry-After` header.
+
+**Abuse-prevention signals — Sentinel's threat model, self-hosted** (build on real abuse signal, not pre-launch; the velocity store + `session.ipAddress` we already persist are the substrate):
+
+- [ ] **Credential-stuffing** — per-visitor failed-login counter → challenge at N, block at M (reuses the rate-limit store).
+- [ ] **Impossible-travel** — flag a sign-in whose geo-IP jumps faster than physically possible vs the last session (we already store `session.ipAddress` + `userAgent`).
+- [ ] **Free-trial abuse** — IP/device-fingerprint heuristic capping accounts-per-visitor (pairs with B.1 "max 1 free team org per user").
+- [ ] **Geo / suspicious-IP deny-list** — env-driven country/ASN block middleware. All four emit `security.*` events (rule §6) → auto-audited.
 
 ### Content-Security-Policy strict (no `unsafe-inline`)
 
@@ -262,7 +273,9 @@ modules/consents/
 
 **Why**: any B2B SaaS exposes its API to customer systems. PATs are the standard primitive (OAuth-app flow comes later if needed). Without them, customers integrate via screen-scraping or session-cookie-stealing — both bad.
 
-- [ ] DB schema `api_token(id, userId FK, organizationId FK nullable, name, hashedToken, scopes jsonb, lastUsedAt, expiresAt nullable, createdAt, revokedAt nullable)`. Token shown ONCE at creation, hashed (sha256 + per-row salt) at rest.
+**Relation to BetterAuth** (default-to-the-lib): BetterAuth ships an **OSS `apiKey` plugin** (`@better-auth/api-key`, self-hostable) covering key generation, hashing, expiry, per-key rate-limit, and `secondary-storage` (Redis) mode. **Evaluate it first** — it likely covers 80% of the list below. Build custom only for what its hooks can't model: the `clean_<base58url-32>` GitHub-secret-scanner prefix, org-scoping via `ScopedRepository`, and `api_token.*` outbox events (§6). If the plugin exposes those seams, wrap it; otherwise hand-roll. The tasks below are the spec the boilerplate needs **regardless** of which path wins.
+
+- [ ] DB schema `api_token(id, userId FK, organizationId FK nullable, name, hashedToken, scopes jsonb, lastUsedAt, expiresAt nullable, createdAt, revokedAt nullable)`. Token shown ONCE at creation, hashed (sha256 + per-row salt) at rest. *(If the `apiKey` plugin wins, this is its `apikey` table + our delta columns.)*
 - [ ] Generation: `clean_<base58url-32>` prefix-tagged for grep / leak detection (GitHub secret scanner registers `clean_` prefix).
 - [ ] Scopes — typed const `API_SCOPES = ["read:profile", "write:profile", "read:uploads", "admin"] as const`. Per-token subset. Wildcard `*` only for owner-level tokens, gated by `requireOrgPermission({ apiToken: ["create:wildcard"] })`.
 - [ ] `requireApiToken` middleware (alternative to `requireAuth`) — accepts `Authorization: Bearer clean_<…>`, hashes incoming, compares, sets `c.var.user` + `c.var.tokenScopes`.
@@ -541,6 +554,7 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 - [ ] Typed message keys: a script generates a `.d.ts` from the source catalog so `t({ id: "…" })` is checked by `tsc`
 - [ ] Lang switcher in the header (writes a cookie + navigates to the same path under the new lang)
 - [ ] Zod messages localized via `setErrorMap` per lang at the providers boundary
+- [ ] **Auth error messages** — BetterAuth returns stable `code`s; **web-only default = map them front-side to Lingui catalog entries** (one i18n SSOT — auth errors + UI strings in the same place). **Decision point**: the day multi-client lands (F.1 Capacitor / C.4 PAT API consumers), switch to the OSS `@better-auth/i18n` plugin — server-side `code → localized message` (locale via `Accept-Language`/cookie/session, keeps `originalMessage`) so *every* client gets ready-localized errors without re-implementing the map. Web-only → front mapping wins (the plugin would be a second translation store divorced from Lingui).
 - [ ] Email templates per lang in Resend (`RESEND_TPL_WELCOME_EN`, `_FR`) — picked by user's preferred lang
 - [ ] CI gate: `lingui extract --clean` followed by a git diff check — any drift fails the build
 - [ ] Date / number / relative-time formatting via `Intl.*` (no extra dep)
