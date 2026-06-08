@@ -497,7 +497,10 @@ const authOptions = {
             "policy staleness check failed at verify-email",
           );
         } else if (stale.getValue().length > 0) {
-          const ip = ctx.context.session?.session?.ipAddress ?? undefined;
+          const ip =
+            ctx.context.newSession?.session?.ipAddress ||
+            ctx.context.session?.session?.ipAddress ||
+            undefined;
           const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
           if (recorded.isFailure) {
             logger.error(
