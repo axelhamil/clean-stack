@@ -10,6 +10,7 @@ import { di } from "./container";
 import { auditLogRoutes } from "./modules/audit-log/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
+import { policyRoutes } from "./modules/policies/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
@@ -62,6 +63,7 @@ app.route("/internal", sweepWebhookDeliveryRoutes);
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
   .route("/me", rgpdMeRoutes)
+  .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/webhooks", webhooksRoutes);

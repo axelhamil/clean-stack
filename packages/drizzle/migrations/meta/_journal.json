@@ -36,6 +36,13 @@
       "when": 1780930101291,
       "tag": "0004_public_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780944953700,
+      "tag": "0005_sudden_leo",
+      "breakpoints": true
     }
   ]
 }

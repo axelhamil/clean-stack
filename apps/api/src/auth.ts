@@ -490,6 +490,22 @@ const authOptions = {
         if (email) {
           await emit(EventTypes.USER_EMAIL_VERIFIED, "user", userId, { userId, email });
         }
+        const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
+        if (stale.isFailure) {
+          logger.error(
+            { err: stale.getError(), userId },
+            "policy staleness check failed at verify-email",
+          );
+        } else if (stale.getValue().length > 0) {
+          const ip = ctx.context.session?.session?.ipAddress ?? undefined;
+          const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
+          if (recorded.isFailure) {
+            logger.error(
+              { err: recorded.getError(), userId },
+              "policy acceptance failed at verify-email",
+            );
+          }
+        }
         return;
       }
       if (path === "/change-password") {

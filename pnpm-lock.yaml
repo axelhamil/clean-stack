@@ -83,6 +83,9 @@ importers:
       '@packages/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@packages/policies':
+        specifier: workspace:*
+        version: link:../../packages/policies
       '@sentry/bun':
         specifier: ^10.54.0
         version: 10.54.0
@@ -144,6 +147,9 @@ importers:
       '@packages/access-control':
         specifier: workspace:*
         version: link:../../packages/access-control
+      '@packages/policies':
+        specifier: workspace:*
+        version: link:../../packages/policies
       '@packages/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -276,6 +282,9 @@ importers:
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../ddd-kit
+      '@packages/policies':
+        specifier: workspace:*
+        version: link:../policies
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -314,6 +323,15 @@ importers:
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  packages/policies:
+    devDependencies:
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

@@ -3,6 +3,7 @@ import { TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
 import { auditLogModule } from "./modules/audit-log/module";
 import { healthModule } from "./modules/health/module";
+import { policyModule } from "./modules/policies/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
@@ -79,4 +80,5 @@ export const di = container()
   .addModule(rgpdModule)
   .addModule(auditLogModule)
   .addModule(webhooksModule)
+  .addModule(policyModule)
   .build();

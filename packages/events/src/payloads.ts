@@ -198,6 +198,13 @@ export const WebhookEndpointDeletedPayload = OrgRef.extend({
 });
 export type WebhookEndpointDeletedPayload = z.infer<typeof WebhookEndpointDeletedPayload>;
 
+export const UserPolicyAcceptedPayload = UserRef.extend({
+  policyType: z.string(),
+  policyVersion: z.string(),
+  ipAddress: z.string().optional(),
+});
+export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -233,4 +240,5 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_CREATED]: WebhookEndpointCreatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
+  [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
 } as const;
