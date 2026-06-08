@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { toastError } from "../../../shared/utils";
 
 interface UsePasskeyAutofillOptions {
   enabled: boolean;
@@ -36,21 +35,13 @@ export function usePasskeyAutofill({
           autoFill: true,
           fetchOptions: { signal: controller.signal },
         });
-        if (controller.signal.aborted) return;
-        if (result?.error) {
-          const message = result.error.message?.toLowerCase() ?? "";
-          if (message.includes("not allowed")) return;
-          toastError(result.error, "Passkey sign-in failed");
-          return;
-        }
+        if (controller.signal.aborted || result?.error) return;
         toast.success("Welcome back");
         await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
         broadcastAuthChange();
         void navigate({ to: redirectTo ?? "/" });
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        toastError(err, "Passkey sign-in failed");
+      } catch {
+        // passive conditional passkey UI — cancel / abort / no-credential are expected, never surfaced
       }
     })();
 
