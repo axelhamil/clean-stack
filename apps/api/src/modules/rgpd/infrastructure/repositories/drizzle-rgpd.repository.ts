@@ -120,10 +120,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             .from(schema.user)
             .where(eq(schema.user.id, userId))
             .limit(1);
-          const [u] = await this.instrumentation.startSpan(
-            { name: userQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => userQuery.execute(),
-          );
+          const [u] = await userQuery.execute();
           if (!u)
             return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
 
@@ -137,10 +134,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             })
             .from(schema.session)
             .where(eq(schema.session.userId, userId));
-          const sessions = await this.instrumentation.startSpan(
-            { name: sessionsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => sessionsQuery.execute(),
-          );
+          const sessions = await sessionsQuery.execute();
 
           const membershipsQuery = invoker
             .select({
@@ -156,10 +150,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               eq(schema.member.organizationId, schema.organization.id),
             )
             .where(eq(schema.member.userId, userId));
-          const memberships = await this.instrumentation.startSpan(
-            { name: membershipsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => membershipsQuery.execute(),
-          );
+          const memberships = await membershipsQuery.execute();
 
           const invitationsQuery = invoker
             .select({
@@ -172,10 +163,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             })
             .from(schema.invitation)
             .where(eq(schema.invitation.inviterId, userId));
-          const invitationsSent = await this.instrumentation.startSpan(
-            { name: invitationsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => invitationsQuery.execute(),
-          );
+          const invitationsSent = await invitationsQuery.execute();
 
           return Result.ok({
             exportedAt: new Date().toISOString(),

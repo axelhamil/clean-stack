@@ -32,19 +32,25 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Building2,
+  Copy,
   CreditCard,
+  FileText,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
+  Monitor,
   Moon,
   Plus,
+  ScrollText,
+  ShieldCheck,
   Sun,
+  TriangleAlert,
   User,
   Users,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
-import { toastError } from "../../shared/utils";
+import { toastError, toastSuccess } from "../../shared/utils";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useAuthorization } from "../auth/use-authorization";
@@ -100,6 +106,13 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
     requiresOrg: true,
   },
   { to: "/settings/account", label: "Settings — Account", icon: User },
+  { to: "/settings/danger", label: "Settings — Danger zone", icon: TriangleAlert },
+];
+
+const LEGAL_ROUTES: readonly NavigationRoute[] = [
+  { to: "/legal/data-rights", label: "Data rights (RGPD)", icon: ShieldCheck },
+  { to: "/legal/privacy-policy", label: "Privacy policy", icon: FileText },
+  { to: "/legal/terms", label: "Terms of service", icon: ScrollText },
 ];
 
 function useNavigationGroup(): CommandGroupConfig {
@@ -153,37 +166,69 @@ function useOrganizationGroup(): CommandGroupConfig | null {
   };
 }
 
-function useActionsGroup(): CommandGroupConfig {
-  const { setTheme, resolvedTheme } = useTheme();
-  const signOut = useSignOut();
-  const isDark = resolvedTheme === "dark";
-
+function useLegalGroup(): CommandGroupConfig {
+  const navigate = useNavigate();
   return {
-    heading: "Actions",
-    items: [
-      {
-        id: "action:toggle-theme",
-        label: "Toggle theme",
-        icon: isDark ? Sun : Moon,
-        run: () => setTheme(isDark ? "light" : "dark"),
-      },
-      {
-        id: "action:sign-out",
-        label: "Sign out",
-        icon: LogOut,
-        shortcut: SIGN_OUT_SHORTCUT,
-        run: () => signOut.mutate(),
-      },
-    ],
+    heading: "Legal & privacy",
+    items: LEGAL_ROUTES.map((route) => ({
+      id: `legal:${route.to}`,
+      label: route.label,
+      icon: route.icon,
+      run: () => navigate({ to: route.to }),
+    })),
   };
+}
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Theme: Light", icon: Sun },
+  { value: "dark", label: "Theme: Dark", icon: Moon },
+  { value: "system", label: "Theme: System", icon: Monitor },
+] as const;
+
+function useActionsGroup(): CommandGroupConfig {
+  const { setTheme, theme } = useTheme();
+  const signOut = useSignOut();
+  const { data: activeOrg } = useQuery(activeOrgQueryOptions);
+
+  const items: CommandEntry[] = THEME_OPTIONS.map((option) => ({
+    id: `theme:${option.value}`,
+    label: option.label,
+    icon: option.icon,
+    hint: theme === option.value ? "active" : undefined,
+    run: () => setTheme(option.value),
+  }));
+
+  if (activeOrg) {
+    items.push({
+      id: "action:copy-org-slug",
+      label: "Copy org slug",
+      icon: Copy,
+      searchValue: activeOrg.slug,
+      run: async () => {
+        await navigator.clipboard.writeText(activeOrg.slug);
+        toastSuccess("Org slug copied to clipboard");
+      },
+    });
+  }
+
+  items.push({
+    id: "action:sign-out",
+    label: "Sign out",
+    icon: LogOut,
+    shortcut: SIGN_OUT_SHORTCUT,
+    run: () => signOut.mutate(),
+  });
+
+  return { heading: "Actions", items };
 }
 
 function useCommandGroups(): CommandGroupConfig[] {
   const navigation = useNavigationGroup();
   const organization = useOrganizationGroup();
+  const legal = useLegalGroup();
   const actions = useActionsGroup();
 
-  return [navigation, organization, actions].filter(
+  return [navigation, organization, legal, actions].filter(
     (group): group is CommandGroupConfig => group !== null,
   );
 }
@@ -198,7 +243,7 @@ function isTypingInField(): boolean {
 function useTogglePaletteShortcut(setOpen: Dispatch<SetStateAction<boolean>>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey) {
         e.preventDefault();
         setOpen((v) => !v);
       }

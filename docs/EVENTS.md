@@ -250,11 +250,11 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 - **AEAD secret encryption** (`@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key) for webhook secrets at rest.
 - **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`) — `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Dead-letter after 5 attempts.
 - **Claim window pattern** in delivery worker — claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
-- **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, traceparent) for cross-system interop.
+- **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id` — captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context — Phase D.1 OTel.)
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **32 events automatically** (21 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **35 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`). Source of truth: `packages/events/src/event-types.ts`.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -270,12 +270,14 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 - `USER_PASSKEY_REMOVED` — `path === "/passkey/delete-passkey"` + body.id
 - `USER_EMAIL_VERIFIED` — `path === "/verify-email"` (skipped if session not yet active — limitation)
 - `USER_PASSWORD_CHANGED` — `path === "/change-password"`
+- `USER_PROFILE_UPDATED` — `path === "/update-user"`. Payload: `{ userId, changes }` (field-level diff).
 - `USER_ACCOUNT_LINKED` — `path === "/link-social"` + lookup latest non-credential account created < 5s ago
 
 ### Via BetterAuth callbacks (native)
 - `USER_PASSWORD_RESET_REQUESTED` — `emailAndPassword.sendResetPassword`
 - `USER_PASSWORD_CHANGED` — `emailAndPassword.onPasswordReset`
 - `USER_MAGIC_LINK_REQUESTED` — `magicLink.sendMagicLink`
+- `USER_EMAIL_CHANGE_REQUESTED` — `user.changeEmail.sendChangeEmailConfirmation`. Payload: `{ userId, newEmail }`. Confirmation sent to the **current** address.
 
 ### Via `organizationHooks` (org plugin)
 - `ORG_CREATED` (afterCreateOrganization) · `ORG_UPDATED` · `ORG_DELETED` · `ORG_MEMBER_INVITED` (afterCreateInvitation) · `ORG_INVITATION_CANCELLED` · `ORG_MEMBER_REMOVED` (afterRemoveMember) · `ORG_MEMBER_ROLE_CHANGED` (afterUpdateMemberRole)
@@ -289,6 +291,9 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 ### Via WebhooksService
 - `WEBHOOK_ENDPOINT_CREATED` · `WEBHOOK_ENDPOINT_UPDATED` · `WEBHOOK_ENDPOINT_DELETED` (payload carries `actorUserId` propagated from the HTTP boundary — `c.get("user").id`)
+
+### Via `PolicyAcceptanceService` (Phase A.2)
+- `USER_POLICY_ACCEPTED` (`user.policy.accepted`) — payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
 
 ## Payload validation guarantee
 
@@ -321,7 +326,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (32 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (35 events) |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |
@@ -333,5 +338,5 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
 | `apps/api/src/shared/jitter.ts` | Decorrelated jitter math |
 | `apps/api/src/shared/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
-| `apps/api/src/auth.ts` | BetterAuth bridge (21 events: 13 user + 8 org) |
+| `apps/api/src/auth.ts` | BetterAuth bridge (23 events: 15 user + 8 org) |
 | `apps/api/src/modules/{audit-log,webhooks}/` | Built-in modules (admin routes + worker) |

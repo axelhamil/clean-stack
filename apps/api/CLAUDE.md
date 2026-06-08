@@ -16,6 +16,7 @@ apps/api/src/
   modules/<context>/            See src/modules/CLAUDE.md for layered rules
   container.ts                  Composition root (flat at `src/`): `.add()` for cross-cutting + `.addModule()` per context, then `.build()`.
   auth.ts                       BetterAuth singleton — **deliberate exception** to modules/ rule (config-as-code, lib owns model). Routes auto-mount via plugin (`/api/auth/*`).
+  auth-queries.ts               Typed Drizzle data-access for the bridge — plain functions (no port/DI/aggregate; auth is not domain), `tx?` to join bridge transactions. Keeps `auth.ts` config + event-wiring only, never inline `db.*`.
   client.ts, index.ts           `hcWithType` factory / server entry (chained `.route()` preserves `AppType`)
 ```
 
@@ -62,7 +63,7 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 ## Auth (BetterAuth integration, server)
 
-**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly.
+**Module-level singleton** (`apps/api/src/auth.ts`) — not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **No inline `db.*` in `auth.ts`** — the SQL the hooks/bridge need lives in `auth-queries.ts` as typed Drizzle functions (`tx?`-aware to join the same transaction). This is data-access separation, **not** DDD: no repository class, no port, no DI — auth is infra, not domain.
 
 **Server pipeline** (in order, `index.ts`): `requestId()` → `httpLogger` → `secureHeaders()`+`cors()` → `sessionMiddleware` (calls `auth.api.getSession()` once, stores `user`/`session` on context, skips `/api/auth/*`) → `app.on(["GET","POST"], "/api/auth/*", (c) => auth.handler(c.req.raw))` → `app.onError(errorHandler)`. Protected handlers compose `requireAuth`. **Never re-call `auth.api.getSession()` per handler.**
 
@@ -124,6 +125,15 @@ OTel + Prometheus `/metrics` are deferred to Phase D.1 (no consumer yet). The sp
 **Retention**: derived pipeline tables (`outbox_event`, `audit_log`, `webhook_delivery`) grow unbounded — purged by HMAC-gated `/internal/sweep-*` routes (`shared/internal-routes/sweep-*.route.ts`), driven by env knobs `OUTBOX_RETENTION_DAYS` / `AUDIT_LOG_{OPERATIONAL,COMPLIANCE}_RETENTION_DAYS` / `WEBHOOK_DELIVERY_RETENTION_DAYS`. Triggered by external cron in strict order (FK `ON DELETE RESTRICT`): webhook → audit → outbox. The sweep itself emits no event (rule §6 exception — see `/CLAUDE.md`).
 
 See `docs/EVENTS.md` for full spec, retention matrix, and cron recipe.
+
+## Policy versioning (`modules/policies/` — Phase A.2)
+
+Compliance infra, not DDD. Records which policy version each user accepted and when. Mirrors the `audit-log` module shape.
+
+- **`@packages/policies`** is the SSOT (`POLICY_VERSIONS`, `POLICY_TYPES`, `POLICY_CHANGELOG`, `POLICY_URLS`). Source-only package. Bump the version string here → every consumer (API gate, front sign-up, `@packages/drizzle` enum) sees the change at compile time. `POLICY_URLS` is the swap point for hosting the full policy text externally (marketing site / CMS) instead of in-app.
+- **`PolicyAcceptanceService`** — `accept(userId, types, ipAddress?)` writes N rows + emits N `user.policy.accepted` events (retention `compliance`) atomically in one `uow.run` TX — on any insert failure it throws to force a full rollback (no partial acceptance), then returns `Result.fail`. `getStaleTypes(userId)` drives the gate. `DrizzlePolicyAcceptanceStore` is fully §8-instrumented (outer + inner spans + capture); the service itself only `capture`s in its catch (orchestration, no span).
+- **`requireCurrentPolicies`** (`shared/middleware/policy.middleware.ts`) — composable, **not mounted globally**. Throws `HTTPException(409)` when any policy is stale. The `_shell` `beforeLoad` redirect is the live UX gate; this middleware is defense-in-depth for future business routes.
+- **Sign-up acceptance via `/verify-email` hook** — `PolicyAcceptanceService.accept` is called from the BetterAuth `/verify-email` after-hook in `auth.ts` (idempotent via `getStaleTypes`) AND from `POST /me/policies/accept`. Not at `/sign-up/email`: that route has no session yet and returns a synthetic user on duplicate-email. See `docs/HISTORY.md` Phase A.2 for the full deviation note.
 
 ## Organization scoping (server)
 

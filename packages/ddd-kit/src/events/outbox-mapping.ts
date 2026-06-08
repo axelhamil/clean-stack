@@ -13,6 +13,7 @@ export type OutboxRow = {
     source: string;
     subject?: string;
     traceparent?: string;
+    requestId?: string;
     datacontenttype: "application/json";
   };
   occurredAt: Date;
@@ -23,6 +24,7 @@ export type OutboxMappingScope = {
   organizationId?: string | null;
   aggregateType: string;
   traceparent?: string;
+  requestId?: string;
 };
 
 export function domainEventToOutboxRow(event: IDomainEvent, scope: OutboxMappingScope): OutboxRow {
@@ -38,6 +40,7 @@ export function domainEventToOutboxRow(event: IDomainEvent, scope: OutboxMapping
       source: scope.source,
       subject: event.aggregateId,
       traceparent: scope.traceparent,
+      requestId: scope.requestId,
       datacontenttype: "application/json",
     },
     occurredAt: event.dateOccurred,

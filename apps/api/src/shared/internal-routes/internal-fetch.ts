@@ -10,6 +10,14 @@ export interface SignedFetchInput {
   signingKey: string;
 }
 
+/**
+ * Signs and dispatches an HTTP request to an `/internal/*` endpoint.
+ *
+ * Builds the canonical message, computes the HMAC-SHA256 signature, and
+ * attaches it as `X-Internal-Signature`. Import this in external schedulers
+ * (GH Actions, Railway cron sidecar) — it is the only supported way to call
+ * internal routes from outside the process.
+ */
 export async function signedInternalFetch(input: SignedFetchInput): Promise<Response> {
   const url = new URL(input.path, input.baseUrl);
   const rawBody = input.body === undefined ? "" : JSON.stringify(input.body);

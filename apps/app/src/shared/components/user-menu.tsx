@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback } from "@packages/ui/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@packages/ui/components/ui/avatar";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   DropdownMenu,
@@ -11,9 +11,11 @@ import {
   DropdownMenuTrigger,
 } from "@packages/ui/components/ui/dropdown-menu";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
 import { type DisplayUser, displayName, initialsOf } from "../../shared/utils";
+import { sessionQueryOptions } from "../api/queries/session";
 import { useSignOut } from "../auth/use-sign-out";
 
 interface UserMenuProps {
@@ -23,12 +25,15 @@ interface UserMenuProps {
 export function UserMenu({ user }: UserMenuProps) {
   const signOut = useSignOut();
   const display = displayName(user);
+  const { data: session } = useQuery(sessionQueryOptions);
+  const image = session?.user.image;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
           <Avatar className="size-8">
+            {image ? <AvatarImage src={image} alt={display} /> : null}
             <AvatarFallback className="text-xs font-medium">{initialsOf(display)}</AvatarFallback>
           </Avatar>
           <span className="sr-only">Open user menu</span>

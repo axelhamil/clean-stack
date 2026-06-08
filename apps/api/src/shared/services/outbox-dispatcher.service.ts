@@ -26,6 +26,12 @@ function recordToDomainEvent(rec: OutboxRecord): IDomainEvent {
   };
 }
 
+/**
+ * Scans the DI container snapshot for `EventHandler` instances and indexes
+ * them by `eventType`. Called once at `start()` so dispatch is a plain Map
+ * lookup with no reflection at runtime. The DI container is passed as a plain
+ * `Record` so this function stays testable without a real container.
+ */
 export function collectUserEventHandlers(
   diLike: Record<string, unknown>,
 ): Map<string, EventHandler[]> {

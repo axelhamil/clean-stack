@@ -11,7 +11,10 @@ import { billingRoute } from "./features/billing/billing.route";
 import { dangerRoute } from "./features/danger/danger.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
+import { acceptPoliciesRoute } from "./features/legal/accept.route";
 import { dataRightsRoute } from "./features/legal/data-rights.route";
+import { privacyPolicyRoute } from "./features/legal/privacy-policy.route";
+import { termsRoute } from "./features/legal/terms.route";
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
 import {
@@ -30,6 +33,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   guestLayout.addChildren([signInRoute, signUpRoute, forgotPasswordRoute]),
   protectedLayout.addChildren([
+    acceptPoliciesRoute,
     shellLayout.addChildren([
       dashboardRoute,
       newOrgRoute,
@@ -43,6 +47,8 @@ const routeTree = rootRoute.addChildren([
   ]),
   acceptInvitationRoute,
   dataRightsRoute,
+  privacyPolicyRoute,
+  termsRoute,
   magicLinkRoute,
   resetPasswordRoute,
   twoFactorRoute,

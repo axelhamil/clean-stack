@@ -11,6 +11,7 @@ export type EmailTemplates = {
   delete_requested: { name: string; cancelUrl: string; expiresAt: string };
   delete_cancelled: { name: string };
   delete_completed: { name: string };
+  change_email: { name: string; newEmail: string; confirmUrl: string };
 };
 
 export type EmailError =

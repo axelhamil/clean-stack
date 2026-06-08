@@ -13,6 +13,7 @@ import {
 import { PayloadByEventType } from "@packages/events";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository, OutboxEnqueueScope, OutboxRecord } from "../ports/outbox.port";
+import { getRequestId } from "../request-context";
 
 const oe = outboxSchema.outboxEvent;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
@@ -54,12 +55,14 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
         try {
           if (events.length === 0) return;
           for (const event of events) assertPayloadValid(event);
+          const requestId = getRequestId();
           const rows = events.map((event) =>
             domainEventToOutboxRow(event, {
               source: scope.source,
               organizationId: scope.organizationId,
               aggregateType: scope.aggregateType ?? "unknown",
               traceparent: scope.traceparent,
+              requestId,
             }),
           );
           const query = exec.insert(oe).values(rows);

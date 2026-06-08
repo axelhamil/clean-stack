@@ -16,6 +16,7 @@ export const user = pgTable("user", {
   pendingDeletionUntil: timestamp("pending_deletion_until"),
   deletedAt: timestamp("deleted_at"),
   lastExportRequestedAt: timestamp("last_export_requested_at"),
+  pendingEmail: text("pending_email"),
 });
 
 export const session = pgTable(

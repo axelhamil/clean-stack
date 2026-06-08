@@ -1,3 +1,12 @@
+/**
+ * HMAC-SHA256 request signing primitives for `/internal/*` routes.
+ *
+ * The canonical message binds timestamp, method, path, host, content-type, and
+ * raw body — replay attacks are blocked by the 30-second `MAX_AGE_SECONDS`
+ * window; SSRF spoofing is blocked by including the host. Component order is
+ * fixed (see `canonicalize`) and must stay byte-identical between signer and
+ * verifier.
+ */
 export const SIGNATURE_HEADER = "X-Internal-Signature";
 export const MAX_AGE_SECONDS = 30;
 

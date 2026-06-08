@@ -70,6 +70,10 @@ Personal org is structurally identical to a team org for every operation except 
 - [x] **`NO_ACTIVE_ORGANIZATION` translated to `null`** — `currentMembershipQueryOptions` and `activeOrgQueryOptions` catch BetterAuth's error code and return `null`. "No active org" is a valid transient state in our model (between orgs, pre-self-heal); letting the error bubble crashes any consumer that calls `ensureQueryData`.
 - [x] **`broadcastAuthChange()` extended to org events** — `setActive`, `create-org`, `delete-org`, `leave-org`, `transfer-and-leave`, `accept-invitation`, `remove-member` all call the broadcast in their `onSuccess` (call site, not factory). Listener already refetches `["session", "active-org", "current-membership", "orgs"]`. Cross-tab consistency under the 5-min `cookieCache.maxAge` window.
 
+### May 2026 cleanup — dropped the `teams` sub-plugin
+
+- [x] **Removed the BetterAuth `teams` sub-plugin.** Grouping-only (no team-scoped roles or statements) added UX surface for ~zero value at this stage. Re-enables in two lines if a clear use-case emerges. Settings collapsed from a General/Members/Teams split to a single `Organization` tab with section-level `<Can>` gates per role.
+
 ---
 
 ## Email — Resend (dashboard templates) ✅ Phase 1
@@ -116,6 +120,29 @@ Personal org is structurally identical to a team org for every operation except 
 
 ---
 
+## RGPD / CCPA — data deletion (Art. 17) + export (Art. 20) ✅ Phase 1
+
+**Why**: clean-stack is a boilerplate cloned to start any SaaS. A clone deployed to EU users without Art. 17 (right to erasure) + Art. 20 (data portability) is illegal day one — fines up to 4 % of revenue. The cascade was built **before** Billing / Audit-log / Admin landed so every future feature inherits the deletion contract rather than retrofitting it. Lives in `apps/api/src/modules/rgpd/` (vertical slice — service + drizzle repo + public + internal routes) and `apps/app/src/features/rgpd/` (cards + forms + hooks). Shipped commits `fd3b4b7`, `bfcc15d`, `da659a0`.
+
+- [x] **Export endpoint** `POST /me/export` — auth-gated, **sync** (walks the user's tables in-request, uploads the JSON bundle to R2, emails a signed 7-day URL via Resend `RESEND_TPL_DATA_EXPORT_*`). Rate-limited 1/24h per user via `lastExportRequestedAt`. The presigned URL is **never** put in an event payload — events carry only `storageKey` (security).
+- [x] **Pre-flight ownership gate** `GET /me/delete/preflight` — returns the sole-owner non-personal orgs that block deletion. UI at `/settings/account` renders the blocking list with per-row `Transfer ownership` / `Leave org` CTAs; the `Delete account` button stays disabled while the list is non-empty. **Auto-transfer rejected on principle** — no implicit refiling of legal/billing responsibility onto a member without consent (mirrors the Personal-org deletion posture).
+- [x] **Delete endpoint** `POST /me/delete` — auth + **2FA-required** (BetterAuth `twoFactor`) + server-side preflight re-check (409 `ACCOUNT_DELETION_BLOCKED` if a sole-owner org appeared between read and submit) + **7-day soft-delete grace**. Cron `POST /internal/rgpd/process-pending-deletions` (HMAC-signed) sweeps expired requests, wipes personal data (email, name, sessions, passkeys, MFA factors, R2 avatars) and anonymizes `member` rows (`userId → null`, `email → deleted-<uuid>@anonymized.local`).
+- [x] **Cancel-deletion UX** — signing in during the grace window prompts a cancel/continue dialog; cancel clears `pendingDeletionUntil`.
+- [x] **Soft-delete confined to RGPD** — `user.deletedAt` + `user.pendingDeletionUntil` are the **only** soft-delete columns in the codebase (rule 14 — no creep elsewhere; everything else is hard-delete).
+- [x] **Public `/legal/data-rights` page** — linked from `/settings/account`, lists what's deleted vs anonymized vs retained per legal basis.
+- [x] **Audit-log integration** — every state transition emits an outbox event (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`); `AuditEventSubscriber` writes the audit row with `compliance` retention. Pino logging retained for ops debugging (different concern).
+
+**Decisions (non-obvious, locked-in by code)**:
+
+1. **Soft-delete grace, not immediate wipe** — Art. 17 allows a reasonable processing window. The 7-day grace doubles as a self-service "I changed my mind" path (cancel on sign-in) and a safety net against account-takeover-then-delete attacks. The cron is the only thing that hard-wipes.
+2. **Anonymize `member`, don't cascade-delete it** — deleting the `member` row would corrupt org audit trails ("who invited whom"). Setting `userId → null` + a tombstone email keeps referential history intact while removing the PII link. The org's other members see "deleted user", not a broken page.
+3. **Sole-owner preflight is server-authoritative, re-checked at submit** — the UI gate is UX; the `POST /me/delete` handler re-runs the preflight inside the request so a race (org ownership changing between page-load and click) can't orphan an org without an owner.
+4. **2FA gate on a destructive irreversible action** — account deletion reuses the BetterAuth `twoFactor` challenge, consistent with the "step-up auth on irreversible ops" posture.
+
+**Remaining** (tracked in their dependent phases, not here): E2E Playwright deletion-cascade gate (A.6), admin export-on-behalf + deletion overrides (C.3), Stripe customer cleanup during wipe (B.1).
+
+---
+
 ## App shell — top-nav + ⌘K command palette ✅
 
 **Why**: sidebar SaaS shells are the 2010-2024 standard, but the SOTA 2026 wave (Vercel, Linear web, Resend, Trigger.dev) consolidated on top-nav + global ⌘K palette. Less chrome, better mobile, keyboard-first power-users.
@@ -139,7 +166,7 @@ Personal org is structurally identical to a team org for every operation except 
 
 ### Catalog `@packages/events` (new private package)
 
-- [x] **29 events** covering BetterAuth (user/session/account, organization/member/invitation, MFA/passkey), RGPD (deletion + export transitions), uploads (`hashKey` instead of raw filename for PII).
+- [x] **29 events at foundation** (grown to **35** as later phases added webhook-endpoint ×3, profile-updated + email-change-requested ×2, policy-accepted ×1) covering BetterAuth (user/session/account, organization/member/invitation, MFA/passkey), RGPD (deletion + export transitions), uploads (`hashKey` instead of raw filename for PII).
 - [x] **Zod payload schemas** — typed discriminated union via `PayloadByEventType`.
 - [x] **`RETENTION_MAP`** — per-event `operational` (90d) / `compliance` (7y) / `none`. The audit subscriber reads this directly — no glue.
 
@@ -166,7 +193,8 @@ Personal org is structurally identical to a team org for every operation except 
 - [x] **Decorrelated jitter** (`shared/jitter.ts`) — AWS Architecture Blog formula: `min(cap, random(base, lastDelay × 3))`. `BASE = 1000ms`, `CAP = 12h`, `MAX_ATTEMPTS = 5`. Retry paliers ~1m / 5m / 30m / 2h / 12h, dead-letter after 5 attempts.
 - [x] **Ports** `IOutboxRepository` + `IAuditPort` in `shared/ports/`. Cross-cutting (consumed by 2+ contexts). Drizzle impls in `shared/services/`.
 - [x] **`emitEvent(outbox, ...)` shared helper** (`shared/event-emitter.ts`) — used by BetterAuth bridge, RGPD service, UploadService instead of duplicated private `emit` methods.
-- [x] **`recordAudit(deps, entry, tx?)` shared helper** (`shared/audit-recorder.ts`) — for service-level transitions without aggregate (RGPD-style). Aggregate-driven contexts use `AuditEventSubscriber` automatic — no direct call.
+- [x] **Request correlation via `AsyncLocalStorage`** (`shared/request-context.ts`, Jun 2026) — a `requestId` middleware wraps each request in an ALS carrying its `X-Request-Id`; `DrizzleOutboxRepository.enqueue` reads it at the single write choke-point and stamps `outbox_event.metadata.requestId`, which the `AuditEventSubscriber` copies into `audit_log.request_id`. Chosen over threading `c.get("requestId")` through ~30 call sites because BetterAuth hooks (which emit the majority of events) have no Hono `c` in scope — ALS is the only source that covers Hono routes, BetterAuth lifecycle hooks, and the internal-route cron alike. The actor stays explicit per rule §7 (ALS is for observability only, never authz).
+- [x] **Service-level audit via `emitEvent` → `AuditEventSubscriber`** — code without an aggregate (RGPD, uploads, BetterAuth bridge) emits its event through the `emitEvent` helper; the subscriber writes the `audit_log` row from the outbox. The outbox event *is* the audit primitive — there is no separate `recordAudit` helper.
 
 ### BetterAuth bridge (`apps/api/src/auth.ts`) — 21 unique events emitted automatically (23 emit sites; USER_PASSWORD_CHANGED + ORG_MEMBER_JOINED each have 2)
 
@@ -265,6 +293,28 @@ Personal org is structurally identical to a team org for every operation except 
 
 ---
 
+## Health probes — `/livez` · `/readyz` · `/startupz` ✅ Phase 0.2
+
+**Why**: K8s / Railway / Fly / Render all probe liveness/readiness/startup; absence = restart loops + 502s during deploys. SOTA 2026 = three probes, IETF `draft-inadarei` response format, graceful shutdown wired to `/readyz`. Full per-PaaS recipes in [`docs/HEALTH-PROBES.md`](HEALTH-PROBES.md).
+
+- [x] `modules/health/` vertical slice + `IHealthCheckRegistry` (`shared/ports/health.port.ts`). Each infra-owning module ships an `XxxHealthProbe implements OnInit` that self-registers at `di.preload()` — `trash` the module removes its probe in one shot, no orphan.
+- [x] `/livez` liveness, **no dependency hit** (a DB outage must not restart pods → thundering herd). `/readyz` aggregates checks (db `SELECT 1` critical, storage `HeadBucket` non-critical), tri-state `pass`/`warn`/`fail` → 200 unless a critical check fails (503). `/startupz` shields a slow boot from a tight liveness threshold.
+- [x] Asymmetric cache (positive 30s / negative 5s) + self-cancelling 5s timeout on `/readyz`. Mounted **outside** requestId/httpLogger/cors/session middleware (probes carry no cookies; ~17k hits/day/pod would drown logs).
+- [x] **Graceful shutdown** — `SIGTERM` flips `lifecycleState` → `/readyz` returns 503 within one probe interval (LB drains), waits `SHUTDOWN_GRACE_PERIOD_MS` (15s default), then stops the workers. Without it: intermittent 502s on every deploy.
+- [x] **Prod-validation hardening (Jun 2026)** — `/livez` + `/startupz` payloads trimmed to `{status, uptimeMs}`; build metadata (`version`/`commitSha`/`runtime`) moved behind `/internal/build-info` (HMAC-gated). Public probes were an info-disclosure vector (version fingerprinting + exact-source mapping for private clones). See the Railway closeout below.
+
+---
+
+## Removability dry-run — first leaf removed end-to-end ✅ Phase 0.5 · May 2026
+
+**Why**: the vertical-slice contract claims "a leaf feature is removable in 5 minutes". Until one was actually removed end-to-end, that was theory. Runbook + worked example + edge cases in [`docs/REMOVABILITY.md`](REMOVABILITY.md).
+
+- [x] Removed `modules/rgpd` end-to-end in a throwaway worktree: **46 files touched, −2980 LOC net**, 3 `DROP COLUMN` migration. All 6 gates green (`type-check`, `ci:check`, `check:unused`, `check:duplication`, `build`, `test` baseline-preserving).
+- [x] **4 surprises captured** — a 3rd RGPD column missed by the initial cartography, a transitively-dead `throwApiError` helper, a dangling knip pattern, pre-existing test fails unrelated to the removal. Contract holds: TS error-points the rest.
+- [x] **6-axis checklist** codified (schema barrel, DI `.addModule()` + `app.route()`, access-control statements, front nav, email templates) — the canonical "how to remove a feature".
+
+---
+
 ## Railway reference deploy — config-as-code SOTA 2026 ✅ Phase 0.7 · May 2026
 
 **Why**: clean-stack mentionnait Railway dans 3 docs (`HEALTH-PROBES.md`, `DISASTER-RECOVERY.md`, `EVENTS.md`) mais aucun cloneur n'avait jamais validé le boilerplate de bout en bout. Le projet Railway existant tombait sur Nixpacks par défaut (pas de `railway.toml`) et ne savait pas piloter le monorepo pnpm + Bun. Phase 0 ne pouvait pas être fermée avec ce gap.
@@ -289,3 +339,122 @@ Personal org is structurally identical to a team org for every operation except 
 5. **Pas de `preDeployCommand` pour la migration (Railway-spécifique).** Garde le pattern `CMD migrate && start` portable (marche sur Fly, K8s, Cloud Run sans modif). `preDeployCommand` est une optimisation Railway (1 migration par deploy au lieu d'1 par restart de container) — vaut le coup quand la suite scale > 5 réplicas ; sur 1 réplique le cost est nul. Defer to operational phase.
 6. **Pas de `numReplicas = 1` explicite.** Première itération avait `numReplicas = 1` dans `[deploy]` — invalid : ce champ n'existe que sous `[deploy.multiRegionConfig.<region>]` (Railway docs 2026). Retiré ; default Railway = 1 réplique implicitement.
 7. **Pas de GH Actions deploy workflow.** Railway watch `main` nativement + `watchPatterns` par service = zero glue nécessaire. Première itération avait un `.github/workflows/deploy.yml` matrix qui hit les Deploy Webhooks Railway — retiré après audit (double-deploy avec le watch natif, secrets GH supplémentaires, viole single-source). Le pattern webhook reste utile pour deploys cross-service ordonnés (defer si jamais nécessaire en phase opérationnelle).
+
+
+---
+
+## Right to rectification (Art. 16) + NIST 800-63B-4 ✅ Phase A.1 · Jun 2026
+
+**Why**: two non-negotiables bundled in one push. Art. 16 GDPR requires a working edit-profile surface (BetterAuth back-end already supports it; the boilerplate only exposed disabled placeholders). NIST SP 800-63B-4 final (August 2025) is the SOTA password baseline — minimum length 15, HIBP breach screening, no complexity rules. Both touch the same surface (`/settings/account` + auth flows); shipping together avoids a second round-trip.
+
+### Back-end
+
+- [x] **`user.profile.updated`** event (`USER_PROFILE_UPDATED`, retention `compliance`) — emitted in `auth.ts` via `hooks.after` on path `/update-user`. Payload: `{ userId, changes }` (field-level diff).
+- [x] **`user.email.change_requested`** event (`USER_EMAIL_CHANGE_REQUESTED`, retention `compliance`) — emitted in the `user.changeEmail.sendChangeEmailConfirmation` callback. Payload: `{ userId, newEmail }`.
+- [x] **`IPasswordBreachService` port** (`shared/ports/password-breach.port.ts`) + **`HibpPasswordBreachService`** impl (`shared/services/`) — HIBP k-anonymity (`api.pwnedpasswords.com/range/<sha1[:5]>`, `Add-Padding` header, timeout `HIBP_TIMEOUT_MS` default 3000 ms). Instrumented (span `http.client`). **Fail-open** on network error — breach check failure is captured and logged but never blocks the user.
+- [x] **`findPasswordViolation()` + `validatePassword()` helpers** (`shared/password-policy.ts`) — pure, unit-testable. `findPasswordViolation` bans email-local-part, display name, and app name (`clean-stack` / `cleanstack`). `validatePassword` adds the length-guard (skips HIBP below `MIN_PASSWORD_LENGTH`) then the breach check, returning the first violation or `null`. The inline ~20 common-password list was dropped — HIBP already covers every common password, so it was dead weight.
+- [x] **`auth.ts` changes** — `emailAndPassword.minPasswordLength: MIN_PASSWORD_LENGTH`; `hooks.before` calls `validatePassword(...)` on `/sign-up/email`, `/reset-password`, `/change-password` (throws `APIError` 422 on violation); `user.changeEmail.enabled: true` + confirmation sent to the **current** address (not the new one) + `change_email` email template; `databaseHooks.user.update.after` clears `pendingEmail` and emits `user.profile.updated { changes: { email } }` once the new address becomes effective.
+- [x] **`pendingEmail` field** — nullable `pending_email` column (`packages/drizzle/src/schema/auth.ts`, migration `0004`) exposed as a BetterAuth additionalField (`returned: true, input: false`). Set in `sendChangeEmailConfirmation`, cleared on effective change — drives the front "pending change" badge.
+- [x] **Container + env** — `IPasswordBreachService` binding in `container.ts`; `HIBP_TIMEOUT_MS` in `env.ts`.
+- [x] **Tests** — `hibp-password-breach.service.test.ts` (k-anonymity, found/not-found, network-error fail-open, non-ok response) + `password-policy.test.ts` (`findPasswordViolation` + `validatePassword`: length-guard skips HIBP, contextual ban, breach hit, fail-open).
+
+### Front-end
+
+- [x] **`ProfileCard`** — replaces the dead Card with two disabled inputs in `features/account/account.page.tsx`. Edits `name` + `email` (confirmation to current address; a `<Badge>` "Pending change to X" renders while `user.pendingEmail` is set) + avatar upload via the existing `createUploadMutationOptions` (presign → PUT → confirm), with a client-side type (`image/*`) + size (5 MB) guard and **filename sanitization** (accents stripped / invalid chars → `-`, to satisfy the server `^[\w\-. ]+$` contract) before upload. See [`docs/STORAGE.md`](STORAGE.md) for the key layout.
+- [x] **`ChangePasswordCard`** — standalone card below `ProfileCard`, inline with existing Passkeys/2FA/Sessions/DataExport cards.
+- [x] **`strongPasswordSchema`** (`shared/auth/auth.schema.ts`) — updated to `min(15)`, **all complexity regexes removed** (NIST `SHALL NOT` impose complexity). Applied to sign-up + reset flows as well.
+- [x] **Password field UX (NIST-aligned)** — `FormTextField` (`@packages/ui`) gained a **show/hide reveal toggle** (NIST 800-63B-4 §3.1.1.2 recommends letting users reveal the password) + an optional `description` slot. Every new-password input (sign-up, reset, change) carries the hint *"At least 15 characters. Avoid passwords exposed in known data breaches."* Server-side policy rejections (HIBP breach, contextual ban, wrong current password) surface **inline on the offending field** via `form.setError` — routed to `currentPassword` vs `newPassword` by the message — instead of a transient toast.
+
+### Decisions
+
+1. **15 chars everywhere, no MFA exception** — the 8-with-MFA floor is a NIST *permission*, not an obligation. Implementing the two-tier would add session-state coupling to the password validator with zero security benefit at this scale. Simpler to hold 15 universally.
+2. **HIBP fail-open** — breach-check failure (network, timeout) is captured via `IInstrumentation.capture()` but never blocks auth. Rationale: a transient HIBP outage must not prevent users from signing up or resetting. The risk of accepting one pwned password during a 3-second HIBP blip is lower than locking out all sign-ups.
+3. **Validation via `hooks.before`, not `password.hash` override** — `password.hash` intercepts only hashing; `hooks.before` intercepts at the route level before any BetterAuth processing. This cleanly separates validation (policy) from hashing (crypto), and avoids reproducing BetterAuth's internal scrypt call.
+4. **`user.changeEmail` confirmation to the current address** — confirms the current owner is aware of the change before the new address takes effect. BetterAuth auto-handles the verification challenge to the new address. The `change_email` template is new.
+5. **No `/settings/profile` page** — rectification fields live in `/settings/account` (the existing page). A dedicated `/settings/profile` tab is reserved for Phase A.5 (Privacy dashboard). Splitting now would fragment UX without a composing container.
+6. **Password policy extracted to a pure `validatePassword()`** — the security-critical logic (length guard + contextual ban + HIBP) can't be unit-tested inside a BetterAuth hook (hooks aren't testable in isolation), so it lives in `password-policy.ts` and the hook is a one-line caller. The inline common-password list was removed as redundant with HIBP. Schema change shipped as migration `0004` via `db:generate && db:migrate` (never `db:push` for a committed change — push bypasses `__drizzle_migrations` and desyncs the migrate trail).
+
+### Change-email flow (2-step, BetterAuth)
+
+`user.changeEmail` runs a **two-confirmation** flow — neither the request nor the first click mutates `user.email`:
+
+1. **Request** — `authClient.changeEmail({ newEmail, callbackURL })` → `POST /change-email` (fresh-session gated). Our `sendChangeEmailConfirmation` hook sets `pendingEmail = newEmail`, emits `user.email.change_requested`, and mails the **current** address a confirmation link.
+2. **Confirm (current address)** — the link hits `GET /api/auth/verify-email?token=…` (a `change-email-confirmation` JWT). BetterAuth mints a second token and mails the **new** address a verification link. Email still unchanged; redirects to `callbackURL`.
+3. **Verify (new address)** — the second link (`change-email-verification` JWT) is what flips `user.email` to the new value (`emailVerified: true`). This fires `databaseHooks.user.update.after`, where we clear `pendingEmail` and emit `user.profile.updated { changes: { email } }`. The front "pending change" badge clears on the next session refetch.
+
+**Mail links point at the API** (`baseURL/verify-email`), not the app front — for this one auth mail the click *is* the state transition (BetterAuth applies it server-side), then redirects to `callbackURL` (we pass `/settings/account`). The other auth mails (reset, magic-link, verify) route through the app because the front consumes their token. Storage/key conventions for the avatar upload are documented in [`docs/STORAGE.md`](STORAGE.md).
+
+---
+
+### Prod-validation closeout (Jun 2026) — live on `main`, release 1.19.2
+
+The config-as-code shipped (above) but no one had run it end-to-end. Bringing the reference deploy actually green on Railway surfaced a **stack of prod-boot traps**, each masking the next (a failed deploy only reveals the next layer). All fixed (PR #50/#51 → `main`); api + app verified live.
+
+- [x] **`NODE_ENV` override trap.** A Railway service var `NODE_ENV=development` *overrode* the Dockerfile `ENV NODE_ENV=production` (service vars beat Dockerfile `ENV` at runtime). In dev mode the logger loads `pino-pretty` — a devDependency absent from the `--prod` install → instant boot crash (`unable to determine transport target for "pino-pretty"`). Fix: set `NODE_ENV=production` explicitly, or leave it unset (the Dockerfile wins). Never `development` in prod.
+- [x] **`WEBHOOK_MASTER_KEY` unset** → `env.ts` prod guard threw at boot. Generated + set.
+- [x] **`@packages/access-control` declared `better-auth` as `peer`/`devDependency`, not a `dependency`.** A workspace package that imports a lib in its *runtime* source must declare it under `dependencies`, else `pnpm install --prod` skips it and the import is unresolved in the pruned image (`Cannot find module 'better-auth/plugins/access'`). Compiles in dev (hoisting + devDeps present), breaks only in the pruned prod image. Moved to `dependencies`.
+- [x] **Email + storage threw at boot.** `di.preload()` is eager, so `ResendEmailService` and `S3StorageService` are constructed at startup and fail-hard'd when unconfigured. Changed to **warn-and-degrade**: email logs-not-delivers, storage swaps to a `NoOpStorageService` (returns `STORAGE_PROVIDER_FAILURE`; `/readyz` reports `storage:s3` as a non-critical warn). The API now boots without Resend/R2; those features stay inert until configured. **Reverses the Phase 1 email "boot-time fail-hard in production" decision** — right for a configured SaaS, wrong for a clonable boilerplate that must boot before the cloner wires Resend.
+- [x] **`app` service Start Command override.** A leftover Railway Start Command `pnpm --filter app start` *replaced* the Dockerfile Caddy `CMD` in the `caddy:2.11-alpine` runner (no Node/pnpm) → the container exits instantly with **zero logs**, the healthcheck never passes, the deploy fails silently and reads as a phantom. Cleared the override so the Dockerfile `caddy run` CMD applies.
+- [x] **Cross-site cookies.** `app` and `api` sit on different `*.up.railway.app` hosts = different sites (`up.railway.app` is a public suffix). BetterAuth session cookie set to `sameSite: isProd ? "none" : "lax"` so it survives the cross-site credentialed `fetch`. Custom domain under one shared parent (`api.x.com` + `app.x.com`) → `lax` works and is preferable; documented in `DEPLOY-RAILWAY.md` §8.
+- [x] **Docs hardened for cloners** — `docs/DEPLOY-RAILWAY.md` gained §0 (boot traps + fail-hard-vs-degrade matrix), §8 (cookie strategy by domain topology), §9 (probe info-disclosure note), §12 (troubleshooting matrix with every trap above).
+
+**Lessons (locked in):**
+1. **`railway up` deploys local working-tree code; a variable change / *Redeploy* / git push rebuilds from the connected branch.** During the fix loop `railway up` was the only way to test uncommitted code; a mid-fix variable change rebuilt from `main` (no fixes yet) and re-crashed — confirming the model. Once merged, GitHub-integrated deploys took over and went green.
+2. **`RAILWAY_GIT_COMMIT_SHA` only populates on branch deploys**, not `railway up`. `GIT_SHA`/`BUILD_TIME` show `unknown` under `railway up`; set them to the Railway reference vars (`${{RAILWAY_GIT_COMMIT_SHA}}`) so build-info tracks the deployed commit.
+3. **A multi-service deploy fails one layer at a time.** Each ~3-minute build only reveals the *next* boot trap. Pre-scan for the whole class (eager-preloaded constructors that throw, peer-deps imported at runtime, dashboard overrides) instead of one-fix-per-deploy.
+
+---
+
+## Privacy / Terms versioning ✅ Phase A.2 · Jun 2026
+
+**Why**: Art. 7 §1 RGPD — "the controller shall be able to demonstrate that the data subject has consented". Demonstrability requires recording *which version* was accepted and *when*. The boilerplate had zero versioning — a cloner shipping a policy update had no way to re-prompt users or produce compliance evidence. This phase closes that gap and lays the foundation for A.4 (consent stamps the policy version) and A.5 (privacy dashboard shows acceptance history).
+
+### Shared package `@packages/policies` — version SSOT
+
+- [x] **Source-only package** mirroring `@packages/access-control` (no build, `exports` points at `src/`). Exports `POLICY_TYPES` (`["privacy","terms"]`), `PolicyType`, `POLICY_VERSIONS` (`Record<PolicyType,string>`, both `"2026-01-15"`), `POLICY_CHANGELOG`, `PolicyChangelogEntry`. Imported by `apps/api` (gate + service), `apps/app` (sign-up form + page render), and `@packages/drizzle` (schema enum). **Single place to bump a version** — every consumer sees the change at compile time.
+
+### DB — `policy_acceptance` table
+
+- [x] Append-only table `policy_acceptance` (`packages/drizzle/src/schema/policies.ts`): `id, userId (FK user ON DELETE CASCADE), policyType, policyVersion, ipAddress (nullable), acceptedAt` + composite index `(userId, policyType, acceptedAt DESC)`. Migration `0005_sudden_leo.sql`.
+- [x] **Two-layer compliance trail**: this table is the live gate evidence (fast lookup of latest accepted version per type); the durable 7-year compliance trail lives in `audit_log` via the `user.policy.accepted` event (`compliance` retention).
+
+### Backend module `apps/api/src/modules/policies/` — compliance infra, not DDD
+
+- [x] **Not DDD** — no aggregate, no domain events on a Value Object. Mirrors the `audit-log` module shape: a thin service over a port-backed store. A.4 (Cookie consent) is the **same class** — its expiry/withdrawal/scope rules reduce to date comparisons + `includes()` + the same `version ===`, so it ships as infra too. The boilerplate ships **zero aggregates**; `@packages/ddd-kit/Aggregate` is a published-lib surface that waits for the cloner's real product domain.
+- [x] `IPolicyAcceptanceStore` port (module-private) + `DrizzlePolicyAcceptanceStore` — fully instrumented per rule §8 (outer span wrapping the method, inner span on `query.execute()`, `catch + instrumentation.capture`).
+- [x] `PolicyAcceptanceService` — `accept(userId, types, ipAddress?)` writes N rows + emits N events atomically in one `uow.run` TX. `getStatus(userId)` returns `Record<PolicyType, { current, acceptedVersion }>`. `getStaleTypes(userId)` returns only the types where the latest accepted version differs from the current. `hasAcceptedCurrent(userId)` is the gate predicate.
+- [x] Routes: `POST /me/policies/accept` (body `{ types?: PolicyType[] }` — omit to accept all stale), `GET /me/policies`. Both require auth. Mounted in `index.ts` `routes` chain.
+- [x] `requireCurrentPolicies` middleware (`apps/api/src/shared/middleware/policy.middleware.ts`) — throws `HTTPException(409)` when any policy is stale. **Composable, not mounted globally by default** — there are no business routes yet; this is defense-in-depth for future routes. The live UX gate (the `_shell` `beforeLoad` redirect) is the primary enforcement today.
+
+### Event `user.policy.accepted` — event catalogue grows from 34 to 35
+
+- [x] Self-actor payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. `userId` resolves as the actor via `AuditEventSubscriber.extractActor` (self-actor: the subject accepted for themselves). Emitted from `PolicyAcceptanceService.accept` — fired from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path), and (2) the `POST /me/policies/accept` route (explicit re-acceptance).
+
+### As-built deviation: acceptance recorded at `/verify-email`, not `/sign-up/email`
+
+The original plan proposed recording acceptance at the `/sign-up/email` route. This was changed during implementation for two reasons:
+
+1. **No session at sign-up.** With `requireEmailVerification: true`, `/sign-up/email` has no session yet — reading a reliable `userId` from the response is unsafe because BetterAuth returns a *synthetic user* on duplicate-email attempts (anti-enumeration). The `userId` in the response is not guaranteed to be the just-created user.
+2. **`/verify-email` is the natural idempotent boundary.** This route fires exactly when the user proves ownership of their email address. The session `userId` is reliable. Using `getStaleTypes(userId)` makes the call naturally idempotent — a user who re-verifies after an email change is a no-op because they already accepted the current version.
+
+**Safety net**: the front `_shell` `beforeLoad` gate redirects any authenticated user with stale policies to `/legal/accept` regardless of which auth path they used (social login, magic link, or future SSO). This ensures the re-acceptance gate catches any edge case that bypasses the `auth.ts` hook.
+
+### Frontend `apps/app/src/features/legal/`
+
+- [x] **Sign-up form** — `signUpSchema` gained a required `acceptedPolicies: z.literal(true)` checkbox; its links to the two public pages open in a new tab so a misclick doesn't wipe the entered form. Acceptance is non-optional at sign-up; the server records it at `/verify-email`.
+- [x] **Public pages** `/legal/privacy-policy` + `/legal/terms` — placeholder legal content keyed by version string, shared `PolicyDocView` component, `policies.config.tsx` registry + `getChangesSince` helper for the diff view.
+- [x] **Acceptance gate** `/legal/accept` — under `_protected`, **outside `_shell`** to avoid a redirect loop. **Adapts to context**: a brand-new user with no prior acceptance (the magic-link / social sign-up path, where no checkbox was ever shown) sees a "Before you get started" welcome + a link to read each full policy; a returning user whose accepted version is stale sees an "Updated policies" header + the per-version changelog diff (`getChangesSince`). One Accept button either way; on success navigates to the originally intended route. This is what makes the magic-link sign-up path both legally explicit (affirmative accept, version+IP+timestamp recorded) and UX-clean (no confusing "what changed" on a first acceptance).
+- [x] **`_shell` `beforeLoad`** — calls `policiesQueryOptions` (fresh) and redirects to `/legal/accept?redirect=<current>` when any type is stale. This is the primary UX enforcement layer.
+- [x] `shared/api/queries/policies.ts` (`policiesQueryOptions`), `shared/api/mutations/accept-policies.ts`, `hooks/use-accept-policies.ts`.
+
+### How a cloner uses it
+
+Drop real legal text in `policies.config.tsx`. When a policy changes, bump the relevant string in `@packages/policies/src/versions.ts` and add a `POLICY_CHANGELOG` entry with a summary of changes. All authenticated users are re-prompted on next visit automatically — the `_shell` gate picks up the new version on the next query invalidation.
+
+### Decisions
+
+1. **`@packages/policies` as SSOT, not a front-only config.** The version string must be the same on the API (gate: is this version current?), the front (display + sign-up checkbox), and the DB schema (enum values). A front-only config means the API has a hardcoded constant elsewhere — drift. A shared package eliminates the sync requirement entirely.
+2. **Append-only `policy_acceptance`, not an upsert.** Compliance requires the full history of when each version was accepted. An upsert destroys past evidence. The gate reads the latest row per `(userId, policyType)` via the DESC index — equivalent to an upsert for the gate predicate, with the full trail preserved.
+3. **Not DDD.** The acceptance rule is `latestAcceptedVersion === currentVersion` — a comparison, not an invariant that requires aggregate lifecycle protection. Using an aggregate here would be the OpenUp anti-pattern (rule §test décisif: if the rule fits in a comparison, it's infra). **A.4 (Cookie consent) is the same call** — `isActive = withdrawnAt == null && expiresAt > now && policyVersion == current` is a WHERE clause, scope is `includes()`, validity/cooldown are date math; it ships as infra too. The boilerplate ships **zero aggregates** — `@packages/ddd-kit/Aggregate` earns its keep only once the cloner adds real product domain.
+4. **`/verify-email` hook, not `/sign-up/email`** — see deviation note above. The key insight: the gate-predicate (front `_shell`) is the primary enforcement; the hook is best-effort plus defense-in-depth for the sign-up path specifically.
+5. **`requireCurrentPolicies` composable, not global default.** Mounting it globally on all authenticated routes would make every current API call return 409 for a stale user — too aggressive. The UX re-acceptance gate is the live enforcement. The middleware is opt-in for future business routes that need hard server-side gating.

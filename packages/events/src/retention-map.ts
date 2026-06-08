@@ -19,6 +19,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.USER_DELETION_REQUESTED]: "compliance",
   [EventTypes.USER_DELETION_CANCELLED]: "compliance",
   [EventTypes.USER_DELETED]: "compliance",
+  [EventTypes.USER_PROFILE_UPDATED]: "compliance",
+  [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: "compliance",
   [EventTypes.USER_EXPORT_REQUESTED]: "compliance",
   [EventTypes.USER_EXPORT_COMPLETED]: "compliance",
   [EventTypes.ORG_CREATED]: "compliance",
@@ -35,6 +37,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.WEBHOOK_ENDPOINT_CREATED]: "compliance",
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: "compliance",
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: "compliance",
+  [EventTypes.USER_POLICY_ACCEPTED]: "compliance",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

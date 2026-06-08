@@ -1,0 +1,76 @@
+import { describe, expect, it } from "bun:test";
+import { Result } from "@packages/ddd-kit";
+import { findPasswordViolation, validatePassword } from "../password-policy";
+import type { IPasswordBreachService } from "../ports/password-breach.port";
+
+describe("findPasswordViolation", () => {
+  const ctx = { email: "alice@example.com", name: "Alice Dupont", appName: "clean-stack" };
+
+  it("retourne un message si le password contient l'email local-part", () => {
+    expect(findPasswordViolation("alice@supersecret!", ctx)).not.toBeNull();
+  });
+
+  it("ne bloque pas si l'email local-part est < 3 chars", () => {
+    const shortEmailCtx = { email: "ab@example.com", name: "Bob", appName: "clean-stack" };
+    expect(findPasswordViolation("abXYZ1234567890!", shortEmailCtx)).toBeNull();
+  });
+
+  it("retourne un message si le password contient le name", () => {
+    expect(findPasswordViolation("alice-dupont-rule2025", ctx)).not.toBeNull();
+  });
+
+  it("ne bloque pas si le name est < 3 chars", () => {
+    const shortNameCtx = { email: "user@example.com", name: "Al", appName: "clean-stack" };
+    expect(findPasswordViolation("AlZXY1234567890!", shortNameCtx)).toBeNull();
+  });
+
+  it("retourne un message si le password contient le token app (sans tiret)", () => {
+    expect(findPasswordViolation("cleanstack2025!xyz", ctx)).not.toBeNull();
+  });
+
+  it("retourne null pour un password fort et inédit", () => {
+    expect(findPasswordViolation("Zr!9xK#mP2@qLn8w", ctx)).toBeNull();
+  });
+
+  it("la comparaison est case-insensitive", () => {
+    expect(findPasswordViolation("ALICE@example.com!!!", ctx)).not.toBeNull();
+  });
+});
+
+describe("validatePassword", () => {
+  const ctx = { email: "alice@example.com", name: "Alice Dupont", appName: "clean-stack" };
+  const breachWith = (breached: boolean): IPasswordBreachService => ({
+    isBreached: async () => Result.ok(breached),
+  });
+  const breachFails: IPasswordBreachService = {
+    isBreached: async () => Result.fail({ code: "BREACH_CHECK_PROVIDER_FAILURE", message: "down" }),
+  };
+
+  it("ne contacte pas HIBP et passe quand le password est plus court que le minimum", async () => {
+    let called = false;
+    const spy: IPasswordBreachService = {
+      isBreached: async () => {
+        called = true;
+        return Result.ok(true);
+      },
+    };
+    expect(await validatePassword("short", ctx, spy)).toBeNull();
+    expect(called).toBe(false);
+  });
+
+  it("retourne la violation contextuelle avant même le check breach", async () => {
+    expect(await validatePassword("alice-secret-1234567", ctx, breachWith(false))).not.toBeNull();
+  });
+
+  it("retourne un message quand HIBP signale un breach", async () => {
+    expect(await validatePassword("Zr!9xK#mP2@qLn8w", ctx, breachWith(true))).not.toBeNull();
+  });
+
+  it("passe pour un password fort inédit non-breaché", async () => {
+    expect(await validatePassword("Zr!9xK#mP2@qLn8w", ctx, breachWith(false))).toBeNull();
+  });
+
+  it("fail-open : laisse passer quand HIBP est injoignable", async () => {
+    expect(await validatePassword("Zr!9xK#mP2@qLn8w", ctx, breachFails)).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 const NONCE_BYTES = 24;
 const MIN_CIPHERTEXT_BYTES = NONCE_BYTES + 16;
 
+/** Parses the `WEBHOOK_MASTER_KEY` env var (64 hex chars = 32 bytes). Throws at boot if malformed. */
 export function masterKeyFromHex(hex: string): Uint8Array {
   if (hex.length !== 64) {
     throw new Error("WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)");
@@ -13,11 +14,22 @@ export function masterKeyFromHex(hex: string): Uint8Array {
   return new Uint8Array(Buffer.from(hex, "hex"));
 }
 
+/**
+ * Derives a per-org 32-byte sub-key via HKDF-SHA256 with info string
+ * `"webhook-secret:<organizationId>"`. Each org's webhook secrets are
+ * encrypted under a distinct key, so compromising one org's material never
+ * exposes another's.
+ */
 export function deriveOrgSubKey(masterKey: Uint8Array, organizationId: string): Uint8Array {
   const info = new TextEncoder().encode(`webhook-secret:${organizationId}`);
   return hkdf(sha256, masterKey, undefined, info, 32);
 }
 
+/**
+ * Encrypts `plaintext` with XChaCha20-Poly1305 using a random 24-byte nonce.
+ * Output layout: `base64(nonce[24] || ciphertext+tag)`. The nonce is prepended
+ * so `decryptSecret` can extract it without a separate field.
+ */
 export function encryptSecret(plaintext: string, subKey: Uint8Array): string {
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
   const cipher = xchacha20poly1305(subKey, nonce);

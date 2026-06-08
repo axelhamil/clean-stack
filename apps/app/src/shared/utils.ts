@@ -43,3 +43,7 @@ function rawMessage(err: unknown): string | undefined {
 export function toastError(err: unknown, fallback: string): void {
   toast.error(formatApiError(err, rawMessage(err) ?? fallback));
 }
+
+export function toastSuccess(message: string): void {
+  toast.success(message);
+}

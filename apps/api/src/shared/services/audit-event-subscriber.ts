@@ -37,7 +37,7 @@ export class AuditEventSubscriber implements OutboxSubscriber {
             targetType: event.aggregateType,
             targetId: event.aggregateId,
             metadata: event.payload as Record<string, unknown>,
-            requestId: event.metadata.traceparent ?? null,
+            requestId: event.metadata.requestId ?? null,
             retention,
             occurredAt: event.occurredAt,
           })

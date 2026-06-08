@@ -1,9 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
-import { Form } from "@packages/ui/components/ui/form";
+import { Checkbox } from "@packages/ui/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { type SignUpInput, signUpSchema } from "../../../shared/auth/auth.schema";
+import { PolicyLink } from "../../../shared/components/policy-link";
 import { useSignUp } from "../hooks/use-sign-up";
 
 export function SignUpForm() {
@@ -11,7 +20,7 @@ export function SignUpForm() {
 
   const form = useForm<SignUpInput>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { name: "", email: "", password: "", acceptedPolicies: false },
   });
 
   return (
@@ -45,6 +54,26 @@ export function SignUpForm() {
           type="password"
           autoComplete="new-password"
           placeholder="••••••••"
+          description="At least 15 characters. Avoid passwords exposed in known data breaches."
+        />
+
+        <FormField
+          control={form.control}
+          name="acceptedPolicies"
+          render={({ field }) => (
+            <FormItem className="flex flex-col gap-1">
+              <div className="flex flex-row items-center gap-2">
+                <FormControl>
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+                <FormLabel weight="normal">
+                  I accept the <PolicyLink type="privacy">Privacy Policy</PolicyLink> and{" "}
+                  <PolicyLink type="terms">Terms of Service</PolicyLink>
+                </FormLabel>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         <Button type="submit" className="w-full" disabled={mutation.isPending}>

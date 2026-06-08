@@ -4,11 +4,8 @@ export const passwordSchema = z.string().min(1, { message: "Password is required
 
 export const strongPasswordSchema = z
   .string()
-  .min(12, { message: "Password must be at least 12 characters" })
-  .max(128, { message: "Password must be at most 128 characters" })
-  .regex(/[a-z]/, { message: "Password must contain a lowercase letter" })
-  .regex(/[A-Z]/, { message: "Password must contain an uppercase letter" })
-  .regex(/[0-9]/, { message: "Password must contain a digit" });
+  .min(15, { message: "Password must be at least 15 characters" })
+  .max(128, { message: "Password must be at most 128 characters" });
 
 export const nameSchema = z
   .string()
@@ -32,6 +29,9 @@ export const signUpSchema = z.object({
   name: nameSchema,
   email: z.email(),
   password: strongPasswordSchema,
+  acceptedPolicies: z
+    .boolean()
+    .refine((v) => v, { message: "You must accept the Privacy Policy and Terms" }),
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 

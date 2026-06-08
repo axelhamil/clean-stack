@@ -75,6 +75,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **RGPD / CCPA** | Art. 17 erasure + Art. 20 portability shipped: `POST /me/export` (signed 7-day R2 URL, 1/24h rate-limit), `POST /me/delete` (2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in flow). Cron sweep wipes personal data + anonymizes refs. Day-one EU-legal — without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris — provider swap = one env var. |
 | **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
+| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **35 typed events** auto-emitted on every state change, append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter). Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
@@ -127,9 +128,9 @@ docker compose --profile storage up -d         # start SeaweedFS + bucket init
 
 The S3 client is provider-agnostic ([`region: "auto"`, `forcePathStyle: true`](https://orm.drizzle.team/docs)). Anything S3-compatible works: R2, AWS S3, Backblaze B2, Wasabi, Scaleway, Tigris.
 
-### Email — Resend (optional in dev)
+### Email — Resend (optional)
 
-Resend is **optional in dev** — without `RESEND_API_KEY`, email sends are logged at `warn` and the app continues. **Required in prod** — boot fails fast otherwise.
+Resend is **optional everywhere** — without `RESEND_API_KEY` (or with unconfigured template IDs), email sends are logged at `warn` and the app boots normally; verification, magic-link, password-reset and org-invitation mails simply don't deliver. Wire it before relying on any email flow in prod.
 
 | | |
 |---|---|
@@ -176,6 +177,8 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 ❌ **Incompatible without re-wiring** — Vercel Functions, Netlify Functions, AWS Lambda, Cloudflare Workers, edge runtimes generally. Functions terminate after the response, killing `LISTEN`. To go serverless, swap the in-process dispatcher for a cron-triggered drain endpoint or an external queue (Inngest, QStash, SQS) — see [`docs/EVENTS.md`](docs/EVENTS.md#deployment-requirements) for the workaround. Edge runtimes also can't run the Postgres LISTEN client at all — keep the api on a regular runtime; if you need edge for specific endpoints, split them into a separate service.
 
+**Reference deploy (Railway)** — a prod-validated config-as-code runbook for the 3 services (api + app + cron) + Postgres + R2: env baseline, per-service `infra/railway/*.toml`, the boot-trap gotchas hit in practice (`NODE_ENV` override, app start-command, cross-site cookies), cookie strategy by domain topology, and a provider-swap section (Fly / Render / Cloud Run — Dockerfiles are portable). See [`docs/DEPLOY-RAILWAY.md`](docs/DEPLOY-RAILWAY.md).
+
 **Health probes** — three endpoints (`/livez`, `/readyz`, `/startupz`) following K8s 2026 convention + IETF `draft-inadarei` format, with tri-state aggregation (pass/warn/fail) and `SIGTERM`-driven graceful shutdown. Per-PaaS recipes (Railway, Fly, Render, K8s, Cloud Run) in [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md).
 
 **Disaster recovery** — PITR-first (delegated to your managed Postgres provider), with copy-paste recipes for a weekly portable `pg_dump` export and a monthly automated restore-test. RPO/RTO targets, restore runbook, lifecycle + versioning snippets in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
@@ -206,13 +209,14 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | | |
 |---|---|
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — RGPD/CCPA → Billing → Gating → Admin → Audit → i18n |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅; build order: M1 security perimeter + consent → M2 billing → M3 finish audit/webhooks/recovery UI → M4 admin + PATs → M5 e2e/a11y gates → M6 SSO/i18n/mobile |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) — endpoints, registry, graceful shutdown, per-PaaS recipes |
 | **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md) — PITR-first, restore runbook, weekly export + monthly restore-test recipes |
 | **Observability** | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) — Sentry api+app, RGPD scrubbing, removability runbook, provider swap recipe |
+| **Deploy (Railway)** | [`docs/DEPLOY-RAILWAY.md`](docs/DEPLOY-RAILWAY.md) — config-as-code runbook, boot-trap gotchas, cookie topology, provider swap |
 | **History** | [`docs/HISTORY.md`](docs/HISTORY.md) — design decisions trail |
 
 ---

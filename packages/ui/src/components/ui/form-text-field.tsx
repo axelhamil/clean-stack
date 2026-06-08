@@ -1,6 +1,8 @@
-import type { ComponentProps } from "react";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { type ComponentProps, useState } from "react";
 import type { Control, FieldPath, FieldValues } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "./form";
+import { Button } from "./button";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "./form";
 import { Input } from "./input";
 
 interface FormTextFieldProps<
@@ -10,12 +12,24 @@ interface FormTextFieldProps<
   control: Control<TFieldValues>;
   name: TName;
   label: string;
+  description?: string;
 }
 
 export function FormTextField<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>,
->({ control, name, label, ...inputProps }: FormTextFieldProps<TFieldValues, TName>) {
+>({
+  control,
+  name,
+  label,
+  description,
+  type,
+  ...inputProps
+}: FormTextFieldProps<TFieldValues, TName>) {
+  const [revealed, setRevealed] = useState(false);
+  const isPassword = type === "password";
+  const inputType = isPassword && revealed ? "text" : type;
+
   return (
     <FormField
       control={control}
@@ -24,8 +38,26 @@ export function FormTextField<
         <FormItem>
           <FormLabel>{label}</FormLabel>
           <FormControl>
-            <Input {...inputProps} {...field} />
+            {isPassword ? (
+              <div className="relative">
+                <Input type={inputType} className="pr-10" {...inputProps} {...field} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute inset-y-0 right-1 my-auto"
+                  onClick={() => setRevealed((value) => !value)}
+                  aria-label={revealed ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                >
+                  {revealed ? <EyeOffIcon /> : <EyeIcon />}
+                </Button>
+              </div>
+            ) : (
+              <Input type={type} {...inputProps} {...field} />
+            )}
           </FormControl>
+          {description ? <FormDescription>{description}</FormDescription> : null}
           <FormMessage />
         </FormItem>
       )}

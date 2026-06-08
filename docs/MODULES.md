@@ -23,16 +23,21 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Email** (Resend port + adapter, template registry typed, idempotency, retry, EU region option, SPF/DKIM/DMARC deploy doc) | **€400 – €700** | 1j |
 | **Storage S3-compatible** (R2/SeaweedFS, three-step presign→PUT→confirm, owner-scoped key, server-verified `HeadObject` on confirm, boot-time fail-hard) | **€800 – €1 500** | 2j |
 | **RGPD complet** (Art. 17 erasure with 7-day grace + Art. 20 portability + 2FA-gated + sole-owner preflight + automated cron sweep + `/legal/data-rights` Art. 13/14) | **€2 500 – €4 000** | 5-7j |
-| **DDD-kit** (Result, Option, Entity, Aggregate, ValueObject, UUID v7, WatchedList, BaseRepository, ScopedRepository, IUnitOfWork avec ALS event-collector flush, BaseDomainEvent, onEvent factory, EventCollector, AppErrorException, 273 vitest cases) | **€1 500 – €2 500** | 4-5j |
-| **Event-driven foundation** (transactional outbox + LISTEN/NOTIFY dispatcher in-process Bun + claim window webhook delivery + 2 built-in subscribers + 21 events auto-émis BetterAuth bridge + 5 RGPD + 3 uploads = 29-event catalog `packages/events` partagé api+app+workers + AEAD secrets + decorrelated jitter retry + nested-uow.run guard + 3 retention sweeps HMAC-gated `/internal/sweep-*` SOTA 2026) | **€3 000 – €5 000** | 6-8j |
+| **DDD-kit** (Result, Option, Entity, Aggregate, ValueObject, UUID v7, WatchedList, BaseRepository, ScopedRepository, IUnitOfWork avec ALS event-collector flush, BaseDomainEvent, onEvent factory, EventCollector, AppErrorException, 275 vitest cases) | **€1 500 – €2 500** | 4-5j |
+| **Event-driven foundation** (transactional outbox + LISTEN/NOTIFY dispatcher in-process Bun + claim window webhook delivery + 2 built-in subscribers + 23 events auto-émis BetterAuth bridge + 5 RGPD + 3 uploads + 3 webhooks + 1 policy = 35-event catalog `packages/events` partagé api+app+workers + AEAD secrets + decorrelated jitter retry + nested-uow.run guard + request-id correlation via ALS + 3 retention sweeps HMAC-gated `/internal/sweep-*` SOTA 2026) | **€3 000 – €5 000** | 6-8j |
 | **Audit log** (append-only, SOC2 §CC7.2 / ISO 27001, retention enum operational 90d / compliance 365d, env-driven sweep `/internal/sweep-audit-log`, GET /admin/audit-log gated requireOrgPermission, idempotent via outbox subscriber, prev_hash/hash columns posées pour tamper-evidence future) | **€1 500 – €2 500** | 3-4j |
 | **Outbound webhooks** (CRUD endpoints /settings/webhooks gated requireOrgPermission, plaintext secret retourné une seule fois at creation, HMAC-SHA256 Stripe-style, AEAD-encrypted secrets via @noble/ciphers XChaCha20-Poly1305 + HKDF per-org, retry decorrelated jitter, dead-letter, replay endpoint, idempotency keys) | **€2 500 – €3 500** | 5-6j |
 | **UI shadcn-pure + theme** (full registry + custom primitives `NavLink`, `ListRow`, `FormTextField`, `DestructiveActionDialog`, `BackupCodeList`, `QrCodeFrame`, `BrandLink`, `TextLink` + view-transitions theme toggle + typography exports) | **€600 – €1 200** | 2j |
 | **App shell** (Vite + React 19 + TanStack Router code-based with `lazyRouteComponent` 2-file pattern + intent prefetch + view transitions + AppProviders + 4 pathless gates + settings layout + command palette ⌘K + org switcher + auth devtool) | **€1 500 – €2 500** | 3-4j |
 | **Monorepo tooling** (pnpm 10 + Turborepo TUI with `with: ["type-check"]` + Biome 2 + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push) | **€600 – €1 000** | 2j |
 | **AI-pair ready** (`CLAUDE.md` root + sub-CLAUDE.md per layer auto-loaded by Claude Code + `docs/HISTORY.md` + `docs/CRON.md` + `docs/INTEGRATIONS.md` + `docs/FEATURES.md`) | **€300 – €600** | 1j |
+| **Health probes** (0.2) (`/livez` + `/readyz` + `/startupz` IETF format, registry pattern, graceful shutdown, asymmetric cache) | **€500 – €900** | 1-2j |
+| **Backups + DR** (0.3) (daily `pg_dump` cron, R2 lifecycle 30d/1y cold, monthly automated restore-test, RPO/RTO doc, PITR doc) | **€1 000 – €1 800** | 2-3j |
+| **Observability — Sentry** (0.4) (Sentry api+app removable, `IInstrumentation` port + NoOp default, RGPD scrubbing, source maps CI, release tracking — OTel + Prometheus deferred to D.1) | **€2 500 – €4 000** | 5-6j |
+| **Profile + NIST 800-63B-4 password** (A.1) (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15 universal — no MFA exception, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
+| **Privacy policy / Terms versioning** (A.2) (DB schema, `@packages/policies` version SSOT, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Core (shipped)**: **€10 000 – €17 300** of senior-dev value already in the repo on day zero. ~25-35 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€15 800 – €27 000** of senior-dev value already in the repo on day zero. ~35-50 days of focused senior work compressed into a clone.
 
 ---
 
@@ -40,13 +45,8 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 
 | Phase | Module | Realistic value | Time |
 |---|---|---|---|
-| 0.2 | **Health probes** (`/livez` + `/readyz` + `/startupz` IETF format, registry pattern, graceful shutdown, asymmetric cache) | **€500 – €900** | 1-2j |
-| 0.3 | **Backups + DR** (daily `pg_dump` cron, R2 lifecycle 30d/1y cold, monthly automated restore-test, RPO/RTO doc, PITR doc) | **€1 000 – €1 800** | 2-3j |
-| 0.4 | **Observability stack** (Sentry api+app removable, OpenTelemetry auto-instrumentation, Prometheus `/metrics`, 3 ports + NoOp default, RGPD scrubbing, source maps CI, release tracking) | **€2 500 – €4 000** | 5-6j |
-| A.1 | **Profile + NIST 800-63B-4 password baseline** (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15/8 with MFA, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
-| A.2 | **Privacy policy / Terms versioning** (DB schema, version constants, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
 | A.3 | **Compliance docs bundle** (sub-processor disclosure, accessibility statement EAA, DPA template, DORA annex template) | **€400 – €800** | 1j |
-| A.4 | **Cookie consent + DDD Consent aggregate** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped record, first real Aggregate consumer) | **€2 000 – €3 500** | 4-5j |
+| A.4 | **Cookie consent + consent management** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped `consent_record` — infra, not DDD) | **€1 200 – €2 000** | 2-3j |
 | A.5 | **Privacy dashboard** (`/settings/privacy` aggregating consent + last export + sessions + data sources + acceptance history) | **€600 – €1 000** | 1-2j |
 | A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain, WCAG 2.1 AA gate ≥95) | **€1 200 – €2 000** | 3j |
 | B.1 | **Billing Stripe complet** (`@better-auth/stripe`, customer portal, webhooks idempotents, dunning, invoice automation, plan config) | **€3 000 – €5 000** | 6-8j |
@@ -67,7 +67,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€36 300 – €60 600** committed to ship.
+**Subtotal Roadmap**: **€30 500 – €50 900** committed to ship.
 
 ---
 

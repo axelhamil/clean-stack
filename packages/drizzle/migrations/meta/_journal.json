@@ -29,6 +29,27 @@
       "when": 1779724960076,
       "tag": "0003_overconfident_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780930101291,
+      "tag": "0004_public_newton_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780944953700,
+      "tag": "0005_sudden_leo",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780955625954,
+      "tag": "0006_motionless_patriot",
+      "breakpoints": true
     }
   ]
 }

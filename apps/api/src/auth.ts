@@ -2,21 +2,38 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
-import { and, db, desc, eq, schema, sql, type Transaction } from "@packages/drizzle";
+import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
+import {
+  clearConfirmedPendingEmail,
+  deleteOrgIfEmpty,
+  findActiveMemberOrgId,
+  findActiveMemberRole,
+  findLatestLinkedAccount,
+  findLatestPasskey,
+  insertPersonalOrgWithOwner,
+  setPendingEmail,
+} from "./auth-queries";
 import { di } from "./container";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
+import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
 const isProd = env.NODE_ENV === "production";
 
+/**
+ * Derives a stable idempotency key from an opaque BetterAuth token so that
+ * retried email sends (e.g. Resend 5xx → retry) don't produce duplicate
+ * deliveries. The token is hashed (SHA-256, first 32 hex chars) to avoid
+ * storing a verifiable secret in provider logs.
+ */
 function tokenIdempotencyKey(template: string, token: string): string {
   const hash = new CryptoHasher("sha256").update(token).digest("hex").slice(0, 32);
   return `${template}/${hash}`;
@@ -27,16 +44,20 @@ interface SignupUser {
   name: string;
 }
 
+/**
+ * Idempotent bootstrap that guarantees every user has exactly one Personal org
+ * and is its owner. Runs at signup (`databaseHooks.user.create.after`) and at
+ * every sign-in (`databaseHooks.session.create.before`) to back-fill users who
+ * pre-date the org model. A Postgres advisory lock on `userId` prevents the
+ * double-insert race that would arise if two concurrent sessions trigger this
+ * for the same new user.
+ */
 async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Promise<string> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
 
-    const [existing] = await tx
-      .select({ id: schema.member.organizationId })
-      .from(schema.member)
-      .where(eq(schema.member.userId, userId))
-      .limit(1);
-    if (existing) {
+    const existingOrgId = await findActiveMemberOrgId(userId, tx);
+    if (existingOrgId) {
       if (signupUser)
         await emit(
           EventTypes.USER_CREATED,
@@ -46,26 +67,17 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
           null,
           tx,
         );
-      return existing.id;
+      return existingOrgId;
     }
 
     const orgId = crypto.randomUUID();
     const memberId = crypto.randomUUID();
     const slug = `personal-${orgId}`;
     const now = new Date();
-    await tx.insert(schema.organization).values({
-      id: orgId,
-      name: "Personal",
-      slug,
-      createdAt: now,
-    });
-    await tx.insert(schema.member).values({
-      id: memberId,
-      organizationId: orgId,
-      userId,
-      role: "owner",
-      createdAt: now,
-    });
+    await insertPersonalOrgWithOwner(
+      { orgId, memberId, userId, slug, name: "Personal", createdAt: now },
+      tx,
+    );
     await emit(
       EventTypes.ORG_CREATED,
       "organization",
@@ -95,6 +107,11 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
   });
 }
 
+/**
+ * Thin adapter that binds the module-level `di.IOutboxRepository` to
+ * `emitEvent` so BetterAuth hooks don't need to import the DI container
+ * directly. Keeps all hook bodies concise and the DI reference local.
+ */
 async function emit<TPayload>(
   eventType: EventType,
   aggregateType: string,
@@ -114,6 +131,12 @@ async function emit<TPayload>(
   );
 }
 
+/**
+ * Sends a transactional email through `IEmailService` and surfaces failures
+ * as a thrown `Error` — the only signal available inside BetterAuth's
+ * `async () => void` hook signature. Transport-not-configured is downgraded
+ * to a warning (dev/test without Resend configured should not crash).
+ */
 async function dispatchEmail<K extends keyof EmailTemplates>(
   template: K,
   to: string,
@@ -145,6 +168,23 @@ const authOptions = {
       pendingDeletionUntil: { type: "date", required: false, returned: true, input: false },
       lastExportRequestedAt: { type: "date", required: false, returned: true, input: false },
       deletedAt: { type: "date", required: false, returned: false, input: false },
+      pendingEmail: { type: "string", required: false, returned: true, input: false },
+    },
+    changeEmail: {
+      enabled: true,
+      sendChangeEmailConfirmation: async ({ user, newEmail, url, token }) => {
+        await setPendingEmail(user.id, newEmail);
+        await emit(EventTypes.USER_EMAIL_CHANGE_REQUESTED, "user", user.id, {
+          userId: user.id,
+          newEmail,
+        });
+        await dispatchEmail(
+          "change_email",
+          user.email,
+          { name: user.name ?? "", newEmail, confirmUrl: url },
+          tokenIdempotencyKey("change-email", token),
+        );
+      },
     },
   },
 
@@ -153,6 +193,7 @@ const authOptions = {
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    minPasswordLength: MIN_PASSWORD_LENGTH,
     sendResetPassword: async ({ user, token }) => {
       const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
       await emit(EventTypes.USER_PASSWORD_RESET_REQUESTED, "user", user.id, {
@@ -268,7 +309,7 @@ const authOptions = {
             org.id,
           );
         },
-        afterAddMember: async ({ member, organization: org }) => {
+        afterAddMember: async ({ member, user, organization: org }) => {
           await emit(
             EventTypes.ORG_MEMBER_JOINED,
             "member",
@@ -277,6 +318,7 @@ const authOptions = {
               organizationId: org.id,
               userId: member.userId,
               role: member.role,
+              actorUserId: user.id !== member.userId ? user.id : undefined,
             },
             org.id,
           );
@@ -291,16 +333,8 @@ const authOptions = {
           );
           if (isPersonalOrg(org.slug)) return;
           await db.transaction(async (tx) => {
-            const deleted = await tx
-              .delete(schema.organization)
-              .where(
-                and(
-                  eq(schema.organization.id, org.id),
-                  eq(tx.$count(schema.member, eq(schema.member.organizationId, org.id)), 0),
-                ),
-              )
-              .returning({ id: schema.organization.id });
-            if (deleted.length === 0) return;
+            const deleted = await deleteOrgIfEmpty(org.id, tx);
+            if (!deleted) return;
             await emit(
               EventTypes.ORG_DELETED,
               "organization",
@@ -389,6 +423,36 @@ const authOptions = {
   ],
 
   hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      const path = ctx.path;
+      const body = ctx.body as Record<string, unknown> | undefined;
+      let password: string | undefined;
+      let actorEmail: string | undefined;
+      let actorName: string | undefined;
+
+      if (path === "/sign-up/email") {
+        password = body?.password as string;
+        actorEmail = body?.email as string;
+        actorName = body?.name as string;
+      } else if (path === "/reset-password") {
+        password = body?.newPassword as string;
+      } else if (path === "/change-password") {
+        password = body?.newPassword as string;
+        actorEmail = ctx.context.session?.user.email;
+        actorName = ctx.context.session?.user.name;
+      } else {
+        return;
+      }
+
+      if (typeof password !== "string" || password.length === 0) return;
+
+      const error = await validatePassword(
+        password,
+        { email: actorEmail, name: actorName, appName: "clean-stack" },
+        di.IPasswordBreachService,
+      );
+      if (error) throw new APIError("UNPROCESSABLE_ENTITY", { message: error });
+    }),
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.context.returned instanceof APIError) return;
       const path = ctx.path;
@@ -404,12 +468,7 @@ const authOptions = {
         return;
       }
       if (path === "/passkey/verify-registration") {
-        const [latest] = await db
-          .select({ id: schema.passkey.id, deviceType: schema.passkey.deviceType })
-          .from(schema.passkey)
-          .where(eq(schema.passkey.userId, userId))
-          .orderBy(desc(schema.passkey.createdAt))
-          .limit(1);
+        const latest = await findLatestPasskey(userId);
         if (latest) {
           await emit(EventTypes.USER_PASSKEY_ADDED, "user", userId, {
             userId,
@@ -432,24 +491,41 @@ const authOptions = {
         if (email) {
           await emit(EventTypes.USER_EMAIL_VERIFIED, "user", userId, { userId, email });
         }
+        const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
+        if (stale.isFailure) {
+          logger.error(
+            { err: stale.getError(), userId },
+            "policy staleness check failed at verify-email",
+          );
+        } else if (stale.getValue().length > 0) {
+          const ip =
+            ctx.context.newSession?.session?.ipAddress ||
+            ctx.context.session?.session?.ipAddress ||
+            undefined;
+          const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
+          if (recorded.isFailure) {
+            logger.error(
+              { err: recorded.getError(), userId },
+              "policy acceptance failed at verify-email",
+            );
+          }
+        }
         return;
       }
       if (path === "/change-password") {
         await emit(EventTypes.USER_PASSWORD_CHANGED, "user", userId, { userId });
         return;
       }
+      if (path === "/update-user") {
+        const body = (ctx.body ?? {}) as Record<string, unknown>;
+        const changes: Record<string, unknown> = {};
+        if (typeof body.name === "string") changes.name = body.name;
+        if (typeof body.image === "string") changes.image = body.image;
+        await emit(EventTypes.USER_PROFILE_UPDATED, "user", userId, { userId, changes });
+        return;
+      }
       if (path === "/link-social") {
-        const [latest] = await db
-          .select({
-            id: schema.account.id,
-            providerId: schema.account.providerId,
-            accountId: schema.account.accountId,
-            createdAt: schema.account.createdAt,
-          })
-          .from(schema.account)
-          .where(eq(schema.account.userId, userId))
-          .orderBy(desc(schema.account.createdAt))
-          .limit(1);
+        const latest = await findLatestLinkedAccount(userId);
         const recentEnough = latest?.createdAt && Date.now() - latest.createdAt.getTime() < 5_000;
         if (latest && latest.providerId !== "credential" && recentEnough) {
           await emit(EventTypes.USER_ACCOUNT_LINKED, "account", latest.id, {
@@ -473,6 +549,16 @@ const authOptions = {
             logger.error({ err, userId: user.id }, "personal-org creation failed at signup");
             throw err;
           }
+        },
+      },
+      update: {
+        after: async (user) => {
+          const cleared = await clearConfirmedPendingEmail(user.id, user.email);
+          if (!cleared) return;
+          await emit(EventTypes.USER_PROFILE_UPDATED, "user", user.id, {
+            userId: user.id,
+            changes: { email: user.email },
+          });
         },
       },
     },
@@ -530,19 +616,10 @@ export const auth = betterAuth({
     ...authOptions.plugins,
     customSession(async ({ user, session }) => {
       if (!session.activeOrganizationId) return { user, session };
-      const [row] = await db
-        .select({ role: schema.member.role })
-        .from(schema.member)
-        .where(
-          and(
-            eq(schema.member.organizationId, session.activeOrganizationId),
-            eq(schema.member.userId, user.id),
-          ),
-        )
-        .limit(1);
+      const role = await findActiveMemberRole(user.id, session.activeOrganizationId);
       return {
         user,
-        session: { ...session, activeOrganizationRole: row?.role ?? null },
+        session: { ...session, activeOrganizationRole: role },
       };
     }, authOptions),
   ],

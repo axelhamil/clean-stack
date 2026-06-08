@@ -18,87 +18,66 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | App shell + ⌘K palette | — | top-nav, contextual settings tabs, view-transitions theme, command palette |
 | Vertical-slice layout (front + back) | — | features/<x>/<x>.{route,page}.tsx + modules/<x>/{application,infrastructure,routes,module}.ts |
 | Clone-ability bootstrap (`pnpm bootstrap` + Docker compose v2 + Linux fixes + source-only packages) | May 2026 | `pnpm bootstrap` script, SeaweedFS profile `storage`, db:push --force, internal packages source-only |
-| **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 29 events emitted automatically (21 BetterAuth bridge + 5 RGPD + 3 uploads) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry) + retention sweeps (3 `/internal/sweep-*` routes, SOTA 2026 defaults). See dedicated section below + [`docs/EVENTS.md`](docs/EVENTS.md) (DX guide + retention matrix) + [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) (visual walkthrough). |
+| **Event-driven foundation** | **May 2026** | outbox + LISTEN/NOTIFY dispatcher + 35 events emitted automatically (23 BetterAuth bridge + 5 RGPD + 3 uploads + 3 webhooks + 1 policy) + audit-log API + webhooks API + worker (HMAC + AEAD + decorrelated jitter retry) + retention sweeps (3 `/internal/sweep-*` routes, SOTA 2026 defaults). See [`docs/EVENTS.md`](docs/EVENTS.md) (DX guide + retention matrix) + [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) (visual walkthrough). |
+| **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
 ## 🚧 Priority — read top-to-bottom
 
-Each phase assumes the previous done. Items inside a phase parallelizable. Order: (1) blocking deps, (2) SOTA-2026 non-negotiables (RGPD/EAA/Google-Yahoo email/NIST 800-63B-4/DORA) clustered upfront for EU+US deployability, (3) ops surfaces before customer-facing.
+Phase letters (A–F) are **themes**, not sequence — `A.4` is the consent item forever, regardless of when it ships. The list below is the **build order for a boilerplate**: deploy-safety + legal non-negotiables first (a clone can't ship to the EU without them), then revenue (the reason to clone a SaaS starter), then finish the half-built surfaces, then operator/enterprise/reach. Items in the same milestone parallelize; each links to its full spec further down by ID.
 
-### Phase 0 — Foundation closeout ✅ COMPLETE (0.1–0.7 done — unblocks Phase B)
+### ✅ Done — Phase 0 foundation closeout (Jun 2026)
 
-| # | Item | Status |
-|---|---|---|
-| 0.1 | DB schema split per context (`auth.ts` → `auth.ts` + `multi-tenant.ts`) | DONE — BetterAuth-owned tables stay in `auth.ts`; `organization`/`member`/`invitation` extracted to `multi-tenant.ts`. RGPD = 3 cols on `user` (BetterAuth-owned), inline. Combined `schema` re-export preserves call sites (zero refactor). |
-| 0.2 | Health probes `/livez` + `/readyz` + `/startupz` (K8s 2026, IETF `draft-inadarei`, registry pattern) | DONE — `modules/health/` + `IHealthCheckRegistry` (cache asym 30s/5s, timeout 5s, tri-state agg), `OnInit`+`preload()` self-registering probes (db critical via health, storage non-critical via `uploads`), `SIGTERM`-driven `lifecycleState` flip + `SHUTDOWN_GRACE_PERIOD_MS` window, payload minimal en prod, mount hors middleware. Docs: [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) (recipes Railway/Fly/Render/K8s/Cloud Run). |
-| 0.3 | Backups + disaster recovery (PITR-first, portable `pg_dump` export as fallback, restore runbook) | DONE — doc-only deliverable in `docs/DISASTER-RECOVERY.md`. No backup code shipped (intentional: managed Postgres providers do this better; `pgBackRest` unmaintained since 2026). Covers PITR setup per provider (Railway/Neon/Supabase/RDS/Fly/self-hosted), restore runbook, weekly portable export recipes (GH Actions/Railway/K8s), monthly restore-test recipe, lifecycle + versioning. |
-| 0.4 | Error tracking minimal (Sentry api + app, RGPD scrubbing, pino breadcrumbs) | DONE — Sentry only. OTel + Prom `/metrics` **deferred to Phase D.1** after SOTA 2026 audit (Bun OTel auto-instrumentation manual, prom-client without Grafana consumer = code mort). See [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md). |
-| 0.5 | Removability dry-run on `rgpd` (first leaf removed end-to-end, validates contract) | DONE — May 2026. End-to-end dry-run on `modules/rgpd` inside a throwaway worktree : 46 files touched, **-2980 LOC net**, 3 `DROP COLUMN` migration, all 6 validation gates green (`type-check`, `ci:check`, `check:unused`, `check:duplication`, `build`, `test` baseline-preserving). 4 surprises captured (3rd column missed by cartography, transitively-dead `throwApiError`, knip pattern dangling, pre-existing test fails). Runbook: [`docs/REMOVABILITY.md`](docs/REMOVABILITY.md) — 6-axis checklist + worked example + edge cases. Contract holds : TS error-points the rest. |
-| 0.6 | Retention sweeps (`outbox_event` / `audit_log` / `webhook_delivery`) | DONE — 3 routes `/internal/sweep-*`, SOTA 2026 defaults. Chained entrypoint `apps/api/src/cron/sweep.ts` shipped at 0.7. |
-| 0.7 | Railway reference deploy (api + app + Postgres + storage + cron sweep, env baseline, `main` → auto-deploy) | **DONE — Jun 2026** (PR #50 → `main`, release 1.19.2). Config-as-code SOTA 2026 (`infra/railway/{api,app,cron}.toml`, runbook `docs/DEPLOY-RAILWAY.md`, cron entrypoint, prod.Dockerfile no-bundle Bun-natif). Healthcheck fail root-caused as a **stack of prod-boot traps**, all fixed: (1) Railway var `NODE_ENV=development` overriding the Dockerfile → logger loaded `pino-pretty` (devDep absent in `--prod`); (2) `WEBHOOK_MASTER_KEY` unset (env.ts hard guard); (3) `@packages/access-control` declared `better-auth` as peer/devDep, not `dependency` → unresolved in `--prod`; (4) email + storage threw at boot via eager `di.preload()` when unconfigured → now warn-and-degrade (`NoOpStorageService`, email logs-not-delivers); (5) `app` had a Railway Start Command override (`pnpm --filter app start`) replacing the Caddy CMD in a Node-less image → silent crash; (6) cross-site cookies on `*.up.railway.app` → `sameSite: none` in prod (`auth.ts`). Verified live from `main`: api `/livez` 200, `/readyz` db pass + storage warn, `/internal/build-info` HMAC-gated (public probes trimmed for info-disclosure), app `/health` 200, CORS app→api preflight 204 w/ credentials. Learnings folded into `docs/DEPLOY-RAILWAY.md` §0/§8/§9/§12. |
+0.1 schema split · 0.2 health probes (`/livez` `/readyz` `/startupz`) · 0.3 backups / disaster-recovery · 0.4 Sentry observability · 0.5 removability dry-run (−2980 LOC on `rgpd`) · 0.6 retention sweeps · 0.7 Railway reference deploy — **live on `main`, release 1.19.2**.
 
-#### 0.6 — Retention sweeps (cleanup the event-driven foundation)
+As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-area docs: [HEALTH-PROBES](docs/HEALTH-PROBES.md) · [DISASTER-RECOVERY](docs/DISASTER-RECOVERY.md) · [OBSERVABILITY](docs/OBSERVABILITY.md) · [REMOVABILITY](docs/REMOVABILITY.md) · [DEPLOY-RAILWAY](docs/DEPLOY-RAILWAY.md) · [EVENTS](docs/EVENTS.md).
 
-**Why**: the event-driven foundation creates rows in three tables that grow unboundedly today. `outbox_event` accumulates every dispatched event forever (the row has zero downstream value once `dispatched_at IS NOT NULL` — audit/webhook are independent durables). `audit_log` has a `retention` column wired at INSERT (`retentionFor(eventType)`) but no consumer purges according to it — a SOC2 auditor will flag rows older than their declared retention policy. `webhook_delivery` keeps every `success`/`dead_letter` row indefinitely. Symptom in prod after 12 months: `pg_dump` size dominated by transient pipeline rows, slow `count(*)` analytics, retention policy declared but not enforced (compliance risk).
+### ✅ Done — Phase A legal core
 
-**Pattern**: reuse the `rgpd.service.processPendingDeletions` shape — internal route gated by `internalLayers` (HMAC), callable from any external cron (Vercel Cron / GitHub Actions / Inngest). One route per sweep, idempotent, dry-run friendly.
+- **A.1** Right to rectification (Art. 16) + NIST 800-63B-4 password ✅ COMPLETE (Jun 2026) — `ProfileCard` + `ChangePasswordCard` + HIBP k-anonymity + min 15 + ban-list. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+- **A.2** Privacy policy / Terms versioning (Art. 7) ✅ COMPLETE (Jun 2026) — `@packages/policies` SSOT + `policy_acceptance` + `/legal/accept` gate + `requireCurrentPolicies` + `user.policy.accepted`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-- [x] **`POST /internal/sweep-outbox`** — `DELETE FROM outbox_event WHERE dispatched_at IS NOT NULL AND dispatched_at < now() - interval '<OUTBOX_RETENTION_DAYS>'` (default **7 days** — NServiceBus / industry consensus debug window). Batched (5000 rows / iter, `FOR UPDATE SKIP LOCKED`), idempotent.
-- [x] **`POST /internal/sweep-audit-log`** — iterates over the two real retention buckets in `RETENTION_MAP` (`operational` 90d / `compliance` 365d, env-configurable). `retention = 'none'` rows never reach the DB — `AuditEventSubscriber` skips uncatalogued events.
-- [x] **`POST /internal/sweep-webhook-delivery`** — `DELETE FROM webhook_delivery WHERE status IN ('success','dead_letter') AND created_at < now() - interval '<WEBHOOK_DELIVERY_RETENTION_DAYS>'` (default **30 days** — Stripe/GitHub/Hookdeck convergence). `pending`/`failed` rows never purged (worker-death signal / active retry).
-- [x] **Env knobs**: `OUTBOX_RETENTION_DAYS=7`, `WEBHOOK_DELIVERY_RETENTION_DAYS=30`, `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS=90`, `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS=365` (SOC2 ≥ 12 months baseline). All in `apps/api/src/shared/env.ts` + `.env.example`.
-- [x] **Docs**: `docs/EVENTS.md` § Retention — matrix (table / knob / default / filter / conformance source), order-matters note (FK RESTRICT: webhook → audit → outbox), GitHub Actions cron recipe via `signedInternalFetch`. Legacy `/internal/audit-log-purge` removed — superset coverage by `sweep-audit-log`.
-- [x] **Dry-run mode**: body `{ dryRun: true }` returns the rowcount that *would* be deleted, no mutation. Same pattern as RGPD sweep.
+### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
 
-**Decisor "global vs per-row retention"**: outbox uses a **uniform global policy** (every dispatched row is jetable after the same window — debug window only); audit_log uses **per-row policy** via the column (compliance demands differ per event type). Don't generalize one shape onto the other.
+- **C.1** Security perimeter — rate-limit (sliding-window per IP/user, captcha on auth-burst), strict CSP nonce (no `unsafe-inline`), CSRF on non-BetterAuth POST. **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
+- **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14, mandatory since 28 Jun 2025) + DPA + DORA annex templates. Cheap (~3h), pure config/Markdown.
+- **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
 
-**Estimation**: ~3 hours (3 routes ~30 LOC each + 1 cron config + 1 doc paragraph). Unblocks: SOC2/ISO27001 deployment readiness, predictable storage growth, `pg_dump` size control (relates to Phase 0.3 backups).
+### M2 — Revenue (the #1 reason to clone a SaaS starter)
 
-### Phase A — Legal + accessibility completeness
+- **B.1** Billing via `@better-auth/stripe` — customer portal + idempotent webhooks + dunning. Subscription per `organizationId`.
+- **B.2** Feature & quota gating — typed config + middleware (no DDD).
 
-> RGPD core shipped. Below = closure of EU-deployability surface (RGPD + EAA + ePrivacy + NIS2/DORA contractual). **Filed away after Phase A** — nothing later revisits legal.
+### M3 — Finish the half-shipped surfaces (backends done — highest value per LOC)
 
-- **A.1** Right to rectification UI (Art. 16) + NIST 800-63B-4 password (15 chars min / 8 with MFA, HIBP screening, ban complexity rules)
-- **A.2** Privacy policy / Terms versioning (Art. 7) — foundation for A.4 + A.5
-- **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA + DORA annex templates
-- **A.4** Cookie consent + Consent management — first real Aggregate consumer of `@packages/ddd-kit`. CNIL/EDPB-conform.
-- **A.5** Privacy dashboard `/settings/privacy` — UX hub aggregating A.2/A.3/A.4 + RGPD cards
-- **A.6** E2E gates — Playwright (full legal chain) + Lighthouse a11y CI (WCAG 2.1 AA, EAA non-negotiable depuis 28 juin 2025)
+- **C.2** Audit log **front UI** — `/admin/audit-log` page (filters + metadata diff). API + write-path shipped via event-driven.
+- **C.5** Webhooks **front UI** + `webhook.test` — `/settings/webhooks` page + public event catalog. API + worker shipped via event-driven.
+- **C.6** Account recovery codes UI — BetterAuth backend already supports.
+- **A.5** Privacy dashboard `/settings/privacy` — UX hub aggregating A.2/A.3/A.4 + RGPD cards. Refactor-only (composes existing cards).
 
-### Phase B — Monetization
+### M4 — Operate the product + paying customers
 
-- **B.1** Billing via `@better-auth/stripe` — customer portal + webhooks idempotents + dunning. Depends on 0.1.
-- **B.2** Feature & quota gating — config + middleware (no DDD).
+- **C.3** Admin & impersonation (BetterAuth `admin` plugin) — real dep (audit write-path) already shipped; every admin action auto-audited the moment it lands (needs `admin.*` events declared, rule §6).
+- **C.4** API tokens / PATs — `/settings/tokens`, scoped + expirable, sha256 + per-row salt, `clean_<base58url-32>` prefix for GitHub secret-scanner. Unblocks D.2 + F.1.
+- **D.2** OpenAPI auto-docs (`@hono/zod-openapi` + Scalar UI at `/api/docs`) — after PATs ship (customers integrate).
+- **D.3** In-app notification center — `<Bell />` + `/settings/notifications`. Handler = 1-line `onEvent(...)` via event-driven foundation.
 
-### Phase C — Security perimeter & operations
+### M5 — Lock in quality + compliance (gates over a now-complete surface — written once)
 
-> Event-driven foundation shipped → **C.2 and C.5 reduced to front UI only**.
+- **A.6** E2E gates — Playwright (full legal + billing + deletion chain) + Lighthouse a11y CI (WCAG 2.1 AA, EAA non-negotiable). **Moved late**: the suite covers the real flows once they exist, instead of being rewritten as B/C land.
+- **D.4** SOC2 Type II checklist — maps shipped items to controls (do once most items exist).
+- **D.1** Status page + SLO dashboards + alerting + OTel/Prometheus wiring — needs months of `/metrics` + customer surfaces to be meaningful (Cachet/Astro + Grafana + Sentry → Slack/PagerDuty).
 
-- **C.1** Security perimeter — rate-limit (sliding-window per IP/user, captcha auth-burst), strict CSP nonce (no `unsafe-inline`), CSRF on non-BetterAuth POST
-- **C.2** Audit log **front UI** — `/admin/audit-log` page (filters + expand metadata diff). API + write-path shipped via event-driven.
-- **C.3** Admin & impersonation (BetterAuth `admin` plugin) — depends on C.2 audited
-- **C.4** API tokens / PATs — `/settings/tokens`, scoped + expirable, sha256 + per-row salt, `clean_<base58url-32>` prefix for GitHub secret-scanner
-- **C.5** Webhooks **front UI** + `webhook.test` event — `/settings/webhooks` page + public event catalog. API + worker shipped via event-driven.
-- **C.6** Account recovery codes UI — BetterAuth backend already supports
-- **C.7** SSO SAML/OIDC + SCIM (BetterAuth `sso` + SCIM endpoint) — biggest enterprise multiplier. Audit integration trivial via `onEvent`.
+### M6 — Enterprise + reach (long-tail multipliers)
 
-### Phase D — Customer-facing readiness
-
-- **D.1** Status page + SLO dashboards + alerting (Cachet/Astro + Grafana consuming 0.4 `/metrics` + Sentry → Slack/PagerDuty)
-- **D.2** OpenAPI auto-docs (`@hono/zod-openapi` + Scalar UI at `/api/docs`)
-- **D.3** In-app notification center — `<Bell />` + `/settings/notifications`. **Handler = 1-line `onEvent(...)` via event-driven foundation.**
-- **D.4** SOC2 Type II checklist — mapping shipped items to controls
-
-### Phase E — International + growth
-
-- **E.1** i18n (TanStack Router locale routes + Lingui)
-- **E.2** Marketing site (Astro 5 + Payload 3, self-hosted)
-
-### Phase F — Mobile + extension
-
-- **F.1** Capacitor mobile shell — depends on C.4 PATs + D.3 notifications
-- **F.2** Feature flags (GrowthBook self-hosted)
+- **C.7** SSO SAML/OIDC + SCIM (BetterAuth `sso` + SCIM endpoint) — biggest enterprise price multiplier, heavy. Audit integration trivial via `onEvent`.
+- **E.1** i18n (TanStack Router locale routes + Lingui).
+- **F.1** Capacitor mobile shell — depends on C.4 PATs + D.3 notifications. React Native rejected.
+- **F.2** Feature flags (GrowthBook self-hosted).
+- **E.2** Marketing site (Astro 5 + Payload 3, self-hosted, isolated) — deferred / low-priority, independent of the chain above.
 
 ### Cross-cutting (ship at first consumer)
 
@@ -112,236 +91,9 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 ---
 
-## Event-driven foundation — **shipped**
-
-**Why**: every cloned SaaS needs the same event plumbing — outbox for at-least-once delivery, audit log for compliance, webhooks for customer integrations, in-process handlers for side-effects. Building that rail once-for-all unlocks Phases C.2 (audit), C.5 (webhooks), A.4 (consent handlers), D.3 (in-app notifs), C.7 (SSO audit) and the observability port subscribers (Phase 0.4) — each becomes a 1-line `onEvent(...)` declaration instead of a per-feature plumbing chunk.
-
-**DX contract — zero plumbing post-clone**: a dev cloning the boilerplate writes (1) a 1-line entry in `packages/events/src/event-types.ts` for a new event type, (2) `aggregate.addEvent(new XEvent(...))` in their domain method, (3) `this.uow.run(async tx => repo.save(agg, tx))` in their use-case — outbox enqueue happens transparently via `AsyncLocalStorage` event collector + `IUnitOfWork.run()` flush pre-commit. Audit trail and webhook fan-out are automatic for any event in the retention map. In-process handlers declared via `onEvent(type, factory)` + 1 inwire `b.add(...)` are auto-discovered at boot (container introspection via `EVENT_HANDLER_SYMBOL` marker).
-
-**Shipped surface**:
-
-- [x] **Outbox table** `outbox_event` (UUID v7 PK for B-tree locality + time ordering, partial index `WHERE dispatched_at IS NULL`, CloudEvents 1.0 metadata envelope) + Postgres `LISTEN/NOTIFY` trigger ensured at boot (`pg_notify` queued until COMMIT — visibility-safe).
-- [x] **`OutboxDispatcher`** (in-process Bun worker, dedicated `pg.Client` for LISTEN + reconnect with backoff + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 50` drain — multi-instance ready). Container introspection auto-wires user-defined `EventHandler<T>` bindings.
-- [x] **Built-in subscribers** (`AuditEventSubscriber` writes audit row idempotently via deterministic `audit-${event.id}`, `WebhookFanoutSubscriber` enqueues `webhook_delivery` rows scoped by `organizationId` + `eventTypes` array match).
-- [x] **`@packages/events`** — central catalog (29 events covering BetterAuth user/session/account, organization/member/invitation, RGPD deletion/export, uploads), Zod payloads per event, `RETENTION_MAP` (operational/compliance/none).
-- [x] **`@packages/ddd-kit` primitives**: `Aggregate.pullDomainEvents()` atomic, `EventCollector` ALS, `IUnitOfWork.run(cb)` standardized (flushes ALS to outbox via `flushHandler` injected in `TransactionService`), `onEvent(type, factory)` + `EVENT_HANDLER_SYMBOL` for inwire-discovered handlers, UUID v7 primitive (replaces v4 default in `UUID.create()`).
-- [x] **AEAD secret crypto** for webhook secrets: `@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key from `WEBHOOK_MASTER_KEY` (32-byte hex env var). `@noble/hashes` v2.
-- [x] **Decorrelated jitter backoff** (AWS Architecture Blog spec) for outbox + webhook retries; dead-letter after 5 attempts; total window ~12h.
-- [x] **BetterAuth bridge** (`apps/api/src/auth.ts`) — **21 unique events emitted automatically** (13 user + 8 org, 23 emit sites — USER_PASSWORD_CHANGED + ORG_MEMBER_JOINED each fire from 2 paths), 3 voies SOTA combinées :
-  - `databaseHooks` (TX-bound, captures all flows including non-HTTP) — `user.create.after` (USER_CREATED), `session.create.after` (USER_SIGNED_IN), `session.delete.after` (USER_SIGNED_OUT), `account.delete.after` (USER_ACCOUNT_UNLINKED, skip credential).
-  - `hooks.after` + `createAuthMiddleware` (path-based, plugin events) avec filter `if (ctx.context.returned instanceof APIError) return` — `/two-factor/{enable,disable}` (USER_MFA_ENABLED/DISABLED), `/passkey/verify-registration` (USER_PASSKEY_ADDED, lookup latest), `/passkey/delete-passkey` (USER_PASSKEY_REMOVED, body.id), `/verify-email` (USER_EMAIL_VERIFIED), `/change-password` (USER_PASSWORD_CHANGED), `/link-social` (USER_ACCOUNT_LINKED, lookup latest non-credential account < 5s).
-  - Native callbacks — `emailAndPassword.{sendResetPassword,onPasswordReset}` (USER_PASSWORD_RESET_REQUESTED + USER_PASSWORD_CHANGED), `magicLink.sendMagicLink` (USER_MAGIC_LINK_REQUESTED).
-  - `organizationHooks` (org plugin) — `afterCreateOrganization` (ORG_CREATED), `afterUpdateOrganization` (ORG_UPDATED), `afterDeleteOrganization` (ORG_DELETED), `afterAddMember` (ORG_MEMBER_JOINED — direct add only) **+** `afterAcceptInvitation` (ORG_MEMBER_JOINED — invitation accept; the two lifecycles are independent in BetterAuth and both must be wired), `afterRemoveMember` (ORG_MEMBER_REMOVED), `afterUpdateMemberRole` (ORG_MEMBER_ROLE_CHANGED), `afterCreateInvitation` (ORG_MEMBER_INVITED), `afterCancelInvitation` (ORG_INVITATION_CANCELLED).
-  - **RGPD service** — USER_DELETION_{REQUESTED,CANCELLED}, USER_DELETED, USER_EXPORT_{REQUESTED,COMPLETED} (payload: `storageKey`, jamais l'URL presigned — security).
-  - **UploadService** — UPLOAD_REQUESTED + UPLOAD_CONFIRMED (payload: `hashKey(key)` sha256-truncated, jamais le filename brut — PII).
-  - Race window BetterAuth COMMIT ↔ outbox enqueue acceptée et documentée (pas de 2PC).
-- [x] **Multi-tenant safety**: events avec `organizationId = null` (platform: USER_CREATED, USER_SIGNED_IN, etc.) skippent le webhook fanout — never broadcast across tenants. Validé runtime via smoke test (signup → user.created → audit row écrite, fanout subscriber early return).
-- [x] **Lifecycle**: `OutboxDispatcher.start()` + `WebhookDeliveryWorker.start()` at boot in `apps/api/src/index.ts`; SIGTERM/SIGINT graceful drain.
-- [x] **Tests**: `event-collector.test.ts` (ALS isolation between concurrent contexts), `aggregate.test.ts` extension (`pullDomainEvents` atomic), `jitter.test.ts` (bounds + dead-letter), `aead.test.ts` (encrypt/decrypt round-trip + sub-key determinism + ciphertext tampering rejection), `hmac-signer.test.ts` (Stripe-format signature + verify round-trip + stale timestamp window).
-
-**Remaining — front UI pages** (back is shipped, ~12-15h app-side total):
-
-- [ ] **`/admin/audit-log`** page (Phase C.2) — table read-only avec filtres (actor, action, target, dateRange, action prefix), pagination cursor, expand row → JSON viewer pour `metadata`. Permission `auditLog: ["read"]` (owner/admin). API ready: `di.AuditQueryService.listForOrg(orgId, filters)`. **Estimation: ~3-4h.**
-- [ ] **`/settings/webhooks`** page (Phase C.5) — CRUD endpoints + create-secret-shown-once dialog modal + list deliveries par endpoint avec status filter + replay button + dead-letter view. Permission `webhooks: ["read","write"]` (owner/admin). API ready: `POST/GET/PATCH/DELETE /settings/webhooks/*`. **Estimation: ~6-8h.**
-- [ ] **Public event catalog page** (Phase C.5 companion) — `/docs/events` ou `/legal/event-types` enumerating les 29 events emitted with their Zod payload schemas. Pas de gating. Source: `packages/events/event-types.ts` + `payloads.ts`. **Estimation: ~2h.**
-
-**Remaining — backend mineur**:
-
-- [ ] **`webhook.test` event type** — sent on endpoint creation, surfaces "is the URL reachable" feedback in UI. ~30min after the front page lands.
-- [ ] **Tamper-evidence audit hash chain** — columns posées (`prevHash`/`hash`), calc gated by `AUDIT_TAMPER_EVIDENCE=false` env flag. Implementation deferred until SOC2 audit demands (Merkle batch ou hash chain row-lock).
-- [ ] **Domain-event → telemetry subscribers** (Sentry breadcrumb / OTel span attr / Prom counter per event-type) — trivial 1-line `onEvent(...)` additions. Sentry capture on 5xx already wired via `IInstrumentation` (Phase 0.4); OTel + Prom land with Phase D.1 Grafana consumer.
-- [ ] **`USER_EMAIL_VERIFIED`** path edge case: `ctx.context.session?.user.id` peut être `null` si auto-sign-in pas encore propagé. Skip silencieux actuellement. Workaround propre : extraire userId du verification token (BetterAuth API not exposed publicly today — check v1.7+).
-- [x] **`UPLOAD_DELETED`** event + `DELETE /uploads` route shipped. Ownership-gated (`key.startsWith(\`${ownerId}/\`)` → 403 sinon), emit après `storage.deleteObject()` succès, payload utilise `hashKey(key)` (PII-safe).
-
-**Setup checklist post-clone** (pour le cloner):
-
-1. `pnpm db:push` après premier clone (créé les 4 nouvelles tables + indexes).
-2. `WEBHOOK_MASTER_KEY` dans `apps/api/.env` (32 hex bytes; `openssl rand -hex 32`). Required en prod, vérifié au boot.
-3. (Optionnel) `AUDIT_TAMPER_EVIDENCE=false` (défaut). Flip à `true` quand SOC2 audit demande hash chain.
-
----
-
-## Health probes — **Phase 0.2**
-
-**Why**: Kubernetes / Railway / Fly.io / Cloudflare Workers / Render all probe liveness/readiness/startup. Absence = restart loops, no rolling deploys, 502s during deploys. SOTA 2026 = three probes (not two), draft-inadarei response format, graceful shutdown wired to `/readyz`.
-
-**Endpoint shape — convention K8s 2026** (`z` suffix is the official one; `/health` / `/ready` are the legacy names):
-
-- [x] `GET /livez` — liveness. Returns 200 with `{ status, version, commitSha, buildTime, runtime, uptimeMs }`. **No dependency hit** (a DB outage must NOT restart pods — would cause thundering herd). `commitSha`/`buildTime` injected at build via `GIT_SHA` / `BUILD_TIME` env vars (CI sets them).
-- [x] `GET /readyz` — readiness. Aggregates registered checks (DB `SELECT 1`, R2 `HeadBucket`). Returns 200 if all `pass`/`warn`, 503 if any critical check is `fail`.
-- [x] `GET /startupz` — startup probe (K8s 1.16+). Distinct from liveness so a slow boot (warming caches, DI graph build) doesn't get killed by a tight liveness threshold. Returns 200 once initial bootstrap completes; 503 before.
-
-**Response format — IETF `draft-inadarei-api-health-check-06`** (Datadog / New Relic / Grafana parse it natively):
-
-```json
-{
-  "status": "pass" | "warn" | "fail",
-  "version": "1.11.1",
-  "checks": {
-    "db:postgres": [{ "status": "pass", "time": "2026-05-04T23:00:00Z", "observedValue": 12, "observedUnit": "ms" }],
-    "storage:r2":  [{ "status": "pass", "time": "...", "observedValue": 38, "observedUnit": "ms" }],
-    "email:resend": [{ "status": "warn", "output": "cached, last refresh 25s ago" }]
-  }
-}
-```
-
-- [x] **Tri-state status** (`pass`/`warn`/`fail`) — non-binary. Resend down + DB up = `warn` + 200 (degraded but functional). DB down = `fail` + 503 (truly unhealthy). Aligns with the draft and avoids the "everything red because Resend hiccup'd" problem.
-- [x] **Per-check `observedValue` + `observedUnit`** — latency in ms; populates Phase D.1 SLO dashboards for free.
-- [x] **Prod payload minimal** — outside `NODE_ENV !== "production"`, only the top-level `status` + per-check `status` are returned to avoid leaking infra details (DB host, bucket name in error messages). Full payload in dev/staging.
-
-**Architecture — registry pattern, futureproof**:
-
-- [x] `apps/api/src/modules/health/` — vertical-slice module. `IHealthCheckRegistry` port (`register(name, fn, { critical: boolean })`); each module owner-of-infra ships an `XxxHealthProbe implements OnInit` class that self-registers when `di.preload()` fires at boot (inwire `OnInit` interface, duck-typed). `/readyz` iterates the registry. **Why per-module class**: removability — `trash modules/billing` removes the binding + the probe in one shot, no orphan registration code.
-- [x] `IHealthCheckRegistry` exposed to other modules via `shared/ports/health.port.ts` (cross-module port; current consumers: `modules/health` for db probe, `modules/uploads` for storage probe via `StorageHealthProbe`).
-
-**Robustness — what kills probes in production**:
-
-- [x] **Cache positive 30s + cache negative 5s** — healthy result is cached 30s (don't hammer Resend on every PaaS probe, ~6 req/sec); failed result cached only 5s (re-check fast, restore quickly). Asymmetric cache is the SOTA pattern.
-- [x] **Self-cancelling timeout 5s on `/readyz`** — `Promise.race(check, timeoutFail(5000))`. A probe that hangs blocks rolling deploys.
-- [x] **No PII in fail payloads** — never return stack traces, hostnames, env-var values, full DB error messages. Just the failed check name + a generic code (`bucket unreachable`, `timeout >5000ms`).
-
-**Graceful shutdown — wired to `/readyz`** (the single most critical zero-downtime piece, and the one most boilerplates skip):
-
-- [x] On `SIGTERM`/`SIGINT`, `lifecycleState.signalShutdown()` flips the flag. `/readyz` immediately returns 503 (`status: "fail", output: "shutting down"`) — the LB stops routing new requests within one probe interval (~5s).
-- [x] Wait `SHUTDOWN_GRACE_PERIOD_MS` (default `15000`, env-tunable per PaaS) for in-flight requests to drain. Then stop the outbox dispatcher + webhook delivery worker (existing `stopWithTimeout` 25s safety net).
-- [x] **Why critical**: without this, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
-
-**Phase D.1 prep — Prometheus metrics** (cheap to wire now, expensive to retrofit):
-
-- [ ] `GET /metrics` — `prom-client` exports `up{check="db:postgres"} 1|0` per registered check + `health_check_duration_ms{check}` histogram. ~15 LOC. When D.1 status page lands, it consumes `/metrics` directly — no rework.
-- [ ] Gate `/metrics` behind a shared secret header (`X-Metrics-Token` env var) — prevents random scraping from public internet.
-
-**Mounting + observability**:
-
-- [x] All three probes (`/livez`, `/readyz`, `/startupz`) mounted **outside** `requestId` + `httpLogger` + `cors` + `sessionMiddleware`. Probes don't carry session cookies, and a probe every 5s would drown prod logs (~17 280/day per pod).
-- [ ] Probes to be excluded from rate-limiting when Phase C.1 lands — PaaS probe IPs aren't predictable. (Currently no rate-limit, so nothing to wire today.)
-
-**Documentation**:
-
-- [x] `README.md` deploy section — pointer to `docs/HEALTH-PROBES.md` (per-PaaS recipes Railway, Fly, Render, K8s, Cloud Run; Vercel/Lambda flagged N/A as the api is non-serverless).
-- [x] `docs/HEALTH-PROBES.md` — endpoint table, response shape, tri-state aggregation table, registry usage with worked `StripeHealthProbe` example, graceful-shutdown sequence, env vars, monitoring integrations (Datadog/Grafana/Sentry).
-
----
-
-## Backups + disaster recovery — **Phase 0.3** ✅ May 2026
-
-**Why**: a backup never tested isn't a backup. SOC2 §A.1 + ISO 27001 A.12.3 prerequisite; client-side trust signal. SaaS-killer if the first prod incident reveals the dump is corrupt.
-
-**Why doc-only, no code shipped**: SOTA 2026 closed the case — every managed Postgres provider (Railway, Neon, Supabase, AWS RDS, Fly) ships PITR one-click with sub-minute RPO. `pgBackRest` is unmaintained since 2026. A custom cron `pg_dump` route inside the API would duplicate what the platform already does, add `postgresql-client` to the Docker image, and introduce streaming / OOM / timeout failure modes that the cloneur inherits for zero value. clean-stack ships infrastructure that's cross-cutting (audit, webhooks, RGPD, observability), not DBA tooling.
-
-- [x] **`docs/DISASTER-RECOVERY.md`** — full DR doc: RPO/RTO targets (1–5 min with PITR / 7 d fallback), 3-2-1 rule applied, PITR setup per provider, restore runbook (provision ephemeral target, download, restore, smoke-check snippet, roll-forward vs in-place vs side decision tree).
-- [x] **PITR-first guidance** — per-provider pointers (Railway add-on, Neon branches, Supabase add-on, RDS automated, Fly volume snapshots, self-hosted WAL-G). pgBackRest flagged unmaintained.
-- [x] **Weekly portable `pg_dump` export** — copy-paste recipes for GitHub Actions, Railway Cron, and K8s CronJob. Streams `pg_dump | gzip | aws s3 cp -` (no OOM, multipart auto), targets a `backups/postgres/<ISO>.sql.gz` prefix in the existing S3 bucket. Uses a **read-only** Postgres role per CI-secret-leak best practice.
-- [x] **Monthly automated restore-test** — GitHub Actions workflow recipe: spawns Postgres `services.postgres:17-alpine` on port `5436`, downloads latest dump, restores, runs an inline `psql count(*)` smoke check, fails loud. Cloneur copy-pastes.
-- [x] **Lifecycle + versioning** — `aws s3api put-bucket-lifecycle-configuration` snippet (expire weekly exports 30 d, transition monthly snapshots to cold storage 1 y), `put-bucket-versioning` snippet, MFA-delete note. Caveats documented for R2 (no GLACIER → use STANDARD_IA) and SeaweedFS (partial lifecycle support).
-- [x] **README pointer** — `## Deployment` section links to `docs/DISASTER-RECOVERY.md` alongside `HEALTH-PROBES.md`.
-
----
-
-## Error tracking — **Phase 0.4** ✅ May 2026 (Sentry only)
-
-**Why before Phase A**: every phase A/B/C ships prod code. Without Sentry active from day one, you're blind on errors until Phase D.1 — six phases away. The ~3h wiring cost is dwarfed by the cost of debugging without traces/breadcrumbs across all of A, B, C.
-
-**Why Sentry-only, not the original 3-in-1 (Sentry + OTel + Prom)**: SOTA 2026 re-audit (échéance May 2026) invalidated the bundled scope :
-
-- `@sentry/bun` v9.x+ is still **beta** (regressions récentes), but errors are immediate-value and Sentry SDK gracefully handles uninit state — fragility acceptable.
-- **OTel under Bun 1.3+** = manual instrumentation for `Bun.serve()` (auto broken). `@hono/otel` + `@kubiks/otel-drizzle` exist but wiring (~200 LOC) buys zero value before a Grafana/Tempo/Jaeger consumer (Phase D.1). Bun likely ships native OTel — waiting avoids a refactor.
-- **`prom-client` `/metrics`** = SOTA confirmed (Julius Volz native > OTel push) but exposing without Grafana scrape = code mort jusqu'à D.1.
-- **`pinoIntegration`** is now native in the Sentry SDK (v10.18+), replacing the deprecated `@sentry/pino-transport` community package.
-
-OTel + Prom + `/metrics` are **deferred to Phase D.1** when status page + Grafana scaffold gives them a consumer. Cohérent avec la décision Phase 0.3 (ship infra cross-cutting *avec consommateur*, pas du wiring spéculatif).
-
-### Shipped surface
-
-```
-apps/api/src/shared/
-  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb }
-  services/
-    noop-instrumentation.ts            Always-bound default — silent passthrough
-    sentry-instrumentation.ts          @sentry/bun adapter (startSpan + captureException + addBreadcrumb)
-    sentry-init.ts                     Module-load side-effect Sentry.init() if SENTRY_DSN
-
-apps/api/src/container.ts              Conditional binding: SentryInstrumentation if DSN, else NoOpInstrumentation
-
-apps/app/src/shared/observability/
-  sentry.ts                            Init + captureError/addBreadcrumb/ErrorBoundary (default consumer)
-  noop.ts                              Swap target for removal (1-line import swap in app-providers.tsx)
-```
-
-- [x] **Single `IInstrumentation` port** (combine startSpan + capture + addBreadcrumb) bound via inwire DI — same Pinia-style pattern as `IEmailService`/`IStorageService`. Injected via constructor into every I/O-bound class (no service-locator, no module-level singleton). `c.IInstrumentation` is always present ; binding picks NoOp or Sentry based on `env.SENTRY_DSN`.
-- [x] **Repo / service spans applied** to `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `ResendEmailService`, `DrizzleRgpdRepository`, `S3StorageService`, `DrizzleWebhookEndpointRepository`, `DrizzleWebhookDeliveryRepository`, `AuditQueryService`. Lazar pattern : outer span `{ name: "Class > method" }`, inner span `{ name: query.toSQL().sql, op: "db.query", attributes: { "db.system.name": "postgresql" } }` on `query.execute()` / `client.send()` / `fetch()`. catch + `this.instrumentation.capture(err)` + `return Result.fail(...)` (or rethrow for non-Result methods).
-- [x] **`@sentry/bun` SDK** init via side-effect `import "./shared/services/sentry-init"` placed as the first import of `apps/api/src/index.ts` (order matters: hooks async-hooks before pino/Hono/Drizzle).
-- [x] **`createErrorHandler(instrumentation)` factory** in `error.middleware.ts` — called once in `index.ts` after `di.build()` as `app.onError(createErrorHandler(di.IInstrumentation))`. Captures `>= 500` for `AppErrorException` + `HTTPException` + unhandled, tags `{ requestId, userId, orgId, path, method }`. 4xx skipped. Factory pattern avoids any future cycle between middleware and container.
-- [x] **`beforeSend` scrubbing** whitelist-based (default = drop): `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email` / `username` / `ip_address`. RGPD-clean.
-- [x] **Release tracking** via `env.GIT_SHA` (already injected by Phase 0.2 for `/livez`).
-- [x] **`Sentry.pinoIntegration()`** wired in `Sentry.init({ integrations: [...] })` — every `logger.warn` / `logger.error` auto-becomes a breadcrumb on the next captured event. Pino's stdout JSON line format unchanged.
-- [x] **Sentry EU region** — DSN can target `*.eu.sentry.io` for RGPD residency.
-- [x] **App side** — `@sentry/react` init in `shared/observability/sentry.ts`, `<Sentry.ErrorBoundary>` wraps the provider tree in `app-providers.tsx` with a fallback UI.
-- [x] **`@sentry/vite-plugin`** in `apps/app/vite.config.ts` — uploads sourcemaps at build when CI sets `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT`. No-op otherwise.
-- [x] **Env**: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` (api) + `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_GIT_SHA` (app). All optional ; empty = NoOp.
-- [x] **Knip protection** — `noop.ts` + `sentry.ts` listed as `entry` in `knip.json` (boilerplate-symmetry pattern, like `shared/api/{queries,mutations}/*`).
-- [x] **Docs** — [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) covers setup, instrumentation pattern, manual capture API, removability runbook, provider swap recipe (Sentry → GlitchTip / Highlight, DSN-compatible), deferred section, EU residency.
-
-### Removability — flip one binding
-
-The whole Sentry stack is one DI binding plus one side-effect import. The call sites (`this.instrumentation.capture(...)`, `this.instrumentation.startSpan(...)`, `<ErrorBoundary>`) never change — they resolve to NoOp.
-
-1. Edit `apps/api/src/container.ts` → replace the `IInstrumentation` factory by `() => new NoOpInstrumentation()`. `trash apps/api/src/shared/services/sentry-{init,instrumentation}.ts`. Remove the `import "./shared/services/sentry-init"` line from `index.ts`.
-2. In `apps/app/src/shared/app-providers.tsx`, swap `from "./observability/sentry"` to `from "./observability/noop"`. `trash apps/app/src/shared/observability/sentry.ts`.
-3. Remove the `@sentry/vite-plugin` block from `vite.config.ts`.
-4. `pnpm remove @sentry/bun --filter=api && pnpm remove @sentry/react @sentry/vite-plugin --filter=app`
-5. Unset env vars.
-
-All call sites keep working via NoOp. **Zero refactor.** `pnpm ci:check && pnpm type-check && pnpm test` stay green.
-
-### Deferred to Phase D.1
-
-- **OpenTelemetry tracing** — `@hono/otel` + `@kubiks/otel-drizzle` recipes when Grafana/Tempo/Jaeger arrives, or sooner if a debug incident demands distributed traces.
-- **`prom-client` `/metrics`** — health check registry from Phase 0.2 already exports `up{check}` state ; drop-in 30 LOC route + `X-Metrics-Token` gate when D.1 status page scrapes.
-- **Sentry Performance** (`tracesSampleRate > 0`) — coupled to OTel deferral (Sentry consumes OTel spans natively).
-- **Session Replay** — privacy-first config + separate `VITE_SENTRY_REPLAY=true` flag, post-audit.
-
----
-
-## Right to rectification UI + NIST 800-63B-4 password baseline — **Phase A.1**
-
-**Why first**: bundles two non-negotiables in one push. Art. 16 GDPR rectification (BetterAuth backend already supports it, UI gap only) + the SOTA-2026 password baseline (NIST SP 800-63B-4 final August 2025). Both touch the same surface (`/settings/profile` + auth flows), shipping them together avoids a second pass.
-
-**Rectification (Art. 16) tasks**:
-
-- [ ] `/settings/profile` page — edit name, email (with re-verification flow), avatar (upload via existing `uploads` module).
-- [ ] Form: RHF + zodResolver, `name` (max 100), `email` (re-verify on change — BetterAuth auto-handles email verification challenge), avatar (`<UploadAvatar />` reusing presign+confirm flow from `uploads`).
-- [ ] On email change: BetterAuth sends new verification mail, old email invalidated until new one verified, UI shows "Pending email change to X" badge.
-- [ ] Replace the `disabled` placeholders currently in `features/account/account.page.tsx` with active fields, keep the page composition (security cards stay below).
-- [ ] Audit-log entry: `user.profile.updated` with diff metadata (deferred — depends on Phase C.2).
-
-**Password baseline (NIST SP 800-63B-4)**:
-
-- [ ] **Min length 15 chars** for single-factor accounts, **8 chars** acceptable when MFA enrolled. BetterAuth `password.minLength` defaults to 8 — bump to 15, with override path post-MFA enrollment.
-- [ ] **HIBP screening** at sign-up + password change — `k-anonymity` API (`https://api.pwnedpasswords.com/range/<sha1[:5]>`), reject if hash suffix matches. Wrap in `IPasswordBreachService` port (provider-agnostic) + `HibpPasswordBreachService` impl in `shared/services/`.
-- [ ] **Ban complexity rules** — confirm BetterAuth doesn't enforce uppercase/symbol requirements. NIST 800-63B-4 §3.1.1.2 says `SHALL NOT` impose complexity.
-- [ ] **Ban forced rotation** — confirm no scheduled "your password is N months old, change it" prompt. Rotation only on compromise (auto-trigger on HIBP match at next login or admin-initiated reset).
-- [ ] **Phishing-resistant MFA = passkeys** (already shipped via `passkey()` plugin — gold standard per NIST 800-63B-4). Document in `/settings/security` UI as the recommended method, ahead of TOTP.
-- [ ] **Block sequential / contextual / common passwords** — additional NIST recommendation: reject `email-local-part`, `name`, `<service-name>2026`. Wire a list-banned-tokens check (~20 LOC, no external service).
-
----
-
-## Privacy policy / Terms versioning — **Phase A.2**
-
-**Why second**: foundational for A.4 (consent stamps the policy version) and A.5 (privacy dashboard surfaces acceptance history). Art. 7 §1 RGPD — "the controller shall be able to demonstrate that the data subject has consented". Requires logging WHICH version was accepted. Current boilerplate has zero versioning.
-
-- [ ] DB schema `policy_acceptance(userId, policyType: "privacy"|"terms", policyVersion, acceptedAt, ipAddress)` — append-only.
-- [ ] `apps/app/src/features/legal/policies.config.ts` — `PRIVACY_VERSION = "2026-01-15"`, `TERMS_VERSION = "2026-01-15"`. Bump triggers re-acceptance.
-- [ ] `requireCurrentPolicies` middleware — if user's latest accepted version < current, return 409 with re-acceptance gate URL. Front route gate redirects to `/legal/accept` blocking modal.
-- [ ] `/legal/accept` page — diff view (what changed since previous version), accept button writes `policy_acceptance` row.
-- [ ] Sign-up flow: accept current versions inline (checkbox + link).
-- [ ] Audit-log entry on each acceptance (`compliance` retention) — deferred until Phase C.2 lands.
-
----
-
 ## Compliance docs bundle — **Phase A.3**
 
-**Why third (bundled)**: 4 pure-config / Markdown items that share the same context (legal disclosure pages + contractual templates). ~3h total. Each missing one blocks a specific scenario: no sub-processor page = Art. 28 GDPR violation; no accessibility statement = EAA Art. 14 violation since June 28 2025; no DPA template = every EU client demands it at signature; no DORA annex = no fintech/insurance deal can sign since Jan 17 2025.
+**Why** (M1, bundled): 4 pure-config / Markdown items that share the same context (legal disclosure pages + contractual templates). ~3h total. Each missing one blocks a specific scenario: no sub-processor page = Art. 28 GDPR violation; no accessibility statement = EAA Art. 14 violation since June 28 2025; no DPA template = every EU client demands it at signature; no DORA annex = no fintech/insurance deal can sign since Jan 17 2025.
 
 **Sub-processor disclosure** (Art. 28 GDPR):
 
@@ -366,9 +118,9 @@ All call sites keep working via NoOp. **Zero refactor.** `pnpm ci:check && pnpm 
 
 ## Cookie consent + Consent management — **Phase A.4**
 
-**Why now (after A.1-A.3)**: the moment any clone adds analytics (Umami, Plausible, GA), Stripe pixel, intercom, hotjar, anything — without a CNIL-conform banner the deploy is illegal in EU. ePrivacy directive + RGPD Art. 7. Currently the boilerplate has zero consent surface, so it's `clone → add Umami → fine`. Block that. Stamps **policy version from A.2** on every consent record so version bumps invalidate stale consents cleanly.
+**Why** (M1 — before any analytics ships): the moment any clone adds analytics (Umami, Plausible, GA), Stripe pixel, intercom, hotjar, anything — without a CNIL-conform banner the deploy is illegal in EU. ePrivacy directive + RGPD Art. 7. Currently the boilerplate has zero consent surface, so it's `clone → add Umami → fine`. Block that. Stamps **policy version from A.2** on every consent record so version bumps invalidate stale consents cleanly.
 
-**Why this is the boilerplate's first real DDD module**: `Consent` carries invariants (granted-at timestamp, policy-version-at-grant, scope set, expiration ≤ 13 months, granted == not withdrawn). It's a real aggregate — not infra orchestration. First user of `@packages/ddd-kit/Aggregate` + `DomainEvent` + `EventDispatcher` in the boilerplate. Validates the kit isn't dead code.
+**Why this is infra, not DDD**: consent *looks* domain-ish, but every rule collapses under the decisive test — `isActive = withdrawnAt == null && expiresAt > now && policyVersion == current` is a WHERE clause; category scope = `categories.includes(cat)`; validity / refusal-cooldown = date comparisons; version-invalidation = the same `version ===` as A.2. No invariant needs an `Aggregate` to defend it. So A.4 is the **same class as A.2**: append-only `consent_record` + a `ConsentService` + a typed category config + GPC/DNT middleware. The boilerplate ships **zero aggregates** — `@packages/ddd-kit`'s `Aggregate` / `ValueObject` / `DomainEvent` stay dormant (not dead: it's a published-lib surface; `Result` / `Option` / `UUID` are used everywhere) until the cloner writes their real product domain. Building an aggregate here just to exercise the kit is backwards — the OpenUp anti-pattern (ratio test/code > 3× = over-engineering).
 
 **Decided constraints** (CNIL 2024+ guidelines, EDPB 2024 binding decisions):
 - Reject-all button **same visual prominence** as accept-all (same size, same level, same color contrast). Single click reject.
@@ -379,32 +131,24 @@ All call sites keep working via NoOp. **Zero refactor.** `pnpm ci:check && pnpm 
 - Server-side authoritative — banner-side `localStorage` is UX cache, the `consent_record` table is source of truth.
 - Versioned per policy — when privacy policy version bumps, all granted consents are invalidated and user re-prompted.
 
-**Architecture** — first-class module, not infra:
+**Architecture** — infra module, mirror of `modules/policies/` (no domain layer):
 
 ```
 modules/consents/
-  domain/
-    consent.aggregate.ts           Consent extends Aggregate<ConsentProps>
-                                     - props: userId, policyVersion, categories: Set<Category>, grantedAt, withdrawnAt?, expiresAt
-                                     - invariants: validate(), grant(), withdraw(), isActive()
-                                     - emits: ConsentGranted, ConsentWithdrawn, ConsentExpired
-    consent-category.vo.ts         ValueObject<"necessary"|"functional"|"analytics"|"marketing">
-    consent.events.ts              ConsentGranted, ConsentWithdrawn, ConsentExpired
   application/
+    services/
+      consent.service.ts           record(userId, categories, policyVersion, ip, ua) → append row + emitEvent
+                                     withdraw(userId, categories?)                    → append withdrawal row + emitEvent
+                                     getActive(userId)                                → WHERE withdrawnAt IS NULL AND expiresAt > now AND policyVersion = current
     ports/
-      consent.repository.port.ts   IConsentRepository (ScopedRepository<Consent, UserScope>)
-    use-cases/
-      record-consent.use-case.ts   Validates policy version current, upserts active consent, dispatches event
-      withdraw-consent.use-case.ts Withdraws active consent for given category, dispatches event
-      get-active-consents.use-case.ts Returns active categories for user
-    event-handlers/
-      invalidate-analytics-on-withdraw.handler.ts
+      consent-store.port.ts        IConsentStore { insert, findActive } (module-private)
     dto/
       record-consent.dto.ts        zod: { categories: Category[], policyVersion: string }
   infrastructure/
     repositories/
-      drizzle-consent.repository.ts
-  routes.ts                        POST /me/consents (record), DELETE /me/consents (withdraw all), GET /me/consents
+      drizzle-consent.store.ts     §8-instrumented (outer + inner span + capture)
+  config.ts                        CONSENT_CATEGORIES = ["necessary","functional","analytics","marketing"] as const + cookie inventory per category
+  routes.ts                        POST /me/consents (record) · DELETE /me/consents (withdraw) · GET /me/consents
   module.ts
 ```
 
@@ -420,7 +164,7 @@ modules/consents/
 **Tasks**:
 
 - [ ] Drizzle schema `consent_record` + migration. Index on `(userId, expiresAt DESC)`.
-- [ ] `modules/consents/` skeleton (domain aggregate + repo + use cases + routes + module.ts) — first module under `@packages/ddd-kit/Aggregate`.
+- [ ] `modules/consents/` skeleton (`ConsentService` + store port + drizzle store + category config + routes + module.ts) — infra, mirror of `modules/policies/`.
 - [ ] DB hook on `policy_version` change: invalidate all `consent_record` (set `expiresAt = NOW()`).
 - [ ] `recordConsent` writes ip + UA from request context (compliance evidence).
 - [ ] `<CookieBanner />` + `<ConsentSettings />` components in `@packages/ui` (reusable across app + future marketing site).
@@ -428,8 +172,8 @@ modules/consents/
 - [ ] Auto-decline on `Sec-GPC: 1` / `DNT: 1` — Hono middleware reads header, frontend reads `navigator.globalPrivacyControl`.
 - [ ] Re-prompt timing: refuse → 6-month cooldown stored in `consent_record.expiresAt` (custom shorter window for refusal vs grant).
 - [ ] Withdraw all UX: footer link `Cookie settings` + `/settings/privacy` toggle. Withdrawal is single-click, no confirm dialog (CNIL).
-- [ ] Domain event handler: on `ConsentWithdrawn(analytics)`, fire client-side `umami.disable()` (or analog) — no late-arriving events.
-- [ ] Audit-log integration (Phase C.10) — every grant/withdraw/expiry call `recordAudit({ action: "consent.granted|withdrawn|expired", retention: "compliance" })`.
+- [ ] On `consent.withdrawn(analytics)`, an `onEvent(...)` handler fires client-side `umami.disable()` (or analog) — no late-arriving events.
+- [ ] Audit: declare `consent.{granted,withdrawn}` in `@packages/events` (compliance retention, actor = `userId`) — auto-audited via `AuditEventSubscriber`, no manual `recordAudit` call (rule §6/§7).
 - [ ] Public `/legal/cookies` page enumerating all categories with their concrete cookie names + purposes + retention (CNIL transparency obligation, copy from a config).
 
 **Out of scope (rule 14 — promote on second occurrence)**:
@@ -441,7 +185,7 @@ modules/consents/
 
 ## Privacy dashboard — **Phase A.5**
 
-**Why last in Phase A**: composes everything above (consent A.4 + acceptance history A.2 + sub-processors A.3 + RGPD core + sessions). Today RGPD/security/sessions cards are scattered across `/settings/account`. Users (and auditors) want ONE place. Refactor-only — reuses existing cards.
+**Why** (M3 — after consent A.4 + docs A.3 land): composes everything above (consent A.4 + acceptance history A.2 + sub-processors A.3 + RGPD core + sessions). Today RGPD/security/sessions cards are scattered across `/settings/account`. Users (and auditors) want ONE place. Refactor-only — reuses existing cards.
 
 - [ ] `/settings/privacy` page — composes existing components: `<DataExportCard />` (rgpd) + `<RgpdDeletionCard />` (rgpd) + `<ConsentSettings />` (A.4) + `<ActiveSessionsCard />` (security) + `<PolicyAcceptanceCard />` (A.2) + `<DataSourcesCard />` (lists A.3 sub-processors that hold this user's data with last-sync timestamp).
 - [ ] Top-right: timestamp "Last data export: never / 2026-04-12", direct download link if export still valid (R2 signed URL).
@@ -452,7 +196,7 @@ modules/consents/
 
 ## End-to-end gates — Playwright + Lighthouse a11y CI — **Phase A.6**
 
-**Why last in Phase A**: closes regression-proof gates over (1) the full legal chain — deletion silently leaving orphans = compliance theatre, (2) WCAG 2.1 AA — EAA non-negotiable since 28 June 2025, accessibility regressions ship invisibly without automation. Bundled because both gates run in CI on the same Playwright runner.
+**Why** (M5 — gates over a now-complete surface): closes regression-proof gates over (1) the full legal chain — deletion silently leaving orphans = compliance theatre, (2) WCAG 2.1 AA — EAA non-negotiable since 28 June 2025, accessibility regressions ship invisibly without automation. Bundled because both gates run in CI on the same Playwright runner.
 
 **Playwright legal-chain scenarios**:
 
@@ -528,27 +272,17 @@ modules/consents/
 
 ---
 
-## Outbound webhooks — **Phase C.5**
+## Outbound webhooks front UI — **Phase C.5**
 
-**Status**: **API + worker shipped** via event-driven foundation. UI front (`/settings/webhooks`) and `webhook.test` event remain.
+**Shipped** (event-driven foundation — as-built in [`docs/HISTORY.md`](docs/HISTORY.md)): `webhook_endpoint` + `webhook_delivery` schema, `WebhookFanoutSubscriber` (org-scoped fanout, idempotency-key dedupe), `WebhookDeliveryWorker` (HMAC `t=,v1=` Stripe-style, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, claim-window pattern), replay endpoint, and the full CRUD API `/settings/webhooks` (gated `requireOrgPermission({ webhooks: ["read"|"write"] })`, plaintext secret returned once).
 
-**Why**: customer integrations need real-time event delivery from the SaaS. Polling is dead. Standard B2B primitive — every Stripe / Linear / GitHub clone has it.
+**Remaining (front UI + one event)**:
 
-**Decided shape**:
-- **HMAC-SHA256 signing** with rotatable per-endpoint secret. AEAD-encrypted at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per-org sub-key from `WEBHOOK_MASTER_KEY` env var).
-- **Retry policy**: decorrelated jitter (AWS spec, `apps/api/src/shared/jitter.ts`) on paliers ~1m/5m/30m/2h/12h, then dead-letter after 5 attempts. Total window ~14h.
-- **Idempotency-Key per delivery** = `<eventId>:<endpointId>` (UNIQUE constraint) so retries are safe customer-side.
-- **Dead-letter visible in API** — `GET /settings/webhooks/:id/deliveries?status=dead_letter`. UI page deferred.
-- **Replay** — `POST /settings/webhooks/:id/deliveries/:deliveryId/replay` re-enqueues with fresh idempotency key.
+- [ ] `/settings/webhooks` UI — list + create + edit + delete + view deliveries + replay. API ready.
+- [ ] `webhook.test` event type — sent on endpoint creation, surfaces immediate "is the URL reachable" feedback in the UI.
+- [ ] Public `<EventTypesTable />` page enumerating every event the SaaS emits — read from `packages/events/src/event-types.ts` (35 events catalogued).
 
-- [x] DB schema `webhook_endpoint(id, organizationId FK CASCADE, url, secretCipher, eventTypes text[], enabled, createdAt, updatedAt)` + `webhook_delivery(id, endpointId FK CASCADE, outboxEventId FK RESTRICT, eventType, payload jsonb, status: pending|success|failed|dead_letter, attempts, nextAttemptAt, lastError, lastResponseStatus, idempotencyKey UNIQUE, createdAt)`.
-- [x] Dispatcher: `WebhookFanoutSubscriber` (built-in outbox subscriber, hard-coded in `OutboxDispatcher`) — for each dispatched outbox event, queries enabled endpoints WHERE `eventTypes` matches AND `organizationId` scope-matches, INSERT N `webhook_delivery` rows with `ON CONFLICT (idempotencyKey) DO NOTHING`. Independent `WebhookDeliveryWorker` (poll 5s, `FOR UPDATE SKIP LOCKED LIMIT 50`) drains pending + retry-due deliveries, decrypts secret via AEAD, signs HMAC `t=<unix>,v1=<hex>` (Stripe-style), POSTs with 30s timeout, updates status with decorrelated jitter.
-- [ ] `webhook.test` event type — sent on endpoint creation, surfaces immediate "is the URL reachable" feedback in UI.
-- [ ] `/settings/webhooks` UI front — list + create + edit + delete + view deliveries + replay. **API ready** at `apps/api/src/modules/webhooks/routes.ts` (gated `requireOrgPermission({ webhooks: ["read"|"write"] })`). Plaintext secret returned **once** at creation (Stripe-style).
-- [ ] Public `<EventTypesTable />` page enumerating all events the SaaS emits — read from `packages/events/src/event-types.ts` (29 events catalogued).
-
-**Deferred**:
-- Webhook proxy (Svix-style) for managed reliability — host-it-yourself first, evaluate Svix when delivery volume passes 10k/day.
+**Deferred**: Webhook proxy (Svix-style) — host-it-yourself first, evaluate Svix past 10k deliveries/day.
 
 ---
 
@@ -616,7 +350,7 @@ modules/consents/
 
 ## Status page + SLO dashboards + alerting — **Phase D.1**
 
-**Why now (after Phase C ships customer-facing surfaces)**: Phase 0.4 shipped Sentry error tracking only ; OTel tracing + Prometheus `/metrics` were deferred here so they wire alongside their consumer (Grafana). What's needed at D.1 :
+**Why** (M5 — wires alongside its Grafana consumer): Phase 0.4 shipped Sentry error tracking only ; OTel tracing + Prometheus `/metrics` were deferred here so they wire alongside their consumer (Grafana). What's needed at D.1 :
 
 1. **Add OTel tracing** — `@hono/otel` + `@kubiks/otel-drizzle` (~150 LOC). Sentry consumes OTel spans natively, so `SENTRY_TRACES_SAMPLE_RATE` can finally bump > 0. `traceparent` header propagation api ↔ app (fetch interceptor in `api-client.ts`). Re-evaluate Bun native OTel availability before wiring.
 2. **Add Prometheus `/metrics`** — `prom-client` adapter + `GET /metrics` route gated by `X-Metrics-Token`, mounted outside `requireAuth` + `httpLogger`. Health check registry from Phase 0.2 already exports `up{check}` state.
@@ -643,7 +377,7 @@ Shipping a status page before there are customer integrations is theatre.
 
 ### SLO dashboards (Grafana)
 
-**Why**: Phase 0.4 already exposes `/metrics` Prometheus. Without dashboards on top, the data accumulates blind. SLOs (Service Level Objectives) translate raw metrics into "is the product healthy from a user perspective", which is what alerting fires on.
+**Why**: D.1 wires Prometheus `/metrics` (deferred from 0.4, which shipped Sentry only — see step 2 above). Without dashboards on top, the accumulated metrics stay blind. SLOs (Service Level Objectives) translate raw metrics into "is the product healthy from a user perspective", which is what alerting fires on.
 
 - [ ] **Grafana self-hosted** (Docker, free) OR Grafana Cloud free tier (10k series). Scrapes `/metrics` from Phase 0.4 + Sentry API (errors). Removable with the same contract as Phase 0.4 — Grafana isn't wired to anything inside the app.
 - [ ] **Default SLO dashboards** shipped as JSON in `docs/grafana/`:
@@ -775,7 +509,7 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 - [ ] `admin` plugin enabled in `auth` config (server) + on `authClient` (client)
 - [ ] Drizzle schema regenerated (adds platform `role` on `user` + ban fields). Platform roles `admin` / `support` (read-only) are **distinct from org roles** (`owner` / `admin` / `member`).
 - [ ] `requireAdmin` Hono middleware (mirror of `requireAuth`, throws 403 when role ∉ allowed set). Composable per-route like the rest.
-- [ ] **Impersonation flow** — `authClient.admin.impersonateUser(id)` issues a short-lived impersonation session (default 1h, configurable). Original admin session preserved server-side, restored on `stopImpersonating()`. Front banner non-dismissable, distinct color (`bg-destructive`), visible on every page during impersonation. Start + stop = `recordAudit(...)` (cf audit log section).
+- [ ] **Impersonation flow** — `authClient.admin.impersonateUser(id)` issues a short-lived impersonation session (default 1h, configurable). Original admin session preserved server-side, restored on `stopImpersonating()`. Front banner non-dismissable, distinct color (`bg-destructive`), visible on every page during impersonation. Start + stop emit `admin.impersonation.{started,stopped}` events → auto-audited via `AuditEventSubscriber`.
 - [ ] **Ban / unban** — `authClient.admin.banUser(id, reason)` revokes all sessions and blocks future sign-in (BetterAuth handles the session invalidation). `unbanUser(id)` symmetric. Reason captured in audit log.
 - [ ] **Force password reset** — `authClient.admin.setUserPassword(id)` invalidates current sessions, sends magic-link via existing Resend template.
 - [ ] Pages in `features/admin/`: `/admin/users` (list, search, filter by org / status / role), `/admin/users/:id` (detail + actions), `/admin/orgs`, `/admin/orgs/:id`.
@@ -785,94 +519,14 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 
 ---
 
-## Audit log — append-only event trail — **Phase C.2**
+## Audit log front UI — **Phase C.2**
 
-**Status**: **API + write-path shipped** via event-driven foundation. Admin UI page (`/admin/audit-log`) remains in Phase A admin section. Tamper-evidence intentionally deferred (columns posed, flag off).
+**Shipped** (event-driven foundation — as-built in [`docs/HISTORY.md`](docs/HISTORY.md)): `audit_log` schema (append-only, nullable org, soft target FK, retention enum), `AuditEventSubscriber` zero-plumbing auto-write (service-level code emits via `emitEvent`, no separate helper), actor identification (rule #7), outbox payload validation, retention sweeps (Phase 0.6), and the read API `GET /admin/audit-log` (gated `requireOrgPermission({ auditLog: ["read"] })`).
 
-**Why**: compliance (SOC2 §CC7.2, RGPD Art. 30, ISO 27001) requires a tamper-evident trail of who did what when. Operational value too — debugging "who changed this user's email at 3am" without `git log`-style detective work. Append-only, scoped by org, never mutated after write.
+**Remaining (front UI only)**:
 
-- [x] Drizzle schema `audit_log`: `id`, `organizationId` (FK, **nullable** for platform-level events like impersonation), `actorId`, `actorType` (`user` | `admin` | `system`), `action` (snake_case verb, e.g. `user.ban`, `subscription.upgrade`, `org.member.invite`, `data.export.requested`), `targetType` + `targetId` (soft FK, no DB constraint — survives delete), `metadata` (`jsonb`: diff before/after, reason, IP, UA), `createdAt`. **No `updatedAt` / `deletedAt`** — append-only is the contract.
-- [x] **Helper `recordAudit(deps, { action, target, metadata })`** in `apps/api/src/shared/audit-recorder.ts` for service-level transitions; for aggregate-driven contexts the `AuditEventSubscriber` (built-in outbox subscriber, hard-coded in dispatcher) writes the row idempotently from the outbox event — zero plumbing post-clone.
-- [x] **Phase-1 audited actions** — auto-emitted from BetterAuth hooks (`user.created`, `user.signed_in`, `user.account.linked`, `org.*`, `org.member.*`, `org.invitation.*`) + RGPD service (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`) + uploads service (`upload.{requested,confirmed,deleted}`) + webhooks service (`webhook.endpoint.{created,updated,deleted}`). Catalog declared in `packages/events/src/event-types.ts` (32 events).
-- [x] **Actor identification** (rule #7 of `/CLAUDE.md`) — every state-change payload carries the user who triggered it under a recognized key (`actorUserId` canonical when actor ≠ subject, `inviterUserId`/`ownerUserId`/`userId` for self-actor flows). `actor_type="system"` is the explicit exception (cron, cascade), not a silent default.
-- [x] **Runtime payload validation at outbox enqueue** — `DrizzleOutboxRepository.enqueue` parses each event against `PayloadByEventType[eventType]` via Zod `safeParse` and throws on mismatch, rolling back the surrounding TX. Catches missing required fields (e.g. `actorUserId`), wrong types, and unknown event types at the call site — before the row lands in `outbox_event` and before any side effect (audit_log, webhook_delivery).
-- [x] **Retention** driven by `retention` enum column (`operational` 90d / `compliance` 365d) — mapping in `packages/events/src/retention-map.ts`. Cron `POST /internal/sweep-audit-log` sweeps both buckets per env knobs (see Phase 0.6).
-- [x] Indexes: `(actorId, occurredAt DESC)`, `(targetType, targetId)`, `(action, occurredAt DESC)`, `(organizationId, occurredAt DESC)`, `(retention, occurredAt)` cover the main read paths + purge.
-- [ ] Page `/admin/audit-log` (admin only, gated by `_admin.tsx`) with filters (actor, action, target, range). Each row expandable to show `metadata` diff. **API ready** — `GET /admin/audit-log` (gated `requireOrgPermission({ auditLog: ["read"] })`).
-- [ ] **Tamper-evidence (deferred phase 2)** — `prevHash`/`hash` columns posed in schema; calculation off behind `AUDIT_TAMPER_EVIDENCE=false` env flag. Promote when SOC2 audit demands it (rule 14).
-- [x] **Cross-cutting rule extension**: replaced by zero-plumbing event-driven model — any aggregate emitting a domain event in `EventTypes` catalog with retention `operational|compliance` is auto-audited via `AuditEventSubscriber`. Service-level transitions without aggregate use `recordAudit` helper or emit the event directly via `IOutboxRepository.enqueue`.
-
----
-
-## RGPD / CCPA — data deletion + export — **shipped (referenced from Phase A)**
-
-**Status**: **core shipped** (commits `fd3b4b7`, `bfcc15d`, `da659a0`). Lives in `apps/api/src/modules/rgpd/` (vertical slice — application service + drizzle repo + public + internal routes) and `apps/app/src/features/rgpd/` (cards + forms + hooks). What remains is in **Phase A** above (E2E gate + admin overrides + audit-log integration once the audit-log section ships).
-
-**Why this matters**: clean-stack is a boilerplate cloned to start any SaaS. A clone deployed to EU users without Art. 17 (right to erasure) + Art. 20 (data portability) is illegal day one — fines up to 4% of revenue. The cascade was built before Billing / Audit-log / etc. landed so every future feature inherits the contract.
-
-**Shipped surface**:
-
-- [x] **Export endpoint** `POST /me/export` — auth-gated, sync (walks tables in-request, R2 upload, signed 7-day URL emailed via Resend `RESEND_TPL_DATA_EXPORT_*`). Rate-limit 1/24h per user via `lastExportRequestedAt`.
-- [x] **Pre-flight ownership gate** `GET /me/delete/preflight` — returns sole-owner non-personal orgs blocking deletion. UI at `/settings/account` renders the blocking list with `Transfer ownership` / `Leave org` per-row CTAs; `Delete account` button stays disabled while the list is non-empty. Auto-transfer rejected on principle (no implicit refiling of legal/billing on a member without consent — mirrors Personal-org deletion posture, org R5).
-- [x] **Delete endpoint** `POST /me/delete` — auth + 2FA-required (BetterAuth `twoFactor`) + server-side preflight re-check (409 `ACCOUNT_DELETION_BLOCKED` if a sole-owner org appeared between read and submit) + 7-day soft-delete grace. Cron `/internal/rgpd/process-pending-deletions` (signed) sweeps expired requests, wipes personal data (email, name, sessions, passkeys, MFA factors, R2 avatars), anonymizes `member` rows (`userId → null`, `email → deleted-<uuid>@anonymized.local`).
-- [x] **Cancel-deletion UX** — sign-in during grace prompts cancel/continue dialog.
-- [x] **Soft-delete confined to RGPD** — `user.deletedAt` + `user.pendingDeletionUntil` are the **only** soft-delete columns in the codebase (rule 14 — no creep elsewhere).
-- [x] **Public `/legal/data-rights` page** — linked from `/settings/account`, lists what's deleted vs anonymized vs retained per legal basis.
-
-**Remaining (tracked in Phase A above + dependent sections)**:
-
-- [ ] **E2E Playwright gate** (Phase A.6) — sign up → upload avatar → request export → fetch export → request delete → simulate grace expiry → verify every `userId` reference is gone or anonymized. Without this gate, deletion silently leaves orphans and the compliance claim is theatre.
-- [ ] **Admin overrides** (depends on Phase C.9 admin plugin) — `/admin/users/:id` triggers export-on-behalf (audited `data.export.requested` `actorType: admin`); cannot cancel a user's deletion without a documented `metadata.reason`.
-- [x] **Audit-log integration** — every state transition emits an event via outbox (`user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}`); `AuditEventSubscriber` writes the audit row with `retention: compliance` from the catalog. Pino logging retained for ops debugging (different concern).
-- [ ] **Stripe customer cleanup** (depends on Phase B.7 Billing) — wipe Stripe customer via the BetterAuth Stripe plugin during deletion; refund/proration policy is a billing-config decision.
-
----
-
-## Vertical-slice layout — front + back alignment for true removability — **Phase 0.1**
-
-**Status**: ships **right after RGPD**, before Billing. Foundational refactor — every feature shipped after inherits the "removable in 5 minutes" contract; every feature shipped before (auth, multi-tenant, storage, rgpd) is migrated as part of this section. **Rule already documented in `CLAUDE.md` `## Layout`** — this section is the migration plan, not the design.
-
-**Why ship before Billing**: clean-stack is cloned to start *any* SaaS. Each clone keeps a different subset (a B2C product won't bill api-keys, a tool won't need members invitations, an internal app won't need marketing legal). If a *leaf feature* can't be removed cleanly — `trash` one folder + remove a `registerXxx(c, app)` line + remove route imports — the clone diverges fast. Billing is the next big feature; it must land in vertical-slice form, otherwise we re-pay the refactor cost on every subsequent feature.
-
-**Honest scope — what is and isn't removable**:
-
-- ✅ **Leaf bounded contexts** (rgpd, billing, api-keys, audit log, admin): vertical-slice = clean removal.
-- ❌ **Cross-cutting concerns** (auth, multi-tenancy, observability, db, storage): not features, postures. Removing multi-tenancy = re-architecturing every business table's `organizationId`, ditching `ScopedRepository`, the org plugin, access-control, half the UI. No layout fixes that — it's a *clone-time* decision (future `create-clean-stack --no-multi-tenancy` CLI, or branch variants), not a `rm -rf`.
-
-**The two failure modes today**:
-
-1. **Front**: `features/<area>/` mixes *area* (UI shell — `settings/`, `dashboard/`) and *feature* (sub-domain — `account`, `api-keys`, `members`). Removing `api-keys` from `features/settings/_components/`, `_forms/`, `_schemas/`, `_hooks/` requires `git grep` archeology.
-2. **Back**: horizontal layout (`domain/`, `application/`, `adapters/`, `routes/` at top level). A bounded context's code is sprayed across 4 sibling folders. Removing RGPD means touching `domain/rgpd*`, `application/use-cases/*-account-deletion*`, `application/dto/*deletion*`, `adapters/repositories/drizzle-rgpd*`, `routes/me.routes.ts`, `routes/internal.routes.ts`, plus DI wiring. No single-folder boundary.
-
-**Six registration sites, no more** — adding a feature touches **only** these (and removing it untouches them):
-
-1. API composition root (`apps/api/src/index.ts`) — `app.route("/xxx", xxxModule.routes)` (or via `registerXxxModule(app)`)
-2. API DI root (`apps/api/src/di/container.ts`) — `c = registerXxx(c)`
-3. DB schema barrel (`packages/drizzle/src/schema/index.ts`) — `export * from "./xxx"`
-4. Capability statement (`@packages/access-control`) — extend `statement` + role policies if the feature has permissions
-5. Front nav source (`SETTINGS_TABS`, `NAVIGATION_ROUTES`) — declare `requires` + `requiresOrg`
-6. Email template registry (if the feature emits transactional mail)
-
-**Migration sequence** (front first — smaller blast radius, validates naming):
-
-- [x] **Step 0 — define the rule** in `CLAUDE.md` `## Layout` + `## App import direction` + `## App feature anatomy` + `## Don't`.
-- [x] **Front step 1 — split `features/settings/`** into top-level `features/<sub-domain>/`. Underscore-private folders dropped. Account composition moved to `features/account/account.route.tsx` (composes `security/` + `rgpd/` library features).
-- [x] **Front step 2 — collapse `adapters/` + `common/` + `providers/` into `shared/`**. `shared/api/`, `shared/auth/`, `shared/components/`, `shared/app-providers.tsx`, `shared/env.ts`, `shared/utils.ts`. 4 sub-folders + 2 root files; lean.
-- [x] **Front step 3 — code-based routing** (Option C). `routes/` folder + `routeTree.gen.ts` + `@tanstack/router-plugin` deleted. Each feature exposes `<name>Route(parent)` factory in `<name>.route.tsx`; `apps/app/src/router.tsx` defines layouts/gates inline + assembles via `addChildren`. Library features (`security/`, `rgpd/`) stay route-less, composed by `account/`. Feature-scoped queries/mutations relocation to `features/<x>/api/` deferred (current `shared/api/queries+mutations/` remains pragmatic until duplication justifies the split).
-- [x] **Back step 1 — pivot `apps/api/src/` to `modules/<context>/`**: `modules/uploads/`, `modules/rgpd/` shipped (auth + organizations stay at `apps/api/src/auth.ts` — BetterAuth singleton, no DDD). Each contains `application/{dto,services,ports for module-private interfaces}` + `infrastructure/{services,repositories}` + `routes.ts` (where applicable) + `module.ts`. `adapters/` removed; `infrastructure/` is the DDD-canonical naming. **`modules/email/` deliberately not created** — email is pure infra (no domain, no use cases, no routes), lives in `shared/services/email.service.ts` consuming `shared/ports/email.port.ts` (rule "shared kernel" in CLAUDE.md).
-- [x] **Back step 2 — extract `shared/`**: `apps/api/src/shared/{middleware,ports,services}/` + process-level singletons at the root. Cross-context port interfaces (`IStorageService`, `IEmailService`) live in `shared/ports/`; cross-context impls (`ResendEmailService`) in `shared/services/`. The composed env-driven gate for `/internal/*` lives in `shared/internal-routes/internal-layers.ts` (single source — any future module exposing `/internal/*` consumes the same `internalLayers`); the whole `/internal/*` concern (signature primitives + middlewares + signed-fetch client) is grouped under `shared/internal-routes/`. `common/` deleted.
-- [x] **Back step 3 — `module.ts` per context (split form)**: each `module.ts` defines an inwire `defineModule()` (typed prerequisites local to the module). `di/container.ts` chains `.addModule(emailModule).addModule(uploadsModule).addModule(rgpdModule)`. Routes stay in `routes.ts` / `internal.routes.ts` and are imported by `index.ts` directly — splitting DI from routes avoids a `module.ts → routes.ts → di/container.ts → module.ts` cycle (Biome `noImportCycles` flagged it; the SOTA is to keep DI wiring and route mounting on separate import graphs).
-- [x] **Back step 4 — split DB schema**: `packages/drizzle/src/schema/auth.ts` → `auth.ts` (BetterAuth-owned: user/session/account/verification/twoFactor/passkey) + `multi-tenant.ts` (organization/member/invitation). RGPD fields stay on `user` (BetterAuth-owned column extensions). Combined `schema` namespace re-export preserved in `src/index.ts` → zero call-site change. New billing tables will land in `packages/drizzle/src/schema/billing.ts` from day one.
-- [ ] **Removability dry-run** on the smallest module (probably `rgpd` since fresh in memory, or `uploads` if smaller) — delete it end-to-end, run `pnpm ci:check`, document the diff in `docs/HISTORY.md` as the canonical "how to remove a feature" example.
-- [ ] **Removability CI gate (phase 2 — deferred until pattern stabilizes)**: script `scripts/check-removability.ts` that picks a random module, snapshots, removes, type-checks, restores. Optional weekly cron in CI; promote to PR-blocking once stable.
-
-**Out of scope (deferred — rule 14)**:
-
-- Plugin manifest / runtime registry / dynamic load — explicitly rejected. Static modules with explicit registration achieve removability without the cost of indirection. Revisit only if a clone needs *runtime* feature toggling (different SKUs same codebase), which is a different problem.
-- Workspace package per feature (`packages/feature-billing/`) — extra workspace overhead for a benefit (physical boundary) already met by directory + `eslint-plugin-boundaries` (deferred phase 2).
-- `eslint-plugin-boundaries` rules enforcing cross-module isolation — added once the module pattern has settled (premature otherwise; tweaking rules + layout simultaneously is double pain).
-- `create-clean-stack` CLI for clone-time variant selection (no-multi-tenancy, no-storage, etc.) — phase 2 once the boilerplate has 3+ adopters asking for it. README documents the manual variant for now.
-- Splitting `@packages/ui` per feature — the UI package stays shared; module pivot is an *app-level* concern.
+- [ ] Page `/admin/audit-log` (admin only, gated by `_admin.tsx`) — filters (actor, action, target, range), each row expandable to a `metadata` diff. API ready.
+- [ ] **Tamper-evidence (deferred)** — `prevHash`/`hash` columns already posed in schema; calc off behind `AUDIT_TAMPER_EVIDENCE` flag. Promote when a SOC2 audit demands it (rule 14).
 
 ---
 
@@ -995,7 +649,7 @@ apps/site/
 - [ ] **CI** `.github/workflows/site.yml` triggered on `apps/site/**` paths — type-check, build, Lighthouse CI gate (LCP <2s, CLS <0.05, INP <200ms, perf score >95). Failing perf budget blocks deploy.
 - [ ] **Deploy**: Cloudflare Workers (root `apps/site`, build `bun run build`, output `dist/`). Postgres prod = Neon free tier (3 GB) ou VPS Postgres existant. Secrets via Cloudflare dashboard, jamais committés.
 - [ ] **Sitemap + robots.txt**: `@astrojs/sitemap` config (changefreq per route type, priority weights, hreflang if i18n). `public/robots.txt` referencing the sitemap URL. `site` declared in `astro.config.mjs` (else URLs are relative — gotcha).
-- [ ] **Legal pages**: `/legal/privacy`, `/legal/terms`, `/legal/data-rights` (cf RGPD section above). Stored as `Pages` in Payload — non-tech can update without dev.
+- [ ] **Legal pages**: `/legal/privacy`, `/legal/terms`, `/legal/data-rights` (RGPD core + policy versioning shipped — see [`docs/HISTORY.md`](docs/HISTORY.md); `POLICY_URLS` in `@packages/policies` is the one-line swap point to host them here instead of in-app). Stored as `Pages` in Payload — non-tech can update without dev.
 - [ ] **Editor onboarding doc** `apps/site/README.md` — 30-line non-tech guide ("How to publish a blog post", "How to edit the homepage", "How to add a redirect"), plus 1-page dev setup section.
 
 **Out of scope (deferred until first concrete need — rule 14)**:
@@ -1023,14 +677,4 @@ apps/site/
 
 ---
 
-## Shipped phases
-
-Full architectural log preserved in [`docs/HISTORY.md`](docs/HISTORY.md):
-
-- **Auth — BetterAuth (end-to-end)** ✅ Phase 1 + Phase 2 (organization plugin)
-- **Multi-tenant — `organization` plugin** ✅ Phase 2 (per-org scoping, invitations, roles, slug auto-gen). **May 2026 cleanup**: dropped the `teams` sub-plugin — grouping-only without team-scoped roles or statements adds UX surface for ~zero value at this stage; can be re-enabled in two lines if a clear use-case emerges. Settings collapsed from a General/Members/Teams split to a single `Organization` tab with section-level `<Can>` gates per role.
-- **Email — Resend** ✅ Phase 1 (typed templates, idempotency, retry, DNS hardening)
-- **Storage — R2 + SeaweedFS** ✅ Phase 1 (presign / PUT-direct / confirm flow, owner-scoped keys)
-- **RGPD core — Art. 17 + Art. 20** ✅ Phase 1 (sync export to R2, 7-day grace deletion, 2FA gate, sole-owner preflight, cancel UX, `/legal/data-rights`) — remaining items in Phase A.6 / dependent on Audit-log + Admin + Billing
-- **Vertical-slice layout** ✅ Front (steps 1-3: feature split, `shared/`, code-based routing) + Back (steps 1-3: `modules/<context>/`, `shared/`, inwire `defineModule`) — back step 4 (DB schema split) outstanding
-- **App shell — top-nav + ⌘K palette** ✅ (sticky header, contextual settings tabs, command palette, custom logo mark)
+_Full as-built log for every shipped phase: [`docs/HISTORY.md`](docs/HISTORY.md). Current inventory: [`docs/FEATURES.md`](docs/FEATURES.md)._
