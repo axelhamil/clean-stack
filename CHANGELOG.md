@@ -1,3 +1,9 @@
+## [1.20.1](https://github.com/axelhamil/clean-stack/compare/v1.20.0...v1.20.1) (2026-06-08)
+
+### Bug Fixes
+
+* **auth:** silence cancelled passkey conditional-ui toast on sign-in ([5a5e614](https://github.com/axelhamil/clean-stack/commit/5a5e6141a9fa09a5368482284f43ef272914cd82))
+
 ## [1.20.0](https://github.com/axelhamil/clean-stack/compare/v1.19.2...v1.20.0) (2026-06-08)
 
 ### Features
