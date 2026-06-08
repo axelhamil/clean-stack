@@ -1,3 +1,33 @@
+## [1.20.0](https://github.com/axelhamil/clean-stack/compare/v1.19.2...v1.20.0) (2026-06-08)
+
+### Features
+
+* **account:** profile rectification (rgpd art.16) + nist 800-63b-4 password baseline ([fa38d6c](https://github.com/axelhamil/clean-stack/commit/fa38d6c3feadc07ad87aab54bb525b947db6b1e1))
+* **app:** enrich command palette nav + actions ([fa2978e](https://github.com/axelhamil/clean-stack/commit/fa2978e29022205141718081de28b390e2864cfa))
+* **legal:** policy acceptance ui — sign-up checkbox + re-acceptance gate ([92d18c3](https://github.com/axelhamil/clean-stack/commit/92d18c351064336093b2910247c2bff5706ac7cc))
+* **observability:** correlate audit_log rows to their originating request ([738bda7](https://github.com/axelhamil/clean-stack/commit/738bda7ea7b4bbda99749fa58c5283af7875450a))
+* **policies:** privacy/terms versioning + acceptance recording (rgpd art.7) ([a44335e](https://github.com/axelhamil/clean-stack/commit/a44335ebc24cff48a13e5d5ffa7c642ff2b73282))
+
+### Bug Fixes
+
+* **audit:** attribute the admin actor on org.member.joined direct-add ([403283f](https://github.com/axelhamil/clean-stack/commit/403283f8f6470828b0a872a4808685402cb419b2))
+* **policies:** record acceptance ip from the freshly-created session ([e1f4842](https://github.com/axelhamil/clean-stack/commit/e1f4842e1ba8ccb067eda8fd32039be72e4614dc))
+* **storage:** s3-compatible put + seaweedfs ipv6 healthcheck ([09e3722](https://github.com/axelhamil/clean-stack/commit/09e3722929e43d41c6502b33e02cffcd9e05d40d))
+
+### Performance
+
+* **drizzle:** index webhook_delivery sweep + typed .desc() on time indexes ([4209edd](https://github.com/axelhamil/clean-stack/commit/4209edde155017dd40f9661cfcf16eaf09b3a091))
+
+### Documentation
+
+* close phase 0, trim roadmap, record railway prod closeout ([8f1fb4f](https://github.com/axelhamil/clean-stack/commit/8f1fb4f4261724dca05027b92d5a756aab44c404))
+* document request-id correlation + add event-driven row to readme ([72fa3d9](https://github.com/axelhamil/clean-stack/commit/72fa3d99197c7a90ce08238f02132470b2650d3a))
+* fix accuracy drifts surfaced by the full-repo review ([6771647](https://github.com/axelhamil/clean-stack/commit/67716474f0bbaf04c571c1ba0b0a251081bc2232))
+* jsdoc obscure shared helpers + close a.1 in roadmap/history ([6121242](https://github.com/axelhamil/clean-stack/commit/612124200b8103591d6523c789f5ae9f38074bcf))
+* record a.2 policy versioning + close it in the roadmap ([c625d54](https://github.com/axelhamil/clean-stack/commit/c625d54a2efe4d4f77bc302a74318db8c58323d8))
+* **roadmap:** close phase 0 — railway deploy live on main (1.19.2) ([a78841b](https://github.com/axelhamil/clean-stack/commit/a78841b7a4ec61e633b1a425c9a67d59977edaa3))
+* slim roadmap to build-order milestones, reclassify consent as infra ([9afa0b9](https://github.com/axelhamil/clean-stack/commit/9afa0b98fb00bb138b90bc3f1385bc7f369e40c8))
+
 ## [1.19.2](https://github.com/axelhamil/clean-stack/compare/v1.19.1...v1.19.2) (2026-06-02)
 
 ### Bug Fixes
