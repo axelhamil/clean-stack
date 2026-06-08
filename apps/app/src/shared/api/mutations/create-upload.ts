@@ -14,7 +14,19 @@ export interface CreateUploadInput {
   expiresInSeconds?: PresignBody["expiresInSeconds"];
 }
 
-async function createUpload({
+function sanitizeFilename(name: string): string {
+  const deaccented = name.normalize("NFKD").replace(/\p{Diacritic}/gu, "");
+  const lastDot = deaccented.lastIndexOf(".");
+  const ext = lastDot > 0 ? deaccented.slice(lastDot + 1).replace(/[^\w]/g, "") : "";
+  const base =
+    (lastDot > 0 ? deaccented.slice(0, lastDot) : deaccented)
+      .replace(/[^\w\-. ]+/g, "-")
+      .replace(/[-\s]+/g, "-")
+      .replace(/^[-.\s]+|[-.\s]+$/g, "") || "file";
+  return (ext ? `${base}.${ext}` : base).slice(0, 200);
+}
+
+export async function createUpload({
   file,
   scope,
   expiresInSeconds,
@@ -23,7 +35,7 @@ async function createUpload({
 
   const presignRes = await $presign({
     json: {
-      filename: file.name,
+      filename: sanitizeFilename(file.name),
       contentType,
       size: file.size,
       ...(scope ? { scope } : {}),

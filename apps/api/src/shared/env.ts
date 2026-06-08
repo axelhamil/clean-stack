@@ -66,6 +66,7 @@ const envSchema = z.object({
   SENTRY_DSN: z.url().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+  HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
 });
 
 const rawEnv = Object.fromEntries(

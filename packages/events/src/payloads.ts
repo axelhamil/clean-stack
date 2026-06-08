@@ -83,6 +83,16 @@ export const UserDeletedPayload = UserRef.extend({
 });
 export type UserDeletedPayload = z.infer<typeof UserDeletedPayload>;
 
+export const UserProfileUpdatedPayload = UserRef.extend({
+  changes: z.record(z.string(), z.unknown()),
+});
+export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
+
+export const UserEmailChangeRequestedPayload = UserRef.extend({
+  newEmail: z.string().email(),
+});
+export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
+
 export const UserExportRequestedPayload = UserRef;
 export type UserExportRequestedPayload = z.infer<typeof UserExportRequestedPayload>;
 
@@ -205,6 +215,8 @@ export const PayloadByEventType = {
   [EventTypes.USER_DELETION_REQUESTED]: UserDeletionRequestedPayload,
   [EventTypes.USER_DELETION_CANCELLED]: UserDeletionCancelledPayload,
   [EventTypes.USER_DELETED]: UserDeletedPayload,
+  [EventTypes.USER_PROFILE_UPDATED]: UserProfileUpdatedPayload,
+  [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: UserEmailChangeRequestedPayload,
   [EventTypes.USER_EXPORT_REQUESTED]: UserExportRequestedPayload,
   [EventTypes.USER_EXPORT_COMPLETED]: UserExportCompletedPayload,
   [EventTypes.ORG_CREATED]: OrgCreatedPayload,

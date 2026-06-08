@@ -29,6 +29,13 @@
       "when": 1779724960076,
       "tag": "0003_overconfident_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780930101291,
+      "tag": "0004_public_newton_destine",
+      "breakpoints": true
     }
   ]
 }

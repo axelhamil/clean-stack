@@ -32,6 +32,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           type="password"
           autoComplete="new-password"
           placeholder="••••••••"
+          description="At least 15 characters. Avoid passwords exposed in known data breaches."
         />
 
         <FormTextField

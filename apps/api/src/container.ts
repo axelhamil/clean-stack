@@ -12,10 +12,12 @@ import type { IAuditPort } from "./shared/ports/audit.port";
 import type { IEmailService } from "./shared/ports/email.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
+import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { ResendEmailService } from "./shared/services/email.service";
+import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
@@ -29,6 +31,7 @@ declare module "inwire" {
     IOutboxRepository: IOutboxRepository;
     IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
+    IPasswordBreachService: IPasswordBreachService;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
@@ -54,6 +57,10 @@ export const di = container()
       }),
   )
   .add("IEmailService", (c): IEmailService => new ResendEmailService(c.IInstrumentation))
+  .add(
+    "IPasswordBreachService",
+    (c): IPasswordBreachService => new HibpPasswordBreachService(c.IInstrumentation),
+  )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
   .add(

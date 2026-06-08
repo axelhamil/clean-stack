@@ -21,6 +21,7 @@ const TEMPLATE_IDS: Record<keyof EmailTemplates, string> = {
   delete_requested: "",
   delete_cancelled: "",
   delete_completed: "",
+  change_email: "",
 };
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -81,9 +82,18 @@ export class ResendEmailService implements IEmailService {
     const templateId = TEMPLATE_IDS[template];
     if (!this.resend || !templateId) {
       if (env.NODE_ENV !== "production") {
+        const links = Object.entries(variables)
+          .filter(
+            ([key, value]) =>
+              typeof value === "string" &&
+              (key.toLowerCase().includes("url") || value.startsWith("http")),
+          )
+          .map(([, value]) => value as string);
         logger.info(
-          { template, to, variables, idempotencyKey: options?.idempotencyKey },
-          "[email-dev] transport not configured — payload logged",
+          { template, to, links, variables, idempotencyKey: options?.idempotencyKey },
+          links.length > 0
+            ? `[email-dev] ${template} → ${to} — link: ${links.join(" | ")}`
+            : `[email-dev] ${template} → ${to} (no link in payload)`,
         );
         return Result.ok();
       }

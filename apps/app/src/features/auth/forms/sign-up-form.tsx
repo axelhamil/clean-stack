@@ -45,6 +45,7 @@ export function SignUpForm() {
           type="password"
           autoComplete="new-password"
           placeholder="••••••••"
+          description="At least 15 characters. Avoid passwords exposed in known data breaches."
         />
 
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
