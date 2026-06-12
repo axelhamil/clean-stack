@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
-import { toastError, toastSuccess } from "../../shared/utils";
+import { toastError, toastSuccess } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useAuthorization } from "../auth/use-authorization";

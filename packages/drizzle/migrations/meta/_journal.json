@@ -50,6 +50,20 @@
       "when": 1780955625954,
       "tag": "0006_motionless_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781290763033,
+      "tag": "0007_medical_liz_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781291315182,
+      "tag": "0008_small_shape",
+      "breakpoints": true
     }
   ]
 }

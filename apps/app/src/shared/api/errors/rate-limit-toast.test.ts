@@ -51,14 +51,19 @@ describe("showRateLimitToast", () => {
     );
   });
 
-  it("dismisses the toast when countdown reaches zero", () => {
+  it("dismisses the toast with the correct id when countdown reaches zero", () => {
     showRateLimitToast({ message: "Too many requests.", seconds: 2 });
+
+    const capturedId = (toast.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]?.id as string;
+    expect(capturedId).toBeDefined();
+    expect(capturedId).toMatch(/^rate-limit-\d+-[a-z0-9]+$/);
 
     vi.advanceTimersByTime(1000);
     expect(toast.dismiss).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(1000);
     expect(toast.dismiss).toHaveBeenCalledOnce();
+    expect(toast.dismiss).toHaveBeenCalledWith(capturedId);
   });
 
   it("calls toast.error immediately when seconds is 0", () => {
@@ -79,6 +84,20 @@ describe("showRateLimitToast", () => {
     const callsBefore = (toast.error as ReturnType<typeof vi.fn>).mock.calls.length;
     vi.advanceTimersByTime(3000);
     expect((toast.error as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+  });
+
+  it("after manual dismiss, timer is cleared and toast.dismiss is NOT called by the timer", () => {
+    showRateLimitToast({ message: "Too many requests.", seconds: 5 });
+
+    const onDismiss = (toast.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]?.onDismiss as
+      | (() => void)
+      | undefined;
+    expect(onDismiss).toBeDefined();
+    onDismiss?.();
+
+    vi.clearAllMocks();
+    vi.advanceTimersByTime(6000);
+    expect(toast.dismiss).not.toHaveBeenCalled();
   });
 
   it("uses stable id so sonner updates the same toast", () => {

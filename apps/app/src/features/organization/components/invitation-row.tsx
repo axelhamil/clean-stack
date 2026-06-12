@@ -4,10 +4,11 @@ import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { cancelInvitationMutationOptions } from "../../../shared/api/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
-import { formatDate, toastError } from "../../../shared/utils";
+import { formatDate } from "../../../shared/utils";
 
 export interface InvitationRowProps {
   invitation: {

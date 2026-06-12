@@ -31,8 +31,12 @@ import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
 import {
   AUTH_FORGOT_PASSWORD_POLICY,
   AUTH_MAGIC_LINK_POLICY,
+  AUTH_PASSKEY_POLICY,
+  AUTH_RESET_PASSWORD_POLICY,
   AUTH_SIGN_IN_POLICY,
   AUTH_SIGN_UP_POLICY,
+  AUTH_TWO_FACTOR_POLICY,
+  AUTH_VERIFY_EMAIL_POLICY,
   GLOBAL_POLICY,
 } from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
@@ -62,14 +66,68 @@ app.use(
 
 app.use("*", sessionMiddleware);
 
-app.use("*", requireRateLimit(di.IRateLimiter, GLOBAL_POLICY));
-app.use("/api/auth/sign-in/email", requireRateLimit(di.IRateLimiter, AUTH_SIGN_IN_POLICY));
+app.use("*", requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY));
+app.use(
+  "/api/auth/sign-in/email",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_IN_POLICY),
+);
 app.use(
   "/api/auth/request-password-reset",
-  requireRateLimit(di.IRateLimiter, AUTH_FORGOT_PASSWORD_POLICY),
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_FORGOT_PASSWORD_POLICY,
+  ),
 );
-app.use("/api/auth/sign-in/magic-link", requireRateLimit(di.IRateLimiter, AUTH_MAGIC_LINK_POLICY));
-app.use("/api/auth/sign-up/email", requireRateLimit(di.IRateLimiter, AUTH_SIGN_UP_POLICY));
+app.use(
+  "/api/auth/sign-in/magic-link",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_MAGIC_LINK_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/sign-up/email",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_UP_POLICY),
+);
+app.use(
+  "/api/auth/two-factor/verify-totp",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/two-factor/verify-otp",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/two-factor/verify-backup-code",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/verify-email",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_VERIFY_EMAIL_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/reset-password",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_RESET_PASSWORD_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/passkey/verify-authentication",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
+);
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 

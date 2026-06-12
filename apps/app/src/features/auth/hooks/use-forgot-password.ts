@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ForgotPasswordInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
-import { resolveAuthError } from "./auth-error";
+import { resolveAuthError } from "../auth-error";
 
 export function useForgotPassword() {
   return useMutation({

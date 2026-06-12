@@ -12,13 +12,13 @@ import {
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { removeMemberMutationOptions } from "../../../shared/api/mutations/remove-member";
 import { updateMemberRoleMutationOptions } from "../../../shared/api/mutations/update-member-role";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../../shared/api/queries/org-members";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
-import { toastError } from "../../../shared/utils";
 
 export interface MemberRowProps {
   member: {

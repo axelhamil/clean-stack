@@ -12,14 +12,17 @@ export interface RateLimitDecision {
   remaining: number;
   resetSeconds: number;
   policyName: string;
+  /**
+   * True only on the first consume that crosses the limit
+   * (consumedPoints === maxRequests + 1). Used by the middleware to emit
+   * `security.rate_limit.exceeded` exactly once per burst.
+   * Always false on allowed decisions.
+   */
+  firstBlock: boolean;
 }
 
 export type RateLimitError = { code: "RATE_LIMITER_INTERNAL_ERROR"; message: string };
 
-/**
- * Security events (sampled `security.rate_limit.exceeded`) are deferred to S2
- * once the durable store lands.
- */
 export interface IRateLimiter {
   consume(key: string, windows: WindowConfig[]): Promise<Result<RateLimitDecision, RateLimitError>>;
 }

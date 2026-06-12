@@ -84,6 +84,7 @@ mock.module("@packages/drizzle", () => ({
   schema: {},
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
+  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
 }));
 
 // ── Mock @packages/events ──────────────────────────────────────────────────
@@ -121,6 +122,8 @@ const EventTypesMock = {
   WEBHOOK_ENDPOINT_CREATED: "webhook.endpoint.created",
   WEBHOOK_ENDPOINT_UPDATED: "webhook.endpoint.updated",
   WEBHOOK_ENDPOINT_DELETED: "webhook.endpoint.deleted",
+  USER_POLICY_ACCEPTED: "user.policy.accepted",
+  SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
 } as const;
 const stubPayload = { safeParse: () => ({ success: true }) };
 mock.module("@packages/events", () => ({
@@ -165,6 +168,8 @@ mock.module("@packages/events", () => ({
   WebhookEndpointCreatedPayload: stubPayload,
   WebhookEndpointUpdatedPayload: stubPayload,
   WebhookEndpointDeletedPayload: stubPayload,
+  UserPolicyAcceptedPayload: stubPayload,
+  SecurityRateLimitExceededPayload: stubPayload,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────

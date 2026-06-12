@@ -19,13 +19,13 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { inviteMemberMutationOptions } from "../../../shared/api/mutations/invite-member";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import {
   type InviteMemberInput,
   inviteMemberSchema,
 } from "../../../shared/auth/organization.schema";
-import { toastError } from "../../../shared/utils";
 
 export interface InviteMemberFormProps {
   organizationId: string;

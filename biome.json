@@ -1,6 +1,9 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "root": true,
+  "files": {
+    "includes": ["**", "!**/.claude"]
+  },
   "assist": {
     "actions": {
       "source": { "organizeImports": "on" }

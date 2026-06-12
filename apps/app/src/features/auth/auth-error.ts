@@ -1,4 +1,4 @@
-import { RATE_LIMITED_MESSAGE } from "../../../shared/api/errors/messages";
+import { RATE_LIMITED_MESSAGE } from "../../shared/api/errors/messages";
 
 interface BetterAuthError {
   status?: number;

@@ -62,6 +62,7 @@ mock.module("@packages/drizzle", () => ({
   multiTenantSchema: {},
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
+  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
   webhooksSchema: {
     webhookEndpoint: {
       id: "id",
