@@ -4,7 +4,7 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 
 ## What you get out of the box
 
-- **Error capture** on every `>= 500` HTTP response (api), every uncaught React render error (app), and every unexpected TanStack Query/mutation failure (app) — global `QueryCache`/`MutationCache` `onError` handlers capture 5xx and network errors (no `status`); expected 4xx (validation, 401/403/404, 429 rate-limit), `CancelledError` and `AbortError` are filtered out by `error-classifier.ts`. Mutations additionally skip plain `Error`s without a `status` field — real API failures always carry `status` (via `throwApiError`), so a bare `Error` from a mutation is a flow-control signal (passkey cancel, verify-email redirect), not an incident.
+- **Error capture** on every `>= 500` HTTP response (api), every uncaught React render error (app), and every unexpected TanStack Query/mutation failure (app) — global `QueryCache`/`MutationCache` `onError` handlers capture 5xx and network errors (no `status`); expected 4xx (validation, 401/403/404, 429 rate-limit), `CancelledError` and `AbortError` are filtered out by `error-classifier.ts`. Mutations additionally skip an explicit allowlist of flow-control messages (`FLOW_CONTROL_MESSAGES` in `error-classifier.ts` — passkey cancel, verify-email redirect) that auth hooks throw on purpose; everything else, including plain `Error`s wrapping server failures, is captured.
 - **User identification (app)** — `Sentry.setUser({ id })` synced automatically from the `["session"]` query cache (`session-watcher.ts`): set on sign-in (any flow — password, magic link, passkey, session restore), cleared on sign-out. Id only; `beforeSend` scrubs the rest.
 - **Tags** auto-populated on every event: `requestId`, `userId`, `orgId`, `path`, `method`.
 - **Payload scrubbing** RGPD-clean by default — `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address` are stripped before transmission.
@@ -170,6 +170,7 @@ No code change. For a non-compatible provider, replace `SentryInstrumentation` w
 
 - `sendDefaultPii: false` is hard-coded.
 - `beforeSend` strips `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email`, `username`, `ip_address` before transmission. Whitelist-based (default = drop).
+- Fetch/XHR breadcrumbs record full request URLs and are **not** covered by the `beforeSend` request scrub — keep sensitive data out of query strings (repo convention: payloads travel in POST bodies, identifiers are opaque UUIDs).
 - For EU clients, use a `*.eu.sentry.io` DSN — Sentry stores all data in Frankfurt.
 
 If you ship a non-trivial scrubbing exception, document it inline in `sentry-init.ts` and update this section.

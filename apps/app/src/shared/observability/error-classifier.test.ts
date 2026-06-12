@@ -57,9 +57,13 @@ describe("isUnexpectedMutationError", () => {
     expect(isUnexpectedMutationError(new TypeError("Failed to fetch"))).toBe(true);
   });
 
-  it("skips plain Error without status (flow-control signals)", () => {
+  it("skips known flow-control messages", () => {
     expect(isUnexpectedMutationError(new Error("Cancelled"))).toBe(false);
-    expect(isUnexpectedMutationError(new Error("EMAIL_NOT_VERIFIED_REDIRECT"))).toBe(false);
+    expect(isUnexpectedMutationError(new Error("email-not-verified-redirect"))).toBe(false);
+  });
+
+  it("captures plain Errors wrapping server failures (better-auth hooks)", () => {
+    expect(isUnexpectedMutationError(new Error("Sign-in failed"))).toBe(true);
   });
 
   it("skips AbortError and CancelledError", () => {

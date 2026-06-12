@@ -10,9 +10,10 @@ export function isUnexpectedError(error: unknown): boolean {
   return true;
 }
 
+const FLOW_CONTROL_MESSAGES = new Set(["Cancelled", "email-not-verified-redirect"]);
+
 export function isUnexpectedMutationError(error: unknown): boolean {
   if (!isUnexpectedError(error)) return false;
-  if (error instanceof TypeError) return true;
-  if (error instanceof Error && !("status" in error)) return false;
+  if (error instanceof Error && FLOW_CONTROL_MESSAGES.has(error.message)) return false;
   return true;
 }
