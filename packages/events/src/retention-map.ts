@@ -39,6 +39,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: "compliance",
   [EventTypes.USER_POLICY_ACCEPTED]: "compliance",
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: "operational",
+  [EventTypes.SECURITY_CSP_VIOLATION]: "operational",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {
