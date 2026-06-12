@@ -69,4 +69,29 @@ describe("throwApiError", () => {
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBe(10);
   });
+
+  it("HTTP-date Retry-After header is parsed to seconds from now", async () => {
+    const future = new Date(Date.now() + 120_000);
+    const httpDate = future.toUTCString();
+    const res = makeResponse(
+      429,
+      { error: { code: "SECURITY_RATE_LIMITED", message: "rate limited", metadata: {} } },
+      { "Retry-After": httpDate },
+    );
+    const err = await throwApiError(res, "fallback").catch((e) => e);
+    expect(err.status).toBe(429);
+    expect(err.metadata?.retryAfter).toBeGreaterThanOrEqual(118);
+    expect(err.metadata?.retryAfter).toBeLessThanOrEqual(122);
+  });
+
+  it("garbage Retry-After header is ignored, no retryAfter, no crash", async () => {
+    const res = makeResponse(
+      429,
+      { error: { code: "SECURITY_RATE_LIMITED", message: "rate limited", metadata: {} } },
+      { "Retry-After": "not-a-date-or-number" },
+    );
+    const err = await throwApiError(res, "fallback").catch((e) => e);
+    expect(err.status).toBe(429);
+    expect(err.metadata?.retryAfter).toBeUndefined();
+  });
 });

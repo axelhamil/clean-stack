@@ -1,0 +1,1 @@
+CREATE INDEX "rate_limit_expire_idx" ON "rate_limit" USING btree ("expire") WHERE "rate_limit"."expire" IS NOT NULL;

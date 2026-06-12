@@ -67,6 +67,7 @@ const envSchema = z.object({
   SENTRY_ENVIRONMENT: z.string().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
   HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
   TRUSTED_PROXIES: z
     .string()
     .optional()

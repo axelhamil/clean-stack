@@ -206,6 +206,15 @@ export const UserPolicyAcceptedPayload = UserRef.extend({
 });
 export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
 
+export const SecurityRateLimitExceededPayload = z.object({
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45),
+  policyName: z.string().max(64),
+  path: z.string().max(512),
+  method: z.string().max(16),
+});
+export type SecurityRateLimitExceededPayload = z.infer<typeof SecurityRateLimitExceededPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -242,4 +251,5 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
+  [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
 } as const;

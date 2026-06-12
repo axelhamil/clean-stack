@@ -1,33 +1,13 @@
 import type { Context } from "hono";
-import { getConnInfo } from "hono/bun";
-import { env } from "../env";
 import type { WindowConfig } from "../ports/rate-limiter.port";
+import { resolveClientIp } from "./rate-limit.ip";
 
 export interface PolicyConfig {
   name: string;
   keyFn: (c: Context) => string;
   windows: WindowConfig[];
-}
-
-export function resolveClientIp(c: Context): string {
-  const socketAddr = getConnInfo(c).remote.address ?? "";
-  const trusted = env.TRUSTED_PROXIES;
-
-  if (!trusted?.includes(socketAddr)) return socketAddr || "unknown";
-
-  const xff = c.req.header("x-forwarded-for");
-  if (!xff) return socketAddr || "unknown";
-
-  // OWASP rightmost-non-trusted: walk XFF from right, skip trusted entries,
-  // return the first non-trusted entry. This is the real client IP regardless
-  // of how many trusted proxies are in the chain.
-  const hops = xff.split(",").map((h) => h.trim());
-  for (let i = hops.length - 1; i >= 0; i--) {
-    const hop = hops[i];
-    if (hop && !trusted.includes(hop)) return hop;
-  }
-
-  return socketAddr || "unknown";
+  emitSecurityEvent?: boolean;
+  advertiseBudget?: boolean;
 }
 
 function ipKeyFn(name: string): (c: Context) => string {
@@ -50,22 +30,67 @@ export const AUTH_SIGN_IN_POLICY: PolicyConfig = {
   name: "auth-sign-in",
   keyFn: ipKeyFn("auth-sign-in"),
   windows: [{ policyName: "auth-sign-in", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
 };
 
 export const AUTH_FORGOT_PASSWORD_POLICY: PolicyConfig = {
   name: "auth-forgot-password",
   keyFn: ipKeyFn("auth-forgot-password"),
   windows: [{ policyName: "auth-forgot-password", windowSec: 900, maxRequests: 3 }],
+  emitSecurityEvent: true,
 };
 
 export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
   name: "auth-magic-link",
   keyFn: ipKeyFn("auth-magic-link"),
   windows: [{ policyName: "auth-magic-link", windowSec: 900, maxRequests: 3 }],
+  emitSecurityEvent: true,
 };
 
 export const AUTH_SIGN_UP_POLICY: PolicyConfig = {
   name: "auth-sign-up",
   keyFn: ipKeyFn("auth-sign-up"),
   windows: [{ policyName: "auth-sign-up", windowSec: 3600, maxRequests: 10 }],
+  emitSecurityEvent: true,
+};
+
+// Two-factor verify paths: /two-factor/verify-totp, /two-factor/verify-otp,
+// /two-factor/verify-backup-code (BetterAuth twoFactor plugin, confirmed via dist grep).
+export const AUTH_TWO_FACTOR_POLICY: PolicyConfig = {
+  name: "auth-two-factor",
+  keyFn: ipKeyFn("auth-two-factor"),
+  windows: [{ policyName: "auth-two-factor", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
+  advertiseBudget: false,
+};
+
+// /verify-email: GET with ?token= (token consumption path).
+export const AUTH_VERIFY_EMAIL_POLICY: PolicyConfig = {
+  name: "auth-verify-email",
+  keyFn: (c) => {
+    const token = c.req.query("token");
+    return `auth-verify-email:${token ?? resolveClientIp(c)}`;
+  },
+  windows: [{ policyName: "auth-verify-email", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
+  advertiseBudget: false,
+};
+
+// /reset-password: POST that consumes the reset token (distinct from /request-password-reset).
+export const AUTH_RESET_PASSWORD_POLICY: PolicyConfig = {
+  name: "auth-reset-password",
+  keyFn: ipKeyFn("auth-reset-password"),
+  windows: [{ policyName: "auth-reset-password", windowSec: 900, maxRequests: 3 }],
+  emitSecurityEvent: true,
+  advertiseBudget: false,
+};
+
+// /passkey/generate-authenticate-options + /passkey/verify-authentication
+// (BetterAuth @better-auth/passkey plugin, confirmed via dist grep).
+export const AUTH_PASSKEY_POLICY: PolicyConfig = {
+  name: "auth-passkey",
+  keyFn: ipKeyFn("auth-passkey"),
+  windows: [{ policyName: "auth-passkey", windowSec: 900, maxRequests: 10 }],
+  emitSecurityEvent: true,
+  advertiseBudget: false,
 };

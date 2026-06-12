@@ -11,7 +11,7 @@ export function showRateLimitToast({ message, seconds }: RateLimitToastOptions):
     return;
   }
 
-  const id = `rate-limit-${Date.now()}`;
+  const id = `rate-limit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   let remaining = seconds;
 
   const interval = setInterval(() => {

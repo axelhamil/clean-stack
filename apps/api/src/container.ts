@@ -22,7 +22,10 @@ import { ResendEmailService } from "./shared/services/email.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
-import { RateLimiterMemoryAdapter } from "./shared/services/rate-limiter-memory.adapter";
+import {
+  RateLimiterFlexibleAdapter,
+  storeFactoryFor,
+} from "./shared/services/rate-limiter-flexible.adapter";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
 import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscriber";
 import type { ITransaction } from "./shared/transaction";
@@ -65,7 +68,11 @@ export const di = container()
     "IPasswordBreachService",
     (c): IPasswordBreachService => new HibpPasswordBreachService(c.IInstrumentation),
   )
-  .add("IRateLimiter", (c): IRateLimiter => new RateLimiterMemoryAdapter(c.IInstrumentation))
+  .add(
+    "IRateLimiter",
+    (c): IRateLimiter =>
+      new RateLimiterFlexibleAdapter(c.IInstrumentation, storeFactoryFor(env.RATE_LIMIT_STORE)),
+  )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
   .add(

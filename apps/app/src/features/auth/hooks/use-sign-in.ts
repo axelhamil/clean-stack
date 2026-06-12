@@ -5,7 +5,7 @@ import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { SignInInput } from "../../../shared/auth/auth.schema";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { resolveAuthError } from "./auth-error";
+import { resolveAuthError } from "../auth-error";
 
 const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
 

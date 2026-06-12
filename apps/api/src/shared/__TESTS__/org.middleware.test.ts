@@ -42,6 +42,7 @@ mock.module("@packages/drizzle", () => ({
   authSchema: {},
   TransactionService: class {},
   trackEventsOnSuccess: () => {},
+  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");
