@@ -37,5 +37,9 @@ export function addBreadcrumb(message: string, data?: Record<string, unknown>): 
   Sentry.addBreadcrumb({ message, data });
 }
 
+export function setUser(user: { id: string } | null): void {
+  Sentry.setUser(user);
+}
+
 export const ErrorBoundary = Sentry.ErrorBoundary;
 export const reactErrorHandler = Sentry.reactErrorHandler;

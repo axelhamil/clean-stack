@@ -7,6 +7,7 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 - `api/` — api-client, query-client, queries/, mutations/, errors/
 - `auth/` — auth-client, auth-broadcast, can, use-authorization, use-set-active-org, use-sign-out, schemas/
 - `components/` — cross-feature UI (app-shell, org-switcher, command-palette, …)
+- `observability/` — sentry.ts (init + captureError/addBreadcrumb/setUser/ErrorBoundary/reactErrorHandler) + noop.ts mirror, error-classifier, query-error-handler (QueryCache/MutationCache onError), session-watcher (setUser sync)
 - `app-providers.tsx` — provider tree
 - `env.ts` — validated env
 - `utils.ts` — pure helpers
@@ -14,6 +15,13 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 ## Hono RPC client
 
 Single client lives in `shared/api/api-client.ts`: `hcWithType(baseUrl, { init: { credentials: "include" }, fetch: customFetch })`. Custom fetch injects `X-Request-Id` and is the slot for future global handlers (401 redirect, token refresh, Capacitor Bearer). **`hcWithType` from `api/client`, not inline `hc<AppType>`** — `tsc` resolves `ApiClient` once. **Errors stay `throw on !res.ok`** — `ApplyGlobalResponse` widens response types but no discriminated union.
+
+## Observability (front)
+
+- **Every error shown to the user must also reach telemetry — and it already does for TanStack Query.** Global `QueryCache`/`MutationCache` `onError` handlers (`observability/query-error-handler.ts`, bound in `api/query-client.ts`) capture every unexpected failure: 5xx and network errors (no `status`). Expected errors — 4xx (validation, 401/403/404, 429 rate-limit), `CancelledError`, `AbortError` — are filtered by `error-classifier.ts`. **Never add `captureError` to a mutation/query `onError` callback** — it would double-report; local `onError` is for UX (toast, redirect) only. Manual `captureError(err, context)` is reserved for code paths outside TanStack Query (event listeners, fire-and-forget promises).
+- **`Sentry.setUser` is synced automatically** by `watchSession(queryClient)` (`observability/session-watcher.ts`), started module-level in `app-providers.tsx`. It observes the `["session"]` query — the single source of session truth — so every auth flow (password, magic link, passkey, restore, sign-out) is covered without touching auth hooks. Never call `setUser` from components or hooks. RGPD: id only.
+- **No direct `@sentry/react` import outside `observability/sentry.ts`.** Removability = swap the `./sentry` imports to `./noop` (see `docs/OBSERVABILITY.md`); call sites never change.
+- **The `["session"]` key is intentionally hardcoded in `session-watcher.ts`** — importing `sessionQueryOptions` would pull `auth-client` (and `window`) into non-React code and break node tests. **Why** `state.data === undefined` is skipped there: `undefined` = query not resolved yet, `null` = resolved with no session; only the latter must clear the Sentry user.
 
 ## Auth (BetterAuth client)
 
