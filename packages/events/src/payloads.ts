@@ -215,6 +215,22 @@ export const SecurityRateLimitExceededPayload = z.object({
 });
 export type SecurityRateLimitExceededPayload = z.infer<typeof SecurityRateLimitExceededPayload>;
 
+export const SecurityCspViolationPayload = z.object({
+  // Always null: CSP reports are browser-sent before any authenticated session — no known actor.
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45),
+  documentUri: z.string().max(2048),
+  blockedUri: z.string().max(2048),
+  violatedDirective: z.string().max(128),
+  effectiveDirective: z.string().max(64),
+  disposition: z.enum(["enforce", "report"]),
+  sourceFile: z.string().max(2048).optional(),
+  sample: z.string().max(100).optional(),
+  lineNumber: z.number().int().min(0).optional(),
+  columnNumber: z.number().int().min(0).optional(),
+});
+export type SecurityCspViolationPayload = z.infer<typeof SecurityCspViolationPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -252,4 +268,5 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
+  [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
 } as const;

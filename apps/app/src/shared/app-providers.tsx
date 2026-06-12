@@ -19,6 +19,15 @@ import { watchSession } from "./observability/session-watcher";
 
 watchSession(queryClient);
 
+const cspNonce = (() => {
+  if (typeof document === "undefined") return undefined;
+  // <meta> is not a nonceable element, so the IDL .nonce property stays empty — read the attribute.
+  return (
+    document.querySelector<HTMLMetaElement>('meta[property="csp-nonce"]')?.getAttribute("nonce") ??
+    undefined
+  );
+})();
+
 onAuthChange(async () => {
   await Promise.all([
     queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey }),
@@ -38,6 +47,7 @@ export function AppProviders() {
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={cspNonce}
         >
           <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />

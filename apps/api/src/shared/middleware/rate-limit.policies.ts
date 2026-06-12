@@ -94,3 +94,17 @@ export const AUTH_PASSKEY_POLICY: PolicyConfig = {
   emitSecurityEvent: true,
   advertiseBudget: false,
 };
+
+// Browser-sent CSP violation reports — no user identity, keyed by IP.
+// emitSecurityEvent=false: the violation itself is the signal (emitted unconditionally per report).
+// advertiseBudget=false: no RateLimit headers exposed to browsers.
+export const CSP_REPORT_POLICY: PolicyConfig = {
+  name: "csp-report",
+  keyFn: ipKeyFn("csp-report"),
+  windows: [
+    { policyName: "csp-report", windowSec: 60, maxRequests: 20 },
+    { policyName: "csp-report", windowSec: 3600, maxRequests: 200 },
+  ],
+  emitSecurityEvent: false,
+  advertiseBudget: false,
+};

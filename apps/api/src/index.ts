@@ -16,6 +16,7 @@ import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { env } from "./shared/env";
+import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
@@ -37,6 +38,7 @@ import {
   AUTH_SIGN_UP_POLICY,
   AUTH_TWO_FACTOR_POLICY,
   AUTH_VERIFY_EMAIL_POLICY,
+  CSP_REPORT_POLICY,
   GLOBAL_POLICY,
 } from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
@@ -52,10 +54,28 @@ const app = new Hono<AppEnv>();
 
 app.route("/", healthRoutes);
 
+// Mounted before the global middlewares: the endpoint is public, cross-origin (browser-posted),
+// and must not inherit the same-origin CORP that secureHeaders sets — that would block the report POST.
+app.use("/csp-report", cspReportCors);
+app.use(
+  "/csp-report",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, CSP_REPORT_POLICY),
+);
+app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
+
 app.use("*", requestId());
 app.use("*", (c, next) => runWithRequestContext({ requestId: c.get("requestId") }, next));
 app.use("*", httpLogger);
-app.use("*", secureHeaders());
+app.use(
+  "*",
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'none'"],
+    },
+  }),
+);
 app.use(
   "*",
   cors({
