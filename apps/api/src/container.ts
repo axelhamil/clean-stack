@@ -14,6 +14,7 @@ import type { IEmailService } from "./shared/ports/email.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
+import type { IRateLimiter } from "./shared/ports/rate-limiter.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
@@ -21,6 +22,7 @@ import { ResendEmailService } from "./shared/services/email.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
+import { RateLimiterMemoryAdapter } from "./shared/services/rate-limiter-memory.adapter";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
 import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscriber";
 import type { ITransaction } from "./shared/transaction";
@@ -33,6 +35,7 @@ declare module "inwire" {
     IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
     IPasswordBreachService: IPasswordBreachService;
+    IRateLimiter: IRateLimiter;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
@@ -62,6 +65,7 @@ export const di = container()
     "IPasswordBreachService",
     (c): IPasswordBreachService => new HibpPasswordBreachService(c.IInstrumentation),
   )
+  .add("IRateLimiter", (c): IRateLimiter => new RateLimiterMemoryAdapter(c.IInstrumentation))
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
   .add(

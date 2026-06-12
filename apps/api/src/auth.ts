@@ -160,6 +160,7 @@ const authOptions = {
   appName: "clean-stack",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
+  rateLimit: { enabled: false },
 
   database: drizzleAdapter(db, { provider: "pg" }),
 

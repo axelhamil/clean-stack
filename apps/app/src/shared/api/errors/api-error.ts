@@ -19,5 +19,12 @@ export async function throwApiError(res: Response, fallbackMessage: string): Pro
   err.code = payload.error?.code;
   err.metadata = payload.error?.metadata;
   err.status = res.status;
+  if (res.status === 429) {
+    const headerVal = res.headers.get("Retry-After");
+    const headerSeconds = headerVal !== null ? Number(headerVal) : Number.NaN;
+    if (!Number.isNaN(headerSeconds) && err.metadata?.retryAfter === undefined) {
+      err.metadata = { ...err.metadata, retryAfter: headerSeconds };
+    }
+  }
   throw err;
 }

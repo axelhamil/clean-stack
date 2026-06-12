@@ -27,6 +27,14 @@ import {
 } from "./shared/middleware/auth.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
+import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
+import {
+  AUTH_FORGOT_PASSWORD_POLICY,
+  AUTH_MAGIC_LINK_POLICY,
+  AUTH_SIGN_IN_POLICY,
+  AUTH_SIGN_UP_POLICY,
+  GLOBAL_POLICY,
+} from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
 import { lifecycleState } from "./shared/shutdown";
 
@@ -53,6 +61,15 @@ app.use(
 );
 
 app.use("*", sessionMiddleware);
+
+app.use("*", requireRateLimit(di.IRateLimiter, GLOBAL_POLICY));
+app.use("/api/auth/sign-in/email", requireRateLimit(di.IRateLimiter, AUTH_SIGN_IN_POLICY));
+app.use(
+  "/api/auth/request-password-reset",
+  requireRateLimit(di.IRateLimiter, AUTH_FORGOT_PASSWORD_POLICY),
+);
+app.use("/api/auth/sign-in/magic-link", requireRateLimit(di.IRateLimiter, AUTH_MAGIC_LINK_POLICY));
+app.use("/api/auth/sign-up/email", requireRateLimit(di.IRateLimiter, AUTH_SIGN_UP_POLICY));
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
@@ -110,6 +127,12 @@ const shutdown = async (signal: string) => {
 
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
+
+if (env.NODE_ENV === "production" && !env.TRUSTED_PROXIES) {
+  logger.warn(
+    "TRUSTED_PROXIES is not set in production — behind a load-balancer all requests share the LB socket address as rate-limit key (collective lockout). Set it to a comma-separated list of exact proxy IPs.",
+  );
+}
 
 logger.info({ port: env.PORT, env: env.NODE_ENV }, "api ready");
 
