@@ -1,6 +1,6 @@
 import type { Mutation, Query } from "@tanstack/react-query";
 import type { ApiError } from "../api/errors/api-error";
-import { isUnexpectedError } from "./error-classifier";
+import { isUnexpectedError, isUnexpectedMutationError } from "./error-classifier";
 import { captureError } from "./sentry";
 
 function errorContext(error: unknown): { status?: number; code?: string } {
@@ -20,7 +20,7 @@ export function onMutationError(
   _onMutateResult: unknown,
   mutation: Mutation<unknown, unknown>,
 ): void {
-  if (!isUnexpectedError(error)) return;
+  if (!isUnexpectedMutationError(error)) return;
   captureError(error, {
     mutationKey: mutation.options.mutationKey ?? null,
     ...errorContext(error),

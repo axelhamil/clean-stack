@@ -81,4 +81,13 @@ describe("onMutationError", () => {
     await mutation.execute(undefined).catch(() => {});
     expect(captureError).not.toHaveBeenCalled();
   });
+
+  it("skips flow-control errors thrown by mutation hooks", async () => {
+    const client = makeClient();
+    const mutation = client.getMutationCache().build(client, {
+      mutationFn: () => Promise.reject(new Error("Cancelled")),
+    });
+    await mutation.execute(undefined).catch(() => {});
+    expect(captureError).not.toHaveBeenCalled();
+  });
 });

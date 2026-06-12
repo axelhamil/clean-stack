@@ -9,12 +9,17 @@ if (env.VITE_SENTRY_DSN) {
     sendDefaultPii: false,
     tracesSampleRate: 0,
     beforeSend(event) {
+      if (event.request) {
+        event.request.data = undefined;
+        event.request.query_string = undefined;
+      }
       if (event.request?.headers) {
         const h = event.request.headers as Record<string, string | undefined>;
         h.cookie = undefined;
         h.Cookie = undefined;
         h.authorization = undefined;
         h.Authorization = undefined;
+        h["x-csrf-token"] = undefined;
       }
       if (event.user) {
         event.user.email = undefined;

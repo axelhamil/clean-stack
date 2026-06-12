@@ -9,3 +9,10 @@ export function isUnexpectedError(error: unknown): boolean {
   if (typeof status === "number") return status >= 500;
   return true;
 }
+
+export function isUnexpectedMutationError(error: unknown): boolean {
+  if (!isUnexpectedError(error)) return false;
+  if (error instanceof TypeError) return true;
+  if (error instanceof Error && !("status" in error)) return false;
+  return true;
+}
