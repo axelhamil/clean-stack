@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ForgotPasswordInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
+import { resolveAuthError } from "./auth-error";
 
 export function useForgotPassword() {
   return useMutation({
@@ -10,7 +11,7 @@ export function useForgotPassword() {
       const { data, error } = await authClient.requestPasswordReset({
         email: input.email,
       });
-      if (error) throw new Error(error.message ?? "Request failed");
+      if (error) throw new Error(resolveAuthError(error, "Request failed"));
 
       return data;
     },

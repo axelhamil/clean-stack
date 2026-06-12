@@ -1,5 +1,7 @@
 import { toast } from "sonner";
+import type { ApiError } from "./api/errors/api-error";
 import { formatApiError } from "./api/errors/messages";
+import { showRateLimitToast } from "./api/errors/rate-limit-toast";
 
 export interface DisplayUser {
   name?: string | null;
@@ -41,6 +43,17 @@ function rawMessage(err: unknown): string | undefined {
 }
 
 export function toastError(err: unknown, fallback: string): void {
+  const apiErr = err as ApiError;
+  if (apiErr?.status === 429) {
+    const retryAfter = apiErr.metadata?.retryAfter;
+    if (typeof retryAfter === "number") {
+      showRateLimitToast({
+        message: formatApiError(err, rawMessage(err) ?? fallback),
+        seconds: retryAfter,
+      });
+      return;
+    }
+  }
   toast.error(formatApiError(err, rawMessage(err) ?? fallback));
 }
 
