@@ -4,7 +4,8 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 
 ## What you get out of the box
 
-- **Error capture** on every `>= 500` HTTP response (api) and every uncaught React render error (app).
+- **Error capture** on every `>= 500` HTTP response (api), every uncaught React render error (app), and every unexpected TanStack Query/mutation failure (app) — global `QueryCache`/`MutationCache` `onError` handlers capture 5xx and network errors (no `status`); expected 4xx (validation, 401/403/404, 429 rate-limit), `CancelledError` and `AbortError` are filtered out by `error-classifier.ts`. Mutations additionally skip an explicit allowlist of flow-control messages (`FLOW_CONTROL_MESSAGES` in `error-classifier.ts` — passkey cancel, verify-email redirect) that auth hooks throw on purpose; everything else, including plain `Error`s wrapping server failures, is captured.
+- **User identification (app)** — `Sentry.setUser({ id })` synced automatically from the `["session"]` query cache (`session-watcher.ts`): set on sign-in (any flow — password, magic link, passkey, session restore), cleared on sign-out. Id only; `beforeSend` scrubs the rest.
 - **Tags** auto-populated on every event: `requestId`, `userId`, `orgId`, `path`, `method`.
 - **Payload scrubbing** RGPD-clean by default — `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address` are stripped before transmission.
 - **Pino integration** — every `logger.warn` / `logger.error` becomes a Sentry breadcrumb attached to the next captured event. Single source of truth for logs.
@@ -51,7 +52,7 @@ VITE_SENTRY_ENVIRONMENT=production
 VITE_GIT_SHA=...
 ```
 
-`<Sentry.ErrorBoundary>` already wraps the provider tree in `apps/app/src/shared/app-providers.tsx` with a fallback UI.
+`<Sentry.ErrorBoundary>` already wraps the provider tree in `apps/app/src/shared/app-providers.tsx` with a fallback UI. With the DSN set you also get, with zero extra wiring: global query/mutation error capture (`shared/observability/query-error-handler.ts`, bound in `shared/api/query-client.ts`) and user-id tagging (`shared/observability/session-watcher.ts`, started module-level in `app-providers.tsx`).
 
 ### CI — source maps upload (production builds)
 
@@ -139,6 +140,8 @@ captureError(err, { feature: "checkout", step: "stripe-redirect" });
 addBreadcrumb("user clicked checkout", { plan: "pro" });
 ```
 
+Unexpected query/mutation errors (5xx, network) are already captured globally by the `QueryCache`/`MutationCache` handlers — manual `captureError` is for code paths outside TanStack Query (event listeners, `BroadcastChannel` handlers, fire-and-forget promises). Don't duplicate it inside mutation `onError` callbacks.
+
 ## Removability — flip one binding, no call-site change
 
 The whole Sentry stack is one DI binding plus one side-effect import. The call sites (`this.instrumentation.capture(...)`, `this.instrumentation.startSpan(...)`, `<ErrorBoundary>`) never change — they resolve to NoOp when Sentry is disabled.
@@ -146,7 +149,7 @@ The whole Sentry stack is one DI binding plus one side-effect import. The call s
 To remove Sentry entirely:
 
 1. **API binding**: edit `apps/api/src/container.ts` → replace the `IInstrumentation` factory by `() => new NoOpInstrumentation()` (drop the conditional). `trash apps/api/src/shared/services/sentry-{init,instrumentation}.ts`. Remove the `import "./shared/services/sentry-init"` line from `index.ts`.
-2. **Front**: in `apps/app/src/shared/app-providers.tsx`, swap `from "./observability/sentry"` to `from "./observability/noop"`. `trash apps/app/src/shared/observability/sentry.ts`.
+2. **Front**: swap `from "./observability/sentry"` (or `"../observability/sentry"`) to the `noop` module in the four importers — `main.tsx`, `app-providers.tsx`, `observability/session-watcher.ts`, `observability/query-error-handler.ts`. `trash apps/app/src/shared/observability/sentry.ts`. `error-classifier.ts`, `session-watcher.ts` and `query-error-handler.ts` stay — they only talk to the noop-able module.
 3. **Build plugin**: remove the `@sentry/vite-plugin` block from `apps/app/vite.config.ts` (revert to `plugins: [react(), tailwindcss()]`).
 4. **Packages**: `pnpm remove @sentry/bun --filter=api && pnpm remove @sentry/react @sentry/vite-plugin --filter=app`.
 5. **Env**: unset `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and drop the matching `.env.example` blocks if you like).
@@ -167,6 +170,7 @@ No code change. For a non-compatible provider, replace `SentryInstrumentation` w
 
 - `sendDefaultPii: false` is hard-coded.
 - `beforeSend` strips `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email`, `username`, `ip_address` before transmission. Whitelist-based (default = drop).
+- Fetch/XHR breadcrumbs record full request URLs and are **not** covered by the `beforeSend` request scrub — keep sensitive data out of query strings (repo convention: payloads travel in POST bodies, identifiers are opaque UUIDs).
 - For EU clients, use a `*.eu.sentry.io` DSN — Sentry stores all data in Frankfurt.
 
 If you ship a non-trivial scrubbing exception, document it inline in `sentry-init.ts` and update this section.

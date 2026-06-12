@@ -15,6 +15,9 @@ import { sessionQueryOptions } from "./api/queries/session";
 import { queryClient } from "./api/query-client";
 import { onAuthChange } from "./auth/auth-broadcast";
 import { ErrorBoundary } from "./observability/sentry";
+import { watchSession } from "./observability/session-watcher";
+
+watchSession(queryClient);
 
 onAuthChange(async () => {
   await Promise.all([

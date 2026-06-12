@@ -4,6 +4,8 @@ export function captureError(..._args: unknown[]): void {}
 
 export function addBreadcrumb(..._args: unknown[]): void {}
 
+export function setUser(_user: { id: string } | null): void {}
+
 export function ErrorBoundary({
   children,
   ..._props
