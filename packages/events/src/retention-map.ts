@@ -40,6 +40,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.USER_POLICY_ACCEPTED]: "compliance",
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: "operational",
   [EventTypes.SECURITY_CSP_VIOLATION]: "operational",
+  [EventTypes.SECURITY_CSRF_REJECTED]: "operational",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

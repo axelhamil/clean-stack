@@ -106,6 +106,8 @@ const EventTypesMock = {
   USER_DELETION_REQUESTED: "user.deletion.requested",
   USER_DELETION_CANCELLED: "user.deletion.cancelled",
   USER_DELETED: "user.deleted",
+  USER_PROFILE_UPDATED: "user.profile.updated",
+  USER_EMAIL_CHANGE_REQUESTED: "user.email.change_requested",
   USER_EXPORT_REQUESTED: "user.export.requested",
   USER_EXPORT_COMPLETED: "user.export.completed",
   ORG_CREATED: "org.created",
@@ -125,6 +127,7 @@ const EventTypesMock = {
   USER_POLICY_ACCEPTED: "user.policy.accepted",
   SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
   SECURITY_CSP_VIOLATION: "security.csp.violation",
+  SECURITY_CSRF_REJECTED: "security.csrf.rejected",
 } as const;
 const stubPayload = { safeParse: () => ({ success: true }) };
 mock.module("@packages/events", () => ({
@@ -153,6 +156,8 @@ mock.module("@packages/events", () => ({
   UserDeletionRequestedPayload: stubPayload,
   UserDeletionCancelledPayload: stubPayload,
   UserDeletedPayload: stubPayload,
+  UserProfileUpdatedPayload: stubPayload,
+  UserEmailChangeRequestedPayload: stubPayload,
   UserExportRequestedPayload: stubPayload,
   UserExportCompletedPayload: stubPayload,
   OrgCreatedPayload: stubPayload,
@@ -172,6 +177,7 @@ mock.module("@packages/events", () => ({
   UserPolicyAcceptedPayload: stubPayload,
   SecurityRateLimitExceededPayload: stubPayload,
   SecurityCspViolationPayload: stubPayload,
+  SecurityCsrfRejectedPayload: stubPayload,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
