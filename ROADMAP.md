@@ -22,6 +22,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.1 — Security perimeter (S1–S4)** | **Jun 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory→Postgres→Redis stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + 2 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S4.1 rate-limiter resilience → S5 abuse → S6 captcha. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -42,7 +43,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 ### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
 
-- **C.1** Security perimeter — rate-limit (sliding-window per IP/user, captcha on auth-burst), strict CSP nonce (no `unsafe-inline`), CSRF on non-BetterAuth POST. **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
+- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF shipped** (Jun 2026 — see ✅ table; S4.1/S5/S6 remain, S4.1 next). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
 - **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14, mandatory since 28 Jun 2025) + DPA + DORA annex templates. Cheap (~3h), pure config/Markdown.
 - **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
 

@@ -16,6 +16,12 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 
 Single client lives in `shared/api/api-client.ts`: `hcWithType(baseUrl, { init: { credentials: "include" }, fetch: customFetch })`. Custom fetch injects `X-Request-Id` and is the slot for future global handlers (401 redirect, token refresh, Capacitor Bearer). **`hcWithType` from `api/client`, not inline `hc<AppType>`** — `tsc` resolves `ApiClient` once. **Errors stay `throw on !res.ok`** — `ApplyGlobalResponse` widens response types but no discriminated union.
 
+**CSRF is transparent on the front** — the API uses Origin-based validation (no double-submit token, no `X-CSRF-Token` header). The browser sends the `Origin` header automatically on every cross-origin fetch; the api-client injects nothing extra for CSRF. Do **not** add `X-CSRF-Token` injection.
+
+## CSP nonce
+
+Caddy injects the nonce via `{http.request.uuid}` into `<meta property="csp-nonce" nonce="...">` in `index.html` (see `apps/app/Caddyfile`). Vite propagates it through `html.cspNonce` in `vite.config.ts`. `app-providers.tsx` reads the nonce from the `<meta>` attribute (IDL `.nonce` is empty on meta — must use `.getAttribute("nonce")`) and passes it to `ThemeProvider`. Do **not** read via `.nonce` IDL; do **not** inline the nonce in JS.
+
 ## Observability (front)
 
 - **Every error shown to the user must also reach telemetry — and it already does for TanStack Query.** Global `QueryCache`/`MutationCache` `onError` handlers (`observability/query-error-handler.ts`, bound in `api/query-client.ts`) capture every unexpected failure: 5xx and network errors (no `status`). Expected errors — 4xx (validation, 401/403/404, 429 rate-limit), `CancelledError`, `AbortError` — are filtered by `error-classifier.ts`. **Never add `captureError` to a mutation/query `onError` callback** — it would double-report; local `onError` is for UX (toast, redirect) only. Manual `captureError(err, context)` is reserved for code paths outside TanStack Query (event listeners, fire-and-forget promises).

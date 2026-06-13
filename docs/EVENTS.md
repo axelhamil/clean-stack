@@ -254,7 +254,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **35 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **38 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, 3 from security middleware/endpoint). Source of truth: `packages/events/src/event-types.ts`.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -295,6 +295,14 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 ### Via `PolicyAcceptanceService` (Phase A.2)
 - `USER_POLICY_ACCEPTED` (`user.policy.accepted`) — payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
 
+### Via security middleware / endpoint (Phase C.1)
+
+Ces 3 events ne sont pas des state-changes métier — ils signalent des rejets de sécurité au niveau infra. Émis via `emitEvent(outbox, ...)` **hors agrégat** (même chemin que les events RGPD/uploads/webhooks), avec `actorUserId` **nullable** (pas de session authentifiée fiable sur ces rejets).
+
+- `SECURITY_RATE_LIMIT_EXCEEDED` (`security.rate_limit.exceeded`) — émis par le rate-limit middleware sur rejet d'une requête auth. Payload : `{ ipAddress, path, actorUserId? }`, retention `operational`.
+- `SECURITY_CSP_VIOLATION` (`security.csp.violation`) — émis par l'endpoint public `POST /csp-report`. Payload : `{ documentUri, violatedDirective, blockedUri, actorUserId? }`, retention `operational`.
+- `SECURITY_CSRF_REJECTED` (`security.csrf.rejected`) — émis par le CSRF middleware sur Origin invalide. Payload : `{ ipAddress, path, origin?, actorUserId? }`, retention `operational`.
+
 ## Payload validation guarantee
 
 Every `outbox.enqueue(...)` call validates each event against `PayloadByEventType[eventType]` via Zod `safeParse` **before** the INSERT. A failure throws, which rolls back the surrounding TX (UoW or BetterAuth hook). **Why**: the audit trail is only as good as the payloads it stores — a missing `actorUserId`, an extra field, a wrong type silently corrupts compliance. Failing the mutation forces the bug to surface at the call site, atomically (the business write and the bad event are rejected together, never half-applied).
@@ -326,7 +334,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (35 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (38 events) |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |

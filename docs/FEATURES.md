@@ -27,7 +27,7 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 - Acceptance gate `/legal/accept` (under `_protected`, outside `_shell`) — adapts: first-time user (magic-link/social, no checkbox shown) sees a "Before you get started" welcome; a returning user with a stale version sees the changelog diff. One Accept button. `_shell` `beforeLoad` redirects here when any policy is stale (fail-open if the policies endpoint errors).
 - **Hosting-agnostic content**: the full policy text ships in-app as placeholder, but every link resolves `POLICY_URLS` from `@packages/policies`. Hosting the real policies on a marketing site/CMS is a **one-line swap** there (point the URL external, delete the in-app pages) — the versioning + acceptance machinery is untouched.
 
-**Event**: `user.policy.accepted` — self-actor, `compliance` retention. Brings the catalogue to **35 events**.
+**Event**: `user.policy.accepted` — self-actor, `compliance` retention.
 
 ---
 
@@ -211,9 +211,50 @@ Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing p
 - **Dispatcher**: in-process Bun worker, dedicated `pg.Client` LISTEN + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers run inside the dispatch TX (atomic), user `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`, SOC2 §CC7.2 / ISO 27001) — append-only, retention `operational` (90d) vs `compliance` (7y) driven by `RETENTION_MAP`. Tamper-evidence columns posed (`prev_hash`/`hash`), calc gated by env flag.
 - **Outbound webhooks** (`webhook_endpoint` + `webhook_delivery`) — HMAC-SHA256 signed (`t=<ts>,v1=<hex>` Stripe-style), AEAD-encrypted secrets at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per org). Decorrelated jitter retry (1m/5m/30m/2h/12h paliers), dead-letter after 5 attempts, replay endpoint. Claim window pattern in delivery worker — fetch HTTP outside TX, no lock starvation.
-- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`) → **35 events total**.
-- **Catalog `@packages/events`** — 35 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
+- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`), SecurityMiddleware emits 3 (`security.rate_limit.exceeded`, `security.csp.violation`, `security.csrf.rejected`) → **38 events total**.
+- **Catalog `@packages/events`** — 38 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
 - **Request correlation** — every event carries the originating request's `X-Request-Id` in `outbox_event.metadata.requestId` (captured via an `AsyncLocalStorage` context, works inside BetterAuth hooks too), copied into `audit_log.request_id` so audit rows join to their logs + Sentry event on one key.
+
+## Security & hardening ✅ Phase C.1
+
+Deploy-safe perimeter — rate-limit, strict CSP, and stateless CSRF protection, all wired before any business feature.
+
+**Rate-limit** (`apps/api/src/shared/middleware/rate-limit.middleware.ts`):
+
+- Unified Hono middleware (`rate-limiter-flexible`); BetterAuth built-in rate-limit disabled — one policy wins, no double-counting.
+- Policies: `global` (all routes) + 8 auth-burst policies (`/sign-in/email`, `/sign-up/email`, `/magic-link`, `/reset-password`, `/change-password`, `/verify-email`, `/two-factor`, `/passkey`) with tighter windows.
+- IETF `RateLimit` / `RateLimit-Policy` / `Retry-After` headers on every rate-limited response.
+- **Fail-closed on auth** — a store outage throws 503 on auth routes rather than silently skipping the guard (OWASP A10:2025). Global routes fail-open.
+- Trusted-proxy IP resolution: `TRUSTED_PROXIES=private` (Railway/Fly), CIDR, or exact IP. OWASP rightmost-non-trusted algorithm — first untrusted IP wins.
+- Store progression: memory (dev) → Postgres → Redis (swap without code change).
+- Front: `sonner` toast on 429 with countdown from `Retry-After`.
+
+**CSP** (Caddy + Vite, _not_ a Hono middleware):
+
+- Per-request nonce via Caddy `{http.request.uuid}` injected into the `Content-Security-Policy` header; same value forwarded to Vite via `html.cspNonce` meta tag.
+- `'strict-dynamic'` policy — no `'unsafe-inline'`, no host allowlist.
+- Public `POST /csp-report` endpoint: IP-rate-limited, `Cross-Origin-Resource-Policy: cross-origin` (browsers need it for report delivery), document-uri origin filter (drops 3rd-party extension noise).
+- Emits `security.csp.violation` audit event (`operational` retention).
+- Trusted Types deferred (no eval/DOM-sink usage today — land when needed).
+
+**CSRF** (`apps/api/src/shared/middleware/csrf.middleware.ts`):
+
+- Origin-allowlist on unsafe HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`). Stateless — no token, no cookie, no endpoint to maintain (the Next.js Server Actions / SvelteKit model).
+- Allowlist is the CORS origin list (`CORS_ORIGIN`) — single source of truth, zero drift.
+- Bearer-skip: requests with `Authorization: Bearer …` bypass the check (Capacitor mobile, PATs, internal HMAC-signed calls).
+- Emits `security.csrf.rejected` audit event (`operational` retention).
+
+**Hardened headers** (Caddy, no Hono duplication):
+
+- `Strict-Transport-Security` (HSTS, 1 year, includeSubDomains).
+- `Content-Security-Policy: frame-ancestors 'none'` (clickjacking).
+- `X-Content-Type-Options: nosniff`.
+- `Referrer-Policy: strict-origin-when-cross-origin`.
+- `Permissions-Policy` (camera, microphone, geolocation off by default).
+
+**Prod boot guard**: api fails hard (`process.exit(1)`) on missing `CORS_ORIGIN` — a silent empty-string allowlist would make CSRF protection a no-op.
+
+**Events** (3 new, `operational` retention): `security.rate_limit.exceeded` · `security.csp.violation` · `security.csrf.rejected`. Brings the catalogue to **38 events** (23 BetterAuth + 5 RGPD + 3 uploads + 3 webhooks + 1 policy + 3 security).
 
 See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
 
