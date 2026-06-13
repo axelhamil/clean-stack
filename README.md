@@ -99,6 +99,12 @@ Everything wired today, and the build order for what's next. Full inventory in [
 - `organization` plugin — Personal org auto-heal, team orgs, email invitations, role-based members, ownership transfer
 - Capability-based authorization SSOT (`@packages/access-control`) — same predicate at server middleware, route `beforeLoad` gate, and `<Can>` UI
 
+**Security & hardening** — *the deploy-safe perimeter (Phase C.1)*
+- Unified rate-limit — one Hono middleware (`rate-limiter-flexible`, BetterAuth built-in disabled) → global + 8 auth-burst policies, multi-window, IETF `RateLimit`/`RateLimit-Policy`/`Retry-After` headers, **fail-closed on auth** (a store outage can't silently disable brute-force protection — OWASP A10:2025), trusted-proxy IP resolution (`private`/CIDR/exact, OWASP rightmost-non-trusted), memory → Postgres → Redis stores
+- Strict CSP — per-request nonce (Caddy native `{http.request.uuid}` + Vite `html.cspNonce`), `'strict-dynamic'`, public `/csp-report` (IP-rate-limited + cross-origin CORP + document-uri origin filter) → `security.csp.violation` audit event
+- CSRF — **Origin-allowlist on unsafe methods** (stateless, no token/cookie/endpoint — the Next.js Server Actions / SvelteKit model), reuses the CORS allowlist as SSOT, Bearer-skip for Capacitor, `security.csrf.rejected` audit event
+- Hardened headers (HSTS, CSP `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy via Caddy) · credentialed CORS allowlist · prod boot **fails hard** on missing `CORS_ORIGIN` / signing keys
+
 **Legal / compliance (GDPR)**
 - Art. 7 — privacy/terms versioning + re-acceptance gate (`@packages/policies`, `/legal/accept`)
 - Art. 16 — rectification (profile, email-change, password)
@@ -147,7 +153,7 @@ Everything wired today, and the build order for what's next. Full inventory in [
 
 Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
 
-- **M1 — Deploy-safe & legal** · rate-limit + strict CSP + CSRF (unified Hono middleware; BetterAuth built-in disabled, Sentinel threat model self-hosted) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
+- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF **shipped** (Phase C.1 — see Security & hardening above; captcha + abuse-signals still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
 - **M2 — Revenue** · billing via `@better-auth/stripe` (per-org customer, portal, dunning) · feature & quota gating (config + middleware, no DDD)
 - **M3 — Finish half-shipped UIs** · audit-log front · webhooks front + `webhook.test` · recovery-codes UI · privacy dashboard
 - **M4 — Operate** · admin & impersonation (BetterAuth `admin` plugin) · API tokens / PATs (eval `@better-auth/api-key`) · OpenAPI docs (Scalar) · in-app notifications
@@ -235,7 +241,7 @@ Three `.env` files, on purpose. **Do not collapse them into one at the root** �
 
 `pnpm bootstrap` (or `bash scripts/bootstrap.sh`) copies each `.env.example` → `.env` if missing. Idempotent — never overwrites.
 
-Only three variables are **required to boot** the api: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
+Only three variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), or `WEBHOOK_MASTER_KEY` is missing — a silent fallback there is worse than a refused boot. Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
 
 ---
 
