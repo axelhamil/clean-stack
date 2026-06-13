@@ -233,7 +233,16 @@ modules/consents/
 >
 > **Documented deployment debt** (see README): `RATE_LIMIT_STORE=memory` is per-replica — switch to `postgres`/Redis before horizontal scaling; `TRUSTED_PROXIES` must be set behind a load-balancer (warn at boot) or every request shares the LB IP (collective lockout); fail-closed-on-auth without a circuit-breaker can turn a store outage into temporary login unavailability (v-next: degraded in-memory fallback).
 >
-> **Still pending in C.1**: captcha hook (S6), abuse-prevention signals (S5 — credential-stuffing / impossible-travel / free-trial / geo deny-list).
+> **Still pending in C.1** (priority order): **S4.1 rate-limiter store resilience (next)** → S5 abuse-prevention signals → S6 captcha.
+
+### S4.1 — Rate-limiter store resilience — **NEXT (priority over S5/S6)**
+
+**Why first**: the only MEDIUM finding from the C.1 SOTA review, and it's live on the `postgres` store. The limiter shares the app's pg pool (`packages/drizzle/src/config.ts:27` — `max: 20`) through the global `db` proxy (`rate-limiter-flexible.adapter.ts:27` passes `storeClient: db`). A sustained flood can exhaust that shared pool → the fail-closed auth policies then 503 (DoS amplification). Isolating the limiter removes the vector **without** an in-memory store (deliberate: `RATE_LIMIT_STORE` stays `postgres`).
+
+- [ ] **Dedicated pg `Pool`** for the limiter — `new Pool({ max: 3, connectionTimeoutMillis: 500 })` wrapped in a minimal `drizzle(dedicatedPool, { schema: { rateLimitRecord } })`. Wire via the `IRateLimiter` binding (`container.ts:71`) → pass into `drizzleFactory` (`rate-limiter-flexible.adapter.ts`). **Do NOT** expose the global pool from `@packages/drizzle` (encapsulation).
+- [ ] **Short acquire timeout** so a store stall fails fast instead of queuing on a saturated pool.
+- [ ] **Decide `insuranceLimiter`**: rate-limiter-flexible offers an in-memory fallback on store error. Since `RATE_LIMIT_STORE` stays postgres by preference and a real pg outage = whole-app outage anyway, default to **fail-closed-fast** (skip insurance) unless a separate Redis store lands — then a tiny conservative in-memory insurance for the auth policies only is worth revisiting.
+- [ ] **Verify Caddy `Reporting-Endpoints`** emits without literal backticks (`curl -I` against a local Caddy run) — the one unverified item from the CSP audit; fix the Caddyfile string syntax if they leak.
 
 ### Rate limiting + abuse prevention
 
