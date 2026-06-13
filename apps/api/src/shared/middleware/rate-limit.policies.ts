@@ -8,6 +8,10 @@ export interface PolicyConfig {
   windows: WindowConfig[];
   emitSecurityEvent?: boolean;
   advertiseBudget?: boolean;
+  // Deny (503) instead of allowing through when the limiter store itself errors.
+  // Set on auth/abuse-sensitive policies: a store outage must not silently disable
+  // brute-force protection (OWASP A10:2025 / CWE-636). GLOBAL/CSP stay fail-open.
+  failClosed?: boolean;
 }
 
 function ipKeyFn(name: string): (c: Context) => string {
@@ -31,6 +35,7 @@ export const AUTH_SIGN_IN_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-sign-in"),
   windows: [{ policyName: "auth-sign-in", windowSec: 900, maxRequests: 5 }],
   emitSecurityEvent: true,
+  failClosed: true,
 };
 
 export const AUTH_FORGOT_PASSWORD_POLICY: PolicyConfig = {
@@ -38,6 +43,7 @@ export const AUTH_FORGOT_PASSWORD_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-forgot-password"),
   windows: [{ policyName: "auth-forgot-password", windowSec: 900, maxRequests: 3 }],
   emitSecurityEvent: true,
+  failClosed: true,
 };
 
 export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
@@ -45,6 +51,7 @@ export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-magic-link"),
   windows: [{ policyName: "auth-magic-link", windowSec: 900, maxRequests: 3 }],
   emitSecurityEvent: true,
+  failClosed: true,
 };
 
 export const AUTH_SIGN_UP_POLICY: PolicyConfig = {
@@ -52,6 +59,7 @@ export const AUTH_SIGN_UP_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-sign-up"),
   windows: [{ policyName: "auth-sign-up", windowSec: 3600, maxRequests: 10 }],
   emitSecurityEvent: true,
+  failClosed: true,
 };
 
 // Two-factor verify paths: /two-factor/verify-totp, /two-factor/verify-otp,
@@ -61,6 +69,7 @@ export const AUTH_TWO_FACTOR_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-two-factor"),
   windows: [{ policyName: "auth-two-factor", windowSec: 900, maxRequests: 5 }],
   emitSecurityEvent: true,
+  failClosed: true,
   advertiseBudget: false,
 };
 
@@ -73,6 +82,7 @@ export const AUTH_VERIFY_EMAIL_POLICY: PolicyConfig = {
   },
   windows: [{ policyName: "auth-verify-email", windowSec: 900, maxRequests: 5 }],
   emitSecurityEvent: true,
+  failClosed: true,
   advertiseBudget: false,
 };
 
@@ -82,6 +92,7 @@ export const AUTH_RESET_PASSWORD_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-reset-password"),
   windows: [{ policyName: "auth-reset-password", windowSec: 900, maxRequests: 3 }],
   emitSecurityEvent: true,
+  failClosed: true,
   advertiseBudget: false,
 };
 
@@ -92,6 +103,7 @@ export const AUTH_PASSKEY_POLICY: PolicyConfig = {
   keyFn: ipKeyFn("auth-passkey"),
   windows: [{ policyName: "auth-passkey", windowSec: 900, maxRequests: 10 }],
   emitSecurityEvent: true,
+  failClosed: true,
   advertiseBudget: false,
 };
 

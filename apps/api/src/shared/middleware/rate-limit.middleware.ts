@@ -26,6 +26,14 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
     const result = await deps.limiter.consume(key, policy.windows);
 
     if (result.isFailure) {
+      if (policy.failClosed) {
+        // 503 routes through the central error handler (logs at error + Sentry capture);
+        // a store outage must not silently disable brute-force protection (OWASP A10:2025).
+        throw new AppErrorException({
+          code: "RATE_LIMITER_UNAVAILABLE",
+          message: "Service temporarily unavailable",
+        });
+      }
       logger.warn({ policy: policy.name, key }, "rate limiter internal error — failing open");
       return next();
     }

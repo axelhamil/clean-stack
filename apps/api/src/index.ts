@@ -219,7 +219,7 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 
 if (env.NODE_ENV === "production" && !env.TRUSTED_PROXIES) {
   logger.warn(
-    "TRUSTED_PROXIES is not set in production — behind a load-balancer all requests share the LB socket address as rate-limit key (collective lockout). Set it to a comma-separated list of exact proxy IPs.",
+    "TRUSTED_PROXIES is not set in production — behind a load-balancer all requests share the LB socket address as rate-limit key (collective lockout). Set it to `private` (trusts platform private ranges — the right value on Railway/Fly/most PaaS), a comma-separated CIDR list, or exact proxy IPs.",
   );
 }
 

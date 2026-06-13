@@ -166,6 +166,25 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
+  describe("fail-closed on limiter error (sensitive policies)", () => {
+    it("denies with 503 when a failClosed policy's limiter errors", async () => {
+      const app = new Hono<{ Variables: { requestId: string; user: null } }>();
+      app.use("*", async (c, next) => {
+        c.set("requestId", "req-fc");
+        c.set("user", null);
+        await next();
+      });
+      app.use("*", requireRateLimit({ limiter: makeFailLimiter() }, AUTH_SIGN_IN_POLICY));
+      app.post("/sign-in", (c) => c.json({ ok: true }));
+      app.onError(createErrorHandler(makeNoop()));
+
+      const res = await app.request("/sign-in", { method: "POST" });
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("RATE_LIMITER_UNAVAILABLE");
+    });
+  });
+
   describe("key function", () => {
     it("uses userId when user is in context", async () => {
       let capturedKey: string | undefined;
@@ -454,6 +473,62 @@ describe("requireRateLimit middleware", () => {
       });
       const body = (await res.json()) as { ip: string };
       expect(body.ip).toBe("127.0.0.1");
+    });
+
+    it("CIDR range: socket inside 10.0.0.0/8 is trusted, XFF client returned", async () => {
+      mockedAddress = "10.5.6.7";
+      const { env: e } = await import("../env");
+      (e as Record<string, unknown>).TRUSTED_PROXIES = ["10.0.0.0/8"];
+
+      const app = new Hono();
+      app.get("/ip", (c) => c.json({ ip: resolveClientIp(c) }));
+      const res = await app.request("/ip", {
+        headers: { "x-forwarded-for": "203.0.113.1" },
+      });
+      const body = (await res.json()) as { ip: string };
+      expect(body.ip).toBe("203.0.113.1");
+    });
+
+    it("`private` keyword trusts an IPv6 ULA proxy (Railway), returns XFF client", async () => {
+      mockedAddress = "fd12:3456:789a::1";
+      const { env: e } = await import("../env");
+      (e as Record<string, unknown>).TRUSTED_PROXIES = ["private"];
+
+      const app = new Hono();
+      app.get("/ip", (c) => c.json({ ip: resolveClientIp(c) }));
+      const res = await app.request("/ip", {
+        headers: { "x-forwarded-for": "203.0.113.9" },
+      });
+      const body = (await res.json()) as { ip: string };
+      expect(body.ip).toBe("203.0.113.9");
+    });
+
+    it("`private` keyword trusts a CGNAT (100.64.0.0/10) proxy", async () => {
+      mockedAddress = "100.96.1.1";
+      const { env: e } = await import("../env");
+      (e as Record<string, unknown>).TRUSTED_PROXIES = ["private"];
+
+      const app = new Hono();
+      app.get("/ip", (c) => c.json({ ip: resolveClientIp(c) }));
+      const res = await app.request("/ip", {
+        headers: { "x-forwarded-for": "198.51.100.7" },
+      });
+      const body = (await res.json()) as { ip: string };
+      expect(body.ip).toBe("198.51.100.7");
+    });
+
+    it("public socket address is NOT trusted even with `private` set", async () => {
+      mockedAddress = "8.8.8.8";
+      const { env: e } = await import("../env");
+      (e as Record<string, unknown>).TRUSTED_PROXIES = ["private"];
+
+      const app = new Hono();
+      app.get("/ip", (c) => c.json({ ip: resolveClientIp(c) }));
+      const res = await app.request("/ip", {
+        headers: { "x-forwarded-for": "1.2.3.4" },
+      });
+      const body = (await res.json()) as { ip: string };
+      expect(body.ip).toBe("8.8.8.8");
     });
 
     it("no XFF header with trusted socket: falls back to socket address", async () => {

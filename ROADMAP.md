@@ -224,6 +224,17 @@ modules/consents/
 
 **Why bundled**: three hardening layers any public endpoint needs. Shipping them together avoids a 3-pass review of every route. Currently zero rate-limit, default-permissive CSP from `secureHeaders()`, CSRF gated by SameSite-only.
 
+> **Status — S1–S4 shipped (2026-06-13).** Rate-limit core + shared stores + strict CSP + CSRF landed and reviewed (multi-agent SOTA-2026 pass). Three deliberate SOTA deviations vs the original spec below, validated during build:
+> - **CSP nonce lives in Caddy, not a Hono middleware.** The SPA is static-served by Caddy; the per-request nonce uses Caddy's native `{http.request.uuid}` placeholder (`templates` module) threaded into the HTML via Vite `html.cspNonce`. No app-server in the static path → no Hono CSP middleware. `/csp-report` is **public** (browsers post reports unauthenticated — HMAC impossible), hardened by IP rate-limit + cross-origin CORP + document-uri origin filter.
+> - **CSRF is Origin-allowlist, not double-submit token.** SOTA 2026 (Next.js Server Actions / SvelteKit): validate the unforgeable `Origin` header against the CORS allowlist on unsafe methods. Stateless — no cookie, no `/csrf` endpoint, no front code. Bearer-authed clients (Capacitor) skip (no ambient cookie → no CSRF). The decoupled cross-origin deploy makes the literal `__Host-csrf` double-submit unworkable anyway (cookie unreadable from the app origin).
+> - **Trusted Types deferred** to its own story — report-only floods `audit_log` on a non-TT-migrated app, and 2026 browser baseline is still partial (Firefox not stable, Safari only since 26.1).
+>
+> **Hardening from the SOTA review** (S1/S2 amendment): rate-limit **fails closed on auth-sensitive policies** (a store outage must not silently disable brute-force protection — OWASP A10:2025 / CWE-636), fail-open preserved on the global policy; prod boot **fails hard** if `CORS_ORIGIN` is unset (no silent localhost fallback).
+>
+> **Documented deployment debt** (see README): `RATE_LIMIT_STORE=memory` is per-replica — switch to `postgres`/Redis before horizontal scaling; `TRUSTED_PROXIES` must be set behind a load-balancer (warn at boot) or every request shares the LB IP (collective lockout); fail-closed-on-auth without a circuit-breaker can turn a store outage into temporary login unavailability (v-next: degraded in-memory fallback).
+>
+> **Still pending in C.1**: captcha hook (S6), abuse-prevention signals (S5 — credential-stuffing / impossible-travel / free-trial / geo deny-list).
+
 ### Rate limiting + abuse prevention
 
 **Relation to BetterAuth** (default-to-the-lib has a boundary here):
