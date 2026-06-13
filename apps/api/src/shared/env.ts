@@ -86,6 +86,11 @@ const rawEnv = Object.fromEntries(
 export const env = envSchema.parse(rawEnv);
 
 if (env.NODE_ENV === "production") {
+  if (!env.CORS_ORIGIN || env.CORS_ORIGIN.length === 0) {
+    throw new Error(
+      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost — rejecting the real front and collapsing the CORS + CSRF allowlist.",
+    );
+  }
   if (!env.INTERNAL_AUTH_LAYERS?.includes("signature")) {
     throw new Error(
       'INTERNAL_AUTH_LAYERS must include "signature" in production. Stacking with "private-network" is recommended on Railway/Fly.',

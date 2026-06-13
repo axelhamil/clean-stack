@@ -239,6 +239,8 @@ const authOptions = {
     defaultCookieAttributes: {
       httpOnly: true,
       secure: isProd,
+      // "none" in prod: SPA and API are cross-origin (decoupled deploy), the session
+      // cookie must ride cross-site fetch. CSRF is covered in-app by requireCsrf, not SameSite.
       sameSite: isProd ? "none" : "lax",
     },
   },
