@@ -26,6 +26,7 @@ import {
   requireAuth,
   sessionMiddleware,
 } from "./shared/middleware/auth.middleware";
+import { requireCsrf } from "./shared/middleware/csrf.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
 import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
@@ -87,6 +88,16 @@ app.use(
 app.use("*", sessionMiddleware);
 
 app.use("*", requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY));
+const csrf = requireCsrf({
+  outbox: di.IOutboxRepository,
+  allowedOrigins: env.CORS_ORIGIN ?? ["http://localhost:5173"],
+});
+app.use("/me", csrf);
+app.use("/me/*", csrf);
+app.use("/uploads", csrf);
+app.use("/uploads/*", csrf);
+app.use("/settings/*", csrf);
+app.use("/admin/*", csrf);
 app.use(
   "/api/auth/sign-in/email",
   requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_IN_POLICY),
