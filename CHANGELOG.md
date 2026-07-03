@@ -1,3 +1,32 @@
+## [1.21.0](https://github.com/axelhamil/clean-stack/compare/v1.20.1...v1.21.0) (2026-07-03)
+
+### Features
+
+* **api:** add sliding-window rate limiting behind instrumented port ([109da34](https://github.com/axelhamil/clean-stack/commit/109da34812f675fc4daf6671bb66bd117ebe3cf2))
+* **api:** durable postgres rate-limit store, security event, auth-burst hardening ([3e64b4d](https://github.com/axelhamil/clean-stack/commit/3e64b4d0b165dd55f09c65283e44ff154aa77330))
+* **security:** stateless csrf via origin allowlist on non-betterauth routes ([31dc28b](https://github.com/axelhamil/clean-stack/commit/31dc28b84b4b8fa8a7365b079ada49163d625e29))
+* **security:** strict csp with per-request nonce + public csp-report endpoint ([c203a8b](https://github.com/axelhamil/clean-stack/commit/c203a8b6591199a7ccbdecb722a6123eda3e4757))
+
+### Bug Fixes
+
+* **app:** capture mutation errors by default, allowlist flow-control ([95360a1](https://github.com/axelhamil/clean-stack/commit/95360a101e2adee1af66b7df43f04f2c0852b9f0))
+* **app:** skip flow-control mutation errors, align front scrub with api ([5a7c804](https://github.com/axelhamil/clean-stack/commit/5a7c8049fae0a087119b7f1a55e349e6cc2a63dd))
+* **app:** wire sentry capture into tanstack query + sync user identity ([f53bb2d](https://github.com/axelhamil/clean-stack/commit/f53bb2d7e08e8c1e7d917409b708a40d6cdcdc4a))
+* **security:** fail-closed auth rate-limit + prod cors_origin guard + trusted-proxy cidr/private ([0e46f58](https://github.com/axelhamil/clean-stack/commit/0e46f5881c6c6bb5b3fc01201e34dbcd9dc00942))
+* **security:** isolate rate-limiter in a dedicated pg pool (c.1 s4.1) ([fed77d3](https://github.com/axelhamil/clean-stack/commit/fed77d3c7a062450bf7a1ce8a858da60bab7b301))
+
+### Build
+
+* **deps:** bump all deps to sota 2026 + migrate pnpm/biome/knip config ([5141fe8](https://github.com/axelhamil/clean-stack/commit/5141fe8c44a29d1b6e54eae9558aa63460e3c894))
+
+### Documentation
+
+* document c.1 security perimeter + railway trusted_proxies/cors guidance ([08aa290](https://github.com/axelhamil/clean-stack/commit/08aa29091a30a6aea18f430fe4aaff248d384a98))
+* **readme:** add a full features section listing shipped + roadmap items ([04d5cbe](https://github.com/axelhamil/clean-stack/commit/04d5cbec91005aa86383f43fe97e5b2512201f23))
+* **roadmap:** queue s4.1 rate-limiter store resilience as next c.1 priority ([e3b468c](https://github.com/axelhamil/clean-stack/commit/e3b468c75dd63f0f9c3a43c5c7a5bf03300d3f33))
+* surface shipped legal coverage, cite betterauth oss plugins in roadmap ([6fa7915](https://github.com/axelhamil/clean-stack/commit/6fa7915f8adaec7d8cc15308c819b72f010a68ff))
+* sync all docs to c.1 shipped (event count 35→38, security perimeter, claude.md) ([08eb0ca](https://github.com/axelhamil/clean-stack/commit/08eb0cae32319d8c14874d876b384576c2a5ba57))
+
 ## [1.20.1](https://github.com/axelhamil/clean-stack/compare/v1.20.0...v1.20.1) (2026-06-08)
 
 ### Bug Fixes
