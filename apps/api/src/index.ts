@@ -16,6 +16,7 @@ import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { env } from "./shared/env";
+import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
@@ -25,8 +26,22 @@ import {
   requireAuth,
   sessionMiddleware,
 } from "./shared/middleware/auth.middleware";
+import { requireCsrf } from "./shared/middleware/csrf.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
+import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
+import {
+  AUTH_FORGOT_PASSWORD_POLICY,
+  AUTH_MAGIC_LINK_POLICY,
+  AUTH_PASSKEY_POLICY,
+  AUTH_RESET_PASSWORD_POLICY,
+  AUTH_SIGN_IN_POLICY,
+  AUTH_SIGN_UP_POLICY,
+  AUTH_TWO_FACTOR_POLICY,
+  AUTH_VERIFY_EMAIL_POLICY,
+  CSP_REPORT_POLICY,
+  GLOBAL_POLICY,
+} from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
 import { lifecycleState } from "./shared/shutdown";
 
@@ -40,10 +55,28 @@ const app = new Hono<AppEnv>();
 
 app.route("/", healthRoutes);
 
+// Mounted before the global middlewares: the endpoint is public, cross-origin (browser-posted),
+// and must not inherit the same-origin CORP that secureHeaders sets — that would block the report POST.
+app.use("/csp-report", cspReportCors);
+app.use(
+  "/csp-report",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, CSP_REPORT_POLICY),
+);
+app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
+
 app.use("*", requestId());
 app.use("*", (c, next) => runWithRequestContext({ requestId: c.get("requestId") }, next));
 app.use("*", httpLogger);
-app.use("*", secureHeaders());
+app.use(
+  "*",
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'none'"],
+    },
+  }),
+);
 app.use(
   "*",
   cors({
@@ -53,6 +86,79 @@ app.use(
 );
 
 app.use("*", sessionMiddleware);
+
+app.use("*", requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY));
+const csrf = requireCsrf({
+  outbox: di.IOutboxRepository,
+  allowedOrigins: env.CORS_ORIGIN ?? ["http://localhost:5173"],
+});
+app.use("/me", csrf);
+app.use("/me/*", csrf);
+app.use("/uploads", csrf);
+app.use("/uploads/*", csrf);
+app.use("/settings/*", csrf);
+app.use("/admin/*", csrf);
+app.use(
+  "/api/auth/sign-in/email",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_IN_POLICY),
+);
+app.use(
+  "/api/auth/request-password-reset",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_FORGOT_PASSWORD_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/sign-in/magic-link",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_MAGIC_LINK_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/sign-up/email",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_UP_POLICY),
+);
+app.use(
+  "/api/auth/two-factor/verify-totp",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/two-factor/verify-otp",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/two-factor/verify-backup-code",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/verify-email",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_VERIFY_EMAIL_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/reset-password",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_RESET_PASSWORD_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/passkey/verify-authentication",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
+);
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
@@ -110,6 +216,12 @@ const shutdown = async (signal: string) => {
 
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
+
+if (env.NODE_ENV === "production" && !env.TRUSTED_PROXIES) {
+  logger.warn(
+    "TRUSTED_PROXIES is not set in production — behind a load-balancer all requests share the LB socket address as rate-limit key (collective lockout). Set it to `private` (trusts platform private ranges — the right value on Railway/Fly/most PaaS), a comma-separated CIDR list, or exact proxy IPs.",
+  );
+}
 
 logger.info({ port: env.PORT, env: env.NODE_ENV }, "api ready");
 

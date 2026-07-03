@@ -72,15 +72,93 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Auth** | BetterAuth — passkeys (WebAuthn), 2FA (TOTP + backup codes), magic-link, DB-backed sessions, cross-tab sync via `BroadcastChannel`. Bearer alongside cookies for Capacitor. Native Bun + Hono, no hacks. |
 | **Multi-tenant** | `organizationId` FK on every business table from migration #1 + `ScopedRepository` enforces it at the port. Personal org auto-created on signup, role-based invitations, ownership transfer. Bolting tenancy on later is hell — the reverse is free. |
 | **Authorization** | Capability-based SSOT (`@packages/access-control`). **Same predicate** at server middleware, route `beforeLoad` gate, and `<Can requires={...}>` UI — drift impossible by construction. |
-| **RGPD / CCPA** | Art. 17 erasure + Art. 20 portability shipped: `POST /me/export` (signed 7-day R2 URL, 1/24h rate-limit), `POST /me/delete` (2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in flow). Cron sweep wipes personal data + anonymizes refs. Day-one EU-legal — without this, fines up to 4% of revenue. |
+| **Legal / compliance** | Day-one EU-legal across the GDPR surface: **Art. 7** privacy/terms versioning (re-acceptance gate when a version bumps, `user.policy.accepted` evidence), **Art. 16** rectification (profile + email-change + password), **Art. 17** erasure (`POST /me/delete` — 2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in, cron wipe + ref anonymization), **Art. 20** portability (`POST /me/export` — signed 7-day R2 URL, 1/24h throttle). Passwords follow **NIST SP 800-63B** (min 15, HIBP k-anonymity breach check, contextual ban-list, no forced complexity). Without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris — provider swap = one env var. |
 | **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
-| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **35 typed events** auto-emitted on every state change, append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter). Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
+| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **38 typed events** auto-emitted on every state change, append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter). Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
 | **AI-pair ready** | `CLAUDE.md` at the root + per-layer sub-`CLAUDE.md`. Your agent already knows the rules — Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
 | **Zero-warning pipeline** | Husky + lint-staged + commitlint + pre-push CI (Biome, knip, jscpd, type-check). Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
+
+---
+
+## Features
+
+Everything wired today, and the build order for what's next. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
+
+### Shipped
+
+**Auth & identity**
+- Email + password (required verification + reset), magic-link, passkeys (WebAuthn), 2FA (TOTP + backup codes)
+- Active-session list & revoke · bearer tokens alongside cookies · 5-min session cookie cache · cross-tab sync (`BroadcastChannel`)
+- NIST SP 800-63B password baseline — min 15, HIBP k-anonymity breach check (fail-open), contextual ban-list, no forced complexity
+
+**Multi-tenant & authorization**
+- `organization` plugin — Personal org auto-heal, team orgs, email invitations, role-based members, ownership transfer
+- Capability-based authorization SSOT (`@packages/access-control`) — same predicate at server middleware, route `beforeLoad` gate, and `<Can>` UI
+
+**Security & hardening** — *the deploy-safe perimeter (Phase C.1)*
+- Unified rate-limit — one Hono middleware (`rate-limiter-flexible`, BetterAuth built-in disabled) → global + 8 auth-burst policies, multi-window, IETF `RateLimit`/`RateLimit-Policy`/`Retry-After` headers, **fail-closed on auth** (a store outage can't silently disable brute-force protection — OWASP A10:2025), trusted-proxy IP resolution (`private`/CIDR/exact, OWASP rightmost-non-trusted), memory → Postgres (dedicated pool) stores
+- Strict CSP — per-request nonce (Caddy native `{http.request.uuid}` + Vite `html.cspNonce`), `'strict-dynamic'`, public `/csp-report` (IP-rate-limited + cross-origin CORP + document-uri origin filter) → `security.csp.violation` audit event
+- CSRF — **Origin-allowlist on unsafe methods** (stateless, no token/cookie/endpoint — the Next.js Server Actions / SvelteKit model), reuses the CORS allowlist as SSOT, Bearer-skip for Capacitor, `security.csrf.rejected` audit event
+- Hardened headers (HSTS, CSP `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy via Caddy) · credentialed CORS allowlist · prod boot **fails hard** on missing `CORS_ORIGIN` / signing keys
+
+**Legal / compliance (GDPR)**
+- Art. 7 — privacy/terms versioning + re-acceptance gate (`@packages/policies`, `/legal/accept`)
+- Art. 16 — rectification (profile, email-change, password)
+- Art. 17 — erasure (2FA-gated, 7-day grace, sole-owner preflight, cron wipe + ref anonymization)
+- Art. 20 — portability (signed 7-day R2 export, 1/24h throttle)
+
+**Storage & email**
+- Direct uploads — three-step presign → PUT → confirm, owner-scoped keys (R2 / S3 / B2 / Wasabi / Tigris)
+- Transactional email (Resend) — typed templates, idempotency, provider-side suppression
+
+**Event-driven core & transactions** — *the hard distributed-systems part, already solved*
+- Transactional outbox — domain events persisted in the **same DB transaction** as the state change (`IUnitOfWork.run()` + `EventCollector` AsyncLocalStorage) → no event ever lost, none emitted for a rolled-back write (the dual-write problem, solved)
+- Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout), user `onEvent(...)` handlers isolated post-commit
+- **38 typed events**, append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay), `X-Request-Id` correlation
+- **Zero plumbing post-clone** — declare the event in `@packages/events` → `addEvent()` in the aggregate → run via `uow.run()`; the audit row, webhook fanout, and in-process handlers (auto-discovered via inwire) come for free
+- Internal `/internal/*` endpoints — HMAC-signed, optional private-network layer
+
+**Architecture & conventions** — *the part that keeps shipping fast sustainable*
+- Clean Architecture + DDD **enforced by structure** — layers import inward, modules never import each other (only via domain events / shared ports), each module removable by a documented contract (`trash` + line delete, `tsc` points to the rest)
+- **8 cross-cutting rules**, each tied to an architectural property with its *why* — every state change emits a typed event (audit + webhooks opt-out, not opt-in) · every I/O method spans + captures (no silent prod failure) · every event payload names its actor (RGPD forensic trail) · internal packages ship source not artifacts · ORM-first, raw SQL only where the ORM can't model it
+- **DDD scoped to the business domain only** — never billing / auth / gating / quotas (config + middleware suffices); the discipline that cut ~70% of code vs full-DDD plumbing (lesson learned the hard way)
+- **Domain & repo rules** — no `throw` in domain/application (`Result`), no `null` for absence (`Option`), value objects validated via zod, aggregates expose only `get id()`; ownership enforced at the port (`ScopedRepository` scopes `organizationId`/`userId` across HTTP, cron, queue, events — wrong owner leaks nothing)
+- **Rules live next to the code** — root + per-layer `CLAUDE.md`, recursively auto-loaded; conventions are executable guardrails for AI agents and humans, not tribal knowledge
+
+**Building blocks**
+- DDD-kit (`@packages/ddd-kit`) — `Result` / `Option`, `Entity` / `Aggregate` / `ValueObject` (zod-validated) / `UUID` / `DomainEvent`, `BaseRepository` / `ScopedRepository` / `IUnitOfWork`
+- Vertical-slice modular monolith — `modules/<context>/{domain,application,infrastructure}` + per-feature front slices
+- CQRS (commands via use-cases, queries direct to Drizzle) · inwire DI (type-inference container, no declared interfaces)
+- Drizzle + Postgres 17 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
+
+**Frontend & UI**
+- App shell — sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
+- TanStack Router code-based 2-file pattern (`route` + lazy `page`) — no codegen, no `routeTree.gen.ts`, near-zero TanStack Start migration
+- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~588 KB, route chunks 1–43 KB)
+- TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
+- shadcn-pure UI kit (`@packages/ui`) — typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
+
+**Infra, ops & DX**
+- Hono RPC end-to-end types (`hcWithType`) · `pino` logging with single error envelope · CQRS error contract
+- Health probes (`/livez` `/readyz` `/startupz`) + graceful shutdown · Sentry error tracking (RGPD-scrubbed, NoOp without DSN)
+- Disaster-recovery runbook (PITR-first) · Railway reference deploy (config-as-code)
+- `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
+- Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
+
+### Roadmap
+
+Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
+
+- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF **shipped** (Phase C.1 — see Security & hardening above; captcha + abuse-signals still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
+- **M2 — Revenue** · billing via `@better-auth/stripe` (per-org customer, portal, dunning) · feature & quota gating (config + middleware, no DDD)
+- **M3 — Finish half-shipped UIs** · audit-log front · webhooks front + `webhook.test` · recovery-codes UI · privacy dashboard
+- **M4 — Operate** · admin & impersonation (BetterAuth `admin` plugin) · API tokens / PATs (eval `@better-auth/api-key`) · OpenAPI docs (Scalar) · in-app notifications
+- **M5 — Quality & compliance gates** · Playwright e2e (full legal chain) + Lighthouse a11y CI · SOC2 Type II checklist · status page + SLO dashboards + OTel/Prometheus
+- **M6 — Enterprise & reach** · SSO SAML/OIDC + SCIM (BetterAuth `sso`) · i18n (TanStack locale routes + Lingui; `@better-auth/i18n` for auth errors) · Capacitor mobile · feature flags · marketing site
 
 ---
 
@@ -163,7 +241,7 @@ Three `.env` files, on purpose. **Do not collapse them into one at the root** �
 
 `pnpm bootstrap` (or `bash scripts/bootstrap.sh`) copies each `.env.example` → `.env` if missing. Idempotent — never overwrites.
 
-Only three variables are **required to boot** the api: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
+Only three variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), or `WEBHOOK_MASTER_KEY` is missing — a silent fallback there is worse than a refused boot. Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
 
 ---
 
@@ -183,7 +261,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 **Disaster recovery** — PITR-first (delegated to your managed Postgres provider), with copy-paste recipes for a weekly portable `pg_dump` export and a monthly automated restore-test. RPO/RTO targets, restore runbook, lifecycle + versioning snippets in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
 
-**Observability** — error tracking via Sentry on api + app, RGPD-clean payload scrubbing by default, pino integration for log breadcrumbs, NoOp without `SENTRY_DSN`. OpenTelemetry tracing and Prometheus `/metrics` are deferred to Phase D.1 (managed alongside dashboards). Port usage, removability runbook, provider swap recipe (GlitchTip / Highlight) in [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
+**Observability** — error tracking via Sentry on api + app, RGPD-clean payload scrubbing by default, pino integration for log breadcrumbs, global TanStack Query/mutation error capture + user-id tagging on the front, NoOp without `SENTRY_DSN`. OpenTelemetry tracing and Prometheus `/metrics` are deferred to Phase D.1 (managed alongside dashboards). Port usage, removability runbook, provider swap recipe (GlitchTip / Highlight) in [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
 ---
 

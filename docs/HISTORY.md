@@ -458,3 +458,100 @@ Drop real legal text in `policies.config.tsx`. When a policy changes, bump the r
 3. **Not DDD.** The acceptance rule is `latestAcceptedVersion === currentVersion` — a comparison, not an invariant that requires aggregate lifecycle protection. Using an aggregate here would be the OpenUp anti-pattern (rule §test décisif: if the rule fits in a comparison, it's infra). **A.4 (Cookie consent) is the same call** — `isActive = withdrawnAt == null && expiresAt > now && policyVersion == current` is a WHERE clause, scope is `includes()`, validity/cooldown are date math; it ships as infra too. The boilerplate ships **zero aggregates** — `@packages/ddd-kit/Aggregate` earns its keep only once the cloner adds real product domain.
 4. **`/verify-email` hook, not `/sign-up/email`** — see deviation note above. The key insight: the gate-predicate (front `_shell`) is the primary enforcement; the hook is best-effort plus defense-in-depth for the sign-up path specifically.
 5. **`requireCurrentPolicies` composable, not global default.** Mounting it globally on all authenticated routes would make every current API call return 409 for a stale user — too aggressive. The UX re-acceptance gate is the live enforcement. The middleware is opt-in for future business routes that need hard server-side gating.
+
+---
+
+## Security perimeter — rate-limit + CSP + CSRF ✅ Phase C.1 · Jun 2026
+
+**Why**: a boilerplate that ships auth, multi-tenant, and billing surfaces without a security perimeter is a liability for every cloner. Phase C.1 closes the four cheapest attack vectors: brute-force / credential-stuffing (rate-limit), XSS script injection (CSP), cross-site request forgery (CSRF), and CSP telemetry (report endpoint). All four were implemented as composable infra — no business logic inside, each addable or removable in `index.ts` without touching modules.
+
+### S1 — Rate-limit core
+
+- [x] **`requireRateLimit(deps, policy)`** factory (`apps/api/src/shared/middleware/rate-limit.middleware.ts`) — Hono middleware wrapping `IRateLimiter.consume`. On allowed: sets IETF `RateLimit-Policy` + `RateLimit` response headers (budget advertising). On blocked: sets `Retry-After` (floored to 1), throws `AppErrorException({ code: "SECURITY_RATE_LIMITED" })` → central error handler → 429. On first block: emits `security.rate_limit.exceeded` event if `policy.emitSecurityEvent` and outbox provided. On store error: either 503 `RATE_LIMITER_UNAVAILABLE` (fail-closed) or warn + pass-through (fail-open) — controlled per policy.
+- [x] **`rate-limit.policies.ts`** — defines `PolicyConfig` interface + all named policies: `GLOBAL_POLICY` (60 req/min, 1800 req/hr, keyed user-or-IP, fail-open), 8 auth-burst policies (`AUTH_SIGN_IN`, `AUTH_FORGOT_PASSWORD`, `AUTH_MAGIC_LINK`, `AUTH_SIGN_UP`, `AUTH_TWO_FACTOR`, `AUTH_VERIFY_EMAIL`, `AUTH_RESET_PASSWORD`, `AUTH_PASSKEY` — all keyed by IP, `failClosed: true`, `emitSecurityEvent: true`, budgets hidden on sensitive paths), `CSP_REPORT_POLICY` (20/min + 200/hr, IP-keyed, fail-open, no budget headers).
+- [x] **BetterAuth built-in `rateLimit` disabled** (`rateLimit: { enabled: false }` in `auth.ts`) — the Hono middleware is the single 429 path. One envelope, one store, one set of headers.
+- [x] **Front 429 toast with countdown** (`apps/app/src/shared/api/errors/rate-limit-toast.ts`) — `showRateLimitToast({ message, seconds })` drives a sonner toast that ticks down every second and auto-dismisses at zero. Wired from `shared/api/errors/toast.ts`: if `apiErr.status === 429` and `metadata.retryAfter` is numeric, shows countdown; otherwise falls back to a plain error toast.
+
+### S2 — Shared stores
+
+- [x] **`IRateLimiter` port** (`apps/api/src/shared/ports/rate-limiter.port.ts`) — `consume(key, windows): Promise<Result<RateLimitDecision, RateLimitError>>`. `RateLimitDecision` carries `allowed`, `limit`, `remaining`, `resetSeconds`, `policyName`, `firstBlock`.
+- [x] **`RateLimiterFlexibleAdapter`** (`apps/api/src/shared/services/rate-limiter-flexible.adapter.ts`) — implements `IRateLimiter` via `rate-limiter-flexible`. Constructor-injected `IInstrumentation` (§8 outer span on `consume`). Per-window limiters are lazily constructed and cached. A thrown `RateLimiterRes` = blocked decision; any other throw = `Result.fail(RATE_LIMITER_INTERNAL_ERROR)` after `instrumentation.capture(err)`.
+- [x] **Durable Postgres store** — `RateLimiterDrizzle` backed by `rate_limit` table (migration `0007_medical_liz_osborn.sql`): `key TEXT PK`, `points INT`, `expire TIMESTAMPTZ`. `clearExpiredByTimeout` default (true) keeps the table lean via an unref'd 5-min purge — no sweep route needed for this ephemeral infra table.
+- [x] **`RATE_LIMIT_STORE` env** — `z.enum(["memory", "postgres"]).default("memory")` in `env.ts`. `storeFactoryFor(store, clientFactory?)` returns `memoryFactory`, or calls `makeDrizzleFactory(clientFactory())` for postgres (throws if the factory is absent). Default is `memory` (zero-config dev); set to `postgres` before horizontal scaling.
+
+### S3 — Strict CSP
+
+- [x] **Per-request nonce via Caddy `templates`** (`apps/app/Caddyfile`) — the SPA is static-served by Caddy; Caddy's native `{http.request.uuid}` provides the per-request nonce with no app-server involvement. The `handle` block wraps `try_files` with `templates { mime text/html }` so Caddy processes the HTML template directives before serving.
+- [x] **`Content-Security-Policy` header in Caddyfile**: `default-src 'self'; script-src 'nonce-{http.request.uuid}' 'strict-dynamic' https: 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors 'none'; object-src 'none'` + `report-uri` + `Reporting-Endpoints` pointing at `{$VITE_API_URL}/csp-report`.
+- [x] **Vite `html.cspNonce`** (`apps/app/vite.config.ts:42`) — `{ cspNonce: "{{placeholder \`http.request.uuid\`}}" }`: Vite stamps `nonce=` attributes on `<script>` and `<style>` tags at build time using the placeholder string; Caddy's `templates` directive replaces the literal at request time with the actual UUID nonce.
+- [x] **`POST /csp-report` endpoint** (`apps/api/src/shared/internal-routes/csp-report.route.ts`) — mounted before the global restrictive CORS so browsers can post unauthenticated cross-origin. Handles both `application/csp-report` (legacy) and `application/reports+json` (Reporting API v1). IP-rate-limited via `CSP_REPORT_POLICY`. Sets `Cross-Origin-Resource-Policy: cross-origin` to prevent Chrome ERR_BLOCKED_BY_RESPONSE on the report POST. Filters out reports whose `document-uri` / `documentURL` origin doesn't match `APP_URL` (third-party extension noise). Emits `security.csp.violation` event (`EventTypes.SECURITY_CSP_VIOLATION`) via outbox.
+
+### S4 — CSRF
+
+- [x] **`requireCsrf(deps)` middleware** (`apps/api/src/shared/middleware/csrf.middleware.ts`) — Origin-allowlist strategy: safe methods (`GET`, `HEAD`, `OPTIONS`) and Bearer-authenticated requests pass through unconditionally; for all other methods, the `Origin` header must be present, non-`null`, and in `deps.allowedOrigins`. Violation throws `AppErrorException({ code: "SECURITY_CSRF_FORBIDDEN" })` → 403. The rejection `reason` (`missing_origin` | `origin_mismatch`) is included in the emitted `security.csrf.rejected` event but intentionally absent from the client response (no security-decision leak).
+- [x] **Mounted** on `/me`, `/me/*`, `/uploads`, `/uploads/*`, `/settings/*`, `/admin/*` in `index.ts`.
+- [x] **`allowedOrigins` reuses `env.CORS_ORIGIN`** — the same list fed to `cors()` and BetterAuth `trustedOrigins`; single source of truth for "who is our front".
+
+### S4.1 — Rate-limiter store resilience
+
+- [x] **Dedicated pg pool for the rate-limit store** (`packages/drizzle/src/rate-limit-client.ts`) — `getRateLimitDbClient()` lazy singleton: `new Pool({ max: 3, connectionTimeoutMillis: 500, idleTimeoutMillis: 30_000 })` + `drizzle(pool, { schema: rlSchema })`. The package exports only `getRateLimitDbClient()` and the `RateLimitDbClient` type; the underlying `Pool` is never exposed. Mirrors the `getDb()` pattern in `config.ts`.
+- [x] **`makeDrizzleFactory(client)` higher-order** — replaces the old `drizzleFactory` closure that captured the global `db`. Takes a `RateLimitDbClient` and returns a `RateLimiterFactory`. `storeFactoryFor(store, clientFactory?)` calls `makeDrizzleFactory(clientFactory())` for postgres (throws `"RateLimitDbClient factory is required for the postgres store"` if absent); for memory, `clientFactory` is never called — no pool allocated in memory mode.
+- [x] **`container.ts` binding** — `getRateLimitDbClient` passed by reference (lazy): `storeFactoryFor(env.RATE_LIMIT_STORE, getRateLimitDbClient)`. The dedicated pool is created only if `RATE_LIMIT_STORE=postgres`, on first HTTP resolution.
+- [x] **DoS amplification vector closed** — under flood the dedicated pool (max: 3) saturates; `pg` throws "timeout" in ≤ 500 ms → adapter `capture(err)` + `Result.fail` → fail-closed policies → 503 `RATE_LIMITER_UNAVAILABLE`. The global app pool (max: 20) is never touched.
+- [x] **`insuranceLimiter` — skip (fail-closed-fast).** A real pg outage means app-wide outage; an in-memory fallback during pg-down would be moot. Decision to revisit only if a Redis store lands (Redis is not in the stack today).
+- [ ] **Caddy `Reporting-Endpoints` backtick syntax** — confirmed valid Caddyfile raw-string syntax, not leaked to the browser. Pending: runtime `curl -I` verification in production.
+
+### Hardening pass
+
+Post multi-agent SOTA-2026 review, several low-cost hardening items were folded in before shipping:
+
+- [x] **Fail-closed on auth policies** — `failClosed: true` on all 8 auth-burst policies. When `IRateLimiter.consume` returns `Result.fail`, the middleware throws `RATE_LIMITER_UNAVAILABLE` (503) instead of passing through. Rationale: a transient store outage must not silently disable brute-force protection (OWASP A10:2025 / CWE-636). `GLOBAL_POLICY` and `CSP_REPORT_POLICY` remain fail-open — a store outage should not block normal browsing or CSP telemetry.
+- [x] **`CORS_ORIGIN` fail-hard in production** — `env.ts` throws at boot if `NODE_ENV === "production"` and `CORS_ORIGIN` is unset. Without it the API falls back to `localhost`, which rejects the real front and collapses both the `cors()` and `requireCsrf` allowlists silently.
+- [x] **`TRUSTED_PROXIES` CIDR + `private` keyword** (`rate-limit.ip.ts`) — `resolveClientIp` uses `node:net` `BlockList` to check trust. The `private` keyword expands to all RFC1918 + loopback + CGNAT ranges (mirrors Caddy's `trusted_proxies private_ranges`), allowing Railway/PaaS deploys to set `TRUSTED_PROXIES=private` without pinning a non-stable internal IP. Plain IPs and CIDR notation also accepted. Boot warns in production if `TRUSTED_PROXIES` is unset (collective lockout risk behind a load-balancer).
+- [x] **CSRF 403 leaks no reason** — the `reason` field used internally for the emitted audit event is not forwarded to the client response. Only `"CSRF check failed"` is visible externally.
+
+### As-built deviation: CSRF is Origin-allowlist, not double-submit cookie
+
+The ROADMAP originally specified a `__Host-csrf` cookie + `X-CSRF-Token` double-submit pattern. Dropped for two reasons:
+
+1. **Cross-origin deploy makes double-submit physically impossible.** App and API are on different eTLD+1 origins (distinct `*.up.railway.app` hosts). `document.cookie` is per-origin; `__Host-` forbids `Domain=`; so the front can never read a cookie set by the API origin to echo it back as a header.
+2. **Origin-header validation is the 2026 SOTA.** Next.js Server Actions, SvelteKit, and Remix all use it. The `Origin` header is unforgeable by the browser (forbidden header), stateless, and requires zero front-end code or dedicated CSRF endpoint.
+
+Bearer-authed requests (Capacitor mobile) skip `requireCsrf` entirely: no ambient cookie means no CSRF surface, and a forged cross-origin request cannot set `Authorization` without a CORS preflight that the `cors()` allowlist blocks.
+
+### As-built deviation: CSP nonce in Caddy, not a Hono middleware
+
+The ROADMAP assumed a `csp.middleware.ts` injecting the nonce server-side. That model requires the app server to intercept and modify HTML responses — impossible when the SPA is a pre-built static bundle served directly by Caddy. Caddy's `templates` directive with `{http.request.uuid}` is the correct per-request nonce mechanism for static SPAs: no app-server roundtrip, zero Bun involvement, cryptographically unique per request (UUID v4 from Caddy's internal counter).
+
+`/csp-report` is public (browsers post unauthenticated — HMAC verification is impossible from a browser context); it is defended instead by rate-limit + `Cross-Origin-Resource-Policy: cross-origin` + document-uri origin filter.
+
+### As-built deviation: Trusted Types deferred
+
+Trusted Types was in scope as a CSP directive but was deferred to its own story. In `report-only` mode on a non-migrated React app, every React DOM call produces a violation and floods `audit_log` with noise. Browser baseline is also partial: Firefox support is not stable, and Safari only reached partial support in 26.1 (2026). The nonce-based CSP ships first; Trusted Types lands once React's DOM abstraction is Trusted-Types-compatible in the project's baseline.
+
+### Decisions
+
+1. **Single unified Hono rate-limit middleware; BetterAuth built-in disabled.** One 429 error envelope (`SECURITY_RATE_LIMITED`), one §8-instrumented store, one set of IETF headers. BetterAuth's built-in has its own 429 shape and its own in-memory store — running both creates two codepaths for the same property. Disabling it is the right call once you own the layer.
+2. **Fail-closed on auth, fail-open on global traffic.** A store outage must not silently disable brute-force protection (OWASP A10:2025). Noted v-next: a circuit-breaker / degraded in-memory fallback would avoid a transient store glitch turning prolonged login into 503 for all users.
+3. **`env.CORS_ORIGIN` as single source of truth for "who is our front".** The same list feeds `cors()`, `requireCsrf({ allowedOrigins })`, and BetterAuth `trustedOrigins`. One place to update when the front domain changes; misalignment between cors and csrf would be an open CSRF hole.
+4. **`TRUSTED_PROXIES=private` is the correct Railway value.** The container is only reachable via the platform's edge proxy over the private network, so trusting private ranges is safe and avoids pinning a non-stable internal IP. Mirrors the Caddyfile's `trusted_proxies static private_ranges`. Single-IP pinning is fragile — Railway recycles IPs across deploys.
+5. **Cookie `sameSite: none` in prod is required; `requireCsrf` is the replacement CSRF layer.** The cross-origin (different eTLD+1) Railway-domain deploy means cookies must be `none` to survive credentialed `fetch`. `SameSite` no longer provides transport-layer CSRF protection in that topology; `requireCsrf` (Origin allowlist) is the explicit in-app replacement. Cloners who deploy under a single parent domain (`api.x.com` + `app.x.com`, same eTLD+1) should switch to `sameSite: "lax"` for a free transport-layer CSRF layer on top.
+
+### Deployment debt
+
+- `RATE_LIMIT_STORE=memory` is per-replica — all in-process state is lost on restart and not shared across instances. Switch to `postgres` before horizontal scaling; a second replica with `memory` store effectively halves the rate-limit budget.
+- `TRUSTED_PROXIES` must be set (`private` on Railway) before going to production. If unset, all requests appear to originate from the load-balancer IP — rate-limit keys collide and a small burst from one user can trigger a collective lockout. Boot warns but does not hard-fail (dev default of unset is fine).
+- **Pool isolation — shipped S4.1.** The Postgres rate-limit store runs on a dedicated pool (max: 3, connectionTimeoutMillis: 500 ms), separate from the app `db` pool (max: 20). Pool exhaustion under a traffic spike or DDoS flood can no longer spill over into application query capacity.
+
+### Still pending
+
+Captcha hook (Turnstile / hCaptcha via `ICaptchaService` port), abuse-prevention signals (credential-stuffing counter, impossible-travel detection, free-trial abuse, geo deny-list).
+
+### How a cloner uses it
+
+1. Set `TRUSTED_PROXIES=private` (Railway) or the relevant CIDR for your platform proxy.
+2. Set `CORS_ORIGIN` to the front's public URL (required in production — hard boot error if absent).
+3. Set `RATE_LIMIT_STORE=postgres` before horizontal scaling; leave `memory` for single-replica deploys.
+4. The 8 auth-burst policies and GLOBAL policy are pre-wired in `index.ts`. Add a `requireRateLimit(deps, policy)` call for any new public endpoint that needs its own budget.
+5. `requireCsrf` is already mounted on the mutation-capable prefixes. New mutation prefixes → add a `app.use("/new-prefix/*", csrf)` line.
+6. CSP report URL is baked into `Caddyfile` via `{$VITE_API_URL}`. Violations appear in `audit_log` with `event_type = 'security.csp.violation'`.

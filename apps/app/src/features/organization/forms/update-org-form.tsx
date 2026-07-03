@@ -12,12 +12,12 @@ import { Input } from "@packages/ui/components/ui/input";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { updateOrgMutationOptions } from "../../../shared/api/mutations/update-org";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { orgsListQueryOptions } from "../../../shared/api/queries/orgs-list";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { type UpdateOrgInput, updateOrgSchema } from "../../../shared/auth/organization.schema";
-import { toastError } from "../../../shared/utils";
 
 export interface UpdateOrgFormProps {
   organizationId: string;

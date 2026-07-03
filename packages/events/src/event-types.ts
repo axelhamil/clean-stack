@@ -34,6 +34,9 @@ export const EventTypes = {
   WEBHOOK_ENDPOINT_UPDATED: "webhook.endpoint.updated",
   WEBHOOK_ENDPOINT_DELETED: "webhook.endpoint.deleted",
   USER_POLICY_ACCEPTED: "user.policy.accepted",
+  SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
+  SECURITY_CSP_VIOLATION: "security.csp.violation",
+  SECURITY_CSRF_REJECTED: "security.csrf.rejected",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

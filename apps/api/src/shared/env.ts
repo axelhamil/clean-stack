@@ -67,6 +67,16 @@ const envSchema = z.object({
   SENTRY_ENVIRONMENT: z.string().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
   HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
+  TRUSTED_PROXIES: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
 });
 
 const rawEnv = Object.fromEntries(
@@ -76,6 +86,11 @@ const rawEnv = Object.fromEntries(
 export const env = envSchema.parse(rawEnv);
 
 if (env.NODE_ENV === "production") {
+  if (!env.CORS_ORIGIN || env.CORS_ORIGIN.length === 0) {
+    throw new Error(
+      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost — rejecting the real front and collapsing the CORS + CSRF allowlist.",
+    );
+  }
   if (!env.INTERNAL_AUTH_LAYERS?.includes("signature")) {
     throw new Error(
       'INTERNAL_AUTH_LAYERS must include "signature" in production. Stacking with "private-network" is recommended on Railway/Fly.',

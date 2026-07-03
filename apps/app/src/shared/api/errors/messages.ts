@@ -24,8 +24,10 @@ const OVERRIDES: Record<string, string> = {
   TWO_FACTOR_INVALID: "Invalid authenticator code.",
 };
 
+export const RATE_LIMITED_MESSAGE = "Too many requests. Please wait a moment and try again.";
+
 const SUFFIX_DEFAULTS: readonly [suffix: string, message: string][] = [
-  ["_RATE_LIMITED", "Too many requests. Please wait a moment and try again."],
+  ["_RATE_LIMITED", RATE_LIMITED_MESSAGE],
   ["_NOT_FOUND", "Not found."],
   ["_FORBIDDEN", "You don't have permission to do this."],
   ["_UNAUTHORIZED", "Please sign in again."],

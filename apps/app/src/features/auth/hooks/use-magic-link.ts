@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { MagicLinkInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
+import { resolveAuthError } from "../auth-error";
 
 export function useMagicLink() {
   return useMutation({
@@ -10,7 +11,7 @@ export function useMagicLink() {
       const { data, error } = await authClient.signIn.magicLink({
         email: input.email,
       });
-      if (error) throw new Error(error.message ?? "Failed to send link");
+      if (error) throw new Error(resolveAuthError(error, "Failed to send link"));
 
       return data;
     },

@@ -30,6 +30,14 @@ export default defineConfig({
   optimizeDeps: {
     include: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
   },
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    headers: {
+      // HMR injects scripts/styles inline — enforce is impractical in dev; exercises the report endpoint
+      "Content-Security-Policy-Report-Only":
+        "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' ws: wss: http://localhost:3000; report-uri http://localhost:3000/csp-report",
+    },
+  },
   build: { chunkSizeWarningLimit: 700, sourcemap: "hidden" },
+  html: { cspNonce: "{{placeholder `http.request.uuid`}}" },
 });

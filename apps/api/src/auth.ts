@@ -160,6 +160,7 @@ const authOptions = {
   appName: "clean-stack",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
+  rateLimit: { enabled: false },
 
   database: drizzleAdapter(db, { provider: "pg" }),
 
@@ -238,6 +239,8 @@ const authOptions = {
     defaultCookieAttributes: {
       httpOnly: true,
       secure: isProd,
+      // "none" in prod: SPA and API are cross-origin (decoupled deploy), the session
+      // cookie must ride cross-site fetch. CSRF is covered in-app by requireCsrf, not SameSite.
       sameSite: isProd ? "none" : "lax",
     },
   },

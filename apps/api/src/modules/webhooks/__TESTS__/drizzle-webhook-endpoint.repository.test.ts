@@ -109,6 +109,7 @@ mock.module("@packages/drizzle", () => ({
   TransactionService: class {},
   trackEventsOnSuccess: () => {},
   uuidv7: () => "generated-uuid",
+  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
 }));
 
 const { DrizzleWebhookEndpointRepository } = await import(

@@ -206,6 +206,41 @@ export const UserPolicyAcceptedPayload = UserRef.extend({
 });
 export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
 
+export const SecurityRateLimitExceededPayload = z.object({
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45),
+  policyName: z.string().max(64),
+  path: z.string().max(512),
+  method: z.string().max(16),
+});
+export type SecurityRateLimitExceededPayload = z.infer<typeof SecurityRateLimitExceededPayload>;
+
+export const SecurityCspViolationPayload = z.object({
+  // Always null: CSP reports are browser-sent before any authenticated session — no known actor.
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45),
+  documentUri: z.string().max(2048),
+  blockedUri: z.string().max(2048),
+  violatedDirective: z.string().max(128),
+  effectiveDirective: z.string().max(64),
+  disposition: z.enum(["enforce", "report"]),
+  sourceFile: z.string().max(2048).optional(),
+  sample: z.string().max(100).optional(),
+  lineNumber: z.number().int().min(0).optional(),
+  columnNumber: z.number().int().min(0).optional(),
+});
+export type SecurityCspViolationPayload = z.infer<typeof SecurityCspViolationPayload>;
+
+export const SecurityCsrfRejectedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45),
+  method: z.string().max(16),
+  path: z.string().max(512),
+  origin: z.string().max(2048).nullable(),
+  reason: z.enum(["missing_origin", "origin_mismatch"]),
+});
+export type SecurityCsrfRejectedPayload = z.infer<typeof SecurityCsrfRejectedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -242,4 +277,7 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
+  [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
+  [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
+  [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,
 } as const;

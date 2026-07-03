@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon } from "lucide-react";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { deleteOrgMutationOptions } from "../../../shared/api/mutations/delete-org";
 import { leaveOrgMutationOptions } from "../../../shared/api/mutations/leave-org";
 import { transferAndLeaveMutationOptions } from "../../../shared/api/mutations/transfer-and-leave";
@@ -25,7 +26,6 @@ import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { Can } from "../../../shared/auth/can";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
-import { toastError } from "../../../shared/utils";
 import { TransferLeaveDialog } from "./transfer-leave-dialog";
 
 export function OrgDangerCard() {

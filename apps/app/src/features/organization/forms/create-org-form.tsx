@@ -13,10 +13,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { createOrgMutationOptions } from "../../../shared/api/mutations/create-org";
 import { type CreateOrgInput, createOrgSchema } from "../../../shared/auth/organization.schema";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
-import { toastError } from "../../../shared/utils";
 
 export interface CreateOrgFormProps {
   onSuccess?: () => void;

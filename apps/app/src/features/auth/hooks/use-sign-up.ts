@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import type { SignUpInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
+import { resolveAuthError } from "../auth-error";
 
 export function useSignUp() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export function useSignUp() {
         password: input.password,
         name: input.name,
       });
-      if (error) throw new Error(error.message ?? "Sign-up failed");
+      if (error) throw new Error(resolveAuthError(error, "Sign-up failed"));
 
       return data;
     },
