@@ -477,7 +477,7 @@ Drop real legal text in `policies.config.tsx`. When a policy changes, bump the r
 - [x] **`IRateLimiter` port** (`apps/api/src/shared/ports/rate-limiter.port.ts`) — `consume(key, windows): Promise<Result<RateLimitDecision, RateLimitError>>`. `RateLimitDecision` carries `allowed`, `limit`, `remaining`, `resetSeconds`, `policyName`, `firstBlock`.
 - [x] **`RateLimiterFlexibleAdapter`** (`apps/api/src/shared/services/rate-limiter-flexible.adapter.ts`) — implements `IRateLimiter` via `rate-limiter-flexible`. Constructor-injected `IInstrumentation` (§8 outer span on `consume`). Per-window limiters are lazily constructed and cached. A thrown `RateLimiterRes` = blocked decision; any other throw = `Result.fail(RATE_LIMITER_INTERNAL_ERROR)` after `instrumentation.capture(err)`.
 - [x] **Durable Postgres store** — `RateLimiterDrizzle` backed by `rate_limit` table (migration `0007_medical_liz_osborn.sql`): `key TEXT PK`, `points INT`, `expire TIMESTAMPTZ`. `clearExpiredByTimeout` default (true) keeps the table lean via an unref'd 5-min purge — no sweep route needed for this ephemeral infra table.
-- [x] **`RATE_LIMIT_STORE` env** — `z.enum(["memory", "postgres"]).default("memory")` in `env.ts`. `storeFactoryFor(store)` returns `memoryFactory` or `drizzleFactory`. Default is `memory` (zero-config dev); set to `postgres` before horizontal scaling.
+- [x] **`RATE_LIMIT_STORE` env** — `z.enum(["memory", "postgres"]).default("memory")` in `env.ts`. `storeFactoryFor(store, clientFactory?)` returns `memoryFactory`, or calls `makeDrizzleFactory(clientFactory())` for postgres (throws if the factory is absent). Default is `memory` (zero-config dev); set to `postgres` before horizontal scaling.
 
 ### S3 — Strict CSP
 
@@ -491,6 +491,15 @@ Drop real legal text in `policies.config.tsx`. When a policy changes, bump the r
 - [x] **`requireCsrf(deps)` middleware** (`apps/api/src/shared/middleware/csrf.middleware.ts`) — Origin-allowlist strategy: safe methods (`GET`, `HEAD`, `OPTIONS`) and Bearer-authenticated requests pass through unconditionally; for all other methods, the `Origin` header must be present, non-`null`, and in `deps.allowedOrigins`. Violation throws `AppErrorException({ code: "SECURITY_CSRF_FORBIDDEN" })` → 403. The rejection `reason` (`missing_origin` | `origin_mismatch`) is included in the emitted `security.csrf.rejected` event but intentionally absent from the client response (no security-decision leak).
 - [x] **Mounted** on `/me`, `/me/*`, `/uploads`, `/uploads/*`, `/settings/*`, `/admin/*` in `index.ts`.
 - [x] **`allowedOrigins` reuses `env.CORS_ORIGIN`** — the same list fed to `cors()` and BetterAuth `trustedOrigins`; single source of truth for "who is our front".
+
+### S4.1 — Rate-limiter store resilience
+
+- [x] **Dedicated pg pool for the rate-limit store** (`packages/drizzle/src/rate-limit-client.ts`) — `getRateLimitDbClient()` lazy singleton: `new Pool({ max: 3, connectionTimeoutMillis: 500, idleTimeoutMillis: 30_000 })` + `drizzle(pool, { schema: rlSchema })`. The package exports only `getRateLimitDbClient()` and the `RateLimitDbClient` type; the underlying `Pool` is never exposed. Mirrors the `getDb()` pattern in `config.ts`.
+- [x] **`makeDrizzleFactory(client)` higher-order** — replaces the old `drizzleFactory` closure that captured the global `db`. Takes a `RateLimitDbClient` and returns a `RateLimiterFactory`. `storeFactoryFor(store, clientFactory?)` calls `makeDrizzleFactory(clientFactory())` for postgres (throws `"RateLimitDbClient factory is required for the postgres store"` if absent); for memory, `clientFactory` is never called — no pool allocated in memory mode.
+- [x] **`container.ts` binding** — `getRateLimitDbClient` passed by reference (lazy): `storeFactoryFor(env.RATE_LIMIT_STORE, getRateLimitDbClient)`. The dedicated pool is created only if `RATE_LIMIT_STORE=postgres`, on first HTTP resolution.
+- [x] **DoS amplification vector closed** — under flood the dedicated pool (max: 3) saturates; `pg` throws "timeout" in ≤ 500 ms → adapter `capture(err)` + `Result.fail` → fail-closed policies → 503 `RATE_LIMITER_UNAVAILABLE`. The global app pool (max: 20) is never touched.
+- [x] **`insuranceLimiter` — skip (fail-closed-fast).** A real pg outage means app-wide outage; an in-memory fallback during pg-down would be moot. Decision to revisit only if a Redis store lands (Redis is not in the stack today).
+- [ ] **Caddy `Reporting-Endpoints` backtick syntax** — confirmed valid Caddyfile raw-string syntax, not leaked to the browser. Pending: runtime `curl -I` verification in production.
 
 ### Hardening pass
 
@@ -532,7 +541,7 @@ Trusted Types was in scope as a CSP directive but was deferred to its own story.
 
 - `RATE_LIMIT_STORE=memory` is per-replica — all in-process state is lost on restart and not shared across instances. Switch to `postgres` before horizontal scaling; a second replica with `memory` store effectively halves the rate-limit budget.
 - `TRUSTED_PROXIES` must be set (`private` on Railway) before going to production. If unset, all requests appear to originate from the load-balancer IP — rate-limit keys collide and a small burst from one user can trigger a collective lockout. Boot warns but does not hard-fail (dev default of unset is fine).
-- The Postgres rate-limit store shares the app `db` pool (`RateLimiterDrizzle` takes `storeClient: db`). Under a traffic spike or DDoS, pool exhaustion can cause the store to error → `RATE_LIMITER_UNAVAILABLE` 503 on all auth endpoints (fail-closed). A dedicated connection / explicit acquire-timeout is the v-next mitigation.
+- **Pool isolation — shipped S4.1.** The Postgres rate-limit store runs on a dedicated pool (max: 3, connectionTimeoutMillis: 500 ms), separate from the app `db` pool (max: 20). Pool exhaustion under a traffic spike or DDoS flood can no longer spill over into application query capacity.
 
 ### Still pending
 

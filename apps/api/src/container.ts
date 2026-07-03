@@ -1,5 +1,5 @@
 import type { IUnitOfWork } from "@packages/ddd-kit";
-import { TransactionService } from "@packages/drizzle";
+import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
 import { auditLogModule } from "./modules/audit-log/module";
 import { healthModule } from "./modules/health/module";
@@ -71,7 +71,10 @@ export const di = container()
   .add(
     "IRateLimiter",
     (c): IRateLimiter =>
-      new RateLimiterFlexibleAdapter(c.IInstrumentation, storeFactoryFor(env.RATE_LIMIT_STORE)),
+      new RateLimiterFlexibleAdapter(
+        c.IInstrumentation,
+        storeFactoryFor(env.RATE_LIMIT_STORE, getRateLimitDbClient),
+      ),
   )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))

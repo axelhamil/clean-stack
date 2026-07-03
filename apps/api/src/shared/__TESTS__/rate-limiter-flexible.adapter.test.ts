@@ -26,13 +26,16 @@ import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { WindowConfig } from "../ports/rate-limiter.port";
 
 // ── Mock @packages/drizzle ──────────────────────────────────────────────────
-// The drizzleFactory imports `db` and `rateLimitSchema` from this package.
-// Superset rule: expose all exports used anywhere in the test suite.
+// The adapter imports `rateLimitSchema` + the `RateLimitDbClient` type; the container
+// imports `getRateLimitDbClient`. Superset rule: expose all exports used anywhere in
+// the test suite (the mock leaks cross-test via bun's parallel `mock.module`).
 const fakeDb = {};
+const fakeRateLimitClient = {};
 const fakeRateLimitRecord = { key: {}, points: {}, expire: {} };
 
 mock.module("@packages/drizzle", () => ({
   db: fakeDb,
+  getRateLimitDbClient: () => fakeRateLimitClient,
   eq: () => ({}),
   and: (..._args: unknown[]) => ({}),
   or: (..._args: unknown[]) => ({}),
@@ -106,9 +109,8 @@ mock.module("rate-limiter-flexible", () => ({
   RateLimiterEtcdTransactionFailedError: class {},
 }));
 
-const { RateLimiterFlexibleAdapter, memoryFactory, drizzleFactory, storeFactoryFor } = await import(
-  "../services/rate-limiter-flexible.adapter"
-);
+const { RateLimiterFlexibleAdapter, memoryFactory, makeDrizzleFactory, storeFactoryFor } =
+  await import("../services/rate-limiter-flexible.adapter");
 
 function makeNoopInstrumentation(): IInstrumentation {
   return {
@@ -344,22 +346,22 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
   });
 });
 
-describe("drizzleFactory option-mapping", () => {
+describe("makeDrizzleFactory option-mapping", () => {
   beforeEach(() => {
     drizzleCtorCalls.length = 0;
   });
 
-  it("instantiates RateLimiterDrizzle with correct options", () => {
+  it("instantiates RateLimiterDrizzle with the injected client and correct options", () => {
     const window: WindowConfig = {
       policyName: "auth-sign-in",
       windowSec: 900,
       maxRequests: 5,
     };
-    drizzleFactory(window);
+    makeDrizzleFactory(fakeRateLimitClient as never)(window);
 
     expect(drizzleCtorCalls).toHaveLength(1);
     const opts = drizzleCtorCalls[0] as Record<string, unknown>;
-    expect(opts.storeClient).toBe(fakeDb);
+    expect(opts.storeClient).toBe(fakeRateLimitClient);
     expect(opts.schema).toBe(fakeRateLimitRecord);
     expect(opts.keyPrefix).toBe("auth-sign-in:900");
     expect(opts.points).toBe(5);
@@ -370,11 +372,32 @@ describe("drizzleFactory option-mapping", () => {
 });
 
 describe("storeFactoryFor", () => {
+  beforeEach(() => {
+    drizzleCtorCalls.length = 0;
+  });
+
   it("returns memoryFactory for 'memory'", () => {
     expect(storeFactoryFor("memory")).toBe(memoryFactory);
   });
 
-  it("returns drizzleFactory for 'postgres'", () => {
-    expect(storeFactoryFor("postgres")).toBe(drizzleFactory);
+  it("returns a factory bound to the injected client for 'postgres'", () => {
+    const factory = storeFactoryFor("postgres", () => fakeRateLimitClient as never);
+    factory({ policyName: "p", windowSec: 60, maxRequests: 1 });
+
+    expect(drizzleCtorCalls).toHaveLength(1);
+    expect((drizzleCtorCalls[0] as Record<string, unknown>).storeClient).toBe(fakeRateLimitClient);
+  });
+
+  it("does not invoke the client factory for the memory store", () => {
+    let called = false;
+    storeFactoryFor("memory", () => {
+      called = true;
+      return fakeRateLimitClient as never;
+    });
+    expect(called).toBe(false);
+  });
+
+  it("throws when the postgres store is requested without a client factory", () => {
+    expect(() => storeFactoryFor("postgres")).toThrow("RateLimitDbClient factory is required");
   });
 });

@@ -1,5 +1,5 @@
 import { Result } from "@packages/ddd-kit";
-import { db, rateLimitSchema } from "@packages/drizzle";
+import { type RateLimitDbClient, rateLimitSchema } from "@packages/drizzle";
 import type { RateLimiterAbstract } from "rate-limiter-flexible";
 import { RateLimiterDrizzle, RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 import type { IInstrumentation } from "../ports/instrumentation.port";
@@ -20,22 +20,33 @@ export function memoryFactory(window: WindowConfig): RateLimiterAbstract {
   });
 }
 
-export function drizzleFactory(window: WindowConfig): RateLimiterAbstract {
+export function makeDrizzleFactory(client: RateLimitDbClient): RateLimiterFactory {
   // clearExpiredByTimeout stays at the lib default (true): its unref'd 5-min purge timer
   // owns rate_limit cleanup, sparing a sweep route for this ephemeral infra table.
-  return new RateLimiterDrizzle({
-    storeClient: db,
-    schema: rateLimitSchema.rateLimitRecord,
-    keyPrefix: `${window.policyName}:${window.windowSec}`,
-    points: window.maxRequests,
-    duration: window.windowSec,
-    inMemoryBlockOnConsumed: window.maxRequests,
-    inMemoryBlockDuration: window.windowSec,
-  } as never);
+  return function drizzleFactory(window: WindowConfig): RateLimiterAbstract {
+    return new RateLimiterDrizzle({
+      storeClient: client,
+      schema: rateLimitSchema.rateLimitRecord,
+      keyPrefix: `${window.policyName}:${window.windowSec}`,
+      points: window.maxRequests,
+      duration: window.windowSec,
+      inMemoryBlockOnConsumed: window.maxRequests,
+      inMemoryBlockDuration: window.windowSec,
+    } as never);
+  };
 }
 
-export function storeFactoryFor(store: "memory" | "postgres"): RateLimiterFactory {
-  return store === "postgres" ? drizzleFactory : memoryFactory;
+export function storeFactoryFor(
+  store: "memory" | "postgres",
+  clientFactory?: () => RateLimitDbClient,
+): RateLimiterFactory {
+  if (store === "postgres") {
+    if (!clientFactory) {
+      throw new Error("RateLimitDbClient factory is required for the postgres store");
+    }
+    return makeDrizzleFactory(clientFactory());
+  }
+  return memoryFactory;
 }
 
 const SPAN_NAME = "RateLimiterFlexibleAdapter > consume";

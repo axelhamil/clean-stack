@@ -226,7 +226,7 @@ Deploy-safe perimeter — rate-limit, strict CSP, and stateless CSRF protection,
 - IETF `RateLimit` / `RateLimit-Policy` / `Retry-After` headers on every rate-limited response.
 - **Fail-closed on auth** — a store outage throws 503 on auth routes rather than silently skipping the guard (OWASP A10:2025). Global routes fail-open.
 - Trusted-proxy IP resolution: `TRUSTED_PROXIES=private` (Railway/Fly), CIDR, or exact IP. OWASP rightmost-non-trusted algorithm — first untrusted IP wins.
-- Store progression: memory (dev) → Postgres → Redis (swap without code change).
+- Store progression: memory (dev / single-replica) → Postgres (multi-replica, dedicated pool isolated from app queries). Redis is not yet implemented — envisaged if multi-replica pressure on the DB justifies it (would require a new factory + enum value).
 - Front: `sonner` toast on 429 with countdown from `Retry-After`.
 
 **CSP** (Caddy + Vite, _not_ a Hono middleware):

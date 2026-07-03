@@ -22,7 +22,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
-| **Phase C.1 — Security perimeter (S1–S4)** | **Jun 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory→Postgres→Redis stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + 2 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S4.1 rate-limiter resilience → S5 abuse → S6 captcha. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.1 — Security perimeter (S1–S4.1)** | **Jun 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + 2 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5 abuse → S6 captcha (S4.1 store resilience shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -43,7 +43,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 ### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
 
-- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF shipped** (Jun 2026 — see ✅ table; S4.1/S5/S6 remain, S4.1 next). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
+- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience shipped** (Jun 2026 — see ✅ table; S5/S6 remain, S5 next). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
 - **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14, mandatory since 28 Jun 2025) + DPA + DORA annex templates. Cheap (~3h), pure config/Markdown.
 - **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
 
@@ -232,18 +232,18 @@ modules/consents/
 >
 > **Hardening from the SOTA review** (S1/S2 amendment): rate-limit **fails closed on auth-sensitive policies** (a store outage must not silently disable brute-force protection — OWASP A10:2025 / CWE-636), fail-open preserved on the global policy; prod boot **fails hard** if `CORS_ORIGIN` is unset (no silent localhost fallback).
 >
-> **Documented deployment debt** (see README): `RATE_LIMIT_STORE=memory` is per-replica — switch to `postgres`/Redis before horizontal scaling; `TRUSTED_PROXIES` must be set behind a load-balancer (warn at boot) or every request shares the LB IP (collective lockout); fail-closed-on-auth without a circuit-breaker can turn a store outage into temporary login unavailability (v-next: degraded in-memory fallback).
+> **Documented deployment debt** (see README): `RATE_LIMIT_STORE=memory` is per-replica — switch to `postgres` before horizontal scaling (Redis not yet implemented); `TRUSTED_PROXIES` must be set behind a load-balancer (warn at boot) or every request shares the LB IP (collective lockout). **S4.1 isolated the postgres limiter in a dedicated pg pool** (max:3, 500 ms acquire-timeout) so a flood can't exhaust the app pool; in-memory insurance is deliberately skipped (fail-closed-fast) until a Redis store lands.
 >
-> **Still pending in C.1** (priority order): **S4.1 rate-limiter store resilience (next)** → S5 abuse-prevention signals → S6 captcha.
+> **Still pending in C.1** (priority order): **S5 abuse-prevention signals (next)** → S6 captcha. (S4.1 store resilience ✅ shipped — see below.)
 
-### S4.1 — Rate-limiter store resilience — **NEXT (priority over S5/S6)**
+### S4.1 — Rate-limiter store resilience — ✅ **SHIPPED**
 
-**Why first**: the only MEDIUM finding from the C.1 SOTA review, and it's live on the `postgres` store. The limiter shares the app's pg pool (`packages/drizzle/src/config.ts:27` — `max: 20`) through the global `db` proxy (`rate-limiter-flexible.adapter.ts:27` passes `storeClient: db`). A sustained flood can exhaust that shared pool → the fail-closed auth policies then 503 (DoS amplification). Isolating the limiter removes the vector **without** an in-memory store (deliberate: `RATE_LIMIT_STORE` stays `postgres`).
+**Why it mattered**: the only MEDIUM finding from the C.1 SOTA review. The limiter used to share the app's pg pool (`max: 20`) through the global `db` proxy — a sustained flood could exhaust that shared pool → the fail-closed auth policies then 503 (DoS amplification). S4.1 isolated the limiter in a dedicated pg pool **without** an in-memory store (deliberate: `RATE_LIMIT_STORE` stays `postgres`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-- [ ] **Dedicated pg `Pool`** for the limiter — `new Pool({ max: 3, connectionTimeoutMillis: 500 })` wrapped in a minimal `drizzle(dedicatedPool, { schema: { rateLimitRecord } })`. Wire via the `IRateLimiter` binding (`container.ts:71`) → pass into `drizzleFactory` (`rate-limiter-flexible.adapter.ts`). **Do NOT** expose the global pool from `@packages/drizzle` (encapsulation).
-- [ ] **Short acquire timeout** so a store stall fails fast instead of queuing on a saturated pool.
-- [ ] **Decide `insuranceLimiter`**: rate-limiter-flexible offers an in-memory fallback on store error. Since `RATE_LIMIT_STORE` stays postgres by preference and a real pg outage = whole-app outage anyway, default to **fail-closed-fast** (skip insurance) unless a separate Redis store lands — then a tiny conservative in-memory insurance for the auth policies only is worth revisiting.
-- [ ] **Verify Caddy `Reporting-Endpoints`** emits without literal backticks (`curl -I` against a local Caddy run) — the one unverified item from the CSP audit; fix the Caddyfile string syntax if they leak.
+- [x] **Dedicated pg `Pool`** for the limiter — `new Pool({ max: 3, connectionTimeoutMillis: 500 })` wrapped in a minimal `drizzle(dedicatedPool, { schema: rateLimitSchema })`. Exposed via factory `getRateLimitDbClient()` in `@packages/drizzle` (lazy singleton, `DATABASE_URL` stays encapsulated — the `Pool` is **never** exported). Wired in the `IRateLimiter` binding (`container.ts`) via `storeFactoryFor(env.RATE_LIMIT_STORE, getRateLimitDbClient)` — the client factory is invoked (pool created) only when `RATE_LIMIT_STORE=postgres`.
+- [x] **Short acquire timeout** — `connectionTimeoutMillis: 500` on the dedicated pool: a store stall throws in ≤500 ms → `capture` + `Result.fail` → auth policies fail-closed (503) instead of queuing on a saturated pool.
+- [x] **Decide `insuranceLimiter`**: **fail-closed-fast** (skip insurance). A real pg outage = whole-app outage anyway, and `RATE_LIMIT_STORE` stays postgres by preference. Revisit only if a separate Redis store lands — then a tiny conservative in-memory insurance for the auth policies only is worth reconsidering.
+- [x] **Verify Caddy `Reporting-Endpoints`** emits without literal backticks — confirmed via `caddy adapt`: the resolved header value is `csp-endpoint="…/csp-report"` (backticks are Caddy raw-string delimiters, not leaked to the browser). Note: prod still serves the pre-C.1 CSP (CSP strict + reporting lives on `dev`, not yet released to `main`) — re-`curl -I` prod after the `dev`→`main` merge to confirm the deployed header.
 
 ### Rate limiting + abuse prevention
 
@@ -258,11 +258,13 @@ modules/consents/
 - **Always responds 429 with `Retry-After`** via the central `app.onError` envelope, never 5xx.
 - **Auth-burst surface** (sign-in / forgot-password / verify-email submit / 2FA submit / magic-link request): tighter window — `5/15min/IP` baseline.
 
-- [ ] Disable BetterAuth built-in `rateLimit` (`{ enabled: false }`) — replaced by the unified Hono middleware.
-- [ ] Middleware `apps/api/src/shared/middleware/rate-limit.middleware.ts` (factory) mounted `app.use("*")` before the BetterAuth handler; wraps `hono-rate-limiter` + `IRateLimitStore` (memory default, Redis impl swappable — `IInstrumentation` NoOp→Sentry pattern).
-- [ ] Store backend at scaffold: in-memory (single replica) → Redis `secondaryStorage` (2+ replicas, mandatory) → or Postgres `rate_limit_window(key, windowStart, count)` PK `(key, windowStart)` + TTL sweep.
-- [ ] Captcha hook (Turnstile / hCaptcha free tier — provider-agnostic via `ICaptchaService` port) — invoked when `requireRateLimit` enters "near-cap" state (>80% of window). Optional, env-flagged.
-- [ ] Front error UX: 429 toast with countdown using `Retry-After` header.
+> **Status**: the rate-limit core below shipped in **S1–S4** via `rate-limiter-flexible` (not `hono-rate-limiter` — deviation validated during build) behind the `IRateLimiter` port. This section keeps the original decided shape for reference; the remaining `[ ]` are the abuse-prevention layer (S5) and captcha (S6).
+
+- [x] Disable BetterAuth built-in `rateLimit` (`{ enabled: false }`) — replaced by the unified Hono middleware.
+- [x] Middleware `apps/api/src/shared/middleware/rate-limit.middleware.ts` (factory) mounted before the BetterAuth handler; wraps `rate-limiter-flexible` behind the `IRateLimiter` port (memory default, Postgres dedicated-pool swappable — `IInstrumentation` NoOp→Sentry pattern).
+- [x] Store backend at scaffold: in-memory (single replica) → Postgres `rate_limit(key, points, expire)` via `RateLimiterDrizzle` on a dedicated pool (2+ replicas). Redis `secondaryStorage` deferred until a real multi-replica + DB-pressure need.
+- [ ] Captcha hook (Turnstile / hCaptcha free tier — provider-agnostic via `ICaptchaService` port) — invoked when `requireRateLimit` enters "near-cap" state (>80% of window). Optional, env-flagged. **(S6)**
+- [x] Front error UX: 429 toast with countdown using `Retry-After` header.
 
 **Abuse-prevention signals — Sentinel's threat model, self-hosted** (build on real abuse signal, not pre-launch; the velocity store + `session.ipAddress` we already persist are the substrate):
 

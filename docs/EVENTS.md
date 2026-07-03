@@ -299,7 +299,7 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 Ces 3 events ne sont pas des state-changes métier — ils signalent des rejets de sécurité au niveau infra. Émis via `emitEvent(outbox, ...)` **hors agrégat** (même chemin que les events RGPD/uploads/webhooks), avec `actorUserId` **nullable** (pas de session authentifiée fiable sur ces rejets).
 
-- `SECURITY_RATE_LIMIT_EXCEEDED` (`security.rate_limit.exceeded`) — émis par le rate-limit middleware sur rejet d'une requête auth. Payload : `{ ipAddress, path, actorUserId? }`, retention `operational`.
+- `SECURITY_RATE_LIMIT_EXCEEDED` (`security.rate_limit.exceeded`) — émis par le rate-limit middleware sur rejet d'une requête auth. Payload : `{ actorUserId: string | null, ip: string (max 45), policyName: string (max 64), path: string (max 512), method: string (max 16) }`, retention `operational`.
 - `SECURITY_CSP_VIOLATION` (`security.csp.violation`) — émis par l'endpoint public `POST /csp-report`. Payload : `{ documentUri, violatedDirective, blockedUri, actorUserId? }`, retention `operational`.
 - `SECURITY_CSRF_REJECTED` (`security.csrf.rejected`) — émis par le CSRF middleware sur Origin invalide. Payload : `{ ipAddress, path, origin?, actorUserId? }`, retention `operational`.
 
