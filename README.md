@@ -154,7 +154,7 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 
 Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
 
-- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF **shipped** (Phase C.1 — see Security & hardening above; captcha + abuse-signals still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
+- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF + abuse quick-wins (s5a) **shipped** (Phase C.1 — see Security & hardening above; captcha + advanced abuse signals impossible-travel/geo still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
 - **M2 — Revenue** · billing via `@better-auth/stripe` (per-org customer, portal, dunning) · feature & quota gating (config + middleware, no DDD)
 - **M3 — Finish half-shipped UIs** · audit-log front · webhooks front + `webhook.test` · recovery-codes UI · privacy dashboard
 - **M4 — Operate** · admin & impersonation (BetterAuth `admin` plugin) · API tokens / PATs (eval `@better-auth/api-key`) · OpenAPI docs (Scalar) · in-app notifications

@@ -117,9 +117,10 @@ OTel + Prometheus `/metrics` are deferred to Phase D.1 (no consumer yet). The sp
 
 `IUnitOfWork.run(cb)` opens an `EventCollector` (AsyncLocalStorage). `repo.save(agg, tx)` wraps `trackEventsOnSuccess(result, agg)` to push pulled domain events into the collector. Pre-COMMIT, the UoW flushes them via `outbox.enqueue` in the same TX → atomicity. Post-COMMIT, Postgres `pg_notify` wakes `OutboxDispatcher` which fans out to built-in subscribers (audit, webhook fanout) inside the dispatch TX, then to user-defined `onEvent(...)` handlers post-commit (best-effort, isolated).
 
-**BetterAuth → outbox bridge** lives in `auth.ts` (the documented exception). Two paths:
+**BetterAuth → outbox bridge** lives in `auth.ts` (the documented exception). These paths:
 - **`databaseHooks` for core models** (user/session/account/verification) — TX-bound, captures all flows including non-HTTP. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.
 - **`hooks.after` + `createAuthMiddleware` for plugin events** (twoFactor, passkey, email-verified, password-changed, link-social) — path-based, only voie viable since plugin tables aren't exposed in `databaseHooks`. Filter `if (ctx.context.returned instanceof APIError) return` is critical (otherwise events fire on 4xx).
+- **`hooks.before` + `createAuthMiddleware` for pre-rejection security signals** (S5a abuse-prevention: disposable-email, per-account credential-stuffing, HIBP telemetry) — emits before the `throw APIError`. **Trap**: `ctx.context.request` / `ctx.context.session` are **`undefined`** in a before-hook (it runs before the session middleware) — read the IP from `ctx.headers`, load the authenticated actor via `auth.api.getSession({ headers: ctx.headers })`. Wiring `ctx.context.*` throws before the emit → event silently lost + `/sign-in` 500s; only an end-to-end pass catches it (unit tests don't mount the hooks).
 - **Native callbacks** — `emailAndPassword.{sendResetPassword,onPasswordReset}`, `magicLink.sendMagicLink` for the corresponding events.
 
 `organizationHooks` (org plugin) covers all org/member/invitation events.

@@ -22,7 +22,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
-| **Phase C.1 — Security perimeter (S1–S4.1)** | **Jun 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + 2 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5 abuse → S6 captcha (S4.1 store resilience shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.1 — Security perimeter (S1–S5a)** | **Jun–Jul 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + abuse quick-wins (per-account credential-stuffing, disposable-email, HIBP telemetry) + 5 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5b advanced abuse signals → S6 captcha (S4.1 store resilience + S5a shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -43,7 +43,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 ### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
 
-- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience shipped** (Jun 2026 — see ✅ table; S5/S6 remain, S5 next). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
+- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience + S5a abuse quick-wins shipped** (Jun–Jul 2026 — see ✅ table; S5b advanced signals + S6 captcha remain). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
 - **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14, mandatory since 28 Jun 2025) + DPA + DORA annex templates. Cheap (~3h), pure config/Markdown.
 - **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
 
@@ -234,7 +234,7 @@ modules/consents/
 >
 > **Documented deployment debt** (see README): `RATE_LIMIT_STORE=memory` is per-replica — switch to `postgres` before horizontal scaling (Redis not yet implemented); `TRUSTED_PROXIES` must be set behind a load-balancer (warn at boot) or every request shares the LB IP (collective lockout). **S4.1 isolated the postgres limiter in a dedicated pg pool** (max:3, 500 ms acquire-timeout) so a flood can't exhaust the app pool; in-memory insurance is deliberately skipped (fail-closed-fast) until a Redis store lands.
 >
-> **Still pending in C.1** (priority order): **S5 abuse-prevention signals (next)** → S6 captcha. (S4.1 store resilience ✅ shipped — see below.)
+> **Still pending in C.1** (priority order): **S5b advanced abuse signals (impossible-travel, geo/IP deny-list)** → S6 captcha. (S4.1 store resilience ✅ + S5a abuse quick-wins ✅ shipped — see below.)
 
 ### S4.1 — Rate-limiter store resilience — ✅ **SHIPPED**
 
@@ -258,7 +258,7 @@ modules/consents/
 - **Always responds 429 with `Retry-After`** via the central `app.onError` envelope, never 5xx.
 - **Auth-burst surface** (sign-in / forgot-password / verify-email submit / 2FA submit / magic-link request): tighter window — `5/15min/IP` baseline.
 
-> **Status**: the rate-limit core below shipped in **S1–S4** via `rate-limiter-flexible` (not `hono-rate-limiter` — deviation validated during build) behind the `IRateLimiter` port. This section keeps the original decided shape for reference; the remaining `[ ]` are the abuse-prevention layer (S5) and captcha (S6).
+> **Status**: the rate-limit core below shipped in **S1–S4** via `rate-limiter-flexible` (not `hono-rate-limiter` — deviation validated during build) behind the `IRateLimiter` port. **S5a abuse quick-wins shipped** (credential-stuffing per-account counter, disposable-email, HIBP telemetry — see below). This section keeps the original decided shape for reference; the remaining `[ ]` are the S5b abuse signals and captcha (S6).
 
 - [x] Disable BetterAuth built-in `rateLimit` (`{ enabled: false }`) — replaced by the unified Hono middleware.
 - [x] Middleware `apps/api/src/shared/middleware/rate-limit.middleware.ts` (factory) mounted before the BetterAuth handler; wraps `rate-limiter-flexible` behind the `IRateLimiter` port (memory default, Postgres dedicated-pool swappable — `IInstrumentation` NoOp→Sentry pattern).
@@ -268,10 +268,12 @@ modules/consents/
 
 **Abuse-prevention signals — Sentinel's threat model, self-hosted** (build on real abuse signal, not pre-launch; the velocity store + `session.ipAddress` we already persist are the substrate):
 
-- [ ] **Credential-stuffing** — per-visitor failed-login counter → challenge at N, block at M (reuses the rate-limit store).
-- [ ] **Impossible-travel** — flag a sign-in whose geo-IP jumps faster than physically possible vs the last session (we already store `session.ipAddress` + `userAgent`).
-- [ ] **Free-trial abuse** — IP/device-fingerprint heuristic capping accounts-per-visitor (pairs with B.1 "max 1 free team org per user").
-- [ ] **Geo / suspicious-IP deny-list** — env-driven country/ASN block middleware. All four emit `security.*` events (rule §6) → auto-audited.
+> **S5a — quick-wins ✅ shipped** (Jul 2026, OSS only; BetterAuth Sentinel stays excluded as paid SaaS): per-account credential-stuffing counter on `/sign-in` (fail-closed, reuses `security.rate_limit.exceeded` with `policyName: auth-sign-in-account`), disposable/throwaway-email block at sign-up (~90k-domain list + DNS MX check, fail-open → `security.signup.rejected`), HIBP breached-password telemetry on sign-up/reset/change (→ `security.password.breached`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). **S5b = the calibration-heavy signals below**, deferred until real traffic exists to tune them (false-positive risk: VPN/carrier-NAT for geo, device-fingerprint bypass).
+
+- [x] **Credential-stuffing** — per-account failed-login counter on `/sign-in` → block at M (reuses the rate-limit store). **S5a shipped**; the progressive "challenge at N" step waits on captcha (S6).
+- [ ] **Impossible-travel** — flag a sign-in whose geo-IP jumps faster than physically possible vs the last session (we already store `session.ipAddress` + `userAgent`). **(S5b)**
+- [ ] **Free-trial abuse** — IP/device-fingerprint heuristic capping accounts-per-visitor (pairs with B.1 "max 1 free team org per user"). **(S5b — the disposable-email block already ships in S5a as the cheap first layer.)**
+- [ ] **Geo / suspicious-IP deny-list** — env-driven country/ASN block middleware. Emits `security.*` events (rule §6) → auto-audited. **(S5b)**
 
 ### Content-Security-Policy strict (no `unsafe-inline`)
 
