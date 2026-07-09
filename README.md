@@ -86,7 +86,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 
 ## Features
 
-Everything wired today, and the build order for what's next. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
+Everything wired today, and the build order for what's next. Prefer prose? [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the guided tour. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
 
 ### Shipped
 
@@ -286,7 +286,8 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 | | |
 |---|---|
-| **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) |
+| **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
+| **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
 | **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅; build order: M1 security perimeter + consent → M2 billing → M3 finish audit/webhooks/recovery UI → M4 admin + PATs → M5 e2e/a11y gates → M6 SSO/i18n/mobile |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
