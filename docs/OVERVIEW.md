@@ -48,8 +48,10 @@ Compliance is built into the foundation, before any feature, so a clone deployed
 - **Rectification (Art. 16)** — users edit their profile, change their email (with re-verification), and change their password.
 - **Erasure (Art. 17)** — a self-service delete that requires 2FA, holds a 7-day grace window (signing in cancels it), verifies the user isn't the sole owner of a shared organization, then a scheduled job wipes personal data and anonymizes references so shared audit trails stay intact.
 - **Portability (Art. 20)** — a self-service export that emails a signed, 7-day download link, throttled to once a day.
+- **Sub-processor disclosure (Art. 28)** — a public `/legal/sub-processors` page lists every sub-processor (active: Resend, Cloudflare R2, BetterAuth OAuth; planned: Stripe, GrowthBook, Umami) with purpose, region, and DPA link. The active/planned split keeps cloners aware of which additions require the 30-day advance notice to DPA contacts before going live.
+- **Accessibility statement (EAA Art. 14, mandatory since June 2025)** — a public `/legal/accessibility` page declares WCAG 2.1 AA / EN 301 549 v3.2.1 conformance, known limitations, and a contact alias for accessibility complaints. The page itself follows the pattern it prescribes: one `<h1>`, real `<h2>` section headings, a labelled mailto link.
 
-A public "data rights" page states plainly what is deleted, what is anonymized, and what is retained under which legal basis.
+Public compliance pages cover data rights (`/legal/data-rights`), sub-processor disclosure (`/legal/sub-processors`), and the accessibility statement (`/legal/accessibility`). DPA and DORA-annex contract templates in `docs/legal/` cover EU enterprise client onboarding (a decision table routes: fintech → DPA + DORA annex; non-fintech EU B2B → DPA only).
 
 ## A perimeter that's safe to deploy
 

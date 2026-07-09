@@ -565,3 +565,40 @@ Captcha hook (Turnstile / hCaptcha via `ICaptchaService` port — S6), and the c
 4. The 8 auth-burst policies and GLOBAL policy are pre-wired in `index.ts`. Add a `requireRateLimit(deps, policy)` call for any new public endpoint that needs its own budget.
 5. `requireCsrf` is already mounted on the mutation-capable prefixes. New mutation prefixes → add a `app.use("/new-prefix/*", csrf)` line.
 6. CSP report URL is baked into `Caddyfile` via `{$VITE_API_URL}`. Violations appear in `audit_log` with `event_type = 'security.csp.violation'`.
+
+---
+
+## Compliance docs bundle ✅ Phase A.3 · Jul 2026
+
+**Why**: two legal obligations were shipping as missing pages — GDPR Art. 28 (sub-processor disclosure is mandatory when acting as a data processor for any EU client) and EAA Art. 14 (accessibility statement mandatory since June 28 2025). Bundled with two contractual templates (DPA + DORA annex) because they share the same context window and are all pure Markdown / static config: no DB, no backend, no event. A missing sub-processor page or accessibility statement is a legal violation the moment a clone ships to EU users; a missing DPA template blocks every EU enterprise deal.
+
+### Front pages (`apps/app/src/features/legal/`)
+
+- [x] **`sub-processors.config.ts`** — typed const `SUB_PROCESSORS` (interface `SubProcessor { name, purpose, region, category, url?, dpaUrl?, status }`). Active entries: Resend (transactional email, US DPF-certified), Cloudflare R2 (object storage, EU option available), BetterAuth OAuth (identity provider bridge, N/A region). Planned entries: Stripe (billing), GrowthBook (feature flags), Umami (analytics).
+- [x] **`sub-processors.{route,page}.tsx`** — public route `/legal/sub-processors`, no auth gate (child of `rootRoute`). 4 Cards: "What is a sub-processor?" (context), Active sub-processors (shadcn `<Table>` columns: Name / Purpose / Region / DPA), Planned sub-processors (same Table), Change notice (Art. 28 §2 30-day advance-notice language + `dpo@[domain]` contact). `last-updated: 2026-07-09`.
+- [x] **`accessibility.{route,page}.tsx`** — public route `/legal/accessibility`, no auth gate. 5 `<section>` blocks with `<TypographyH2>` headings: Compliance status (WCAG 2.1 AA / EN 301 549 v3.2.1 target), Known limitations, Technical specifications, Feedback and contact (`accessibility@[domain]` alias), Enforcement and escalation. Page itself exemplary a11y: single `<h1>`, genuine `<h2>` section headings, `mailto:` link labelled with the alias address.
+- [x] **Router + palette wiring** — `apps/app/src/router.tsx` adds 2 public child routes under `rootRoute`. `command-palette.tsx` adds both routes to `LEGAL_ROUTES` group (visible on ⌘K). `data-rights.page.tsx` gains cross-link `<Card>` components to both new pages.
+
+### Contract templates (`docs/legal/`)
+
+- [x] **`DPA-template.md`** — 12-clause GDPR Art. 28 Data Processing Agreement. Covers: subject matter + duration, nature/purpose/type of personal data, categories of data subjects, processor obligations, sub-processor management (30-day notice per Art. 28 §2), data location + jurisdiction, technical and organizational measures, audit rights, incident notification (72h), data return/deletion on contract end, liability. Placeholders: `[CLIENT_NAME]`, `[EFFECTIVE_DATE]`, `[CLIENT_CONTACT]`, `[DPA_CONTACT]`.
+- [x] **`DORA-annex-template.md`** — 11-provision DORA Art. 30 annex for EU fintech/insurance clients (mandatory since Jan 17 2025). Provisions: description of services, SLA targets (RPO/RTO mirroring Phase 0.3 disaster-recovery), data location + jurisdiction, audit rights (on-site + remote + documentary), sub-contractor chain disclosure, incident reporting (mirrors NIS2 24h first notice / 72h impact assessment / 1-month final report), operational continuity + exit plan + reversibility, security standards certification, change management notification, data portability on exit, insurance. Sourced from the 11 mandatory Art. 30 contractual provisions per DORA regulatory text (EU 2022/2554).
+- [x] **`README.md`** — index of both templates + usage decision table (fintech or DORA-regulated EU client → DPA + DORA annex; non-fintech EU B2B → DPA only; non-EU → neither, though DPA is best practice) + consolidated placeholder checklist to complete before production: `accessibility@[domain]`, `dpo@[domain]`, national accessibility authority name per EAA Art. 14, client-specific fields per template.
+
+### Clone-ability fix (`apps/app/src/shared/env.ts`)
+
+- [x] **`VITE_SENTRY_DSN`** — schema was `z.url().optional()`. The `.env.example` ships the var as an empty string (`VITE_SENTRY_DSN=`). Zod `optional()` coerces `undefined` → skip, but `""` is not `undefined` — `z.url().parse("")` throws a validation error at boot. Fix: `z.preprocess((v) => (v === "" ? undefined : v), z.url().optional())`. The boilerplate now boots clean on a fresh `pnpm bootstrap` without requiring the cloner to manually delete the empty DSN line.
+
+### As-built deviations
+
+1. **No footer links → command-palette + `data-rights` cross-links.** The roadmap spec said "linked from footer (every page)". No global footer component exists in the app shell (top-nav only — SOTA 2026 pattern, see App shell entry). Links surface instead via two discoverability points: the command-palette (`LEGAL_ROUTES` group, visible on ⌘K search) and `data-rights.page.tsx` (explicit cross-link cards). Footer links can be added when a global footer is introduced (likely Phase E.2 marketing site).
+2. **`CardTitle` heading tree → `<TypographyH2>`.** A review finding: shadcn `<CardTitle>` renders as `<div>`, not an `<h2>` — the `<h1>` page title had no `<h2>` children, a WCAG 1.3.1 heading-structure violation. Fixed by replacing `<CardTitle>` with `<TypographyH2>` for section cards, so the heading tree is valid and the accessibility statement is itself accessible.
+3. **Component props `interface` over `type`.** A review finding: component prop types were declared with `type` instead of `interface`. Fixed to `interface SubProcessorCardProps { ... }` per the project rule (component props = `interface`; `type` reserved for unions/mapped types).
+
+### Decisions
+
+1. **0 domain events.** Pages are 100% static reads — no aggregate, no write path, no compliance state change. Event count stays at 40. A `compliance.sub_processors.viewed` style instrumentation event would be analytics, blocked until A.4 consent ships.
+2. **`status: "active" | "planned"` split.** Rather than a flat list, sub-processors are split into active (contractually engaged today, require DPA coverage) and planned (will require a DPA update before they go live — Art. 28 §2 30-day advance notice obligation). This makes the contractual obligation visible: a cloner who activates Stripe must move it from planned to active and trigger the notice.
+3. **`url?` + `dpaUrl?` both optional.** Not every sub-processor publishes a DPA URL directly; some (BetterAuth OAuth) are conditional-on-use. Optional fields allow the config to be honest about availability without breaking the type or rendering empty cells.
+4. **Accessibility statement written before A.6 CI gate.** The statement declares a WCAG 2.1 AA conformance target but acknowledges known limitations and defers the auto-update to A.6 Lighthouse CI. This is the EAA-compliant posture: the statement must exist (obligation since Jun 2025); its accuracy improves as A.6 lands. A statement with a complaint contact satisfies the obligation; a blank page does not.
+5. **`docs/legal/README.md` as the cloner's decision guide.** The fintech-vs-B2B table and placeholder checklist are the highest-value item in A.3 for cloners: they prevent "which template do I send?" ambiguity at first EU enterprise signature and surface the production-readiness gaps (`accessibility@`, `dpo@`, national authority) that are easy to overlook.

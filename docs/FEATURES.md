@@ -31,6 +31,24 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 
 ---
 
+## Compliance docs bundle ✅ Phase A.3
+
+EAA Art. 14 accessibility declaration + GDPR Art. 28 sub-processor disclosure, both mandatory for EU deploys. Static public pages (no auth gate, no backend touched). Contract templates for EU client onboarding. 0 domain events — event count stays at 40.
+
+**Frontend** (`apps/app/src/features/legal/`):
+- `/legal/sub-processors` (`sub-processors.{route,page}.tsx`) — 4 Cards: context, Active sub-processors (shadcn Table: Name/Purpose/Region/DPA), Planned sub-processors (same Table), Change-notice (Art. 28 §2, 30-day advance notice + `dpo@[domain]`). Typed config `SUB_PROCESSORS` in `sub-processors.config.ts` (`SubProcessor { name, purpose, region, category, url?, dpaUrl?, status }`). Active: Resend, Cloudflare R2, BetterAuth OAuth. Planned: Stripe, GrowthBook, Umami.
+- `/legal/accessibility` (`accessibility.{route,page}.tsx`) — 5 sections (EAA Art. 14): Compliance status (WCAG 2.1 AA / EN 301 549 v3.2.1 target), Known limitations, Technical specifications, Feedback + contact (`accessibility@[domain]`), Enforcement + escalation. Exemplary a11y: single `<h1>`, `<TypographyH2>` section headings, labelled `mailto:`.
+- Linked via `router.tsx` (2 public child routes under `rootRoute`), `command-palette.tsx` (2 `LEGAL_ROUTES` entries), `data-rights.page.tsx` (cross-link cards). Footer links deferred (no global footer yet).
+
+**Contract templates** (`docs/legal/`):
+- `DPA-template.md` — 12-clause GDPR Art. 28 Data Processing Agreement. Covers sub-processor management (30-day notice), incident notification (72h), data return/deletion on contract end. Placeholders: `[CLIENT_NAME]`, `[EFFECTIVE_DATE]`, `[CLIENT_CONTACT]`, `[DPA_CONTACT]`.
+- `DORA-annex-template.md` — 11-provision DORA Art. 30 annex (mandatory for EU fintech/insurance clients since Jan 17 2025). Covers SLA targets (mirrors Phase 0.3 RPO/RTO), audit rights (on-site + remote), incident reporting (NIS2 24h/72h/1-month), exit plan + data portability, sub-contractor chain.
+- `README.md` — index + fintech-vs-B2B decision table (fintech → DPA + DORA annex; non-fintech EU B2B → DPA only) + placeholder checklist for production readiness (`accessibility@[domain]`, `dpo@[domain]`, national accessibility authority).
+
+**Clone-ability fix** (`apps/app/src/shared/env.ts`): `VITE_SENTRY_DSN: z.preprocess((v) => (v === "" ? undefined : v), z.url().optional())` — `.env.example` ships the var as an empty string; bare `z.url().optional()` threw on `""` because empty string is not `undefined`. Now boots clean on a fresh `pnpm bootstrap`.
+
+---
+
 ## Profile editing + NIST 800-63B-4 password baseline ✅ Phase A.1
 
 GDPR Art. 16 rectification surface + SOTA-2026 password policy, both wired into the existing `/settings/account` page.

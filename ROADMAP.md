@@ -23,6 +23,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase C.1 — Security perimeter (S1–S5a)** | **Jun–Jul 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + abuse quick-wins (per-account credential-stuffing, disposable-email, HIBP telemetry) + 5 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5b advanced abuse signals → S6 captcha (S4.1 store resilience + S5a shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.3 — Compliance docs bundle** | **Jul 2026** | `/legal/sub-processors` (Art. 28 sub-processor disclosure — 3 active: Resend, R2, OAuth; 3 planned: Stripe, GrowthBook, Umami) + `/legal/accessibility` (EAA Art. 14, WCAG 2.1 AA / EN 301 549 v3.2.1 declaration + complaint alias) + `docs/legal/` DPA template (12 Art. 28 clauses) + DORA annex template (11 Art. 30 provisions) + README index + fintech-vs-B2B decision table. Linked via command-palette + `data-rights` cross-links (no global footer yet). Clone-ability fix: `VITE_SENTRY_DSN` empty-string coercion in `apps/app/src/shared/env.ts`. 0 domain events (static pages). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -40,11 +41,12 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 - **A.1** Right to rectification (Art. 16) + NIST 800-63B-4 password ✅ COMPLETE (Jun 2026) — `ProfileCard` + `ChangePasswordCard` + HIBP k-anonymity + min 15 + ban-list. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.2** Privacy policy / Terms versioning (Art. 7) ✅ COMPLETE (Jun 2026) — `@packages/policies` SSOT + `policy_acceptance` + `/legal/accept` gate + `requireCurrentPolicies` + `user.policy.accepted`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+- **A.3** Compliance docs bundle ✅ COMPLETE (Jul 2026) — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA template + DORA annex + `docs/legal/README.md`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
 ### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
 
 - **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience + S5a abuse quick-wins shipped** (Jun–Jul 2026 — see ✅ table; S5b advanced signals + S6 captcha remain). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
-- **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14, mandatory since 28 Jun 2025) + DPA + DORA annex templates. Cheap (~3h), pure config/Markdown.
+- **A.3** Compliance docs bundle ✅ **shipped** (Jul 2026 — see ✅ table; 2 public pages + DPA/DORA templates landed. RSS change history + re-acceptance trigger on sub-processor changes deferred as next-step; accessibility auto-update tied to A.6). As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
 
 ### M2 — Revenue (the #1 reason to clone a SaaS starter)
@@ -96,24 +98,26 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Why** (M1, bundled): 4 pure-config / Markdown items that share the same context (legal disclosure pages + contractual templates). ~3h total. Each missing one blocks a specific scenario: no sub-processor page = Art. 28 GDPR violation; no accessibility statement = EAA Art. 14 violation since June 28 2025; no DPA template = every EU client demands it at signature; no DORA annex = no fintech/insurance deal can sign since Jan 17 2025.
 
+> **Status — shipped (2026-07-09).** 2 public legal pages + 3 contract templates landed. 0 domain events (pages 100% static, no backend touched) — event count stays at 40. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). Two deferred items: (1) RSS change history + re-acceptance trigger on sub-processor list changes (Art. 28 §2 advance-notice automation — marked next-step in the sub-processor bullet below); (2) accessibility statement auto-update tied to A.6 Lighthouse CI (remains `[ ]`).
+
 **Sub-processor disclosure** (Art. 28 GDPR):
 
-- [ ] `apps/app/src/features/legal/sub-processors.config.ts` — typed const `SUB_PROCESSORS = [{ name: "Resend", purpose: "Transactional email", region: "US (DPF-certified)", url: "https://resend.com/legal/dpa", category: "infra" }, ...] as const`. Pre-fill with current stack: Resend, Cloudflare R2, BetterAuth providers, future Stripe + GrowthBook + Umami.
-- [ ] `/legal/sub-processors.page.tsx` — table view, last-updated timestamp, RSS-style change history (next-step: trigger re-acceptance when sub-processor list changes — Art. 28 §2 requires advance notice).
-- [ ] Linked from `/legal/data-rights` + footer + `/settings/privacy` (A.5).
+- [x] `apps/app/src/features/legal/sub-processors.config.ts` — typed const `SUB_PROCESSORS` (interface `SubProcessor { name, purpose, region, category, url?, dpaUrl?, status }`). Active: Resend, Cloudflare R2, BetterAuth OAuth. Planned: Stripe, GrowthBook, Umami.
+- [x] `apps/app/src/features/legal/sub-processors.{route,page}.tsx` — 4 Cards (What is a sub-processor?, Active sub-processors → shadcn Table, Planned sub-processors → shadcn Table, Change notice Art. 28 §2 30-day notice + `dpo@[domain]`), `last-updated: 2026-07-09`. RSS change history + re-acceptance trigger on sub-processor list changes deferred (next-step).
+- [x] Linked via `command-palette.tsx` (2 `LEGAL_ROUTES` entries) + `data-rights.page.tsx` cross-links. Footer link deferred (no global footer yet); `/settings/privacy` links land with A.5.
 
 **Accessibility statement** (EAA Art. 14, mandatory since June 28 2025):
 
-- [ ] `/legal/accessibility.page.tsx` — declares conformance level (target: WCAG 2.1 AA per EN 301 549 v3.2.1, the EAA harmonised standard), known limitations, contact for complaints, last review date.
-- [ ] **Complaint procedure** — embedded form or dedicated email alias (`accessibility@<domain>`). Mandatory per EAA — users must have a channel to flag a barrier.
-- [ ] Linked from footer (every page) + `/legal/data-rights`.
+- [x] `apps/app/src/features/legal/accessibility.{route,page}.tsx` — 5 sections EAA Art. 14: Compliance status (WCAG 2.1 AA / EN 301 549 v3.2.1), Known limitations, Technical specifications, Feedback and contact (`accessibility@[domain]`), Enforcement and escalation. Page itself is exemplary a11y (single `<h1>`, `<h2>` section headings, labelled mailto).
+- [x] **Complaint procedure** — `accessibility@[domain]` email alias embedded in the Feedback section. Mandatory per EAA — users must have a channel to flag a barrier.
+- [x] Linked via command-palette + `data-rights.page.tsx` cross-links. Footer deferred; see sub-processor linking note above.
 - [ ] Auto-update mechanism: tied to A.6 Lighthouse CI gate — when audit results change, page reflects the new conformance state.
 
 **Contract templates** (Markdown in `docs/legal/`):
 
-- [ ] `docs/legal/DPA-template.md` — Data Processing Agreement covering Art. 28 GDPR clauses: scope of processing, sub-processor list (link to `/legal/sub-processors`), data location, retention, audit rights, sub-processor notice (30 days), incident notification (72h), end-of-contract data return/deletion. Boilerplate clauses + `[CLIENT_NAME]` / `[EFFECTIVE_DATE]` placeholders.
-- [ ] `docs/legal/DORA-annex-template.md` — Digital Operational Resilience Act annex for fintech/insurance EU clients (mandatory since 17 Jan 2025). Clauses: SLA targets (RPO/RTO mirroring Phase 0.3), audit rights (on-site + remote), data location, exit plan + reversibility, incident reporting (mirror NIS2 24h/72h/1-month), sub-processor concentration (cap on critical sub-processors), insurance proof of cover. Sourced from the 11 mandatory DORA Article 30 contractual provisions.
-- [ ] `docs/legal/README.md` — index of all legal templates with usage notes ("when a fintech client is in pipeline, send DPA + DORA annex; non-fintech B2B = DPA only").
+- [x] `docs/legal/DPA-template.md` — Data Processing Agreement covering Art. 28 GDPR clauses: scope of processing, sub-processor list (link to `/legal/sub-processors`), data location, retention, audit rights, sub-processor notice (30 days), incident notification (72h), end-of-contract data return/deletion. Boilerplate clauses + `[CLIENT_NAME]` / `[EFFECTIVE_DATE]` placeholders.
+- [x] `docs/legal/DORA-annex-template.md` — Digital Operational Resilience Act annex for fintech/insurance EU clients (mandatory since 17 Jan 2025). Clauses: SLA targets (RPO/RTO mirroring Phase 0.3), audit rights (on-site + remote), data location, exit plan + reversibility, incident reporting (mirror NIS2 24h/72h/1-month), sub-processor concentration (cap on critical sub-processors), insurance proof of cover. Sourced from the 11 mandatory DORA Article 30 contractual provisions.
+- [x] `docs/legal/README.md` — index of all legal templates with usage notes ("when a fintech client is in pipeline, send DPA + DORA annex; non-fintech B2B = DPA only") + fintech-vs-B2B decision table + placeholder checklist (`accessibility@[domain]`, `dpo@[domain]`, national accessibility authority per EAA Art. 14).
 
 ---
 
