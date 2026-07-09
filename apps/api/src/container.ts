@@ -10,12 +10,14 @@ import { webhooksModule } from "./modules/webhooks/module";
 import { env } from "./shared/env";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
+import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
 import type { IEmailService } from "./shared/ports/email.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter } from "./shared/ports/rate-limiter.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
+import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { ResendEmailService } from "./shared/services/email.service";
@@ -38,6 +40,7 @@ declare module "inwire" {
     IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
     IPasswordBreachService: IPasswordBreachService;
+    IDisposableEmailService: IDisposableEmailService;
     IRateLimiter: IRateLimiter;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
@@ -67,6 +70,10 @@ export const di = container()
   .add(
     "IPasswordBreachService",
     (c): IPasswordBreachService => new HibpPasswordBreachService(c.IInstrumentation),
+  )
+  .add(
+    "IDisposableEmailService",
+    (c): IDisposableEmailService => new DisposableEmailService(c.IInstrumentation),
   )
   .add(
     "IRateLimiter",

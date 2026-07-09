@@ -67,6 +67,13 @@ const envSchema = z.object({
   SENTRY_ENVIRONMENT: z.string().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
   HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  AUTH_SIGN_IN_ACCOUNT_MAX: z.coerce.number().int().positive().default(5),
+  AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC: z.coerce.number().int().positive().default(900),
+  DISPOSABLE_EMAIL_BLOCK_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
+  DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
   RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
   TRUSTED_PROXIES: z
     .string()

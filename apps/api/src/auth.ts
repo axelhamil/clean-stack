@@ -132,6 +132,15 @@ async function emit<TPayload>(
 }
 
 /**
+ * Best-effort client IP from a BetterAuth hook's `ctx.headers` for audit-only
+ * event payloads. NOT the trusted-proxy resolver (`resolveClientIp`, Hono layer,
+ * unreachable from here) — acceptable because these emits are non-blocking audit.
+ */
+function clientIpFromHeaders(headers?: Headers): string | null {
+  return headers?.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 45) ?? null;
+}
+
+/**
  * Sends a transactional email through `IEmailService` and surfaces failures
  * as a thrown `Error` — the only signal available inside BetterAuth's
  * `async () => void` hook signature. Transport-not-configured is downgraded
@@ -429,32 +438,106 @@ const authOptions = {
     before: createAuthMiddleware(async (ctx) => {
       const path = ctx.path;
       const body = ctx.body as Record<string, unknown> | undefined;
+
+      // Credential-stuffing: per-account rate-limit on sign-in (fail-closed — store error → 503)
+      if (path === "/sign-in/email") {
+        const email = body?.email as string | undefined;
+        if (!email) return;
+        const ip = clientIpFromHeaders(ctx.headers) ?? "unknown";
+        const rl = await di.IRateLimiter.consume(`auth-sign-in:account:${email}`, [
+          {
+            policyName: "auth-sign-in-account",
+            windowSec: env.AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC,
+            maxRequests: env.AUTH_SIGN_IN_ACCOUNT_MAX,
+          },
+        ]);
+        if (rl.isFailure) {
+          throw new APIError("SERVICE_UNAVAILABLE", { message: "Service temporarily unavailable" });
+        }
+        const decision = rl.getValue();
+        if (!decision.allowed) {
+          if (decision.firstBlock) {
+            try {
+              await emit(
+                EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
+                "rate_limit",
+                `auth-sign-in-account:${email}`,
+                { actorUserId: null, ip, policyName: "auth-sign-in-account", path, method: "POST" },
+              );
+            } catch (emitErr) {
+              logger.warn({ err: emitErr }, "account rate-limit event emit failed");
+            }
+          }
+          throw new APIError("TOO_MANY_REQUESTS", { message: "Too many login attempts" });
+        }
+        return;
+      }
+
       let password: string | undefined;
       let actorEmail: string | undefined;
       let actorName: string | undefined;
+      let actorUserId: string | null = null;
 
       if (path === "/sign-up/email") {
         password = body?.password as string;
         actorEmail = body?.email as string;
         actorName = body?.name as string;
+
+        // Disposable email check (fail-open — DNS error → allow + warn)
+        if (env.DISPOSABLE_EMAIL_BLOCK_ENABLED && actorEmail) {
+          const d = await di.IDisposableEmailService.isDisposable(actorEmail);
+          if (d.isFailure) {
+            logger.warn({ err: d.getError() }, "disposable-email check failed — failing open");
+          } else if (d.getValue()) {
+            try {
+              await emit(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
+                actorUserId: null,
+                email: actorEmail,
+                ip: clientIpFromHeaders(ctx.headers),
+                reason: "disposable_email" as const,
+              });
+            } catch (emitErr) {
+              logger.warn({ err: emitErr }, "signup-rejected event emit failed");
+            }
+            throw new APIError("UNPROCESSABLE_ENTITY", {
+              message: "This email address is not accepted.",
+            });
+          }
+        }
       } else if (path === "/reset-password") {
         password = body?.newPassword as string;
       } else if (path === "/change-password") {
         password = body?.newPassword as string;
-        actorEmail = ctx.context.session?.user.email;
-        actorName = ctx.context.session?.user.name;
+        // `ctx.context.session` is not populated in a global before-hook (runs before
+        // the session middleware) — load it explicitly so the audit actor is the real user.
+        const session = ctx.headers ? await auth.api.getSession({ headers: ctx.headers }) : null;
+        actorUserId = session?.user.id ?? null;
+        actorEmail = session?.user.email;
+        actorName = session?.user.name;
       } else {
         return;
       }
 
       if (typeof password !== "string" || password.length === 0) return;
 
-      const error = await validatePassword(
+      const result = await validatePassword(
         password,
         { email: actorEmail, name: actorName, appName: "clean-stack" },
         di.IPasswordBreachService,
       );
-      if (error) throw new APIError("UNPROCESSABLE_ENTITY", { message: error });
+      if (result?.isBreach) {
+        try {
+          await emit(EventTypes.SECURITY_PASSWORD_BREACHED, "security", path, {
+            actorUserId,
+            email: actorEmail ?? null,
+            ip: clientIpFromHeaders(ctx.headers),
+            path,
+          });
+        } catch (emitErr) {
+          logger.warn({ err: emitErr }, "password-breached event emit failed");
+        }
+      }
+      if (result !== null) throw new APIError("UNPROCESSABLE_ENTITY", { message: result.message });
     }),
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.context.returned instanceof APIError) return;

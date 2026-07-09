@@ -241,6 +241,22 @@ export const SecurityCsrfRejectedPayload = z.object({
 });
 export type SecurityCsrfRejectedPayload = z.infer<typeof SecurityCsrfRejectedPayload>;
 
+export const SecurityPasswordBreachedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  email: z.string().max(254).nullable(),
+  ip: z.string().max(45).nullable(),
+  path: z.string().max(512),
+});
+export type SecurityPasswordBreachedPayload = z.infer<typeof SecurityPasswordBreachedPayload>;
+
+export const SecuritySignupRejectedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  email: z.string().max(254),
+  ip: z.string().max(45).nullable(),
+  reason: z.enum(["disposable_email"]),
+});
+export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -280,4 +296,6 @@ export const PayloadByEventType = {
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
   [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,
+  [EventTypes.SECURITY_PASSWORD_BREACHED]: SecurityPasswordBreachedPayload,
+  [EventTypes.SECURITY_SIGNUP_REJECTED]: SecuritySignupRejectedPayload,
 } as const;

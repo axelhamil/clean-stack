@@ -33,6 +33,7 @@
     "@sentry/bun": "^10.61.0",
     "@simplewebauthn/server": "^13.3.2",
     "better-auth": "^1.6.20",
+    "disposable-email-domains": "^1.0.62",
     "hono": "^4.12.27",
     "hono-pino": "^0.10.3",
     "inwire": "^3.0.0",

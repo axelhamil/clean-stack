@@ -37,6 +37,8 @@ export const EventTypes = {
   SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
   SECURITY_CSP_VIOLATION: "security.csp.violation",
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",
+  SECURITY_PASSWORD_BREACHED: "security.password.breached",
+  SECURITY_SIGNUP_REJECTED: "security.signup.rejected",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
