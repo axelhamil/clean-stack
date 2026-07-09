@@ -12,8 +12,10 @@ import { dangerRoute } from "./features/danger/danger.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
 import { acceptPoliciesRoute } from "./features/legal/accept.route";
+import { accessibilityRoute } from "./features/legal/accessibility.route";
 import { dataRightsRoute } from "./features/legal/data-rights.route";
 import { privacyPolicyRoute } from "./features/legal/privacy-policy.route";
+import { subProcessorsRoute } from "./features/legal/sub-processors.route";
 import { termsRoute } from "./features/legal/terms.route";
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
@@ -49,6 +51,8 @@ const routeTree = rootRoute.addChildren([
   dataRightsRoute,
   privacyPolicyRoute,
   termsRoute,
+  subProcessorsRoute,
+  accessibilityRoute,
   magicLinkRoute,
   resetPasswordRoute,
   twoFactorRoute,

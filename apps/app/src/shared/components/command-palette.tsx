@@ -31,9 +31,11 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  Accessibility,
   Building2,
   Copy,
   CreditCard,
+  Database,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -113,6 +115,12 @@ const LEGAL_ROUTES: readonly NavigationRoute[] = [
   { to: "/legal/data-rights", label: "Data rights (RGPD)", icon: ShieldCheck },
   { to: "/legal/privacy-policy", label: "Privacy policy", icon: FileText },
   { to: "/legal/terms", label: "Terms of service", icon: ScrollText },
+  { to: "/legal/sub-processors", label: "Sub-processors (RGPD Art. 28)", icon: Database },
+  {
+    to: "/legal/accessibility",
+    label: "Accessibility statement (EAA Art. 14)",
+    icon: Accessibility,
+  },
 ];
 
 function useNavigationGroup(): CommandGroupConfig {
