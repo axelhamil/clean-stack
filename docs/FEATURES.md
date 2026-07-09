@@ -211,8 +211,8 @@ Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing p
 - **Dispatcher**: in-process Bun worker, dedicated `pg.Client` LISTEN + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers run inside the dispatch TX (atomic), user `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`, SOC2 §CC7.2 / ISO 27001) — append-only, retention `operational` (90d) vs `compliance` (7y) driven by `RETENTION_MAP`. Tamper-evidence columns posed (`prev_hash`/`hash`), calc gated by env flag.
 - **Outbound webhooks** (`webhook_endpoint` + `webhook_delivery`) — HMAC-SHA256 signed (`t=<ts>,v1=<hex>` Stripe-style), AEAD-encrypted secrets at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per org). Decorrelated jitter retry (1m/5m/30m/2h/12h paliers), dead-letter after 5 attempts, replay endpoint. Claim window pattern in delivery worker — fetch HTTP outside TX, no lock starvation.
-- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`), SecurityMiddleware emits 3 (`security.rate_limit.exceeded`, `security.csp.violation`, `security.csrf.rejected`) → **38 events total**.
-- **Catalog `@packages/events`** — 38 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
+- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`), SecurityMiddleware emits 3 (`security.rate_limit.exceeded`, `security.csp.violation`, `security.csrf.rejected`), and the abuse-prevention hooks in `auth.ts` emit 2 (`security.signup.rejected` on a disposable-email block, `security.password.breached` on a HIBP hit) → **40 events total**.
+- **Catalog `@packages/events`** — 40 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
 - **Request correlation** — every event carries the originating request's `X-Request-Id` in `outbox_event.metadata.requestId` (captured via an `AsyncLocalStorage` context, works inside BetterAuth hooks too), copied into `audit_log.request_id` so audit rows join to their logs + Sentry event on one key.
 
 ## Security & hardening ✅ Phase C.1
@@ -252,9 +252,14 @@ Deploy-safe perimeter — rate-limit, strict CSP, and stateless CSRF protection,
 - `Referrer-Policy: strict-origin-when-cross-origin`.
 - `Permissions-Policy` (camera, microphone, geolocation off by default).
 
+**Abuse prevention** (s5a):
+
+- **Disposable-email block at sign-up** — a ~90k-domain static blocklist (`disposable-email-domains`) plus a DNS MX-record lookup (a domain with no MX is treated as disposable). **Fail-open**: a DNS error or timeout logs a warning and lets the sign-up through (`DISPOSABLE_EMAIL_BLOCK_ENABLED`, `DISPOSABLE_EMAIL_DNS_TIMEOUT_MS`). Emits `security.signup.rejected` (`reason: "disposable_email"`).
+- **Breached-password telemetry** — a HIBP hit on sign-up / reset / change (the request is already rejected by the NIST policy) emits `security.password.breached`, making the attempt observable in the audit trail. Both events carry the actor and use `operational` retention.
+
 **Prod boot guard**: api fails hard (`process.exit(1)`) on missing `CORS_ORIGIN` — a silent empty-string allowlist would make CSRF protection a no-op.
 
-**Events** (3 new, `operational` retention): `security.rate_limit.exceeded` · `security.csp.violation` · `security.csrf.rejected`. Brings the catalogue to **38 events** (23 BetterAuth + 5 RGPD + 3 uploads + 3 webhooks + 1 policy + 3 security).
+**Events** (`operational` retention): the perimeter adds `security.rate_limit.exceeded` · `security.csp.violation` · `security.csrf.rejected`; the s5a abuse-prevention hooks add `security.signup.rejected` · `security.password.breached`. Brings the catalogue to **40 events** (23 BetterAuth + 5 RGPD + 3 uploads + 3 webhooks + 1 policy + 5 security).
 
 See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
 

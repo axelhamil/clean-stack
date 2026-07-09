@@ -60,6 +60,7 @@ The boring-but-mandatory hardening is done and wired before any business route.
 - **CSRF** — a stateless origin-allowlist check on unsafe methods, the same model as Next.js Server Actions and SvelteKit: no token, no cookie, no endpoint to maintain.
 - **Hardened headers** — HSTS, clickjacking protection, MIME-sniffing off, a strict referrer policy, and locked-down browser permissions, set at the edge.
 - **Correct client IPs behind a proxy** — a trusted-proxy resolver walks `X-Forwarded-For` the OWASP way, so rate-limit keys and audit IPs are the real client, not your load balancer.
+- **Abuse prevention at sign-up** — disposable and throwaway email domains are refused (a ~90,000-domain blocklist plus a DNS MX-record check, fail-open so a DNS blip never blocks a real user), and both a rejected sign-up and a compromised-password attempt are recorded as security events.
 - **Fail-hard boot** — in production the API refuses to start with a missing origin allowlist or signing key, so a misconfiguration can't quietly disable a protection.
 
 Every rejection — rate-limit, CSP violation, CSRF — is recorded as an audit event.
@@ -74,7 +75,7 @@ Email runs on Resend with nine typed templates and idempotency keys, so a retry 
 
 The event backbone is the piece most teams get wrong. Here it's a transactional outbox: a domain event is written in the *same* database transaction as the state change it describes. No event is ever lost, and none is emitted for a write that rolled back — the dual-write problem, solved. A dedicated Postgres `LISTEN/NOTIFY` connection dispatches events the moment the transaction commits, with a 30-second poll as a safety net and row-level locking so multiple replicas share the work without a coordinator, a leader election, or Redis.
 
-- **38 typed events** are emitted automatically on every state change — auth, organization, upload, compliance, and security actions all included. Each payload is Zod-validated before it's written, so a malformed event rolls back its own transaction instead of corrupting the log.
+- **40 typed events** are emitted automatically on every state change — auth, organization, upload, compliance, and security actions all included. Each payload is Zod-validated before it's written, so a malformed event rolls back its own transaction instead of corrupting the log.
 - An **append-only audit log** (90-day operational and 7-year compliance retention) satisfies SOC 2 and GDPR Art. 30. Every row names the actor who triggered it and is correlated to its request and error trace by a single ID. It's queryable through a capability-gated admin endpoint with actor, target, action, and time-range filters.
 - **Outbound webhooks** are a full feature, not just a signer: per-organization endpoints subscribe to the event types they care about, deliveries are HMAC-signed (Stripe-style), secrets are encrypted at rest, failed deliveries retry with decorrelated jitter and dead-letter after five attempts, and every delivery is logged and individually replayable.
 
