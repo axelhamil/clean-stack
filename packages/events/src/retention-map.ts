@@ -45,6 +45,10 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.SECURITY_CSRF_REJECTED]: "operational",
   [EventTypes.SECURITY_PASSWORD_BREACHED]: "operational",
   [EventTypes.SECURITY_SIGNUP_REJECTED]: "operational",
+  [EventTypes.BILLING_SUBSCRIPTION_CREATED]: "compliance",
+  [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: "compliance",
+  [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: "compliance",
+  [EventTypes.BILLING_PAYMENT_FAILED]: "operational",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

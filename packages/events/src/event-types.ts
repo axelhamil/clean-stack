@@ -41,6 +41,10 @@ export const EventTypes = {
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",
   SECURITY_PASSWORD_BREACHED: "security.password.breached",
   SECURITY_SIGNUP_REJECTED: "security.signup.rejected",
+  BILLING_SUBSCRIPTION_CREATED: "billing.subscription.created",
+  BILLING_SUBSCRIPTION_UPDATED: "billing.subscription.updated",
+  BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
+  BILLING_PAYMENT_FAILED: "billing.payment.failed",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

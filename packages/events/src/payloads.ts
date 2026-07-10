@@ -277,6 +277,35 @@ export const SecuritySignupRejectedPayload = z.object({
 });
 export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
 
+export const BillingSubscriptionCreatedPayload = OrgRef.extend({
+  subscriptionId: z.string(),
+  tier: z.string(),
+  status: z.string(),
+  actorUserId: z.string().nullable(),
+  currentPeriodEnd: z.coerce.date().nullable(),
+});
+export type BillingSubscriptionCreatedPayload = z.infer<typeof BillingSubscriptionCreatedPayload>;
+
+export const BillingSubscriptionUpdatedPayload = BillingSubscriptionCreatedPayload;
+export type BillingSubscriptionUpdatedPayload = z.infer<typeof BillingSubscriptionUpdatedPayload>;
+
+export const BillingSubscriptionCancelledPayload = OrgRef.extend({
+  subscriptionId: z.string(),
+  tier: z.string(),
+  status: z.string(),
+  actorUserId: z.string().nullable(),
+});
+export type BillingSubscriptionCancelledPayload = z.infer<
+  typeof BillingSubscriptionCancelledPayload
+>;
+
+export const BillingPaymentFailedPayload = OrgRef.extend({
+  subscriptionId: z.string(),
+  invoiceId: z.string(),
+  actorUserId: z.string().nullable(),
+});
+export type BillingPaymentFailedPayload = z.infer<typeof BillingPaymentFailedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -320,4 +349,8 @@ export const PayloadByEventType = {
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,
   [EventTypes.SECURITY_PASSWORD_BREACHED]: SecurityPasswordBreachedPayload,
   [EventTypes.SECURITY_SIGNUP_REJECTED]: SecuritySignupRejectedPayload,
+  [EventTypes.BILLING_SUBSCRIPTION_CREATED]: BillingSubscriptionCreatedPayload,
+  [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: BillingSubscriptionUpdatedPayload,
+  [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,
+  [EventTypes.BILLING_PAYMENT_FAILED]: BillingPaymentFailedPayload,
 } as const;
