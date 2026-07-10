@@ -17,6 +17,7 @@ export const user = pgTable("user", {
   deletedAt: timestamp("deleted_at"),
   lastExportRequestedAt: timestamp("last_export_requested_at"),
   pendingEmail: text("pending_email"),
+  stripeCustomerId: text("stripe_customer_id"),
 });
 
 export const session = pgTable(

@@ -1,6 +1,7 @@
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
+import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
@@ -10,6 +11,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
+import Stripe from "stripe";
 import {
   clearConfirmedPendingEmail,
   deleteOrgIfEmpty,
@@ -266,6 +268,14 @@ const authOptions = {
   },
 
   plugins: [
+    stripe({
+      stripeClient: new Stripe(env.STRIPE_SECRET_KEY ?? "sk_test_placeholder", {
+        apiVersion: "2026-06-24.dahlia",
+      }),
+      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
+      createCustomerOnSignUp: true,
+      subscription: { enabled: true, plans: [] },
+    }),
     bearer(),
     twoFactor(),
     magicLink({

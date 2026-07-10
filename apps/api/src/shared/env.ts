@@ -85,6 +85,8 @@ const envSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const rawEnv = Object.fromEntries(
@@ -112,6 +114,11 @@ if (env.NODE_ENV === "production") {
   if (!env.WEBHOOK_MASTER_KEY) {
     throw new Error(
       "WEBHOOK_MASTER_KEY is required in production (64 hex chars). Generate: openssl rand -hex 32",
+    );
+  }
+  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
+    throw new Error(
+      "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are required in production. Without them Checkout, the Billing Portal and webhook signature verification all fail.",
     );
   }
 }

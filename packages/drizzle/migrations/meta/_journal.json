@@ -71,6 +71,13 @@
       "when": 1783631259914,
       "tag": "0009_elite_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783691364964,
+      "tag": "0010_wise_arachne",
+      "breakpoints": true
     }
   ]
 }

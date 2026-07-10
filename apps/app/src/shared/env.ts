@@ -6,6 +6,10 @@ const envSchema = z.object({
   VITE_SENTRY_ENVIRONMENT: z.string().optional(),
   VITE_GIT_SHA: z.string().optional(),
   VITE_ANALYTICS_SRC: z.preprocess((v) => (v === "" ? undefined : v), z.url().optional()),
+  VITE_STRIPE_PUBLISHABLE_KEY: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().optional(),
+  ),
 });
 
 export const env = envSchema.parse(import.meta.env);
