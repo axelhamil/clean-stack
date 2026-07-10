@@ -4,7 +4,7 @@
  * Plain functions, no DI, no repository class, no port interface — auth is
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
-import { and, db, desc, eq, schema, type Transaction } from "@packages/drizzle";
+import { and, count, db, desc, eq, schema, type Transaction } from "@packages/drizzle";
 
 // ── #1 – ensurePersonalOrgFor queries ──────────────────────────────────────
 
@@ -140,4 +140,14 @@ export async function findOrgOwnerUserId(organizationId: string): Promise<string
     .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.role, "owner")))
     .limit(1);
   return row?.userId ?? null;
+}
+
+// ── #9 – beforeAddMember: count current active members ────────────────────
+
+export async function countActiveMembers(organizationId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: count() })
+    .from(schema.member)
+    .where(eq(schema.member.organizationId, organizationId));
+  return row?.count ?? 0;
 }

@@ -14,6 +14,7 @@ import { CryptoHasher } from "bun";
 import type Stripe from "stripe";
 import {
   clearConfirmedPendingEmail,
+  countActiveMembers,
   deleteOrgIfEmpty,
   findActiveMemberOrgId,
   findActiveMemberRole,
@@ -32,6 +33,7 @@ import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
+import { assertSeat } from "./shared/middleware/billing.middleware";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
@@ -390,6 +392,11 @@ const authOptions = {
       roles,
       creatorRole: "owner",
       organizationHooks: {
+        beforeAddMember: async ({ organization: org }) => {
+          const view = await di.EntitlementsService.getEntitlements(org.id);
+          const activeMembers = await countActiveMembers(org.id);
+          assertSeat(activeMembers, view.maxMembers);
+        },
         beforeDeleteOrganization: async ({ organization: org }) => {
           if (isPersonalOrg(org.slug)) {
             throw new Error(
