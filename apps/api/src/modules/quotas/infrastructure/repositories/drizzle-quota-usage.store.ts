@@ -55,7 +55,7 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(rows[0]?.used ?? by);
+          return Result.ok(rows[0]?.used ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(failure(err, "increment"));
