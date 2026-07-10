@@ -1,7 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
+import { env as realEnv } from "../../env";
 
 mock.module("../../env", () => ({
-  env: { PLATFORM_ADMIN_IDS: ["op-1"], PLATFORM_ADMIN_REQUIRE_MFA: true },
+  env: { ...realEnv, PLATFORM_ADMIN_IDS: ["op-1"], PLATFORM_ADMIN_REQUIRE_MFA: true },
 }));
 
 const { requirePlatformAdmin } = await import("../platform-admin.middleware");

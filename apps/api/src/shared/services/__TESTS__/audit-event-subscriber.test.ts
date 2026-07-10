@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
+import { env as realEnv } from "../../env";
 
-mock.module("../../env", () => ({ env: { AUDIT_TAMPER_EVIDENCE: true } }));
+mock.module("../../env", () => ({ env: { ...realEnv, AUDIT_TAMPER_EVIDENCE: true } }));
 
 const { AuditEventSubscriber } = await import("../audit-event-subscriber");
 
