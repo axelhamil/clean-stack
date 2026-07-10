@@ -95,6 +95,12 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   uuidv7: () => "generated-uuid",
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
 }));
 
 // All imports AFTER mock.module to ensure mocks are in place before module resolution.

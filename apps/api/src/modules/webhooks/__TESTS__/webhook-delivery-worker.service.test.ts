@@ -63,6 +63,12 @@ mock.module("@packages/drizzle", () => ({
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
   webhooksSchema: {
     webhookEndpoint: {
       id: "id",

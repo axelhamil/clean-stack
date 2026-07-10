@@ -70,6 +70,12 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
