@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@better-auth/passkey": "^1.6.20",
-    "@better-auth/stripe": "^1.6.23",
     "@hookform/resolvers": "^5.4.0",
     "@packages/access-control": "workspace:*",
     "@packages/cookie-consent": "workspace:*",

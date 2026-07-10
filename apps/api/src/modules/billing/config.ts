@@ -17,8 +17,6 @@ export const ENTITLEMENTS: Record<Tier, Entitlement> = {
   },
 };
 
-export const PAID_TIERS = ["pro", "business"] as const satisfies readonly Exclude<Tier, "free">[];
-
 export function isTier(value: string): value is Tier {
   return value === "free" || value === "pro" || value === "business";
 }
