@@ -315,12 +315,45 @@ Deploy-safe perimeter — rate-limit, strict CSP, and stateless CSRF protection,
 
 See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
 
+## Billing — Stripe subscriptions + feature/seat gating ✅ Phase B.1
+
+Per-organization subscriptions with zero billing backoffice. Stripe Checkout handles upgrades; Stripe Billing Portal handles management. The app shows the plan, seat usage, and the two buttons. A public `/pricing` page lists live plans from the Stripe catalog.
+
+**Subscription state**: the plugin's `subscription` table (webhook-synced, FK to `organization`). Not `organization.metadata` — metadata is untyped, unqueryable, and diverges under out-of-order webhooks.
+
+**Hybrid catalog** (`apps/api/src/modules/billing/config.ts`):
+- Prices, copy, and `marketing_features` (pricing-page bullets) live in Stripe Products.
+- Feature entitlements, tier rank, and `maxMembers` live in the typed `ENTITLEMENTS` map in code.
+- `metadata.tier` on the Stripe Product is the sole join key. Editing a gate = a code review, not a silent dashboard edit.
+
+**Three gate axes** — the transferable pattern for any new premium feature:
+- **Role**: `billing:["read","manage"]` in `@packages/access-control`. `billing:read` = owner + admin; `billing:manage` = owner only. `requireOrgPermission({ billing: ["manage"] })` on `POST /billing/portal`.
+- **Seats**: `ENTITLEMENTS[tier].maxMembers` enforced in `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`. Unlimited = `null` (JSON-safe). Returns `403 BILLING_SEAT_LIMIT_REACHED`.
+- **Tier/feature**: `requireFeature(flag)` / `requirePlan(minTier)` (back, `402 BILLING_PAYMENT_REQUIRED`); `useEntitlements()` / `<FeatureGate flag>` / `<PlanGate minTier>` (front).
+
+**Free-tier model**: unlimited team orgs; each free org gets 3 members and no premium features; paid orgs inherit higher caps from `ENTITLEMENTS`. No per-account org-count cap.
+
+**Module** `apps/api/src/modules/billing/` (infra no-DDD, same class as `modules/consents/`):
+- `CatalogService` — assembles `Plan[]` (Stripe Products + `ENTITLEMENTS` merge). Degrades to free-only when `STRIPE_SECRET_KEY` is unset.
+- `EntitlementsService` — `resolveEntitlements(tier)` + `getSubscriptionTier(orgId)`.
+- `SubscriptionReadStore` — §8-instrumented Drizzle reader for the `subscription` table.
+- `StripeCatalogSourceAdapter` — all Stripe SDK calls, instrumented `op: "http.client"`.
+- Routes: `GET /billing/plans` (public), `GET /billing/subscription` (requireAuth), `POST /billing/checkout`, `POST /billing/portal`.
+
+**Frontend** (`apps/app/src/features/billing/`): public `/pricing`; `/settings/billing` (plan + usage + buttons); `useEntitlements()` hook; `<FeatureGate>` + `<PlanGate>` render gates.
+
+**Events** (4 new, catalog → **46**): `billing.subscription.{created,updated,cancelled}` (`compliance` retention) + `billing.payment.failed` (`operational`), emitted from `@better-auth/stripe` callbacks in `auth.ts`.
+
+**Env**: `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. No `STRIPE_PRICE_*` vars — prices live in Stripe. Unset `STRIPE_SECRET_KEY` → free-only degradation.
+
+See [`HISTORY.md`](./HISTORY.md) for the state-SSOT decision, hybrid-catalog rationale, unlimited=null choice, and pre-merge review catches.
+
+---
+
 ## Roadmap (not yet shipped)
 
 See [`../ROADMAP.md`](../ROADMAP.md) for the full plan with constraints + extension points.
 
-- **Billing** — Stripe via `@better-auth/stripe` (customer portal, subscriptions, signed webhooks, customer = per organization).
-- **Feature & quota gating** — config + middleware layer (no DDD).
 - **Admin & impersonation** — BetterAuth `admin` plugin.
 - **Front UI for audit log + webhooks** — API ready, app-side pages remain.
 - **Tamper-evidence audit hash chain** — columns posed, calc deferred until SOC2 audit demands.

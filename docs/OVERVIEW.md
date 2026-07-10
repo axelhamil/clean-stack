@@ -111,6 +111,22 @@ Most boilerplates hand you an app and leave "make it deployable" as an exercise.
 - **Domain rules with teeth** — no exceptions thrown in the domain (a `Result` type instead), no `null` for absence (an `Option` type), value objects validated at the boundary, and a typed error system that maps to HTTP status codes in one place.
 - **Rules live next to the code** — a `CLAUDE.md` at the root and one per layer, auto-loaded, so an AI pair-programmer and your teammates work from the same guardrails instead of tribal knowledge.
 
+## Per-organization billing, without a billing backoffice
+
+Monetizing a multi-tenant SaaS means wiring Stripe subscriptions, keeping the subscription state consistent with webhooks, enforcing feature and seat limits at every entry point, and presenting a coherent pricing page. Here all of that is already wired.
+
+Subscriptions are per organization — each org is either free (3 members, no premium features) or on a paid plan. The subscription state lives in the plugin's `subscription` table, kept current by webhook sync. It is never stored in `organization.metadata` — that pattern diverges under out-of-order webhooks and cannot be queried with a typed ORM.
+
+The catalog is split deliberately: prices and display copy live in Stripe (changing them requires no deploy), and feature entitlements live in typed code (changing them requires a code review). A single field, `metadata.tier` on the Stripe Product, is the join key between the two. The boilerplate ships without Stripe keys configured and degrades cleanly to a free-only catalog — the app starts before you connect a payment provider.
+
+Three gate axes cover every billing enforcement need:
+
+- **Role** — `billing:read` lets owners and admins see the subscription page; `billing:manage` (owner only) is required for portal redirects that can cancel or downgrade.
+- **Seats** — a `maxMembers` cap from the entitlements config is enforced in every org-membership hook (add, invite, accept). Unlimited is represented as `null`, which is JSON-safe and unambiguous in code.
+- **Tier and features** — `requireFeature(flag)` and `requirePlan(minTier)` on the API return a `402 BILLING_PAYMENT_REQUIRED` response (semantically distinct from `403`). `<FeatureGate>` and `<PlanGate>` on the frontend gate any subtree declaratively. `useEntitlements()` gives imperative access to the current org's resolved plan.
+
+The app provides a public `/pricing` page (plan grid fed from the live Stripe catalog, with pricing bullets from `marketing_features`) and a `/settings/billing` page (current plan, seat usage, Upgrade button → Checkout, Manage button → Portal). Four audit events are emitted automatically on every subscription lifecycle change.
+
 ## A frontend that's already assembled
 
 - An **app shell** — sticky navigation, organization switcher, theme toggle, user menu, and a ⌘K command palette that navigates, switches org, changes theme, and only shows what the current user is allowed to reach
@@ -128,9 +144,8 @@ Most boilerplates hand you an app and leave "make it deployable" as an exercise.
 
 ## What's next
 
-The roadmap follows a boilerplate's natural order — deploy-safety and legal first, then revenue, then finish and polish.
+The roadmap follows a boilerplate's natural order — deploy-safety and legal first, revenue, then finish and polish.
 
-- **Revenue** — Stripe billing (per-organization customer, portal, dunning) plus config-driven feature and quota gating
 - **Operate** — admin and impersonation, API tokens, OpenAPI docs, in-app notifications
 - **Reach** — SSO (SAML / OIDC) with SCIM, internationalization, Capacitor mobile, and a marketing site
 

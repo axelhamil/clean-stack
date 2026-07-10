@@ -36,8 +36,9 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Observability — Sentry** (0.4) (Sentry api+app removable, `IInstrumentation` port + NoOp default, RGPD scrubbing, source maps CI, release tracking — OTel + Prometheus deferred to D.1) | **€2 500 – €4 000** | 5-6j |
 | **Profile + NIST 800-63B-4 password** (A.1) (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15 universal — no MFA exception, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
 | **Privacy policy / Terms versioning** (A.2) (DB schema, `@packages/policies` version SSOT, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
+| **Billing — Stripe subscriptions + feature/seat gating** (B.1) (`@better-auth/stripe`, Checkout + Billing Portal hosted, subscription SSOT in plugin table, hybrid catalog Stripe+code via `ENTITLEMENTS`, 3 gate axes: role/seat/tier, `useEntitlements()` + `<FeatureGate>` + `<PlanGate>`, 4 compliance/operational events, free-tier degradation when key unset) | **€3 600 – €6 000** | 7-10j |
 
-**Subtotal Core (shipped)**: **€15 800 – €27 000** of senior-dev value already in the repo on day zero. ~35-50 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€19 400 – €33 000** of senior-dev value already in the repo on day zero. ~42-60 days of focused senior work compressed into a clone.
 
 ---
 
@@ -49,8 +50,6 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | A.4 | **Cookie consent + consent management** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped `consent_record` — infra, not DDD) | **€1 200 – €2 000** | 2-3j |
 | A.5 | **Privacy dashboard** (`/settings/privacy` aggregating consent + last export + sessions + data sources + acceptance history) | **€600 – €1 000** | 1-2j |
 | A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain, WCAG 2.1 AA gate ≥95) | **€1 200 – €2 000** | 3j |
-| B.1 | **Billing Stripe complet** (`@better-auth/stripe`, customer portal, webhooks idempotents, dunning, invoice automation, plan config) | **€3 000 – €5 000** | 6-8j |
-| B.2 | **Feature & quota gating** (config-driven `PLANS`, `useEntitlements()`, `requireFeature()`, `requireSeat()`) | **€600 – €1 000** | 1-2j |
 | C.1 | **Security perimeter** (sliding-window rate-limit per IP/user, captcha on auth-burst, strict CSP with nonce, CSRF on non-BetterAuth POST routes) | **€1 200 – €2 000** | 3j |
 | C.2 | **Audit log front UI** (page `/admin/audit-log` avec filtres + diff metadata expand, API déjà shipped) | **€500 – €1 000** | 1-2j |
 | C.3 | **Admin & impersonation** (BetterAuth `admin` plugin, `/admin/*` separate hostname, audit-logged actions) | **€1 500 – €2 500** | 3-4j |
@@ -67,7 +66,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€30 500 – €50 900** committed to ship.
+**Subtotal Roadmap**: **€26 900 – €44 900** committed to ship.
 
 ---
 

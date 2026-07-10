@@ -150,7 +150,56 @@ credentials are the dev defaults (`dev`/`dev`).
 
 ---
 
-## 4. Production secrets — checklist
+## 4. Stripe — subscriptions + webhooks
+
+The billing module uses `@better-auth/stripe`. The plugin owns the webhook endpoint (`POST /api/auth/stripe/webhook`) and the `subscription` table. Configuration is minimal — no price IDs in env; prices live in Stripe.
+
+### Stripe setup checklist
+
+1. **Create a Stripe account** and enable billing features (Stripe Dashboard → Settings → Billing).
+2. **Create Products and Prices** for each paid plan. Each paid Product *must* carry `metadata.tier = <your-tier-key>` — this is the join key to the `ENTITLEMENTS` map in `apps/api/src/modules/billing/config.ts`. Set `marketing_features` on each Product for the pricing-page bullet list.
+3. **Add a webhook endpoint** in the Stripe Dashboard pointing at `https://<your-api-domain>/api/auth/stripe/webhook`. Subscribe to at minimum: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+4. **Copy the webhook signing secret** (starts with `whsec_`) into `STRIPE_WEBHOOK_SECRET`.
+
+### Entitlements contract (`apps/api/src/modules/billing/config.ts`)
+
+Each entry in `ENTITLEMENTS` must have a key matching a `metadata.tier` value on a Stripe Product:
+
+```ts
+// pattern — not the actual file; adapt to your plan names
+export const ENTITLEMENTS: Record<string, { rank: number; maxMembers: number | null; features: string[] }> = {
+  free:  { rank: 0, maxMembers: 3,    features: [] },
+  pro:   { rank: 1, maxMembers: null, features: ["advanced-analytics"] },
+};
+```
+
+- `maxMembers: null` = unlimited seats (JSON-safe).
+- `features` = string flags checked by `requireFeature(flag)` / `<FeatureGate flag>`.
+- `rank` = integer used by `requirePlan(minTier)` to compare tiers ordinally.
+
+The free tier (`rank: 0`) is always available, even when Stripe is unconfigured — the catalog degrades to free-only and the app boots normally.
+
+### Env vars
+
+```
+STRIPE_SECRET_KEY=sk_live_...        # Required for Checkout/Portal/webhooks; omit → free-only mode
+STRIPE_WEBHOOK_SECRET=whsec_...      # Required when STRIPE_SECRET_KEY is set; signs webhook payloads
+```
+
+No `STRIPE_PRICE_*` variables — prices live in the Stripe dashboard, fetched at runtime by `CatalogService`.
+
+### Hosted flows (no custom UI needed)
+
+- **Upgrade** → `POST /billing/checkout` redirects to Stripe Checkout (hosted, Stripe-managed).
+- **Manage / cancel / change payment method** → `POST /billing/portal` (gated `billing:manage`, owner only) redirects to the Stripe Billing Portal (hosted).
+
+### RGPD: Stripe customer cleanup on account deletion
+
+`RgpdService.executeAccountWipe` calls Stripe to delete the customer object during the wipe sequence. Failure is captured and logged (non-fatal) — account deletion must never be blocked by a Stripe API error.
+
+---
+
+## 5. Production secrets — checklist
 
 Every secret below must be set in production. Boot validates via Zod and fails
 fast on missing/invalid values.
@@ -175,6 +224,11 @@ fast on missing/invalid values.
 - `RGPD_EXPORT_RATE_LIMIT_HOURS` (default `24`)
 - `RGPD_SWEEP_BATCH_SIZE` (default `50`)
 
+### Billing (required when Stripe is configured)
+
+- `STRIPE_SECRET_KEY` — Stripe secret key (`sk_live_...` or `sk_test_...`). Omit → free-only catalog, no Checkout/Portal.
+- `STRIPE_WEBHOOK_SECRET` — webhook signing secret (`whsec_...`). Required when `STRIPE_SECRET_KEY` is set. See §4.
+
 ### Optional
 
 - `RESEND_FROM` — defaults to `onboarding@resend.dev`; switch to your
@@ -185,7 +239,7 @@ root is the up-to-date template.
 
 ---
 
-## 5. Database
+## 6. Database
 
 - **First-time provisioning**: `pnpm db:push` (dev) or `pnpm db:generate &&
   pnpm db:migrate` (prod-style — ship migrations as artifacts). `db:push` runs
@@ -199,17 +253,12 @@ root is the up-to-date template.
 
 ---
 
-## 6. Optional follow-ups
+## 7. Optional follow-ups
 
 These aren't blockers for launch but pay off quickly:
 
 - **Uptime monitoring**: external probe on `GET /readyz` (returns 200 once DB
   reachable). `/livez` is the liveness counterpart (no external deps).
-- **Stripe customer deletion**: when `@better-auth/stripe` lands (Phase B.1),
-  wire the customer cleanup into `RgpdService.executeAccountWipe` — same TX as
-  the rest of the wipe. (Error tracking + the RGPD audit trail are already
-  shipped: Sentry in Phase 0.4, and every RGPD transition auto-audits via the
-  outbox `AuditEventSubscriber` — no TODO hooks left in the service.)
 
 ---
 
@@ -219,11 +268,15 @@ These aren't blockers for launch but pay off quickly:
       `TEMPLATE_IDS` in `apps/api/src/shared/services/email.service.ts`
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC) — green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
+- [ ] Stripe Products created with `metadata.tier` set; `ENTITLEMENTS` in
+      `apps/api/src/modules/billing/config.ts` matches every tier key
+- [ ] Stripe webhook endpoint registered for the 4 required event types;
+      `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` set (or omit both for free-only)
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`
       set per infra (`signature` everywhere, add `private-network` on Railway/Fly)
 - [ ] `BETTER_AUTH_SECRET` generated (≥32 chars)
-- [ ] All env vars set per §4
+- [ ] All env vars set per §5
 - [ ] Cron service chosen and wired to `/internal/rgpd-sweep` (daily)
 - [ ] DB migrations applied; backups verified
 - [ ] `pnpm ci:check` green; smoke test on staging (signup → invite → upload →
-      export → request deletion → cancel → expire grace → sweep)
+      export → request deletion → cancel → expire grace → sweep → billing checkout)

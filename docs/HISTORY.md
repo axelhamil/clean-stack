@@ -684,3 +684,65 @@ Décision clé de l'architecture : la réconciliation guest→user se fait **ent
 4. **`<LegalFooter>` extrait depuis command-palette** — le ROADMAP prévoyait un footer avec liens légaux. Implémenté via `<LegalFooter>` monté dans `AppShell`, avec `LEGAL_ROUTES` extrait de `command-palette.tsx` (DRY — la palette et le footer sourcent la même liste). Le footer légal est visible pour tous les users connectés (AppShell), et les pages légales sont accessibles via ⌘K pour les non-connectés.
 5. **`onEvent` umami-disable déféré** — la tâche "un `onEvent(...)` handler fires client-side umami.disable()" n'a pas été implémentée. La raison : `<AnalyticsScripts>` unmount via React quand `useConsent("analytics")` devient `false` — ce qui couvre le cas Umami/Plausible (le script se supprime du DOM). Un `onEvent` backend dédié serait de la plomberie pour le même résultat dans un contexte où l'analytics est self-hosted sans SDK JS "disable". Déféré jusqu'au premier consommateur avec un SDK qui expose explicitement `.disable()`.
 5. **`docs/legal/README.md` as the cloner's decision guide.** The fintech-vs-B2B table and placeholder checklist are the highest-value item in A.3 for cloners: they prevent "which template do I send?" ambiguity at first EU enterprise signature and surface the production-readiness gaps (`accessibility@`, `dpo@`, national authority) that are easy to overlook.
+
+---
+
+## Billing — Stripe subscriptions + feature/seat gating ✅ Phase B.1 · Jul 2026
+
+**Why**: every SaaS needs billing. B.1 ships the plumbing as permanent infra — not a disposable demo — following the same infra-not-DDD principle as policies (A.2) and consent (A.4). The alternative (leaving billing to the cloner) means every clone rebuilds the same Stripe webhook idempotency, subscription SSOT decision, seat-gating hooks, and free-tier fallback independently — that is the OpenUp anti-pattern at scale.
+
+**Posture**: zero billing backoffice. Stripe Checkout handles upgrades; Stripe Billing Portal handles subscription management. The app surfaces only the current plan, seat usage, an Upgrade button (→ Checkout), and a Manage button (→ Portal). A public `/pricing` page lists live plans fetched from the Stripe catalog. Copy and prices live in Stripe; no redeploy is needed to change them.
+
+### Wire-up
+
+- [x] **`@better-auth/stripe@1.6.23`** (`stripe@22.3.0`) — Stripe customer = per organization (honoring the Phase 2 multi-tenant decision). Plugin provisions the `subscription` table, handles webhook ingestion at `POST /api/auth/stripe/webhook` (BetterAuth-owned, HMAC-signed by Stripe), and exposes `createCheckoutSession` / `createPortalSession`.
+- [x] **Subscription state SSOT = `subscription` table** (plugin-managed, webhook-synced). `organization.metadata` carries no plan data. The table has typed Drizzle columns, a FK to `organization`, and requires no poll-to-Stripe in the request path.
+- [x] **Hybrid catalog** — price + display copy live in Stripe Products (`marketing_features` = pricing bullets on the public page). Feature entitlements, tier rank, and `maxMembers` live in typed code at `apps/api/src/modules/billing/config.ts` (`ENTITLEMENTS` map). `metadata.tier` on the Stripe Product is the sole join key. Editing a gate or seat cap = a reviewable code change, never a silent dashboard edit.
+- [x] **Unlimited seats = `null`** (JSON-safe). `Infinity` is not JSON-serializable (`JSON.stringify(Infinity) === "null"` — a silent wrong value). A magic sentinel like `9999` silently becomes a real limit. `null` is explicit and makes the nil-check obvious: `if (maxMembers !== null && current >= maxMembers)`.
+- [x] **Standard free-tier model** — unlimited team orgs per account; each free org is capped at 3 members with no premium features; paid orgs inherit higher caps from `ENTITLEMENTS`. No per-account org-count cap (would require a cross-org aggregate on every org-create path — avoidable complexity; re-evaluate only when a product decision explicitly gates on org count).
+- [x] **Seat gates in all three org hooks** — `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation` all check `ENTITLEMENTS[tier].maxMembers`. All three are required: gating only `beforeAddMember` leaves a window where an admin can issue more invitations than the seat cap allows; the acceptances then fail with an unhelpful error (see review catch §3 below).
+- [x] **Three gate axes (transferable pattern)** — any cloner adding a premium feature picks from these:
+  1. **Role gate** — `billing:["read","manage"]` in `@packages/access-control` (pre-existing from Phase 2). `billing:read` = owner + admin; `billing:manage` = owner only. Applied via `requireOrgPermission({ billing: ["manage"] })` on `POST /billing/portal`.
+  2. **Seat quota** — `ENTITLEMENTS[tier].maxMembers` in the org hooks above. Returns `403 BILLING_SEAT_LIMIT_REACHED` (a capability boundary, not a payment request).
+  3. **Tier/feature gate** — `requireFeature(flag)` / `requirePlan(minTier)` (back, returning `402 BILLING_PAYMENT_REQUIRED`); `useEntitlements()` / `<FeatureGate flag>` / `<PlanGate minTier>` (front). `402` = "available on a higher plan" — semantically distinct from `403` (wrong permission) or `401` (unauthenticated).
+- [x] **Module `apps/api/src/modules/billing/`** — infra no-DDD, mirrors `modules/consents/`:
+  - `CatalogService` — assembles `Plan[]` by fetching active Stripe Products + Prices and merging with `ENTITLEMENTS`. Degrades to free-only when `STRIPE_SECRET_KEY` is unset (boilerplate ships without keys by design).
+  - `EntitlementsService` — `resolveEntitlements(tier)` returns the typed `ENTITLEMENTS` entry; `getSubscriptionTier(orgId)` reads the `subscription` table.
+  - `SubscriptionReadStore` — §8-instrumented (outer span per method, inner span on `query.execute()`, `catch + instrumentation.capture`).
+  - `StripeCatalogSourceAdapter` — all Stripe SDK calls isolated here, instrumented with `op: "http.client"`. `CatalogService` never touches the SDK directly.
+  - Routes: `GET /billing/plans` (public, no auth), `GET /billing/subscription` (requireAuth), `POST /billing/checkout` (requireAuth), `POST /billing/portal` (requireAuth + `billing:manage`).
+- [x] **Frontend** (`apps/app/src/features/billing/`): public `/pricing` (plan list + bullets from `marketing_features`); `/settings/billing` (current plan, seat usage, Upgrade / Manage buttons); `useEntitlements()` hook; `<FeatureGate flag>` + `<PlanGate minTier>` declarative render gates.
+- [x] **4 new events** emitted from `@better-auth/stripe` callbacks in `auth.ts` via `emitEvent(outbox, ...)`:
+  - `billing.subscription.created` / `billing.subscription.updated` / `billing.subscription.cancelled` — `compliance` retention (RGPD financial-state changes).
+  - `billing.payment.failed` — `operational` retention (dunning observability, alerting).
+  - Catalog total: **46 events**.
+- [x] **Env** — `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. No `STRIPE_PRICE_*` env vars: prices live in Stripe. `STRIPE_SECRET_KEY` unset → free-only degradation, no boot failure.
+- [x] **`RgpdService.executeAccountWipe`** — closes the "Stripe customer cleanup during wipe" deferred from Phase 1. Customer deletion is called in the wipe sequence; failure is captured and logged (non-fatal — account deletion must never be blocked by a Stripe API error).
+
+### Decisions (B.1)
+
+1. **State SSOT = plugin `subscription` table, not `organization.metadata`**. Metadata is an opaque blob: not queryable by column, not typed at compile time, and subject to divergence when a webhook arrives out of order. The plugin table has a FK to `organization`, a typed schema, and no in-request poll to the Stripe API. This was the central design decision — the alternative was the most common Stripe integration mistake.
+
+2. **Hybrid catalog (Stripe + typed code, `metadata.tier` as join key)**. Pure-Stripe (all entitlements in Product metadata) means a feature gate change is a dashboard edit — unreviewed, unversioned, silently live. Pure-code (hardcode prices) means a price change requires a deploy. The hybrid: prices and copy in Stripe (the natural editor, change without a deploy), capabilities in code (must pass code review, version-controlled). `metadata.tier` is the only stable contract; the rest of the Product object is unconstrained.
+
+3. **`null` for unlimited, not `Infinity`**. `JSON.stringify(Infinity) === "null"` — a silent wrong value. `null` is idiomatic for "no limit" in JSON and makes the check (`maxMembers !== null`) unambiguous. The sentinel `9999` was also ruled out: it silently becomes a real cap if a customer ever reaches it.
+
+4. **Standard unlimited-orgs model**. An alternative was capping org count per account per plan (e.g., "3 orgs on free, unlimited on paid"). Rejected: (a) the Phase 2 multi-tenant architecture has no per-account org-count tracking — adding it requires a new cross-org aggregate query on every org-create path; (b) the dominant SaaS precedent (Vercel, Linear, Resend) limits seats and features within an org, not org count. Re-evaluate only if an explicit product decision makes org count a differentiator.
+
+5. **`402 BILLING_PAYMENT_REQUIRED` code suffix required in the response body**. A bare `HTTPException(402)` produces no `code` field in the error envelope — the client-side branch is unreliable. The suffix makes "upgrade required" distinct from hypothetical future `402 STRIPE_PAYMENT_FAILED` (direct purchase) at the protocol level (see review catch §2 below).
+
+6. **`billing.payment.failed` as `operational`, subscription lifecycle events as `compliance`**. Subscription state changes (created / updated / cancelled) document financial transitions that may be subject to RGPD Art. 30 processing records — `compliance` retention (7y). Payment failures are transient operational signals (dunning, Stripe retry) — `operational` retention (90d). Different purposes, different retention lifetimes.
+
+7. **Loose-typed `authClient.billing.*` (documented debt)**. `@better-auth/stripe` v1.6.23 client extensions are not fully typed — `useActiveSubscription()` and `createCheckoutSession()` return `any` in client types. The app confines them behind typed adapters in `features/billing/_api/`; the untyped surface is a single file. The adapter layer absorbs the upstream fix in one place when it lands.
+
+### Review catches (pre-merge whole-branch pass)
+
+Four issues caught before merge — all fixed:
+
+1. **Portal route missing `billing:manage` gate** — `POST /billing/portal` initially had `requireAuth` only. Any authenticated member could redirect to the org's Stripe portal and change the payment method or cancel the subscription. Fixed: added `requireOrgPermission({ billing: ["manage"] })`.
+
+2. **`402` response body missing code suffix** — a bare `throw new HTTPException(402)` in an early draft produced no `code` field in the error envelope. The error handler's `instanceof HTTPException` branch could not distinguish it from other 402s. Enforced the `BILLING_PAYMENT_REQUIRED` code in the body at all call sites.
+
+3. **`beforeCreateInvitation` not seat-gated (rule §6 gap)** — only `beforeAddMember` and `beforeAcceptInvitation` were gated initially. An admin could create 10 invitations for a 3-seat free org; the first 3 acceptances succeed, the remaining 7 fail at acceptance time with a generic error and no clear recovery path. Added `beforeCreateInvitation` to the seat-check hooks.
+
+4. **Double `billing.subscription.cancelled` emission** — an early draft emitted `cancelled` from both the `subscription.updated` webhook (when `cancelAtPeriodEnd` flips to `true` — a *scheduled* cancellation) and `subscription.deleted` (actual termination). These are distinct business facts. Fix: `subscription.updated` emits `billing.subscription.updated` (with `cancelAtPeriodEnd` in the payload for observers that care); only `subscription.deleted` emits `billing.subscription.cancelled`. The final catalog has 4 unambiguous events.
