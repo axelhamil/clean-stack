@@ -10,6 +10,7 @@ export interface EntitlementsData {
   rank: number;
   features: readonly string[];
   maxMembers: number | null;
+  quotas: Record<string, number | null>;
 }
 
 const FREE_DATA: EntitlementsData = {
@@ -18,6 +19,7 @@ const FREE_DATA: EntitlementsData = {
   rank: 0,
   features: [],
   maxMembers: 3,
+  quotas: { uploads: 10, projects: 3, apiCallsPerMonth: 1_000 },
 };
 
 export function buildEntitlementsView(data: EntitlementsData | undefined) {
@@ -34,6 +36,13 @@ export function buildEntitlementsView(data: EntitlementsData | undefined) {
     seatsRemaining: (memberCount: number): number | null =>
       max === null ? null : Math.max(0, max - memberCount),
     canInviteMember: (memberCount: number) => max === null || memberCount < max,
+    quotas: d.quotas,
+    useQuota: (key: string, used: number) => {
+      const limit = d.quotas[key] ?? null;
+      const remaining = limit === null ? null : Math.max(0, limit - used);
+      const exceeded = limit !== null && used >= limit;
+      return { limit, used, remaining, exceeded };
+    },
   };
 }
 

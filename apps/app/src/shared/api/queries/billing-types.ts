@@ -20,4 +20,5 @@ export type EntitlementsView = {
   maxMembers: number | null;
   tier: Tier;
   status: string;
+  quotas: Record<string, number | null>;
 };
