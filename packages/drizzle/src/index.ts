@@ -35,6 +35,7 @@ export * as billingSchema from "./schema/billing";
 export type { OutboxEventMetadata } from "./schema/outbox";
 export * as outboxSchema from "./schema/outbox";
 export * as policiesSchema from "./schema/policies";
+export * as quotaUsageSchema from "./schema/quota-usage";
 export * as rateLimitSchema from "./schema/rate-limit";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
 export * as webhooksSchema from "./schema/webhooks";
