@@ -306,6 +306,15 @@ export const BillingPaymentFailedPayload = OrgRef.extend({
 });
 export type BillingPaymentFailedPayload = z.infer<typeof BillingPaymentFailedPayload>;
 
+export const BillingQuotaExceededPayload = OrgRef.extend({
+  resource: z.string(),
+  limit: z.number().int().nonnegative(),
+  attempted: z.number().int().nonnegative(),
+  tier: z.string(),
+  actorUserId: z.string(),
+});
+export type BillingQuotaExceededPayload = z.infer<typeof BillingQuotaExceededPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -353,4 +362,5 @@ export const PayloadByEventType = {
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: BillingSubscriptionUpdatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,
   [EventTypes.BILLING_PAYMENT_FAILED]: BillingPaymentFailedPayload,
+  [EventTypes.BILLING_QUOTA_EXCEEDED]: BillingQuotaExceededPayload,
 } as const;

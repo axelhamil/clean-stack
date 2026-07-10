@@ -49,6 +49,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: "compliance",
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: "compliance",
   [EventTypes.BILLING_PAYMENT_FAILED]: "compliance",
+  [EventTypes.BILLING_QUOTA_EXCEEDED]: "operational",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

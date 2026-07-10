@@ -45,6 +45,7 @@ export const EventTypes = {
   BILLING_SUBSCRIPTION_UPDATED: "billing.subscription.updated",
   BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
   BILLING_PAYMENT_FAILED: "billing.payment.failed",
+  BILLING_QUOTA_EXCEEDED: "billing.quota.exceeded",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
