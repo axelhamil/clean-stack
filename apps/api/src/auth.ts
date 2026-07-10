@@ -345,22 +345,6 @@ const authOptions = {
             subscription.referenceId,
           );
         },
-        onSubscriptionCancel: async ({ subscription }) => {
-          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
-          await emit(
-            EventTypes.BILLING_SUBSCRIPTION_CANCELLED,
-            "subscription",
-            subscription.id,
-            {
-              organizationId: subscription.referenceId,
-              subscriptionId: subscription.id,
-              tier: subscription.plan,
-              status: subscription.status,
-              actorUserId,
-            },
-            subscription.referenceId,
-          );
-        },
       },
       onEvent: async (event) => {
         if (event.type !== "invoice.payment_failed") return;

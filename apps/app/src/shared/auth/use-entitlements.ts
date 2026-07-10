@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import type { Tier } from "../api/queries/billing-types";
 import { subscriptionQueryOptions } from "../api/queries/subscription";
 
-const TIER_RANK = { free: 0, pro: 1, business: 2 } as const;
-type Tier = keyof typeof TIER_RANK;
+const TIER_RANK: Record<Tier, number> = { free: 0, pro: 1, business: 2 };
 
 export interface EntitlementsData {
   tier: Tier;
@@ -39,5 +39,5 @@ export function buildEntitlementsView(data: EntitlementsData | undefined) {
 
 export function useEntitlements() {
   const { data } = useQuery(subscriptionQueryOptions);
-  return buildEntitlementsView(data as EntitlementsData | undefined);
+  return buildEntitlementsView(data);
 }

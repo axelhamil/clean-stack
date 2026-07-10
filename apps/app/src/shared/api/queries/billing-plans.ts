@@ -1,22 +1,9 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "../api-client";
 import { throwApiError } from "../errors/api-error";
+import type { PlanCatalogItem } from "./billing-types";
 
-type Tier = "free" | "pro" | "business";
-type Feature = "audit_log" | "api" | "sso";
-
-export type PlanCatalogItem = {
-  tier: Tier;
-  name: string;
-  priceId: string | null;
-  unitAmount: number;
-  currency: string;
-  interval: string | null;
-  marketingFeatures: string[];
-  rank: number;
-  features: Feature[];
-  maxMembers: number | null;
-};
+export type { PlanCatalogItem } from "./billing-types";
 
 export const plansQueryOptions = queryOptions({
   queryKey: ["billing", "plans"] as const,

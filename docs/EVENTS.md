@@ -315,9 +315,9 @@ Ces 3 events ne sont pas des state-changes métier — ils signalent des rejets 
 - `SECURITY_SIGNUP_REJECTED` (`security.signup.rejected`) — émis sur blocage d'un email jetable au sign-up. Payload : `{ actorUserId: null, email: string (max 254), ip: string | null, reason: "disposable_email" }`, retention `operational`.
 - `SECURITY_PASSWORD_BREACHED` (`security.password.breached`) — émis sur un mot de passe compromis HIBP au sign-up / reset / change-password (le rejet 422 vient déjà de la NIST policy). Payload : `{ actorUserId: string | null, email: string | null, ip: string | null, path }` — `actorUserId`/`email` portés par la session réelle sur `/change-password`, `null` sur sign-up/reset (pas de session). Retention `operational`.
 
-### Via subscription events (`modules/billing/` — Phase B.1)
+### Via subscription events (`auth.ts` `@better-auth/stripe` callbacks — Phase B.1)
 
-Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` webhook handler. These are Stripe-originated lifecycle events — not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
+Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin callbacks wired in `apps/api/src/auth.ts` (`onSubscriptionComplete`, `onSubscriptionUpdate`, and the `onEvent` invoice.payment_failed handler). These are Stripe-originated lifecycle events — not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
 
 - `BILLING_SUBSCRIPTION_CREATED` (`billing.subscription.created`) — emitted on `customer.subscription.created` Stripe webhook (first active subscription for an org). Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null, currentPeriodEnd }`, retention `compliance`.
 - `BILLING_SUBSCRIPTION_UPDATED` (`billing.subscription.updated`) — emitted on `customer.subscription.updated` when the new status is not terminal. Same payload shape as `created`, retention `compliance`.
