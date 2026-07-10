@@ -13,6 +13,7 @@ import { dashboardRoute } from "./features/dashboard/dashboard.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
 import { acceptPoliciesRoute } from "./features/legal/accept.route";
 import { accessibilityRoute } from "./features/legal/accessibility.route";
+import { cookiesRoute } from "./features/legal/cookies.route";
 import { dataRightsRoute } from "./features/legal/data-rights.route";
 import { privacyPolicyRoute } from "./features/legal/privacy-policy.route";
 import { subProcessorsRoute } from "./features/legal/sub-processors.route";
@@ -53,6 +54,7 @@ const routeTree = rootRoute.addChildren([
   termsRoute,
   subProcessorsRoute,
   accessibilityRoute,
+  cookiesRoute,
   magicLinkRoute,
   resetPasswordRoute,
   twoFactorRoute,

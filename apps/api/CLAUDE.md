@@ -140,6 +140,35 @@ Compliance infra, not DDD. Records which policy version each user accepted and w
 - **`requireCurrentPolicies`** (`shared/middleware/policy.middleware.ts`) — composable, **not mounted globally**. Throws `HTTPException(409)` when any policy is stale. The `_shell` `beforeLoad` redirect is the live UX gate; this middleware is defense-in-depth for future business routes.
 - **Sign-up acceptance via `/verify-email` hook** — `PolicyAcceptanceService.accept` is called from the BetterAuth `/verify-email` after-hook in `auth.ts` (idempotent via `getStaleTypes`) AND from `POST /me/policies/accept`. Not at `/sign-up/email`: that route has no session yet and returns a synthetic user on duplicate-email. See `docs/HISTORY.md` Phase A.2 for the full deviation note.
 
+## Cookie consent (`modules/consents/` — Phase A.4)
+
+Compliance infra, pas DDD. Enregistre le consentement device-scoped (guest→user réconcilié au login). Miroir du module `modules/policies/` — même shape (port + service + drizzle store + routes).
+
+- **`@packages/cookie-consent`** est le SSOT (`CONSENT_CATEGORIES`, `OPTIONAL_CATEGORIES`, `CONSENT_COOKIE_NAME = "cc_sid"`, `COOKIE_CONSENT_VERSION`, `CONSENT_GRANT_TTL_DAYS`, `CONSENT_REFUSAL_TTL_DAYS`). Source-only. Bump `COOKIE_CONSENT_VERSION` ici → tous les users re-promptés automatiquement.
+- **`IConsentStore`** port (module-private) + `DrizzleConsentStore` — §8-instrumenté. **`ConsentService`** : `record` (append-only — chaque save = nouveau row, le plus récent gagne) · `withdraw` · `getActive` (avec fallback subjectId quand un user connecté n'a pas encore de record) · `reconcile(subjectId, userId)` (UPDATE `user_id WHERE user_id IS NULL`).
+- **Routes `/consents` — publiques, `optionalAuth`** (guests ET connectés). Cookie `cc_sid` httpOnly géré serveur. **Rate-limit `CONSENT_POST_POLICY` sur POST/DELETE uniquement** — GET exempt (appelé en prefetch à chaque render ; un GET rate-limité sature la fenêtre en quelques reloads normaux et bloque l'affichage du banner). CSRF Origin sur `/consents` (comme tous les prefixes de mutation).
+- **Cookie `cc_sid`** : `httpOnly: true`, `secure: isProd`, `sameSite: isProd ? "none" : "lax"`, `path: "/"`. **Pas de prefix `__Host-`** — le déploiement cross-origin (SPA + API origines distinctes) rend `__Host-` inutilisable (`Domain` refusé + `secure` requis mais `sameSite: none` pour cross-origin). Même logique que le cookie de session BetterAuth.
+- **Sweep guests expirés** (`shared/internal-routes/sweep-consents.route.ts`, gate `internalLayers` HMAC) : purge `user_id IS NULL AND expires_at < cutoff` (env `CONSENT_RETENTION_DAYS=365`). Ajouté au runner `cron/sweep.ts`.
+
+**Réconciliation au login — règle réutilisable** :
+
+Pour exécuter du code à chaque login (tous flux confondus : password/passkey/magic-link/2FA/email-verify/OAuth futur) avec accès aux cookies de requête, utiliser **`hooks.after` + `createAuthMiddleware` + vérifier `ctx.context.newSession`**. Ne pas utiliser `databaseHooks.session.create` — ce hook n'a **pas** accès aux `Request` headers (donc pas aux cookies).
+
+```ts
+// Dans auth.ts — réconciliation consent au login
+hooks: {
+  after: createAuthMiddleware(async (ctx) => {
+    const userId = ctx.context.newSession?.user?.id;  // null hors login → skip
+    if (!userId) return;
+    const subjectId = readCookieFromHeaders(ctx.headers, CONSENT_COOKIE_NAME);
+    if (!subjectId) return;
+    await di.ConsentService.reconcile(subjectId, userId);
+  }),
+}
+```
+
+`ctx.context.newSession` est positionné par BetterAuth sur **chaque** login (tous flux) et vaut `null` sur les requêtes courantes de session. C'est le signal idiomatique pour "un login vient d'avoir lieu sur cette requête". Câbler sur `databaseHooks.session.create` rate les cookies ; câbler sur un path spécifique (ex. `/sign-in/email`) rate les autres flux.
+
 ## Organization scoping (server)
 
 1. **Ownership at port (`ScopedRepository`), not route.** `requireOrg` exposes `c.var.orgId`; controller builds `RepoScope.org(orgId)` and passes to `di.XxxUseCase.execute(input, scope)`; `requireOrgPermission({ resource: ["action"] })` still gates *capabilities*. Routes **construct** scope; repo **honors** it. Skipping `requireOrg` on a handler reading/writing rows scoped by `organizationId` silently accepts requests with no active org.

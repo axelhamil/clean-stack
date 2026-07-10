@@ -206,6 +206,26 @@ export const UserPolicyAcceptedPayload = UserRef.extend({
 });
 export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
 
+// userId is optional: guest consents have no userId, only subjectId (anonymous cookie-based id).
+// extractActor will fall back to system/anonymous for guests — accepted per §7 (no identified user).
+export const UserCookieConsentGrantedPayload = z.object({
+  userId: z.string().optional(),
+  subjectId: z.string(),
+  categories: z.array(z.string()),
+  policyVersion: z.string(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+});
+export type UserCookieConsentGrantedPayload = z.infer<typeof UserCookieConsentGrantedPayload>;
+
+export const UserCookieConsentWithdrawnPayload = z.object({
+  userId: z.string().optional(),
+  subjectId: z.string(),
+  categories: z.array(z.string()),
+  policyVersion: z.string(),
+});
+export type UserCookieConsentWithdrawnPayload = z.infer<typeof UserCookieConsentWithdrawnPayload>;
+
 export const SecurityRateLimitExceededPayload = z.object({
   actorUserId: z.string().nullable(),
   ip: z.string().max(45),
@@ -293,6 +313,8 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
+  [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
+  [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
   [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,

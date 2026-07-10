@@ -2,6 +2,7 @@ import type { IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
 import { auditLogModule } from "./modules/audit-log/module";
+import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
 import { policyModule } from "./modules/policies/module";
 import { rgpdModule } from "./modules/rgpd/module";
@@ -102,4 +103,5 @@ export const di = container()
   .addModule(auditLogModule)
   .addModule(webhooksModule)
   .addModule(policyModule)
+  .addModule(consentModule)
   .build();

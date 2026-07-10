@@ -28,6 +28,7 @@ import * as multiTenantSchema from "./schema/multi-tenant";
 
 export * as auditLogSchema from "./schema/audit-log";
 export * as authSchema from "./schema/auth";
+export * as consentSchema from "./schema/consent";
 export * as multiTenantSchema from "./schema/multi-tenant";
 export const schema = { ...authSchema, ...multiTenantSchema };
 export type { OutboxEventMetadata } from "./schema/outbox";

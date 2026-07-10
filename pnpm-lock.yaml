@@ -74,6 +74,9 @@ importers:
       '@packages/access-control':
         specifier: workspace:*
         version: link:../../packages/access-control
+      '@packages/cookie-consent':
+        specifier: workspace:*
+        version: link:../../packages/cookie-consent
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../../packages/ddd-kit
@@ -153,6 +156,9 @@ importers:
       '@packages/access-control':
         specifier: workspace:*
         version: link:../../packages/access-control
+      '@packages/cookie-consent':
+        specifier: workspace:*
+        version: link:../../packages/cookie-consent
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
@@ -255,6 +261,15 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  packages/cookie-consent:
+    devDependencies:
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/ddd-kit:
     dependencies:
       zod:
@@ -285,6 +300,9 @@ importers:
 
   packages/drizzle:
     dependencies:
+      '@packages/cookie-consent':
+        specifier: workspace:*
+        version: link:../cookie-consent
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../ddd-kit

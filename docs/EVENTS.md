@@ -254,7 +254,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **40 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, 5 from security — 3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **42 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security — 3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`). Source of truth: `packages/events/src/event-types.ts`.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -294,6 +294,11 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 ### Via `PolicyAcceptanceService` (Phase A.2)
 - `USER_POLICY_ACCEPTED` (`user.policy.accepted`) — payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
+
+### Via `ConsentService` (Phase A.4)
+
+- `USER_COOKIE_CONSENT_GRANTED` (`user.cookie_consent.granted`) — émis par `ConsentService.record` à chaque sauvegarde. Payload : `{ subjectId: string (device cookie), userId?: string (null pour guests), categories: ConsentCategory[], policyVersion: string, ipAddress?, userAgent? }`, retention `compliance`. L'`actorUserId` résout sur `userId` quand l'utilisateur est connecté (self-actor) ; `null` pour un guest (le `subjectId` est la seule identité disponible). Les guests obtiennent un record réconcilié au login via `ConsentService.reconcile` (hook `hooks.after` + `ctx.context.newSession`).
+- `USER_COOKIE_CONSENT_WITHDRAWN` (`user.cookie_consent.withdrawn`) — émis par `ConsentService.withdraw`. Même shape de payload. Retention `compliance`.
 
 ### Via security middleware / endpoint (Phase C.1)
 
@@ -341,7 +346,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (40 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (42 events) |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |

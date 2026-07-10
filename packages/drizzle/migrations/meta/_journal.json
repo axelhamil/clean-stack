@@ -64,6 +64,13 @@
       "when": 1781291315182,
       "tag": "0008_small_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783631259914,
+      "tag": "0009_elite_jack_power",
+      "breakpoints": true
     }
   ]
 }

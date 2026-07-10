@@ -31,6 +31,40 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 
 ---
 
+## Cookie consent + Consent management ✅ Phase A.4
+
+CNIL/RGPD Art. 7 ePrivacy — dual-layer device-scoped. `localStorage` seul est insuffisant comme preuve RGPD Art.7§1 (pas horodaté serveur) — le consentement est authoritative côté serveur, le cookie `cc_sid` est le lien device→record.
+
+**Shared SSOT** (`@packages/cookie-consent`): `CONSENT_CATEGORIES` (`["necessary","functional","analytics","marketing"]`), `OPTIONAL_CATEGORIES`, type `ConsentCategory`, `COOKIE_CONSENT_VERSION`, `CONSENT_GRANT_TTL_DAYS=180`, `CONSENT_REFUSAL_TTL_DAYS=180`, `CONSENT_COOKIE_NAME="cc_sid"`. Source-only, miroir de `@packages/policies`.
+
+**DB** (`packages/drizzle/src/schema/consent.ts`): `consent_record(id, subjectId NOT NULL, userId nullable FK user ON DELETE CASCADE, categories jsonb, policyVersion, grantedAt, withdrawnAt nullable, expiresAt, ipAddress, userAgent)` — **append-only** (chaque save = nouveau record, le plus récent gagne). 2 indexes: `(subjectId, expiresAt DESC)` + `(userId, expiresAt DESC)`. Migration `0009_elite_jack_power.sql`. Export `consentSchema` dans le barrel.
+
+**Backend module** (`apps/api/src/modules/consents/`): compliance infra, pas DDD (même classe que `modules/policies/`).
+- `IConsentStore` port (module-private) + `DrizzleConsentStore` — §8-instrumenté (outer + inner spans + capture).
+- `ConsentService` — `record` (append-only) · `withdraw` · `getActive` (avec **fallback** `subjectId` quand un user connecté n'a pas encore de record) · `reconcile` (link subjectId→userId au login).
+- Routes **publiques** `POST /consents` (record, cookie `cc_sid` généré serveur, IP via `resolveClientIp`) · `GET /consents` (état courant) · `DELETE /consents` (withdraw). `optionalAuth` (guest + logged-in). CSRF Origin sur `/consents`. **Rate-limit `CONSENT_POST_POLICY` sur POST/DELETE uniquement** — un GET rate-limité saturait la fenêtre et bloquait l'affichage du banner. Cookie `cc_sid` httpOnly : `secure: isProd`, `sameSite: isProd ? "none" : "lax"`, path `"/"`, pas de prefix `__Host-` (déploiement cross-origin).
+- **Réconciliation au login via `hooks.after`** — dans `auth.ts`, si `ctx.context.newSession` existe (= login tous flux confondus : password/passkey/magic-link/2FA/OAuth futur), lit `cc_sid` via `readCookieFromHeaders` et appelle `ConsentService.reconcile` → `UPDATE SET user_id WHERE subject_id = cookie AND user_id IS NULL`. Zéro round-trip client. (`databaseHooks.session.create` n'a **pas** accès aux cookies de requête — vérifié doc BetterAuth.)
+- Sweep guests expirés (`apps/api/src/shared/internal-routes/sweep-consents.route.ts`, gate `internalLayers` HMAC) — purge `user_id IS NULL AND expires_at < cutoff`, env `CONSENT_RETENTION_DAYS=365`. Ajouté au runner `cron/sweep.ts`.
+
+**Events**: `user.cookie_consent.granted` + `user.cookie_consent.withdrawn` — payload `{ subjectId, userId?, categories, policyVersion, ipAddress?, userAgent? }`, retention `compliance`. Porte le compteur à **42 events**.
+
+**Frontend** (`apps/app/src/shared/`):
+- `api/queries/consent.ts` (`consentQueryOptions`) — état serveur initial, évite le flash-of-banner.
+- `api/mutations/record-consent.ts` + `withdraw-consent.ts` — factories `mutationOptions`.
+- `hooks/use-consent.ts` (`useConsent(category): boolean`) — hook impératif de vérification.
+- `components/cookie-banner.tsx` (`<CookieBanner>`) — symétrie CNIL Reject/Accept (même prominence), `necessary` non-toggleable, auto-monté dans `app-providers.tsx`, caché si consentement courant.
+- `components/consent-settings.tsx` (`<ConsentSettings>`) — toggles reflètent l'état réellement consenti (pas de pré-réglage GPC).
+- `components/consent-gate.tsx` (`<ConsentGate category>`) — **primitif déclaratif** : rend ses enfants seulement si la catégorie est consentie.
+- `components/analytics-scripts.tsx` (`<AnalyticsScripts>`) — **exemple d'usage** : charge le script `VITE_ANALYTICS_SRC` (env optionnel) seulement si `analytics` consenti, cleanup React au retrait.
+- `components/legal-footer.tsx` (`<LegalFooter>`) — footer avec liens vers toutes les pages légales, monté dans `AppShell` (users connectés). Source : `shared/legal-routes.ts` (`LEGAL_ROUTES`) extrait de command-palette (DRY, consommé par les deux).
+- Page `/legal/cookies` (`features/legal/cookies.{route,page}.tsx` + `cookies.config.ts`) — inventaire des cookies par catégorie (CNIL transparence obligation), route publique sous `rootRoute`.
+- `shared/env.ts` : + `VITE_ANALYTICS_SRC` (optionnel).
+- **Toast 429 global consolidé** (`observability/query-error-handler.ts`) — `notifyIfRateLimited` affiche un toast unique (message + durée depuis `Retry-After`) sur tout 429 queries ET mutations, dédup par `id`. L'ancien countdown seconde-par-seconde (`rate-limit-toast.ts`) supprimé (inadapté aux durées en minutes/heures).
+
+**Décisions réglementaires (SOTA 2026)**: GPC = aucune valeur légale en EU (CCPA/US uniquement) — conformité assurée par le modèle opt-in. DNT = mort, ignoré. Google Consent Mode v2 = hors scope (pas de produit Google). Symétrie Reject/Accept premier niveau (sanctions CNIL 2025). Durées 180j configurables (CNIL non figée). Référence : recommandation CNIL consolidée janvier 2026.
+
+---
+
 ## Compliance docs bundle ✅ Phase A.3
 
 EAA Art. 14 accessibility declaration + GDPR Art. 28 sub-processor disclosure, both mandatory for EU deploys. Static public pages (no auth gate, no backend touched). Contract templates for EU client onboarding. 0 domain events — event count stays at 40.
@@ -229,8 +263,8 @@ Transactional outbox + dispatcher + audit/webhook subscribers. **Zero plumbing p
 - **Dispatcher**: in-process Bun worker, dedicated `pg.Client` LISTEN + 30s poll fallback + `SELECT ... FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers run inside the dispatch TX (atomic), user `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`, SOC2 §CC7.2 / ISO 27001) — append-only, retention `operational` (90d) vs `compliance` (7y) driven by `RETENTION_MAP`. Tamper-evidence columns posed (`prev_hash`/`hash`), calc gated by env flag.
 - **Outbound webhooks** (`webhook_endpoint` + `webhook_delivery`) — HMAC-SHA256 signed (`t=<ts>,v1=<hex>` Stripe-style), AEAD-encrypted secrets at rest (`@noble/ciphers` XChaCha20-Poly1305 + HKDF per org). Decorrelated jitter retry (1m/5m/30m/2h/12h paliers), dead-letter after 5 attempts, replay endpoint. Claim window pattern in delivery worker — fetch HTTP outside TX, no lock starvation.
-- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`), SecurityMiddleware emits 3 (`security.rate_limit.exceeded`, `security.csp.violation`, `security.csrf.rejected`), and the abuse-prevention hooks in `auth.ts` emit 2 (`security.signup.rejected` on a disposable-email block, `security.password.breached` on a HIBP hit) → **40 events total**.
-- **Catalog `@packages/events`** — 40 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
+- **BetterAuth bridge** (`auth.ts`) emits 23 unique events automatically (15 user + 8 org) via 4 voies: user/session lifecycle (`databaseHooks`), MFA/passkey/email-verified/password-changed/profile-updated/email-change-requested/link-social (`hooks.after` with `createAuthMiddleware`, `APIError` filter), password reset / magic link (native callbacks), org/member/invitation (`organizationHooks`, with both `afterAddMember` AND `afterAcceptInvitation` for `ORG_MEMBER_JOINED` to cover direct adds + invite acceptance). RGPD service emits 5 more, UploadService emits 3, WebhooksService emits 3, PolicyAcceptanceService emits 1 (`user.policy.accepted`), SecurityMiddleware emits 3 (`security.rate_limit.exceeded`, `security.csp.violation`, `security.csrf.rejected`), the abuse-prevention hooks in `auth.ts` emit 2 (`security.signup.rejected` on a disposable-email block, `security.password.breached` on a HIBP hit), and `ConsentService` emits 2 (`user.cookie_consent.granted`, `user.cookie_consent.withdrawn` — retention `compliance`) → **42 events total**.
+- **Catalog `@packages/events`** — 42 events with Zod payloads + `RETENTION_MAP`, shared api+app+future workers.
 - **Request correlation** — every event carries the originating request's `X-Request-Id` in `outbox_event.metadata.requestId` (captured via an `AsyncLocalStorage` context, works inside BetterAuth hooks too), copied into `audit_log.request_id` so audit rows join to their logs + Sentry event on one key.
 
 ## Security & hardening ✅ Phase C.1
@@ -277,7 +311,7 @@ Deploy-safe perimeter — rate-limit, strict CSP, and stateless CSRF protection,
 
 **Prod boot guard**: api fails hard (`process.exit(1)`) on missing `CORS_ORIGIN` — a silent empty-string allowlist would make CSRF protection a no-op.
 
-**Events** (`operational` retention): the perimeter adds `security.rate_limit.exceeded` · `security.csp.violation` · `security.csrf.rejected`; the s5a abuse-prevention hooks add `security.signup.rejected` · `security.password.breached`. Brings the catalogue to **40 events** (23 BetterAuth + 5 RGPD + 3 uploads + 3 webhooks + 1 policy + 5 security).
+**Events** (`operational` retention): the perimeter adds `security.rate_limit.exceeded` · `security.csp.violation` · `security.csrf.rejected`; the s5a abuse-prevention hooks add `security.signup.rejected` · `security.password.breached`. Brings the catalogue to **42 events** (23 BetterAuth + 5 RGPD + 3 uploads + 3 webhooks + 1 policy + 2 consent + 5 security).
 
 See [`./EVENTS.md`](./EVENTS.md) for the full DX guide (how to add an event, build a handler, multi-tenant safety, BetterAuth bridge specifics, HMAC verification, known limitations).
 

@@ -26,6 +26,7 @@
     "@noble/ciphers": "^2.2.0",
     "@noble/hashes": "^2.2.0",
     "@packages/access-control": "workspace:*",
+    "@packages/cookie-consent": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
     "@packages/drizzle": "workspace:*",
     "@packages/events": "workspace:*",

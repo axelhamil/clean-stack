@@ -107,6 +107,21 @@ export const AUTH_PASSKEY_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
+// Cookie consent POST — public guest endpoint, keyed by IP.
+// fail-open: a store outage must not block consent recording (guest flow).
+// emitSecurityEvent=false: consent spam is not a security signal.
+// advertiseBudget=false: no RateLimit headers on consent routes.
+export const CONSENT_POST_POLICY: PolicyConfig = {
+  name: "consent-post",
+  keyFn: ipKeyFn("consent-post"),
+  windows: [
+    { policyName: "consent-post", windowSec: 60, maxRequests: 10 },
+    { policyName: "consent-post", windowSec: 3600, maxRequests: 50 },
+  ],
+  emitSecurityEvent: false,
+  advertiseBudget: false,
+};
+
 // Browser-sent CSP violation reports — no user identity, keyed by IP.
 // emitSecurityEvent=false: the violation itself is the signal (emitted unconditionally per report).
 // advertiseBudget=false: no RateLimit headers exposed to browsers.

@@ -601,4 +601,86 @@ Captcha hook (Turnstile / hCaptcha via `ICaptchaService` port — S6), and the c
 2. **`status: "active" | "planned"` split.** Rather than a flat list, sub-processors are split into active (contractually engaged today, require DPA coverage) and planned (will require a DPA update before they go live — Art. 28 §2 30-day advance notice obligation). This makes the contractual obligation visible: a cloner who activates Stripe must move it from planned to active and trigger the notice.
 3. **`url?` + `dpaUrl?` both optional.** Not every sub-processor publishes a DPA URL directly; some (BetterAuth OAuth) are conditional-on-use. Optional fields allow the config to be honest about availability without breaking the type or rendering empty cells.
 4. **Accessibility statement written before A.6 CI gate.** The statement declares a WCAG 2.1 AA conformance target but acknowledges known limitations and defers the auto-update to A.6 Lighthouse CI. This is the EAA-compliant posture: the statement must exist (obligation since Jun 2025); its accuracy improves as A.6 lands. A statement with a complaint contact satisfies the obligation; a blank page does not.
+
+---
+
+## Cookie consent + Consent management ✅ Phase A.4 · Jul 2026
+
+**Why**: la directive ePrivacy + RGPD Art. 7 exigent un consentement valide avant tout dépôt de cookie non-nécessaire. Sans banner conforme, un clone qui ajoute Umami, Plausible, Stripe pixel ou n'importe quel tracker est illégal en EU dès le premier déploiement. Le boilerplate n'avait aucune surface de consentement — A.4 ferme ce gap, fournit la mécanique de réconciliation guest→user, et expose les primitifs (`<ConsentGate>`, `<AnalyticsScripts>`) pour que les cloners branchent leurs outils sans réécrire la couche.
+
+**Pourquoi infra, pas DDD** : toutes les règles de consentement passent le test décisif — `isActive = withdrawnAt IS NULL AND expiresAt > now AND policyVersion = current` est une WHERE clause ; la catégorie = `categories.includes(cat)` ; la validité = comparaison de dates. Même classe qu'A.2 (`modules/policies/`). Le boilerplate livre **zéro aggregate** — `@packages/ddd-kit/Aggregate` attend le domaine produit du cloner.
+
+### Package `@packages/cookie-consent` — version SSOT
+
+- [x] **Source-only** (miroir `@packages/policies`, aucun build). Exports : `CONSENT_CATEGORIES = ["necessary","functional","analytics","marketing"] as const`, `OPTIONAL_CATEGORIES`, type `ConsentCategory`, `COOKIE_CONSENT_VERSION = "2026-07-09"`, `CONSENT_GRANT_TTL_DAYS = 180`, `CONSENT_REFUSAL_TTL_DAYS = 180`, `CONSENT_COOKIE_NAME = "cc_sid"`. Importé par api, app, et `@packages/drizzle`. Bump `COOKIE_CONSENT_VERSION` → re-prompt automatique de tous les users.
+
+### DB — `consent_record` table
+
+- [x] **Append-only** `consent_record` (`packages/drizzle/src/schema/consent.ts`) : `id, subjectId NOT NULL, userId nullable FK user ON DELETE CASCADE, categories jsonb, policyVersion, grantedAt, withdrawnAt nullable, expiresAt, ipAddress, userAgent`. Chaque call `record()` = nouveau row — le plus récent gagne. Conformité trail intact même après retrait (les rows de grant précédents restent). Migration `0009_elite_jack_power.sql`.
+- [x] **2 indexes** : `(subjectId, expiresAt DESC)` pour les lookups guest (avant login) et `(userId, expiresAt DESC)` pour les lookups post-réconciliation.
+- [x] **`subjectId` device-scoped** — UUID généré serveur, stocké dans le cookie `cc_sid` httpOnly. Découple le consentement du compte (un guest peut consentir avant de créer un compte). La réconciliation au login lie le subjectId à l'userId.
+
+### Backend module `apps/api/src/modules/consents/` — compliance infra, pas DDD
+
+- [x] **`IConsentStore`** port (module-private) : `insert`, `findActiveBySubject`, `findActiveByUser`, `linkSubjectToUser`. `DrizzleConsentStore` entièrement §8-instrumenté (outer span method, inner span query.execute, catch+capture).
+- [x] **`ConsentService`** : `record(subjectId, userId?, categories, policyVersion, ip?, ua?)` (append-only, chaque save = nouveau row) · `withdraw(subjectId, userId?, categories?)` · `getActive(subjectId, userId?)` avec **fallback** subjectId quand un user connecté n'a pas encore de record (ex. login après guest-consent) · `reconcile(subjectId, userId)` (UPDATE `user_id` WHERE `subject_id = cookie AND user_id IS NULL`).
+- [x] **Routes publiques `/consents`** (`optionalAuth` — fonctionne pour guests ET utilisateurs connectés) : `POST /` (record, génère le cookie `cc_sid` serveur via `resolveClientIp`), `GET /` (état courant), `DELETE /` (withdraw). Cookie `cc_sid` : `httpOnly: true`, `secure: isProd`, `sameSite: isProd ? "none" : "lax"`, `path: "/"`. **Pas de prefix `__Host-`** — le déploiement cross-origin (SPA + API sur des origines distinctes Railway) rend `__Host-` inutilisable (`Domain` refusé + secure required, mais `sameSite: none` pour cross-origin).
+- [x] **CSRF Origin sur `/consents`** — monté dans `index.ts` comme tous les prefixes de mutation.
+- [x] **Rate-limit `CONSENT_POST_POLICY` sur POST/DELETE uniquement** — un GET rate-limité saturait la fenêtre et bloquait l'affichage du banner (bug découvert en test : après plusieurs reloads, le GET `/consents` retournait 429 et la bannière flashait en boucle). GET est exempt.
+- [x] **Sweep guests expirés** (`apps/api/src/shared/internal-routes/sweep-consents.route.ts`, gate `internalLayers` HMAC) : purge `user_id IS NULL AND expires_at < now() - INTERVAL X days` (env `CONSENT_RETENTION_DAYS=365`, guests orphelins uniquement). Ajouté au runner `cron/sweep.ts` — appelé après les autres sweeps pour respecter les FK.
+- [x] **Wiring** : `container.ts` `.addModule(consentModule)`, `index.ts` route `/consents` + sweep + rate-limit conditionnel POST/DELETE + CSRF.
+
+### Réconciliation au login — `hooks.after` + `ctx.context.newSession`
+
+Décision clé de l'architecture : la réconciliation guest→user se fait **entièrement côté serveur**, sans round-trip client, via le hook BetterAuth `hooks.after`.
+
+- [x] Dans `auth.ts`, `hooks.after` (`createAuthMiddleware`) : si `ctx.context.newSession` est non-null (= un login vient d'avoir lieu — signal couvre **TOUS** les flux : password/passkey/magic-link/2FA/email-verify/OAuth futur sans changement de code), lit `cc_sid` depuis les headers (`readCookieFromHeaders(ctx.headers, CONSENT_COOKIE_NAME)`), appelle `di.ConsentService.reconcile(subjectId, userId)` → `UPDATE consent_record SET user_id = ? WHERE subject_id = ? AND user_id IS NULL`.
+
+**Pourquoi `hooks.after` + `ctx.context.newSession` et PAS `databaseHooks.session.create`** :
+1. `databaseHooks.session.create.after` n'a **pas** accès aux cookies de la requête HTTP — confirmé par la source BetterAuth (le hook reçoit le model `session` et la `ctx.session`, pas les `Request` headers). Lire le cookie `cc_sid` y est impossible.
+2. `hooks.after` + `createAuthMiddleware` donne accès aux `ctx.headers` (la requête HTTP complète). `ctx.context.newSession` est le signal canonique "un login vient d'avoir lieu sur cette requête, tous flux confondus" — BetterAuth le positionne exactement pour ce pattern.
+3. Un seul point d'entrée = pas de drift si BetterAuth ajoute un nouveau flux d'authentification (OAuth, SSO SAML) : `newSession` sera positionné pour ces flux aussi.
+
+**Règle générale extraite** : pour exécuter du code à chaque login (tous flux confondus) avec accès aux cookies de requête, utiliser `hooks.after` + `createAuthMiddleware` + vérifier `ctx.context.newSession`. `databaseHooks.session.create` est TX-bound mais n'a pas les headers.
+
+### Frontend `apps/app/src/shared/`
+
+- [x] **`api/queries/consent.ts`** — `consentQueryOptions` (état serveur initial pour éviter le flash-of-banner à l'hydratation).
+- [x] **`api/mutations/record-consent.ts`** + **`withdraw-consent.ts`** — factories `mutationOptions`.
+- [x] **`hooks/use-consent.ts`** — `useConsent(category: ConsentCategory): boolean`. Hook impératif : lecture de l'état consenti pour un usage conditionnel dans du code impératif.
+- [x] **`components/cookie-banner.tsx`** (`<CookieBanner>`) — symétrie CNIL Reject/Accept (même prominence, même niveau, même taille — exigence renforcée après sanctions CNIL 2025 : Google 325M€, Shein 150M€), `necessary` non-toggleable (always on), auto-monté dans `app-providers.tsx`, caché si consentement courant, expansion inline pour `<ConsentSettings>`.
+- [x] **`components/consent-settings.tsx`** (`<ConsentSettings>`) — toggles reflètent l'**état réellement consenti** (pas de pré-réglage GPC qui écraserait le choix user).
+- [x] **`components/consent-gate.tsx`** (`<ConsentGate category>`) — **primitif d'application déclaratif** : rend ses enfants seulement si la catégorie est consentie (au-dessus de `useConsent`). Pattern recommandé pour gater du JSX.
+- [x] **`components/analytics-scripts.tsx`** (`<AnalyticsScripts>`) — **exemple d'usage** : charge le script `VITE_ANALYTICS_SRC` (env optionnel, ex. Umami/Plausible) seulement si `analytics` consenti via `<ConsentGate>`, cleanup React au retrait. Monté dans `app-providers.tsx`. Le boilerplate ne trace rien par défaut (env vide) — le cloner met son URL d'analytics dans `VITE_ANALYTICS_SRC`.
+- [x] **`components/legal-footer.tsx`** (`<LegalFooter>`) — footer avec liens vers toutes les pages légales, monté dans `AppShell` (users connectés). Source `shared/legal-routes.ts` (`LEGAL_ROUTES`) extrait de `command-palette.tsx` (DRY — les deux consomment la même const).
+- [x] **Page `/legal/cookies`** (`features/legal/cookies.{route,page}.tsx` + `cookies.config.ts`) — inventaire cookies par catégorie (CNIL obligation de transparence), route publique sous `rootRoute`.
+- [x] **`shared/env.ts`** : `VITE_ANALYTICS_SRC: z.string().url().optional()` ajouté.
+- [x] **Toast 429 global consolidé** (`observability/query-error-handler.ts`) — `notifyIfRateLimited` centralise le toast 429 (message + durée formatée depuis `Retry-After`) pour **toutes** les queries ET mutations, dédup par `id`. `toastError` cède le 429 au global. L'ancien `rate-limit-toast.ts` (countdown seconde-par-seconde) est **supprimé** — inadapté aux durées `CONSENT_REFUSAL_TTL_DAYS` (heures/jours, pas secondes). Cette consolidation est un sous-livrable A.4 (le consent POST est la première route avec une durée de several hours).
+
+### Events `user.cookie_consent.{granted,withdrawn}` — compteur 40 → 42
+
+- [x] Déclarés dans `packages/events/src/event-types.ts` : `USER_COOKIE_CONSENT_GRANTED = "user.cookie_consent.granted"` + `USER_COOKIE_CONSENT_WITHDRAWN = "user.cookie_consent.withdrawn"`.
+- [x] Payloads Zod : `{ subjectId: string, userId: z.string().optional(), categories: z.array(ConsentCategorySchema), policyVersion: z.string(), ipAddress: z.string().optional(), userAgent: z.string().optional() }`. `userId` optionnel (guests). `actorUserId` non déclaré séparément (userId = acteur self-actor quand connecté ; guest sans userId = acteur implicite via subjectId, `AuditEventSubscriber` positionne `actorType = "system"` — exception documentée, le seul identificateur disponible est `subjectId`).
+- [x] Retention `compliance` dans `RETENTION_MAP` — trace durable 7 ans.
+- [x] Émis depuis `ConsentService.record` et `ConsentService.withdraw` via `emitEvent(outbox, ...)` dans `uow.run` TX.
+
+### Décisions SOTA (recherche 2026 vérifiée)
+
+1. **Device-scoped vs user-scoped** — l'architecture originale (ROADMAP) prévoyait `userId NOT NULL` sur `consent_record`. Changé en `subjectId NOT NULL, userId nullable` pour deux raisons : (a) un guest doit pouvoir consentir avant de créer un compte (checkout-flow, marketing site futur) — sans subjectId, le consentement est perdu au login ; (b) RGPD Art.7§1 requiert "démontrer que la personne a consenti" — la preuve est le record horodaté, pas la session. La réconciliation au login lie le guest au compte sans perdre l'historique.
+2. **Réconciliation via `hooks.after`+`newSession`, pas `databaseHooks`** — voir section dédiée ci-dessus. La contrainte technique (pas d'accès aux cookies dans `databaseHooks`) a forcé ce choix ; la solution est plus solide (couvre tous les flux en un point).
+3. **Rate-limit GET exclu** — le GET `/consents` est appelé à chaque rendu initial (consentQueryOptions en prefetch). Un rate-limit sur GET saturait la fenêtre en quelques reloads normaux et bloquait l'affichage du banner (bug reproduit en test manuel). POST et DELETE sont les seules opérations write → seules à limiter.
+4. **Append-only, pas d'idempotence sur record** — chaque `POST /consents` crée un nouveau row même si les catégories n'ont pas changé (ex. user clique "Accept all" deux fois). Rationale : la trace complète des changements de consentement est une exigence de compliance (l'auditeur veut voir "l'user avait accepté marketing le 3 juillet, puis l'a retiré le 5") ; une upsert détruirait cet historique. Le "plus récent gagne" est géré par les indexes `expiresAt DESC`.
+5. **GPC requalifié hors scope EU** — après SOTA review 2026 : le Groupe de Travail 29 n'a jamais adopté une position contraignante sur GPC ; l'EDPB ne l'a pas reconnu comme signal de retrait valide au sens RGPD ; seule la CCPA (California) lui donne force légale. Le modèle opt-in du boilerplate (rien tracké sans consentement explicite) satisfait intrinsèquement la conformité RGPD, ce qui rend le header-checking redondant en EU.
+6. **DNT mort** — le W3C a officiellement abandonné la spécification DNT en 2024. Tous les navigateurs majeurs ont retiré l'option de leurs UI. Ignorer `DNT: 1` est la posture correcte en 2026.
+7. **Google Consent Mode v2 hors scope** — aucun produit Google dans le stack (analytics self-hosted via Umami/Plausible). IAB TCF v2.2 pareillement (heavy, vendor-specific, B2B SaaS ne fait pas de programmatic advertising).
+8. **`<AnalyticsScripts>` comme exemple, pas comme primitif figé** — le composant montre le pattern (gater via `<ConsentGate>`, cleanup au unmount) ; le cloner le remplace ou le réutilise. Aucune dépendance runtime sur un outil spécifique — `VITE_ANALYTICS_SRC` vide = composant no-op.
+9. **Toast 429 consolidé** — le sous-livrable "toast 429 global" était initialement dans le scope A.4 parce que `CONSENT_REFUSAL_TTL_DAYS=180` produirait des `Retry-After` de plusieurs heures, que l'ancien countdown seconde-par-seconde (`rate-limit-toast.ts`) ne gérait pas. La consolidation via `notifyIfRateLimited` bénéficie à TOUTES les routes rate-limitées (pas seulement `/consents`), donc c'est une amélioration globale déclenchée par A.4.
+
+### As-built deviations
+
+1. **Routes `/consents` (public) vs `/me/consents` (auth required)** — le spec original prévoyait `POST /me/consents` (requireAuth). Changé en `/consents` + `optionalAuth` pour que les guests puissent enregistrer leur consentement sans compte. Découle directement de la décision device-scoped.
+2. **`@packages/cookie-consent` vs `config.ts` inline** — le spec original mettait la config dans `modules/consents/config.ts`. Promu en package séparé (source-only, miroir `@packages/policies`) pour que le front puisse importer `CONSENT_CATEGORIES` et `COOKIE_CONSENT_VERSION` sans circular deps. Même raisonnement que `@packages/policies`.
+3. **Composants dans `shared/components/` vs `@packages/ui`** — le spec prévoyait de mettre `<CookieBanner>` dans `@packages/ui` pour réutilisabilité (app + futur marketing site). Laissé dans `shared/components/` pour l'instant : le marketing site (Phase E.2) n'existe pas encore, et promouvoir vers `@packages/ui` sans consommateur concret est le OpenUp anti-pattern. Promouvoir sur 2ème consommateur (règle 14).
+4. **`<LegalFooter>` extrait depuis command-palette** — le ROADMAP prévoyait un footer avec liens légaux. Implémenté via `<LegalFooter>` monté dans `AppShell`, avec `LEGAL_ROUTES` extrait de `command-palette.tsx` (DRY — la palette et le footer sourcent la même liste). Le footer légal est visible pour tous les users connectés (AppShell), et les pages légales sont accessibles via ⌘K pour les non-connectés.
+5. **`onEvent` umami-disable déféré** — la tâche "un `onEvent(...)` handler fires client-side umami.disable()" n'a pas été implémentée. La raison : `<AnalyticsScripts>` unmount via React quand `useConsent("analytics")` devient `false` — ce qui couvre le cas Umami/Plausible (le script se supprime du DOM). Un `onEvent` backend dédié serait de la plomberie pour le même résultat dans un contexte où l'analytics est self-hosted sans SDK JS "disable". Déféré jusqu'au premier consommateur avec un SDK qui expose explicitement `.disable()`.
 5. **`docs/legal/README.md` as the cloner's decision guide.** The fintech-vs-B2B table and placeholder checklist are the highest-value item in A.3 for cloners: they prevent "which template do I send?" ambiguity at first EU enterprise signature and surface the production-readiness gaps (`accessibility@`, `dpo@`, national authority) that are easy to overlook.

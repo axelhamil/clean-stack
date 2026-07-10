@@ -24,6 +24,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase C.1 — Security perimeter (S1–S5a)** | **Jun–Jul 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + abuse quick-wins (per-account credential-stuffing, disposable-email, HIBP telemetry) + 5 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5b advanced abuse signals → S6 captcha (S4.1 store resilience + S5a shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.3 — Compliance docs bundle** | **Jul 2026** | `/legal/sub-processors` (Art. 28 sub-processor disclosure — 3 active: Resend, R2, OAuth; 3 planned: Stripe, GrowthBook, Umami) + `/legal/accessibility` (EAA Art. 14, WCAG 2.1 AA / EN 301 549 v3.2.1 declaration + complaint alias) + `docs/legal/` DPA template (12 Art. 28 clauses) + DORA annex template (11 Art. 30 provisions) + README index + fintech-vs-B2B decision table. Linked via command-palette + `data-rights` cross-links (no global footer yet). Clone-ability fix: `VITE_SENTRY_DSN` empty-string coercion in `apps/app/src/shared/env.ts`. 0 domain events (static pages). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.4 — Cookie consent + Consent management** | **Jul 2026** | Dual-layer device-scoped (preuve RGPD Art.7§1 = stockage serveur horodaté) : `@packages/cookie-consent` SSOT + append-only `consent_record` (`subjectId NOT NULL`, `userId` nullable, 2 indexes) + `ConsentService` (record append-only, fallback subjectId, reconcile) + routes publiques `/consents` (`optionalAuth`, `cc_sid` httpOnly, CSRF, rate-limit POST/DELETE uniquement) + sweep guests expirés + `<CookieBanner>` (symétrie CNIL Reject/Accept) + `<ConsentSettings>` + `<ConsentGate category>` + `<AnalyticsScripts>` (`VITE_ANALYTICS_SRC`) + `<LegalFooter>` (AppShell) + `/legal/cookies` + toast 429 global consolidé. Réconciliation au login via `hooks.after`+`ctx.context.newSession` (PAS `databaseHooks`). GPC/DNT requalifiés hors scope EU. 2 events (`user.cookie_consent.{granted,withdrawn}`, retention `compliance`) → **42 events**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -42,12 +43,13 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 - **A.1** Right to rectification (Art. 16) + NIST 800-63B-4 password ✅ COMPLETE (Jun 2026) — `ProfileCard` + `ChangePasswordCard` + HIBP k-anonymity + min 15 + ban-list. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.2** Privacy policy / Terms versioning (Art. 7) ✅ COMPLETE (Jun 2026) — `@packages/policies` SSOT + `policy_acceptance` + `/legal/accept` gate + `requireCurrentPolicies` + `user.policy.accepted`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.3** Compliance docs bundle ✅ COMPLETE (Jul 2026) — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA template + DORA annex + `docs/legal/README.md`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+- **A.4** Cookie consent + Consent management ✅ COMPLETE (Jul 2026) — dual-layer device-scoped, `@packages/cookie-consent` + `consent_record` + `ConsentService` + routes `/consents` + `<CookieBanner>` + `<ConsentGate>` + `<AnalyticsScripts>` + `<LegalFooter>` + `/legal/cookies` + 2 events → 42 total. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
 ### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
 
 - **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience + S5a abuse quick-wins shipped** (Jun–Jul 2026 — see ✅ table; S5b advanced signals + S6 captcha remain). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
 - **A.3** Compliance docs bundle ✅ **shipped** (Jul 2026 — see ✅ table; 2 public pages + DPA/DORA templates landed. RSS change history + re-acceptance trigger on sub-processor changes deferred as next-step; accessibility auto-update tied to A.6). As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
-- **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
+- **A.4** Cookie consent + Consent management ✅ **shipped** (Jul 2026 — dual-layer device-scoped, `<ConsentGate category>` + `<AnalyticsScripts>` + `<LegalFooter>`, réconciliation login via `hooks.after`+`newSession`, 2 events → **42 total**. GPC/DNT requalifiés hors scope EU. As-built dans [`docs/HISTORY.md`](docs/HISTORY.md).)
 
 ### M2 — Revenue (the #1 reason to clone a SaaS starter)
 
@@ -127,14 +129,16 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Why this is infra, not DDD**: consent *looks* domain-ish, but every rule collapses under the decisive test — `isActive = withdrawnAt == null && expiresAt > now && policyVersion == current` is a WHERE clause; category scope = `categories.includes(cat)`; validity / refusal-cooldown = date comparisons; version-invalidation = the same `version ===` as A.2. No invariant needs an `Aggregate` to defend it. So A.4 is the **same class as A.2**: append-only `consent_record` + a `ConsentService` + a typed category config + GPC/DNT middleware. The boilerplate ships **zero aggregates** — `@packages/ddd-kit`'s `Aggregate` / `ValueObject` / `DomainEvent` stay dormant (not dead: it's a published-lib surface; `Result` / `Option` / `UUID` are used everywhere) until the cloner writes their real product domain. Building an aggregate here just to exercise the kit is backwards — the OpenUp anti-pattern (ratio test/code > 3× = over-engineering).
 
-**Decided constraints** (CNIL 2024+ guidelines, EDPB 2024 binding decisions):
+> **Status — shipped (Jul 2026).** Dual-layer device-scoped (preuve RGPD Art.7§1 = stockage serveur horodaté). 2 events `user.cookie_consent.{granted,withdrawn}` (retention `compliance`) → **compteur 42**. As-built + toutes les décisions dans [`docs/HISTORY.md`](docs/HISTORY.md). **Déviations SOTA vs spec originale** : architecture device-scoped (`subjectId` cookie, `userId` nullable) vs user-centric ; routes `/consents` publiques (`optionalAuth`) vs `/me/consents` (`requireAuth`) ; composants dans `shared/components/` vs `@packages/ui` ; GPC/DNT requalifiés hors scope EU (voir contraintes ci-dessous). **Déféré** : DB hook invalidation `policy_version` (tâche 3), re-prompt cooldown 6 mois comme mécanique séparée (tâche 7, TTL 180j livré via `CONSENT_REFUSAL_TTL_DAYS`), `onEvent` client-side disable (tâche 10, couvert par unmount React via `<AnalyticsScripts>`).
+
+**Decided constraints** (recommandation CNIL consolidée janvier 2026, EDPB 2024 binding decisions):
 - Reject-all button **same visual prominence** as accept-all (same size, same level, same color contrast). Single click reject.
 - Granular categories: `necessary` (always on, no toggle), `functional`, `analytics`, `marketing`. Each toggleable, default OFF except `necessary`.
-- Respect `Sec-GPC: 1` (Global Privacy Control) and `DNT: 1` headers — auto-decline analytics/marketing if either present.
-- Re-prompt cadence: 6 months minimum after refusal (don't pester), 13 months max validity for granted consent (Art. 5 + EDPB).
-- Withdrawal as easy as granting — `<ConsentSettings />` accessible from footer + `/settings/privacy`, single-click withdraw.
-- Server-side authoritative — banner-side `localStorage` is UX cache, the `consent_record` table is source of truth.
-- Versioned per policy — when privacy policy version bumps, all granted consents are invalidated and user re-prompted.
+- **GPC/DNT** — requalifiés hors scope EU : `Sec-GPC: 1` = signal CCPA/California uniquement (EDPB non contraignant) ; `DNT: 1` = header mort, ignoré. Conformité RGPD assurée par le modèle opt-in (rien tracké sans consentement explicite). Google Consent Mode v2 = hors scope (pas de produit Google dans le stack).
+- TTL configurables : `CONSENT_GRANT_TTL_DAYS=180` (durée de validité du consentement accordé) + `CONSENT_REFUSAL_TTL_DAYS=180` (durée de mémorisation du refus, évite le re-prompt immédiat). Durées non figées par la CNIL.
+- Withdrawal as easy as granting — `<ConsentSettings />` accessible depuis `<LegalFooter>` (AppShell) + `/settings/privacy` (A.5), single-click withdraw.
+- **Dual-layer authoritative** — `cc_sid` httpOnly cookie = lien device→serveur, `consent_record` table = source de vérité horodatée. La réconciliation guest→user se fait au login côté serveur (hook `hooks.after`+`ctx.context.newSession`), sans round-trip client.
+- `COOKIE_CONSENT_VERSION` (date-string) — version SSOT dans `@packages/cookie-consent` ; bump → re-prompt.
 
 **Architecture** — infra module, mirror of `modules/policies/` (no domain layer):
 
@@ -168,18 +172,18 @@ modules/consents/
 
 **Tasks**:
 
-- [ ] Drizzle schema `consent_record` + migration. Index on `(userId, expiresAt DESC)`.
-- [ ] `modules/consents/` skeleton (`ConsentService` + store port + drizzle store + category config + routes + module.ts) — infra, mirror of `modules/policies/`.
-- [ ] DB hook on `policy_version` change: invalidate all `consent_record` (set `expiresAt = NOW()`).
-- [ ] `recordConsent` writes ip + UA from request context (compliance evidence).
-- [ ] `<CookieBanner />` + `<ConsentSettings />` components in `@packages/ui` (reusable across app + future marketing site).
-- [ ] `useConsent(category)` hook in `apps/app/src/shared/hooks/`.
-- [ ] Auto-decline on `Sec-GPC: 1` / `DNT: 1` — Hono middleware reads header, frontend reads `navigator.globalPrivacyControl`.
-- [ ] Re-prompt timing: refuse → 6-month cooldown stored in `consent_record.expiresAt` (custom shorter window for refusal vs grant).
-- [ ] Withdraw all UX: footer link `Cookie settings` + `/settings/privacy` toggle. Withdrawal is single-click, no confirm dialog (CNIL).
-- [ ] On `consent.withdrawn(analytics)`, an `onEvent(...)` handler fires client-side `umami.disable()` (or analog) — no late-arriving events.
-- [ ] Audit: declare `consent.{granted,withdrawn}` in `@packages/events` (compliance retention, actor = `userId`) — auto-audited via `AuditEventSubscriber`, no manual `recordAudit` call (rule §6/§7).
-- [ ] Public `/legal/cookies` page enumerating all categories with their concrete cookie names + purposes + retention (CNIL transparency obligation, copy from a config).
+- [x] Drizzle schema `consent_record` + migration `0009_elite_jack_power.sql`. 2 indexes : `(subjectId, expiresAt DESC)` + `(userId, expiresAt DESC)`. `subjectId NOT NULL`, `userId` nullable FK `ON DELETE CASCADE`.
+- [x] `modules/consents/` skeleton (`ConsentService` + `IConsentStore` port + `DrizzleConsentStore` + `@packages/cookie-consent` config + routes + module.ts) — infra, mirror de `modules/policies/`.
+- [ ] DB hook on `policy_version` change: invalidate all `consent_record` (set `expiresAt = NOW()`). **(déféré — `COOKIE_CONSENT_VERSION` date-based SSOT utilisé à la place)**
+- [x] `recordConsent` writes ip + UA from request context (compliance evidence). IP via `resolveClientIp`.
+- [x] `<CookieBanner />` + `<ConsentSettings />` components dans `apps/app/src/shared/components/` (symétrie CNIL Reject/Accept, `necessary` non-toggleable, auto-monté dans `app-providers.tsx`). **Déviation** : dans `shared/components/`, pas dans `@packages/ui` (scope app uniquement à ce stade).
+- [x] `useConsent(category)` hook dans `apps/app/src/shared/hooks/use-consent.ts`.
+- [ ] Auto-decline on `Sec-GPC: 1` / `DNT: 1`. **Requalifié hors scope EU** — GPC = CCPA/US uniquement, DNT = mort. Le modèle opt-in couvre la conformité RGPD sans header-checking.
+- [ ] Re-prompt timing: refuse → 6-month cooldown stored in `consent_record.expiresAt`. **(partiellement livré : `CONSENT_REFUSAL_TTL_DAYS=180` par défaut ; la mécanique de re-prompt UX dédiée est déférée)**
+- [x] Withdraw all UX: `<LegalFooter>` (monté dans `AppShell`) + `<ConsentSettings>` (accessible partout, `/settings/privacy` via A.5). Single-click withdraw.
+- [ ] On `consent.withdrawn(analytics)`, an `onEvent(...)` handler fires client-side `umami.disable()`. **(déféré : `<AnalyticsScripts>` unmount React via `useConsent("analytics")` couvre le cas Umami/Plausible self-hosted)**
+- [x] Audit: `user.cookie_consent.{granted,withdrawn}` déclarés dans `@packages/events` (retention `compliance`, payload `subjectId`+`userId?`+`categories`+`policyVersion`) — auto-audité via `AuditEventSubscriber` (règles §6/§7).
+- [x] Public `/legal/cookies` page — inventaire cookies par catégorie, from `cookies.config.ts`. Route publique sous `rootRoute`.
 
 **Out of scope (rule 14 — promote on second occurrence)**:
 
@@ -322,7 +326,7 @@ modules/consents/
 
 - [ ] `/settings/webhooks` UI — list + create + edit + delete + view deliveries + replay. API ready.
 - [ ] `webhook.test` event type — sent on endpoint creation, surfaces immediate "is the URL reachable" feedback in the UI.
-- [ ] Public `<EventTypesTable />` page enumerating every event the SaaS emits — read from `packages/events/src/event-types.ts` (35 events catalogued).
+- [ ] Public `<EventTypesTable />` page enumerating every event the SaaS emits — read from `packages/events/src/event-types.ts` (42 events catalogued).
 
 **Deferred**: Webhook proxy (Svix-style) — host-it-yourself first, evaluate Svix past 10k deliveries/day.
 

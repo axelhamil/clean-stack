@@ -34,6 +34,8 @@ export const EventTypes = {
   WEBHOOK_ENDPOINT_UPDATED: "webhook.endpoint.updated",
   WEBHOOK_ENDPOINT_DELETED: "webhook.endpoint.deleted",
   USER_POLICY_ACCEPTED: "user.policy.accepted",
+  USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
+  USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
   SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
   SECURITY_CSP_VIOLATION: "security.csp.violation",
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",

@@ -10,6 +10,7 @@ import { ThemeToggle } from "../../shared/components/theme-toggle";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
 import { CommandPalette } from "./command-palette";
 import { ContextualTabs } from "./contextual-tabs";
+import { LegalFooter } from "./legal-footer";
 import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -41,7 +42,7 @@ export function AppShell({ user, children }: AppShellProps) {
   };
 
   return (
-    <>
+    <div className="flex min-h-dvh flex-col">
       <header className="glass-header sticky top-0 z-30 border-b">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
           <BrandLink asChild>
@@ -103,10 +104,12 @@ export function AppShell({ user, children }: AppShellProps) {
         )}
       </header>
 
-      {children}
+      <div className="flex-1">{children}</div>
+
+      <LegalFooter />
 
       <CommandPalette />
       <AuthorizationDevTool />
-    </>
+    </div>
   );
 }

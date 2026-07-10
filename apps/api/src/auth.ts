@@ -2,6 +2,7 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
+import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -138,6 +139,16 @@ async function emit<TPayload>(
  */
 function clientIpFromHeaders(headers?: Headers): string | null {
   return headers?.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 45) ?? null;
+}
+
+function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
+  const raw = headers?.get("cookie");
+  if (!raw) return undefined;
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq !== -1 && part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return undefined;
 }
 
 /**
@@ -541,6 +552,21 @@ const authOptions = {
     }),
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.context.returned instanceof APIError) return;
+
+      const newUserId = ctx.context.newSession?.user?.id;
+      if (newUserId) {
+        const ccSid = readCookieFromHeaders(ctx.headers, CONSENT_COOKIE_NAME);
+        if (ccSid) {
+          const linked = await di.ConsentService.reconcile(ccSid, newUserId);
+          if (linked.isFailure) {
+            logger.warn(
+              { err: linked.getError(), userId: newUserId },
+              "cookie consent reconcile failed at login",
+            );
+          }
+        }
+      }
+
       const path = ctx.path;
       const userId = ctx.context.session?.user.id;
       if (!userId) return;
