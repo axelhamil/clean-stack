@@ -62,6 +62,46 @@ describe("DrizzleQuotaUsageStore.increment", () => {
   });
 });
 
+// Fake update chain: update(...).set(...).where(...) → { toSQL, execute }
+function fakeResetChain() {
+  const q = {
+    toSQL: () => ({ sql: "update quota_usage set used = 0 where ..." }),
+    execute: () => Promise.resolve([]),
+  };
+  const withWhere = { where: () => q };
+  const withSet = { set: () => withWhere };
+  return { update: () => withSet };
+}
+
+function failingResetChain(err: Error) {
+  const q = {
+    toSQL: () => ({ sql: "update quota_usage set used = 0 where ..." }),
+    execute: () => Promise.reject(err),
+  };
+  const withWhere = { where: () => q };
+  const withSet = { set: () => withWhere };
+  return { update: () => withSet };
+}
+
+describe("DrizzleQuotaUsageStore.reset", () => {
+  it("returns Result.ok on success", async () => {
+    const fakeTx = fakeResetChain() as never;
+    const store = new DrizzleQuotaUsageStore(new NoOpInstrumentation());
+    const res = await store.reset("org1", "uploads", period, fakeTx);
+    expect(res.isSuccess).toBe(true);
+  });
+
+  it("captures + fails closed on a store error", async () => {
+    const capture = mock(() => undefined);
+    const instrumentation = Object.assign(new NoOpInstrumentation(), { capture });
+    const fakeTx = failingResetChain(new Error("db down")) as never;
+    const store = new DrizzleQuotaUsageStore(instrumentation);
+    const res = await store.reset("org1", "uploads", period, fakeTx);
+    expect(res.isFailure).toBe(true);
+    expect(capture).toHaveBeenCalled();
+  });
+});
+
 describe("DrizzleQuotaUsageStore.current", () => {
   it("returns 0 when no row exists (Result.ok)", async () => {
     const q = fakeQuery([]);

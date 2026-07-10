@@ -19,7 +19,7 @@ const FREE_DATA: EntitlementsData = {
   rank: 0,
   features: [],
   maxMembers: 3,
-  quotas: { uploads: 10, projects: 3, apiCallsPerMonth: 1_000 },
+  quotas: {},
 };
 
 export function buildEntitlementsView(data: EntitlementsData | undefined) {

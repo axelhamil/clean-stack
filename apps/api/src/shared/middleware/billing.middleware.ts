@@ -14,6 +14,7 @@ import {
   type Tier,
 } from "../../modules/billing/config";
 import { emitEvent } from "../event-emitter";
+import { logger } from "../logger";
 
 function paymentRequired(message: string): never {
   throw new AppErrorException({ code: "BILLING_PAYMENT_REQUIRED", message });
@@ -82,7 +83,12 @@ export const requireQuota = (key: QuotaKey, readUsage: (c: Context) => Promise<n
     const limit = view.quotas[key];
     const used = await readUsage(c);
     if (limit !== null && used >= limit) {
-      await emitQuotaExceeded(orgId, c.get("user").id, key, limit, used, view.tier);
+      try {
+        await emitQuotaExceeded(orgId, c.get("user").id, key, limit, used, view.tier);
+      } catch (err) {
+        // telemetry must never break enforcement — the event is operational, not compliance
+        logger.warn({ err }, "billing: quota exceeded event emit failed — still enforcing 429");
+      }
       quotaExceeded(`Quota exceeded for ${key} (${used}/${limit}).`);
     }
     await next();

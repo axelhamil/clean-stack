@@ -1,11 +1,31 @@
 import { describe, expect, it, mock } from "bun:test";
 import { AppErrorException } from "@packages/ddd-kit";
-import { reserveQuota } from "../db/quota-reservation";
+import { countScopedRows, reserveQuota } from "../db/quota-reservation";
 import type { ITransaction } from "../transaction";
 
 function fakeTx() {
   return { execute: mock(async () => undefined) } as unknown as ITransaction;
 }
+
+function fakeCountTx(rows: { n: number }[]) {
+  return {
+    select: () => ({ from: () => ({ where: () => Promise.resolve(rows) }) }),
+  } as unknown as ITransaction;
+}
+
+describe("countScopedRows", () => {
+  it("returns the count from the row", async () => {
+    const tx = fakeCountTx([{ n: 5 }]);
+    const result = await countScopedRows(tx, null as never, null as never, "org1");
+    expect(result).toBe(5);
+  });
+
+  it("returns 0 via the ?? guard when no rows are returned", async () => {
+    const tx = fakeCountTx([]);
+    const result = await countScopedRows(tx, null as never, null as never, "org1");
+    expect(result).toBe(0);
+  });
+});
 
 describe("reserveQuota", () => {
   it("skips the lock and count when the limit is unlimited (null)", async () => {
