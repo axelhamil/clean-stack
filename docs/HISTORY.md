@@ -755,14 +755,14 @@ Four issues caught before merge — all fixed:
 **Two-layer design (anti-TOCTOU)**:
 
 - **Pre-check (`requireQuota` middleware)** — UX-layer, runs before the write, returns `429 BILLING_QUOTA_EXCEEDED` early so the client never does work it can't commit. Optional; mounted per route. Uses `countScopedRows` (a `COUNT(*)` over the source table) or the `quota_usage` denormalized counter.
-- **Authoritative reserve (`reserveQuota`)** — inside `uow.run()`, acquires a Postgres advisory lock (`pg_try_advisory_xact_lock(orgId hash, quotaKey hash)`) then recomputes the count and compares against the limit *within the same TX as the insert*. No TOCTOU: the count and the write are atomic. Fails with `BILLING_QUOTA_EXCEEDED` if the ceiling is hit. Lock is advisory-only: a concurrent writer without the lock can still insert (enforcement is opt-in per resource, matching the dormant-skeleton philosophy).
+- **Authoritative reserve (`reserveQuota`)** — inside `uow.run()`, acquires a Postgres advisory lock (`pg_advisory_xact_lock(orgId hash, quotaKey hash)`) then recomputes the count and compares against the limit *within the same TX as the insert*. No TOCTOU: the count and the write are atomic. Fails with `BILLING_QUOTA_EXCEEDED` if the ceiling is hit. Lock is advisory-only: a concurrent writer without the lock can still insert (enforcement is opt-in per resource, matching the dormant-skeleton philosophy).
 
 **Two counting strategies**:
 
 - **Live `COUNT(*)` (default)** — `countScopedRows(tx, table, orgIdCol, orgId)`. The source table is the truth; zero drift. For uploads/projects/seats (low-to-medium volume).
 - **Denormalized `quota_usage` (high-volume)** — `IQuotaUsageStore.increment(orgId, resource, period, tx)` writes a counter row in the same TX as the business write, window-aligned on `currentPeriodFor(subscription)` (the Stripe billing period). Use when a `COUNT(*)` over millions of rows would be prohibitive. Bounded drift via period reset; a nightly reconciliation (`used = COUNT(*)`) is the belt-and-suspenders recommendation.
 
-**Atomic reserve decision** — advisory locks (`pg_try_advisory_xact_lock`) were chosen over `SELECT … FOR UPDATE` on the usage row because: (a) the `quota_usage` row may not exist yet (first use in a period), requiring an upsert + lock sequence that advisory locks short-circuit; (b) advisory locks are XACT-scoped (auto-release at TX end, no explicit unlock); (c) they add zero table contention on the resource table itself. The downside (two non-serializable writers in the same ms window theoretically racing) is accepted: the quota check is fail-open in that narrow window, and the consequence is a transient over-limit write that the pre-check already filtered.
+**Atomic reserve decision** — advisory locks (`pg_advisory_xact_lock`) were chosen over `SELECT … FOR UPDATE` on the usage row because: (a) the `quota_usage` row may not exist yet (first use in a period), requiring an upsert + lock sequence that advisory locks short-circuit; (b) advisory locks are XACT-scoped (auto-release at TX end, no explicit unlock); (c) they add zero table contention on the resource table itself. The downside (two non-serializable writers in the same ms window theoretically racing) is accepted: the quota check is fail-open in that narrow window, and the consequence is a transient over-limit write that the pre-check already filtered.
 
 **SOTA rejections (2026)**:
 
@@ -774,4 +774,4 @@ Four issues caught before merge — all fixed:
 
 **Dormant + knip**: the primitives are not called by any product code today. `knip.json` whitelists `apps/app/src/shared/auth/quota-gate.tsx` (front gate) and `apps/api/src/shared/db/quota-reservation.ts` (back atomic reserve) as explicit `entry` points — the boilerplate-primitive pattern, same as `feature-gate.tsx` and `plan-gate.tsx` from B.1. `modules/quotas/module.ts` is covered by the existing `src/modules/*/module.ts` glob.
 
-**Event**: `billing.quota.exceeded` (operational) — payload `{ organizationId, resource, limit, attempted, tier, actorUserId }`. Emitted from `requireQuota` (pre-check rejection) and `reserveQuota` (authoritative rejection). Catalog total: **47 events**.
+**Event**: `billing.quota.exceeded` (operational) — payload `{ organizationId, resource, limit, attempted, tier, actorUserId }`. Emitted only from `requireQuota` (the pre-check middleware). `reserveQuota` does NOT emit it — callers using `reserveQuota` inside `uow.run()` without the middleware must emit the event themselves if they want the telemetry. Catalog total: **47 events**.
