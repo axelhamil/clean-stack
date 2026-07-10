@@ -45,11 +45,12 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 - **A.3** Compliance docs bundle ✅ COMPLETE (Jul 2026) — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA template + DORA annex + `docs/legal/README.md`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.4** Cookie consent + Consent management ✅ COMPLETE (Jul 2026) — dual-layer device-scoped, `@packages/cookie-consent` + `consent_record` + `ConsentService` + routes `/consents` + `<CookieBanner>` + `<ConsentGate>` + `<AnalyticsScripts>` + `<LegalFooter>` + `/legal/cookies` + 2 events → 42 total. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
+### M1 — Deploy-safe & legal (a clone can't ship to the EU/US without these)
 
 - **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience + S5a abuse quick-wins shipped** (Jun–Jul 2026 — see ✅ table; S5b advanced signals + S6 captcha remain). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
 - **A.3** Compliance docs bundle ✅ **shipped** (Jul 2026 — see ✅ table; 2 public pages + DPA/DORA templates landed. RSS change history + re-acceptance trigger on sub-processor changes deferred as next-step; accessibility auto-update tied to A.6). As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.4** Cookie consent + Consent management ✅ **shipped** (Jul 2026 — dual-layer device-scoped, `<ConsentGate category>` + `<AnalyticsScripts>` + `<LegalFooter>`, réconciliation login via `hooks.after`+`newSession`, 2 events → **42 total**. GPC/DNT requalifiés hors scope EU. As-built dans [`docs/HISTORY.md`](docs/HISTORY.md).)
+- **A.7** US privacy — Global Privacy Control (GPC) `[ ]` — honor `Sec-GPC: 1` as a binding CCPA/state-law opt-out (mandatory in the US, unlike the EU where the EDPB stance made it non-binding — parked in A.4). Middleware + reuse A.4's `consent_record` / `ConsentService`; small surface. The one US-required mechanism A.4 doesn't cover → with it, legal coverage is EU **and** US. Full spec below.
 
 ### M2 — Revenue (the #1 reason to clone a SaaS starter)
 
@@ -187,8 +188,36 @@ modules/consents/
 
 **Out of scope (rule 14 — promote on second occurrence)**:
 
-- Per-region rules (US California vs EU vs UK vs Brazil LGPD). Ship the strictest (EDPB) and document override hooks. CCPA-specific UX bolts on later.
+- Per-region rules (US California vs EU vs UK vs Brazil LGPD). Ship the strictest (EDPB) and document override hooks. **GPC honoring promoted to A.7** (CCPA-binding opt-out signal); remaining CCPA-specific UX bolts on later.
 - IAB TCF v2.2 framework — heavy, vendor-specific. Skip until an ad-tech use case demands it (most B2B SaaS don't).
+
+---
+
+## US privacy — Global Privacy Control (GPC) — **Phase A.7**
+
+**Why** (M1 — US counterpart of A.4): the EU opt-in model already tracks nothing without explicit consent, so on substance a clone is *stricter* than US law demands. But CCPA/CPRA (California) and the 2024–2025 wave of state privacy laws (Colorado CPA, Connecticut CTDPA, Texas TDPSA, Oregon, Montana…) treat the `Sec-GPC: 1` browser header as a **legally binding opt-out signal** — honoring it is mandatory, not advisory (unlike the EDPB stance that made us park it in A.4). A boilerplate that ignores GPC hands every clone a CCPA violation the moment it has a Californian visitor. This is the one concrete US-required mechanism A.4 doesn't cover.
+
+**Why still infra, not DDD**: same class as A.4 — reading a request header and forcing a consent category to `false` is a middleware + a default, no aggregate. Reuses the entire A.4 `consent_record` + `ConsentService` machinery; GPC is just an *input* that pre-seeds a withdrawal.
+
+**Decided shape**:
+- **Server middleware** reads `Sec-GPC: 1` (and legacy `DNT: 1` as a courtesy alias — no legal weight, but cheap). On presence, `analytics` + `marketing` default to **declined** and any incoming grant for those categories is refused (opt-out overrides opt-in for GPC-signalled visitors).
+- **Persist the signal** on the `consent_record` row (`source: "gpc"`) — CCPA demands *demonstrability* that the opt-out was honored, mirroring A.2's Art. 7 evidence logic.
+- **Front reflects it**: `<CookieBanner>` shows a "Global Privacy Control detected — analytics/marketing off" state instead of the prompt; re-grant possible only by an explicit affirmative user action (GPC can be overridden by an opt-in choice, per CCPA).
+- **Scope flag** — env `PRIVACY_GPC_ENABLED` (default on). GPC is US-oriented; EU behaviour is unchanged (opt-in already covers it), so no regression for EU-only clones.
+- **"Do Not Sell/Share"** — stays near-moot: opt-in + zero data-sale means the mandatory CCPA link points at an already-empty opt-out. Document the override hook; bolt real UX on only if a clone actually sells data.
+
+**Tasks**:
+
+- [ ] Middleware `apps/api/src/shared/middleware/gpc.middleware.ts` — parse `Sec-GPC` / `DNT`, expose `c.var.gpcSignalled`, force-decline `analytics` + `marketing` for signalled requests. Composed before the `/consents` routes.
+- [ ] `ConsentService.record` refuses `analytics` / `marketing` grants when `gpcSignalled` (opt-out wins) + stamps the origin on `consent_record`.
+- [ ] Schema delta: `consent_record.source` enum (`user` | `gpc` | `reconcile`) — demonstrability evidence, append-only like the rest of the table.
+- [ ] Front: `<CookieBanner>` reads a server-passed `gpcSignalled` flag via `consentQueryOptions` → renders the "GPC detected, tracking off" state instead of the prompt; re-grant only via explicit toggle.
+- [ ] Reuse `user.cookie_consent.withdrawn` event with `source: "gpc"` in the payload — no new event type unless the audit trail needs to distinguish auto-GPC from user-withdrawal.
+- [ ] Doc: `/legal/cookies` + `/legal/data-rights` mention GPC support; README notes `PRIVACY_GPC_ENABLED`.
+
+**Out of scope**:
+- Full CCPA "Do Not Sell/Share" opt-out portal — moot under the opt-in + no-sale model; document the hook, build UX only when a clone sells data.
+- Per-state divergence (each state's exact cure period / notice wording) — GPC honoring is the shared mechanism; state-specific legal copy is a lawyer task, not code.
 
 ---
 
