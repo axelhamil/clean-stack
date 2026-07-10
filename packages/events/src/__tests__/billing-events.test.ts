@@ -24,8 +24,10 @@ describe("billing events", () => {
     expect(ok.success).toBe(true);
   });
 
-  it("maps retention: subscription→compliance, payment→operational", () => {
+  it("maps all billing events to compliance retention", () => {
     expect(RETENTION_MAP[EventTypes.BILLING_SUBSCRIPTION_CREATED]).toBe("compliance");
-    expect(RETENTION_MAP[EventTypes.BILLING_PAYMENT_FAILED]).toBe("operational");
+    expect(RETENTION_MAP[EventTypes.BILLING_SUBSCRIPTION_UPDATED]).toBe("compliance");
+    expect(RETENTION_MAP[EventTypes.BILLING_SUBSCRIPTION_CANCELLED]).toBe("compliance");
+    expect(RETENTION_MAP[EventTypes.BILLING_PAYMENT_FAILED]).toBe("compliance");
   });
 });

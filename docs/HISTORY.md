@@ -713,8 +713,7 @@ Décision clé de l'architecture : la réconciliation guest→user se fait **ent
   - Routes: `GET /billing/plans` (public, no auth), `GET /billing/subscription` (requireAuth), `POST /billing/checkout` (requireAuth), `POST /billing/portal` (requireAuth + `billing:manage`).
 - [x] **Frontend** (`apps/app/src/features/billing/`): public `/pricing` (plan list + bullets from `marketing_features`); `/settings/billing` (current plan, seat usage, Upgrade / Manage buttons); `useEntitlements()` hook; `<FeatureGate flag>` + `<PlanGate minTier>` declarative render gates.
 - [x] **4 new events** emitted from `@better-auth/stripe` callbacks in `auth.ts` via `emitEvent(outbox, ...)`:
-  - `billing.subscription.created` / `billing.subscription.updated` / `billing.subscription.cancelled` — `compliance` retention (RGPD financial-state changes).
-  - `billing.payment.failed` — `operational` retention (dunning observability, alerting).
+  - `billing.subscription.created` / `billing.subscription.updated` / `billing.subscription.cancelled` / `billing.payment.failed` — all `compliance` retention (billing/financial audit trail; the whole `billing.*` family shares one retention lifetime, no divergence).
   - Catalog total: **46 events**.
 - [x] **Env** — `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. No `STRIPE_PRICE_*` env vars: prices live in Stripe. `STRIPE_SECRET_KEY` unset → free-only degradation, no boot failure.
 - [x] **`RgpdService.executeAccountWipe`** — closes the "Stripe customer cleanup during wipe" deferred from Phase 1. Customer deletion is called in the wipe sequence; failure is captured and logged (non-fatal — account deletion must never be blocked by a Stripe API error).
@@ -731,7 +730,7 @@ Décision clé de l'architecture : la réconciliation guest→user se fait **ent
 
 5. **`402 BILLING_PAYMENT_REQUIRED` code suffix required in the response body**. A bare `HTTPException(402)` produces no `code` field in the error envelope — the client-side branch is unreliable. The suffix makes "upgrade required" distinct from hypothetical future `402 STRIPE_PAYMENT_FAILED` (direct purchase) at the protocol level (see review catch §2 below).
 
-6. **`billing.payment.failed` as `operational`, subscription lifecycle events as `compliance`**. Subscription state changes (created / updated / cancelled) document financial transitions that may be subject to RGPD Art. 30 processing records — `compliance` retention (7y). Payment failures are transient operational signals (dunning, Stripe retry) — `operational` retention (90d). Different purposes, different retention lifetimes.
+6. **Whole `billing.*` family = `compliance` retention (no divergence)**. Subscription state changes and payment failures are all part of the billing/financial audit trail (potentially subject to RGPD Art. 30 processing records / financial record-keeping) — `compliance` retention. `operational` was initially considered for `billing.payment.failed` (a transient dunning signal), but keeping the whole family on one retention lifetime avoids a split audit trail where a failed-payment record is purged before the subscription events that reference it.
 
 7. **Loose-typed `authClient.billing.*` (documented debt)**. `@better-auth/stripe` v1.6.23 client extensions are not fully typed — `useActiveSubscription()` and `createCheckoutSession()` return `any` in client types. The app confines them behind typed adapters in `features/billing/_api/`; the untyped surface is a single file. The adapter layer absorbs the upstream fix in one place when it lands.
 
