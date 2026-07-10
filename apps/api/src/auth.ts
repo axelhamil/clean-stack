@@ -143,6 +143,18 @@ async function emit<TPayload>(
 }
 
 /**
+ * DRY seat-check helper used by every member-creation gate (direct add,
+ * invitation acceptance, invitation creation). Throws 402 if the org is at
+ * or over its plan seat cap. Centralised so the 3-line check is never
+ * duplicated across hooks (CLAUDE.md reusability rule, §6 two-path trap).
+ */
+async function assertSeatAvailableFor(orgId: string): Promise<void> {
+  const view = await di.EntitlementsService.getEntitlements(orgId);
+  const activeMembers = await countActiveMembers(orgId);
+  assertSeat(activeMembers, view.maxMembers);
+}
+
+/**
  * Best-effort client IP from a BetterAuth hook's `ctx.headers` for audit-only
  * event payloads. NOT the trusted-proxy resolver (`resolveClientIp`, Hono layer,
  * unreachable from here) — acceptable because these emits are non-blocking audit.
@@ -393,9 +405,19 @@ const authOptions = {
       creatorRole: "owner",
       organizationHooks: {
         beforeAddMember: async ({ organization: org }) => {
-          const view = await di.EntitlementsService.getEntitlements(org.id);
-          const activeMembers = await countActiveMembers(org.id);
-          assertSeat(activeMembers, view.maxMembers);
+          await assertSeatAvailableFor(org.id);
+        },
+        // Gate the invite-create path so operators get early feedback when the
+        // org is already at cap (nice-to-have UX, not the authoritative gate).
+        beforeCreateInvitation: async ({ organization: org }) => {
+          await assertSeatAvailableFor(org.id);
+        },
+        // Authoritative gate for the invite→accept path. `beforeAddMember` does
+        // NOT fire on invitation acceptance (§6 two-path trap documented above).
+        // Throwing here blocks the accept endpoint with a 402 before the member
+        // row is written, closing the over-provisioning race on this path.
+        beforeAcceptInvitation: async ({ organization: org }) => {
+          await assertSeatAvailableFor(org.id);
         },
         beforeDeleteOrganization: async ({ organization: org }) => {
           if (isPersonalOrg(org.slug)) {
