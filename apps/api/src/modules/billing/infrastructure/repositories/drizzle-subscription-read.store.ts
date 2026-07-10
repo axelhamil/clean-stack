@@ -22,6 +22,41 @@ function storeFailure(err: unknown, op: string): BillingError {
 export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
+  async findCustomerIdByReference(
+    referenceId: string,
+    tx?: ITransaction,
+  ): Promise<Result<string | null, BillingError>> {
+    const invoker = tx ?? db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleSubscriptionReadStore > findCustomerIdByReference" },
+      async () => {
+        try {
+          const query = invoker
+            .select({
+              stripeCustomerId: billingSchema.subscription.stripeCustomerId,
+            })
+            .from(billingSchema.subscription)
+            .where(
+              and(
+                eq(billingSchema.subscription.referenceId, referenceId),
+                inArray(billingSchema.subscription.status, [...ACTIVE_STATUSES]),
+              ),
+            )
+            .limit(1);
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          const r = rows[0];
+          return Result.ok(r?.stripeCustomerId ?? null);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "findCustomerIdByReference"));
+        }
+      },
+    );
+  }
+
   async findActiveByReference(
     referenceId: string,
     tx?: ITransaction,

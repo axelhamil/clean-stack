@@ -19,6 +19,7 @@ function makeStore(row: SubscriptionRow | null, fail = false): ISubscriptionRead
           })
         : Result.ok<SubscriptionRow | null, BillingError>(row),
     ),
+    findCustomerIdByReference: mock(async () => Result.ok<string | null, BillingError>(null)),
   };
 }
 

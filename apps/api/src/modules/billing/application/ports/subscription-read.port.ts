@@ -13,4 +13,8 @@ export interface ISubscriptionReadStore {
     referenceId: string,
     tx?: ITransaction,
   ): Promise<Result<SubscriptionRow | null, BillingError>>;
+  findCustomerIdByReference(
+    referenceId: string,
+    tx?: ITransaction,
+  ): Promise<Result<string | null, BillingError>>;
 }

@@ -8,6 +8,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
 import { di } from "./container";
 import { auditLogRoutes } from "./modules/audit-log/routes";
+import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
@@ -103,6 +104,7 @@ app.use("/settings/*", csrf);
 app.use("/admin/*", csrf);
 app.use("/consents", csrf);
 app.use("/consents/*", csrf);
+app.use("/billing/portal", csrf);
 const consentRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, CONSENT_POST_POLICY);
 app.use("/consents", (c, next) =>
   c.req.method === "POST" || c.req.method === "DELETE" ? consentRateLimit(c, next) : next(),
@@ -185,7 +187,8 @@ const routes = app
   .route("/uploads", uploadsRoutes)
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/webhooks", webhooksRoutes)
-  .route("/consents", consentRoutes);
+  .route("/consents", consentRoutes)
+  .route("/billing", billingRoutes);
 
 app.onError(createErrorHandler(di.IInstrumentation));
 
