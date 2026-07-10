@@ -68,15 +68,20 @@ describe("AuditEventSubscriber hash chain", () => {
     const sub = new AuditEventSubscriber(noopInstr as never);
     await sub.handle(event("e1") as never, tx as never);
     expect(captured).toHaveLength(1);
-    expect(captured[0].prevHash).toBe("GENESIS");
-    expect(typeof captured[0].hash).toBe("string");
-    expect((captured[0].hash as string).length).toBe(64);
+    const row = captured[0];
+    if (!row) throw new Error("expected a captured row");
+    expect(row.prevHash).toBe("GENESIS");
+    expect(typeof row.hash).toBe("string");
+    expect((row.hash as string).length).toBe(64);
   });
 
   it("links: next row's prevHash equals the last stored hash", async () => {
     const { tx, captured } = makeTx(() => [{ hash: "abc123" }]);
     const sub = new AuditEventSubscriber(noopInstr as never);
     await sub.handle(event("e2") as never, tx as never);
-    expect(captured[0].prevHash).toBe("abc123");
+    expect(captured).toHaveLength(1);
+    const row = captured[0];
+    if (!row) throw new Error("expected a captured row");
+    expect(row.prevHash).toBe("abc123");
   });
 });
