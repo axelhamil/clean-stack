@@ -6,6 +6,7 @@ import { billingModule } from "./modules/billing/module";
 import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
 import { policyModule } from "./modules/policies/module";
+import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
@@ -105,5 +106,6 @@ export const di = container()
   .addModule(webhooksModule)
   .addModule(policyModule)
   .addModule(consentModule)
+  .addModule(quotaModule)
   .addModule(billingModule)
   .build();
