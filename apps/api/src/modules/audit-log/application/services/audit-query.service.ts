@@ -14,12 +14,9 @@ export class AuditQueryService {
     private readonly instrumentation: IInstrumentation,
   ) {}
 
-  async listForOrg(
-    organizationId: string,
-    filters: Omit<AuditFilters, "organizationId">,
-  ): Promise<Result<AuditPage, AuditError>> {
-    return this.instrumentation.startSpan({ name: "AuditQueryService > listForOrg" }, () =>
-      this.audit.list({ ...filters, organizationId }),
+  async listForPlatform(filters: AuditFilters): Promise<Result<AuditPage, AuditError>> {
+    return this.instrumentation.startSpan({ name: "AuditQueryService > listForPlatform" }, () =>
+      this.audit.list(filters),
     );
   }
 

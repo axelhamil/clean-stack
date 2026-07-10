@@ -41,40 +41,29 @@ function makeAuditPort(overrides: Partial<IAuditPort> = {}): IAuditPort {
 }
 
 describe("AuditQueryService", () => {
-  describe("listForOrg", () => {
-    it("delegates to audit.list with organizationId merged into filters (happy path)", async () => {
-      const audit = makeAuditPort();
-      const service = new AuditQueryService(audit, new NoOpInstrumentation());
-
-      const filters: Omit<AuditFilters, "organizationId"> = { limit: 20 };
-      const result = await service.listForOrg("org-1", filters);
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue()).toEqual(stubPage);
-      expect(audit.list).toHaveBeenCalledWith({ limit: 20, organizationId: "org-1" });
+  describe("listForPlatform", () => {
+    it("listForPlatform forwards filters straight to the port (no org injection)", async () => {
+      const port = { list: mock(async () => Result.ok({ items: [], nextCursor: null })) };
+      const svc = new AuditQueryService(port as unknown as IAuditPort, new NoOpInstrumentation());
+      await svc.listForPlatform({ actionPrefix: "user." });
+      expect(port.list).toHaveBeenCalledWith({ actionPrefix: "user." });
     });
 
-    it("passes through optional filters untouched", async () => {
+    it("passes all filters untouched including organizationId", async () => {
       const audit = makeAuditPort();
       const service = new AuditQueryService(audit, new NoOpInstrumentation());
 
-      const filters: Omit<AuditFilters, "organizationId"> = {
+      const filters: AuditFilters = {
         actorId: "user-2",
+        organizationId: "org-2",
         targetType: "organization",
         actionPrefix: "org.",
         limit: 10,
         cursor: "cursor-abc",
       };
-      await service.listForOrg("org-2", filters);
+      await service.listForPlatform(filters);
 
-      expect(audit.list).toHaveBeenCalledWith({
-        actorId: "user-2",
-        targetType: "organization",
-        actionPrefix: "org.",
-        limit: 10,
-        cursor: "cursor-abc",
-        organizationId: "org-2",
-      });
+      expect(audit.list).toHaveBeenCalledWith(filters);
     });
 
     it("propagates failure from audit.list (AUDIT_PERSISTENCE_PROVIDER_FAILURE)", async () => {
@@ -88,7 +77,7 @@ describe("AuditQueryService", () => {
       });
       const service = new AuditQueryService(audit, new NoOpInstrumentation());
 
-      const result = await service.listForOrg("org-1", {});
+      const result = await service.listForPlatform({});
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
@@ -100,22 +89,22 @@ describe("AuditQueryService", () => {
       const spy = spyOn(instrumentation, "startSpan");
       const service = new AuditQueryService(audit, instrumentation);
 
-      await service.listForOrg("org-1", {});
+      await service.listForPlatform({});
 
       expect(spy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "AuditQueryService > listForOrg" }),
+        expect.objectContaining({ name: "AuditQueryService > listForPlatform" }),
         expect.any(Function),
       );
     });
 
-    it("returns empty items list when org has no audit entries", async () => {
+    it("returns empty items list when no audit entries match", async () => {
       const emptyPage: AuditPage = { items: [], nextCursor: null };
       const audit = makeAuditPort({
         list: mock(async () => Result.ok<AuditPage, AuditError>(emptyPage)),
       });
       const service = new AuditQueryService(audit, new NoOpInstrumentation());
 
-      const result = await service.listForOrg("org-empty", {});
+      const result = await service.listForPlatform({});
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().items).toHaveLength(0);
@@ -129,7 +118,7 @@ describe("AuditQueryService", () => {
       });
       const service = new AuditQueryService(audit, new NoOpInstrumentation());
 
-      const result = await service.listForOrg("org-1", { limit: 1 });
+      const result = await service.listForPlatform({ limit: 1 });
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().nextCursor).toBe("next-page-cursor");
