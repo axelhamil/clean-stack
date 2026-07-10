@@ -49,6 +49,7 @@ mock.module("@packages/drizzle", () => ({
   gt: () => ({}),
   gte: () => ({}),
   not: () => ({}),
+  asc: () => ({}),
   desc: () => ({}),
   inArray: () => ({}),
   like: () => ({}),

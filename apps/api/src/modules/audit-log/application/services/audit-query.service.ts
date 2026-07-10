@@ -3,6 +3,7 @@ import type {
   AuditError,
   AuditFilters,
   AuditPage,
+  ChainVerification,
   IAuditPort,
 } from "../../../../shared/ports/audit.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -19,6 +20,12 @@ export class AuditQueryService {
   ): Promise<Result<AuditPage, AuditError>> {
     return this.instrumentation.startSpan({ name: "AuditQueryService > listForOrg" }, () =>
       this.audit.list({ ...filters, organizationId }),
+    );
+  }
+
+  async verifyChain(): Promise<Result<ChainVerification, AuditError>> {
+    return this.instrumentation.startSpan({ name: "AuditQueryService > verifyChain" }, () =>
+      this.audit.verifyChain(),
     );
   }
 }

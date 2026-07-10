@@ -4,6 +4,7 @@ import type {
   AuditError,
   AuditFilters,
   AuditPage,
+  ChainVerification,
   IAuditPort,
 } from "../../../shared/ports/audit.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
@@ -132,6 +133,27 @@ describe("AuditQueryService", () => {
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().nextCursor).toBe("next-page-cursor");
+    });
+  });
+
+  describe("verifyChain", () => {
+    it("delegates to audit.verifyChain and returns its result", async () => {
+      const verdict: ChainVerification = {
+        verified: true,
+        rowCount: 2,
+        brokenAtId: null,
+        brokenAtSequence: null,
+      };
+      const audit = makeAuditPort({
+        verifyChain: mock(async () => Result.ok<ChainVerification, AuditError>(verdict)),
+      });
+      const service = new AuditQueryService(audit, new NoOpInstrumentation());
+
+      const result = await service.verifyChain();
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue()).toEqual(verdict);
+      expect(audit.verifyChain).toHaveBeenCalledTimes(1);
     });
   });
 });

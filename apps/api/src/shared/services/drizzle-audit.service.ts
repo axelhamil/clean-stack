@@ -1,11 +1,13 @@
 import { Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
+  asc,
   auditLogSchema,
   db,
   desc,
   eq,
   gte,
+  isNotNull,
   isNull,
   like,
   lt,
@@ -19,9 +21,11 @@ import type {
   AuditFilters,
   AuditPage,
   AuditRecord,
+  ChainVerification,
   IAuditPort,
 } from "../ports/audit.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
+import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
@@ -128,5 +132,57 @@ export class DrizzleAuditRepository implements IAuditPort {
         return fail(e, "audit list failed");
       }
     });
+  }
+
+  async verifyChain(tx?: Transaction): Promise<Result<ChainVerification, AuditError>> {
+    const exec = tx ?? db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAuditRepository > verifyChain" },
+      async () => {
+        try {
+          const al = auditLogSchema.auditLog;
+          const query = exec.select().from(al).where(isNotNull(al.hash)).orderBy(asc(al.sequence));
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          let prev = GENESIS_HASH;
+          for (const r of rows) {
+            const recomputed = computeAuditHash({
+              id: r.id,
+              action: r.action,
+              actorId: r.actorId,
+              actorType: r.actorType,
+              organizationId: r.organizationId,
+              targetType: r.targetType,
+              targetId: r.targetId,
+              metadata: r.metadata,
+              occurredAt: r.occurredAt.toISOString(),
+              requestId: r.requestId ?? null,
+              retention: r.retention,
+              prevHash: r.prevHash ?? GENESIS_HASH,
+            });
+            if (r.prevHash !== prev || r.hash !== recomputed) {
+              return Result.ok({
+                verified: false,
+                rowCount: rows.length,
+                brokenAtId: r.id,
+                brokenAtSequence: r.sequence,
+              });
+            }
+            prev = r.hash as string;
+          }
+          return Result.ok({
+            verified: true,
+            rowCount: rows.length,
+            brokenAtId: null,
+            brokenAtSequence: null,
+          });
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "audit verifyChain failed");
+        }
+      },
+    );
   }
 }

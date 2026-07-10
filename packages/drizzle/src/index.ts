@@ -1,6 +1,7 @@
 export {
   and,
   arrayContains,
+  asc,
   count,
   desc,
   eq,

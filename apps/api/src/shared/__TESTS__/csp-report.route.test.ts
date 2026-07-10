@@ -33,6 +33,8 @@ mock.module("@packages/drizzle", () => ({
   eq: () => {},
   lt: () => {},
   isNotNull: () => {},
+  asc: () => {},
+  desc: () => {},
   and: () => {},
   sql: () => {},
 }));
