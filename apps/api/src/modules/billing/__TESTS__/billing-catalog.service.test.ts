@@ -46,7 +46,7 @@ describe("BillingCatalogService", () => {
 
   it("caches within the TTL (single upstream call for two reads)", async () => {
     const source = makeSource([proPrice]);
-    const svc = new BillingCatalogService(source, new NoOpInstrumentation());
+    const svc = new BillingCatalogService(source, new NoOpInstrumentation(), () => 1000);
     await svc.getCatalog();
     await svc.getCatalog();
     expect(source.listActivePrices).toHaveBeenCalledTimes(1);

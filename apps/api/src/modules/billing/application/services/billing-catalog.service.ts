@@ -29,41 +29,51 @@ export class BillingCatalogService {
   async getCatalog(): Promise<PlanCatalogItem[]> {
     if (this.cache && this.now() - this.cache.at < TTL_MS) return this.cache.items;
 
-    const prices = await this.source.listActivePrices();
-    const paid: PlanCatalogItem[] = prices
-      .filter((p) => isTier(p.tier) && p.tier !== "free")
-      .map((p) => {
-        const tier = p.tier as Tier;
-        const ent = ENTITLEMENTS[tier];
-        return {
-          tier,
-          name: p.productName,
-          priceId: p.priceId,
-          unitAmount: p.unitAmount,
-          currency: p.currency,
-          interval: p.interval,
-          marketingFeatures: p.marketingFeatures,
-          rank: ent.rank,
-          features: ent.features,
-          maxMembers: ent.maxMembers,
-        };
-      });
+    return this.instrumentation.startSpan(
+      { name: "BillingCatalogService > getCatalog" },
+      async () => {
+        try {
+          const prices = await this.source.listActivePrices();
+          const paid: PlanCatalogItem[] = prices
+            .filter((p) => isTier(p.tier) && p.tier !== "free")
+            .map((p) => {
+              const tier = p.tier as Tier;
+              const ent = ENTITLEMENTS[tier];
+              return {
+                tier,
+                name: p.productName,
+                priceId: p.priceId,
+                unitAmount: p.unitAmount,
+                currency: p.currency,
+                interval: p.interval,
+                marketingFeatures: p.marketingFeatures,
+                rank: ent.rank,
+                features: ent.features,
+                maxMembers: ent.maxMembers,
+              };
+            });
 
-    const free: PlanCatalogItem = {
-      tier: "free",
-      name: "Free",
-      priceId: null,
-      unitAmount: 0,
-      currency: paid[0]?.currency ?? "usd",
-      interval: null,
-      marketingFeatures: [],
-      rank: ENTITLEMENTS.free.rank,
-      features: ENTITLEMENTS.free.features,
-      maxMembers: ENTITLEMENTS.free.maxMembers,
-    };
+          const free: PlanCatalogItem = {
+            tier: "free",
+            name: "Free",
+            priceId: null,
+            unitAmount: 0,
+            currency: paid[0]?.currency ?? "usd",
+            interval: null,
+            marketingFeatures: [],
+            rank: ENTITLEMENTS.free.rank,
+            features: ENTITLEMENTS.free.features,
+            maxMembers: ENTITLEMENTS.free.maxMembers,
+          };
 
-    const items = [free, ...paid].sort((a, b) => a.rank - b.rank);
-    this.cache = { at: this.now(), items };
-    return items;
+          const items = [free, ...paid].sort((a, b) => a.rank - b.rank);
+          this.cache = { at: this.now(), items };
+          return items;
+        } catch (err) {
+          this.instrumentation.capture(err);
+          throw err;
+        }
+      },
+    );
   }
 }
