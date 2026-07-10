@@ -277,6 +277,23 @@ export const SecuritySignupRejectedPayload = z.object({
 });
 export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
 
+export const SecurityOperatorAuditAccessedPayload = z.object({
+  actorUserId: z.string(),
+  ip: z.string().max(45).nullable(),
+  filters: z
+    .object({
+      actorId: z.string().optional(),
+      actionPrefix: z.string().optional(),
+      organizationId: z.string().optional(),
+      occurredFrom: z.string().optional(),
+      occurredTo: z.string().optional(),
+    })
+    .optional(),
+});
+export type SecurityOperatorAuditAccessedPayload = z.infer<
+  typeof SecurityOperatorAuditAccessedPayload
+>;
+
 export const BillingSubscriptionCreatedPayload = OrgRef.extend({
   subscriptionId: z.string(),
   tier: z.string(),
@@ -358,6 +375,7 @@ export const PayloadByEventType = {
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,
   [EventTypes.SECURITY_PASSWORD_BREACHED]: SecurityPasswordBreachedPayload,
   [EventTypes.SECURITY_SIGNUP_REJECTED]: SecuritySignupRejectedPayload,
+  [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: SecurityOperatorAuditAccessedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CREATED]: BillingSubscriptionCreatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: BillingSubscriptionUpdatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,

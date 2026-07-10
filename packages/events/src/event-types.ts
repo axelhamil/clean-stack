@@ -41,6 +41,7 @@ export const EventTypes = {
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",
   SECURITY_PASSWORD_BREACHED: "security.password.breached",
   SECURITY_SIGNUP_REJECTED: "security.signup.rejected",
+  SECURITY_OPERATOR_AUDIT_ACCESSED: "security.operator.audit_accessed",
   BILLING_SUBSCRIPTION_CREATED: "billing.subscription.created",
   BILLING_SUBSCRIPTION_UPDATED: "billing.subscription.updated",
   BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
