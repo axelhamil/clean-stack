@@ -573,6 +573,8 @@ Users can create unlimited team orgs. Each is independently `free` (default) or 
 
 ## Feature gating & quota gating — guards layer — **Phase B.2**
 
+> **Status — shipped (Jul 2026), as a dormant skeleton.** The catalog is `ENTITLEMENTS[tier].quotas` (not a separate `PLANS` map — quotas joined the B.1 entitlements SSOT). Delivered: `requireQuota(key, readUsage)` pre-check (429 `BILLING_QUOTA_EXCEEDED`) + `reserveQuota` (advisory-lock atomic reserve inside the write's TX — the authoritative, TOCTOU-safe gate) + `countScopedRows` (live-count default) + `quota_usage` table + `modules/quotas/` `IQuotaUsageStore` (high-volume) + front `useQuota`/`<QuotaGate>` + `billing.quota.exceeded` (operational) → **47 events**. SOTA-rejected: Stripe Entitlements API (boolean-only), Billing Meters (metering-to-bill), `@better-auth/stripe` native `limits` (2nd SSOT). Dormant + knip-whitelisted until a resource is wired. Activation guide: [`docs/QUOTA-GATING.md`](docs/QUOTA-GATING.md). As-built + decisions in [`docs/HISTORY.md`](docs/HISTORY.md). **The spec below is the original pre-build design** (names like `PLANS`/`requireSeat` predate the as-built `ENTITLEMENTS`/seat-hooks).
+
 **Why**: gating is *not* DDD — the rule fits in `array.includes()` / `count(*)` / config lookup. Wrapping it in aggregates + use-cases is the OpenUp anti-pattern (~6.4k LOC for what 330 LOC of config + guard would cover). Stay in pragmatic infra: typed plan config + Hono guard middlewares on the API + React hook on the app.
 
 The **Billing** section above lays the foundation: `PLANS` config, `useEntitlements()`, `requireCreateOrg`, `requireSeat`. This section extends it for the next gating dimensions as features land.
