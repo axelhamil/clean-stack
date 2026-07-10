@@ -2,9 +2,7 @@
   "extends": "@packages/typescript-config/react.json",
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"],
-      "stripe": ["./node_modules/stripe"],
-      "stripe/*": ["./node_modules/stripe/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],

@@ -244,9 +244,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.3
         version: 6.0.3(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-      stripe:
-        specifier: ^22.3.0
-        version: 22.3.0(@types/node@26.0.1)
       tailwindcss:
         specifier: ^4.3.1
         version: 4.3.1
