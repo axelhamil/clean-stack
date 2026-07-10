@@ -17,7 +17,7 @@ export {
   sql,
 } from "drizzle-orm";
 export { migrate } from "drizzle-orm/node-postgres/migrator";
-export type { AnyPgTable } from "drizzle-orm/pg-core";
+export type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 export { type DbClient, db, type Transaction } from "./config";
 export { getRateLimitDbClient, type RateLimitDbClient } from "./rate-limit-client";
 export { trackEventsOnSuccess } from "./repositories/track-events";
