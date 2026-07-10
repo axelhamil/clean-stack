@@ -173,14 +173,15 @@ hooks: {
 
 Pragmatic infra, NOT DDD. No domain layer: `config.ts` holds `ENTITLEMENTS[tier]` (features / rank / maxMembers, `null` = unlimited seats), `@better-auth/stripe` plugin owns subscription STATE (its `subscription` table, webhook-synced via `/api/auth/stripe/webhook`), Stripe owns price/display (`metadata.tier` join key + `marketing_features`). Typed config is the single business-rules SSOT — never duplicate into a domain model.
 
-**Three orthogonal gate axes** — applied independently, never conflated:
+**Four orthogonal gate axes** — applied independently, never conflated:
 1. **Role** — `billing:["read","manage"]` capability (`@packages/access-control`, pre-existing).
 2. **Seats** — hard-capped in the org plugin's `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`. **All three hooks must be wired** (§6 two-path trap — missing one silently admits overquota members).
 3. **Tier/feature** — `requireFeature(flag)` / `requirePlan(minTier)` middlewares (`shared/middleware/billing.middleware.ts`) → 402 `BILLING_PAYMENT_REQUIRED`.
+4. **Quota** (Phase B.2, dormant skeleton) — limits in `ENTITLEMENTS[tier].quotas` (`null` = unlimited). `requireQuota(key, readUsage)` middleware = best-effort pre-check → 429 `BILLING_QUOTA_EXCEEDED`; `reserveQuota(tx, orgId, key, limit, countFn)` (`shared/db/quota-reservation.ts`) = the **authoritative** gate — `pg_advisory_xact_lock` + count + assert **inside the write's `uow.run()`**, TOCTOU-safe. Counting: live `countScopedRows` (default, zero drift) or the denormalized `quota_usage` table + `modules/quotas/` `IQuotaUsageStore.{increment,current,reset}` (high-volume, increment in the SAME TX as the gated write — never background). Dormant + knip-whitelisted until a resource is wired. Details: `docs/QUOTA-GATING.md`.
 
 No billing backoffice: Stripe Checkout + Billing Portal hosted. `POST /billing/portal` gated `requireOrgPermission({ billing:["manage"] })`.
 
-**Events**: `billing.subscription.{created,updated,cancelled}` + `billing.payment.failed`, emitted from stripe plugin callbacks in `auth.ts` (same BetterAuth bridge pattern as org/policy hooks).
+**Events**: `billing.subscription.{created,updated,cancelled}` + `billing.payment.failed`, emitted from stripe plugin callbacks in `auth.ts` (same BetterAuth bridge pattern as org/policy hooks). `billing.quota.exceeded` (operational) is emitted from `requireQuota` only — `reserveQuota` does not emit; a caller enforcing via `reserveQuota` alone emits it themselves.
 
 ## Organization scoping (server)
 

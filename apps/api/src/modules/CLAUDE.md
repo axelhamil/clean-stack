@@ -23,7 +23,7 @@ modules/<context>/
   __TESTS__/                    All tests at module root, never colocated. Mirrors source filenames.
 ```
 
-**Infra-only modules** (`billing`, `consents`, `policies`) have no `domain/` layer — config + service + store + routes only. Billing gates (`requireFeature`/`requirePlan`/seat checks) live in `shared/middleware/billing.middleware.ts` + org-plugin hooks, not use cases. See global `~/.claude/rules/40-quality.md` §"DDD scope" for why billing/compliance are never DDD.
+**Infra-only modules** (`billing`, `consents`, `policies`, `quotas`) have no `domain/` layer — config + service/store + routes only. Billing gates (`requireFeature`/`requirePlan`/seat checks + `requireQuota`/`reserveQuota` quota gates) live in `shared/middleware/billing.middleware.ts` + `shared/db/quota-reservation.ts` + org-plugin hooks, not use cases. `modules/quotas/` is a store-only infra module (`IQuotaUsageStore` + `quota_usage` table, §8-instrumented), no service/routes. See global `~/.claude/rules/40-quality.md` §"DDD scope" for why billing/compliance are never DDD.
 
 ## Architecture rule (module-specific)
 

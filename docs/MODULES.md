@@ -37,8 +37,9 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Profile + NIST 800-63B-4 password** (A.1) (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15 universal — no MFA exception, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
 | **Privacy policy / Terms versioning** (A.2) (DB schema, `@packages/policies` version SSOT, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
 | **Billing — Stripe subscriptions + feature/seat gating** (B.1) (`@better-auth/stripe`, Checkout + Billing Portal hosted, subscription SSOT in plugin table, hybrid catalog Stripe+code via `ENTITLEMENTS`, 3 gate axes: role/seat/tier, `useEntitlements()` + `<FeatureGate>` + `<PlanGate>`, 4 compliance/operational events, free-tier degradation when key unset) | **€3 600 – €6 000** | 7-10j |
+| **Quota gating** (B.2) (dormant skeleton extending B.1: `ENTITLEMENTS[tier].quotas` catalog, `requireQuota` pre-check + `reserveQuota` advisory-lock atomic gate + `countScopedRows`, `quota_usage` table + `modules/quotas/` `IQuotaUsageStore`, `useQuota()` + `<QuotaGate>`, `billing.quota.exceeded` event, knip-whitelisted) | **€800 – €1 200** | 1-2j |
 
-**Subtotal Core (shipped)**: **€19 400 – €33 000** of senior-dev value already in the repo on day zero. ~42-60 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€20 200 – €34 200** of senior-dev value already in the repo on day zero. ~43-62 days of focused senior work compressed into a clone.
 
 ---
 

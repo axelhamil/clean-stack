@@ -95,6 +95,15 @@ Three primitives for gating features and plans in front code:
 
 **`authClient.subscription`** is deliberately loosely typed (cast keeps the Stripe SERVER SDK out of the app workspace). Consume entitlements via the `GET /billing/subscription` typed endpoint, not `authClient.subscription` directly.
 
+## Quota gating (Phase B.2)
+
+Symmetric to feature/plan gating, over `ENTITLEMENTS[tier].quotas` (exposed on the same `GET /billing/subscription` view):
+
+1. **`useQuota(key, used): { limit, used, remaining, exceeded }`** — imperative hook (from `useEntitlements()`). `used` is passed in by the caller (usage counting is server-side; the front never re-declares quota limits).
+2. **`<QuotaGate quotaKey used fallback>`** (`shared/auth/quota-gate.tsx`) — declarative wrapper, renders `fallback` when `exceeded`, children otherwise.
+
+Enforcement is backend-only (`requireQuota`/`reserveQuota`); these front primitives are UX (show remaining, hide/limit CTA). Dormant + knip-whitelisted (like `<FeatureGate>`/`<PlanGate>`).
+
 ## Org-scoping (front)
 
 1. **Org-changing mutations broadcast `broadcastAuthChange()` from call-site `onSuccess`** (not the factory): `setActive`, `create-org`, `delete-org`, `leave-org`, `transfer-and-leave`, `accept-invitation`, `remove-member`. **Why**: a tab holds stale `activeOrganizationId` up to `cookieCache.maxAge` (5 min) without a signal.

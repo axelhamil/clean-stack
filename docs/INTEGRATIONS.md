@@ -167,15 +167,16 @@ Each entry in `ENTITLEMENTS` must have a key matching a `metadata.tier` value on
 
 ```ts
 // pattern — not the actual file; adapt to your plan names
-export const ENTITLEMENTS: Record<string, { rank: number; maxMembers: number | null; features: string[] }> = {
-  free:  { rank: 0, maxMembers: 3,    features: [] },
-  pro:   { rank: 1, maxMembers: null, features: ["advanced-analytics"] },
+export const ENTITLEMENTS: Record<string, { rank: number; maxMembers: number | null; features: string[]; quotas: Record<string, number | null> }> = {
+  free:  { rank: 0, maxMembers: 3,    features: [],                     quotas: { uploads: 10,  projects: 3 } },
+  pro:   { rank: 1, maxMembers: null, features: ["advanced-analytics"], quotas: { uploads: null, projects: null } },
 };
 ```
 
 - `maxMembers: null` = unlimited seats (JSON-safe).
 - `features` = string flags checked by `requireFeature(flag)` / `<FeatureGate flag>`.
 - `rank` = integer used by `requirePlan(minTier)` to compare tiers ordinally.
+- `quotas` (Phase B.2) = per-resource numeric caps (`null` = unlimited), enforced by `requireQuota(key, readUsage)` / `reserveQuota` and surfaced front-side via `useQuota(key, used)` / `<QuotaGate>`. Dormant skeleton — see [`QUOTA-GATING.md`](QUOTA-GATING.md) for how to wire a quota to a resource.
 
 The free tier (`rank: 0`) is always available, even when Stripe is unconfigured — the catalog degrades to free-only and the app boots normally.
 
