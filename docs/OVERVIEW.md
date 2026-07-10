@@ -125,7 +125,7 @@ Three gate axes cover every billing enforcement need:
 - **Seats** — a `maxMembers` cap from the entitlements config is enforced in every org-membership hook (add, invite, accept). Unlimited is represented as `null`, which is JSON-safe and unambiguous in code.
 - **Tier and features** — `requireFeature(flag)` and `requirePlan(minTier)` on the API return a `402 BILLING_PAYMENT_REQUIRED` response (semantically distinct from `403`). `<FeatureGate>` and `<PlanGate>` on the frontend gate any subtree declaratively. `useEntitlements()` gives imperative access to the current org's resolved plan.
 
-The app provides a public `/pricing` page (plan grid fed from the live Stripe catalog, with pricing bullets from `marketing_features`) and a `/settings/billing` page (current plan, seat usage, Upgrade button → Checkout, Manage button → Portal). Four audit events are emitted automatically on every subscription lifecycle change.
+The app provides a public `/pricing` page (plan grid fed from the live Stripe catalog, with pricing bullets from `marketing_features`) and a `/settings/billing` page (current plan, seat usage, Upgrade button → Checkout, Manage button → Portal). Four audit events are emitted automatically on every subscription lifecycle change. Quota gating ships as a dormant skeleton: a typed quota catalog, atomic-reserve middleware, `quota_usage` store, and front `useQuota`/`<QuotaGate>` primitives are wired and knip-whitelisted — activating a quota on any resource requires adding a key to the catalog and two call-site lines. See [`docs/QUOTA-GATING.md`](docs/QUOTA-GATING.md) for the activation guide.
 
 ## A frontend that's already assembled
 

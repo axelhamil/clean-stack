@@ -346,6 +346,8 @@ Per-organization subscriptions with zero billing backoffice. Stripe Checkout han
 
 **Env**: `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. No `STRIPE_PRICE_*` vars — prices live in Stripe. Unset `STRIPE_SECRET_KEY` → free-only degradation.
 
+**Quota gating (B.2, dormant skeleton)**: `ENTITLEMENTS[tier].quotas` typed catalog; `assertQuota`/`requireQuota` middleware (429 `BILLING_QUOTA_EXCEEDED`); `reserveQuota`/`countScopedRows` advisory-lock atomic reserve (`apps/api/src/shared/db/quota-reservation.ts`); `quota_usage` table + `modules/quotas/` store (`IQuotaUsageStore.{increment,current,reset}`); front `useQuota` + `<QuotaGate>` (`apps/app/src/shared/auth/quota-gate.tsx`). 1 new event (`billing.quota.exceeded` operational) → **47 events total**. Primitives knip-whitelisted as boilerplate-pattern entries. See [`docs/QUOTA-GATING.md`](./QUOTA-GATING.md) for the activation guide.
+
 See [`HISTORY.md`](./HISTORY.md) for the state-SSOT decision, hybrid-catalog rationale, unlimited=null choice, and pre-merge review catches.
 
 ---

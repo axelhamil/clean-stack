@@ -745,3 +745,33 @@ Four issues caught before merge — all fixed:
 3. **`beforeCreateInvitation` not seat-gated (rule §6 gap)** — only `beforeAddMember` and `beforeAcceptInvitation` were gated initially. An admin could create 10 invitations for a 3-seat free org; the first 3 acceptances succeed, the remaining 7 fail at acceptance time with a generic error and no clear recovery path. Added `beforeCreateInvitation` to the seat-check hooks.
 
 4. **Double `billing.subscription.cancelled` emission** — an early draft emitted `cancelled` from both the `subscription.updated` webhook (when `cancelAtPeriodEnd` flips to `true` — a *scheduled* cancellation) and `subscription.deleted` (actual termination). These are distinct business facts. Fix: `subscription.updated` emits `billing.subscription.updated` (with `cancelAtPeriodEnd` in the payload for observers that care); only `subscription.deleted` emits `billing.subscription.cancelled`. The final catalog has 4 unambiguous events.
+
+---
+
+## Quota gating ✅ Phase B.2
+
+**Why**: the third gate axis in the billing design (Role, Seats, Tier/Feature from B.1) was always quotas — quantitative limits per org per billing period (projects, uploads, API calls). Shipped as a **dormant, complete skeleton** extending B.1: no code path calls `requireQuota` or `reserveQuota` today, but the plumbing is wired and the primitives are knip-whitelisted so they survive dead-code checks until the first product feature needs them.
+
+**Two-layer design (anti-TOCTOU)**:
+
+- **Pre-check (`requireQuota` middleware)** — UX-layer, runs before the write, returns `429 BILLING_QUOTA_EXCEEDED` early so the client never does work it can't commit. Optional; mounted per route. Uses `countScopedRows` (a `COUNT(*)` over the source table) or the `quota_usage` denormalized counter.
+- **Authoritative reserve (`reserveQuota`)** — inside `uow.run()`, acquires a Postgres advisory lock (`pg_try_advisory_xact_lock(orgId hash, quotaKey hash)`) then recomputes the count and compares against the limit *within the same TX as the insert*. No TOCTOU: the count and the write are atomic. Fails with `BILLING_QUOTA_EXCEEDED` if the ceiling is hit. Lock is advisory-only: a concurrent writer without the lock can still insert (enforcement is opt-in per resource, matching the dormant-skeleton philosophy).
+
+**Two counting strategies**:
+
+- **Live `COUNT(*)` (default)** — `countScopedRows(tx, table, orgIdCol, orgId)`. The source table is the truth; zero drift. For uploads/projects/seats (low-to-medium volume).
+- **Denormalized `quota_usage` (high-volume)** — `IQuotaUsageStore.increment(orgId, resource, period, tx)` writes a counter row in the same TX as the business write, window-aligned on `currentPeriodFor(subscription)` (the Stripe billing period). Use when a `COUNT(*)` over millions of rows would be prohibitive. Bounded drift via period reset; a nightly reconciliation (`used = COUNT(*)`) is the belt-and-suspenders recommendation.
+
+**Atomic reserve decision** — advisory locks (`pg_try_advisory_xact_lock`) were chosen over `SELECT … FOR UPDATE` on the usage row because: (a) the `quota_usage` row may not exist yet (first use in a period), requiring an upsert + lock sequence that advisory locks short-circuit; (b) advisory locks are XACT-scoped (auto-release at TX end, no explicit unlock); (c) they add zero table contention on the resource table itself. The downside (two non-serializable writers in the same ms window theoretically racing) is accepted: the quota check is fail-open in that narrow window, and the consequence is a transient over-limit write that the pre-check already filtered.
+
+**SOTA rejections (2026)**:
+
+1. **Stripe Entitlements API** — boolean-only (feature flags, not counts). No quantitative quota, no runtime blocking.
+2. **Stripe Billing Meters** — async metering-to-bill (Stripe receives usage data and bills it), not synchronous gating-to-block. A metered event reaching Stripe does not prevent the next write; the cap enforcement lives on the Stripe invoice, not at the API call.
+3. **`@better-auth/stripe` native `limits`** — the `@better-auth/stripe` plugin v1.x exposes a `limits` object on the subscription record. Using it would create a 2nd SSOT: entitlements in code (`ENTITLEMENTS[tier]`) for features and a separate limits map in the plugin config for quotas. Kept unified in `ENTITLEMENTS[tier].quotas` — gate change = code + deploy, not a dashboard edit or a plugin config drift.
+
+**Why not DDD**: the decisive test — `count(rows) >= limit` is a WHERE clause and a comparison. No aggregate invariant, no `ValueObject`, no `DomainEvent` bubbling from a `Quota` entity. Every quota rule collapses to config lookup + arithmetic. Applying DDD here would match the OpenUp anti-pattern (ratio test/code > 3×). `modules/quotas/` is infra: a typed store + a `currentPeriodFor` helper.
+
+**Dormant + knip**: the primitives are not called by any product code today. `knip.json` whitelists `apps/app/src/shared/auth/quota-gate.tsx` (front gate) and `apps/api/src/shared/db/quota-reservation.ts` (back atomic reserve) as explicit `entry` points — the boilerplate-primitive pattern, same as `feature-gate.tsx` and `plan-gate.tsx` from B.1. `modules/quotas/module.ts` is covered by the existing `src/modules/*/module.ts` glob.
+
+**Event**: `billing.quota.exceeded` (operational) — payload `{ organizationId, resource, limit, attempted, tier, actorUserId }`. Emitted from `requireQuota` (pre-check rejection) and `reserveQuota` (authoritative rejection). Catalog total: **47 events**.

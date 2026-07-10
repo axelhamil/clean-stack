@@ -6,6 +6,7 @@
       "entry": [
         "src/container.ts",
         "src/shared/middleware/*.ts",
+        "src/shared/db/quota-reservation.ts",
         "src/shared/internal-routes/internal-fetch.ts",
         "src/modules/*/module.ts",
         "src/modules/*/routes.ts",
@@ -22,6 +23,7 @@
         "src/shared/api/queries/*.ts",
         "src/shared/auth/feature-gate.tsx",
         "src/shared/auth/plan-gate.tsx",
+        "src/shared/auth/quota-gate.tsx",
         "src/shared/observability/noop.ts",
         "src/shared/observability/sentry.ts"
       ],
