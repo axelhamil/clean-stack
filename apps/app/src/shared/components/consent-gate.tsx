@@ -9,5 +9,5 @@ interface ConsentGateProps {
 }
 
 export function ConsentGate({ category, children, fallback = null }: ConsentGateProps) {
-  return useConsent(category) ? <>{children}</> : <>{fallback}</>;
+  return useConsent(category) ? children : fallback;
 }
