@@ -74,6 +74,20 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v !== "false"),
+  PLATFORM_ADMIN_IDS: z
+    .string()
+    .optional()
+    .transform(
+      (v) =>
+        v
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) ?? [],
+    ),
+  PLATFORM_ADMIN_REQUIRE_MFA: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
   DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
   RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
   TRUSTED_PROXIES: z
