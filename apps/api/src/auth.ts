@@ -2,7 +2,7 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import { stripe } from "@better-auth/stripe";
-import { ac, isPersonalOrg, roles } from "@packages/access-control";
+import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
@@ -11,7 +11,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
 import { CryptoHasher } from "bun";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import {
   clearConfirmedPendingEmail,
   deleteOrgIfEmpty,
@@ -19,10 +19,16 @@ import {
   findActiveMemberRole,
   findLatestLinkedAccount,
   findLatestPasskey,
+  findOrgOwnerUserId,
   insertPersonalOrgWithOwner,
   setPendingEmail,
 } from "./auth-queries";
 import { di } from "./container";
+import {
+  authorizeSubscriptionReference,
+  subscriptionEventType,
+} from "./modules/billing/application/subscription-events";
+import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
@@ -269,12 +275,100 @@ const authOptions = {
 
   plugins: [
     stripe({
-      stripeClient: new Stripe(env.STRIPE_SECRET_KEY ?? "sk_test_placeholder", {
-        apiVersion: "2026-06-24.dahlia",
-      }),
+      stripeClient,
       stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
       createCustomerOnSignUp: true,
-      subscription: { enabled: true, plans: [] },
+      subscription: {
+        enabled: true,
+        plans: async () => {
+          const catalog = await di.BillingCatalogService.getCatalog();
+          return catalog
+            .filter((p) => p.priceId !== null)
+            .map((p) => ({ name: p.tier, priceId: p.priceId as string }));
+        },
+        authorizeReference: async ({ user, referenceId, action }) => {
+          if (
+            action !== "upgrade-subscription" &&
+            action !== "cancel-subscription" &&
+            action !== "restore-subscription"
+          ) {
+            return true;
+          }
+          const role = await findActiveMemberRole(user.id, referenceId);
+          return authorizeSubscriptionReference((role ?? undefined) as OrgRole | undefined);
+        },
+        onSubscriptionComplete: async ({ subscription, plan }) => {
+          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+          await emit(
+            EventTypes.BILLING_SUBSCRIPTION_CREATED,
+            "subscription",
+            subscription.id,
+            {
+              organizationId: subscription.referenceId,
+              subscriptionId: subscription.id,
+              tier: plan.name,
+              status: subscription.status,
+              actorUserId,
+              currentPeriodEnd: subscription.periodEnd ?? null,
+            },
+            subscription.referenceId,
+          );
+        },
+        onSubscriptionUpdate: async ({ subscription }) => {
+          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+          await emit(
+            subscriptionEventType(subscription.status),
+            "subscription",
+            subscription.id,
+            {
+              organizationId: subscription.referenceId,
+              subscriptionId: subscription.id,
+              tier: subscription.plan,
+              status: subscription.status,
+              actorUserId,
+              currentPeriodEnd: subscription.periodEnd ?? null,
+            },
+            subscription.referenceId,
+          );
+        },
+        onSubscriptionCancel: async ({ subscription }) => {
+          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+          await emit(
+            EventTypes.BILLING_SUBSCRIPTION_CANCELLED,
+            "subscription",
+            subscription.id,
+            {
+              organizationId: subscription.referenceId,
+              subscriptionId: subscription.id,
+              tier: subscription.plan,
+              status: subscription.status,
+              actorUserId,
+            },
+            subscription.referenceId,
+          );
+        },
+      },
+      onEvent: async (event) => {
+        if (event.type !== "invoice.payment_failed") return;
+        const invoice = event.data.object as Stripe.Invoice;
+        const subDetails = invoice.parent?.subscription_details;
+        const referenceId = subDetails?.metadata?.referenceId;
+        if (!referenceId) return;
+        const subscriptionId =
+          typeof subDetails?.subscription === "string" ? subDetails.subscription : "";
+        await emit(
+          EventTypes.BILLING_PAYMENT_FAILED,
+          "subscription",
+          subscriptionId || invoice.id,
+          {
+            organizationId: referenceId,
+            subscriptionId,
+            invoiceId: invoice.id,
+            actorUserId: null,
+          },
+          referenceId,
+        );
+      },
     }),
     bearer(),
     twoFactor(),

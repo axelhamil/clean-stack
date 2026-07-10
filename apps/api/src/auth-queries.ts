@@ -130,3 +130,14 @@ export async function findActiveMemberRole(
     .limit(1);
   return row?.role ?? null;
 }
+
+// ── #8 – stripe lifecycle: resolve org owner as fallback actor ─────────────
+
+export async function findOrgOwnerUserId(organizationId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ userId: schema.member.userId })
+    .from(schema.member)
+    .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.role, "owner")))
+    .limit(1);
+  return row?.userId ?? null;
+}
