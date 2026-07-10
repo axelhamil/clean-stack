@@ -25,6 +25,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase C.1 — Security perimeter (S1–S5a)** | **Jun–Jul 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + abuse quick-wins (per-account credential-stuffing, disposable-email, HIBP telemetry) + 5 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5b advanced abuse signals → S6 captcha (S4.1 store resilience + S5a shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.3 — Compliance docs bundle** | **Jul 2026** | `/legal/sub-processors` (Art. 28 sub-processor disclosure — 3 active: Resend, R2, OAuth; 3 planned: Stripe, GrowthBook, Umami) + `/legal/accessibility` (EAA Art. 14, WCAG 2.1 AA / EN 301 549 v3.2.1 declaration + complaint alias) + `docs/legal/` DPA template (12 Art. 28 clauses) + DORA annex template (11 Art. 30 provisions) + README index + fintech-vs-B2B decision table. Linked via command-palette + `data-rights` cross-links (no global footer yet). Clone-ability fix: `VITE_SENTRY_DSN` empty-string coercion in `apps/app/src/shared/env.ts`. 0 domain events (static pages). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.4 — Cookie consent + Consent management** | **Jul 2026** | Dual-layer device-scoped (preuve RGPD Art.7§1 = stockage serveur horodaté) : `@packages/cookie-consent` SSOT + append-only `consent_record` (`subjectId NOT NULL`, `userId` nullable, 2 indexes) + `ConsentService` (record append-only, fallback subjectId, reconcile) + routes publiques `/consents` (`optionalAuth`, `cc_sid` httpOnly, CSRF, rate-limit POST/DELETE uniquement) + sweep guests expirés + `<CookieBanner>` (symétrie CNIL Reject/Accept) + `<ConsentSettings>` + `<ConsentGate category>` + `<AnalyticsScripts>` (`VITE_ANALYTICS_SRC`) + `<LegalFooter>` (AppShell) + `/legal/cookies` + toast 429 global consolidé. Réconciliation au login via `hooks.after`+`ctx.context.newSession` (PAS `databaseHooks`). GPC/DNT requalifiés hors scope EU. 2 events (`user.cookie_consent.{granted,withdrawn}`, retention `compliance`) → **42 events**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase B.1 — Billing (Stripe)** | **Jul 2026** | `@better-auth/stripe` + Stripe Checkout + Billing Portal. Subscription SSOT = plugin `subscription` table (webhook-synced). Hybrid catalog: price + display in Stripe (`metadata.tier` join key, `marketing_features` bullets); entitlements (features, rank, `maxMembers`) in typed `ENTITLEMENTS[tier]` at `apps/api/src/modules/billing/config.ts` — gate change = code + deploy, never Stripe dashboard. 3 tiers: `free` (3 members), `pro` (20 members, `audit_log`+`api`), `business` (unlimited = `null`, +`sso`). Standard model: unlimited team orgs per user; seat gate only (`beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`), no create-org cap. Back gate primitives: `requireFeature`/`requirePlan`/seat gate → `402 BILLING_PAYMENT_REQUIRED`. Front: `useEntitlements()` hook. No billing backoffice: Stripe Checkout (upgrade) + Stripe Billing Portal (manage). UI: `/settings/billing` (plan + usage + Upgrade + Manage billing) + public `/pricing`. 4 new events (`billing.subscription.{created,updated,cancelled}` compliance + `billing.payment.failed` operational) → **46 events**. |
 
 ---
 
@@ -54,7 +55,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 ### M2 — Revenue (the #1 reason to clone a SaaS starter)
 
-- **B.1** Billing via `@better-auth/stripe` — customer portal + idempotent webhooks + dunning. Subscription per `organizationId`.
+- **B.1** Billing via `@better-auth/stripe` ✅ **shipped** (Jul 2026 — see ✅ table; Stripe Checkout + Billing Portal + seat gate + 3-tier entitlements + `/pricing` + `/settings/billing`. 4 billing events → **46 total**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
 - **B.2** Feature & quota gating — typed config + middleware (no DDD).
 
 ### M3 — Finish the half-shipped surfaces (backends done — highest value per LOC)
@@ -518,42 +519,54 @@ Shipping a status page before there are customer integrations is theatre.
 
 ## Billing — Stripe via the BetterAuth plugin — **Phase B.1**
 
+> **Status — shipped (Jul 2026).** `@better-auth/stripe@1.6.23` + `stripe@22.3.0`. Stripe Checkout (upgrade) + Billing Portal (manage) hosted — no billing backoffice. 4 billing events → **46 total**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+>
+> **Key deviations from the original spec** (document REALITY, not the plan):
+> - **Subscription SSOT = plugin `subscription` table** (webhook-synced by `@better-auth/stripe`). `organization.metadata.plan` is NOT used — the plugin owns the state.
+> - **Hybrid catalog**: price + display live in Stripe (each paid Product needs `metadata.tier` = `pro`|`business` matching a key in `ENTITLEMENTS`; `marketing_features` drive pricing bullets). **Entitlements (features, rank, maxMembers) live in typed code** at `apps/api/src/modules/billing/config.ts`. Gate change = code + deploy (reviewable), never a Stripe dashboard edit.
+> - **`maxMembers: null` = unlimited** (JSON-safe). `free`=3, `pro`=20, `business`=null.
+> - **Standard unlimited-orgs model** — users can create as many team orgs as they want; each is free or paid. No create-org count cap. The ONLY per-org limit is SEATS (gated in `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`).
+> - **Env vars**: `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` only. No `STRIPE_PRICE_*` — price IDs come from the Stripe catalog directly.
+> - **Events**: 42 → **46** (`billing.subscription.{created,updated,cancelled}` retention `compliance` + `billing.payment.failed` retention `operational`).
+
 **Why**: `@better-auth/stripe` (official, late 2025) wraps customer creation, subscriptions, customer portal, webhooks, DB sync. No more 600 lines of hand-written Stripe glue.
 
-**Pricing model (GitHub / Vercel-aligned)** — the decided shape:
+**Pricing model (standard SaaS)** — the as-built shape:
 
-| Org type | Plan | Members | Other | Price |
+| Org type | Tier | Members | Features | Price |
 |---|---|---|---|---|
-| Personal | structural (always free, never billed) | 1 (the user) | exempt from every quota | $0 |
-| Team #1 (per user) | Free | 3 | basic | $0 |
-| Team #2+ or upgraded | Pro | unlimited | full feature set | per-seat $X/mo |
-| Team — Business | Pro+ | unlimited | + SSO / SCIM / audit | per-seat $Y/mo |
+| Personal | structural (always free, never billed) | 1 (the user) | exempt | $0 |
+| Team org | `free` | 3 | — | $0 |
+| Team org | `pro` | 20 | audit_log, api | $X/mo |
+| Team org | `business` | unlimited (`null`) | audit_log, api, sso | $Y/mo |
 
-The constraint **"max 1 free team org per user"** is the only quota gate enforced at create-org time. Personal is invisible to the count (slug pattern `personal-*` already in `auth.ts`).
+Users can create unlimited team orgs. Each is independently `free` (default) or paid. No quota at org-creation time.
 
-**Architecture**:
+**As-built architecture**:
 
-- **Subscription scoped per `organizationId`** — `referenceId` in the Stripe plugin = orgId. `authorizeReference` checks the calling user is owner of the target org. Members inherit the active org's plan.
-- **Plan stored in `organization.metadata.plan`** (BetterAuth supports `metadata` natively) — webhook-synced, never hand-written. `metadata.plan` defaults to `"free"` on org creation.
-- **Plans config = typed const** (no DDD): `apps/api/src/billing/plans.ts` exports `PLANS = { free, pro, business } as const` with `displayName`, `maxMembers`, `priceId` (env-driven). Single source of truth.
-- **Entitlements layer** (rule 14 promotion of `requireAuth` shape):
-  - API: `requireCreateOrg` middleware (counts user's non-personal free orgs → 402 `BILLING_PAYMENT_REQUIRED` if ≥ 1). `requireSeat(orgId)` middleware composed on `invite-member` (refuses when `members.count >= plan.maxMembers`).
-  - App: `useEntitlements()` hook (reads active org + plan, exposes `canCreateFreeOrg`, `canInviteMember`, `seatsRemaining`).
+- **Subscription scoped per `organizationId`** — `referenceId` in the Stripe plugin = orgId. `authorizeReference` checks the calling user is owner of the target org. Members inherit the active org's tier.
+- **Subscription SSOT = plugin `subscription` table** — webhook-synced by `@better-auth/stripe`. Not `organization.metadata`. `tier` is read from the subscription record via `EntitlementsService.getEntitlements(orgId)`.
+- **Hybrid catalog** — price + display in Stripe; entitlements in code:
+  - Each paid Stripe Product must have `metadata.tier` = `pro`|`business` (join key to `ENTITLEMENTS`).
+  - `marketing_features` on the Stripe Product drives the pricing UI bullets (read via `BillingCatalogService`).
+  - `ENTITLEMENTS[tier]` in `apps/api/src/modules/billing/config.ts` is the sole source of features/rank/maxMembers. Never edit gates in Stripe.
+- **Gate primitives** (infra, not DDD):
+  - API: `requireFeature(flag)` (→ 402 `BILLING_FEATURE_REQUIRED`), `requirePlan(minTier)` (→ 402 `BILLING_PLAN_REQUIRED`), seat gate in `beforeAddMember`/`beforeAcceptInvitation`/`beforeCreateInvitation` (→ 402 `BILLING_SEAT_LIMIT_REACHED`).
+  - App: `useEntitlements()` hook — exposes `tier`, `status`, `features`, `maxMembers`, `hasFeature(flag)`, `atLeast(minTier)`, `seatUsage`.
+- **No billing backoffice** — Stripe Checkout (upgrade) + Stripe Billing Portal (manage) are fully hosted. `/settings/billing` shows current plan + usage + Upgrade + Manage billing buttons. Public `/pricing` page (logged-out CTA → `/sign-in`).
 - **Backend gate is authoritative; UI gate is UX courtesy** — both ship together.
 
 **Tasks**:
 
-- [ ] Install `@better-auth/stripe` + the `stripe` SDK + `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_BUSINESS` in `apps/api/common/env.ts` (zod-validated)
-- [ ] `apps/api/src/billing/plans.ts` — `PLANS` const, `PlanId` type, `entitlementsForPlan(plan)` helper. Pure config, zero runtime.
-- [ ] `auth.ts`: declare `stripe()` plugin with `subscription: { enabled: true, plans, authorizeReference }`. Webhook auto-mounted at `/api/auth/stripe/webhook`. `databaseHooks.organization.create.after` defaults `metadata.plan = "free"`.
-- [ ] `requireCreateOrg` middleware (`apps/api/src/modules/billing/infrastructure/middleware/billing.middleware.ts`) composed on `auth.api.organization.create` interceptor — when user already owns ≥ 1 free non-personal org, throw 402.
-- [ ] `requireSeat` middleware composed on org member-invite flow (front route or auth-plugin override).
-- [ ] `useEntitlements()` hook (`apps/app/src/features/billing/hooks/use-entitlements.ts`) reading active org + plan from existing queries.
-- [ ] `/settings/billing` UI: current plan, members usage (`X / Y` with progress), `Upgrade to Pro` button → `authClient.subscription.upgrade({ plan, referenceId: orgId })` (opens Stripe Checkout), `Manage billing` button → `authClient.subscription.billingPortal({ referenceId: orgId })`.
-- [ ] **Plan picker dialog** at create-org when user already has 1 free team org — Free disabled with "Upgrade an existing org or pick Pro", Pro / Business actionable. On selection: Stripe Checkout with `referenceId: <orgId>` (org pre-created in `pending` state, plan attached on `subscription.created` webhook).
-- [ ] `<PricingTable />` component (3 tiers, currentPlan highlighted, CTA per tier).
-- [ ] **Cross-tab sync**: webhook → org metadata change → next tab refresh picks it up via `cookieCache` 5-min refresh. Force-refresh path: `broadcastAuthChange()` from a `subscription.updated` webhook listener if needed (unlikely — 5 min is fine).
-- [ ] **Dev**: `stripe listen --forward-to localhost:3000/api/auth/stripe/webhook` documented in README + `.env.example` template (`STRIPE_*` placeholders).
+- [x] Install `@better-auth/stripe@1.6.23` + `stripe@22.3.0` + `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` in `apps/api/src/shared/env.ts` (zod-validated)
+- [x] `apps/api/src/modules/billing/config.ts` — `ENTITLEMENTS` typed const (`Tier`, `Feature`, `Entitlement`), `isTier`, `entitlementsForTier`, `rankOf`, `hasFeature`, `meetsPlan`, `hasSeatAvailable`. Pure config, zero runtime.
+- [x] `auth.ts`: declare `stripe()` plugin with `subscription: { enabled: true, plans, authorizeReference }`. Webhook auto-mounted at `/api/auth/stripe/webhook`.
+- [x] Seat gate in `beforeAddMember` / `beforeAcceptInvitation` / `beforeCreateInvitation` — calls `EntitlementsService.getEntitlements(orgId)` + `hasSeatAvailable(activeCount, maxMembers)`, throws `402`.
+- [x] `useEntitlements()` hook (`apps/app/src/features/billing/hooks/use-entitlements.ts`) — reads active org's entitlements view.
+- [x] `/settings/billing` UI: current tier badge, members usage (`X / Y`), `Upgrade` button → Stripe Checkout, `Manage billing` button → Stripe Billing Portal.
+- [x] `/pricing` public page — 3-tier table, `marketing_features` bullets from Stripe catalog, CTA routes to `/sign-in` when logged out.
+- [x] 4 billing events declared in `@packages/events` + `retention-map` (see `docs/EVENTS.md` billing section) → **46 total**
+- [x] **Dev**: `stripe listen --forward-to localhost:3000/api/auth/stripe/webhook` (see README Billing section + `.env.example` `STRIPE_*` placeholders)
 
 ---
 

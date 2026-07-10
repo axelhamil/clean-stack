@@ -254,7 +254,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **42 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security — 3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **46 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security — 3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`, **4 from `modules/billing/`**). Source of truth: `packages/events/src/event-types.ts`.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -315,6 +315,17 @@ Ces 3 events ne sont pas des state-changes métier — ils signalent des rejets 
 - `SECURITY_SIGNUP_REJECTED` (`security.signup.rejected`) — émis sur blocage d'un email jetable au sign-up. Payload : `{ actorUserId: null, email: string (max 254), ip: string | null, reason: "disposable_email" }`, retention `operational`.
 - `SECURITY_PASSWORD_BREACHED` (`security.password.breached`) — émis sur un mot de passe compromis HIBP au sign-up / reset / change-password (le rejet 422 vient déjà de la NIST policy). Payload : `{ actorUserId: string | null, email: string | null, ip: string | null, path }` — `actorUserId`/`email` portés par la session réelle sur `/change-password`, `null` sur sign-up/reset (pas de session). Retention `operational`.
 
+### Via subscription events (`modules/billing/` — Phase B.1)
+
+Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` webhook handler. These are Stripe-originated lifecycle events — not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
+
+- `BILLING_SUBSCRIPTION_CREATED` (`billing.subscription.created`) — emitted on `customer.subscription.created` Stripe webhook (first active subscription for an org). Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null, currentPeriodEnd }`, retention `compliance`.
+- `BILLING_SUBSCRIPTION_UPDATED` (`billing.subscription.updated`) — emitted on `customer.subscription.updated` when the new status is not terminal. Same payload shape as `created`, retention `compliance`.
+- `BILLING_SUBSCRIPTION_CANCELLED` (`billing.subscription.cancelled`) — emitted on `customer.subscription.updated` when status is `canceled` / `incomplete_expired` / `unpaid`. Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null }`, retention `compliance`.
+- `BILLING_PAYMENT_FAILED` (`billing.payment.failed`) — emitted on `invoice.payment_failed` Stripe webhook. Payload: `{ organizationId, subscriptionId, invoiceId, actorUserId: null }`, retention `operational`. Operational (not compliance) because the subscription-state events already carry the compliance trail; this is an operational signal for dunning / alerting.
+
+**Status mapping** — `subscriptionEventType(status)` in `apps/api/src/modules/billing/application/subscription-events.ts` maps Stripe subscription statuses to the three state events: `canceled` / `incomplete_expired` / `unpaid` → `BILLING_SUBSCRIPTION_CANCELLED`; all other statuses → `BILLING_SUBSCRIPTION_UPDATED`. `BILLING_SUBSCRIPTION_CREATED` fires only on the initial `customer.subscription.created` webhook path.
+
 ## Payload validation guarantee
 
 Every `outbox.enqueue(...)` call validates each event against `PayloadByEventType[eventType]` via Zod `safeParse` **before** the INSERT. A failure throws, which rolls back the surrounding TX (UoW or BetterAuth hook). **Why**: the audit trail is only as good as the payloads it stores — a missing `actorUserId`, an extra field, a wrong type silently corrupts compliance. Failing the mutation forces the bug to surface at the call site, atomically (the business write and the bad event are rejected together, never half-applied).
@@ -346,7 +357,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (42 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (46 events) |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |
