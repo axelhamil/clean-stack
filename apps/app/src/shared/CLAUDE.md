@@ -83,6 +83,18 @@ Trois primitifs pour appliquer le consentement dans le code front :
 
 **Règle** : tout script ou pixel tiers (analytics, chat, support, publicité) doit être conditionnel à la catégorie appropriée via `<ConsentGate>` ou `useConsent`. Ne pas charger un script tiers directement dans `index.html` ou `app-providers.tsx` sans gate de consentement.
 
+## Billing entitlements (Phase B.1)
+
+Three primitives for gating features and plans in front code:
+
+1. **`useEntitlements(): EntitlementsView`** — imperative hook. Server-resolved via `GET /billing/subscription`; the front **never re-declares** the `ENTITLEMENTS` config table.
+2. **`<FeatureGate feature="...">`** — declarative JSX wrapper, renders children only if the entitlement flag is active for the current org tier.
+3. **`<PlanGate min="pro">`** — renders children only if active tier ≥ `min` (rank-based comparison from server-resolved view).
+
+**`shared/api/queries/billing-types.ts`** is the shared wire contract (`Tier` / `Feature` / `PlanCatalogItem` / `EntitlementsView`). Never duplicate these types in features.
+
+**`authClient.subscription`** is deliberately loosely typed (cast keeps the Stripe SERVER SDK out of the app workspace). Consume entitlements via the `GET /billing/subscription` typed endpoint, not `authClient.subscription` directly.
+
 ## Org-scoping (front)
 
 1. **Org-changing mutations broadcast `broadcastAuthChange()` from call-site `onSuccess`** (not the factory): `setActive`, `create-org`, `delete-org`, `leave-org`, `transfer-and-leave`, `accept-invitation`, `remove-member`. **Why**: a tab holds stale `activeOrganizationId` up to `cookieCache.maxAge` (5 min) without a signal.

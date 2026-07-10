@@ -169,6 +169,19 @@ hooks: {
 
 `ctx.context.newSession` est positionné par BetterAuth sur **chaque** login (tous flux) et vaut `null` sur les requêtes courantes de session. C'est le signal idiomatique pour "un login vient d'avoir lieu sur cette requête". Câbler sur `databaseHooks.session.create` rate les cookies ; câbler sur un path spécifique (ex. `/sign-in/email`) rate les autres flux.
 
+## Billing (`modules/billing/` + `stripe()` plugin — Phase B.1)
+
+Pragmatic infra, NOT DDD. No domain layer: `config.ts` holds `ENTITLEMENTS[tier]` (features / rank / maxMembers, `null` = unlimited seats), `@better-auth/stripe` plugin owns subscription STATE (its `subscription` table, webhook-synced via `/api/auth/stripe/webhook`), Stripe owns price/display (`metadata.tier` join key + `marketing_features`). Typed config is the single business-rules SSOT — never duplicate into a domain model.
+
+**Three orthogonal gate axes** — applied independently, never conflated:
+1. **Role** — `billing:["read","manage"]` capability (`@packages/access-control`, pre-existing).
+2. **Seats** — hard-capped in the org plugin's `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`. **All three hooks must be wired** (§6 two-path trap — missing one silently admits overquota members).
+3. **Tier/feature** — `requireFeature(flag)` / `requirePlan(minTier)` middlewares (`shared/middleware/billing.middleware.ts`) → 402 `BILLING_PAYMENT_REQUIRED`.
+
+No billing backoffice: Stripe Checkout + Billing Portal hosted. `POST /billing/portal` gated `requireOrgPermission({ billing:["manage"] })`.
+
+**Events**: `billing.subscription.{created,updated,cancelled}` + `billing.payment.failed`, emitted from stripe plugin callbacks in `auth.ts` (same BetterAuth bridge pattern as org/policy hooks).
+
 ## Organization scoping (server)
 
 1. **Ownership at port (`ScopedRepository`), not route.** `requireOrg` exposes `c.var.orgId`; controller builds `RepoScope.org(orgId)` and passes to `di.XxxUseCase.execute(input, scope)`; `requireOrgPermission({ resource: ["action"] })` still gates *capabilities*. Routes **construct** scope; repo **honors** it. Skipping `requireOrg` on a handler reading/writing rows scoped by `organizationId` silently accepts requests with no active org.

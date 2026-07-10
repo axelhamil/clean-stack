@@ -23,6 +23,8 @@ modules/<context>/
   __TESTS__/                    All tests at module root, never colocated. Mirrors source filenames.
 ```
 
+**Infra-only modules** (`billing`, `consents`, `policies`) have no `domain/` layer — config + service + store + routes only. Billing gates (`requireFeature`/`requirePlan`/seat checks) live in `shared/middleware/billing.middleware.ts` + org-plugin hooks, not use cases. See global `~/.claude/rules/40-quality.md` §"DDD scope" for why billing/compliance are never DDD.
+
 ## Architecture rule (module-specific)
 
 **Domain has zero external imports** (only `@packages/ddd-kit`+`zod`). **Application layer has zero infrastructure imports** — `application/**` import only `@packages/ddd-kit`, `zod`, ports/types they own. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `NodePgTransaction`, `SessionUser`, `SessionData`, `S3Client`, …). **Why**: application says *what*, not *how* — a use case importing a provider type survives a swap only by accident, exactly what ports exist to enable. **One exception**: `apps/api/src/shared/transaction.ts` aliases `type ITransaction = Transaction` so repos thread the tx natively typed (`tx ?? db` works without `as unknown as`). Type-only, single swap-point. Cross-aggregate references use VO IDs (`UserId`, future `OrgId`) — never `SessionUser["id"]` or `string`.
