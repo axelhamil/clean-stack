@@ -26,6 +26,21 @@ export class BillingCatalogService {
     private readonly now: () => number = () => Date.now(),
   ) {}
 
+  private buildFreeEntry(currency = "usd"): PlanCatalogItem {
+    return {
+      tier: "free",
+      name: "Free",
+      priceId: null,
+      unitAmount: 0,
+      currency,
+      interval: null,
+      marketingFeatures: [],
+      rank: ENTITLEMENTS.free.rank,
+      features: ENTITLEMENTS.free.features,
+      maxMembers: ENTITLEMENTS.free.maxMembers,
+    };
+  }
+
   async getCatalog(): Promise<PlanCatalogItem[]> {
     if (this.cache && this.now() - this.cache.at < TTL_MS) return this.cache.items;
 
@@ -53,25 +68,15 @@ export class BillingCatalogService {
               };
             });
 
-          const free: PlanCatalogItem = {
-            tier: "free",
-            name: "Free",
-            priceId: null,
-            unitAmount: 0,
-            currency: paid[0]?.currency ?? "usd",
-            interval: null,
-            marketingFeatures: [],
-            rank: ENTITLEMENTS.free.rank,
-            features: ENTITLEMENTS.free.features,
-            maxMembers: ENTITLEMENTS.free.maxMembers,
-          };
-
-          const items = [free, ...paid].sort((a, b) => a.rank - b.rank);
+          const items = [this.buildFreeEntry(paid[0]?.currency), ...paid].sort(
+            (a, b) => a.rank - b.rank,
+          );
           this.cache = { at: this.now(), items };
           return items;
-        } catch (err) {
-          this.instrumentation.capture(err);
-          throw err;
+        } catch {
+          // Adapter already captured to telemetry (§8). Degrade to free-only;
+          // do not cache so the next call retries Stripe when it recovers.
+          return [this.buildFreeEntry()];
         }
       },
     );

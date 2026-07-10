@@ -44,6 +44,19 @@ describe("BillingCatalogService", () => {
     expect(catalog.map((c) => c.tier)).toEqual(["free"]);
   });
 
+  it("degrades to a free-only catalog when the source rejects (no throw)", async () => {
+    const source: IStripeCatalogSource = {
+      listActivePrices: mock(async () => {
+        throw new Error("stripe down");
+      }),
+    };
+    const svc = new BillingCatalogService(source, new NoOpInstrumentation());
+    const catalog = await svc.getCatalog();
+    expect(catalog.length).toBe(1);
+    expect(catalog[0]?.tier).toBe("free");
+    expect(catalog[0]?.priceId).toBeNull();
+  });
+
   it("caches within the TTL (single upstream call for two reads)", async () => {
     const source = makeSource([proPrice]);
     const svc = new BillingCatalogService(source, new NoOpInstrumentation(), () => 1000);
