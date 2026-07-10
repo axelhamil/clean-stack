@@ -9,7 +9,14 @@ import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
+import {
+  admin,
+  bearer,
+  customSession,
+  magicLink,
+  organization,
+  twoFactor,
+} from "better-auth/plugins";
 import { CryptoHasher } from "bun";
 import type Stripe from "stripe";
 import {
@@ -383,6 +390,7 @@ const authOptions = {
       },
     }),
     passkey({ rpName: "clean-stack" }),
+    admin({ adminUserIds: env.PLATFORM_ADMIN_IDS, defaultRole: "user", adminRoles: ["admin"] }),
     organization({
       ac,
       roles,
@@ -844,12 +852,12 @@ export const auth = betterAuth({
   plugins: [
     ...authOptions.plugins,
     customSession(async ({ user, session }) => {
-      if (!session.activeOrganizationId) return { user, session };
+      const isPlatformAdmin =
+        env.PLATFORM_ADMIN_IDS.includes(user.id) || (user as { role?: string }).role === "admin";
+      const enrichedUser = { ...user, isPlatformAdmin };
+      if (!session.activeOrganizationId) return { user: enrichedUser, session };
       const role = await findActiveMemberRole(user.id, session.activeOrganizationId);
-      return {
-        user,
-        session: { ...session, activeOrganizationRole: role },
-      };
+      return { user: enrichedUser, session: { ...session, activeOrganizationRole: role } };
     }, authOptions),
   ],
 });
