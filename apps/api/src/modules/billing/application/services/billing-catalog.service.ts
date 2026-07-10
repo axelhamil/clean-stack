@@ -12,7 +12,7 @@ export interface PlanCatalogItem {
   marketingFeatures: string[];
   rank: number;
   features: Feature[];
-  maxMembers: number;
+  maxMembers: number | null;
 }
 
 const TTL_MS = 5 * 60 * 1000;

@@ -9,7 +9,7 @@ type Feature = "audit_log" | "api" | "sso";
 export type EntitlementsView = {
   rank: number;
   features: Feature[];
-  maxMembers: number;
+  maxMembers: number | null;
   tier: Tier;
   status: string;
 };

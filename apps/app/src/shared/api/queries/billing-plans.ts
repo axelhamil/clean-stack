@@ -15,7 +15,7 @@ export type PlanCatalogItem = {
   marketingFeatures: string[];
   rank: number;
   features: Feature[];
-  maxMembers: number;
+  maxMembers: number | null;
 };
 
 export const plansQueryOptions = queryOptions({

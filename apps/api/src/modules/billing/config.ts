@@ -4,7 +4,7 @@ export type Feature = "audit_log" | "api" | "sso";
 export interface Entitlement {
   rank: number;
   features: Feature[];
-  maxMembers: number;
+  maxMembers: number | null;
 }
 
 export const ENTITLEMENTS: Record<Tier, Entitlement> = {
@@ -13,7 +13,7 @@ export const ENTITLEMENTS: Record<Tier, Entitlement> = {
   business: {
     rank: 2,
     features: ["audit_log", "api", "sso"],
-    maxMembers: Number.POSITIVE_INFINITY,
+    maxMembers: null,
   },
 };
 
@@ -42,6 +42,6 @@ export function meetsPlan(view: EntitlementsView, minTier: Tier): boolean {
   return view.rank >= rankOf(minTier);
 }
 
-export function hasSeatAvailable(activeMembers: number, maxMembers: number): boolean {
-  return activeMembers < maxMembers;
+export function hasSeatAvailable(activeMembers: number, maxMembers: number | null): boolean {
+  return maxMembers === null || activeMembers < maxMembers;
 }

@@ -32,9 +32,10 @@ describe("billing config", () => {
     expect(meetsPlan(proView, "business")).toBe(false);
   });
 
-  it("hasSeatAvailable blocks at the cap, allows below", () => {
+  it("hasSeatAvailable blocks at the cap, allows below, treats null as unlimited", () => {
     expect(hasSeatAvailable(2, 3)).toBe(true);
     expect(hasSeatAvailable(3, 3)).toBe(false);
-    expect(hasSeatAvailable(0, Number.POSITIVE_INFINITY)).toBe(true);
+    expect(hasSeatAvailable(0, null)).toBe(true);
+    expect(hasSeatAvailable(5, null)).toBe(true);
   });
 });
