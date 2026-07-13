@@ -60,3 +60,38 @@ export const ALL_EVENT_TYPES: readonly EventType[] = Object.values(EventTypes);
 export function isKnownEventType(value: string): value is EventType {
   return ALL_EVENT_TYPES.includes(value as EventType);
 }
+
+export const INTERNAL_EVENT_TYPES: readonly EventType[] = [
+  EventTypes.WEBHOOK_TEST,
+  EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED,
+  EventTypes.WEBHOOK_ENDPOINT_DISABLED,
+  EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
+];
+
+export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(
+  (t) => !INTERNAL_EVENT_TYPES.includes(t),
+);
+
+export function eventGroupOf(eventType: string): string {
+  const dot = eventType.indexOf(".");
+  return dot === -1 ? eventType : eventType.slice(0, dot);
+}
+
+export function matchesSubscription(
+  eventType: EventType,
+  subscriptions: readonly string[],
+): boolean {
+  if (INTERNAL_EVENT_TYPES.includes(eventType)) return false;
+  if (subscriptions.includes("*")) return true;
+  if (subscriptions.includes(eventType)) return true;
+  return subscriptions.includes(`${eventGroupOf(eventType)}.*`);
+}
+
+export function isSubscribableSelector(value: string): boolean {
+  if (value === "*") return true;
+  if (value.endsWith(".*")) {
+    const group = value.slice(0, -2);
+    return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
+  }
+  return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+}
