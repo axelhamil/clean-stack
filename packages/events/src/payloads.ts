@@ -199,6 +199,37 @@ export const WebhookEndpointDeletedPayload = OrgRef.extend({
 });
 export type WebhookEndpointDeletedPayload = z.infer<typeof WebhookEndpointDeletedPayload>;
 
+export const WebhookTestPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+});
+export type WebhookTestPayload = z.infer<typeof WebhookTestPayload>;
+
+export const WebhookEndpointSecretRotatedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+});
+export type WebhookEndpointSecretRotatedPayload = z.infer<
+  typeof WebhookEndpointSecretRotatedPayload
+>;
+
+export const WebhookEndpointDisabledPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string().nullable(),
+  reason: z.enum(["delivery_failures"]),
+  consecutiveFailures: z.number().int().nonnegative(),
+});
+export type WebhookEndpointDisabledPayload = z.infer<typeof WebhookEndpointDisabledPayload>;
+
+export const WebhookDeliveryExhaustedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  deliveryId: z.string(),
+  eventType: z.string(),
+  attempts: z.number().int().nonnegative(),
+  actorUserId: z.string().nullable(),
+});
+export type WebhookDeliveryExhaustedPayload = z.infer<typeof WebhookDeliveryExhaustedPayload>;
+
 export const UserPolicyAcceptedPayload = UserRef.extend({
   policyType: z.string(),
   policyVersion: z.string(),
@@ -367,6 +398,10 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_CREATED]: WebhookEndpointCreatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
+  [EventTypes.WEBHOOK_TEST]: WebhookTestPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED]: WebhookEndpointSecretRotatedPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_DISABLED]: WebhookEndpointDisabledPayload,
+  [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]: WebhookDeliveryExhaustedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,
