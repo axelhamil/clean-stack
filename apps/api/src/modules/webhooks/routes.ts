@@ -115,6 +115,31 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       });
     },
   )
+  .get(
+    "/:id/deliveries/:deliveryId",
+    requireAuth,
+    requireOrg,
+    requireOrgPermission({ webhooks: ["read"] }),
+    async (c) => {
+      const orgId = c.get("orgId");
+      const id = c.req.param("id");
+      const deliveryId = c.req.param("deliveryId");
+      const endpoint = await di.WebhooksService.findEndpoint(id, orgId);
+      if (endpoint.isNone())
+        throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const opt = await di.WebhooksService.findDelivery(deliveryId, orgId);
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });
+      const { nextAttemptAt, lastError, lastResponseStatus, attemptHistory, ...rest } =
+        opt.unwrap();
+      return c.json({
+        ...rest,
+        nextAttemptAt: nextAttemptAt.toNull(),
+        lastError: lastError.toNull(),
+        lastResponseStatus: lastResponseStatus.toNull(),
+        attemptHistory,
+      });
+    },
+  )
   .post(
     "/:id/test",
     requireAuth,

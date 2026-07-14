@@ -8,6 +8,7 @@ import type { ITransaction } from "../../../shared/transaction";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
+  WebhookDeliveryAttemptRecord,
   WebhookDeliveryRecord,
 } from "../application/ports/webhook-delivery.port";
 import type {
@@ -57,6 +58,25 @@ const stubDelivery: WebhookDeliveryRecord = {
   lastResponseStatus: Option.none(),
   idempotencyKey: "idem-1",
   createdAt: new Date("2024-01-01"),
+};
+
+const stubDeliveryWithAttempts = {
+  ...stubDelivery,
+  attemptHistory: [
+    {
+      id: "att-1",
+      deliveryId: DELIVERY_ID,
+      attemptNumber: 1,
+      requestHeaders: null,
+      requestBody: null,
+      responseStatus: null,
+      responseHeaders: null,
+      responseBody: null,
+      durationMs: null,
+      error: "connection refused",
+      createdAt: new Date("2024-01-01"),
+    },
+  ],
 };
 
 const MASTER_KEY_HEX = "a".repeat(64);
@@ -110,6 +130,7 @@ function makeDeliveries(
     enqueueTargeted: mock(async () =>
       Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
     ),
+    findByIdWithAttempts: mock(async () => Option.some(stubDeliveryWithAttempts)),
     ...overrides,
   } as unknown as IWebhookDeliveryRepository;
 }
@@ -717,6 +738,94 @@ describe("WebhooksService", () => {
         expect.objectContaining({ name: "WebhooksService > replayDelivery", op: "function" }),
         expect.any(Function),
       );
+    });
+  });
+
+  describe("findDelivery", () => {
+    it("returns Some(delivery with attemptHistory) when found", async () => {
+      const service = makeService();
+      const opt = await service.findDelivery(DELIVERY_ID, ORG_ID);
+
+      expect(opt.isSome()).toBe(true);
+      const val = opt.unwrap();
+      expect(val.id).toBe(DELIVERY_ID);
+      expect(Array.isArray(val.attemptHistory)).toBe(true);
+      expect(val.attemptHistory).toHaveLength(1);
+    });
+
+    it("returns None when delivery not found", async () => {
+      const deliveries = makeDeliveries({
+        findByIdWithAttempts: mock(async () =>
+          Option.none<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>(),
+        ),
+      });
+      const service = makeService({ deliveries });
+      const opt = await service.findDelivery("nonexistent", ORG_ID);
+
+      expect(opt.isNone()).toBe(true);
+    });
+
+    it("calls instrumentation span with op=function", async () => {
+      const instrumentation = new NoOpInstrumentation();
+      const spy = spyOn(instrumentation, "startSpan");
+      const service = new WebhooksService(
+        makeEndpoints(),
+        makeDeliveries(),
+        tx,
+        noopOutbox,
+        validMasterKey,
+        instrumentation,
+      );
+
+      await service.findDelivery(DELIVERY_ID, ORG_ID);
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "WebhooksService > findDelivery", op: "function" }),
+        expect.any(Function),
+      );
+    });
+  });
+
+  describe("createEndpoint SSRF guard", () => {
+    it("returns WEBHOOK_URL_FORBIDDEN for private IP (127.0.0.1)", async () => {
+      const service = makeService();
+      const result = await service.createEndpoint({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        url: "http://127.0.0.1/hook",
+        eventTypes: ["user.created"],
+        enabled: true,
+      });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_URL_FORBIDDEN");
+    });
+  });
+
+  describe("updateEndpoint SSRF guard", () => {
+    it("returns WEBHOOK_URL_FORBIDDEN when url is a private address", async () => {
+      const service = makeService();
+      const result = await service.updateEndpoint({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        url: "http://192.168.1.1/hook",
+      });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_URL_FORBIDDEN");
+    });
+
+    it("does not trigger SSRF guard when url is not provided", async () => {
+      const service = makeService();
+      const result = await service.updateEndpoint({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        enabled: true,
+      });
+
+      expect(result.isSuccess).toBe(true);
     });
   });
 });

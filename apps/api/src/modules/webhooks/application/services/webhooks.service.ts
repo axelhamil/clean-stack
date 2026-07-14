@@ -6,10 +6,12 @@ import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { assertPublicUrl } from "../../../../shared/ssrf-guard";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
+  WebhookDeliveryAttemptRecord,
   WebhookDeliveryRecord,
 } from "../ports/webhook-delivery.port";
 import type {
@@ -22,7 +24,10 @@ export type WebhookSecretGenerator = () => string;
 export type MasterKeyProvider = () => Option<Uint8Array>;
 
 export type WebhookConfigError = AppError<"WEBHOOK_MASTER_KEY_UNAVAILABLE">;
-export type WebhookServiceError = WebhookConfigError | WebhookRepoError;
+export type WebhookServiceError =
+  | WebhookConfigError
+  | WebhookRepoError
+  | AppError<"WEBHOOK_URL_FORBIDDEN">;
 
 export class WebhooksService {
   constructor(
@@ -47,6 +52,10 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > createEndpoint", op: "function" },
       async () => {
+        const guard = await assertPublicUrl(args.url);
+        if (guard.isFailure)
+          return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: guard.getError().message });
+
         const masterKeyOpt = this.masterKey();
         if (masterKeyOpt.isNone()) {
           return Result.fail({
@@ -114,8 +123,16 @@ export class WebhooksService {
   }): Promise<Result<Option<WebhookEndpointRecord>, WebhookServiceError>> {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > updateEndpoint", op: "function" },
-      async () =>
-        this.uow.run(async (tx) => {
+      async () => {
+        if (args.url !== undefined) {
+          const guard = await assertPublicUrl(args.url);
+          if (guard.isFailure)
+            return Result.fail({
+              code: "WEBHOOK_URL_FORBIDDEN",
+              message: guard.getError().message,
+            });
+        }
+        return this.uow.run(async (tx) => {
           const updated = await this.endpoints.update(args, tx);
           if (updated.isFailure) return updated;
           const opt = updated.getValue();
@@ -139,7 +156,8 @@ export class WebhooksService {
             tx,
           );
           return updated;
-        }),
+        });
+      },
     );
   }
 
@@ -195,6 +213,16 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > listDeliveries", op: "function" },
       () => this.deliveries.list(args),
+    );
+  }
+
+  async findDelivery(
+    id: string,
+    organizationId: string,
+  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>> {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > findDelivery", op: "function" },
+      () => this.deliveries.findByIdWithAttempts(id, organizationId),
     );
   }
 
