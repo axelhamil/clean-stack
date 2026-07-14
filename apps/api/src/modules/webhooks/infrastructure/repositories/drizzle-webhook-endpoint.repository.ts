@@ -243,10 +243,12 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
             () => query.execute(),
           );
           if (!row) return Result.ok(Option.none());
+          const firstFailedAt = row.firstFailedAt;
+          if (firstFailedAt === null) return Result.ok(Option.none());
           return Result.ok(
             Option.some({
               consecutiveFailures: row.consecutiveFailures,
-              firstFailedAt: row.firstFailedAt!,
+              firstFailedAt,
             }),
           );
         } catch (e) {
