@@ -541,8 +541,8 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       expect(result.isSome()).toBe(true);
       const record = result.unwrap();
       expect(record.id).toBe("del-1");
-      expect(record.attempts).toHaveLength(1);
-      expect(record.attempts[0]?.attemptNumber).toBe(1);
+      expect(record.attemptHistory).toHaveLength(1);
+      expect(record.attemptHistory[0]?.attemptNumber).toBe(1);
     });
 
     it("happy path: outer span name + inner db.query spans", async () => {
@@ -555,7 +555,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const outer = calls.find(
         (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > findByIdWithAttempts",
       );
+      const inner = calls.find((c) => c[0]?.op === "db.query");
       expect(outer).toBeDefined();
+      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
     });
   });
 

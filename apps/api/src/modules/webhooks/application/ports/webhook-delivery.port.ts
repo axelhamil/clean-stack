@@ -78,9 +78,7 @@ export interface IWebhookDeliveryRepository {
   findByIdWithAttempts(
     id: string,
     organizationId: string,
-  ): Promise<
-    Option<Omit<WebhookDeliveryRecord, "attempts"> & { attempts: WebhookDeliveryAttemptRecord[] }>
-  >;
+  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>>;
   enqueueTargeted(
     args: {
       endpointId: string;

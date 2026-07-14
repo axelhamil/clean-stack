@@ -268,9 +268,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
   async findByIdWithAttempts(
     id: string,
     organizationId: string,
-  ): Promise<
-    Option<Omit<WebhookDeliveryRecord, "attempts"> & { attempts: WebhookDeliveryAttemptRecord[] }>
-  > {
+  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>> {
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findByIdWithAttempts" },
       async () => {
@@ -295,7 +293,10 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
             { name: attemptsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => attemptsQuery.execute(),
           );
-          return Option.some({ ...toRecord(row.d), attempts: attemptRows.map(toAttemptRecord) });
+          return Option.some({
+            ...toRecord(row.d),
+            attemptHistory: attemptRows.map(toAttemptRecord),
+          });
         } catch (e) {
           this.instrumentation.capture(e);
           throw e;
