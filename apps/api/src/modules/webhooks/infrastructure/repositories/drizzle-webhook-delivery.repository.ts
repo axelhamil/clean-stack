@@ -1,6 +1,7 @@
 import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
+  asc,
   db,
   desc,
   eq,
@@ -20,12 +21,14 @@ import type {
   DeliveryUpdate,
   IWebhookDeliveryRepository,
   ListDeliveriesArgs,
+  WebhookDeliveryAttemptRecord,
   WebhookDeliveryRecord,
 } from "../../application/ports/webhook-delivery.port";
 import type { WebhookRepoError } from "../../application/ports/webhook-endpoint.port";
 
 const wd = webhooksSchema.webhookDelivery;
 const we = webhooksSchema.webhookEndpoint;
+const wda = webhooksSchema.webhookDeliveryAttempt;
 const fail = createDbFailure("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
@@ -42,6 +45,22 @@ function toRecord(row: typeof wd.$inferSelect): WebhookDeliveryRecord {
     lastError: Option.fromNullable(row.lastError),
     lastResponseStatus: Option.fromNullable(row.lastResponseStatus),
     idempotencyKey: row.idempotencyKey,
+    createdAt: row.createdAt,
+  };
+}
+
+function toAttemptRecord(row: typeof wda.$inferSelect): WebhookDeliveryAttemptRecord {
+  return {
+    id: row.id,
+    deliveryId: row.deliveryId,
+    attemptNumber: row.attemptNumber,
+    requestHeaders: row.requestHeaders ?? null,
+    requestBody: row.requestBody ?? null,
+    responseStatus: row.responseStatus ?? null,
+    responseHeaders: row.responseHeaders ?? null,
+    responseBody: row.responseBody ?? null,
+    durationMs: row.durationMs ?? null,
+    error: row.error ?? null,
     createdAt: row.createdAt,
   };
 }
@@ -219,6 +238,108 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
         } catch (e) {
           this.instrumentation.capture(e);
           return fail(e, "webhook delivery enqueueReplay failed");
+        }
+      },
+    );
+  }
+
+  async createAttempt(
+    args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
+    tx: Transaction,
+  ): Promise<Result<void, WebhookRepoError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleWebhookDeliveryRepository > createAttempt" },
+      async () => {
+        try {
+          const query = tx.insert(wda).values({ id: uuidv7(), ...args });
+          await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok();
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "webhook delivery createAttempt failed");
+        }
+      },
+    );
+  }
+
+  async findByIdWithAttempts(
+    id: string,
+    organizationId: string,
+  ): Promise<
+    Option<Omit<WebhookDeliveryRecord, "attempts"> & { attempts: WebhookDeliveryAttemptRecord[] }>
+  > {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleWebhookDeliveryRepository > findByIdWithAttempts" },
+      async () => {
+        try {
+          const deliveryQuery = db
+            .select({ d: wd })
+            .from(wd)
+            .innerJoin(we, eq(wd.endpointId, we.id))
+            .where(and(eq(wd.id, id), eq(we.organizationId, organizationId)))
+            .limit(1);
+          const [row] = await this.instrumentation.startSpan(
+            { name: deliveryQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => deliveryQuery.execute(),
+          );
+          if (!row) return Option.none();
+          const attemptsQuery = db
+            .select()
+            .from(wda)
+            .where(eq(wda.deliveryId, id))
+            .orderBy(asc(wda.attemptNumber));
+          const attemptRows = await this.instrumentation.startSpan(
+            { name: attemptsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => attemptsQuery.execute(),
+          );
+          return Option.some({ ...toRecord(row.d), attempts: attemptRows.map(toAttemptRecord) });
+        } catch (e) {
+          this.instrumentation.capture(e);
+          throw e;
+        }
+      },
+    );
+  }
+
+  async enqueueTargeted(
+    args: {
+      endpointId: string;
+      outboxEventId: string;
+      eventType: string;
+      payload: unknown;
+      idempotencyKey: string;
+    },
+    tx: Transaction,
+  ): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleWebhookDeliveryRepository > enqueueTargeted" },
+      async () => {
+        try {
+          const query = tx
+            .insert(wd)
+            .values({
+              id: uuidv7(),
+              endpointId: args.endpointId,
+              outboxEventId: args.outboxEventId,
+              eventType: args.eventType,
+              payload: args.payload,
+              status: "pending",
+              attempts: 0,
+              idempotencyKey: args.idempotencyKey,
+            })
+            .returning();
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          if (!row) throw new Error("enqueueTargeted returned no row");
+          return Result.ok(toRecord(row));
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "webhook delivery enqueueTargeted failed");
         }
       },
     );
