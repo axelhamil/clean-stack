@@ -350,6 +350,36 @@ Per-organization subscriptions with zero billing backoffice. Stripe Checkout han
 
 See [`HISTORY.md`](./HISTORY.md) for the state-SSOT decision, hybrid-catalog rationale, unlimited=null choice, and pre-merge review catches.
 
+## Outbound webhooks front UI + public event catalog ✅ Phase C.5
+
+Full operator surface for managing webhook endpoints and inspecting deliveries, plus a public developer reference for the event catalog. The back-end (CRUD API + worker + outbox integration + SSRF guard + rotation) is on the API; this section covers the front-end UI and the back-end hardening added alongside it.
+
+**Back-end hardening (Plans 1–2)**:
+
+- **SSRF guard** — webhook URLs validated at create/update AND re-validated at delivery time (anti-DNS-rebinding). Blocks: loopback (127.0.0.0/8, `::1`), RFC1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), link-local (169.254.0.0/16, `fe80::/10`), ULA (fd00::/8), CGNAT (100.64.0.0/10), cloud-metadata endpoints (169.254.169.254, 169.254.170.2, fd00:ec2::254, metadata.google.internal). Rejections → `WEBHOOK_URL_FORBIDDEN` (403).
+
+- **Dual-secret rotation** (`POST /settings/webhooks/:id/rotate-secret`) — grace window `WEBHOOK_SECRET_GRACE_HOURS` (default 24h). During grace, both old + new secrets sign; `x-webhook-signature` carries multiple `v1=` values. Consumers accept on first match. New secret returned once, never re-exposed.
+
+- **Per-attempt delivery timeline** — `webhook_delivery_attempt` table: `attemptNumber`, `requestHeaders`, `requestBody`, `responseStatus`, `responseHeaders`, `responseBody` (capped at `WEBHOOK_RESPONSE_CAPTURE_BYTES`, default 4096), `durationMs`, `error`, `attemptedAt`. Exposed via `GET /settings/webhooks/:id/deliveries/:deliveryId`.
+
+- **Auto-disable failing endpoints** — after `WEBHOOK_AUTO_DISABLE_AFTER_DAYS` (default 5) of failures with ≥ `WEBHOOK_AUTO_DISABLE_MIN_FAILURES` (default 2) consecutive failures: endpoint `status` → `auto_disabled`, `webhook.endpoint.disabled` emitted. Re-enable is manual + resets counters.
+
+- **Wildcard subscriptions** — `"*"`, `"<group>.*"`, or exact event names. Internal webhook events never fan out (feedback-loop prevention).
+
+- **Test event** (`POST /settings/webhooks/:id/test`) — sends `webhook.test` to the endpoint. Also auto-fired on endpoint creation for immediate reachability feedback.
+
+- **4 new internal events** (`operational` retention, non-subscribable, non-fanout): `webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`. **Catalog → 52 total / 48 subscribable / 4 internal**.
+
+**Frontend** (`apps/app/src/features/webhooks/` + `apps/app/src/features/developers/`):
+
+- Gated `webhooks: ["read"]` (list/deliveries) / `webhooks: ["write"]` (CRUD/rotate/test). Wired in `SETTINGS_TABS`.
+- `/settings/webhooks` page (`webhooks.{route,page}.tsx`) — endpoint list with status badges (enabled / paused / auto-disabled), create/edit in a side Sheet (name, URL, `EventTypePicker` grouped by namespace with group wildcards + select-all), per-endpoint delivery list (cursor-paginated, status filter), per-delivery timeline drawer showing each attempt's request/response headers + bodies, one-shot secret reveal on create, rotate-secret dialog, send-test button.
+- `EventTypePicker` (`_components/event-type-picker.tsx`) — consumes `SUBSCRIBABLE_EVENT_TYPES` from `@packages/events`. The picker and the public catalog share the same SSOT: no drift possible.
+- **Auto-disabled badge** — `status: "auto_disabled"` renders a destructive "Auto-disabled — delivery failures" badge, distinct from the yellow "Paused" badge for user-paused endpoints.
+- **Queries** (`_api/webhooks.queries.ts`): `endpointsQueryOptions`, `endpointDeliveriesQueryOptions` (paginated), `deliveryDetailQueryOptions` (with `attempts[]`).
+- **Mutations** (`_api/webhooks.mutations.ts`): create / update / delete / `rotateSecretMutationOptions` / `sendTestMutationOptions`.
+- Public `/developers/events` page (`developers/developers.{route,page}.tsx`, no auth, under `rootRoute`) — `EventTypesTable` component: all 48 subscribable events with group, retention, description, and expandable JSON schema per event (via `jsonSchemaForEvent` wrapping Zod 4 native `z.toJSONSchema({ unrepresentable: "any" })`). Includes a Node.js signature-verification snippet. Linked from the command palette.
+
 ---
 
 ## Roadmap (not yet shipped)
@@ -357,7 +387,7 @@ See [`HISTORY.md`](./HISTORY.md) for the state-SSOT decision, hybrid-catalog rat
 See [`../ROADMAP.md`](../ROADMAP.md) for the full plan with constraints + extension points.
 
 - **Admin & impersonation** — BetterAuth `admin` plugin.
-- **Front UI for audit log + webhooks** — API ready, app-side pages remain.
+- **Front UI for webhooks** ✅ **shipped** (Phase C.5 — see above).
 - **Tamper-evidence audit hash chain** — columns posed, calc deferred until SOC2 audit demands.
 - **Domain-event → telemetry subscribers** (Sentry breadcrumb / OTel span attr / Prom counter per event-type) — trivial `onEvent(...)` additions. Sentry capture on 5xx errors already wired via `IInstrumentation` (Phase 0.4); OTel + Prom subscribers land with Phase D.1 Grafana consumer.
 - **i18n** — TanStack Router locale routes + typed message catalogs.

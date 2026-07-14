@@ -221,12 +221,15 @@ For other orchestrators (Fly Machines `--schedule`, Render Cron Job, Cloud Sched
 - `GET /admin/audit-log` — list audit events for active org. Permission: `auditLog: ["read"]`. `organizationId` always derived from session, never query string.
 - `POST /internal/sweep-{outbox,audit-log,webhook-delivery}` — retention sweeps (see § Retention above). Internal-gated (HMAC signature + optional private network).
 - `GET/POST/PATCH/DELETE /settings/webhooks` — manage endpoints. Permission: `webhooks: ["read"|"write"]`. Plaintext secret returned **once at creation** (Stripe-style), never re-exposed.
-- `GET /settings/webhooks/:id/deliveries` — list deliveries with status filter (`?status=pending|success|failed|dead_letter`).
+- `POST /settings/webhooks/:id/rotate-secret` — rotate the endpoint signing secret; returns the new secret once. Both old + new secrets sign during the `WEBHOOK_SECRET_GRACE_HOURS` grace window.
+- `POST /settings/webhooks/:id/test` — send a targeted `webhook.test` delivery to the endpoint. Also auto-fired on endpoint creation.
+- `GET /settings/webhooks/:id/deliveries` — list deliveries with status filter (`?status=pending|success|failed|dead_letter`), cursor pagination.
+- `GET /settings/webhooks/:id/deliveries/:deliveryId` — single delivery detail including `attempts[]` (per-attempt request/response headers + body).
 - `POST /settings/webhooks/:id/deliveries/:deliveryId/replay` — re-enqueue a past delivery with fresh idempotency key.
 
 ## HMAC signature format (for receivers)
 
-Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. Signed payload: `${timestamp}.${rawBody}`. Body shape: `{ id, type, data, time }` (CloudEvents-aligned).
+Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. During a secret rotation grace window the header carries multiple `v1=` values: `t=<unix>,v1=<hex_old>,v1=<hex_new>`. Accept if **any** `v1=` value verifies. Signed payload: `${timestamp}.${rawBody}`. Body shape: `{ id, type, data, time }` (CloudEvents-aligned).
 
 Reject if timestamp drift > 5 min (replay protection). Use the `x-webhook-idempotency` header (`<eventId>:<endpointId>`) to dedupe on your side.
 
@@ -254,7 +257,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **47 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security — 3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`, **4 from `modules/billing/`**, **1 from quota middleware**). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **52 events** (48 subscribable + 4 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -291,6 +294,12 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 ### Via WebhooksService
 - `WEBHOOK_ENDPOINT_CREATED` · `WEBHOOK_ENDPOINT_UPDATED` · `WEBHOOK_ENDPOINT_DELETED` (payload carries `actorUserId` propagated from the HTTP boundary — `c.get("user").id`)
+
+**Phase C.5 — 4 new internal events** (non-subscribable, non-fanout — guarded by `INTERNAL_EVENT_TYPES` in `WebhookFanoutSubscriber`; `retention: "operational"`):
+- `WEBHOOK_TEST` (`webhook.test`) — emitted when a test delivery is triggered (`POST /settings/webhooks/:id/test` or auto-on-create). Payload: `{ endpointId, organizationId, actorUserId }`.
+- `WEBHOOK_ENDPOINT_SECRET_ROTATED` (`webhook.endpoint.secret_rotated`) — secret rotation completed. Payload: `{ endpointId, organizationId, actorUserId }`.
+- `WEBHOOK_ENDPOINT_DISABLED` (`webhook.endpoint.disabled`) — auto-disable fired after sustained failures. Payload: `{ endpointId, organizationId, consecutiveFailures: number, lastFailedAt: string }`.
+- `WEBHOOK_DELIVERY_EXHAUSTED` (`webhook.delivery.exhausted`) — delivery dead-lettered after all retry attempts. Payload: `{ deliveryId, endpointId, organizationId, eventType: string, attempts: number }`.
 
 ### Via `PolicyAcceptanceService` (Phase A.2)
 - `USER_POLICY_ACCEPTED` (`user.policy.accepted`) — payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
@@ -363,7 +372,8 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (47 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (52 events: 48 subscribable + 4 internal) |
+| `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |

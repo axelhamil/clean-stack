@@ -774,4 +774,91 @@ Four issues caught before merge — all fixed:
 
 **Dormant + knip**: the primitives are not called by any product code today. `knip.json` whitelists `apps/app/src/shared/auth/quota-gate.tsx` (front gate) and `apps/api/src/shared/db/quota-reservation.ts` (back atomic reserve) as explicit `entry` points — the boilerplate-primitive pattern, same as `feature-gate.tsx` and `plan-gate.tsx` from B.1. `modules/quotas/module.ts` is covered by the existing `src/modules/*/module.ts` glob.
 
+---
+
+## Outbound webhooks — SOTA hardening (Plans 1–2) + front UI + public catalog (Plan 3) ✅ Phase C.5 · Jul 2026
+
+**Why (hardening)**: the event-driven foundation shipped the webhook worker with HMAC signing and jitter retry, but left several attack surfaces open: (1) SSRF — org admins can register arbitrary URLs; without validation an insider could exfiltrate cloud-instance metadata or pivot into private networks; (2) secret rotation — hard-cutting a secret during rotation breaks all in-flight verifications; a grace window is necessary; (3) delivery forensics — debugging a failing endpoint was guesswork without a per-attempt request/response log; (4) resource pressure — dead endpoints accumulate retry backpressure in the delivery worker queue and slow delivery for everyone; auto-disable with a distinct UX badge is the correct response.
+
+**Why (front UI)**: the CRUD API was live but operator access required raw HTTP calls. `/settings/webhooks` surfaces endpoint management, delivery inspection, secret rotation, and test-fire in a single page. The public `/developers/events` catalog solves a real integration onboarding friction: customers need to know what events fire, what their payloads look like, and how to verify signatures without reading the source code.
+
+### Back-end (Plans 1–2)
+
+- [x] **SSRF guard** (`apps/api/src/modules/webhooks/application/validators/webhook-url.validator.ts`) — Zod custom validator that DNS-resolves the URL and checks every resolved IP against: loopback (127.0.0.0/8, `::1`), RFC1918 (10/8, 172.16/12, 192.168/16), link-local (169.254/16, `fe80::/10`), ULA (fd00::/8), CGNAT (100.64/10), cloud-metadata hosts (169.254.169.254, 169.254.170.2, fd00:ec2::254, metadata.google.internal, 100.100.100.200). Runs at create/update AND at delivery time — re-resolving at delivery closes the DNS-rebinding window (register a public domain → TTL-0 rebind to 169.254.169.254 by delivery time). Rejections → `WEBHOOK_URL_FORBIDDEN` (403).
+
+- [x] **Dual-secret rotation** (`POST /settings/webhooks/:id/rotate-secret`) — `WebhooksService.rotateSecret` generates a new secret, stores it alongside the old one, and sets `rotatedAt = now()`. During the grace period (`WEBHOOK_SECRET_GRACE_HOURS`, default 24), `WebhookDeliveryWorker` signs with **both** secrets and emits `t=<ts>,v1=<hex_old>,v1=<hex_new>` in a single `x-webhook-signature` header. Consumers accept if **any** `v1=` value verifies. After the grace period the old secret is nulled. New secret returned once in the `POST` response body and never re-exposed. Emits `webhook.endpoint.secret_rotated`.
+
+- [x] **Per-attempt delivery timeline** — `webhook_delivery_attempt` table (UUID v7 PK, FK → `webhook_delivery` ON DELETE CASCADE): `attemptNumber int`, `requestHeaders jsonb`, `requestBody text`, `responseStatus int?`, `responseHeaders jsonb?`, `responseBody text?` (capped at `WEBHOOK_RESPONSE_CAPTURE_BYTES` env, default 4096 bytes — prevents large HTML error pages from filling the table), `durationMs int`, `error text?` (network-level errors), `attemptedAt timestamptz`. `WebhookDeliveryWorker` writes one row per HTTP attempt inside the same TX as the delivery status update. Exposed via `GET /settings/webhooks/:id/deliveries/:deliveryId` → `{ delivery, attempts: DeliveryAttempt[] }`.
+
+- [x] **Auto-disable failing endpoints** — `WebhookDeliveryWorker` tracks `consecutiveFailures` on the `webhook_endpoint` row. When `consecutiveFailures >= WEBHOOK_AUTO_DISABLE_MIN_FAILURES` (default 2) AND the first failure was more than `WEBHOOK_AUTO_DISABLE_AFTER_DAYS` (default 5) days ago: `status` flips to `auto_disabled`, `consecutiveFailures` stays set (forensics), `webhook.endpoint.disabled` emitted (payload: `{ endpointId, organizationId, consecutiveFailures, lastFailedAt }`). Re-enable: `PATCH /settings/webhooks/:id` with `{ status: "enabled" }` resets `consecutiveFailures` and `rotatedAt`. Fanout skips `auto_disabled` endpoints (no backpressure while disabled).
+
+- [x] **Wildcard subscriptions** — `webhook_endpoint.eventTypes` accepts: `"*"` (all subscribable events), `"<group>.*"` (e.g., `"billing.*"`, `"user.*"`, `"org.*"`), or exact event names. `WebhookFanoutSubscriber` expands wildcards at fan-out time against `SUBSCRIBABLE_EVENT_TYPES`. **Internal events** (`webhook.test`, `webhook.endpoint.*`, `webhook.delivery.*`) are never included in the expandable set — they use the delivery worker directly and skip the fanout path entirely (no infinite-fanout loop).
+
+- [x] **Test event** (`POST /settings/webhooks/:id/test`) — creates a `webhook_delivery` row with `eventType: "webhook.test"` and a synthetic payload targeted at the specific endpoint, bypassing the fanout subscriber (direct insert). Also auto-inserted on endpoint creation (immediate reachability feedback without waiting for a real event). Delivery is processed by `WebhookDeliveryWorker` identically to any other delivery and recorded in `webhook_delivery_attempt`.
+
+- [x] **4 new internal events** (all `operational` retention, all non-subscribable, never fanout — `INTERNAL_EVENT_TYPES` set guards `WebhookFanoutSubscriber`):
+  - `webhook.test` — targeted test delivery to a specific endpoint.
+  - `webhook.endpoint.secret_rotated` — secret rotation. Payload: `{ endpointId, organizationId, actorUserId }`.
+  - `webhook.endpoint.disabled` — auto-disable fired. Payload: `{ endpointId, organizationId, consecutiveFailures, lastFailedAt }`.
+  - `webhook.delivery.exhausted` — delivery dead-lettered after all retry attempts. Payload: `{ deliveryId, endpointId, organizationId, eventType, attempts: number }`.
+  - **Catalog after C.5: 52 total events, 48 subscribable, 4 internal.**
+
+### Front-end (Plan 3)
+
+Gated `webhooks: ["read"]` (list, deliveries, detail) / `webhooks: ["write"]` (create, update, delete, rotate, test). `SETTINGS_TABS` entry with `requires: { webhooks: ["read"] }`.
+
+- [x] **Route** `apps/app/src/features/webhooks/webhooks.route.tsx` — nested under `_org-scope`, `beforeLoad: ensureOrgPermission({ webhooks: ["read"] })`.
+
+- [x] **Page** `apps/app/src/features/webhooks/webhooks.page.tsx`:
+  - Endpoint list with status badges: enabled (green), paused (yellow, user-set), auto-disabled (destructive — distinct from user-paused, avoids confusion about who disabled it).
+  - Create/edit endpoint in a side Sheet — name, URL field, `EventTypePicker` grouped by namespace.
+  - One-shot secret reveal on create — secret shown once in a `Dialog` with copy-to-clipboard, "I've saved it" to close. Never shown again.
+  - Rotate-secret button (write gate) — calls `POST /:id/rotate-secret`, new secret revealed the same one-shot way.
+  - Send-test button (write gate) — calls `POST /:id/test`, sonner toast on success/failure.
+  - Per-endpoint delivery list: cursor pagination (`?cursor=<id>`), status filter (pending / success / failed / dead_letter), columns: event type, status, duration, attempted-at, replay button.
+  - Per-delivery timeline drawer (`DeliveryDrawer`) — attempt rows with status, HTTP status, duration; expandable request headers/body and response headers/body panels.
+
+- [x] **Queries** (`apps/app/src/features/webhooks/_api/webhooks.queries.ts`):
+  - `endpointsQueryOptions(orgId)` — list all endpoints.
+  - `endpointDeliveriesQueryOptions(endpointId, filters)` — paginated delivery list (cursor + status).
+  - `deliveryDetailQueryOptions(endpointId, deliveryId)` — single delivery with `attempts[]`.
+
+- [x] **Mutations** (`apps/app/src/features/webhooks/_api/webhooks.mutations.ts`):
+  - `createEndpointMutationOptions` / `updateEndpointMutationOptions` / `deleteEndpointMutationOptions` — invalidate `endpointsQueryOptions` on success.
+  - `rotateSecretMutationOptions` — response carries `data.secret` (the new plaintext secret, shown once).
+  - `sendTestMutationOptions` — `POST /:id/test`, fires a toast.
+
+- [x] **`EventTypePicker`** (`_components/event-type-picker.tsx`) — consumes `SUBSCRIBABLE_EVENT_TYPES` + `groupedSubscribableEvents` from `@packages/events`. Checkbox per event + group-level wildcard toggle + select-all. Used in both create and edit forms.
+
+- [x] **Public developer catalog** (`apps/app/src/features/developers/developers.{route,page}.tsx`, no auth, under `rootRoute`):
+  - `EventTypesTable` component — all 48 subscribable events in a table: group, event type, retention label (`operational` / `compliance`), description, expandable JSON schema (rendered from `jsonSchemaForEvent(type)` which wraps Zod 4's `z.toJSONSchema({ unrepresentable: "any" })`).
+  - Node.js signature-verification snippet (matches the server's `t=<ts>,v1=<hex>` format exactly — cross-checked against `hmac-signer.ts`).
+  - Route is public; linked from the command palette under "Developers".
+  - `jsonSchemaForEvent` defined in `packages/events/src/json-schema.ts`, exported from `@packages/events`. Safe fallback for events not in `PayloadByEventType`.
+  - `descriptionFor(type)` — human-readable description per event type, defined in `packages/events/src/descriptions.ts`, consumed by both `EventTypesTable` (catalog) and `EventTypePicker` (form). Same SSOT: no description drift.
+
+### Decisions (C.5)
+
+1. **SSRF guard at both create and delivery time (anti-rebinding)**: validating only at create allows a DNS-rebinding attack — a URL that resolves to a safe IP at registration time can re-resolve to `169.254.169.254` by delivery time via a TTL-0 record swap. Re-checking at delivery closes the window at the cost of one extra DNS lookup per delivery attempt (acceptable: already doing an HTTP connect).
+
+2. **Multiple `v1=` values for secret rotation (Stripe-compatible)**: the simplest consumer-compatible model. Receivers already split on `,` then `=`; iterating pairs and accepting on first match requires ~3 extra lines. The alternative (a `x-webhook-signature-old` header) adds a new header contract that receivers must learn; the Stripe-style multi-value approach is self-contained in the existing header.
+
+3. **`webhook.test` and `webhook.endpoint.*` as internal events (non-subscribable, non-fanout)**: the test delivery must travel through the outbox + delivery worker for realistic integration testing, but must never fan out to *other* endpoints' subscriptions. Marking them internal in `INTERNAL_EVENT_TYPES` achieves this: `WebhookFanoutSubscriber` skips them, and they don't appear in `EventTypePicker` or `EventTypesTable`. The four internal events expand the catalog to 52 without changing the subscribable set (still 48).
+
+4. **Zod 4 native `z.toJSONSchema` for the public catalog**: spec §5 left the schema-rendering strategy open ("`zod-to-json-schema` vs hand-rolled walker"). Zod 4 ships `z.toJSONSchema({ unrepresentable: "any" })` natively — no external dependency, no walker, no drift. `jsonSchemaForEvent` wraps it with a safe fallback (`{}`) for unregistered event types.
+
+5. **Separate `EventTypePicker` and `EventTypesTable` components (shared SSOT, distinct rendering contracts)**: the SSOT is `SUBSCRIBABLE_EVENT_TYPES` + `descriptionFor` + `jsonSchemaForEvent` + `groupedSubscribableEvents` in `@packages/events`. The two components are separate because their contracts are incompatible (interactive checkboxes with state + RHF integration vs. a static reference table with expandable JSON). A polymorphic component would add complexity without reducing drift — both already depend on the shared SSOT, so description and schema changes propagate to both automatically.
+
+6. **`webhook_delivery_attempt` response body capped at `WEBHOOK_RESPONSE_CAPTURE_BYTES` (default 4096)**: the capture exists for debugging, not for storage. A 500-error HTML page from a misconfigured endpoint can be megabytes; capturing it in full would bloat the table indefinitely. 4096 bytes is enough to see the error type and message for every real-world error format (JSON API errors, Rails/Django HTML error pages truncated to the `<h1>`, plain-text). Configurable for operators who need more context.
+
+7. **Auto-disable threshold is time-based + count-based (not count-only)**: a count-only threshold (e.g., "10 consecutive failures") would auto-disable an endpoint within minutes of a brief server restart — too aggressive. The time-based component (`WEBHOOK_AUTO_DISABLE_AFTER_DAYS`) ensures the endpoint has been failing for days, not just a maintenance window. The combination distinguishes "transient outage" from "dead endpoint".
+
+### As-built deviations (C.5)
+
+1. **`jsonSchemaForEvent` in `@packages/events`, not a separate package**: the schema-rendering helper was considered for a standalone `@packages/webhook-schema` package. Placed in `@packages/events` instead (new file `json-schema.ts`) because the primary consumer (`EventTypesTable`) already depends on `@packages/events` for `SUBSCRIBABLE_EVENT_TYPES` — adding the schema helper there avoids a new dependency and keeps the event catalog a single import.
+
+2. **No `EventTypesTable` in `@packages/ui`**: the component is app-specific (links to the catalog page, uses app-side routing, depends on `@packages/events`). No second consumer exists today. Rule 14: promote on second occurrence.
+
+3. **Test delivery bypasses `WebhookFanoutSubscriber`**: a test event could be emitted through the normal outbox path and discovered by the fanout subscriber, but that would require the fanout subscriber to special-case endpoint targeting (normally it's org-wide). Direct delivery-row insertion is cleaner and avoids the fanout subscriber needing to know about the concept of a "test delivery".
+
 **Event**: `billing.quota.exceeded` (operational) — payload `{ organizationId, resource, limit, attempted, tier, actorUserId }`. Emitted only from `requireQuota` (the pre-check middleware). `reserveQuota` does NOT emit it — callers using `reserveQuota` inside `uow.run()` without the middleware must emit the event themselves if they want the telemetry. Catalog total: **47 events**.

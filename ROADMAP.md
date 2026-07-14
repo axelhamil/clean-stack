@@ -27,6 +27,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase A.4 — Cookie consent + Consent management** | **Jul 2026** | Dual-layer device-scoped (preuve RGPD Art.7§1 = stockage serveur horodaté) : `@packages/cookie-consent` SSOT + append-only `consent_record` (`subjectId NOT NULL`, `userId` nullable, 2 indexes) + `ConsentService` (record append-only, fallback subjectId, reconcile) + routes publiques `/consents` (`optionalAuth`, `cc_sid` httpOnly, CSRF, rate-limit POST/DELETE uniquement) + sweep guests expirés + `<CookieBanner>` (symétrie CNIL Reject/Accept) + `<ConsentSettings>` + `<ConsentGate category>` + `<AnalyticsScripts>` (`VITE_ANALYTICS_SRC`) + `<LegalFooter>` (AppShell) + `/legal/cookies` + toast 429 global consolidé. Réconciliation au login via `hooks.after`+`ctx.context.newSession` (PAS `databaseHooks`). GPC/DNT requalifiés hors scope EU. 2 events (`user.cookie_consent.{granted,withdrawn}`, retention `compliance`) → **42 events**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase B.1 — Billing (Stripe)** | **Jul 2026** | `@better-auth/stripe` + Stripe Checkout + Billing Portal. Subscription SSOT = plugin `subscription` table (webhook-synced). Hybrid catalog: price + display in Stripe (`metadata.tier` join key, `marketing_features` bullets); entitlements (features, rank, `maxMembers`) in typed `ENTITLEMENTS[tier]` at `apps/api/src/modules/billing/config.ts` — gate change = code + deploy, never Stripe dashboard. 3 tiers: `free` (3 members), `pro` (20 members, `audit_log`+`api`), `business` (unlimited = `null`, +`sso`). Standard model: unlimited team orgs per user; seat gate only (`beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`), no create-org cap. Back gate primitives: `requireFeature`/`requirePlan`/seat gate → `402 BILLING_PAYMENT_REQUIRED`. Front: `useEntitlements()` hook. No billing backoffice: Stripe Checkout (upgrade) + Stripe Billing Portal (manage). UI: `/settings/billing` (plan + usage + Upgrade + Manage billing) + public `/pricing`. 4 new events (`billing.subscription.{created,updated,cancelled}` compliance + `billing.payment.failed` operational) → **46 events**. |
 | **Phase B.2 — Quota gating** | **Jul 2026** | quota gating skeleton: catalog + `requireQuota`/`reserveQuota` + `quota_usage` + `useQuota`/`<QuotaGate>` + `billing.quota.exceeded` → **47 events**. Dormant + knip-whitelisted. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.5 — Webhooks front UI + public event catalog** | **Jul 2026** | Operator UI `/settings/webhooks` (CRUD, wildcard subscriptions, per-attempt delivery timeline, one-shot secret reveal + rotate, send-test, auto-disabled badge) + public `/developers/events` (48 subscribable events + JSON schemas + Node signature-verification snippet) + back-end hardening: SSRF guard (create + delivery-time anti-rebinding), dual-secret rotation with grace window (`WEBHOOK_SECRET_GRACE_HOURS`), `webhook_delivery_attempt` table (request/response headers+body, duration, error), auto-disable after consecutive failures (`WEBHOOK_AUTO_DISABLE_AFTER_DAYS`). 4 new internal events (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) → **52 total / 48 subscribable / 4 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -62,7 +63,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 ### M3 — Finish the half-shipped surfaces (backends done — highest value per LOC)
 
 - **C.2** Audit log **front UI** — `/admin/audit-log` page (filters + metadata diff). API + write-path shipped via event-driven.
-- **C.5** Webhooks **front UI** + `webhook.test` — `/settings/webhooks` page + public event catalog. API + worker shipped via event-driven.
+- **C.5** Webhooks **front UI** + `webhook.test` ✅ **shipped** (Jul 2026 — see ✅ table; `/settings/webhooks` operator page (CRUD, wildcard subscriptions, delivery timeline, per-attempt drawer, one-shot secret reveal, rotate, send-test, auto-disabled badge) + public `/developers/events` catalog (48 subscribable events, JSON schemas, Node verification snippet) + SSRF guard + dual-secret rotation + `webhook_delivery_attempt` table + auto-disable. 4 internal events → **52 total / 48 subscribable / 4 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
 - **C.6** Account recovery codes UI — BetterAuth backend already supports.
 - **A.5** Privacy dashboard `/settings/privacy` — UX hub aggregating A.2/A.3/A.4 + RGPD cards. Refactor-only (composes existing cards).
 
@@ -355,15 +356,15 @@ modules/consents/
 
 ---
 
-## Outbound webhooks front UI — **Phase C.5**
+## Outbound webhooks front UI — **Phase C.5** ✅ SHIPPED (Jul 2026)
 
-**Shipped** (event-driven foundation — as-built in [`docs/HISTORY.md`](docs/HISTORY.md)): `webhook_endpoint` + `webhook_delivery` schema, `WebhookFanoutSubscriber` (org-scoped fanout, idempotency-key dedupe), `WebhookDeliveryWorker` (HMAC `t=,v1=` Stripe-style, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, claim-window pattern), replay endpoint, and the full CRUD API `/settings/webhooks` (gated `requireOrgPermission({ webhooks: ["read"|"write"] })`, plaintext secret returned once).
+> **Full as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).** Summary in the ✅ table above.
 
-**Remaining (front UI + one event)**:
+**Back-end (Plans 1–2, on `dev`)**: SSRF guard (create + delivery-time anti-DNS-rebinding, blocks loopback / RFC1918 / link-local / ULA / CGNAT / cloud-metadata → `WEBHOOK_URL_FORBIDDEN`), dual-secret rotation with `WEBHOOK_SECRET_GRACE_HOURS` grace window (multiple `v1=` values in the signature header), `webhook_delivery_attempt` table (every HTTP exchange recorded with headers + body capped at `WEBHOOK_RESPONSE_CAPTURE_BYTES`), auto-disable after `WEBHOOK_AUTO_DISABLE_AFTER_DAYS` of consecutive failures + `webhook.endpoint.disabled` event, wildcard subscriptions (`"*"`, `"<group>.*"`, exact), `POST /settings/webhooks/:id/test` test delivery (also auto-fired on endpoint creation), and the full CRUD API `/settings/webhooks`.
 
-- [ ] `/settings/webhooks` UI — list + create + edit + delete + view deliveries + replay. API ready.
-- [ ] `webhook.test` event type — sent on endpoint creation, surfaces immediate "is the URL reachable" feedback in the UI.
-- [ ] Public `<EventTypesTable />` page enumerating every event the SaaS emits — read from `packages/events/src/event-types.ts` (42 events catalogued).
+**Front-end (Plan 3)**: `/settings/webhooks` operator page (endpoint list + CRUD in side Sheet, subscribed-event picker with group wildcards, per-endpoint delivery list with cursor pagination, per-attempt timeline drawer, one-shot secret reveal on create + rotate-secret dialog, send-test button, auto-disabled badge distinct from user-paused) + public `/developers/events` catalog (48 subscribable events, grouping, retention labels, expandable JSON schema per event via `z.toJSONSchema`, Node.js signature-verification snippet). Gated `webhooks: read/write`. Wired in `SETTINGS_TABS` and command palette.
+
+**4 new internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) — non-subscribable, non-fanout. **Catalog: 52 total / 48 subscribable / 4 internal**.
 
 **Deferred**: Webhook proxy (Svix-style) — host-it-yourself first, evaluate Svix past 10k deliveries/day.
 

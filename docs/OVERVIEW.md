@@ -78,9 +78,9 @@ Email runs on Resend with nine typed templates and idempotency keys, so a retry 
 
 The event backbone is the piece most teams get wrong. Here it's a transactional outbox: a domain event is written in the *same* database transaction as the state change it describes. No event is ever lost, and none is emitted for a write that rolled back — the dual-write problem, solved. A dedicated Postgres `LISTEN/NOTIFY` connection dispatches events the moment the transaction commits, with a 30-second poll as a safety net and row-level locking so multiple replicas share the work without a coordinator, a leader election, or Redis.
 
-- **42 typed events** are emitted automatically on every state change — auth, organization, upload, compliance, consent, and security actions all included. Each payload is Zod-validated before it's written, so a malformed event rolls back its own transaction instead of corrupting the log.
+- **52 typed events** (48 subscribable + 4 internal) are emitted automatically on every state change — auth, organization, upload, compliance, consent, security, billing, and webhook actions all included. Each payload is Zod-validated before it's written, so a malformed event rolls back its own transaction instead of corrupting the log.
 - An **append-only audit log** (90-day operational and 7-year compliance retention) satisfies SOC 2 and GDPR Art. 30. Every row names the actor who triggered it and is correlated to its request and error trace by a single ID. It's queryable through a capability-gated admin endpoint with actor, target, action, and time-range filters.
-- **Outbound webhooks** are a full feature, not just a signer: per-organization endpoints subscribe to the event types they care about, deliveries are HMAC-signed (Stripe-style), secrets are encrypted at rest, failed deliveries retry with decorrelated jitter and dead-letter after five attempts, and every delivery is logged and individually replayable.
+- **Outbound webhooks** are a full feature, not just a signer: per-organization endpoints subscribe to the event types they care about (exact names, group wildcards like `billing.*`, or `*`), deliveries are HMAC-signed (Stripe-style), secrets are encrypted at rest and rotatable with a grace window (both old and new secrets sign during rotation so consumers can migrate without downtime), failed deliveries retry with decorrelated jitter and dead-letter after five attempts, and every delivery — including every individual HTTP attempt's request/response headers and body — is logged and individually replayable. Endpoints that keep failing auto-disable, surfacing a distinct badge from a user-paused endpoint. Webhook URLs are validated against a SSRF blocklist at registration and again at delivery time to prevent DNS-rebinding. The operator UI lives at `/settings/webhooks`; a public reference of all 48 subscribable events (with JSON schema per event type and a ready-to-paste Node.js verification snippet) is at `/developers/events`.
 
 For your own code this is opt-out, not opt-in: declare an event, add it in your aggregate, run the use case — the audit row, the webhook fan-out, and any in-process handlers (auto-discovered, no registration list) happen for free.
 
@@ -146,7 +146,7 @@ The app provides a public `/pricing` page (plan grid fed from the live Stripe ca
 
 The roadmap follows a boilerplate's natural order — deploy-safety and legal first, revenue, then finish and polish.
 
-- **Operate** — admin and impersonation, API tokens, OpenAPI docs, in-app notifications
+- **Operate** — admin and impersonation, API tokens, OpenAPI docs, in-app notifications; recovery-codes UI and privacy dashboard (`/settings/privacy`) remain
 - **Reach** — SSO (SAML / OIDC) with SCIM, internationalization, Capacitor mobile, and a marketing site
 
 The full plan, with constraints and extension points, lives in [`../ROADMAP.md`](../ROADMAP.md).
