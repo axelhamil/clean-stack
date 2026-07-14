@@ -1,4 +1,7 @@
+import { lookup } from "node:dns/promises";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
+import { Result } from "@packages/ddd-kit";
+import { env } from "./env";
 import { PRIVATE_V4, PRIVATE_V6 } from "./private-ranges";
 
 let cachedList: BlockList | undefined;
@@ -32,4 +35,41 @@ export function isPrivateOrReservedAddress(ip: string): boolean {
     return privateBlockList().check(ip, "ipv6");
   }
   return true;
+}
+
+export type SsrfError = { code: "WEBHOOK_URL_FORBIDDEN"; message: string };
+export type AddressResolver = (hostname: string) => Promise<Array<{ address: string }>>;
+
+const defaultResolver: AddressResolver = (hostname) => lookup(hostname, { all: true });
+
+function forbidden(message: string): Result<URL, SsrfError> {
+  return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message });
+}
+
+export async function assertPublicUrl(
+  rawUrl: string,
+  resolve: AddressResolver = defaultResolver,
+): Promise<Result<URL, SsrfError>> {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return forbidden("invalid url");
+  }
+
+  const httpsOnly = env.NODE_ENV === "production";
+  const schemeOk = url.protocol === "https:" || (url.protocol === "http:" && !httpsOnly);
+  if (!schemeOk) return forbidden("scheme not allowed");
+  if (url.username || url.password) return forbidden("credentials in url not allowed");
+
+  let addrs: Array<{ address: string }>;
+  try {
+    addrs = await resolve(url.hostname);
+  } catch {
+    return forbidden("host not resolvable");
+  }
+  if (addrs.length === 0 || addrs.some((a) => isPrivateOrReservedAddress(a.address)))
+    return forbidden("destination not publicly routable");
+
+  return Result.ok(url);
 }

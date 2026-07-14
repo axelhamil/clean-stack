@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isPrivateOrReservedAddress } from "../ssrf-guard";
+import { type AddressResolver, assertPublicUrl, isPrivateOrReservedAddress } from "../ssrf-guard";
 
 describe("isPrivateOrReservedAddress", () => {
   it("blocks private/reserved v4", () => {
@@ -38,5 +38,31 @@ describe("isPrivateOrReservedAddress", () => {
 
   it("treats unparseable input as unsafe", () => {
     expect(isPrivateOrReservedAddress("not-an-ip")).toBe(true);
+  });
+});
+
+const publicResolver: AddressResolver = async () => [{ address: "93.184.216.34" }];
+const privateResolver: AddressResolver = async () => [{ address: "10.0.0.5" }];
+
+describe("assertPublicUrl", () => {
+  it("rejects invalid url", async () => {
+    const r = await assertPublicUrl("not a url", publicResolver);
+    expect(r.isFailure).toBe(true);
+  });
+
+  it("rejects credentials in url", async () => {
+    const r = await assertPublicUrl("https://user:pass@example.com/hook", publicResolver);
+    expect(r.isFailure).toBe(true);
+  });
+
+  it("rejects a host resolving to a private ip", async () => {
+    const r = await assertPublicUrl("https://sneaky.example.com/hook", privateResolver);
+    expect(r.isFailure).toBe(true);
+  });
+
+  it("accepts a public https url", async () => {
+    const r = await assertPublicUrl("https://example.com/hook", publicResolver);
+    expect(r.isSuccess).toBe(true);
+    if (r.isSuccess) expect(r.getValue().hostname).toBe("example.com");
   });
 });
