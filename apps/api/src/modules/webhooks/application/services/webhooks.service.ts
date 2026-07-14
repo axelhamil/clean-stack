@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
+import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
@@ -198,6 +199,73 @@ export class WebhooksService {
       { name: "WebhooksService > replayDelivery", op: "function" },
       async () =>
         this.uow.run(async (tx) => this.deliveries.enqueueReplay(deliveryId, organizationId, tx)),
+    );
+  }
+
+  async rotateSecret(args: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<
+    Result<
+      Option<{ endpoint: WebhookEndpointRecord; plaintextSecret: string }>,
+      WebhookServiceError
+    >
+  > {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > rotateSecret", op: "function" },
+      async () => {
+        const masterKeyOpt = this.masterKey();
+        if (masterKeyOpt.isNone()) {
+          return Result.fail({
+            code: "WEBHOOK_MASTER_KEY_UNAVAILABLE",
+            message: "WEBHOOK_MASTER_KEY env var is not configured (64 hex chars)",
+          });
+        }
+        const endpoint = await this.endpoints.findById(args.id, args.organizationId);
+        if (endpoint.isNone()) return Result.ok(Option.none());
+
+        const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), args.organizationId);
+        const newPlaintext = this.secretGen();
+        const newCipher = encryptSecret(newPlaintext, subKey);
+        const previousSecretExpiresAt = new Date(
+          Date.now() + env.WEBHOOK_SECRET_GRACE_HOURS * 3_600_000,
+        );
+
+        const rotated = await this.uow.run(async (tx) => {
+          const result = await this.endpoints.applySecretRotation(
+            {
+              id: args.id,
+              organizationId: args.organizationId,
+              secretCipher: newCipher,
+              previousSecretCipher: endpoint.unwrap().secretCipher,
+              previousSecretExpiresAt,
+            },
+            tx,
+          );
+          if (result.isFailure) return result;
+          await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED,
+            "webhook_endpoint",
+            args.id,
+            {
+              organizationId: args.organizationId,
+              endpointId: args.id,
+              actorUserId: args.actorUserId,
+            },
+            { organizationId: args.organizationId },
+            tx,
+          );
+          return result;
+        });
+        if (rotated.isFailure) return Result.fail(rotated.getError());
+        const rotatedOpt = rotated.getValue();
+        if (rotatedOpt.isNone()) return Result.ok(Option.none());
+        return Result.ok(
+          Option.some({ endpoint: rotatedOpt.unwrap(), plaintextSecret: newPlaintext }),
+        );
+      },
     );
   }
 }

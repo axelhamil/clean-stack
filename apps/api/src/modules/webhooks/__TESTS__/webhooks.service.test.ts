@@ -87,6 +87,9 @@ function makeEndpoints(
     listByOrg: mock(async () =>
       Result.ok<WebhookEndpointRecord[], WebhookRepoError>([stubEndpoint]),
     ),
+    applySecretRotation: mock(async () =>
+      Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
+    ),
     ...overrides,
   } as unknown as IWebhookEndpointRepository;
 }
@@ -499,6 +502,38 @@ describe("WebhooksService", () => {
         expect.objectContaining({ name: "WebhooksService > listDeliveries", op: "function" }),
         expect.any(Function),
       );
+    });
+  });
+
+  describe("rotateSecret", () => {
+    it("generates a new secret, moves the current to previous, emits, returns plaintext", async () => {
+      const endpoints = makeEndpoints({
+        findById: mock(async () => Option.some(stubEndpoint)),
+        applySecretRotation: mock(async () =>
+          Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
+        ),
+      });
+      const service = makeService({ endpoints });
+      const r = await service.rotateSecret({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+      expect(r.isSuccess).toBe(true);
+      expect(r.getValue().isSome()).toBe(true);
+      expect(r.getValue().unwrap().plaintextSecret).toMatch(/^whsec_/);
+    });
+    it("returns None when endpoint not found", async () => {
+      const endpoints = makeEndpoints({
+        findById: mock(async () => Option.none<WebhookEndpointRecord>()),
+      });
+      const service = makeService({ endpoints });
+      const r = await service.rotateSecret({
+        id: "nope",
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+      expect(r.getValue().isNone()).toBe(true);
     });
   });
 
