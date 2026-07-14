@@ -13,12 +13,22 @@ function privateBlockList(): BlockList {
   return bl;
 }
 
+function unwrapIpv4Mapped(ip: string): string | null {
+  if (!ip.toLowerCase().startsWith("::ffff:")) return null;
+  const tail = ip.slice(7);
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(tail)) return tail;
+  const hex = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(tail);
+  if (!hex) return null;
+  const hi = Number.parseInt(hex[1] as string, 16);
+  const lo = Number.parseInt(hex[2] as string, 16);
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+}
+
 export function isPrivateOrReservedAddress(ip: string): boolean {
   if (isIPv4(ip)) return privateBlockList().check(ip, "ipv4");
   if (isIPv6(ip)) {
-    const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
-    const inner = mapped?.[1];
-    if (inner) return isPrivateOrReservedAddress(inner);
+    const mapped = unwrapIpv4Mapped(ip);
+    if (mapped) return isPrivateOrReservedAddress(mapped);
     return privateBlockList().check(ip, "ipv6");
   }
   return true;

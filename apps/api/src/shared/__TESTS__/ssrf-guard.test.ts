@@ -21,11 +21,19 @@ describe("isPrivateOrReservedAddress", () => {
     expect(isPrivateOrReservedAddress("fe80::1")).toBe(true);
     expect(isPrivateOrReservedAddress("fc00::1")).toBe(true);
     expect(isPrivateOrReservedAddress("::ffff:169.254.169.254")).toBe(true);
+    // hex-form ipv4-mapped: ::ffff:7f00:0001 = ::ffff:127.0.0.1
+    expect(isPrivateOrReservedAddress("::ffff:7f00:0001")).toBe(true);
+    // hex-form ipv4-mapped: ::ffff:0a00:0005 = ::ffff:10.0.0.5
+    expect(isPrivateOrReservedAddress("::ffff:0a00:0005")).toBe(true);
   });
 
   it("allows public addresses", () => {
     expect(isPrivateOrReservedAddress("93.184.216.34")).toBe(false);
     expect(isPrivateOrReservedAddress("2606:2800:220:1:248:1893:25c8:1946")).toBe(false);
+    // dotted-form mapped public: must not be over-blocked
+    expect(isPrivateOrReservedAddress("::ffff:93.184.216.34")).toBe(false);
+    // hex-form mapped public: ::ffff:5db8:d822 = ::ffff:93.184.216.34
+    expect(isPrivateOrReservedAddress("::ffff:5db8:d822")).toBe(false);
   });
 
   it("treats unparseable input as unsafe", () => {
