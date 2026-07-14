@@ -168,6 +168,9 @@ importers:
       '@packages/cookie-consent':
         specifier: workspace:*
         version: link:../../packages/cookie-consent
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
