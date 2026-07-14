@@ -37,7 +37,7 @@ async function readCappedBody(res: Response, cap: number): Promise<string | null
       total += value.length;
     }
   } finally {
-    reader.releaseLock();
+    reader.cancel().catch(() => {});
   }
   const buf = new Uint8Array(Math.min(total, cap));
   let offset = 0;

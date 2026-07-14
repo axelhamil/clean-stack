@@ -588,6 +588,30 @@ describe("WebhookDeliveryWorker", () => {
     expect(body!.length).toBeLessThanOrEqual(4096);
   });
 
+  it("transport-error (fetch throws) → createAttempt avec responseStatus=null et error non-null", async () => {
+    const fakeDeliveries = makeFakeDeliveries();
+
+    globalThis.fetch = (async () => {
+      throw new DOMException("The operation was aborted", "AbortError");
+    }) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      noopOutbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(fakeDeliveries.createAttempts).toHaveLength(1);
+    const attempt = fakeDeliveries.createAttempts[0]!;
+    expect(attempt.responseStatus).toBeNull();
+    expect(attempt.error).not.toBeNull();
+  });
+
   it("SSRF bloqué → createAttempt appelé avec error, champs réponse null", async () => {
     dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://192.168.1.1/hook" }];
     const fakeDeliveries = makeFakeDeliveries();
