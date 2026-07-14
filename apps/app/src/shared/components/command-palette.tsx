@@ -44,6 +44,7 @@ import {
   TriangleAlert,
   User,
   Users,
+  Webhook,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
@@ -101,6 +102,13 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
     label: "Settings — Billing",
     icon: CreditCard,
     requires: { billing: ["manage"] },
+    requiresOrg: true,
+  },
+  {
+    to: "/settings/webhooks",
+    label: "Settings — Webhooks",
+    icon: Webhook,
+    requires: { webhooks: ["read"] },
     requiresOrg: true,
   },
   { to: "/settings/account", label: "Settings — Account", icon: User },

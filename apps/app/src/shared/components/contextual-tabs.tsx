@@ -21,6 +21,12 @@ const SETTINGS_TABS: readonly TabItem[] = [
     requires: { billing: ["manage"] },
     requiresOrg: true,
   },
+  {
+    to: "/settings/webhooks",
+    label: "Webhooks",
+    requires: { webhooks: ["read"] },
+    requiresOrg: true,
+  },
   { to: "/settings/account", label: "Account" },
   { to: "/settings/danger", label: "Danger", icon: AlertTriangleIcon },
 ];

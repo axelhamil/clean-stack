@@ -22,6 +22,7 @@ import { subProcessorsRoute } from "./features/legal/sub-processors.route";
 import { termsRoute } from "./features/legal/terms.route";
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
+import { webhooksRoute } from "./features/webhooks/webhooks.route";
 import {
   adminLayout,
   guestLayout,
@@ -48,7 +49,7 @@ const routeTree = rootRoute.addChildren([
         settingsIndexRoute,
         accountRoute,
         dangerRoute,
-        orgScopeLayout.addChildren([billingRoute, organizationRoute]),
+        orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute]),
       ]),
     ]),
   ]),
