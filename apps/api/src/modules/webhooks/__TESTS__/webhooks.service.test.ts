@@ -107,6 +107,9 @@ function makeDeliveries(
     enqueueReplay: mock(async () =>
       Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.some(stubDelivery)),
     ),
+    enqueueTargeted: mock(async () =>
+      Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
+    ),
     ...overrides,
   } as unknown as IWebhookDeliveryRepository;
 }
@@ -568,6 +571,92 @@ describe("WebhooksService", () => {
       });
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_MASTER_KEY_UNAVAILABLE");
+    });
+  });
+
+  describe("sendTest", () => {
+    it("emits webhook.test event and enqueues targeted delivery, returns Some(delivery)", async () => {
+      const enqueueTargeted = mock(async () =>
+        Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
+      );
+      const deliveries = makeDeliveries({ enqueueTargeted });
+      const enqueueMock = mock(async () => {});
+      const spiedOutbox = {
+        enqueue: enqueueMock,
+        findPendingBatch: mock(async () => []),
+        markDispatched: mock(async () => {}),
+        markFailed: mock(async () => {}),
+      } as unknown as IOutboxRepository;
+      const service = new WebhooksService(
+        makeEndpoints(),
+        deliveries,
+        tx,
+        spiedOutbox,
+        validMasterKey,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.sendTest({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap()).toEqual(stubDelivery);
+      expect(enqueueMock).toHaveBeenCalledTimes(1);
+      expect(enqueueMock).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ eventType: EventTypes.WEBHOOK_TEST })]),
+        expect.any(Object),
+        expect.any(Object),
+      );
+      const [[firstArg]] = (enqueueTargeted as ReturnType<typeof mock>).mock.calls as [
+        [{ outboxEventId: string }, unknown],
+      ];
+      expect(typeof firstArg.outboxEventId).toBe("string");
+      expect(firstArg.outboxEventId.length).toBeGreaterThan(0);
+    });
+
+    it("returns Option.none() when endpoint not found, no enqueue", async () => {
+      const endpoints = makeEndpoints({
+        findById: mock(async () => Option.none<WebhookEndpointRecord>()),
+      });
+      const enqueueTargeted = mock(async () =>
+        Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
+      );
+      const deliveries = makeDeliveries({ enqueueTargeted });
+      const service = makeService({ endpoints, deliveries });
+
+      const result = await service.sendTest({
+        id: "nonexistent",
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
+      expect(enqueueTargeted).not.toHaveBeenCalled();
+    });
+
+    it("calls instrumentation span with op=function", async () => {
+      const instrumentation = new NoOpInstrumentation();
+      const spy = spyOn(instrumentation, "startSpan");
+      const service = new WebhooksService(
+        makeEndpoints(),
+        makeDeliveries(),
+        tx,
+        noopOutbox,
+        validMasterKey,
+        instrumentation,
+      );
+
+      await service.sendTest({ id: ENDPOINT_ID, organizationId: ORG_ID, actorUserId: USER_ID });
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "WebhooksService > sendTest", op: "function" }),
+        expect.any(Function),
+      );
     });
   });
 

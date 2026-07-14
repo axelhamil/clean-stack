@@ -1,4 +1,5 @@
 import type { IDomainEvent } from "@packages/ddd-kit";
+import { uuidv7 } from "@packages/ddd-kit";
 import type { Transaction } from "@packages/drizzle";
 import type { EventType } from "@packages/events";
 import type { IOutboxRepository } from "./ports/outbox.port";
@@ -26,7 +27,8 @@ export async function emitEvent<TPayload>(
   payload: TPayload,
   opts: EmitOptions = {},
   tx?: Transaction,
-): Promise<void> {
+): Promise<string> {
+  const id = uuidv7();
   const event: IDomainEvent<TPayload> = {
     eventType,
     dateOccurred: new Date(),
@@ -40,7 +42,9 @@ export async function emitEvent<TPayload>(
       aggregateType,
       organizationId: opts.organizationId,
       traceparent: opts.traceparent,
+      id,
     },
     tx,
   );
+  return id;
 }

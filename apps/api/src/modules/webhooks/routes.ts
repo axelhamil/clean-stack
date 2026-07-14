@@ -116,6 +116,34 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     },
   )
   .post(
+    "/:id/test",
+    requireAuth,
+    requireOrg,
+    requireOrgPermission({ webhooks: ["write"] }),
+    async (c) => {
+      const orgId = c.get("orgId");
+      const id = c.req.param("id");
+      const result = await di.WebhooksService.sendTest({
+        id,
+        organizationId: orgId,
+        actorUserId: c.get("user").id,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const opt = result.getValue();
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const { payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest } = opt.unwrap();
+      return c.json(
+        {
+          ...rest,
+          nextAttemptAt: nextAttemptAt.toNull(),
+          lastError: lastError.toNull(),
+          lastResponseStatus: lastResponseStatus.toNull(),
+        },
+        201,
+      );
+    },
+  )
+  .post(
     "/:id/rotate-secret",
     requireAuth,
     requireOrg,

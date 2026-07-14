@@ -92,7 +92,14 @@ export class WebhooksService {
         });
         if (created.isFailure) return Result.fail(created.getError());
 
-        return Result.ok({ endpoint: created.getValue(), plaintextSecret });
+        const endpoint = created.getValue();
+        await this.sendTest({
+          id: endpoint.id,
+          organizationId: args.organizationId,
+          actorUserId: args.actorUserId,
+        }).catch(() => {});
+
+        return Result.ok({ endpoint, plaintextSecret });
       },
     );
   }
@@ -199,6 +206,51 @@ export class WebhooksService {
       { name: "WebhooksService > replayDelivery", op: "function" },
       async () =>
         this.uow.run(async (tx) => this.deliveries.enqueueReplay(deliveryId, organizationId, tx)),
+    );
+  }
+
+  async sendTest(args: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > sendTest", op: "function" },
+      async () => {
+        const endpoint = await this.endpoints.findById(args.id, args.organizationId);
+        if (endpoint.isNone()) return Result.ok(Option.none());
+        return this.uow.run(async (tx) => {
+          const outboxEventId = await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_TEST,
+            "webhook_endpoint",
+            args.id,
+            {
+              organizationId: args.organizationId,
+              endpointId: args.id,
+              actorUserId: args.actorUserId,
+            },
+            { organizationId: args.organizationId },
+            tx,
+          );
+          const delivery = await this.deliveries.enqueueTargeted(
+            {
+              endpointId: args.id,
+              outboxEventId,
+              eventType: EventTypes.WEBHOOK_TEST,
+              payload: {
+                organizationId: args.organizationId,
+                endpointId: args.id,
+                actorUserId: args.actorUserId,
+              },
+              idempotencyKey: `test:${outboxEventId}`,
+            },
+            tx,
+          );
+          if (delivery.isFailure) return Result.fail(delivery.getError());
+          return Result.ok(Option.some(delivery.getValue()));
+        });
+      },
     );
   }
 
