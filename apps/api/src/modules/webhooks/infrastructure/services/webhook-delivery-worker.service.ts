@@ -1,7 +1,9 @@
 import { Option } from "@packages/ddd-kit";
 import { db, eq, sql, webhooksSchema } from "@packages/drizzle";
+import { EventTypes } from "@packages/events";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
+import { emitEvent } from "../../../../shared/event-emitter";
 import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../../../../shared/jitter";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -22,6 +24,16 @@ const CLAIM_WINDOW_MS = BATCH_SIZE * FETCH_TIMEOUT_MS + 30_000;
 
 function expectedDelayFromAttempts(currentAttempts: number): number {
   return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
+}
+
+function shouldAutoDisable(
+  { consecutiveFailures, firstFailedAt }: { consecutiveFailures: number; firstFailedAt: Date },
+  now: Date,
+): boolean {
+  return (
+    consecutiveFailures >= env.WEBHOOK_AUTO_DISABLE_MIN_FAILURES &&
+    now.getTime() - firstFailedAt.getTime() > env.WEBHOOK_AUTO_DISABLE_AFTER_DAYS * 86_400_000
+  );
 }
 
 async function readCappedBody(res: Response, cap: number): Promise<string | null> {
@@ -174,7 +186,7 @@ export class WebhookDeliveryWorker {
           "webhook delivery process threw",
         );
         await db
-          .transaction(async (tx) => this.markFailed(delivery, errMsg, Option.none(), tx))
+          .transaction(async (tx) => this.markFailed(delivery, errMsg, Option.none(), null, tx))
           .catch((e) =>
             this.logger.error({ err: e, deliveryId: delivery.id }, "markFailed failed"),
           );
@@ -192,7 +204,7 @@ export class WebhookDeliveryWorker {
           if (endpointResult.reason === "db_error") {
             await db
               .transaction(async (tx) =>
-                this.markFailed(delivery, "endpoint lookup db error", Option.none(), tx),
+                this.markFailed(delivery, "endpoint lookup db error", Option.none(), null, tx),
               )
               .catch((e) =>
                 this.logger.error(
@@ -228,12 +240,13 @@ export class WebhookDeliveryWorker {
 
         const guard = await assertPublicUrl(endpointAndOrg.url);
         if (guard.isFailure) {
+          const ssrfAttempts = delivery.attempts + 1;
           await db.transaction(async (tx) => {
             const upd = await this.deliveries.updateStatus(
               delivery.id,
               {
                 status: "dead_letter",
-                attempts: delivery.attempts + 1,
+                attempts: ssrfAttempts,
                 nextAttemptAt: Option.none(),
                 lastError: Option.some("destination not publicly routable"),
                 lastResponseStatus: Option.none(),
@@ -249,7 +262,7 @@ export class WebhookDeliveryWorker {
             const attemptRes = await this.deliveries.createAttempt(
               {
                 deliveryId: delivery.id,
-                attemptNumber: delivery.attempts + 1,
+                attemptNumber: ssrfAttempts,
                 requestHeaders: null,
                 requestBody: null,
                 responseStatus: null,
@@ -266,6 +279,12 @@ export class WebhookDeliveryWorker {
                 "webhook delivery ssrf createAttempt failed",
               );
             }
+            await this.runTerminalFailureBlock(
+              delivery,
+              endpointAndOrg.organizationId,
+              ssrfAttempts,
+              tx,
+            );
           });
           return;
         }
@@ -273,7 +292,13 @@ export class WebhookDeliveryWorker {
         const masterKeyOpt = this.masterKey();
         if (masterKeyOpt.isNone()) {
           await db.transaction(async (tx) =>
-            this.markFailed(delivery, "WEBHOOK_MASTER_KEY missing", Option.none(), tx),
+            this.markFailed(
+              delivery,
+              "WEBHOOK_MASTER_KEY missing",
+              Option.none(),
+              endpointAndOrg.organizationId,
+              tx,
+            ),
           );
           return;
         }
@@ -298,7 +323,13 @@ export class WebhookDeliveryWorker {
           );
           this.instrumentation.capture(err);
           await db.transaction(async (tx) =>
-            this.markFailed(delivery, "secret decryption failed", Option.none(), tx),
+            this.markFailed(
+              delivery,
+              "secret decryption failed",
+              Option.none(),
+              endpointAndOrg.organizationId,
+              tx,
+            ),
           );
           return;
         }
@@ -360,7 +391,13 @@ export class WebhookDeliveryWorker {
 
         await db.transaction(async (tx) => {
           if (errorMessage.isSome()) {
-            await this.markFailed(delivery, errorMessage.unwrap(), responseStatus, tx);
+            await this.markFailed(
+              delivery,
+              errorMessage.unwrap(),
+              responseStatus,
+              endpointAndOrg.organizationId,
+              tx,
+            );
           } else {
             const upd = await this.deliveries.updateStatus(
               delivery.id,
@@ -377,6 +414,13 @@ export class WebhookDeliveryWorker {
               this.logger.error(
                 { err: upd.getError(), deliveryId: delivery.id },
                 "webhook delivery success updateStatus failed",
+              );
+            }
+            const resetRes = await this.endpoints.resetFailure(delivery.endpointId, tx);
+            if (resetRes.isFailure) {
+              this.logger.error(
+                { err: resetRes.getError(), endpointId: delivery.endpointId },
+                "webhook endpoint resetFailure failed",
               );
             }
           }
@@ -409,6 +453,7 @@ export class WebhookDeliveryWorker {
     delivery: WebhookDeliveryRecord,
     error: string,
     responseStatus: Option<number>,
+    organizationId: string | null,
     tx: Parameters<IWebhookDeliveryRepository["updateStatus"]>[2],
   ): Promise<void> {
     const newAttempts = delivery.attempts + 1;
@@ -431,6 +476,72 @@ export class WebhookDeliveryWorker {
         "webhook delivery markFailed updateStatus failed",
       );
     }
+    if (status === "dead_letter" && organizationId !== null) {
+      await this.runTerminalFailureBlock(delivery, organizationId, newAttempts, tx);
+    }
+  }
+
+  private async runTerminalFailureBlock(
+    delivery: WebhookDeliveryRecord,
+    organizationId: string,
+    newAttempts: number,
+    tx: Parameters<IWebhookDeliveryRepository["updateStatus"]>[2],
+  ): Promise<void> {
+    await emitEvent(
+      this.outbox,
+      EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
+      "webhook_delivery",
+      delivery.id,
+      {
+        organizationId,
+        endpointId: delivery.endpointId,
+        deliveryId: delivery.id,
+        eventType: delivery.eventType,
+        attempts: newAttempts,
+        actorUserId: null,
+      },
+      { organizationId },
+      tx,
+    );
+
+    const bumpedResult = await this.endpoints.bumpFailure(delivery.endpointId, tx);
+    if (bumpedResult.isFailure) {
+      this.logger.error(
+        { err: bumpedResult.getError(), endpointId: delivery.endpointId },
+        "webhook endpoint bumpFailure failed",
+      );
+      return;
+    }
+    const bumpedOpt = bumpedResult.getValue();
+    if (bumpedOpt.isNone()) return;
+
+    const bumped = bumpedOpt.unwrap();
+    const now = new Date();
+    if (!shouldAutoDisable(bumped, now)) return;
+
+    const disableRes = await this.endpoints.markDisabled(delivery.endpointId, now, tx);
+    if (disableRes.isFailure) {
+      this.logger.error(
+        { err: disableRes.getError(), endpointId: delivery.endpointId },
+        "webhook endpoint markDisabled failed",
+      );
+      return;
+    }
+    await emitEvent(
+      this.outbox,
+      EventTypes.WEBHOOK_ENDPOINT_DISABLED,
+      "webhook_endpoint",
+      delivery.endpointId,
+      {
+        organizationId,
+        endpointId: delivery.endpointId,
+        actorUserId: null,
+        reason: "delivery_failures",
+        consecutiveFailures: bumped.consecutiveFailures,
+      },
+      { organizationId },
+      tx,
+    );
   }
 
   private async findEndpointWithOrg(endpointId: string): Promise<

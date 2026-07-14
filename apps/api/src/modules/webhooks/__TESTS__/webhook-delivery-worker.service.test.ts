@@ -136,6 +136,8 @@ mock.module("@packages/drizzle", () => ({
 mock.module("../../../shared/env", () => ({
   env: {
     WEBHOOK_RESPONSE_CAPTURE_BYTES: 4096,
+    WEBHOOK_AUTO_DISABLE_AFTER_DAYS: 5,
+    WEBHOOK_AUTO_DISABLE_MIN_FAILURES: 2,
   },
 }));
 
@@ -216,18 +218,50 @@ function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [mak
   };
 }
 
-function makeFakeEndpoints() {
+type BumpFailureResult = ReturnType<
+  import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository["bumpFailure"]
+>;
+
+function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
+  const calls = {
+    resetFailure: [] as string[],
+    markDisabled: [] as string[],
+    bumpFailure: [] as string[],
+  };
   return {
+    calls,
     applySecretRotation: async () => Result.ok(Option.some({} as never)),
-    bumpFailure: async () => Result.ok(Option.none()),
-    resetFailure: async () => Result.ok(undefined as never),
-    markDisabled: async () => Result.ok(undefined as never),
+    bumpFailure: async (id: string, _tx: unknown) => {
+      calls.bumpFailure.push(id);
+      return opts?.bumpFailureResult ?? Result.ok(Option.none());
+    },
+    resetFailure: async (id: string, _tx: unknown) => {
+      calls.resetFailure.push(id);
+      return Result.ok(undefined as never);
+    },
+    markDisabled: async (id: string, _date: Date, _tx: unknown) => {
+      calls.markDisabled.push(id);
+      return Result.ok(undefined as never);
+    },
     create: async () => Result.ok({} as never),
     update: async () => Result.ok(Option.none()),
     delete: async () => Result.ok(false),
     findById: async () => Option.none(),
     listByOrg: async () => Result.ok([]),
   };
+}
+
+function makeOutbox() {
+  const enqueueCalls: Array<{ events: unknown[]; opts: unknown; tx: unknown }> = [];
+  const outbox: IOutboxRepository = {
+    enqueue: mock(async (events, opts, tx) => {
+      enqueueCalls.push({ events: events as unknown[], opts, tx });
+    }),
+    findPendingBatch: mock(async () => []),
+    markDispatched: mock(async () => {}),
+    markFailed: mock(async () => {}),
+  };
+  return { outbox, enqueueCalls };
 }
 
 const noopOutbox: IOutboxRepository = {
@@ -633,5 +667,133 @@ describe("WebhookDeliveryWorker", () => {
     expect(attempt.responseHeaders).toBeNull();
     expect(attempt.responseBody).toBeNull();
     expect(attempt.error).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 6 — endpoint failure lifecycle
+  // -------------------------------------------------------------------------
+  it("success → resetFailure appelé sur l'endpoint", async () => {
+    const fakeDeliveries = makeFakeDeliveries();
+    const endpoints = makeFakeEndpoints();
+    const { outbox } = makeOutbox();
+
+    globalThis.fetch = (async () => new Response(null, { status: 200 })) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      outbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(endpoints.calls.resetFailure).toEqual(["ep-1"]);
+  });
+
+  it("dead_letter → WEBHOOK_DELIVERY_EXHAUSTED émis dans l'outbox", async () => {
+    const delivery = { ...makeDelivery(), attempts: 4 };
+    const fakeDeliveries = makeFakeDeliveries([delivery]);
+    const endpoints = makeFakeEndpoints();
+    const { outbox, enqueueCalls } = makeOutbox();
+
+    globalThis.fetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      outbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    const exhausted = enqueueCalls.find(
+      ({ events }) =>
+        Array.isArray(events) &&
+        (events[0] as { eventType?: string } | undefined)?.eventType ===
+          "webhook.delivery.exhausted",
+    );
+    expect(exhausted).toBeDefined();
+  });
+
+  it("bumpFailure ancien + count élevé → markDisabled + WEBHOOK_ENDPOINT_DISABLED émis", async () => {
+    const delivery = { ...makeDelivery(), attempts: 4 };
+    const fakeDeliveries = makeFakeDeliveries([delivery]);
+    const endpoints = makeFakeEndpoints({
+      bumpFailureResult: Promise.resolve(
+        Result.ok(
+          Option.some({
+            consecutiveFailures: 3,
+            firstFailedAt: new Date(Date.now() - 6 * 86_400_000),
+          }),
+        ),
+      ) as BumpFailureResult,
+    });
+    const { outbox, enqueueCalls } = makeOutbox();
+
+    globalThis.fetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      outbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(endpoints.calls.markDisabled).toContain("ep-1");
+    const disabled = enqueueCalls.find(
+      ({ events }) =>
+        Array.isArray(events) &&
+        (events[0] as { eventType?: string } | undefined)?.eventType ===
+          "webhook.endpoint.disabled",
+    );
+    expect(disabled).toBeDefined();
+  });
+
+  it("bumpFailure récent/count bas → markDisabled NOT appelé", async () => {
+    const delivery = { ...makeDelivery(), attempts: 4 };
+    const fakeDeliveries = makeFakeDeliveries([delivery]);
+    const endpoints = makeFakeEndpoints({
+      bumpFailureResult: Promise.resolve(
+        Result.ok(
+          Option.some({
+            consecutiveFailures: 1,
+            firstFailedAt: new Date(),
+          }),
+        ),
+      ) as BumpFailureResult,
+    });
+    const { outbox, enqueueCalls } = makeOutbox();
+
+    globalThis.fetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      outbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(endpoints.calls.markDisabled).toHaveLength(0);
+    const disabled = enqueueCalls.find(
+      ({ events }) =>
+        Array.isArray(events) &&
+        (events[0] as { eventType?: string } | undefined)?.eventType ===
+          "webhook.endpoint.disabled",
+    );
+    expect(disabled).toBeUndefined();
   });
 });
