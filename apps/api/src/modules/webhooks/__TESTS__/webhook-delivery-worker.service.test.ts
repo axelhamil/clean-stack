@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 
@@ -128,17 +128,6 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
   uuidv7: () => "generated-uuid",
-}));
-
-// ---------------------------------------------------------------------------
-// Env mock — avoids Zod validation on required env vars not set in test
-// ---------------------------------------------------------------------------
-mock.module("../../../shared/env", () => ({
-  env: {
-    WEBHOOK_RESPONSE_CAPTURE_BYTES: 4096,
-    WEBHOOK_AUTO_DISABLE_AFTER_DAYS: 5,
-    WEBHOOK_AUTO_DISABLE_MIN_FAILURES: 2,
-  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -305,15 +294,8 @@ async function runDrain(worker: InstanceType<typeof WebhookDeliveryWorker>) {
 }
 
 describe("WebhookDeliveryWorker", () => {
-  let originalFetch: typeof globalThis.fetch;
-
   beforeEach(() => {
-    originalFetch = globalThis.fetch;
     dbTransactionResult = [FAKE_ENDPOINT];
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
   });
 
   // -------------------------------------------------------------------------
@@ -341,8 +323,7 @@ describe("WebhookDeliveryWorker", () => {
   // -------------------------------------------------------------------------
   it("delivery 200 OK → updateStatus avec status=success", async () => {
     const fakeDeliveries = makeFakeDeliveries();
-    globalThis.fetch = (async () =>
-      new Response(null, { status: 200, statusText: "OK" })) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(null, { status: 200, statusText: "OK" });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -351,6 +332,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -369,10 +351,10 @@ describe("WebhookDeliveryWorker", () => {
     const fakeDeliveries = makeFakeDeliveries();
     let capturedHeaders: Record<string, string> | undefined;
 
-    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    const mockFetch = async (_url: string | URL | Request, init?: RequestInit) => {
       capturedHeaders = init?.headers as Record<string, string>;
       return new Response(null, { status: 200 });
-    }) as unknown as typeof fetch;
+    };
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -381,6 +363,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -395,11 +378,11 @@ describe("WebhookDeliveryWorker", () => {
   // -------------------------------------------------------------------------
   it("delivery 500 → status failed avec nextAttemptAt planifié", async () => {
     const fakeDeliveries = makeFakeDeliveries();
-    globalThis.fetch = (async () =>
+    const mockFetch = async () =>
       new Response(null, {
         status: 500,
         statusText: "Internal Server Error",
-      })) as unknown as typeof fetch;
+      });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -408,6 +391,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -434,9 +418,9 @@ describe("WebhookDeliveryWorker", () => {
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
 
-    globalThis.fetch = (async () => {
+    const mockFetch = async () => {
       throw new DOMException("The operation was aborted", "AbortError");
-    }) as unknown as typeof fetch;
+    };
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -445,6 +429,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       instrumentation,
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -516,10 +501,10 @@ describe("WebhookDeliveryWorker", () => {
       },
     ];
     let sig: string | undefined;
-    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+    const mockFetch = async (_u: unknown, init?: RequestInit) => {
       sig = (init?.headers as Record<string, string>)["x-webhook-signature"];
       return new Response(null, { status: 200 });
-    }) as unknown as typeof fetch;
+    };
 
     const fakeDeliveries = makeFakeDeliveries();
     const worker = new WebhookDeliveryWorker(
@@ -529,6 +514,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -542,10 +528,10 @@ describe("WebhookDeliveryWorker", () => {
   it("marks dead_letter without fetching when the endpoint url is not publicly routable", async () => {
     dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://127.0.0.1/hook" }];
     let fetched = false;
-    globalThis.fetch = (async () => {
+    const mockFetch = async () => {
       fetched = true;
       return new Response(null, { status: 200 });
-    }) as unknown as typeof fetch;
+    };
 
     const fakeDeliveries = makeFakeDeliveries();
     const worker = new WebhookDeliveryWorker(
@@ -555,6 +541,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -571,11 +558,7 @@ describe("WebhookDeliveryWorker", () => {
   it("200 OK → createAttempt appelé avec requestHeaders + responseStatus=200", async () => {
     const fakeDeliveries = makeFakeDeliveries();
 
-    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
-      void _url;
-      void init;
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    }) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(JSON.stringify({ ok: true }), { status: 200 });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -584,6 +567,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -602,8 +586,7 @@ describe("WebhookDeliveryWorker", () => {
     const fakeDeliveries = makeFakeDeliveries();
     const largeBody = "x".repeat(8192);
 
-    globalThis.fetch = (async () =>
-      new Response(largeBody, { status: 200 })) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(largeBody, { status: 200 });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -612,6 +595,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -625,9 +609,9 @@ describe("WebhookDeliveryWorker", () => {
   it("transport-error (fetch throws) → createAttempt avec responseStatus=null et error non-null", async () => {
     const fakeDeliveries = makeFakeDeliveries();
 
-    globalThis.fetch = (async () => {
+    const mockFetch = async () => {
       throw new DOMException("The operation was aborted", "AbortError");
-    }) as unknown as typeof fetch;
+    };
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -636,6 +620,7 @@ describe("WebhookDeliveryWorker", () => {
       noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -677,7 +662,7 @@ describe("WebhookDeliveryWorker", () => {
     const endpoints = makeFakeEndpoints();
     const { outbox } = makeOutbox();
 
-    globalThis.fetch = (async () => new Response(null, { status: 200 })) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(null, { status: 200 });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -686,6 +671,7 @@ describe("WebhookDeliveryWorker", () => {
       outbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -699,7 +685,7 @@ describe("WebhookDeliveryWorker", () => {
     const endpoints = makeFakeEndpoints();
     const { outbox, enqueueCalls } = makeOutbox();
 
-    globalThis.fetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(null, { status: 500 });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -708,6 +694,7 @@ describe("WebhookDeliveryWorker", () => {
       outbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -736,7 +723,7 @@ describe("WebhookDeliveryWorker", () => {
     });
     const { outbox, enqueueCalls } = makeOutbox();
 
-    globalThis.fetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(null, { status: 500 });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -745,6 +732,7 @@ describe("WebhookDeliveryWorker", () => {
       outbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);
@@ -774,7 +762,7 @@ describe("WebhookDeliveryWorker", () => {
     });
     const { outbox, enqueueCalls } = makeOutbox();
 
-    globalThis.fetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+    const mockFetch = async () => new Response(null, { status: 500 });
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
@@ -783,6 +771,7 @@ describe("WebhookDeliveryWorker", () => {
       outbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
     );
 
     await runDrain(worker);

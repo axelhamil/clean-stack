@@ -66,6 +66,7 @@ export class WebhookDeliveryWorker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private draining = false;
   private stopping = false;
+  private readonly fetchImpl: typeof fetch;
 
   constructor(
     private readonly deliveries: IWebhookDeliveryRepository,
@@ -74,7 +75,10 @@ export class WebhookDeliveryWorker {
     private readonly outbox: IOutboxRepository,
     private readonly logger: Logger,
     private readonly instrumentation: IInstrumentation,
-  ) {}
+    fetchImpl: typeof fetch = fetch,
+  ) {
+    this.fetchImpl = fetchImpl;
+  }
 
   async start(): Promise<void> {
     return this.instrumentation.startSpan(
@@ -366,7 +370,7 @@ export class WebhookDeliveryWorker {
               attributes: { "http.method": "POST" },
             },
             () =>
-              fetch(endpointAndOrg.url, {
+              this.fetchImpl(endpointAndOrg.url, {
                 method: "POST",
                 headers: requestHeaders,
                 body: rawBody,
