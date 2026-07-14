@@ -245,7 +245,7 @@ describe("WebhooksService", () => {
         id: ENDPOINT_ID,
         organizationId: ORG_ID,
         actorUserId: USER_ID,
-        url: "https://new.example.com/hook",
+        url: "https://93.184.216.34/hook", // use IP to avoid DNS in sandboxed env
       });
 
       expect(result.isSuccess).toBe(true);
@@ -287,6 +287,37 @@ describe("WebhooksService", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+    });
+
+    it("re-enable flows through and returns endpoint with reset failure counters", async () => {
+      const reEnabledEndpoint: WebhookEndpointRecord = {
+        ...stubEndpoint,
+        enabled: true,
+        consecutiveFailures: 0,
+        firstFailedAt: null,
+        disabledAt: null,
+      };
+      const endpoints = makeEndpoints({
+        update: mock(async () =>
+          Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(
+            Option.some(reEnabledEndpoint),
+          ),
+        ),
+      });
+      const service = makeService({ endpoints });
+      const result = await service.updateEndpoint({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        enabled: true,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      const opt = result.getValue();
+      expect(opt.isSome()).toBe(true);
+      const record = opt.unwrap();
+      expect(record.consecutiveFailures).toBe(0);
+      expect(record.disabledAt).toBeNull();
     });
 
     it("calls instrumentation span with op=function", async () => {

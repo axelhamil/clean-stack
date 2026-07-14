@@ -129,8 +129,10 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const opt = await di.WebhooksService.findDelivery(deliveryId, orgId);
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });
-      const { nextAttemptAt, lastError, lastResponseStatus, attemptHistory, ...rest } =
-        opt.unwrap();
+      const delivery = opt.unwrap();
+      if (delivery.endpointId !== id)
+        throw new HTTPException(404, { message: "Webhook delivery not found" });
+      const { nextAttemptAt, lastError, lastResponseStatus, attemptHistory, ...rest } = delivery;
       return c.json({
         ...rest,
         nextAttemptAt: nextAttemptAt.toNull(),
