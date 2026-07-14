@@ -12,6 +12,11 @@ export type WebhookEndpointRecord = {
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
+  previousSecretCipher: string | null;
+  previousSecretExpiresAt: Date | null;
+  consecutiveFailures: number;
+  firstFailedAt: Date | null;
+  disabledAt: Date | null;
 };
 
 export type CreateEndpointArgs = {
@@ -47,4 +52,26 @@ export interface IWebhookEndpointRepository {
   ): Promise<Result<boolean, WebhookRepoError>>;
   findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>>;
   listByOrg(organizationId: string): Promise<Result<WebhookEndpointRecord[], WebhookRepoError>>;
+  applySecretRotation(
+    args: {
+      id: string;
+      organizationId: string;
+      secretCipher: string;
+      previousSecretCipher: string;
+      previousSecretExpiresAt: Date;
+    },
+    tx: ITransaction,
+  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
+  bumpFailure(
+    id: string,
+    tx: ITransaction,
+  ): Promise<
+    Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
+  >;
+  resetFailure(id: string, tx: ITransaction): Promise<Result<void, WebhookRepoError>>;
+  markDisabled(
+    id: string,
+    disabledAt: Date,
+    tx: ITransaction,
+  ): Promise<Result<void, WebhookRepoError>>;
 }

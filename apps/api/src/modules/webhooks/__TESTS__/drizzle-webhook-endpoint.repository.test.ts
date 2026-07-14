@@ -44,6 +44,11 @@ const fakeRow = {
   enabled: true,
   createdAt: new Date("2024-01-01"),
   updatedAt: new Date("2024-01-01"),
+  previousSecretCipher: null,
+  previousSecretExpiresAt: null,
+  consecutiveFailures: 0,
+  firstFailedAt: null,
+  disabledAt: null,
 };
 
 // Mock exposes the FULL surface of @packages/drizzle — superset rule (see shared/CLAUDE.md):
@@ -86,6 +91,11 @@ mock.module("@packages/drizzle", () => ({
       enabled: {},
       createdAt: {},
       updatedAt: {},
+      previousSecretCipher: {},
+      previousSecretExpiresAt: {},
+      consecutiveFailures: {},
+      firstFailedAt: {},
+      disabledAt: {},
       $inferSelect: {},
       $inferInsert: {},
     },
@@ -125,6 +135,15 @@ const { DrizzleWebhookEndpointRepository } = await import(
 const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
 type InstrType = InstanceType<typeof NoOpInstrumentation>;
+
+// Fake transaction — exposes the same query methods as db so tx ?? db resolves uniformly.
+const tx = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+  // biome-ignore lint/suspicious/noExplicitAny: test stub
+} as unknown as any;
 
 describe("DrizzleWebhookEndpointRepository", () => {
   let instrumentation: InstrType;
@@ -413,6 +432,194 @@ describe("DrizzleWebhookEndpointRepository", () => {
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
       expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // applySecretRotation
+  // -------------------------------------------------------------------------
+
+  describe("applySecretRotation", () => {
+    it("happy path: updates both secrets and returns the record", async () => {
+      dbBehavior = async () => [
+        {
+          ...fakeRow,
+          secretCipher: "new-cipher",
+          previousSecretCipher: "old-cipher",
+          previousSecretExpiresAt: new Date("2030-01-01"),
+        },
+      ];
+
+      const r = await repo.applySecretRotation(
+        {
+          id: "ep-1",
+          organizationId: "org-1",
+          secretCipher: "new-cipher",
+          previousSecretCipher: "old-cipher",
+          previousSecretExpiresAt: new Date("2030-01-01"),
+        },
+        tx,
+      );
+
+      expect(r.isSuccess).toBe(true);
+      expect(r.getValue().isSome()).toBe(true);
+      expect(r.getValue().unwrap().secretCipher).toBe("new-cipher");
+      expect(r.getValue().unwrap().previousSecretCipher).toBe("old-cipher");
+    });
+
+    it("happy path: returns Option.none when no row matched", async () => {
+      dbBehavior = async () => [];
+
+      const r = await repo.applySecretRotation(
+        {
+          id: "ep-99",
+          organizationId: "org-1",
+          secretCipher: "x",
+          previousSecretCipher: "y",
+          previousSecretExpiresAt: new Date(),
+        },
+        tx,
+      );
+
+      expect(r.isSuccess).toBe(true);
+      expect(r.getValue().isNone()).toBe(true);
+    });
+
+    it("failure path: DB throws → capture + Result.fail", async () => {
+      const boom = new Error("rotation boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const r = await repo.applySecretRotation(
+        {
+          id: "ep-1",
+          organizationId: "org-1",
+          secretCipher: "x",
+          previousSecretCipher: "y",
+          previousSecretExpiresAt: new Date(),
+        },
+        tx,
+      );
+
+      expect(r.isFailure).toBe(true);
+      expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // bumpFailure
+  // -------------------------------------------------------------------------
+
+  describe("bumpFailure", () => {
+    it("happy path: returns the incremented counters", async () => {
+      const failedAt = new Date("2024-06-01");
+      dbBehavior = async () => [{ consecutiveFailures: 3, firstFailedAt: failedAt }];
+
+      const r = await repo.bumpFailure("ep-1", tx);
+
+      expect(r.isSuccess).toBe(true);
+      expect(r.getValue().isSome()).toBe(true);
+      expect(r.getValue().unwrap().consecutiveFailures).toBe(3);
+      expect(r.getValue().unwrap().firstFailedAt).toBe(failedAt);
+    });
+
+    it("happy path: returns Option.none when no row matched", async () => {
+      dbBehavior = async () => [];
+
+      const r = await repo.bumpFailure("ep-99", tx);
+
+      expect(r.isSuccess).toBe(true);
+      expect(r.getValue().isNone()).toBe(true);
+    });
+
+    it("failure path: DB throws → capture + Result.fail", async () => {
+      const boom = new Error("bump boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const r = await repo.bumpFailure("ep-1", tx);
+
+      expect(r.isFailure).toBe(true);
+      expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resetFailure
+  // -------------------------------------------------------------------------
+
+  describe("resetFailure", () => {
+    it("happy path: returns Result.ok(undefined)", async () => {
+      dbBehavior = async () => [];
+
+      const r = await repo.resetFailure("ep-1", tx);
+
+      expect(r.isSuccess).toBe(true);
+    });
+
+    it("failure path: DB throws → capture + Result.fail", async () => {
+      const boom = new Error("reset boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const r = await repo.resetFailure("ep-1", tx);
+
+      expect(r.isFailure).toBe(true);
+      expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // markDisabled
+  // -------------------------------------------------------------------------
+
+  describe("markDisabled", () => {
+    it("happy path: returns Result.ok(undefined)", async () => {
+      dbBehavior = async () => [];
+
+      const r = await repo.markDisabled("ep-1", new Date(), tx);
+
+      expect(r.isSuccess).toBe(true);
+    });
+
+    it("failure path: DB throws → capture + Result.fail", async () => {
+      const boom = new Error("disable boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const r = await repo.markDisabled("ep-1", new Date(), tx);
+
+      expect(r.isFailure).toBe(true);
+      expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // update — enabled:true clears failure state
+  // -------------------------------------------------------------------------
+
+  describe("update (re-enable clears failure state)", () => {
+    it("happy path: enabled:true yields a record with consecutiveFailures:0 and disabledAt:null", async () => {
+      dbBehavior = async () => [
+        {
+          ...fakeRow,
+          enabled: true,
+          consecutiveFailures: 0,
+          firstFailedAt: null,
+          disabledAt: null,
+        },
+      ];
+
+      const result = await repo.update({ id: "ep-1", organizationId: "org-1", enabled: true });
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap().consecutiveFailures).toBe(0);
+      expect(result.getValue().unwrap().disabledAt).toBeNull();
     });
   });
 });

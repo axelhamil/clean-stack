@@ -36,6 +36,11 @@ const stubEndpoint: WebhookEndpointRecord = {
   enabled: true,
   createdAt: new Date("2024-01-01"),
   updatedAt: new Date("2024-01-01"),
+  previousSecretCipher: null,
+  previousSecretExpiresAt: null,
+  consecutiveFailures: 0,
+  firstFailedAt: null,
+  disabledAt: null,
 };
 
 const stubDelivery: WebhookDeliveryRecord = {
