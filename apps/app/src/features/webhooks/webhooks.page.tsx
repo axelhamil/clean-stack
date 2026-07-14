@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Can } from "../../shared/auth/can";
@@ -125,7 +126,15 @@ export function WebhooksPage() {
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Webhooks</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold">Webhooks</h1>
+          <Link
+            to="/developers/events"
+            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            View event catalog
+          </Link>
+        </div>
         <Can requires={{ webhooks: ["write"] }}>
           <Button onClick={() => setCreating(true)}>Add endpoint</Button>
         </Can>

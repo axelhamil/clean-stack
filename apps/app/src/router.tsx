@@ -12,6 +12,7 @@ import { billingRoute } from "./features/billing/billing.route";
 import { pricingRoute } from "./features/billing/pricing.route";
 import { dangerRoute } from "./features/danger/danger.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
+import { developersEventsRoute } from "./features/developers/events.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
 import { acceptPoliciesRoute } from "./features/legal/accept.route";
 import { accessibilityRoute } from "./features/legal/accessibility.route";
@@ -61,6 +62,7 @@ const routeTree = rootRoute.addChildren([
   accessibilityRoute,
   cookiesRoute,
   pricingRoute,
+  developersEventsRoute,
   magicLinkRoute,
   resetPasswordRoute,
   twoFactorRoute,

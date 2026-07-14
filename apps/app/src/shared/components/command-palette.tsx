@@ -31,6 +31,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  BookOpen,
   Building2,
   Copy,
   CreditCard,
@@ -113,6 +114,7 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
   },
   { to: "/settings/account", label: "Settings — Account", icon: User },
   { to: "/settings/danger", label: "Settings — Danger zone", icon: TriangleAlert },
+  { to: "/developers/events", label: "Developers — Event catalog", icon: BookOpen },
 ];
 
 function useNavigationGroup(): CommandGroupConfig {
