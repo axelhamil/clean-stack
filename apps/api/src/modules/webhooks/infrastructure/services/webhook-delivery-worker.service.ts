@@ -1,6 +1,7 @@
 import { Option } from "@packages/ddd-kit";
 import { db, eq, sql, webhooksSchema } from "@packages/drizzle";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
+import { env } from "../../../../shared/env";
 import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../../../../shared/jitter";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -21,6 +22,32 @@ const CLAIM_WINDOW_MS = BATCH_SIZE * FETCH_TIMEOUT_MS + 30_000;
 
 function expectedDelayFromAttempts(currentAttempts: number): number {
   return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
+}
+
+async function readCappedBody(res: Response, cap: number): Promise<string | null> {
+  if (!res.body) return null;
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < cap) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      chunks.push(value);
+      total += value.length;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const buf = new Uint8Array(Math.min(total, cap));
+  let offset = 0;
+  for (const chunk of chunks) {
+    const remaining = cap - offset;
+    if (remaining <= 0) break;
+    buf.set(chunk.subarray(0, Math.min(chunk.length, remaining)), offset);
+    offset += Math.min(chunk.length, remaining);
+  }
+  return new TextDecoder().decode(buf);
 }
 
 export class WebhookDeliveryWorker {
@@ -219,6 +246,26 @@ export class WebhookDeliveryWorker {
                 "webhook delivery ssrf dead-letter updateStatus failed",
               );
             }
+            const attemptRes = await this.deliveries.createAttempt(
+              {
+                deliveryId: delivery.id,
+                attemptNumber: delivery.attempts + 1,
+                requestHeaders: null,
+                requestBody: null,
+                responseStatus: null,
+                responseHeaders: null,
+                responseBody: null,
+                durationMs: 0,
+                error: "destination not publicly routable",
+              },
+              tx,
+            );
+            if (attemptRes.isFailure) {
+              this.logger.error(
+                { err: attemptRes.getError(), deliveryId: delivery.id },
+                "webhook delivery ssrf createAttempt failed",
+              );
+            }
           });
           return;
         }
@@ -265,8 +312,19 @@ export class WebhookDeliveryWorker {
         const ts = Math.floor(Date.now() / 1000);
         const signature = await signWebhookPayload(rawBody, secrets, ts);
 
+        const requestHeaders: Record<string, string> = {
+          "content-type": "application/json",
+          "x-webhook-signature": signature,
+          "x-webhook-event-id": delivery.outboxEventId,
+          "x-webhook-event-type": delivery.eventType,
+          "x-webhook-idempotency": delivery.idempotencyKey,
+        };
+
         let responseStatus: Option<number> = Option.none();
         let errorMessage: Option<string> = Option.none();
+        const responseHeaders: Record<string, string> = {};
+        let responseBody: string | null = null;
+        const startedAt = Date.now();
         const ctrl = new AbortController();
         const timeoutHandle = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
         try {
@@ -279,18 +337,16 @@ export class WebhookDeliveryWorker {
             () =>
               fetch(endpointAndOrg.url, {
                 method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  "x-webhook-signature": signature,
-                  "x-webhook-event-id": delivery.outboxEventId,
-                  "x-webhook-event-type": delivery.eventType,
-                  "x-webhook-idempotency": delivery.idempotencyKey,
-                },
+                headers: requestHeaders,
                 body: rawBody,
                 signal: ctrl.signal,
               }),
           );
           responseStatus = Option.some(res.status);
+          res.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+          responseBody = await readCappedBody(res, env.WEBHOOK_RESPONSE_CAPTURE_BYTES);
           if (!res.ok) errorMessage = Option.some(`HTTP ${res.status}: ${res.statusText}`);
         } catch (err) {
           this.instrumentation.capture(err);
@@ -300,6 +356,7 @@ export class WebhookDeliveryWorker {
         } finally {
           clearTimeout(timeoutHandle);
         }
+        const durationMs = Date.now() - startedAt;
 
         await db.transaction(async (tx) => {
           if (errorMessage.isSome()) {
@@ -322,6 +379,26 @@ export class WebhookDeliveryWorker {
                 "webhook delivery success updateStatus failed",
               );
             }
+          }
+          const attemptRes = await this.deliveries.createAttempt(
+            {
+              deliveryId: delivery.id,
+              attemptNumber: delivery.attempts + 1,
+              requestHeaders,
+              requestBody: rawBody,
+              responseStatus: responseStatus.isSome() ? responseStatus.unwrap() : null,
+              responseHeaders: Object.keys(responseHeaders).length > 0 ? responseHeaders : null,
+              responseBody,
+              durationMs,
+              error: errorMessage.isSome() ? errorMessage.unwrap() : null,
+            },
+            tx,
+          );
+          if (attemptRes.isFailure) {
+            this.logger.error(
+              { err: attemptRes.getError(), deliveryId: delivery.id },
+              "webhook delivery createAttempt failed",
+            );
           }
         });
       },

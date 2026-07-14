@@ -131,6 +131,15 @@ mock.module("@packages/drizzle", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Env mock — avoids Zod validation on required env vars not set in test
+// ---------------------------------------------------------------------------
+mock.module("../../../shared/env", () => ({
+  env: {
+    WEBHOOK_RESPONSE_CAPTURE_BYTES: 4096,
+  },
+}));
+
+// ---------------------------------------------------------------------------
 // AEAD mock — returns predictable values so HMAC path is exercised
 // ---------------------------------------------------------------------------
 mock.module("../../../shared/aead", () => ({
@@ -167,9 +176,16 @@ function makeDelivery() {
 
 function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [makeDelivery()]) {
   const updates: Array<{ id: string; update: unknown }> = [];
+  const createAttempts: Array<
+    Omit<
+      import("../application/ports/webhook-delivery.port").WebhookDeliveryAttemptRecord,
+      "id" | "createdAt"
+    >
+  > = [];
   let callCount = 0;
   return {
     updates,
+    createAttempts,
     findPendingBatch: async (_limit: number, _tx: unknown) => {
       callCount++;
       return Result.ok(callCount === 1 ? deliveries : []) as unknown as ReturnType<
@@ -180,6 +196,18 @@ function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [mak
       updates.push({ id, update });
       return Result.ok() as unknown as ReturnType<
         import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository["updateStatus"]
+      >;
+    },
+    createAttempt: async (
+      args: Omit<
+        import("../application/ports/webhook-delivery.port").WebhookDeliveryAttemptRecord,
+        "id" | "createdAt"
+      >,
+      _tx: unknown,
+    ) => {
+      createAttempts.push(args);
+      return Result.ok() as unknown as ReturnType<
+        import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository["createAttempt"]
       >;
     },
     list: async () => Result.ok({ items: [], nextCursor: Option.none() }),
@@ -501,5 +529,85 @@ describe("WebhookDeliveryWorker", () => {
     expect(
       fakeDeliveries.updates.find((u) => (u.update as { status: string }).status === "dead_letter"),
     ).toBeDefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 5 — per-attempt persistence
+  // -------------------------------------------------------------------------
+  it("200 OK → createAttempt appelé avec requestHeaders + responseStatus=200", async () => {
+    const fakeDeliveries = makeFakeDeliveries();
+
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      void _url;
+      void init;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      noopOutbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(fakeDeliveries.createAttempts).toHaveLength(1);
+    const attempt = fakeDeliveries.createAttempts[0]!;
+    expect(attempt.deliveryId).toBe("del-1");
+    expect(attempt.attemptNumber).toBe(1);
+    expect(attempt.responseStatus).toBe(200);
+    expect(attempt.requestHeaders).toMatchObject({ "content-type": "application/json" });
+    expect(attempt.error).toBeNull();
+    expect(typeof attempt.durationMs).toBe("number");
+  });
+
+  it("responseBody capé à WEBHOOK_RESPONSE_CAPTURE_BYTES (4096)", async () => {
+    const fakeDeliveries = makeFakeDeliveries();
+    const largeBody = "x".repeat(8192);
+
+    globalThis.fetch = (async () =>
+      new Response(largeBody, { status: 200 })) as unknown as typeof fetch;
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      noopOutbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(fakeDeliveries.createAttempts).toHaveLength(1);
+    const body = fakeDeliveries.createAttempts[0]!.responseBody;
+    expect(body).not.toBeNull();
+    expect(body!.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("SSRF bloqué → createAttempt appelé avec error, champs réponse null", async () => {
+    dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://192.168.1.1/hook" }];
+    const fakeDeliveries = makeFakeDeliveries();
+
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      noopOutbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(fakeDeliveries.createAttempts).toHaveLength(1);
+    const attempt = fakeDeliveries.createAttempts[0]!;
+    expect(attempt.responseStatus).toBeNull();
+    expect(attempt.responseHeaders).toBeNull();
+    expect(attempt.responseBody).toBeNull();
+    expect(attempt.error).not.toBeNull();
   });
 });
