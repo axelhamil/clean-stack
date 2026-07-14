@@ -1,6 +1,7 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { ITransaction } from "../../../shared/transaction";
@@ -507,13 +508,27 @@ describe("WebhooksService", () => {
 
   describe("rotateSecret", () => {
     it("generates a new secret, moves the current to previous, emits, returns plaintext", async () => {
+      const enqueueMock = mock(async () => {});
+      const spiedOutbox = {
+        enqueue: enqueueMock,
+        findPendingBatch: mock(async () => []),
+        markDispatched: mock(async () => {}),
+        markFailed: mock(async () => {}),
+      } as unknown as IOutboxRepository;
       const endpoints = makeEndpoints({
         findById: mock(async () => Option.some(stubEndpoint)),
         applySecretRotation: mock(async () =>
           Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
         ),
       });
-      const service = makeService({ endpoints });
+      const service = new WebhooksService(
+        endpoints,
+        makeDeliveries(),
+        tx,
+        spiedOutbox,
+        validMasterKey,
+        new NoOpInstrumentation(),
+      );
       const r = await service.rotateSecret({
         id: ENDPOINT_ID,
         organizationId: ORG_ID,
@@ -522,6 +537,14 @@ describe("WebhooksService", () => {
       expect(r.isSuccess).toBe(true);
       expect(r.getValue().isSome()).toBe(true);
       expect(r.getValue().unwrap().plaintextSecret).toMatch(/^whsec_/);
+      expect(enqueueMock).toHaveBeenCalledTimes(1);
+      expect(enqueueMock).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ eventType: EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED }),
+        ]),
+        expect.any(Object),
+        expect.any(Object),
+      );
     });
     it("returns None when endpoint not found", async () => {
       const endpoints = makeEndpoints({
@@ -533,7 +556,18 @@ describe("WebhooksService", () => {
         organizationId: ORG_ID,
         actorUserId: USER_ID,
       });
+      expect(r.isSuccess).toBe(true);
       expect(r.getValue().isNone()).toBe(true);
+    });
+    it("returns WEBHOOK_MASTER_KEY_UNAVAILABLE when master key not configured", async () => {
+      const service = makeService({ masterKey: noMasterKey });
+      const result = await service.rotateSecret({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_MASTER_KEY_UNAVAILABLE");
     });
   });
 
