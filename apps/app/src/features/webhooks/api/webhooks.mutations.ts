@@ -14,6 +14,7 @@ export type CreateEndpointBody = InferRequestType<typeof $create>["json"];
 export type CreateEndpointResponse = InferResponseType<typeof $create, 201>;
 export type UpdateEndpointBody = InferRequestType<typeof $update>["json"];
 export type RotateSecretResponse = InferResponseType<typeof $rotate, 200>;
+export type WebhookEndpointWithSecret = CreateEndpointResponse;
 
 export const createEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "create"] as const,
@@ -29,7 +30,7 @@ export const updateEndpointMutationOptions = mutationOptions({
   mutationFn: async ({ id, ...json }: UpdateEndpointBody & { id: string }) => {
     const res = await $update({ param: { id }, json });
     if (!res.ok) await throwApiError(res, "Failed to update webhook endpoint");
-    return res.json();
+    return (await res.json()) as InferResponseType<typeof $update, 200>;
   },
 });
 
@@ -38,7 +39,7 @@ export const deleteEndpointMutationOptions = mutationOptions({
   mutationFn: async (id: string) => {
     const res = await $delete({ param: { id } });
     if (!res.ok) await throwApiError(res, "Failed to delete webhook endpoint");
-    return res.json();
+    return (await res.json()) as InferResponseType<typeof $delete, 200>;
   },
 });
 
@@ -47,7 +48,7 @@ export const replayDeliveryMutationOptions = mutationOptions({
   mutationFn: async ({ endpointId, deliveryId }: { endpointId: string; deliveryId: string }) => {
     const res = await $replay({ param: { id: endpointId, deliveryId } });
     if (!res.ok) await throwApiError(res, "Failed to replay delivery");
-    return res.json();
+    return (await res.json()) as InferResponseType<typeof $replay, 201>;
   },
 });
 

@@ -13,6 +13,7 @@ export type WebhookEndpoint = WebhookEndpointsResponse["items"][number];
 
 export type DeliveriesPage = InferResponseType<typeof $listDeliveries, 200>;
 export type DeliveryListItem = DeliveriesPage["items"][number];
+export type WebhookDeliveryStatus = DeliveryListItem["status"];
 
 export type DeliveryDetail = InferResponseType<typeof $deliveryDetail, 200>;
 export type DeliveryAttempt = DeliveryDetail["attemptHistory"][number];

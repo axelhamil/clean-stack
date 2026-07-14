@@ -1,7 +1,6 @@
-// `WebhookDeliveryStatus` is not re-exported by `api/client`; define it here as a
-// string-literal union matching the port definition to avoid a circular dep with
-// webhooks.queries.ts (which imports DeliveryFilters from this file).
-export type WebhookDeliveryStatus = "pending" | "success" | "failed" | "dead_letter";
+import type { WebhookDeliveryStatus } from "./api/webhooks.queries";
+
+export type { WebhookDeliveryStatus };
 
 export interface DeliveryFilters {
   status?: WebhookDeliveryStatus;
