@@ -26,6 +26,7 @@ export function endpointStatus(e: Pick<WebhookEndpoint, "enabled" | "disabledAt"
 
 interface EndpointRowProps {
   endpoint: WebhookEndpoint;
+  canWrite: boolean;
   onEdit: (endpoint: WebhookEndpoint) => void;
   onSendTest: (endpoint: WebhookEndpoint) => void;
   onRotate: (endpoint: WebhookEndpoint) => void;
@@ -35,6 +36,7 @@ interface EndpointRowProps {
 
 export function EndpointRow({
   endpoint,
+  canWrite,
   onEdit,
   onSendTest,
   onRotate,
@@ -66,7 +68,7 @@ export function EndpointRow({
         )}
       </TableCell>
       <TableCell>{endpoint.eventTypes.length}</TableCell>
-      <TableCell>{new Date(endpoint.createdAt as string).toLocaleDateString()}</TableCell>
+      <TableCell>{new Date(endpoint.createdAt).toLocaleDateString()}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -77,17 +79,23 @@ export function EndpointRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onSelect(endpoint)}>View deliveries</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onEdit(endpoint)}>Edit</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onSendTest(endpoint)}>Send test</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onRotate(endpoint)}>Rotate secret</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDelete(endpoint)}
-              className="text-destructive focus:text-destructive"
-            >
-              Delete
-            </DropdownMenuItem>
+            {canWrite && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onEdit(endpoint)}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSendTest(endpoint)}>Send test</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onRotate(endpoint)}>
+                  Rotate secret
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDelete(endpoint)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

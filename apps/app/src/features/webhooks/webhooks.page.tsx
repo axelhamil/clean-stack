@@ -50,6 +50,7 @@ import type { DeliveryFilters } from "./webhook-delivery-filters";
 export function WebhooksPage() {
   const qc = useQueryClient();
   const { can } = useAuthorization();
+  const canWrite = can({ webhooks: ["write"] });
 
   const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(null);
   const [editing, setEditing] = useState<WebhookEndpoint | null>(null);
@@ -162,6 +163,7 @@ export function WebhooksPage() {
               <EndpointRow
                 key={e.id}
                 endpoint={e}
+                canWrite={canWrite}
                 onSelect={(ep) => setSelectedEndpointId(ep.id)}
                 onEdit={(ep) => setEditing(ep)}
                 onSendTest={(ep) => sendTest.mutate(ep.id)}
@@ -237,9 +239,7 @@ export function WebhooksPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{d.attempts}</TableCell>
-                        <TableCell>
-                          {new Date(d.createdAt as string).toLocaleDateString()}
-                        </TableCell>
+                        <TableCell>{new Date(d.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setSelectedDelivery(d)}>
                             Details
@@ -254,7 +254,7 @@ export function WebhooksPage() {
                 <Button
                   variant="outline"
                   disabled={deliveries.isFetchingNextPage}
-                  onClick={() => deliveries.fetchNextPage()}
+                  onClick={() => void deliveries.fetchNextPage()}
                 >
                   Load more
                 </Button>
