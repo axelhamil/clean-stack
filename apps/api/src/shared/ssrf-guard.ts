@@ -11,7 +11,7 @@ function privateBlockList(): BlockList {
   const bl = new BlockList();
   for (const [net, prefix] of PRIVATE_V4) bl.addSubnet(net, prefix, "ipv4");
   for (const [net, prefix] of PRIVATE_V6) bl.addSubnet(net, prefix, "ipv6");
-  bl.addAddress("0.0.0.0", "ipv4");
+  bl.addSubnet("0.0.0.0", 8, "ipv4");
   cachedList = bl;
   return bl;
 }
@@ -49,6 +49,7 @@ function forbidden(message: string): Result<URL, SsrfError> {
 export async function assertPublicUrl(
   rawUrl: string,
   resolve: AddressResolver = defaultResolver,
+  httpsOnly: boolean = env.NODE_ENV === "production",
 ): Promise<Result<URL, SsrfError>> {
   let url: URL;
   try {
@@ -57,7 +58,6 @@ export async function assertPublicUrl(
     return forbidden("invalid url");
   }
 
-  const httpsOnly = env.NODE_ENV === "production";
   const schemeOk = url.protocol === "https:" || (url.protocol === "http:" && !httpsOnly);
   if (!schemeOk) return forbidden("scheme not allowed");
   if (url.username || url.password) return forbidden("credentials in url not allowed");

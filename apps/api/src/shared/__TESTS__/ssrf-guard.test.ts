@@ -39,6 +39,10 @@ describe("isPrivateOrReservedAddress", () => {
   it("treats unparseable input as unsafe", () => {
     expect(isPrivateOrReservedAddress("not-an-ip")).toBe(true);
   });
+
+  it("blocks the 0.0.0.0/8 this-network range", () => {
+    expect(isPrivateOrReservedAddress("0.0.0.5")).toBe(true);
+  });
 });
 
 const publicResolver: AddressResolver = async () => [{ address: "93.184.216.34" }];
@@ -64,5 +68,27 @@ describe("assertPublicUrl", () => {
     const r = await assertPublicUrl("https://example.com/hook", publicResolver);
     expect(r.isSuccess).toBe(true);
     if (r.isSuccess) expect(r.getValue().hostname).toBe("example.com");
+  });
+
+  it("rejects http in production mode", async () => {
+    const r = await assertPublicUrl("http://example.com/hook", publicResolver, true);
+    expect(r.isFailure).toBe(true);
+  });
+
+  it("allows http in non-production mode", async () => {
+    const r = await assertPublicUrl("http://example.com/hook", publicResolver, false);
+    expect(r.isSuccess).toBe(true);
+  });
+
+  it("fails closed when the resolver returns no addresses", async () => {
+    const r = await assertPublicUrl("https://example.com/hook", async () => []);
+    expect(r.isFailure).toBe(true);
+  });
+
+  it("fails closed when the resolver throws", async () => {
+    const r = await assertPublicUrl("https://example.com/hook", async () => {
+      throw new Error("dns failure");
+    });
+    expect(r.isFailure).toBe(true);
   });
 });

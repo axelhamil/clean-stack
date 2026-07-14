@@ -38,6 +38,10 @@ describe("webhook SOTA events", () => {
         actorUserId: "u1",
       }).success,
     ).toBe(true);
+    expect(
+      WebhookEndpointSecretRotatedPayload.safeParse({ organizationId: "o1", endpointId: "e1" })
+        .success,
+    ).toBe(false);
   });
 
   it("disabled + exhausted payloads allow a null system actor", () => {
