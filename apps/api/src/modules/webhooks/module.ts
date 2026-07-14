@@ -50,7 +50,9 @@ export const webhooksModule = defineModule()((b) =>
       (c) =>
         new WebhookDeliveryWorker(
           c.IWebhookDeliveryRepository,
+          c.IWebhookEndpointRepository,
           c.WebhookMasterKey,
+          c.IOutboxRepository,
           logger,
           c.IInstrumentation,
         ),

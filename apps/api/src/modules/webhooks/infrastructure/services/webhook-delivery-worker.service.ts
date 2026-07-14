@@ -4,10 +4,13 @@ import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../../../../shared/jitter";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { assertPublicUrl } from "../../../../shared/ssrf-guard";
 import type {
   IWebhookDeliveryRepository,
   WebhookDeliveryRecord,
 } from "../../application/ports/webhook-delivery.port";
+import type { IWebhookEndpointRepository } from "../../application/ports/webhook-endpoint.port";
 import type { MasterKeyProvider } from "../../application/services/webhooks.service";
 import { signWebhookPayload } from "./hmac-signer";
 
@@ -27,7 +30,9 @@ export class WebhookDeliveryWorker {
 
   constructor(
     private readonly deliveries: IWebhookDeliveryRepository,
+    private readonly endpoints: IWebhookEndpointRepository,
     private readonly masterKey: MasterKeyProvider,
+    private readonly outbox: IOutboxRepository,
     private readonly logger: Logger,
     private readonly instrumentation: IInstrumentation,
   ) {}
@@ -194,6 +199,30 @@ export class WebhookDeliveryWorker {
         }
         const endpointAndOrg = endpointResult.row;
 
+        const guard = await assertPublicUrl(endpointAndOrg.url);
+        if (guard.isFailure) {
+          await db.transaction(async (tx) => {
+            const upd = await this.deliveries.updateStatus(
+              delivery.id,
+              {
+                status: "dead_letter",
+                attempts: delivery.attempts + 1,
+                nextAttemptAt: Option.none(),
+                lastError: Option.some("destination not publicly routable"),
+                lastResponseStatus: Option.none(),
+              },
+              tx,
+            );
+            if (upd.isFailure) {
+              this.logger.error(
+                { err: upd.getError(), deliveryId: delivery.id },
+                "webhook delivery ssrf dead-letter updateStatus failed",
+              );
+            }
+          });
+          return;
+        }
+
         const masterKeyOpt = this.masterKey();
         if (masterKeyOpt.isNone()) {
           await db.transaction(async (tx) =>
@@ -202,10 +231,19 @@ export class WebhookDeliveryWorker {
           return;
         }
 
-        let secret: string;
+        let secrets: string[];
         try {
           const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), endpointAndOrg.organizationId);
-          secret = decryptSecret(endpointAndOrg.secretCipher, subKey);
+          const current = decryptSecret(endpointAndOrg.secretCipher, subKey);
+          secrets = [current];
+          if (
+            endpointAndOrg.previousSecretCipher != null &&
+            endpointAndOrg.previousSecretExpiresAt &&
+            endpointAndOrg.previousSecretExpiresAt > new Date()
+          ) {
+            const previous = decryptSecret(endpointAndOrg.previousSecretCipher, subKey);
+            secrets.push(previous);
+          }
         } catch (err) {
           this.logger.error(
             { err, deliveryId: delivery.id, endpointId: endpointAndOrg.id },
@@ -225,7 +263,7 @@ export class WebhookDeliveryWorker {
           time: delivery.createdAt.toISOString(),
         });
         const ts = Math.floor(Date.now() / 1000);
-        const signature = await signWebhookPayload(rawBody, [secret], ts);
+        const signature = await signWebhookPayload(rawBody, secrets, ts);
 
         let responseStatus: Option<number> = Option.none();
         let errorMessage: Option<string> = Option.none();
@@ -326,6 +364,8 @@ export class WebhookDeliveryWorker {
           url: string;
           organizationId: string;
           secretCipher: string;
+          previousSecretCipher: string | null;
+          previousSecretExpiresAt: Date | null;
           enabled: boolean;
         };
       }
@@ -342,6 +382,8 @@ export class WebhookDeliveryWorker {
               url: we.url,
               organizationId: we.organizationId,
               secretCipher: we.secretCipher,
+              previousSecretCipher: we.previousSecretCipher,
+              previousSecretExpiresAt: we.previousSecretExpiresAt,
               enabled: we.enabled,
             })
             .from(we)

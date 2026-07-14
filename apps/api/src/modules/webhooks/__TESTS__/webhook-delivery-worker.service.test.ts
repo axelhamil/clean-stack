@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 
 // ---------------------------------------------------------------------------
 // Drizzle mock — full superset so parallel test files don't see missing exports
@@ -36,6 +37,33 @@ const fakeDb = {
     return cb(fakeTx);
   },
 };
+
+// ---------------------------------------------------------------------------
+// SSRF guard mock — avoids real DNS in tests; checks literal private IPs
+// ---------------------------------------------------------------------------
+mock.module("../../../shared/ssrf-guard", () => {
+  const PRIVATE_HOSTS = ["127.0.0.1", "localhost", "0.0.0.0", "::1"];
+  return {
+    assertPublicUrl: async (rawUrl: string) => {
+      try {
+        const url = new URL(rawUrl);
+        const isPrivate =
+          PRIVATE_HOSTS.includes(url.hostname) ||
+          /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(url.hostname);
+        if (isPrivate) {
+          return Result.fail({
+            code: "WEBHOOK_URL_FORBIDDEN",
+            message: "destination not publicly routable",
+          });
+        }
+        return Result.ok(url);
+      } catch {
+        return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: "invalid url" });
+      }
+    },
+    isPrivateOrReservedAddress: (_ip: string) => false,
+  };
+});
 
 mock.module("@packages/drizzle", () => ({
   db: fakeDb,
@@ -76,6 +104,8 @@ mock.module("@packages/drizzle", () => ({
       url: "url",
       organizationId: "organization_id",
       secretCipher: "secret_cipher",
+      previousSecretCipher: "previous_secret_cipher",
+      previousSecretExpiresAt: "previous_secret_expires_at",
       enabled: "enabled",
       $inferSelect: {},
       $inferInsert: {},
@@ -158,12 +188,38 @@ function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [mak
   };
 }
 
+function makeFakeEndpoints() {
+  return {
+    applySecretRotation: async () => Result.ok(Option.some({} as never)),
+    bumpFailure: async () => Result.ok(Option.none()),
+    resetFailure: async () => Result.ok(undefined as never),
+    markDisabled: async () => Result.ok(undefined as never),
+    create: async () => Result.ok({} as never),
+    update: async () => Result.ok(Option.none()),
+    delete: async () => Result.ok(false),
+    findById: async () => Option.none(),
+    listByOrg: async () => Result.ok([]),
+  };
+}
+
+const noopOutbox: IOutboxRepository = {
+  enqueue: mock(async () => {}),
+  findPendingBatch: mock(async () => []),
+  markDispatched: mock(async () => {}),
+  markFailed: mock(async () => {}),
+};
+
 const FAKE_ENDPOINT = {
   id: "ep-1",
   url: "https://example.com/hook",
   organizationId: "org-1",
   secretCipher: "c2VjcmV0Y2lwaGVydGV4dA==",
   enabled: true,
+  previousSecretCipher: null,
+  previousSecretExpiresAt: null,
+  consecutiveFailures: 0,
+  firstFailedAt: null,
+  disabledAt: null,
 };
 
 function makeLogger() {
@@ -205,7 +261,9 @@ describe("WebhookDeliveryWorker", () => {
     const fakeDeliveries = makeFakeDeliveries([]);
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.some(new Uint8Array(32)),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
     );
@@ -226,7 +284,9 @@ describe("WebhookDeliveryWorker", () => {
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.some(new Uint8Array(32)),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
     );
@@ -254,7 +314,9 @@ describe("WebhookDeliveryWorker", () => {
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.some(new Uint8Array(32)),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
     );
@@ -279,7 +341,9 @@ describe("WebhookDeliveryWorker", () => {
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.some(new Uint8Array(32)),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
     );
@@ -314,7 +378,9 @@ describe("WebhookDeliveryWorker", () => {
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.some(new Uint8Array(32)),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       instrumentation,
     );
@@ -338,7 +404,9 @@ describe("WebhookDeliveryWorker", () => {
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.some(new Uint8Array(32)),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
     );
@@ -359,7 +427,9 @@ describe("WebhookDeliveryWorker", () => {
 
     const worker = new WebhookDeliveryWorker(
       fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
       () => Option.none(),
+      noopOutbox,
       makeLogger() as unknown as import("../../../shared/logger").Logger,
       new NoOpInstrumentation(),
     );
@@ -370,5 +440,66 @@ describe("WebhookDeliveryWorker", () => {
       ["failed", "dead_letter"].includes((u.update as { status: string }).status),
     );
     expect(failUpdate).toBeDefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Dual-secret — two v1= entries when previous secret is within grace period
+  // -------------------------------------------------------------------------
+  it("signs with both secrets while the previous secret is within grace", async () => {
+    dbTransactionResult = [
+      {
+        ...FAKE_ENDPOINT,
+        previousSecretCipher: "oldcipher",
+        previousSecretExpiresAt: new Date(Date.now() + 3_600_000),
+      },
+    ];
+    let sig: string | undefined;
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      sig = (init?.headers as Record<string, string>)["x-webhook-signature"];
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const fakeDeliveries = makeFakeDeliveries();
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      noopOutbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(sig?.match(/v1=/g)?.length).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // SSRF — dead_letter without fetching for a private URL
+  // -------------------------------------------------------------------------
+  it("marks dead_letter without fetching when the endpoint url is not publicly routable", async () => {
+    dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://127.0.0.1/hook" }];
+    let fetched = false;
+    globalThis.fetch = (async () => {
+      fetched = true;
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const fakeDeliveries = makeFakeDeliveries();
+    const worker = new WebhookDeliveryWorker(
+      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
+      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
+      () => Option.some(new Uint8Array(32)),
+      noopOutbox,
+      makeLogger() as unknown as import("../../../shared/logger").Logger,
+      new NoOpInstrumentation(),
+    );
+
+    await runDrain(worker);
+
+    expect(fetched).toBe(false);
+    expect(
+      fakeDeliveries.updates.find((u) => (u.update as { status: string }).status === "dead_letter"),
+    ).toBeDefined();
   });
 });
