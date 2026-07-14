@@ -420,7 +420,11 @@ export class WebhookDeliveryWorker {
                 "webhook delivery success updateStatus failed",
               );
             }
-            const resetRes = await this.endpoints.resetFailure(delivery.endpointId, tx);
+            const resetRes = await this.endpoints.resetFailure(
+              delivery.endpointId,
+              endpointAndOrg.organizationId,
+              tx,
+            );
             if (resetRes.isFailure) {
               this.logger.error(
                 { err: resetRes.getError(), endpointId: delivery.endpointId },
@@ -508,7 +512,7 @@ export class WebhookDeliveryWorker {
       tx,
     );
 
-    const bumpedResult = await this.endpoints.bumpFailure(delivery.endpointId, tx);
+    const bumpedResult = await this.endpoints.bumpFailure(delivery.endpointId, organizationId, tx);
     if (bumpedResult.isFailure) {
       this.logger.error(
         { err: bumpedResult.getError(), endpointId: delivery.endpointId },
@@ -523,7 +527,12 @@ export class WebhookDeliveryWorker {
     const now = new Date();
     if (!shouldAutoDisable(bumped, now)) return;
 
-    const disableRes = await this.endpoints.markDisabled(delivery.endpointId, now, tx);
+    const disableRes = await this.endpoints.markDisabled(
+      delivery.endpointId,
+      organizationId,
+      now,
+      tx,
+    );
     if (disableRes.isFailure) {
       this.logger.error(
         { err: disableRes.getError(), endpointId: delivery.endpointId },

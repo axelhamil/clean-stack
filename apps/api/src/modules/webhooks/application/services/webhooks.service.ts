@@ -106,7 +106,7 @@ export class WebhooksService {
           id: endpoint.id,
           organizationId: args.organizationId,
           actorUserId: args.actorUserId,
-        }).catch(() => {});
+        }).catch((err) => this.instrumentation.capture(err));
 
         return Result.ok({ endpoint, plaintextSecret });
       },
@@ -228,12 +228,15 @@ export class WebhooksService {
 
   async replayDelivery(
     deliveryId: string,
+    endpointId: string,
     organizationId: string,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > replayDelivery", op: "function" },
       async () =>
-        this.uow.run(async (tx) => this.deliveries.enqueueReplay(deliveryId, organizationId, tx)),
+        this.uow.run(async (tx) =>
+          this.deliveries.enqueueReplay(deliveryId, endpointId, organizationId, tx),
+        ),
     );
   }
 

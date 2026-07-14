@@ -404,7 +404,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns Option.none when original delivery not found", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.enqueueReplay("del-99", "org-1");
+      const result = await repo.enqueueReplay("del-99", "ep-1", "org-1");
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isNone()).toBe(true);
@@ -414,7 +414,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueReplay("del-99", "org-1");
+      await repo.enqueueReplay("del-99", "ep-1", "org-1");
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -427,7 +427,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueReplay("del-99", "org-1");
+      await repo.enqueueReplay("del-99", "ep-1", "org-1");
 
       const calls = spy.mock.calls;
       const innerSpans = calls.filter((c) => c[0]?.op === "db.query");
@@ -440,7 +440,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.enqueueReplay("del-1", "org-1");
+      const result = await repo.enqueueReplay("del-1", "ep-1", "org-1");
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");

@@ -715,7 +715,7 @@ describe("WebhooksService", () => {
   describe("replayDelivery", () => {
     it("returns Some(delivery) when replay enqueued (happy path)", async () => {
       const service = makeService();
-      const result = await service.replayDelivery(DELIVERY_ID, ORG_ID);
+      const result = await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isSome()).toBe(true);
@@ -729,7 +729,20 @@ describe("WebhooksService", () => {
         ),
       });
       const service = makeService({ deliveries });
-      const result = await service.replayDelivery("nonexistent", ORG_ID);
+      const result = await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID);
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
+    });
+
+    it("returns None when delivery belongs to a different endpoint", async () => {
+      const deliveries = makeDeliveries({
+        enqueueReplay: mock(async () =>
+          Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
+        ),
+      });
+      const service = makeService({ deliveries });
+      const result = await service.replayDelivery(DELIVERY_ID, "ep-other", ORG_ID);
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isNone()).toBe(true);
@@ -745,7 +758,7 @@ describe("WebhooksService", () => {
         ),
       });
       const service = makeService({ deliveries });
-      const result = await service.replayDelivery(DELIVERY_ID, ORG_ID);
+      const result = await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -763,7 +776,7 @@ describe("WebhooksService", () => {
         instrumentation,
       );
 
-      await service.replayDelivery(DELIVERY_ID, ORG_ID);
+      await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
 
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({ name: "WebhooksService > replayDelivery", op: "function" }),

@@ -68,6 +68,7 @@ export interface IWebhookDeliveryRepository {
   ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
   enqueueReplay(
     deliveryId: string,
+    endpointId: string,
     organizationId: string,
     tx?: ITransaction,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>>;

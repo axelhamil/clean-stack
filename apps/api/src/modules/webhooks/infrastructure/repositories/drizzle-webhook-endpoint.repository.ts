@@ -218,6 +218,7 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
 
   async bumpFailure(
     id: string,
+    organizationId: string,
     tx: Transaction,
   ): Promise<
     Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
@@ -232,7 +233,7 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
               consecutiveFailures: sql`${we.consecutiveFailures} + 1`,
               firstFailedAt: sql`COALESCE(${we.firstFailedAt}, now())`,
             })
-            .where(eq(we.id, id))
+            .where(and(eq(we.id, id), eq(we.organizationId, organizationId)))
             .returning({
               consecutiveFailures: we.consecutiveFailures,
               firstFailedAt: we.firstFailedAt,
@@ -241,11 +242,11 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          if (!row?.firstFailedAt) return Result.ok(Option.none());
+          if (!row) return Result.ok(Option.none());
           return Result.ok(
             Option.some({
               consecutiveFailures: row.consecutiveFailures,
-              firstFailedAt: row.firstFailedAt,
+              firstFailedAt: row.firstFailedAt!,
             }),
           );
         } catch (e) {
@@ -256,7 +257,11 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     );
   }
 
-  async resetFailure(id: string, tx: Transaction): Promise<Result<void, WebhookRepoError>> {
+  async resetFailure(
+    id: string,
+    organizationId: string,
+    tx: Transaction,
+  ): Promise<Result<void, WebhookRepoError>> {
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > resetFailure" },
       async () => {
@@ -264,7 +269,7 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
           const query = tx
             .update(we)
             .set({ consecutiveFailures: 0, firstFailedAt: null })
-            .where(eq(we.id, id));
+            .where(and(eq(we.id, id), eq(we.organizationId, organizationId)));
           await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
@@ -280,6 +285,7 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
 
   async markDisabled(
     id: string,
+    organizationId: string,
     disabledAt: Date,
     tx: Transaction,
   ): Promise<Result<void, WebhookRepoError>> {
@@ -287,7 +293,10 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
       { name: "DrizzleWebhookEndpointRepository > markDisabled" },
       async () => {
         try {
-          const query = tx.update(we).set({ enabled: false, disabledAt }).where(eq(we.id, id));
+          const query = tx
+            .update(we)
+            .set({ enabled: false, disabledAt })
+            .where(and(eq(we.id, id), eq(we.organizationId, organizationId)));
           await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),

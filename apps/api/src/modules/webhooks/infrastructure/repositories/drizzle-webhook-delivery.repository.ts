@@ -196,6 +196,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
 
   async enqueueReplay(
     deliveryId: string,
+    endpointId: string,
     organizationId: string,
     tx?: Transaction,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>> {
@@ -208,7 +209,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
             .select({ d: wd })
             .from(wd)
             .innerJoin(we, eq(wd.endpointId, we.id))
-            .where(and(eq(wd.id, deliveryId), eq(we.organizationId, organizationId)))
+            .where(
+              and(
+                eq(wd.id, deliveryId),
+                eq(wd.endpointId, endpointId),
+                eq(we.organizationId, organizationId),
+              ),
+            )
             .limit(1);
           const [existingRow] = await this.instrumentation.startSpan(
             { name: findQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },

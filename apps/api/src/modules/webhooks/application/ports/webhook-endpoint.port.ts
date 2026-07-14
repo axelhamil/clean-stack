@@ -64,13 +64,19 @@ export interface IWebhookEndpointRepository {
   ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
   bumpFailure(
     id: string,
+    organizationId: string,
     tx: ITransaction,
   ): Promise<
     Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
   >;
-  resetFailure(id: string, tx: ITransaction): Promise<Result<void, WebhookRepoError>>;
+  resetFailure(
+    id: string,
+    organizationId: string,
+    tx: ITransaction,
+  ): Promise<Result<void, WebhookRepoError>>;
   markDisabled(
     id: string,
+    organizationId: string,
     disabledAt: Date,
     tx: ITransaction,
   ): Promise<Result<void, WebhookRepoError>>;

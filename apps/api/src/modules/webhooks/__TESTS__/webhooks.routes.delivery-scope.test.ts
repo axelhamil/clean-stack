@@ -1,5 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Option } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
+import type { WebhookDeliveryRecord } from "../application/ports/webhook-delivery.port";
+import type { WebhookRepoError } from "../application/ports/webhook-endpoint.port";
 
 // ─── stub data ───────────────────────────────────────────────────────────────
 
@@ -43,6 +45,9 @@ const crossDelivery = {
 
 const mockFindEndpoint = mock(async () => Option.some(stubEndpointA));
 const mockFindDelivery = mock(async () => Option.some(crossDelivery));
+const mockReplayDelivery = mock(async () =>
+  Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
+);
 
 // ─── module mocks (must be declared before dynamic import) ───────────────────
 
@@ -51,6 +56,7 @@ mock.module("../../../container", () => ({
     WebhooksService: {
       findEndpoint: mockFindEndpoint,
       findDelivery: mockFindDelivery,
+      replayDelivery: mockReplayDelivery,
     },
   },
 }));
@@ -100,6 +106,19 @@ describe("GET /webhooks/:id/deliveries/:deliveryId — endpoint-scope guard", ()
     const app = makeApp();
     const res = await app.request(`/webhooks/${ENDPOINT_A}/deliveries/${DELIVERY_OF_B}`, {
       method: "GET",
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { message: string } };
+    expect(body.error.message).toBe("Webhook delivery not found");
+  });
+});
+
+describe("POST /webhooks/:id/deliveries/:deliveryId/replay — endpoint-scope guard", () => {
+  it("returns 404 when replaying a delivery that belongs to a different endpoint", async () => {
+    const app = makeApp();
+    const res = await app.request(`/webhooks/${ENDPOINT_A}/deliveries/${DELIVERY_OF_B}/replay`, {
+      method: "POST",
     });
 
     expect(res.status).toBe(404);

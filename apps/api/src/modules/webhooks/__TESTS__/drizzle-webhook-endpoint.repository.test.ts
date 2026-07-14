@@ -516,7 +516,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const failedAt = new Date("2024-06-01");
       dbBehavior = async () => [{ consecutiveFailures: 3, firstFailedAt: failedAt }];
 
-      const r = await repo.bumpFailure("ep-1", tx);
+      const r = await repo.bumpFailure("ep-1", "org-1", tx);
 
       expect(r.isSuccess).toBe(true);
       expect(r.getValue().isSome()).toBe(true);
@@ -527,7 +527,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Option.none when no row matched", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.bumpFailure("ep-99", tx);
+      const r = await repo.bumpFailure("ep-99", "org-1", tx);
 
       expect(r.isSuccess).toBe(true);
       expect(r.getValue().isNone()).toBe(true);
@@ -538,7 +538,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.bumpFailure("ep-1", tx);
+      const r = await repo.bumpFailure("ep-1", "org-1", tx);
 
       expect(r.isFailure).toBe(true);
       expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -554,7 +554,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Result.ok(undefined)", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.resetFailure("ep-1", tx);
+      const r = await repo.resetFailure("ep-1", "org-1", tx);
 
       expect(r.isSuccess).toBe(true);
     });
@@ -564,7 +564,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.resetFailure("ep-1", tx);
+      const r = await repo.resetFailure("ep-1", "org-1", tx);
 
       expect(r.isFailure).toBe(true);
       expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -580,7 +580,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Result.ok(undefined)", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.markDisabled("ep-1", new Date(), tx);
+      const r = await repo.markDisabled("ep-1", "org-1", new Date(), tx);
 
       expect(r.isSuccess).toBe(true);
     });
@@ -590,7 +590,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.markDisabled("ep-1", new Date(), tx);
+      const r = await repo.markDisabled("ep-1", "org-1", new Date(), tx);
 
       expect(r.isFailure).toBe(true);
       expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");

@@ -220,15 +220,15 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
   return {
     calls,
     applySecretRotation: async () => Result.ok(Option.some({} as never)),
-    bumpFailure: async (id: string, _tx: unknown) => {
+    bumpFailure: async (id: string, _orgId: string, _tx: unknown) => {
       calls.bumpFailure.push(id);
       return opts?.bumpFailureResult ?? Result.ok(Option.none());
     },
-    resetFailure: async (id: string, _tx: unknown) => {
+    resetFailure: async (id: string, _orgId: string, _tx: unknown) => {
       calls.resetFailure.push(id);
       return Result.ok(undefined as never);
     },
-    markDisabled: async (id: string, _date: Date, _tx: unknown) => {
+    markDisabled: async (id: string, _orgId: string, _date: Date, _tx: unknown) => {
       calls.markDisabled.push(id);
       return Result.ok(undefined as never);
     },
