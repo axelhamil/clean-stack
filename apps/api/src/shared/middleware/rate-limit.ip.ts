@@ -2,6 +2,7 @@ import { BlockList, isIPv4, isIPv6 } from "node:net";
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
 import { env } from "../env";
+import { PRIVATE_V4, PRIVATE_V6 } from "../private-ranges";
 
 /**
  * Strip IPv4 `:port` suffix (a.b.c.d:port) and IPv6 zone-id (%...) so
@@ -26,20 +27,6 @@ export function normalizeHop(hop: string): string {
 // internet — on a PaaS (Railway, Fly, …) the only hop that can connect to the container
 // is the platform's edge proxy over the private network, so trusting these is safe and
 // avoids pinning a non-stable internal IP. Mirrors Caddy's `trusted_proxies private_ranges`.
-const PRIVATE_V4: ReadonlyArray<readonly [string, number]> = [
-  ["10.0.0.0", 8],
-  ["172.16.0.0", 12],
-  ["192.168.0.0", 16],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["100.64.0.0", 10],
-];
-const PRIVATE_V6: ReadonlyArray<readonly [string, number]> = [
-  ["::1", 128],
-  ["fc00::", 7],
-  ["fe80::", 10],
-];
-
 let cachedRef: readonly string[] | undefined;
 let cachedList: BlockList | null | undefined;
 
