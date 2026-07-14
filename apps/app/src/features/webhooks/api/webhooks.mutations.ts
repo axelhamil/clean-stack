@@ -14,7 +14,6 @@ export type CreateEndpointBody = InferRequestType<typeof $create>["json"];
 export type CreateEndpointResponse = InferResponseType<typeof $create, 201>;
 export type UpdateEndpointBody = InferRequestType<typeof $update>["json"];
 export type RotateSecretResponse = InferResponseType<typeof $rotate, 200>;
-export type WebhookEndpointWithSecret = CreateEndpointResponse;
 
 export const createEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "create"] as const,
