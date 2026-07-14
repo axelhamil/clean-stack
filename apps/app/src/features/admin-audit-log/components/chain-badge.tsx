@@ -2,9 +2,7 @@ import { Badge } from "@packages/ui/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { chainVerifyQueryOptions } from "../api/audit-log.queries";
 
-type ChainBadgeProps = {};
-
-export function ChainBadge(_: ChainBadgeProps) {
+export function ChainBadge() {
   const { data, isLoading } = useQuery(chainVerifyQueryOptions);
 
   if (isLoading || !data) {

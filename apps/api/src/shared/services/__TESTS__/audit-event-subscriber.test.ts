@@ -11,8 +11,8 @@ const noopInstr = {
   addBreadcrumb: () => {},
 };
 
-function makeTx(lastHashRows: () => Array<{ hash: string | null }>) {
-  const captured: Array<Record<string, unknown>> = [];
+function makeTx(lastHashRows: () => { hash: string | null }[]) {
+  const captured: Record<string, unknown>[] = [];
   const insertChain = {
     values(v: Record<string, unknown>) {
       captured.push(v);
