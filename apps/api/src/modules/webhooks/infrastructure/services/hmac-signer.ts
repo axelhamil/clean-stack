@@ -14,14 +14,18 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
 
 export async function signWebhookPayload(
   rawBody: string,
-  secret: string,
+  secrets: string[],
   timestampSeconds: number,
 ): Promise<string> {
-  const key = await importHmacKey(secret);
   const signed = `${timestampSeconds}.${rawBody}`;
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signed));
-  const hex = Buffer.from(new Uint8Array(sig)).toString("hex");
-  return `t=${timestampSeconds},v1=${hex}`;
+  const sigs = await Promise.all(
+    secrets.map(async (secret) => {
+      const key = await importHmacKey(secret);
+      const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signed));
+      return `v1=${Buffer.from(new Uint8Array(sig)).toString("hex")}`;
+    }),
+  );
+  return `t=${timestampSeconds},${sigs.join(",")}`;
 }
 
 export function isStaleTimestamp(timestampSeconds: number, nowMs = Date.now()): boolean {

@@ -225,7 +225,7 @@ export class WebhookDeliveryWorker {
           time: delivery.createdAt.toISOString(),
         });
         const ts = Math.floor(Date.now() / 1000);
-        const signature = await signWebhookPayload(rawBody, secret, ts);
+        const signature = await signWebhookPayload(rawBody, [secret], ts);
 
         let responseStatus: Option<number> = Option.none();
         let errorMessage: Option<string> = Option.none();
