@@ -107,7 +107,7 @@ End-to-end authentication on Bun + Hono, no hacks.
 - **Email + password** with required verification + password reset (forgot-password flow → token via app URL).
 - **Magic link** (passwordless email).
 - **Passkeys** (`@better-auth/passkey`, WebAuthn) — registered & managed from `/settings/account` (`passkeys-card`, `add-passkey-form`).
-- **Two-factor** (TOTP, backup codes) — enable / disable from `/settings/account` (`two-factor-card`, `enable-two-factor-form`, `disable-two-factor-form`). Recovery codes: `RecoveryCodesCard` (regenerate-only, password gate, `xxxxx-xxxxx` display, copy + download `clean-stack-recovery-codes.txt`). Backup-code fallback on `/two-factor` (`[-\s]` normalization). On-use email via `BackupCodeUsedNotifier` (first `onEvent` handler).
+- **Two-factor** (TOTP, backup codes) — enable / disable from `/settings/account` (`two-factor-card`, `enable-two-factor-form`, `disable-two-factor-form`). Recovery codes: `RecoveryCodesCard` (regenerate-only, password gate, codes natively formatted `xxxxx-xxxxx` by BetterAuth, copy + download `clean-stack-recovery-codes.txt`). Backup-code fallback on `/two-factor` (input normalization tolerant: whitespace stripped, dash auto-inserted on 10-char input). On-use email via `BackupCodeUsedNotifier` (first `onEvent` handler).
 - **Active sessions** — list & revoke from `/settings/account` (`sessions-card`).
 - **Bearer tokens** alongside cookies — web stays cookie-based (httpOnly, XSS-safe), Capacitor uses bearer.
 - **Session cookie cache** (5 min signature-only check; DB is source of truth at expiry → instant revoke).
