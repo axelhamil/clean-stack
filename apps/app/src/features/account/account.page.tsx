@@ -2,6 +2,7 @@ import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { getRouteApi } from "@tanstack/react-router";
 import { DataExportCard } from "../rgpd/components/data-export-card";
 import { PasskeysCard } from "../security/components/passkeys-card";
+import { RecoveryCodesCard } from "../security/components/recovery-codes-card";
 import { SessionsCard } from "../security/components/sessions-card";
 import { TwoFactorCard } from "../security/components/two-factor-card";
 import { ChangePasswordCard } from "./components/change-password-card";
@@ -19,6 +20,7 @@ export function AccountPage() {
       <ChangePasswordCard />
       <PasskeysCard />
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
+      {user.twoFactorEnabled === true && <RecoveryCodesCard />}
       <SessionsCard currentSessionToken={sessionToken} />
       <DataExportCard lastExportRequestedAt={user.lastExportRequestedAt} />
     </main>
