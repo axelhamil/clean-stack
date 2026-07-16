@@ -1,4 +1,4 @@
-import type { IUnitOfWork } from "@packages/ddd-kit";
+import type { EventHandler, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
 import { auditLogModule } from "./modules/audit-log/module";
@@ -20,6 +20,7 @@ import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter } from "./shared/ports/rate-limiter.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
+import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
@@ -48,6 +49,7 @@ declare module "inwire" {
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
+    BackupCodeUsedNotifier: EventHandler;
   }
 }
 
@@ -88,6 +90,7 @@ export const di = container()
   )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
+  .add("BackupCodeUsedNotifier", (c) => backupCodeUsedNotifier({ IEmailService: c.IEmailService }))
   .add(
     "OutboxDispatcher",
     (c) =>

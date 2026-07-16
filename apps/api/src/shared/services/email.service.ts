@@ -22,6 +22,7 @@ const TEMPLATE_IDS: Record<keyof EmailTemplates, string> = {
   delete_cancelled: "",
   delete_completed: "",
   change_email: "",
+  backup_code_used: "",
 };
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
