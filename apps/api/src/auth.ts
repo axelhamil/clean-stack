@@ -693,6 +693,18 @@ const authOptions = {
       }
 
       const path = ctx.path;
+
+      if (path === "/two-factor/verify-backup-code") {
+        const signedInUser = ctx.context.newSession?.user ?? ctx.context.session?.user;
+        if (signedInUser) {
+          await emit(EventTypes.USER_MFA_BACKUP_CODE_USED, "user", signedInUser.id, {
+            userId: signedInUser.id,
+            email: signedInUser.email,
+          });
+        }
+        return;
+      }
+
       const userId = ctx.context.session?.user.id;
       if (!userId) return;
 
@@ -702,6 +714,10 @@ const authOptions = {
       }
       if (path === "/two-factor/disable") {
         await emit(EventTypes.USER_MFA_DISABLED, "user", userId, { userId });
+        return;
+      }
+      if (path === "/two-factor/generate-backup-codes") {
+        await emit(EventTypes.USER_MFA_BACKUP_CODES_REGENERATED, "user", userId, { userId });
         return;
       }
       if (path === "/passkey/verify-registration") {

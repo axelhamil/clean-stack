@@ -153,6 +153,13 @@ app.use(
   ),
 );
 app.use(
+  "/api/auth/two-factor/generate-backup-codes",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
   "/api/auth/verify-email",
   requireRateLimit(
     { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
