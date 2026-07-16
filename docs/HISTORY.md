@@ -776,6 +776,25 @@ Four issues caught before merge — all fixed:
 
 ---
 
+## Operator audit log — cross-org read + tamper-evident hash chain + `/admin` zone ✅ Phase C.2 · Jul 2026
+
+**Why**: the audit write-path shipped with the event-driven foundation (May 2026) but rows were invisible — no read surface, no integrity proof. C.2 ships the read side as an **operator** (platform-admin) surface, repurposed from the originally-specced per-org admin page: cross-org filtering, a tamper-evidence hash chain, and the first `/admin` front zone (foundation for C.3 admin & impersonation).
+
+- [x] **`GET /admin/audit-log`** — cursor-paginated (limit 1–500, default 50), filters `actorId` / `organizationId` / `targetType` / `targetId` / `actionPrefix` / `occurredFrom` / `occurredTo`. CQRS read side, no use case: `modules/audit-log/application/services/audit-query.service.ts`.
+- [x] **Gate repurposed org → platform** — `requirePlatformAdmin` (`shared/middleware/platform-admin.middleware.ts`): operator = `env.PLATFORM_ADMIN_IDS` allowlist OR `user.role === "admin"`, optional MFA via `PLATFORM_ADMIN_REQUIRE_MFA` (403 `PLATFORM_ADMIN_MFA_REQUIRED`). NOT `requireOrgPermission({ auditLog: ["read"] })` — the surface is cross-org by design; the `auditLog` statement stays in `@packages/access-control` for a future per-tenant view.
+- [x] **Tamper-evidence hash chain** (env-gated `AUDIT_TAMPER_EVIDENCE`, default off) — `audit_log.{sequence,prev_hash,hash}`: SHA-256 over canonical row content + `prevHash`, chain writes serialized via `pg_advisory_xact_lock(hashtext('audit_log_chain'))` inside the subscriber TX (`shared/services/audit-hash.ts`). `GET /admin/audit-log/verify` recomputes the full chain → `{ verified, rowCount, brokenAtId, brokenAtSequence }`.
+- [x] **Meta-audit** — reading the audit log is itself audited: `security.operator.audit_accessed` (retention `compliance`) emitted only on the first page (cursor absent), not per pagination step. Event #48 at ship time; the C.5 recount (**52 total**) includes it.
+- [x] **Front `/admin` zone** — pathless `adminLayout` (`beforeLoad: ensurePlatformAdmin`, mirror of the server gate via `customSession`-injected `user.isPlatformAdmin`) + `features/admin-audit-log/`: infinite cursor query, filter bar, `MetadataSheet` (auto-detects `before`/`after` keys in payload → side-by-side diff, else raw JSON), `ChainBadge` polling the verify endpoint.
+- [x] **Operator nav** — conditional "Operator" pill in `AppShell` + "Operator" command-palette group, both driven by the shared `isPlatformAdmin(session)` helper.
+
+**Decisions (C.2)**
+
+- **Operator surface, not tenant surface** — a per-org audit page would either leak platform-level rows (`organizationId = null`) or hide them; the operator view reads everything, and a future tenant view (feature-gated `audit_log` in `ENTITLEMENTS`) stays a separate deliverable.
+- **Hash chain global, not per-org** — one chain, one advisory lock; per-org chains would multiply genesis edge cases without adding forensic value (verification is operator-scoped anyway).
+- **Genesis-at-activation** — rows written before `AUDIT_TAMPER_EVIDENCE=true` keep `hash = null`; the chain starts at the first hashed row (prev = `GENESIS_HASH`), so enabling the flag never requires a backfill migration.
+
+---
+
 ## Outbound webhooks — SOTA hardening (Plans 1–2) + front UI + public catalog (Plan 3) ✅ Phase C.5 · Jul 2026
 
 **Why (hardening)**: the event-driven foundation shipped the webhook worker with HMAC signing and jitter retry, but left several attack surfaces open: (1) SSRF — org admins can register arbitrary URLs; without validation an insider could exfiltrate cloud-instance metadata or pivot into private networks; (2) secret rotation — hard-cutting a secret during rotation breaks all in-flight verifications; a grace window is necessary; (3) delivery forensics — debugging a failing endpoint was guesswork without a per-attempt request/response log; (4) resource pressure — dead endpoints accumulate retry backpressure in the delivery worker queue and slow delivery for everyone; auto-disable with a distinct UX badge is the correct response.
