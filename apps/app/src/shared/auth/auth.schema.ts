@@ -64,7 +64,11 @@ export type TwoFactorInput = z.infer<typeof twoFactorSchema>;
 
 export const backupCodeSchema = z
   .string()
-  .transform((value) => value.replace(/[-\s]/g, ""))
+  .transform((value) => {
+    const stripped = value.replace(/\s/g, "");
+    if (/^[a-zA-Z0-9]{10}$/.test(stripped)) return `${stripped.slice(0, 5)}-${stripped.slice(5)}`;
+    return stripped;
+  })
   .pipe(
     z
       .string()
