@@ -61,3 +61,19 @@ export const twoFactorSchema = z.object({
   trustDevice: z.boolean(),
 });
 export type TwoFactorInput = z.infer<typeof twoFactorSchema>;
+
+export const backupCodeSchema = z
+  .string()
+  .transform((value) => value.replace(/[-\s]/g, ""))
+  .pipe(
+    z
+      .string()
+      .min(8, { message: "Enter a valid backup code" })
+      .max(64, { message: "Enter a valid backup code" }),
+  );
+
+export const backupCodeVerifySchema = z.object({
+  code: backupCodeSchema,
+  trustDevice: z.boolean(),
+});
+export type BackupCodeVerifyInput = z.infer<typeof backupCodeVerifySchema>;
