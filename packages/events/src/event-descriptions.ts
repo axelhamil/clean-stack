@@ -10,6 +10,9 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.USER_MAGIC_LINK_REQUESTED]: "A magic sign-in link was requested.",
   [EventTypes.USER_MFA_ENABLED]: "A user enabled two-factor authentication.",
   [EventTypes.USER_MFA_DISABLED]: "A user disabled two-factor authentication.",
+  [EventTypes.USER_MFA_BACKUP_CODES_REGENERATED]:
+    "A user regenerated their two-factor backup codes.",
+  [EventTypes.USER_MFA_BACKUP_CODE_USED]: "A backup code was used to complete a sign-in.",
   [EventTypes.USER_PASSKEY_ADDED]: "A user registered a new passkey.",
   [EventTypes.USER_PASSKEY_REMOVED]: "A user removed a passkey.",
   [EventTypes.USER_ACCOUNT_LINKED]: "A user linked a third-party sign-in provider.",

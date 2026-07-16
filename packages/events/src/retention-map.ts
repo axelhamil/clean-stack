@@ -12,6 +12,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.USER_MAGIC_LINK_REQUESTED]: "compliance",
   [EventTypes.USER_MFA_ENABLED]: "compliance",
   [EventTypes.USER_MFA_DISABLED]: "compliance",
+  [EventTypes.USER_MFA_BACKUP_CODES_REGENERATED]: "compliance",
+  [EventTypes.USER_MFA_BACKUP_CODE_USED]: "compliance",
   [EventTypes.USER_PASSKEY_ADDED]: "compliance",
   [EventTypes.USER_PASSKEY_REMOVED]: "compliance",
   [EventTypes.USER_ACCOUNT_LINKED]: "compliance",

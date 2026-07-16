@@ -47,6 +47,16 @@ export type UserMfaEnabledPayload = z.infer<typeof UserMfaEnabledPayload>;
 export const UserMfaDisabledPayload = UserRef;
 export type UserMfaDisabledPayload = z.infer<typeof UserMfaDisabledPayload>;
 
+export const UserMfaBackupCodesRegeneratedPayload = UserRef;
+export type UserMfaBackupCodesRegeneratedPayload = z.infer<
+  typeof UserMfaBackupCodesRegeneratedPayload
+>;
+
+export const UserMfaBackupCodeUsedPayload = UserRef.extend({
+  email: Email,
+});
+export type UserMfaBackupCodeUsedPayload = z.infer<typeof UserMfaBackupCodeUsedPayload>;
+
 export const UserPasskeyAddedPayload = UserRef.extend({
   passkeyId: z.string(),
   deviceType: z.string().optional(),
@@ -373,6 +383,8 @@ export const PayloadByEventType = {
   [EventTypes.USER_MAGIC_LINK_REQUESTED]: UserMagicLinkRequestedPayload,
   [EventTypes.USER_MFA_ENABLED]: UserMfaEnabledPayload,
   [EventTypes.USER_MFA_DISABLED]: UserMfaDisabledPayload,
+  [EventTypes.USER_MFA_BACKUP_CODES_REGENERATED]: UserMfaBackupCodesRegeneratedPayload,
+  [EventTypes.USER_MFA_BACKUP_CODE_USED]: UserMfaBackupCodeUsedPayload,
   [EventTypes.USER_PASSKEY_ADDED]: UserPasskeyAddedPayload,
   [EventTypes.USER_PASSKEY_REMOVED]: UserPasskeyRemovedPayload,
   [EventTypes.USER_ACCOUNT_LINKED]: UserAccountLinkedPayload,

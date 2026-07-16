@@ -8,6 +8,8 @@ export const EventTypes = {
   USER_MAGIC_LINK_REQUESTED: "user.magic_link.requested",
   USER_MFA_ENABLED: "user.mfa.enabled",
   USER_MFA_DISABLED: "user.mfa.disabled",
+  USER_MFA_BACKUP_CODES_REGENERATED: "user.mfa.backup_codes_regenerated",
+  USER_MFA_BACKUP_CODE_USED: "user.mfa.backup_code_used",
   USER_PASSKEY_ADDED: "user.passkey.added",
   USER_PASSKEY_REMOVED: "user.passkey.removed",
   USER_ACCOUNT_LINKED: "user.account.linked",
