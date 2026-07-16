@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { redirect } from "@tanstack/react-router";
 import { sessionQueryOptions } from "../api/queries/session";
+import { isPlatformAdmin } from "./is-platform-admin";
 
 export async function ensurePlatformAdmin({
   context,
@@ -8,7 +9,5 @@ export async function ensurePlatformAdmin({
   context: { queryClient: QueryClient };
 }): Promise<void> {
   const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
-  const isPlatformAdmin = (session?.user as { isPlatformAdmin?: boolean } | undefined)
-    ?.isPlatformAdmin;
-  if (!isPlatformAdmin) throw redirect({ to: "/" });
+  if (!isPlatformAdmin(session)) throw redirect({ to: "/" });
 }

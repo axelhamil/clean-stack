@@ -41,6 +41,7 @@ import {
   Monitor,
   Moon,
   Plus,
+  ScrollText,
   Sun,
   TriangleAlert,
   User,
@@ -52,6 +53,8 @@ import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useSta
 import { toastError, toastSuccess } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
+import { sessionQueryOptions } from "../api/queries/session";
+import { isPlatformAdmin } from "../auth/is-platform-admin";
 import { useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { useSignOut } from "../auth/use-sign-out";
@@ -168,6 +171,23 @@ function useOrganizationGroup(): CommandGroupConfig | null {
   };
 }
 
+function useOperatorGroup(): CommandGroupConfig | null {
+  const navigate = useNavigate();
+  const { data: session } = useQuery(sessionQueryOptions);
+  if (!isPlatformAdmin(session)) return null;
+  return {
+    heading: "Operator",
+    items: [
+      {
+        id: "operator:audit-log",
+        label: "Operator — Audit log",
+        icon: ScrollText,
+        run: () => navigate({ to: "/admin/audit-log" }),
+      },
+    ],
+  };
+}
+
 function useLegalGroup(): CommandGroupConfig {
   const navigate = useNavigate();
   return {
@@ -227,10 +247,11 @@ function useActionsGroup(): CommandGroupConfig {
 function useCommandGroups(): CommandGroupConfig[] {
   const navigation = useNavigationGroup();
   const organization = useOrganizationGroup();
+  const operator = useOperatorGroup();
   const legal = useLegalGroup();
   const actions = useActionsGroup();
 
-  return [navigation, organization, legal, actions].filter(
+  return [navigation, organization, operator, legal, actions].filter(
     (group): group is CommandGroupConfig => group !== null,
   );
 }

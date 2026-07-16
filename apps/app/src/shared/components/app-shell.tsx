@@ -3,11 +3,14 @@ import { Button } from "@packages/ui/components/ui/button";
 import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { Separator } from "@packages/ui/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
+import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { LogoMark } from "../../shared/components/logo-mark";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
+import { isPlatformAdmin } from "../auth/is-platform-admin";
 import { CommandPalette } from "./command-palette";
 import { ContextualTabs } from "./contextual-tabs";
 import { LegalFooter } from "./legal-footer";
@@ -34,6 +37,8 @@ const SHORTCUT_LABEL = isApplePlatform() ? "⌘ K" : "Ctrl K";
 
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { data: session } = useQuery(sessionQueryOptions);
+  const platformAdmin = isPlatformAdmin(session);
 
   const fireCommandPalette = () => {
     window.dispatchEvent(
@@ -69,6 +74,11 @@ export function AppShell({ user, children }: AppShellProps) {
                 </NavLink>
               );
             })}
+            {platformAdmin && (
+              <NavLink variant="pill" active={pathname.startsWith("/admin")} asChild>
+                <Link to="/admin/audit-log">Operator</Link>
+              </NavLink>
+            )}
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
