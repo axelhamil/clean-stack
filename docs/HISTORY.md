@@ -881,3 +881,34 @@ Gated `webhooks: ["read"]` (list, deliveries, detail) / `webhooks: ["write"]` (c
 3. **Test delivery bypasses `WebhookFanoutSubscriber`**: a test event could be emitted through the normal outbox path and discovered by the fanout subscriber, but that would require the fanout subscriber to special-case endpoint targeting (normally it's org-wide). Direct delivery-row insertion is cleaner and avoids the fanout subscriber needing to know about the concept of a "test delivery".
 
 **Event**: `billing.quota.exceeded` (operational) — payload `{ organizationId, resource, limit, attempted, tier, actorUserId }`. Emitted only from `requireQuota` (the pre-check middleware). `reserveQuota` does NOT emit it — callers using `reserveQuota` inside `uow.run()` without the middleware must emit the event themselves if they want the telemetry. Catalog total: **47 events**.
+
+---
+
+## Account recovery codes UI ✅ Phase C.6 · Jul 2026
+
+**Why**: NIST 800-63B-4 §5.1.9 (look-up secrets) mandates that backup codes be stored so the verifier can look up the exact value, not just a hash. BetterAuth encrypts the code set (XChaCha20-Poly1305, symmetric key derived from `BETTER_AUTH_SECRET`), satisfying this posture without the entropy-loss argument against hashing. The feature completes the 2FA story: users had TOTP enable/disable but no UI to manage recovery codes or to use one as a fallback when their authenticator is unavailable.
+
+- [x] **`RecoveryCodesCard`** (`apps/app/src/features/settings/account/_components/recovery-codes-card.tsx`) on `/settings/account`: regenerate-only (no re-view of existing codes, matching GitHub model for minimal exposure window). Password gate on regeneration. Grouped `xxxxx-xxxxx` display via `BackupCodeList` + `formatBackupCode` (internal to the component). Copy-to-clipboard button + download `clean-stack-recovery-codes.txt` (raw codes, one per line).
+
+- [x] **Backup-code fallback on `/two-factor`** (`apps/app/src/features/two-factor/two-factor.page.tsx`): "Use a recovery code instead" toggle reveals `BackupCodeVerifyForm`. Input value is stripped of `[-\s]` before submission (normalization): users may type or paste codes with dashes/spaces and the server receives the canonical format. Note: BetterAuth stores codes as `xxxxx-xxxxx` and compares exactly; normalization ensures pasted formatted codes work. Toast on success: "Verified" + nudge-regen notice.
+
+- [x] **`BackupCodesPanel`** (`apps/app/src/features/settings/account/_components/backup-codes-panel.tsx`): copy + download actions, fed `codes: string[]` from the generate-backup-codes mutation response. Used inside `RecoveryCodesCard` immediately after regeneration.
+
+- [x] **2 new compliance events** in `@packages/events`:
+  - `user.mfa.backup_codes_regenerated` (payload: `{ userId }`, retention `compliance`) — emitted in `hooks.after` on path `/two-factor/generate-backup-codes`, inside the `userId` guard (session-authenticated call).
+  - `user.mfa.backup_code_used` (payload: `{ userId, email }`, retention `compliance`) — emitted in `hooks.after` on path `/two-factor/verify-backup-code`. **Emission placement trap**: this path is a login endpoint; `ctx.context.session` is null (no pre-existing session) and `ctx.context.userId` returns early when null. The actor is read from `ctx.context.newSession` (set by BetterAuth after a successful verify), placed before the `userId` early-return guard. Unit tests do not mount BetterAuth hooks; only the runtime QA catches this trap.
+  - Catalog: **54 total / 50 subscribable / 4 internal**.
+
+- [x] **`BackupCodeUsedNotifier`** (`apps/api/src/modules/notifications/application/handlers/backup-code-used.notifier.ts`): first `onEvent` handler in the project. Registered via `collectUserEventHandlers` in the notifications module. Sends template `backup_code_used` via `ResendEmailService`; in dev without `RESEND_API_KEY` it logs the variables instead of sending (confirmed in QA: `[email-dev] backup_code_used` log line visible in api.log). SOTA ref: Bitwarden and NetSuite both send on-use email for backup code consumption (breach signal).
+
+- [x] **Rate-limit on `generate-backup-codes`** (`AUTH_TWO_FACTOR_POLICY`: 5 req/900s, fail-closed, IP-keyed). `verify-backup-code` was already covered by the same policy. Rate-limit uses PostgreSQL store with `inMemoryBlockOnConsumed` (in-memory block survives DB row deletion; requires process restart to reset in dev). QA confirmed 429 on second wrong attempt.
+
+### Decisions (C.6)
+
+1. **Regenerate-only (no re-view)**: showing codes again after initial generation widens the exposure window. GitHub model: show once at generation, force re-generate to see new ones. The user downloads or copies at generation time; if they lose them, they regenerate. No UX argument overcomes the security posture.
+
+2. **Encrypted-not-hashed (BetterAuth default kept)**: NIST 800-63B-4 §5.1.9 requires look-up secrets to be stored so "the verifier can look up the exact value." Hashing would require storing the full set + verifying each hash, or a deterministic PRF per slot. BetterAuth's symmetric encryption (XChaCha20-Poly1305) satisfies the look-up requirement: the server can decrypt and compare exactly. The encrypted-vs-hashed deviation is a known, intentional architectural choice inherited from the library: no `storeBackupCodes` override was applied (`default` = `encrypted`).
+
+3. **No remaining-count UI**: showing "8 of 10 codes remaining" encourages users to think of codes as a finite budget and delay regeneration. YAGNI: regenerate is the right UX prompt, not a progress bar. If a consumer needs it, `backup_code_used` events in the audit log provide the count.
+
+4. **`formatBackupCode` kept internal**: the function is used only by `BackupCodeList` to render `xxxxx-xxxxx` display. Exporting it from `@packages/ui` would expose a formatting concern with no second consumer (knip would flag it). Stays unexported; callers needing the format for other purposes reimplement the trivial 2-line split.

@@ -26,4 +26,4 @@ function BackupCodeList({ codes, className, ...props }: BackupCodeListProps) {
   );
 }
 
-export { BackupCodeList, formatBackupCode };
+export { BackupCodeList };
