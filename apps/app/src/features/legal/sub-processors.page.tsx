@@ -15,8 +15,8 @@ import {
   TypographyMuted,
   TypographyP,
 } from "@packages/ui/components/ui/typography";
-import type { SubProcessor } from "./sub-processors.config";
-import { SUB_PROCESSORS } from "./sub-processors.config";
+import type { SubProcessor } from "../../shared/sub-processors.config";
+import { SUB_PROCESSORS } from "../../shared/sub-processors.config";
 
 interface SubProcessorTableProps {
   processors: SubProcessor[];

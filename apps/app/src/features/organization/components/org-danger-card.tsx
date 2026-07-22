@@ -9,9 +9,10 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-action-dialog";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
@@ -153,7 +154,10 @@ export function OrgDangerCard() {
           <CardContent className="flex flex-col gap-4">
             {personal ? (
               <TypographyMuted>
-                Delete your account below to remove this organization.
+                <NavLink asChild variant="underline">
+                  <Link to="/settings/account">Delete your account in Account settings</Link>
+                </NavLink>{" "}
+                to remove this organization.
               </TypographyMuted>
             ) : (
               <>

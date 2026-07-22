@@ -42,8 +42,8 @@ import {
   Moon,
   Plus,
   ScrollText,
+  ShieldCheck,
   Sun,
-  TriangleAlert,
   User,
   Users,
   Webhook,
@@ -116,7 +116,7 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
     requiresOrg: true,
   },
   { to: "/settings/account", label: "Settings — Account", icon: User },
-  { to: "/settings/danger", label: "Settings — Danger zone", icon: TriangleAlert },
+  { to: "/settings/privacy", label: "Settings — Privacy", icon: ShieldCheck },
   { to: "/developers/events", label: "Developers — Event catalog", icon: BookOpen },
 ];
 

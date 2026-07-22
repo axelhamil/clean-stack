@@ -1,8 +1,8 @@
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { settingsLayout } from "../../router/layouts";
 
-export const dangerRoute = createRoute({
+export const privacyRoute = createRoute({
   getParentRoute: () => settingsLayout,
-  path: "danger",
-  component: lazyRouteComponent(() => import("./danger.page"), "DangerPage"),
+  path: "privacy",
+  component: lazyRouteComponent(() => import("./privacy.page"), "PrivacyPage"),
 });

@@ -2,7 +2,7 @@ import type { OrgPermissions } from "@packages/access-control";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { cn } from "@packages/ui/libs/utils.js";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { AlertTriangleIcon, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useAuthorization } from "../auth/use-authorization";
 
 interface TabItem {
@@ -28,7 +28,7 @@ const SETTINGS_TABS: readonly TabItem[] = [
     requiresOrg: true,
   },
   { to: "/settings/account", label: "Account" },
-  { to: "/settings/danger", label: "Danger", icon: AlertTriangleIcon },
+  { to: "/settings/privacy", label: "Privacy" },
 ];
 
 interface ContextualTabsProps {

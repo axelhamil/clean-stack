@@ -10,7 +10,6 @@ import { twoFactorRoute } from "./features/auth/two-factor.route";
 import { verifyEmailRoute } from "./features/auth/verify-email.route";
 import { billingRoute } from "./features/billing/billing.route";
 import { pricingRoute } from "./features/billing/pricing.route";
-import { dangerRoute } from "./features/danger/danger.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
 import { developersEventsRoute } from "./features/developers/events.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
@@ -23,6 +22,7 @@ import { subProcessorsRoute } from "./features/legal/sub-processors.route";
 import { termsRoute } from "./features/legal/terms.route";
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
+import { privacyRoute } from "./features/privacy/privacy.route";
 import { webhooksRoute } from "./features/webhooks/webhooks.route";
 import {
   adminLayout,
@@ -49,7 +49,7 @@ const routeTree = rootRoute.addChildren([
       settingsLayout.addChildren([
         settingsIndexRoute,
         accountRoute,
-        dangerRoute,
+        privacyRoute,
         orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute]),
       ]),
     ]),

@@ -1,9 +1,9 @@
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { getRouteApi } from "@tanstack/react-router";
-import { DataExportCard } from "../rgpd/components/data-export-card";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { getRouteApi, Link } from "@tanstack/react-router";
+import { RgpdDeletionCard } from "../rgpd/components/rgpd-deletion-card";
 import { PasskeysCard } from "../security/components/passkeys-card";
 import { RecoveryCodesCard } from "../security/components/recovery-codes-card";
-import { SessionsCard } from "../security/components/sessions-card";
 import { TwoFactorCard } from "../security/components/two-factor-card";
 import { ChangePasswordCard } from "./components/change-password-card";
 import { ProfileCard } from "./components/profile-card";
@@ -11,7 +11,7 @@ import { ProfileCard } from "./components/profile-card";
 const route = getRouteApi("/_protected/_shell/settings/account");
 
 export function AccountPage() {
-  const { user, sessionToken } = route.useRouteContext();
+  const { user } = route.useRouteContext();
 
   return (
     <main className="flex flex-col gap-6">
@@ -21,8 +21,17 @@ export function AccountPage() {
       <PasskeysCard />
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
       {user.twoFactorEnabled === true && <RecoveryCodesCard />}
-      <SessionsCard currentSessionToken={sessionToken} />
-      <DataExportCard lastExportRequestedAt={user.lastExportRequestedAt} />
+      <RgpdDeletionCard
+        pendingDeletionUntil={user.pendingDeletionUntil}
+        twoFactorEnabled={user.twoFactorEnabled === true}
+      />
+      <TypographyMuted>
+        Read our{" "}
+        <NavLink asChild variant="underline">
+          <Link to="/legal/data-rights">data rights policy</Link>
+        </NavLink>{" "}
+        for the full breakdown of what&apos;s deleted, anonymized, and retained.
+      </TypographyMuted>
     </main>
   );
 }
