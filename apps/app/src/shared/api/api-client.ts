@@ -1,4 +1,4 @@
-import { hcWithType } from "api/client";
+import { type ApiClient, hcWithType } from "api/client";
 import { env } from "../env";
 
 const baseUrl = env.VITE_API_URL.endsWith("/") ? env.VITE_API_URL : `${env.VITE_API_URL}/`;
@@ -13,7 +13,7 @@ const customFetch: FetchFn = async (input, init) => {
   return fetch(input, { ...init, headers });
 };
 
-export const api = hcWithType(baseUrl, {
+export const api: ApiClient = hcWithType(baseUrl, {
   init: { credentials: "include" },
   fetch: customFetch,
 });

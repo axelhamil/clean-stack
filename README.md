@@ -75,7 +75,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Legal / compliance** | Day-one EU-legal across the GDPR surface: **Art. 7** privacy/terms versioning (re-acceptance gate when a version bumps, `user.policy.accepted` evidence), **Art. 16** rectification (profile + email-change + password), **Art. 17** erasure (`POST /me/delete` — 2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in, cron wipe + ref anonymization), **Art. 20** portability (`POST /me/export` — signed 7-day R2 URL, 1/24h throttle). Passwords follow **NIST SP 800-63B** (min 15, HIBP k-anonymity breach check, contextual ban-list, no forced complexity). Without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris — provider swap = one env var. |
 | **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
-| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **38 typed events** auto-emitted on every state change, append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter). Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
+| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **52 typed events** auto-emitted on every state change (48 subscribable + 4 internal webhook events), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter) — operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
@@ -86,7 +86,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 
 ## Features
 
-Everything wired today, and the build order for what's next. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
+Everything wired today, and the build order for what's next. Prefer prose? [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the guided tour. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
 
 ### Shipped
 
@@ -104,6 +104,7 @@ Everything wired today, and the build order for what's next. Full inventory in [
 - Strict CSP — per-request nonce (Caddy native `{http.request.uuid}` + Vite `html.cspNonce`), `'strict-dynamic'`, public `/csp-report` (IP-rate-limited + cross-origin CORP + document-uri origin filter) → `security.csp.violation` audit event
 - CSRF — **Origin-allowlist on unsafe methods** (stateless, no token/cookie/endpoint — the Next.js Server Actions / SvelteKit model), reuses the CORS allowlist as SSOT, Bearer-skip for Capacitor, `security.csrf.rejected` audit event
 - Hardened headers (HSTS, CSP `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy via Caddy) · credentialed CORS allowlist · prod boot **fails hard** on missing `CORS_ORIGIN` / signing keys
+- Abuse prevention (Phase C.1 s5a) — disposable/throwaway email domains refused at sign-up (~90k-domain list + DNS MX-record check, **fail-open**, `DISPOSABLE_EMAIL_BLOCK_ENABLED`) → `security.signup.rejected`; HIBP breach hit at sign-up/reset/change → `security.password.breached`
 
 **Legal / compliance (GDPR)**
 - Art. 7 — privacy/terms versioning + re-acceptance gate (`@packages/policies`, `/legal/accept`)
@@ -118,7 +119,7 @@ Everything wired today, and the build order for what's next. Full inventory in [
 **Event-driven core & transactions** — *the hard distributed-systems part, already solved*
 - Transactional outbox — domain events persisted in the **same DB transaction** as the state change (`IUnitOfWork.run()` + `EventCollector` AsyncLocalStorage) → no event ever lost, none emitted for a rolled-back write (the dual-write problem, solved)
 - Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout), user `onEvent(...)` handlers isolated post-commit
-- **38 typed events**, append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay), `X-Request-Id` correlation
+- **52 typed events** (48 subscribable + 4 internal), append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay, SSRF guard, dual-secret rotation), `X-Request-Id` correlation
 - **Zero plumbing post-clone** — declare the event in `@packages/events` → `addEvent()` in the aggregate → run via `uow.run()`; the audit row, webhook fanout, and in-process handlers (auto-discovered via inwire) come for free
 - Internal `/internal/*` endpoints — HMAC-signed, optional private-network layer
 
@@ -153,9 +154,9 @@ Everything wired today, and the build order for what's next. Full inventory in [
 
 Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
 
-- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF **shipped** (Phase C.1 — see Security & hardening above; captcha + abuse-signals still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
-- **M2 — Revenue** · billing via `@better-auth/stripe` (per-org customer, portal, dunning) · feature & quota gating (config + middleware, no DDD)
-- **M3 — Finish half-shipped UIs** · audit-log front · webhooks front + `webhook.test` · recovery-codes UI · privacy dashboard
+- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF + abuse quick-wins (s5a) **shipped** (Phase C.1 — see Security & hardening above; captcha + advanced abuse signals impossible-travel/geo still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
+- **M2 — Revenue** · ✅ **B.1 billing via `@better-auth/stripe` shipped** (Stripe Checkout + Billing Portal + idempotent webhooks + seat gate + 3-tier entitlements + `/pricing` + `/settings/billing` — see Billing section above) · feature & quota gating (config + middleware, no DDD)
+- **M3 — Finish half-shipped UIs** · ✅ **C.5 webhooks front shipped** (`/settings/webhooks` operator UI + public `/developers/events` catalog — see Event-driven section; SSRF guard + dual-secret rotation + auto-disable also landed) · audit-log admin page shipped (`/admin/audit-log`) · ✅ **C.6 recovery-codes UI shipped** (`RecoveryCodesCard` + backup-code fallback + `BackupCodeUsedNotifier` + 2 events → 54 total) · privacy dashboard
 - **M4 — Operate** · admin & impersonation (BetterAuth `admin` plugin) · API tokens / PATs (eval `@better-auth/api-key`) · OpenAPI docs (Scalar) · in-app notifications
 - **M5 — Quality & compliance gates** · Playwright e2e (full legal chain) + Lighthouse a11y CI · SOC2 Type II checklist · status page + SLO dashboards + OTel/Prometheus
 - **M6 — Enterprise & reach** · SSO SAML/OIDC + SCIM (BetterAuth `sso`) · i18n (TanStack locale routes + Lingui; `@better-auth/i18n` for auth errors) · Capacitor mobile · feature flags · marketing site
@@ -216,6 +217,40 @@ Resend is **optional everywhere** — without `RESEND_API_KEY` (or with unconfig
 | **Templates** | dashboard-managed, retry + idempotency, provider-side suppression |
 | **DNS prereq prod** | SPF + DKIM (3 CNAMEs) + DMARC — see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md#email) |
 | **EU region** | supported via `region: "eu-west-1"` in adapter config |
+
+### Billing — Stripe (opt-in)
+
+Billing is wired via `@better-auth/stripe` (plugin v1.6+, SDK `stripe@22+`). **Off until you add the two required env vars.** Without them the billing routes return `402` for all subscription calls; the rest of the app is unaffected.
+
+| | |
+|---|---|
+| **Packages** | `stripe@22.3.0` + `@better-auth/stripe@1.6.23` |
+| **Webhook endpoint** | auto-mounted at `/api/auth/stripe/webhook` by the plugin |
+| **Subscription SSOT** | plugin-managed `subscription` table (webhook-synced) — not `organization.metadata` |
+| **Entitlements** | typed `ENTITLEMENTS[tier]` in `apps/api/src/modules/billing/config.ts` — edit + deploy to change gates |
+| **Tiers** | `free` (3 members) · `pro` (20 members, audit_log + api) · `business` (unlimited members + SSO) |
+| **Unlimited** | `maxMembers: null` (JSON-safe) — not `Infinity` |
+| **Org model** | unlimited team orgs per user; each is free or paid independently (seat-only gate) |
+
+**Required env vars** (`apps/api/.env`):
+
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+**Dev webhook forwarding** (forwards Stripe events to your local API):
+
+```bash
+stripe listen --forward-to localhost:3000/api/auth/stripe/webhook
+```
+
+**Stripe product metadata contract** — each paid Product (Pro, Business) in the Stripe dashboard **must** carry:
+
+- `metadata.tier` = the tier key (`pro` or `business`) matching a key in `ENTITLEMENTS`. This is the join key between Stripe and the entitlements config.
+- `marketing_features` (Stripe product field) = array of bullet strings shown in the `/pricing` UI and Stripe Checkout.
+
+Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `apps/api/src/modules/billing/config.ts`. The Stripe dashboard never controls gates — it only carries the price and display copy. Changing a gate = a code change + deploy (reviewable, version-controlled).
 
 ### Containers at a glance
 
@@ -286,7 +321,8 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 | | |
 |---|---|
-| **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) |
+| **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
+| **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
 | **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅; build order: M1 security perimeter + consent → M2 billing → M3 finish audit/webhooks/recovery UI → M4 admin + PATs → M5 e2e/a11y gates → M6 SSO/i18n/mobile |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |

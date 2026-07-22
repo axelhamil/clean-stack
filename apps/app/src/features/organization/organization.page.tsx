@@ -14,6 +14,7 @@ import { orgMembersQueryOptions } from "../../shared/api/queries/org-members";
 import { Can } from "../../shared/auth/can";
 import { InvitationRow } from "./components/invitation-row";
 import { MemberRow } from "./components/member-row";
+import { OrgDangerCard } from "./components/org-danger-card";
 import { InviteMemberForm } from "./forms/invite-member-form";
 import { UpdateOrgForm } from "./forms/update-org-form";
 
@@ -115,6 +116,8 @@ export function OrganizationPage() {
           </CardContent>
         </Card>
       )}
+
+      <OrgDangerCard />
     </main>
   );
 }

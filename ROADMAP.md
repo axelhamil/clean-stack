@@ -1,6 +1,6 @@
 # ROADMAP
 
-Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserved for pure business domain). Already-shipped work is logged in [`docs/HISTORY.md`](docs/HISTORY.md) ; current inventory in [`docs/FEATURES.md`](docs/FEATURES.md).
+Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserved for pure business domain). Already-shipped work is logged in [`docs/HISTORY.md`](docs/HISTORY.md) ; current inventory in [`docs/FEATURES.md`](docs/FEATURES.md) (or [`docs/OVERVIEW.md`](docs/OVERVIEW.md) for the guided tour).
 
 > **Boilerplate target**: clone → ship any SaaS without re-coding plumbing. Anything below that isn't `[x]` is friction the cloner inherits.
 
@@ -22,7 +22,14 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase 0 — Foundation closeout** | **Jun 2026** | health probes + backups/DR + Sentry + removability dry-run + retention sweeps + **Railway reference deploy live on `main`**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.1 — Profil + NIST password** | **Jun 2026** | Rectification Art. 16 (`ProfileCard` nom/email/avatar, `ChangePasswordCard`) + NIST SP 800-63B-4 (min 15 chars, HIBP k-anonymity fail-open, ban-list contextual/common words, no complexity rules) + 2 compliance events (`user.profile.updated`, `user.email.change_requested`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.2 — Privacy / Terms versioning** | **Jun 2026** | Art. 7 demonstrability (RGPD): `@packages/policies` version SSOT + append-only `policy_acceptance` table + re-acceptance gate (`/legal/accept`, `_shell` redirect) + `requireCurrentPolicies` composable middleware + `user.policy.accepted` event (compliance retention, 35 events total) + sign-up checkbox + public `/legal/privacy-policy` + `/legal/terms` pages. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
-| **Phase C.1 — Security perimeter (S1–S4.1)** | **Jun 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + 2 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5 abuse → S6 captcha (S4.1 store resilience shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.1 — Security perimeter (S1–S5a)** | **Jun–Jul 2026** | Unified rate-limit (fail-closed on auth — OWASP A10:2025, IETF `RateLimit` headers, trusted-proxy `private`/CIDR, memory / Postgres dedicated-pool stores) + strict CSP (Caddy per-request nonce + public `/csp-report`) + CSRF (Origin-allowlist, stateless) + abuse quick-wins (per-account credential-stuffing, disposable-email, HIBP telemetry) + 5 `security.*` events. Multi-agent SOTA-2026 reviewed; prod env fail-hard. Remaining: S5b advanced abuse signals → S6 captcha (S4.1 store resilience + S5a shipped). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.3 — Compliance docs bundle** | **Jul 2026** | `/legal/sub-processors` (Art. 28 sub-processor disclosure — 3 active: Resend, R2, OAuth; 3 planned: Stripe, GrowthBook, Umami) + `/legal/accessibility` (EAA Art. 14, WCAG 2.1 AA / EN 301 549 v3.2.1 declaration + complaint alias) + `docs/legal/` DPA template (12 Art. 28 clauses) + DORA annex template (11 Art. 30 provisions) + README index + fintech-vs-B2B decision table. Linked via command-palette + `data-rights` cross-links (no global footer yet). Clone-ability fix: `VITE_SENTRY_DSN` empty-string coercion in `apps/app/src/shared/env.ts`. 0 domain events (static pages). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase A.4 — Cookie consent + Consent management** | **Jul 2026** | Dual-layer device-scoped (preuve RGPD Art.7§1 = stockage serveur horodaté) : `@packages/cookie-consent` SSOT + append-only `consent_record` (`subjectId NOT NULL`, `userId` nullable, 2 indexes) + `ConsentService` (record append-only, fallback subjectId, reconcile) + routes publiques `/consents` (`optionalAuth`, `cc_sid` httpOnly, CSRF, rate-limit POST/DELETE uniquement) + sweep guests expirés + `<CookieBanner>` (symétrie CNIL Reject/Accept) + `<ConsentSettings>` + `<ConsentGate category>` + `<AnalyticsScripts>` (`VITE_ANALYTICS_SRC`) + `<LegalFooter>` (AppShell) + `/legal/cookies` + toast 429 global consolidé. Réconciliation au login via `hooks.after`+`ctx.context.newSession` (PAS `databaseHooks`). GPC/DNT requalifiés hors scope EU. 2 events (`user.cookie_consent.{granted,withdrawn}`, retention `compliance`) → **42 events**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase B.1 — Billing (Stripe)** | **Jul 2026** | `@better-auth/stripe` + Stripe Checkout + Billing Portal. Subscription SSOT = plugin `subscription` table (webhook-synced). Hybrid catalog: price + display in Stripe (`metadata.tier` join key, `marketing_features` bullets); entitlements (features, rank, `maxMembers`) in typed `ENTITLEMENTS[tier]` at `apps/api/src/modules/billing/config.ts` — gate change = code + deploy, never Stripe dashboard. 3 tiers: `free` (3 members), `pro` (20 members, `audit_log`+`api`), `business` (unlimited = `null`, +`sso`). Standard model: unlimited team orgs per user; seat gate only (`beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`), no create-org cap. Back gate primitives: `requireFeature`/`requirePlan`/seat gate → `402 BILLING_PAYMENT_REQUIRED`. Front: `useEntitlements()` hook. No billing backoffice: Stripe Checkout (upgrade) + Stripe Billing Portal (manage). UI: `/settings/billing` (plan + usage + Upgrade + Manage billing) + public `/pricing`. 4 new events (`billing.subscription.{created,updated,cancelled}` compliance + `billing.payment.failed` operational) → **46 events**. |
+| **Phase B.2 — Quota gating** | **Jul 2026** | quota gating skeleton: catalog + `requireQuota`/`reserveQuota` + `quota_usage` + `useQuota`/`<QuotaGate>` + `billing.quota.exceeded` → **47 events**. Dormant + knip-whitelisted. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.2 — Operator audit log (cross-org read + hash chain + `/admin` zone)** | **Jul 2026** | `GET /admin/audit-log` (cursor pagination, filters actor/org/target/actionPrefix/date) + `GET /admin/audit-log/verify` — gated `requirePlatformAdmin` (`PLATFORM_ADMIN_IDS` allowlist OR `role === "admin"`, MFA optionnelle via `PLATFORM_ADMIN_REQUIRE_MFA`). Tamper-evidence hash chain env-gatée (`AUDIT_TAMPER_EVIDENCE`, SHA-256 + advisory lock, genesis-at-activation, zero backfill). Meta-audit `security.operator.audit_accessed` (compliance, première page seulement) → event #48 (absorbé dans le recount C.5). Front : zone pathless `/admin` (`ensurePlatformAdmin` via `customSession.isPlatformAdmin`) + `features/admin-audit-log/` (infinite query, filtres, `MetadataSheet` diff before/after, `ChainBadge`) + nav operator (pill AppShell + groupe palette). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.5 — Webhooks front UI + public event catalog** | **Jul 2026** | Operator UI `/settings/webhooks` (CRUD, wildcard subscriptions, per-attempt delivery timeline, one-shot secret reveal + rotate, send-test, auto-disabled badge) + public `/developers/events` (48 subscribable events + JSON schemas + Node signature-verification snippet) + back-end hardening: SSRF guard (create + delivery-time anti-rebinding), dual-secret rotation with grace window (`WEBHOOK_SECRET_GRACE_HOURS`), `webhook_delivery_attempt` table (request/response headers+body, duration, error), auto-disable after consecutive failures (`WEBHOOK_AUTO_DISABLE_AFTER_DAYS`). 4 new internal events (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) → **52 total / 48 subscribable / 4 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.6 — Account recovery codes UI** | **Jul 2026** | `RecoveryCodesCard` on `/settings/account` (regenerate-only, password gate, codes natively formatted `xxxxx-xxxxx` by BetterAuth, copy + download `clean-stack-recovery-codes.txt`). Backup-code fallback on `/two-factor` (input normalization tolerant: whitespace stripped, dash auto-inserted on 10-char input). `BackupCodeUsedNotifier` (first `onEvent` handler: on-use email via `ResendEmailService`, template `backup_code_used`, dev logs instead of sending). Rate-limit on `generate-backup-codes` (5 req/900s, fail-closed). 2 new compliance events: `user.mfa.backup_codes_regenerated` (payload: `{userId}`) + `user.mfa.backup_code_used` (payload: `{userId, email}`) → **54 total / 50 subscribable / 4 internal**. NIST 800-63B-4 look-up secrets posture (no entropy gain on server hash). Encrypted-not-hashed deviation documented (BetterAuth default kept). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -40,23 +47,26 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 - **A.1** Right to rectification (Art. 16) + NIST 800-63B-4 password ✅ COMPLETE (Jun 2026) — `ProfileCard` + `ChangePasswordCard` + HIBP k-anonymity + min 15 + ban-list. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 - **A.2** Privacy policy / Terms versioning (Art. 7) ✅ COMPLETE (Jun 2026) — `@packages/policies` SSOT + `policy_acceptance` + `/legal/accept` gate + `requireCurrentPolicies` + `user.policy.accepted`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+- **A.3** Compliance docs bundle ✅ COMPLETE (Jul 2026) — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14) + DPA template + DORA annex + `docs/legal/README.md`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+- **A.4** Cookie consent + Consent management ✅ COMPLETE (Jul 2026) — dual-layer device-scoped, `@packages/cookie-consent` + `consent_record` + `ConsentService` + routes `/consents` + `<CookieBanner>` + `<ConsentGate>` + `<AnalyticsScripts>` + `<LegalFooter>` + `/legal/cookies` + 2 events → 42 total. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-### M1 — Deploy-safe & legal (a clone can't ship to the EU without these)
+### M1 — Deploy-safe & legal (a clone can't ship to the EU/US without these)
 
-- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience shipped** (Jun 2026 — see ✅ table; S5/S6 remain, S5 next). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
-- **A.3** Compliance docs bundle — `/legal/sub-processors` (Art. 28) + `/legal/accessibility` (EAA Art. 14, mandatory since 28 Jun 2025) + DPA + DORA annex templates. Cheap (~3h), pure config/Markdown.
-- **A.4** Cookie consent + Consent management — illegal in the EU the moment a clone adds any analytics. **Infra, not DDD** (append-only `consent_record` + `ConsentService` + GPC/DNT middleware — same class as A.2). CNIL/EDPB-conform.
+- **C.1** Security perimeter ✅ **rate-limit + strict CSP + CSRF + S4.1 store resilience + S5a abuse quick-wins shipped** (Jun–Jul 2026 — see ✅ table; S5b advanced signals + S6 captcha remain). **Promoted from Phase C**: a boilerplate shipping without auth rate-limit / CSP hands a live vuln to every clone — same non-negotiable tier as RGPD.
+- **A.3** Compliance docs bundle ✅ **shipped** (Jul 2026 — see ✅ table; 2 public pages + DPA/DORA templates landed. RSS change history + re-acceptance trigger on sub-processor changes deferred as next-step; accessibility auto-update tied to A.6). As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+- **A.4** Cookie consent + Consent management ✅ **shipped** (Jul 2026 — dual-layer device-scoped, `<ConsentGate category>` + `<AnalyticsScripts>` + `<LegalFooter>`, réconciliation login via `hooks.after`+`newSession`, 2 events → **42 total**. GPC/DNT requalifiés hors scope EU. As-built dans [`docs/HISTORY.md`](docs/HISTORY.md).)
+- **A.7** US privacy — Global Privacy Control (GPC) `[deferred]` (2026-07-10) — honor `Sec-GPC: 1` as a binding CCPA/state-law opt-out. **Deferred until a clone ships real tracking** (same "no substrate to exercise it" call as S5b/S6): the boilerplate tracks nothing by default (full opt-in RGPD, zero third-party analytics wired, zero data sale), so GPC has nothing to cut today and §7025(f) exempts a no-sale site from the "Do Not Sell" link. Activation hook documented in the full spec below — reuses A.4's `consent_record` / `ConsentService`, ~1-2h when a clone wires `VITE_ANALYTICS_SRC` or sells data.
 
 ### M2 — Revenue (the #1 reason to clone a SaaS starter)
 
-- **B.1** Billing via `@better-auth/stripe` — customer portal + idempotent webhooks + dunning. Subscription per `organizationId`.
-- **B.2** Feature & quota gating — typed config + middleware (no DDD).
+- **B.1** Billing via `@better-auth/stripe` ✅ **shipped** (Jul 2026 — see ✅ table; Stripe Checkout + Billing Portal + seat gate + 3-tier entitlements + `/pricing` + `/settings/billing`. 4 billing events → **46 total**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
+- **B.2** Feature & quota gating ✅ **shipped** (Jul 2026 — see ✅ table; quota catalog in `ENTITLEMENTS[tier].quotas`; `requireQuota`/`reserveQuota` middleware; `quota_usage` store; `useQuota`/`<QuotaGate>` front; `billing.quota.exceeded` operational event → **47 total**. Dormant + knip-whitelisted. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
 
 ### M3 — Finish the half-shipped surfaces (backends done — highest value per LOC)
 
-- **C.2** Audit log **front UI** — `/admin/audit-log` page (filters + metadata diff). API + write-path shipped via event-driven.
-- **C.5** Webhooks **front UI** + `webhook.test` — `/settings/webhooks` page + public event catalog. API + worker shipped via event-driven.
-- **C.6** Account recovery codes UI — BetterAuth backend already supports.
+- **C.2** Audit log **front UI** ✅ **shipped** (Jul 2026 — see ✅ table; operator `/admin/audit-log` page (filters, cursor pagination, metadata diff, chain badge) + `requirePlatformAdmin` + tamper-evidence hash chain + `security.operator.audit_accessed` → **48 at ship, 52 after C.5**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
+- **C.5** Webhooks **front UI** + `webhook.test` ✅ **shipped** (Jul 2026 — see ✅ table; `/settings/webhooks` operator page (CRUD, wildcard subscriptions, delivery timeline, per-attempt drawer, one-shot secret reveal, rotate, send-test, auto-disabled badge) + public `/developers/events` catalog (48 subscribable events, JSON schemas, Node verification snippet) + SSRF guard + dual-secret rotation + `webhook_delivery_attempt` table + auto-disable. 4 internal events → **52 total / 48 subscribable / 4 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
+- **C.6** Account recovery codes UI ✅ **shipped** (Jul 2026 — see ✅ table; `RecoveryCodesCard` regenerate-only + password gate + codes natively formatted `xxxxx-xxxxx` by BetterAuth + copy/download, backup-code fallback on `/two-factor` (input normalization tolerant: whitespace stripped, dash auto-inserted), `BackupCodeUsedNotifier` (first `onEvent` handler), rate-limit `generate-backup-codes`, 2 compliance events → **54 total / 50 subscribable / 4 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
 - **A.5** Privacy dashboard `/settings/privacy` — UX hub aggregating A.2/A.3/A.4 + RGPD cards. Refactor-only (composes existing cards).
 
 ### M4 — Operate the product + paying customers
@@ -96,24 +106,26 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Why** (M1, bundled): 4 pure-config / Markdown items that share the same context (legal disclosure pages + contractual templates). ~3h total. Each missing one blocks a specific scenario: no sub-processor page = Art. 28 GDPR violation; no accessibility statement = EAA Art. 14 violation since June 28 2025; no DPA template = every EU client demands it at signature; no DORA annex = no fintech/insurance deal can sign since Jan 17 2025.
 
+> **Status — shipped (2026-07-09).** 2 public legal pages + 3 contract templates landed. 0 domain events (pages 100% static, no backend touched) — event count stays at 40. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). Two deferred items: (1) RSS change history + re-acceptance trigger on sub-processor list changes (Art. 28 §2 advance-notice automation — marked next-step in the sub-processor bullet below); (2) accessibility statement auto-update tied to A.6 Lighthouse CI (remains `[ ]`).
+
 **Sub-processor disclosure** (Art. 28 GDPR):
 
-- [ ] `apps/app/src/features/legal/sub-processors.config.ts` — typed const `SUB_PROCESSORS = [{ name: "Resend", purpose: "Transactional email", region: "US (DPF-certified)", url: "https://resend.com/legal/dpa", category: "infra" }, ...] as const`. Pre-fill with current stack: Resend, Cloudflare R2, BetterAuth providers, future Stripe + GrowthBook + Umami.
-- [ ] `/legal/sub-processors.page.tsx` — table view, last-updated timestamp, RSS-style change history (next-step: trigger re-acceptance when sub-processor list changes — Art. 28 §2 requires advance notice).
-- [ ] Linked from `/legal/data-rights` + footer + `/settings/privacy` (A.5).
+- [x] `apps/app/src/features/legal/sub-processors.config.ts` — typed const `SUB_PROCESSORS` (interface `SubProcessor { name, purpose, region, category, url?, dpaUrl?, status }`). Active: Resend, Cloudflare R2, BetterAuth OAuth. Planned: Stripe, GrowthBook, Umami.
+- [x] `apps/app/src/features/legal/sub-processors.{route,page}.tsx` — 4 Cards (What is a sub-processor?, Active sub-processors → shadcn Table, Planned sub-processors → shadcn Table, Change notice Art. 28 §2 30-day notice + `dpo@[domain]`), `last-updated: 2026-07-09`. RSS change history + re-acceptance trigger on sub-processor list changes deferred (next-step).
+- [x] Linked via `command-palette.tsx` (2 `LEGAL_ROUTES` entries) + `data-rights.page.tsx` cross-links. Footer link deferred (no global footer yet); `/settings/privacy` links land with A.5.
 
 **Accessibility statement** (EAA Art. 14, mandatory since June 28 2025):
 
-- [ ] `/legal/accessibility.page.tsx` — declares conformance level (target: WCAG 2.1 AA per EN 301 549 v3.2.1, the EAA harmonised standard), known limitations, contact for complaints, last review date.
-- [ ] **Complaint procedure** — embedded form or dedicated email alias (`accessibility@<domain>`). Mandatory per EAA — users must have a channel to flag a barrier.
-- [ ] Linked from footer (every page) + `/legal/data-rights`.
+- [x] `apps/app/src/features/legal/accessibility.{route,page}.tsx` — 5 sections EAA Art. 14: Compliance status (WCAG 2.1 AA / EN 301 549 v3.2.1), Known limitations, Technical specifications, Feedback and contact (`accessibility@[domain]`), Enforcement and escalation. Page itself is exemplary a11y (single `<h1>`, `<h2>` section headings, labelled mailto).
+- [x] **Complaint procedure** — `accessibility@[domain]` email alias embedded in the Feedback section. Mandatory per EAA — users must have a channel to flag a barrier.
+- [x] Linked via command-palette + `data-rights.page.tsx` cross-links. Footer deferred; see sub-processor linking note above.
 - [ ] Auto-update mechanism: tied to A.6 Lighthouse CI gate — when audit results change, page reflects the new conformance state.
 
 **Contract templates** (Markdown in `docs/legal/`):
 
-- [ ] `docs/legal/DPA-template.md` — Data Processing Agreement covering Art. 28 GDPR clauses: scope of processing, sub-processor list (link to `/legal/sub-processors`), data location, retention, audit rights, sub-processor notice (30 days), incident notification (72h), end-of-contract data return/deletion. Boilerplate clauses + `[CLIENT_NAME]` / `[EFFECTIVE_DATE]` placeholders.
-- [ ] `docs/legal/DORA-annex-template.md` — Digital Operational Resilience Act annex for fintech/insurance EU clients (mandatory since 17 Jan 2025). Clauses: SLA targets (RPO/RTO mirroring Phase 0.3), audit rights (on-site + remote), data location, exit plan + reversibility, incident reporting (mirror NIS2 24h/72h/1-month), sub-processor concentration (cap on critical sub-processors), insurance proof of cover. Sourced from the 11 mandatory DORA Article 30 contractual provisions.
-- [ ] `docs/legal/README.md` — index of all legal templates with usage notes ("when a fintech client is in pipeline, send DPA + DORA annex; non-fintech B2B = DPA only").
+- [x] `docs/legal/DPA-template.md` — Data Processing Agreement covering Art. 28 GDPR clauses: scope of processing, sub-processor list (link to `/legal/sub-processors`), data location, retention, audit rights, sub-processor notice (30 days), incident notification (72h), end-of-contract data return/deletion. Boilerplate clauses + `[CLIENT_NAME]` / `[EFFECTIVE_DATE]` placeholders.
+- [x] `docs/legal/DORA-annex-template.md` — Digital Operational Resilience Act annex for fintech/insurance EU clients (mandatory since 17 Jan 2025). Clauses: SLA targets (RPO/RTO mirroring Phase 0.3), audit rights (on-site + remote), data location, exit plan + reversibility, incident reporting (mirror NIS2 24h/72h/1-month), sub-processor concentration (cap on critical sub-processors), insurance proof of cover. Sourced from the 11 mandatory DORA Article 30 contractual provisions.
+- [x] `docs/legal/README.md` — index of all legal templates with usage notes ("when a fintech client is in pipeline, send DPA + DORA annex; non-fintech B2B = DPA only") + fintech-vs-B2B decision table + placeholder checklist (`accessibility@[domain]`, `dpo@[domain]`, national accessibility authority per EAA Art. 14).
 
 ---
 
@@ -123,14 +135,16 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 **Why this is infra, not DDD**: consent *looks* domain-ish, but every rule collapses under the decisive test — `isActive = withdrawnAt == null && expiresAt > now && policyVersion == current` is a WHERE clause; category scope = `categories.includes(cat)`; validity / refusal-cooldown = date comparisons; version-invalidation = the same `version ===` as A.2. No invariant needs an `Aggregate` to defend it. So A.4 is the **same class as A.2**: append-only `consent_record` + a `ConsentService` + a typed category config + GPC/DNT middleware. The boilerplate ships **zero aggregates** — `@packages/ddd-kit`'s `Aggregate` / `ValueObject` / `DomainEvent` stay dormant (not dead: it's a published-lib surface; `Result` / `Option` / `UUID` are used everywhere) until the cloner writes their real product domain. Building an aggregate here just to exercise the kit is backwards — the OpenUp anti-pattern (ratio test/code > 3× = over-engineering).
 
-**Decided constraints** (CNIL 2024+ guidelines, EDPB 2024 binding decisions):
+> **Status — shipped (Jul 2026).** Dual-layer device-scoped (preuve RGPD Art.7§1 = stockage serveur horodaté). 2 events `user.cookie_consent.{granted,withdrawn}` (retention `compliance`) → **compteur 42**. As-built + toutes les décisions dans [`docs/HISTORY.md`](docs/HISTORY.md). **Déviations SOTA vs spec originale** : architecture device-scoped (`subjectId` cookie, `userId` nullable) vs user-centric ; routes `/consents` publiques (`optionalAuth`) vs `/me/consents` (`requireAuth`) ; composants dans `shared/components/` vs `@packages/ui` ; GPC/DNT requalifiés hors scope EU (voir contraintes ci-dessous). **Déféré** : DB hook invalidation `policy_version` (tâche 3), re-prompt cooldown 6 mois comme mécanique séparée (tâche 7, TTL 180j livré via `CONSENT_REFUSAL_TTL_DAYS`), `onEvent` client-side disable (tâche 10, couvert par unmount React via `<AnalyticsScripts>`).
+
+**Decided constraints** (recommandation CNIL consolidée janvier 2026, EDPB 2024 binding decisions):
 - Reject-all button **same visual prominence** as accept-all (same size, same level, same color contrast). Single click reject.
 - Granular categories: `necessary` (always on, no toggle), `functional`, `analytics`, `marketing`. Each toggleable, default OFF except `necessary`.
-- Respect `Sec-GPC: 1` (Global Privacy Control) and `DNT: 1` headers — auto-decline analytics/marketing if either present.
-- Re-prompt cadence: 6 months minimum after refusal (don't pester), 13 months max validity for granted consent (Art. 5 + EDPB).
-- Withdrawal as easy as granting — `<ConsentSettings />` accessible from footer + `/settings/privacy`, single-click withdraw.
-- Server-side authoritative — banner-side `localStorage` is UX cache, the `consent_record` table is source of truth.
-- Versioned per policy — when privacy policy version bumps, all granted consents are invalidated and user re-prompted.
+- **GPC/DNT** — requalifiés hors scope EU : `Sec-GPC: 1` = signal CCPA/California uniquement (EDPB non contraignant) ; `DNT: 1` = header mort, ignoré. Conformité RGPD assurée par le modèle opt-in (rien tracké sans consentement explicite). Google Consent Mode v2 = hors scope (pas de produit Google dans le stack).
+- TTL configurables : `CONSENT_GRANT_TTL_DAYS=180` (durée de validité du consentement accordé) + `CONSENT_REFUSAL_TTL_DAYS=180` (durée de mémorisation du refus, évite le re-prompt immédiat). Durées non figées par la CNIL.
+- Withdrawal as easy as granting — `<ConsentSettings />` accessible depuis `<LegalFooter>` (AppShell) + `/settings/privacy` (A.5), single-click withdraw.
+- **Dual-layer authoritative** — `cc_sid` httpOnly cookie = lien device→serveur, `consent_record` table = source de vérité horodatée. La réconciliation guest→user se fait au login côté serveur (hook `hooks.after`+`ctx.context.newSession`), sans round-trip client.
+- `COOKIE_CONSENT_VERSION` (date-string) — version SSOT dans `@packages/cookie-consent` ; bump → re-prompt.
 
 **Architecture** — infra module, mirror of `modules/policies/` (no domain layer):
 
@@ -164,23 +178,57 @@ modules/consents/
 
 **Tasks**:
 
-- [ ] Drizzle schema `consent_record` + migration. Index on `(userId, expiresAt DESC)`.
-- [ ] `modules/consents/` skeleton (`ConsentService` + store port + drizzle store + category config + routes + module.ts) — infra, mirror of `modules/policies/`.
-- [ ] DB hook on `policy_version` change: invalidate all `consent_record` (set `expiresAt = NOW()`).
-- [ ] `recordConsent` writes ip + UA from request context (compliance evidence).
-- [ ] `<CookieBanner />` + `<ConsentSettings />` components in `@packages/ui` (reusable across app + future marketing site).
-- [ ] `useConsent(category)` hook in `apps/app/src/shared/hooks/`.
-- [ ] Auto-decline on `Sec-GPC: 1` / `DNT: 1` — Hono middleware reads header, frontend reads `navigator.globalPrivacyControl`.
-- [ ] Re-prompt timing: refuse → 6-month cooldown stored in `consent_record.expiresAt` (custom shorter window for refusal vs grant).
-- [ ] Withdraw all UX: footer link `Cookie settings` + `/settings/privacy` toggle. Withdrawal is single-click, no confirm dialog (CNIL).
-- [ ] On `consent.withdrawn(analytics)`, an `onEvent(...)` handler fires client-side `umami.disable()` (or analog) — no late-arriving events.
-- [ ] Audit: declare `consent.{granted,withdrawn}` in `@packages/events` (compliance retention, actor = `userId`) — auto-audited via `AuditEventSubscriber`, no manual `recordAudit` call (rule §6/§7).
-- [ ] Public `/legal/cookies` page enumerating all categories with their concrete cookie names + purposes + retention (CNIL transparency obligation, copy from a config).
+- [x] Drizzle schema `consent_record` + migration `0009_elite_jack_power.sql`. 2 indexes : `(subjectId, expiresAt DESC)` + `(userId, expiresAt DESC)`. `subjectId NOT NULL`, `userId` nullable FK `ON DELETE CASCADE`.
+- [x] `modules/consents/` skeleton (`ConsentService` + `IConsentStore` port + `DrizzleConsentStore` + `@packages/cookie-consent` config + routes + module.ts) — infra, mirror de `modules/policies/`.
+- [ ] DB hook on `policy_version` change: invalidate all `consent_record` (set `expiresAt = NOW()`). **(déféré — `COOKIE_CONSENT_VERSION` date-based SSOT utilisé à la place)**
+- [x] `recordConsent` writes ip + UA from request context (compliance evidence). IP via `resolveClientIp`.
+- [x] `<CookieBanner />` + `<ConsentSettings />` components dans `apps/app/src/shared/components/` (symétrie CNIL Reject/Accept, `necessary` non-toggleable, auto-monté dans `app-providers.tsx`). **Déviation** : dans `shared/components/`, pas dans `@packages/ui` (scope app uniquement à ce stade).
+- [x] `useConsent(category)` hook dans `apps/app/src/shared/hooks/use-consent.ts`.
+- [ ] Auto-decline on `Sec-GPC: 1` / `DNT: 1`. **Requalifié hors scope EU** — GPC = CCPA/US uniquement, DNT = mort. Le modèle opt-in couvre la conformité RGPD sans header-checking.
+- [ ] Re-prompt timing: refuse → 6-month cooldown stored in `consent_record.expiresAt`. **(partiellement livré : `CONSENT_REFUSAL_TTL_DAYS=180` par défaut ; la mécanique de re-prompt UX dédiée est déférée)**
+- [x] Withdraw all UX: `<LegalFooter>` (monté dans `AppShell`) + `<ConsentSettings>` (accessible partout, `/settings/privacy` via A.5). Single-click withdraw.
+- [ ] On `consent.withdrawn(analytics)`, an `onEvent(...)` handler fires client-side `umami.disable()`. **(déféré : `<AnalyticsScripts>` unmount React via `useConsent("analytics")` couvre le cas Umami/Plausible self-hosted)**
+- [x] Audit: `user.cookie_consent.{granted,withdrawn}` déclarés dans `@packages/events` (retention `compliance`, payload `subjectId`+`userId?`+`categories`+`policyVersion`) — auto-audité via `AuditEventSubscriber` (règles §6/§7).
+- [x] Public `/legal/cookies` page — inventaire cookies par catégorie, from `cookies.config.ts`. Route publique sous `rootRoute`.
 
 **Out of scope (rule 14 — promote on second occurrence)**:
 
-- Per-region rules (US California vs EU vs UK vs Brazil LGPD). Ship the strictest (EDPB) and document override hooks. CCPA-specific UX bolts on later.
+- Per-region rules (US California vs EU vs UK vs Brazil LGPD). Ship the strictest (EDPB) and document override hooks. **GPC honoring promoted to A.7** (CCPA-binding opt-out signal); remaining CCPA-specific UX bolts on later.
 - IAB TCF v2.2 framework — heavy, vendor-specific. Skip until an ad-tech use case demands it (most B2B SaaS don't).
+
+---
+
+## US privacy — Global Privacy Control (GPC) — **Phase A.7**
+
+> **Status — deferred (2026-07-10).** Bypass décidé après revue SOTA 2026. **Rationale**: the boilerplate ships **zero tracking** by default (full opt-in RGPD, no third-party analytics wired, no data sale), so on substance every clone is *already stricter* than CCPA demands — a GPC-signalled visitor has nothing tracked either way, and §7025(f) exempts a no-sale site from the mandatory "Do Not Sell/Share" link. GPC's value here is **100% preventive for a future clone**, not for the boilerplate itself — the same "no real substrate to exercise it" call already made for **S5b advanced abuse signals + S6 captcha**. Building it now = legal infra with nothing to guard (the OpenUp anti-pattern). The full spec below is kept as the **activation runbook**.
+>
+> **SOTA notes captured during the review** (so the next session doesn't re-research): header is `Sec-GPC: 1` only (no `0`; absence = no signal) + DOM `navigator.globalPrivacyControl`. **DNT is legally dead** (W3C dissolved the WG in 2019) — drop it, do **not** ship the "courtesy alias" the tasks below mention. GPC is a **mutable browser state re-sent on every request**, so the correct model is *override computed at read-time* (never a persisted "current state"); persistence, if any, is **evidence-only** (immutable audit row). 12 US states make GPC a binding UOOM in 2026; enforcement is real (Sephora $1.2M, multi-state sweep Sept 2025, Ford settlement Mar 2026 → per-tracker audit is the baseline). CA §7025(c)(6) (2026) requires a **visible "opt-out honored"** confirmation — already covered by the planned `<CookieBanner>` "GPC detected" state.
+>
+> **Activation hook (minimal core when a clone wires tracking)**: (1) `gpc.middleware.ts` reads `Sec-GPC: 1` → `c.var.gpcSignalled`; (2) `ConsentService.getActive` forces `analytics` + `marketing` off when signalled (recomputed per request, always fresh) — this alone makes every clone GPC-safe because `getActive()` already drives `<ConsentGate category="analytics">` → `<AnalyticsScripts>`; (3) add nullable `consent_record.source` (`text` enum `["banner","settings","gpc","api"]`, pattern `audit_actor_type`) + one idempotent evidence row on login of a signalled user; (4) `<CookieBanner>` "GPC detected, tracking off" state. **Drop from the original spec** (over-engineered for a boilerplate): `/.well-known/gpc.json`, 365-day refusal TTL, DNT alias.
+
+**Why** (M1 — US counterpart of A.4): the EU opt-in model already tracks nothing without explicit consent, so on substance a clone is *stricter* than US law demands. But CCPA/CPRA (California) and the 2024–2025 wave of state privacy laws (Colorado CPA, Connecticut CTDPA, Texas TDPSA, Oregon, Montana…) treat the `Sec-GPC: 1` browser header as a **legally binding opt-out signal** — honoring it is mandatory, not advisory (unlike the EDPB stance that made us park it in A.4). A boilerplate that ignores GPC hands every clone a CCPA violation the moment it has a Californian visitor. This is the one concrete US-required mechanism A.4 doesn't cover.
+
+**Why still infra, not DDD**: same class as A.4 — reading a request header and forcing a consent category to `false` is a middleware + a default, no aggregate. Reuses the entire A.4 `consent_record` + `ConsentService` machinery; GPC is just an *input* that pre-seeds a withdrawal.
+
+**Decided shape**:
+- **Server middleware** reads `Sec-GPC: 1` (and legacy `DNT: 1` as a courtesy alias — no legal weight, but cheap). On presence, `analytics` + `marketing` default to **declined** and any incoming grant for those categories is refused (opt-out overrides opt-in for GPC-signalled visitors).
+- **Persist the signal** on the `consent_record` row (`source: "gpc"`) — CCPA demands *demonstrability* that the opt-out was honored, mirroring A.2's Art. 7 evidence logic.
+- **Front reflects it**: `<CookieBanner>` shows a "Global Privacy Control detected — analytics/marketing off" state instead of the prompt; re-grant possible only by an explicit affirmative user action (GPC can be overridden by an opt-in choice, per CCPA).
+- **Scope flag** — env `PRIVACY_GPC_ENABLED` (default on). GPC is US-oriented; EU behaviour is unchanged (opt-in already covers it), so no regression for EU-only clones.
+- **"Do Not Sell/Share"** — stays near-moot: opt-in + zero data-sale means the mandatory CCPA link points at an already-empty opt-out. Document the override hook; bolt real UX on only if a clone actually sells data.
+
+**Tasks**:
+
+- [ ] Middleware `apps/api/src/shared/middleware/gpc.middleware.ts` — parse `Sec-GPC` / `DNT`, expose `c.var.gpcSignalled`, force-decline `analytics` + `marketing` for signalled requests. Composed before the `/consents` routes.
+- [ ] `ConsentService.record` refuses `analytics` / `marketing` grants when `gpcSignalled` (opt-out wins) + stamps the origin on `consent_record`.
+- [ ] Schema delta: `consent_record.source` enum (`user` | `gpc` | `reconcile`) — demonstrability evidence, append-only like the rest of the table.
+- [ ] Front: `<CookieBanner>` reads a server-passed `gpcSignalled` flag via `consentQueryOptions` → renders the "GPC detected, tracking off" state instead of the prompt; re-grant only via explicit toggle.
+- [ ] Reuse `user.cookie_consent.withdrawn` event with `source: "gpc"` in the payload — no new event type unless the audit trail needs to distinguish auto-GPC from user-withdrawal.
+- [ ] Doc: `/legal/cookies` + `/legal/data-rights` mention GPC support; README notes `PRIVACY_GPC_ENABLED`.
+
+**Out of scope**:
+- Full CCPA "Do Not Sell/Share" opt-out portal — moot under the opt-in + no-sale model; document the hook, build UX only when a clone sells data.
+- Per-state divergence (each state's exact cure period / notice wording) — GPC honoring is the shared mechanism; state-specific legal copy is a lawyer task, not code.
 
 ---
 
@@ -234,7 +282,7 @@ modules/consents/
 >
 > **Documented deployment debt** (see README): `RATE_LIMIT_STORE=memory` is per-replica — switch to `postgres` before horizontal scaling (Redis not yet implemented); `TRUSTED_PROXIES` must be set behind a load-balancer (warn at boot) or every request shares the LB IP (collective lockout). **S4.1 isolated the postgres limiter in a dedicated pg pool** (max:3, 500 ms acquire-timeout) so a flood can't exhaust the app pool; in-memory insurance is deliberately skipped (fail-closed-fast) until a Redis store lands.
 >
-> **Still pending in C.1** (priority order): **S5 abuse-prevention signals (next)** → S6 captcha. (S4.1 store resilience ✅ shipped — see below.)
+> **Still pending in C.1** (priority order): **S5b advanced abuse signals (impossible-travel, geo/IP deny-list)** → S6 captcha. (S4.1 store resilience ✅ + S5a abuse quick-wins ✅ shipped — see below.)
 
 ### S4.1 — Rate-limiter store resilience — ✅ **SHIPPED**
 
@@ -258,7 +306,7 @@ modules/consents/
 - **Always responds 429 with `Retry-After`** via the central `app.onError` envelope, never 5xx.
 - **Auth-burst surface** (sign-in / forgot-password / verify-email submit / 2FA submit / magic-link request): tighter window — `5/15min/IP` baseline.
 
-> **Status**: the rate-limit core below shipped in **S1–S4** via `rate-limiter-flexible` (not `hono-rate-limiter` — deviation validated during build) behind the `IRateLimiter` port. This section keeps the original decided shape for reference; the remaining `[ ]` are the abuse-prevention layer (S5) and captcha (S6).
+> **Status**: the rate-limit core below shipped in **S1–S4** via `rate-limiter-flexible` (not `hono-rate-limiter` — deviation validated during build) behind the `IRateLimiter` port. **S5a abuse quick-wins shipped** (credential-stuffing per-account counter, disposable-email, HIBP telemetry — see below). This section keeps the original decided shape for reference; the remaining `[ ]` are the S5b abuse signals and captcha (S6).
 
 - [x] Disable BetterAuth built-in `rateLimit` (`{ enabled: false }`) — replaced by the unified Hono middleware.
 - [x] Middleware `apps/api/src/shared/middleware/rate-limit.middleware.ts` (factory) mounted before the BetterAuth handler; wraps `rate-limiter-flexible` behind the `IRateLimiter` port (memory default, Postgres dedicated-pool swappable — `IInstrumentation` NoOp→Sentry pattern).
@@ -268,10 +316,12 @@ modules/consents/
 
 **Abuse-prevention signals — Sentinel's threat model, self-hosted** (build on real abuse signal, not pre-launch; the velocity store + `session.ipAddress` we already persist are the substrate):
 
-- [ ] **Credential-stuffing** — per-visitor failed-login counter → challenge at N, block at M (reuses the rate-limit store).
-- [ ] **Impossible-travel** — flag a sign-in whose geo-IP jumps faster than physically possible vs the last session (we already store `session.ipAddress` + `userAgent`).
-- [ ] **Free-trial abuse** — IP/device-fingerprint heuristic capping accounts-per-visitor (pairs with B.1 "max 1 free team org per user").
-- [ ] **Geo / suspicious-IP deny-list** — env-driven country/ASN block middleware. All four emit `security.*` events (rule §6) → auto-audited.
+> **S5a — quick-wins ✅ shipped** (Jul 2026, OSS only; BetterAuth Sentinel stays excluded as paid SaaS): per-account credential-stuffing counter on `/sign-in` (fail-closed, reuses `security.rate_limit.exceeded` with `policyName: auth-sign-in-account`), disposable/throwaway-email block at sign-up (~90k-domain list + DNS MX check, fail-open → `security.signup.rejected`), HIBP breached-password telemetry on sign-up/reset/change (→ `security.password.breached`). As-built in [`docs/HISTORY.md`](docs/HISTORY.md). **S5b = the calibration-heavy signals below**, deferred until real traffic exists to tune them (false-positive risk: VPN/carrier-NAT for geo, device-fingerprint bypass).
+
+- [x] **Credential-stuffing** — per-account failed-login counter on `/sign-in` → block at M (reuses the rate-limit store). **S5a shipped**; the progressive "challenge at N" step waits on captcha (S6).
+- [ ] **Impossible-travel** — flag a sign-in whose geo-IP jumps faster than physically possible vs the last session (we already store `session.ipAddress` + `userAgent`). **(S5b)**
+- [ ] **Free-trial abuse** — IP/device-fingerprint heuristic capping accounts-per-visitor (pairs with B.1 "max 1 free team org per user"). **(S5b — the disposable-email block already ships in S5a as the cheap first layer.)**
+- [ ] **Geo / suspicious-IP deny-list** — env-driven country/ASN block middleware. Emits `security.*` events (rule §6) → auto-audited. **(S5b)**
 
 ### Content-Security-Policy strict (no `unsafe-inline`)
 
@@ -308,15 +358,15 @@ modules/consents/
 
 ---
 
-## Outbound webhooks front UI — **Phase C.5**
+## Outbound webhooks front UI — **Phase C.5** ✅ SHIPPED (Jul 2026)
 
-**Shipped** (event-driven foundation — as-built in [`docs/HISTORY.md`](docs/HISTORY.md)): `webhook_endpoint` + `webhook_delivery` schema, `WebhookFanoutSubscriber` (org-scoped fanout, idempotency-key dedupe), `WebhookDeliveryWorker` (HMAC `t=,v1=` Stripe-style, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, claim-window pattern), replay endpoint, and the full CRUD API `/settings/webhooks` (gated `requireOrgPermission({ webhooks: ["read"|"write"] })`, plaintext secret returned once).
+> **Full as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).** Summary in the ✅ table above.
 
-**Remaining (front UI + one event)**:
+**Back-end (Plans 1–2, on `dev`)**: SSRF guard (create + delivery-time anti-DNS-rebinding, blocks loopback / RFC1918 / link-local / ULA / CGNAT / cloud-metadata → `WEBHOOK_URL_FORBIDDEN`), dual-secret rotation with `WEBHOOK_SECRET_GRACE_HOURS` grace window (multiple `v1=` values in the signature header), `webhook_delivery_attempt` table (every HTTP exchange recorded with headers + body capped at `WEBHOOK_RESPONSE_CAPTURE_BYTES`), auto-disable after `WEBHOOK_AUTO_DISABLE_AFTER_DAYS` of consecutive failures + `webhook.endpoint.disabled` event, wildcard subscriptions (`"*"`, `"<group>.*"`, exact), `POST /settings/webhooks/:id/test` test delivery (also auto-fired on endpoint creation), and the full CRUD API `/settings/webhooks`.
 
-- [ ] `/settings/webhooks` UI — list + create + edit + delete + view deliveries + replay. API ready.
-- [ ] `webhook.test` event type — sent on endpoint creation, surfaces immediate "is the URL reachable" feedback in the UI.
-- [ ] Public `<EventTypesTable />` page enumerating every event the SaaS emits — read from `packages/events/src/event-types.ts` (35 events catalogued).
+**Front-end (Plan 3)**: `/settings/webhooks` operator page (endpoint list + CRUD in side Sheet, subscribed-event picker with group wildcards, per-endpoint delivery list with cursor pagination, per-attempt timeline drawer, one-shot secret reveal on create + rotate-secret dialog, send-test button, auto-disabled badge distinct from user-paused) + public `/developers/events` catalog (48 subscribable events, grouping, retention labels, expandable JSON schema per event via `z.toJSONSchema`, Node.js signature-verification snippet). Gated `webhooks: read/write`. Wired in `SETTINGS_TABS` and command palette.
+
+**4 new internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) — non-subscribable, non-fanout. **Catalog: 52 total / 48 subscribable / 4 internal**.
 
 **Deferred**: Webhook proxy (Svix-style) — host-it-yourself first, evaluate Svix past 10k deliveries/day.
 
@@ -473,46 +523,60 @@ Shipping a status page before there are customer integrations is theatre.
 
 ## Billing — Stripe via the BetterAuth plugin — **Phase B.1**
 
+> **Status — shipped (Jul 2026).** `@better-auth/stripe@1.6.23` + `stripe@22.3.0`. Stripe Checkout (upgrade) + Billing Portal (manage) hosted — no billing backoffice. 4 billing events → **46 total**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
+>
+> **Key deviations from the original spec** (document REALITY, not the plan):
+> - **Subscription SSOT = plugin `subscription` table** (webhook-synced by `@better-auth/stripe`). `organization.metadata.plan` is NOT used — the plugin owns the state.
+> - **Hybrid catalog**: price + display live in Stripe (each paid Product needs `metadata.tier` = `pro`|`business` matching a key in `ENTITLEMENTS`; `marketing_features` drive pricing bullets). **Entitlements (features, rank, maxMembers) live in typed code** at `apps/api/src/modules/billing/config.ts`. Gate change = code + deploy (reviewable), never a Stripe dashboard edit.
+> - **`maxMembers: null` = unlimited** (JSON-safe). `free`=3, `pro`=20, `business`=null.
+> - **Standard unlimited-orgs model** — users can create as many team orgs as they want; each is free or paid. No create-org count cap. The ONLY per-org limit is SEATS (gated in `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`).
+> - **Env vars**: `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` only. No `STRIPE_PRICE_*` — price IDs come from the Stripe catalog directly.
+> - **Events**: 42 → **46** (`billing.subscription.{created,updated,cancelled}` retention `compliance` + `billing.payment.failed` retention `operational`).
+
 **Why**: `@better-auth/stripe` (official, late 2025) wraps customer creation, subscriptions, customer portal, webhooks, DB sync. No more 600 lines of hand-written Stripe glue.
 
-**Pricing model (GitHub / Vercel-aligned)** — the decided shape:
+**Pricing model (standard SaaS)** — the as-built shape:
 
-| Org type | Plan | Members | Other | Price |
+| Org type | Tier | Members | Features | Price |
 |---|---|---|---|---|
-| Personal | structural (always free, never billed) | 1 (the user) | exempt from every quota | $0 |
-| Team #1 (per user) | Free | 3 | basic | $0 |
-| Team #2+ or upgraded | Pro | unlimited | full feature set | per-seat $X/mo |
-| Team — Business | Pro+ | unlimited | + SSO / SCIM / audit | per-seat $Y/mo |
+| Personal | structural (always free, never billed) | 1 (the user) | exempt | $0 |
+| Team org | `free` | 3 | — | $0 |
+| Team org | `pro` | 20 | audit_log, api | $X/mo |
+| Team org | `business` | unlimited (`null`) | audit_log, api, sso | $Y/mo |
 
-The constraint **"max 1 free team org per user"** is the only quota gate enforced at create-org time. Personal is invisible to the count (slug pattern `personal-*` already in `auth.ts`).
+Users can create unlimited team orgs. Each is independently `free` (default) or paid. No quota at org-creation time.
 
-**Architecture**:
+**As-built architecture**:
 
-- **Subscription scoped per `organizationId`** — `referenceId` in the Stripe plugin = orgId. `authorizeReference` checks the calling user is owner of the target org. Members inherit the active org's plan.
-- **Plan stored in `organization.metadata.plan`** (BetterAuth supports `metadata` natively) — webhook-synced, never hand-written. `metadata.plan` defaults to `"free"` on org creation.
-- **Plans config = typed const** (no DDD): `apps/api/src/billing/plans.ts` exports `PLANS = { free, pro, business } as const` with `displayName`, `maxMembers`, `priceId` (env-driven). Single source of truth.
-- **Entitlements layer** (rule 14 promotion of `requireAuth` shape):
-  - API: `requireCreateOrg` middleware (counts user's non-personal free orgs → 402 `BILLING_PAYMENT_REQUIRED` if ≥ 1). `requireSeat(orgId)` middleware composed on `invite-member` (refuses when `members.count >= plan.maxMembers`).
-  - App: `useEntitlements()` hook (reads active org + plan, exposes `canCreateFreeOrg`, `canInviteMember`, `seatsRemaining`).
+- **Subscription scoped per `organizationId`** — `referenceId` in the Stripe plugin = orgId. `authorizeReference` checks the calling user is owner of the target org. Members inherit the active org's tier.
+- **Subscription SSOT = plugin `subscription` table** — webhook-synced by `@better-auth/stripe`. Not `organization.metadata`. `tier` is read from the subscription record via `EntitlementsService.getEntitlements(orgId)`.
+- **Hybrid catalog** — price + display in Stripe; entitlements in code:
+  - Each paid Stripe Product must have `metadata.tier` = `pro`|`business` (join key to `ENTITLEMENTS`).
+  - `marketing_features` on the Stripe Product drives the pricing UI bullets (read via `BillingCatalogService`).
+  - `ENTITLEMENTS[tier]` in `apps/api/src/modules/billing/config.ts` is the sole source of features/rank/maxMembers. Never edit gates in Stripe.
+- **Gate primitives** (infra, not DDD):
+  - API: `requireFeature(flag)` (→ 402 `BILLING_FEATURE_REQUIRED`), `requirePlan(minTier)` (→ 402 `BILLING_PLAN_REQUIRED`), seat gate in `beforeAddMember`/`beforeAcceptInvitation`/`beforeCreateInvitation` (→ 402 `BILLING_SEAT_LIMIT_REACHED`).
+  - App: `useEntitlements()` hook — exposes `tier`, `status`, `features`, `maxMembers`, `hasFeature(flag)`, `atLeast(minTier)`, `seatUsage`.
+- **No billing backoffice** — Stripe Checkout (upgrade) + Stripe Billing Portal (manage) are fully hosted. `/settings/billing` shows current plan + usage + Upgrade + Manage billing buttons. Public `/pricing` page (logged-out CTA → `/sign-in`).
 - **Backend gate is authoritative; UI gate is UX courtesy** — both ship together.
 
 **Tasks**:
 
-- [ ] Install `@better-auth/stripe` + the `stripe` SDK + `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_BUSINESS` in `apps/api/common/env.ts` (zod-validated)
-- [ ] `apps/api/src/billing/plans.ts` — `PLANS` const, `PlanId` type, `entitlementsForPlan(plan)` helper. Pure config, zero runtime.
-- [ ] `auth.ts`: declare `stripe()` plugin with `subscription: { enabled: true, plans, authorizeReference }`. Webhook auto-mounted at `/api/auth/stripe/webhook`. `databaseHooks.organization.create.after` defaults `metadata.plan = "free"`.
-- [ ] `requireCreateOrg` middleware (`apps/api/src/modules/billing/infrastructure/middleware/billing.middleware.ts`) composed on `auth.api.organization.create` interceptor — when user already owns ≥ 1 free non-personal org, throw 402.
-- [ ] `requireSeat` middleware composed on org member-invite flow (front route or auth-plugin override).
-- [ ] `useEntitlements()` hook (`apps/app/src/features/billing/hooks/use-entitlements.ts`) reading active org + plan from existing queries.
-- [ ] `/settings/billing` UI: current plan, members usage (`X / Y` with progress), `Upgrade to Pro` button → `authClient.subscription.upgrade({ plan, referenceId: orgId })` (opens Stripe Checkout), `Manage billing` button → `authClient.subscription.billingPortal({ referenceId: orgId })`.
-- [ ] **Plan picker dialog** at create-org when user already has 1 free team org — Free disabled with "Upgrade an existing org or pick Pro", Pro / Business actionable. On selection: Stripe Checkout with `referenceId: <orgId>` (org pre-created in `pending` state, plan attached on `subscription.created` webhook).
-- [ ] `<PricingTable />` component (3 tiers, currentPlan highlighted, CTA per tier).
-- [ ] **Cross-tab sync**: webhook → org metadata change → next tab refresh picks it up via `cookieCache` 5-min refresh. Force-refresh path: `broadcastAuthChange()` from a `subscription.updated` webhook listener if needed (unlikely — 5 min is fine).
-- [ ] **Dev**: `stripe listen --forward-to localhost:3000/api/auth/stripe/webhook` documented in README + `.env.example` template (`STRIPE_*` placeholders).
+- [x] Install `@better-auth/stripe@1.6.23` + `stripe@22.3.0` + `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` in `apps/api/src/shared/env.ts` (zod-validated)
+- [x] `apps/api/src/modules/billing/config.ts` — `ENTITLEMENTS` typed const (`Tier`, `Feature`, `Entitlement`), `isTier`, `entitlementsForTier`, `rankOf`, `hasFeature`, `meetsPlan`, `hasSeatAvailable`. Pure config, zero runtime.
+- [x] `auth.ts`: declare `stripe()` plugin with `subscription: { enabled: true, plans, authorizeReference }`. Webhook auto-mounted at `/api/auth/stripe/webhook`.
+- [x] Seat gate in `beforeAddMember` / `beforeAcceptInvitation` / `beforeCreateInvitation` — calls `EntitlementsService.getEntitlements(orgId)` + `hasSeatAvailable(activeCount, maxMembers)`, throws `402`.
+- [x] `useEntitlements()` hook (`apps/app/src/features/billing/hooks/use-entitlements.ts`) — reads active org's entitlements view.
+- [x] `/settings/billing` UI: current tier badge, members usage (`X / Y`), `Upgrade` button → Stripe Checkout, `Manage billing` button → Stripe Billing Portal.
+- [x] `/pricing` public page — 3-tier table, `marketing_features` bullets from Stripe catalog, CTA routes to `/sign-in` when logged out.
+- [x] 4 billing events declared in `@packages/events` + `retention-map` (see `docs/EVENTS.md` billing section) → **46 total**
+- [x] **Dev**: `stripe listen --forward-to localhost:3000/api/auth/stripe/webhook` (see README Billing section + `.env.example` `STRIPE_*` placeholders)
 
 ---
 
 ## Feature gating & quota gating — guards layer — **Phase B.2**
+
+> **Status — shipped (Jul 2026), as a dormant skeleton.** The catalog is `ENTITLEMENTS[tier].quotas` (not a separate `PLANS` map — quotas joined the B.1 entitlements SSOT). Delivered: `requireQuota(key, readUsage)` pre-check (429 `BILLING_QUOTA_EXCEEDED`) + `reserveQuota` (advisory-lock atomic reserve inside the write's TX — the authoritative, TOCTOU-safe gate) + `countScopedRows` (live-count default) + `quota_usage` table + `modules/quotas/` `IQuotaUsageStore` (high-volume) + front `useQuota`/`<QuotaGate>` + `billing.quota.exceeded` (operational) → **47 events**. SOTA-rejected: Stripe Entitlements API (boolean-only), Billing Meters (metering-to-bill), `@better-auth/stripe` native `limits` (2nd SSOT). Dormant + knip-whitelisted until a resource is wired. Activation guide: [`docs/QUOTA-GATING.md`](docs/QUOTA-GATING.md). As-built + decisions in [`docs/HISTORY.md`](docs/HISTORY.md). **The spec below is the original pre-build design** (names like `PLANS`/`requireSeat` predate the as-built `ENTITLEMENTS`/seat-hooks).
 
 **Why**: gating is *not* DDD — the rule fits in `array.includes()` / `count(*)` / config lookup. Wrapping it in aggregates + use-cases is the OpenUp anti-pattern (~6.4k LOC for what 330 LOC of config + guard would cover). Stay in pragmatic infra: typed plan config + Hono guard middlewares on the API + React hook on the app.
 
@@ -557,12 +621,10 @@ The **Billing** section above lays the foundation: `PLANS` config, `useEntitleme
 
 ## Audit log front UI — **Phase C.2**
 
-**Shipped** (event-driven foundation — as-built in [`docs/HISTORY.md`](docs/HISTORY.md)): `audit_log` schema (append-only, nullable org, soft target FK, retention enum), `AuditEventSubscriber` zero-plumbing auto-write (service-level code emits via `emitEvent`, no separate helper), actor identification (rule #7), outbox payload validation, retention sweeps (Phase 0.6), and the read API `GET /admin/audit-log` (gated `requireOrgPermission({ auditLog: ["read"] })`).
+> **Status — shipped (Jul 2026).** Repurposed org-admin → **operator** surface during design: the read API is gated `requirePlatformAdmin` (cross-org), **not** `requireOrgPermission({ auditLog: ["read"] })` — the statement stays in `@packages/access-control` for a future per-tenant view. Tamper-evidence promoted from deferred to shipped (env-gated `AUDIT_TAMPER_EVIDENCE`, genesis-at-activation, zero backfill) + verify endpoint + meta-audit event `security.operator.audit_accessed`. As-built + decisions in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-**Remaining (front UI only)**:
-
-- [ ] Page `/admin/audit-log` (admin only, gated by `_admin.tsx`) — filters (actor, action, target, range), each row expandable to a `metadata` diff. API ready.
-- [ ] **Tamper-evidence (deferred)** — `prevHash`/`hash` columns already posed in schema; calc off behind `AUDIT_TAMPER_EVIDENCE` flag. Promote when a SOC2 audit demands it (rule 14).
+- [x] Page `/admin/audit-log` (pathless `adminLayout` + `ensurePlatformAdmin`) — filters (actor, org, target, action prefix, date range), cursor pagination, `MetadataSheet` before/after diff, `ChainBadge`.
+- [x] **Tamper-evidence** — `prevHash`/`hash`/`sequence` + SHA-256 chain calc behind `AUDIT_TAMPER_EVIDENCE`, `GET /admin/audit-log/verify`.
 
 ---
 
@@ -714,4 +776,4 @@ apps/site/
 
 ---
 
-_Full as-built log for every shipped phase: [`docs/HISTORY.md`](docs/HISTORY.md). Current inventory: [`docs/FEATURES.md`](docs/FEATURES.md)._
+_Full as-built log for every shipped phase: [`docs/HISTORY.md`](docs/HISTORY.md). Current inventory: [`docs/FEATURES.md`](docs/FEATURES.md) · guided tour: [`docs/OVERVIEW.md`](docs/OVERVIEW.md)._

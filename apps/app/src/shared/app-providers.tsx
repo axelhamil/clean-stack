@@ -14,6 +14,8 @@ import { orgsListQueryOptions } from "./api/queries/orgs-list";
 import { sessionQueryOptions } from "./api/queries/session";
 import { queryClient } from "./api/query-client";
 import { onAuthChange } from "./auth/auth-broadcast";
+import { AnalyticsScripts } from "./components/analytics-scripts";
+import { CookieBanner } from "./components/cookie-banner";
 import { ErrorBoundary } from "./observability/sentry";
 import { watchSession } from "./observability/session-watcher";
 
@@ -52,6 +54,8 @@ export function AppProviders() {
           <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />
             <Toaster richColors closeButton />
+            <CookieBanner />
+            <AnalyticsScripts />
             {import.meta.env.DEV && (
               <>
                 <TanStackRouterDevtools router={router} position="bottom-left" />

@@ -115,6 +115,82 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       });
     },
   )
+  .get(
+    "/:id/deliveries/:deliveryId",
+    requireAuth,
+    requireOrg,
+    requireOrgPermission({ webhooks: ["read"] }),
+    async (c) => {
+      const orgId = c.get("orgId");
+      const id = c.req.param("id");
+      const deliveryId = c.req.param("deliveryId");
+      const endpoint = await di.WebhooksService.findEndpoint(id, orgId);
+      if (endpoint.isNone())
+        throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const opt = await di.WebhooksService.findDelivery(deliveryId, orgId);
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });
+      const delivery = opt.unwrap();
+      if (delivery.endpointId !== id)
+        throw new HTTPException(404, { message: "Webhook delivery not found" });
+      const { nextAttemptAt, lastError, lastResponseStatus, attemptHistory, ...rest } = delivery;
+      return c.json({
+        ...rest,
+        nextAttemptAt: nextAttemptAt.toNull(),
+        lastError: lastError.toNull(),
+        lastResponseStatus: lastResponseStatus.toNull(),
+        attemptHistory,
+      });
+    },
+  )
+  .post(
+    "/:id/test",
+    requireAuth,
+    requireOrg,
+    requireOrgPermission({ webhooks: ["write"] }),
+    async (c) => {
+      const orgId = c.get("orgId");
+      const id = c.req.param("id");
+      const result = await di.WebhooksService.sendTest({
+        id,
+        organizationId: orgId,
+        actorUserId: c.get("user").id,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const opt = result.getValue();
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const { payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest } = opt.unwrap();
+      return c.json(
+        {
+          ...rest,
+          nextAttemptAt: nextAttemptAt.toNull(),
+          lastError: lastError.toNull(),
+          lastResponseStatus: lastResponseStatus.toNull(),
+        },
+        201,
+      );
+    },
+  )
+  .post(
+    "/:id/rotate-secret",
+    requireAuth,
+    requireOrg,
+    requireOrgPermission({ webhooks: ["write"] }),
+    async (c) => {
+      const orgId = c.get("orgId");
+      const id = c.req.param("id");
+      const result = await di.WebhooksService.rotateSecret({
+        id,
+        organizationId: orgId,
+        actorUserId: c.get("user").id,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const opt = result.getValue();
+      if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
+      const { endpoint, plaintextSecret } = opt.unwrap();
+      const { secretCipher: _s, previousSecretCipher: _p, ...rest } = endpoint;
+      return c.json({ ...rest, secret: plaintextSecret });
+    },
+  )
   .post(
     "/:id/deliveries/:deliveryId/replay",
     requireAuth,
@@ -127,7 +203,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const endpoint = await di.WebhooksService.findEndpoint(endpointId, orgId);
       if (endpoint.isNone())
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const result = await di.WebhooksService.replayDelivery(deliveryId, orgId);
+      const result = await di.WebhooksService.replayDelivery(deliveryId, endpointId, orgId);
       if (result.isFailure) throw new AppErrorException(result.getError());
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });

@@ -3,6 +3,7 @@ import { createRootRouteWithContext, createRoute, Outlet, redirect } from "@tans
 import { activeOrgQueryOptions } from "../shared/api/queries/active-org";
 import { policiesQueryOptions } from "../shared/api/queries/policies";
 import { sessionQueryOptions } from "../shared/api/queries/session";
+import { ensurePlatformAdmin } from "../shared/auth/ensure-platform-admin";
 import { AppShell } from "../shared/components/app-shell";
 
 export type RouterContext = { queryClient: QueryClient };
@@ -63,6 +64,13 @@ function ShellLayout() {
     </AppShell>
   );
 }
+
+export const adminLayout = createRoute({
+  getParentRoute: () => shellLayout,
+  id: "_admin",
+  beforeLoad: ensurePlatformAdmin,
+  component: () => <Outlet />,
+});
 
 export const settingsLayout = createRoute({
   getParentRoute: () => shellLayout,

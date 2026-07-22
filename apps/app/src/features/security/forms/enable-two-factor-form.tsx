@@ -1,23 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BackupCodeList } from "@packages/ui/components/ui/backup-code-list";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { QrCodeFrame } from "@packages/ui/components/ui/qr-code-frame";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { CopyIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { BackupCodesPanel } from "../components/backup-codes-panel";
 import { type EnableTwoFactorResult, useEnableTwoFactor } from "../hooks/use-enable-two-factor";
 import { useVerifyTwoFactorSetup } from "../hooks/use-verify-two-factor-setup";
 import {
@@ -88,11 +78,6 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
     defaultValues: { code: "" },
   });
 
-  const copyBackupCodes = () => {
-    void navigator.clipboard.writeText(setup.backupCodes.join("\n"));
-    toast.success("Backup codes copied");
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3">
@@ -106,23 +91,7 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
         </TypographyMuted>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Backup codes</CardTitle>
-          <CardDescription>
-            Save these in a safe place. Each can be used once if you lose your device.
-          </CardDescription>
-          <CardAction>
-            <Button type="button" variant="ghost" size="sm" onClick={copyBackupCodes}>
-              <CopyIcon />
-              Copy
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <BackupCodeList codes={setup.backupCodes} />
-        </CardContent>
-      </Card>
+      <BackupCodesPanel codes={setup.backupCodes} />
 
       <Form {...form}>
         <form

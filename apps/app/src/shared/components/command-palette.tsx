@@ -31,10 +31,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  BookOpen,
   Building2,
   Copy,
   CreditCard,
-  FileText,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
@@ -44,18 +44,21 @@ import {
   ScrollText,
   ShieldCheck,
   Sun,
-  TriangleAlert,
   User,
   Users,
+  Webhook,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
 import { toastError, toastSuccess } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
+import { sessionQueryOptions } from "../api/queries/session";
+import { isPlatformAdmin } from "../auth/is-platform-admin";
 import { useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { useSignOut } from "../auth/use-sign-out";
+import { LEGAL_ROUTES } from "../legal-routes";
 
 interface CommandShortcutBinding {
   display: string;
@@ -105,14 +108,16 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
     requires: { billing: ["manage"] },
     requiresOrg: true,
   },
+  {
+    to: "/settings/webhooks",
+    label: "Settings — Webhooks",
+    icon: Webhook,
+    requires: { webhooks: ["read"] },
+    requiresOrg: true,
+  },
   { to: "/settings/account", label: "Settings — Account", icon: User },
-  { to: "/settings/danger", label: "Settings — Danger zone", icon: TriangleAlert },
-];
-
-const LEGAL_ROUTES: readonly NavigationRoute[] = [
-  { to: "/legal/data-rights", label: "Data rights (RGPD)", icon: ShieldCheck },
-  { to: "/legal/privacy-policy", label: "Privacy policy", icon: FileText },
-  { to: "/legal/terms", label: "Terms of service", icon: ScrollText },
+  { to: "/settings/privacy", label: "Settings — Privacy", icon: ShieldCheck },
+  { to: "/developers/events", label: "Developers — Event catalog", icon: BookOpen },
 ];
 
 function useNavigationGroup(): CommandGroupConfig {
@@ -161,6 +166,23 @@ function useOrganizationGroup(): CommandGroupConfig | null {
         label: "New organization",
         icon: Plus,
         run: () => navigate({ to: "/org/new" }),
+      },
+    ],
+  };
+}
+
+function useOperatorGroup(): CommandGroupConfig | null {
+  const navigate = useNavigate();
+  const { data: session } = useQuery(sessionQueryOptions);
+  if (!isPlatformAdmin(session)) return null;
+  return {
+    heading: "Operator",
+    items: [
+      {
+        id: "operator:audit-log",
+        label: "Operator — Audit log",
+        icon: ScrollText,
+        run: () => navigate({ to: "/admin/audit-log" }),
       },
     ],
   };
@@ -225,10 +247,11 @@ function useActionsGroup(): CommandGroupConfig {
 function useCommandGroups(): CommandGroupConfig[] {
   const navigation = useNavigationGroup();
   const organization = useOrganizationGroup();
+  const operator = useOperatorGroup();
   const legal = useLegalGroup();
   const actions = useActionsGroup();
 
-  return [navigation, organization, legal, actions].filter(
+  return [navigation, organization, operator, legal, actions].filter(
     (group): group is CommandGroupConfig => group !== null,
   );
 }

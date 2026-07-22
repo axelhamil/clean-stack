@@ -5,35 +5,35 @@ import { isStaleTimestamp, signWebhookPayload } from "../infrastructure/services
 describe("signWebhookPayload", () => {
   it("returns the format t=<ts>,v1=<hex>", async () => {
     const ts = Math.floor(Date.now() / 1000);
-    const result = await signWebhookPayload('{"event":"test"}', "secret", ts);
+    const result = await signWebhookPayload('{"event":"test"}', ["secret"], ts);
     expect(result).toMatch(/^t=\d+,v1=[0-9a-f]+$/);
   });
 
   it("is deterministic — same inputs produce same output", async () => {
     const ts = Math.floor(Date.now() / 1000);
-    const a = await signWebhookPayload('{"event":"test"}', "secret", ts);
-    const b = await signWebhookPayload('{"event":"test"}', "secret", ts);
+    const a = await signWebhookPayload('{"event":"test"}', ["secret"], ts);
+    const b = await signWebhookPayload('{"event":"test"}', ["secret"], ts);
     expect(a).toBe(b);
   });
 
   it("changes when rawBody changes", async () => {
     const ts = Math.floor(Date.now() / 1000);
-    const a = await signWebhookPayload('{"event":"a"}', "secret", ts);
-    const b = await signWebhookPayload('{"event":"b"}', "secret", ts);
+    const a = await signWebhookPayload('{"event":"a"}', ["secret"], ts);
+    const b = await signWebhookPayload('{"event":"b"}', ["secret"], ts);
     expect(a).not.toBe(b);
   });
 
   it("changes when secret changes", async () => {
     const ts = Math.floor(Date.now() / 1000);
-    const a = await signWebhookPayload('{"event":"test"}', "secret-1", ts);
-    const b = await signWebhookPayload('{"event":"test"}', "secret-2", ts);
+    const a = await signWebhookPayload('{"event":"test"}', ["secret-1"], ts);
+    const b = await signWebhookPayload('{"event":"test"}', ["secret-2"], ts);
     expect(a).not.toBe(b);
   });
 
   it("changes when timestamp changes", async () => {
     const ts = Math.floor(Date.now() / 1000);
-    const a = await signWebhookPayload('{"event":"test"}', "secret", ts);
-    const b = await signWebhookPayload('{"event":"test"}', "secret", ts + 1);
+    const a = await signWebhookPayload('{"event":"test"}', ["secret"], ts);
+    const b = await signWebhookPayload('{"event":"test"}', ["secret"], ts + 1);
     expect(a).not.toBe(b);
   });
 
@@ -42,7 +42,7 @@ describe("signWebhookPayload", () => {
     const secret = "round-trip-secret";
     const ts = Math.floor(Date.now() / 1000);
 
-    const header = await signWebhookPayload(rawBody, secret, ts);
+    const header = await signWebhookPayload(rawBody, [secret], ts);
     const hexSig = header.split(",v1=")[1] ?? "";
     const sigBytes = new Uint8Array(Buffer.from(hexSig, "hex"));
 
@@ -63,6 +63,24 @@ describe("signWebhookPayload", () => {
     );
 
     expect(valid).toBe(true);
+  });
+
+  it("signs with a single secret (backward compatible t=,v1=)", async () => {
+    const sig = await signWebhookPayload("body", ["secret"], 1000);
+    expect(sig).toMatch(/^t=1000,v1=[0-9a-f]+$/);
+  });
+
+  it("appends one v1= per secret in order", async () => {
+    const sig = await signWebhookPayload("body", ["s1", "s2"], 1000);
+    const parts = sig.split(",");
+    expect(parts[0]).toBe("t=1000");
+    expect(parts.filter((p) => p.startsWith("v1=")).length).toBe(2);
+  });
+
+  it("different secrets produce different signatures", async () => {
+    const a = await signWebhookPayload("body", ["s1"], 1000);
+    const b = await signWebhookPayload("body", ["s2"], 1000);
+    expect(a).not.toBe(b);
   });
 });
 

@@ -47,6 +47,16 @@ export type UserMfaEnabledPayload = z.infer<typeof UserMfaEnabledPayload>;
 export const UserMfaDisabledPayload = UserRef;
 export type UserMfaDisabledPayload = z.infer<typeof UserMfaDisabledPayload>;
 
+export const UserMfaBackupCodesRegeneratedPayload = UserRef;
+export type UserMfaBackupCodesRegeneratedPayload = z.infer<
+  typeof UserMfaBackupCodesRegeneratedPayload
+>;
+
+export const UserMfaBackupCodeUsedPayload = UserRef.extend({
+  email: Email,
+});
+export type UserMfaBackupCodeUsedPayload = z.infer<typeof UserMfaBackupCodeUsedPayload>;
+
 export const UserPasskeyAddedPayload = UserRef.extend({
   passkeyId: z.string(),
   deviceType: z.string().optional(),
@@ -199,12 +209,63 @@ export const WebhookEndpointDeletedPayload = OrgRef.extend({
 });
 export type WebhookEndpointDeletedPayload = z.infer<typeof WebhookEndpointDeletedPayload>;
 
+export const WebhookTestPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+});
+export type WebhookTestPayload = z.infer<typeof WebhookTestPayload>;
+
+export const WebhookEndpointSecretRotatedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string(),
+});
+export type WebhookEndpointSecretRotatedPayload = z.infer<
+  typeof WebhookEndpointSecretRotatedPayload
+>;
+
+export const WebhookEndpointDisabledPayload = OrgRef.extend({
+  endpointId: z.string(),
+  actorUserId: z.string().nullable(),
+  reason: z.enum(["delivery_failures"]),
+  consecutiveFailures: z.number().int().nonnegative(),
+});
+export type WebhookEndpointDisabledPayload = z.infer<typeof WebhookEndpointDisabledPayload>;
+
+export const WebhookDeliveryExhaustedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  deliveryId: z.string(),
+  eventType: z.string(),
+  attempts: z.number().int().nonnegative(),
+  actorUserId: z.string().nullable(),
+});
+export type WebhookDeliveryExhaustedPayload = z.infer<typeof WebhookDeliveryExhaustedPayload>;
+
 export const UserPolicyAcceptedPayload = UserRef.extend({
   policyType: z.string(),
   policyVersion: z.string(),
   ipAddress: z.string().optional(),
 });
 export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
+
+// userId is optional: guest consents have no userId, only subjectId (anonymous cookie-based id).
+// extractActor will fall back to system/anonymous for guests — accepted per §7 (no identified user).
+export const UserCookieConsentGrantedPayload = z.object({
+  userId: z.string().optional(),
+  subjectId: z.string(),
+  categories: z.array(z.string()),
+  policyVersion: z.string(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+});
+export type UserCookieConsentGrantedPayload = z.infer<typeof UserCookieConsentGrantedPayload>;
+
+export const UserCookieConsentWithdrawnPayload = z.object({
+  userId: z.string().optional(),
+  subjectId: z.string(),
+  categories: z.array(z.string()),
+  policyVersion: z.string(),
+});
+export type UserCookieConsentWithdrawnPayload = z.infer<typeof UserCookieConsentWithdrawnPayload>;
 
 export const SecurityRateLimitExceededPayload = z.object({
   actorUserId: z.string().nullable(),
@@ -241,6 +302,77 @@ export const SecurityCsrfRejectedPayload = z.object({
 });
 export type SecurityCsrfRejectedPayload = z.infer<typeof SecurityCsrfRejectedPayload>;
 
+export const SecurityPasswordBreachedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  email: z.string().max(254).nullable(),
+  ip: z.string().max(45).nullable(),
+  path: z.string().max(512),
+});
+export type SecurityPasswordBreachedPayload = z.infer<typeof SecurityPasswordBreachedPayload>;
+
+export const SecuritySignupRejectedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  email: z.string().max(254),
+  ip: z.string().max(45).nullable(),
+  reason: z.enum(["disposable_email"]),
+});
+export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
+
+export const SecurityOperatorAuditAccessedPayload = z.object({
+  actorUserId: z.string(),
+  ip: z.string().max(45).nullable(),
+  filters: z
+    .object({
+      actorId: z.string().optional(),
+      actionPrefix: z.string().optional(),
+      organizationId: z.string().optional(),
+      occurredFrom: z.string().optional(),
+      occurredTo: z.string().optional(),
+    })
+    .optional(),
+});
+export type SecurityOperatorAuditAccessedPayload = z.infer<
+  typeof SecurityOperatorAuditAccessedPayload
+>;
+
+export const BillingSubscriptionCreatedPayload = OrgRef.extend({
+  subscriptionId: z.string(),
+  tier: z.string(),
+  status: z.string(),
+  actorUserId: z.string().nullable(),
+  currentPeriodEnd: z.coerce.date().nullable(),
+});
+export type BillingSubscriptionCreatedPayload = z.infer<typeof BillingSubscriptionCreatedPayload>;
+
+export const BillingSubscriptionUpdatedPayload = BillingSubscriptionCreatedPayload;
+export type BillingSubscriptionUpdatedPayload = z.infer<typeof BillingSubscriptionUpdatedPayload>;
+
+export const BillingSubscriptionCancelledPayload = OrgRef.extend({
+  subscriptionId: z.string(),
+  tier: z.string(),
+  status: z.string(),
+  actorUserId: z.string().nullable(),
+});
+export type BillingSubscriptionCancelledPayload = z.infer<
+  typeof BillingSubscriptionCancelledPayload
+>;
+
+export const BillingPaymentFailedPayload = OrgRef.extend({
+  subscriptionId: z.string(),
+  invoiceId: z.string(),
+  actorUserId: z.string().nullable(),
+});
+export type BillingPaymentFailedPayload = z.infer<typeof BillingPaymentFailedPayload>;
+
+export const BillingQuotaExceededPayload = OrgRef.extend({
+  resource: z.string(),
+  limit: z.number().int().nonnegative(),
+  attempted: z.number().int().nonnegative(),
+  tier: z.string(),
+  actorUserId: z.string(),
+});
+export type BillingQuotaExceededPayload = z.infer<typeof BillingQuotaExceededPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -251,6 +383,8 @@ export const PayloadByEventType = {
   [EventTypes.USER_MAGIC_LINK_REQUESTED]: UserMagicLinkRequestedPayload,
   [EventTypes.USER_MFA_ENABLED]: UserMfaEnabledPayload,
   [EventTypes.USER_MFA_DISABLED]: UserMfaDisabledPayload,
+  [EventTypes.USER_MFA_BACKUP_CODES_REGENERATED]: UserMfaBackupCodesRegeneratedPayload,
+  [EventTypes.USER_MFA_BACKUP_CODE_USED]: UserMfaBackupCodeUsedPayload,
   [EventTypes.USER_PASSKEY_ADDED]: UserPasskeyAddedPayload,
   [EventTypes.USER_PASSKEY_REMOVED]: UserPasskeyRemovedPayload,
   [EventTypes.USER_ACCOUNT_LINKED]: UserAccountLinkedPayload,
@@ -276,8 +410,22 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_CREATED]: WebhookEndpointCreatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_UPDATED]: WebhookEndpointUpdatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DELETED]: WebhookEndpointDeletedPayload,
+  [EventTypes.WEBHOOK_TEST]: WebhookTestPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED]: WebhookEndpointSecretRotatedPayload,
+  [EventTypes.WEBHOOK_ENDPOINT_DISABLED]: WebhookEndpointDisabledPayload,
+  [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]: WebhookDeliveryExhaustedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
+  [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
+  [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
   [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,
+  [EventTypes.SECURITY_PASSWORD_BREACHED]: SecurityPasswordBreachedPayload,
+  [EventTypes.SECURITY_SIGNUP_REJECTED]: SecuritySignupRejectedPayload,
+  [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: SecurityOperatorAuditAccessedPayload,
+  [EventTypes.BILLING_SUBSCRIPTION_CREATED]: BillingSubscriptionCreatedPayload,
+  [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: BillingSubscriptionUpdatedPayload,
+  [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,
+  [EventTypes.BILLING_PAYMENT_FAILED]: BillingPaymentFailedPayload,
+  [EventTypes.BILLING_QUOTA_EXCEEDED]: BillingQuotaExceededPayload,
 } as const;

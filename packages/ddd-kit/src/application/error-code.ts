@@ -7,7 +7,9 @@ const STATUS_BY_SUFFIX = {
   _BLOCKED: 409,
   _INVALID: 400,
   _INTEGRITY_FAILED: 422,
+  _PAYMENT_REQUIRED: 402,
   _RATE_LIMITED: 429,
+  _QUOTA_EXCEEDED: 429,
   _PROVIDER_FAILURE: 502,
   _UNAVAILABLE: 503,
   _TIMEOUT: 504,
@@ -24,7 +26,9 @@ export interface AppError<Code extends ErrorCode = ErrorCode> {
 }
 
 export function httpStatusFromCode(code: ErrorCode): ErrorStatus {
-  const suffix = (Object.keys(STATUS_BY_SUFFIX) as ErrorSuffix[]).find((s) => code.endsWith(s));
+  const suffix = (Object.keys(STATUS_BY_SUFFIX) as ErrorSuffix[])
+    .sort((a, b) => b.length - a.length)
+    .find((s) => code.endsWith(s));
   if (!suffix) throw new Error(`Unreachable: code ${code} has no recognised suffix`);
   return STATUS_BY_SUFFIX[suffix];
 }

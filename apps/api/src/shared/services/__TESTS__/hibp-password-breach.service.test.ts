@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { CryptoHasher } from "bun";
 
 const { HibpPasswordBreachService } = await import("../hibp-password-breach.service");
@@ -11,35 +11,31 @@ const PREFIX = HASH.slice(0, 5);
 const SUFFIX = HASH.slice(5);
 
 describe("HibpPasswordBreachService", () => {
-  let originalFetch: typeof globalThis.fetch;
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
   it("retourne isBreached=true quand le suffix est présent dans la réponse", async () => {
-    globalThis.fetch = mock(async (url: string) => {
+    const mockFetch = mock(async (url: string) => {
       expect(url).toBe(`https://api.pwnedpasswords.com/range/${PREFIX}`);
       expect(url).not.toContain(SUFFIX);
       return new Response(`AAABB:3\r\n${SUFFIX}:42\r\nCCCDD:1`, { status: 200 });
-    }) as unknown as typeof globalThis.fetch;
+    });
 
-    const svc = new HibpPasswordBreachService(new NoOpInstrumentation());
+    const svc = new HibpPasswordBreachService(
+      new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
+    );
     const result = await svc.isBreached(PASSWORD);
     expect(result.isSuccess).toBe(true);
     expect(result.getValue()).toBe(true);
   });
 
   it("retourne isBreached=false quand le suffix est absent", async () => {
-    globalThis.fetch = mock(async (_url: string) => {
+    const mockFetch = mock(async (_url: string) => {
       return new Response("AAABB:3\r\nCCCDD:1", { status: 200 });
-    }) as unknown as typeof globalThis.fetch;
+    });
 
-    const svc = new HibpPasswordBreachService(new NoOpInstrumentation());
+    const svc = new HibpPasswordBreachService(
+      new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
+    );
     const result = await svc.isBreached(PASSWORD);
     expect(result.isSuccess).toBe(true);
     expect(result.getValue()).toBe(false);
@@ -47,12 +43,15 @@ describe("HibpPasswordBreachService", () => {
 
   it("ne transmet jamais le password complet dans l'URL (seulement le prefix 5 chars)", async () => {
     let capturedUrl = "";
-    globalThis.fetch = mock(async (url: string) => {
+    const mockFetch = mock(async (url: string) => {
       capturedUrl = url as string;
       return new Response("", { status: 200 });
-    }) as unknown as typeof globalThis.fetch;
+    });
 
-    const svc = new HibpPasswordBreachService(new NoOpInstrumentation());
+    const svc = new HibpPasswordBreachService(
+      new NoOpInstrumentation(),
+      mockFetch as unknown as typeof fetch,
+    );
     await svc.isBreached(PASSWORD);
 
     expect(capturedUrl).toContain(PREFIX);
@@ -62,14 +61,17 @@ describe("HibpPasswordBreachService", () => {
   });
 
   it("retourne Result.fail quand fetch lève une erreur réseau", async () => {
-    globalThis.fetch = mock(async (_url: string) => {
+    const mockFetch = mock(async (_url: string) => {
       throw new Error("network timeout");
-    }) as unknown as typeof globalThis.fetch;
+    });
 
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
 
-    const svc = new HibpPasswordBreachService(instrumentation);
+    const svc = new HibpPasswordBreachService(
+      instrumentation,
+      mockFetch as unknown as typeof fetch,
+    );
     const result = await svc.isBreached(PASSWORD);
 
     expect(result.isFailure).toBe(true);
@@ -78,14 +80,17 @@ describe("HibpPasswordBreachService", () => {
   });
 
   it("retourne Result.fail et capture quand la réponse n'est pas ok", async () => {
-    globalThis.fetch = mock(async (_url: string) => {
+    const mockFetch = mock(async (_url: string) => {
       return new Response("Too Many Requests", { status: 429 });
-    }) as unknown as typeof globalThis.fetch;
+    });
 
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
 
-    const svc = new HibpPasswordBreachService(instrumentation);
+    const svc = new HibpPasswordBreachService(
+      instrumentation,
+      mockFetch as unknown as typeof fetch,
+    );
     const result = await svc.isBreached(PASSWORD);
 
     expect(result.isFailure).toBe(true);

@@ -117,9 +117,10 @@ OTel + Prometheus `/metrics` are deferred to Phase D.1 (no consumer yet). The sp
 
 `IUnitOfWork.run(cb)` opens an `EventCollector` (AsyncLocalStorage). `repo.save(agg, tx)` wraps `trackEventsOnSuccess(result, agg)` to push pulled domain events into the collector. Pre-COMMIT, the UoW flushes them via `outbox.enqueue` in the same TX → atomicity. Post-COMMIT, Postgres `pg_notify` wakes `OutboxDispatcher` which fans out to built-in subscribers (audit, webhook fanout) inside the dispatch TX, then to user-defined `onEvent(...)` handlers post-commit (best-effort, isolated).
 
-**BetterAuth → outbox bridge** lives in `auth.ts` (the documented exception). Two paths:
+**BetterAuth → outbox bridge** lives in `auth.ts` (the documented exception). These paths:
 - **`databaseHooks` for core models** (user/session/account/verification) — TX-bound, captures all flows including non-HTTP. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.
 - **`hooks.after` + `createAuthMiddleware` for plugin events** (twoFactor, passkey, email-verified, password-changed, link-social) — path-based, only voie viable since plugin tables aren't exposed in `databaseHooks`. Filter `if (ctx.context.returned instanceof APIError) return` is critical (otherwise events fire on 4xx).
+- **`hooks.before` + `createAuthMiddleware` for pre-rejection security signals** (S5a abuse-prevention: disposable-email, per-account credential-stuffing, HIBP telemetry) — emits before the `throw APIError`. **Trap**: `ctx.context.request` / `ctx.context.session` are **`undefined`** in a before-hook (it runs before the session middleware) — read the IP from `ctx.headers`, load the authenticated actor via `auth.api.getSession({ headers: ctx.headers })`. Wiring `ctx.context.*` throws before the emit → event silently lost + `/sign-in` 500s; only an end-to-end pass catches it (unit tests don't mount the hooks).
 - **Native callbacks** — `emailAndPassword.{sendResetPassword,onPasswordReset}`, `magicLink.sendMagicLink` for the corresponding events.
 
 `organizationHooks` (org plugin) covers all org/member/invitation events.
@@ -138,6 +139,49 @@ Compliance infra, not DDD. Records which policy version each user accepted and w
 - **`PolicyAcceptanceService`** — `accept(userId, types, ipAddress?)` writes N rows + emits N `user.policy.accepted` events (retention `compliance`) atomically in one `uow.run` TX — on any insert failure it throws to force a full rollback (no partial acceptance), then returns `Result.fail`. `getStaleTypes(userId)` drives the gate. `DrizzlePolicyAcceptanceStore` is fully §8-instrumented (outer + inner spans + capture); the service itself only `capture`s in its catch (orchestration, no span).
 - **`requireCurrentPolicies`** (`shared/middleware/policy.middleware.ts`) — composable, **not mounted globally**. Throws `HTTPException(409)` when any policy is stale. The `_shell` `beforeLoad` redirect is the live UX gate; this middleware is defense-in-depth for future business routes.
 - **Sign-up acceptance via `/verify-email` hook** — `PolicyAcceptanceService.accept` is called from the BetterAuth `/verify-email` after-hook in `auth.ts` (idempotent via `getStaleTypes`) AND from `POST /me/policies/accept`. Not at `/sign-up/email`: that route has no session yet and returns a synthetic user on duplicate-email. See `docs/HISTORY.md` Phase A.2 for the full deviation note.
+
+## Cookie consent (`modules/consents/` — Phase A.4)
+
+Compliance infra, pas DDD. Enregistre le consentement device-scoped (guest→user réconcilié au login). Miroir du module `modules/policies/` — même shape (port + service + drizzle store + routes).
+
+- **`@packages/cookie-consent`** est le SSOT (`CONSENT_CATEGORIES`, `OPTIONAL_CATEGORIES`, `CONSENT_COOKIE_NAME = "cc_sid"`, `COOKIE_CONSENT_VERSION`, `CONSENT_GRANT_TTL_DAYS`, `CONSENT_REFUSAL_TTL_DAYS`). Source-only. Bump `COOKIE_CONSENT_VERSION` ici → tous les users re-promptés automatiquement.
+- **`IConsentStore`** port (module-private) + `DrizzleConsentStore` — §8-instrumenté. **`ConsentService`** : `record` (append-only — chaque save = nouveau row, le plus récent gagne) · `withdraw` · `getActive` (avec fallback subjectId quand un user connecté n'a pas encore de record) · `reconcile(subjectId, userId)` (UPDATE `user_id WHERE user_id IS NULL`).
+- **Routes `/consents` — publiques, `optionalAuth`** (guests ET connectés). Cookie `cc_sid` httpOnly géré serveur. **Rate-limit `CONSENT_POST_POLICY` sur POST/DELETE uniquement** — GET exempt (appelé en prefetch à chaque render ; un GET rate-limité sature la fenêtre en quelques reloads normaux et bloque l'affichage du banner). CSRF Origin sur `/consents` (comme tous les prefixes de mutation).
+- **Cookie `cc_sid`** : `httpOnly: true`, `secure: isProd`, `sameSite: isProd ? "none" : "lax"`, `path: "/"`. **Pas de prefix `__Host-`** — le déploiement cross-origin (SPA + API origines distinctes) rend `__Host-` inutilisable (`Domain` refusé + `secure` requis mais `sameSite: none` pour cross-origin). Même logique que le cookie de session BetterAuth.
+- **Sweep guests expirés** (`shared/internal-routes/sweep-consents.route.ts`, gate `internalLayers` HMAC) : purge `user_id IS NULL AND expires_at < cutoff` (env `CONSENT_RETENTION_DAYS=365`). Ajouté au runner `cron/sweep.ts`.
+
+**Réconciliation au login — règle réutilisable** :
+
+Pour exécuter du code à chaque login (tous flux confondus : password/passkey/magic-link/2FA/email-verify/OAuth futur) avec accès aux cookies de requête, utiliser **`hooks.after` + `createAuthMiddleware` + vérifier `ctx.context.newSession`**. Ne pas utiliser `databaseHooks.session.create` — ce hook n'a **pas** accès aux `Request` headers (donc pas aux cookies).
+
+```ts
+// Dans auth.ts — réconciliation consent au login
+hooks: {
+  after: createAuthMiddleware(async (ctx) => {
+    const userId = ctx.context.newSession?.user?.id;  // null hors login → skip
+    if (!userId) return;
+    const subjectId = readCookieFromHeaders(ctx.headers, CONSENT_COOKIE_NAME);
+    if (!subjectId) return;
+    await di.ConsentService.reconcile(subjectId, userId);
+  }),
+}
+```
+
+`ctx.context.newSession` est positionné par BetterAuth sur **chaque** login (tous flux) et vaut `null` sur les requêtes courantes de session. C'est le signal idiomatique pour "un login vient d'avoir lieu sur cette requête". Câbler sur `databaseHooks.session.create` rate les cookies ; câbler sur un path spécifique (ex. `/sign-in/email`) rate les autres flux.
+
+## Billing (`modules/billing/` + `stripe()` plugin — Phase B.1)
+
+Pragmatic infra, NOT DDD. No domain layer: `config.ts` holds `ENTITLEMENTS[tier]` (features / rank / maxMembers, `null` = unlimited seats), `@better-auth/stripe` plugin owns subscription STATE (its `subscription` table, webhook-synced via `/api/auth/stripe/webhook`), Stripe owns price/display (`metadata.tier` join key + `marketing_features`). Typed config is the single business-rules SSOT — never duplicate into a domain model.
+
+**Four orthogonal gate axes** — applied independently, never conflated:
+1. **Role** — `billing:["read","manage"]` capability (`@packages/access-control`, pre-existing).
+2. **Seats** — hard-capped in the org plugin's `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`. **All three hooks must be wired** (§6 two-path trap — missing one silently admits overquota members).
+3. **Tier/feature** — `requireFeature(flag)` / `requirePlan(minTier)` middlewares (`shared/middleware/billing.middleware.ts`) → 402 `BILLING_PAYMENT_REQUIRED`.
+4. **Quota** (Phase B.2, dormant skeleton) — limits in `ENTITLEMENTS[tier].quotas` (`null` = unlimited). `requireQuota(key, readUsage)` middleware = best-effort pre-check → 429 `BILLING_QUOTA_EXCEEDED`; `reserveQuota(tx, orgId, key, limit, countFn)` (`shared/db/quota-reservation.ts`) = the **authoritative** gate — `pg_advisory_xact_lock` + count + assert **inside the write's `uow.run()`**, TOCTOU-safe. Counting: live `countScopedRows` (default, zero drift) or the denormalized `quota_usage` table + `modules/quotas/` `IQuotaUsageStore.{increment,current,reset}` (high-volume, increment in the SAME TX as the gated write — never background). Dormant + knip-whitelisted until a resource is wired. Details: `docs/QUOTA-GATING.md`.
+
+No billing backoffice: Stripe Checkout + Billing Portal hosted. `POST /billing/portal` gated `requireOrgPermission({ billing:["manage"] })`.
+
+**Events**: `billing.subscription.{created,updated,cancelled}` + `billing.payment.failed`, emitted from stripe plugin callbacks in `auth.ts` (same BetterAuth bridge pattern as org/policy hooks). `billing.quota.exceeded` (operational) is emitted from `requireQuota` only — `reserveQuota` does not emit; a caller enforcing via `reserveQuota` alone emits it themselves.
 
 ## Organization scoping (server)
 

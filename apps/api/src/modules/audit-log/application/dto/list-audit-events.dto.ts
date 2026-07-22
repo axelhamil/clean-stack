@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const listAuditEventsQuerySchema = z.object({
   actorId: z.string().optional(),
+  organizationId: z.string().optional(),
   targetType: z.string().optional(),
   targetId: z.string().optional(),
   actionPrefix: z.string().optional(),

@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigserial, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const AUDIT_ACTOR_TYPES = ["user", "system", "admin"] as const;
 export const AUDIT_RETENTIONS = ["operational", "compliance"] as const;
@@ -10,6 +10,7 @@ export const auditLog = pgTable(
   "audit_log",
   {
     id: text("id").primaryKey(),
+    sequence: bigserial("sequence", { mode: "number" }).notNull(),
     actorId: text("actor_id"),
     actorType: text("actor_type", { enum: AUDIT_ACTOR_TYPES }).notNull(),
     organizationId: text("organization_id"),
@@ -29,5 +30,6 @@ export const auditLog = pgTable(
     index("audit_log_action_time_idx").on(table.action, table.occurredAt.desc()),
     index("audit_log_org_time_idx").on(table.organizationId, table.occurredAt.desc()),
     index("audit_log_retention_time_idx").on(table.retention, table.occurredAt),
+    index("audit_log_sequence_idx").on(table.sequence),
   ],
 );

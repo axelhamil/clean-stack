@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { TextLink } from "@packages/ui/components/ui/text-link";
 import {
   TypographyH1,
   TypographyH2,
@@ -12,6 +13,7 @@ import {
   TypographyMuted,
   TypographyP,
 } from "@packages/ui/components/ui/typography";
+import { Link } from "@tanstack/react-router";
 
 export function DataRightsPage() {
   return (
@@ -115,6 +117,20 @@ export function DataRightsPage() {
             protection officer. (Replace this paragraph with your DPO contact details when forking
             this boilerplate.)
           </TypographyP>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Related legal pages</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <TextLink asChild>
+            <Link to="/legal/sub-processors">Sub-processor disclosure (RGPD Art. 28)</Link>
+          </TextLink>
+          <TextLink asChild>
+            <Link to="/legal/accessibility">Accessibility statement (EAA Art. 14)</Link>
+          </TextLink>
         </CardContent>
       </Card>
     </main>

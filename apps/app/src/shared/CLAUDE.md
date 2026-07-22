@@ -58,6 +58,52 @@ Defined once in `@packages/access-control` — same `OrgPermissions` shape, same
 
 **Why**: defense in depth — server enforces, gate prevents access, UI hides unreachable controls. Children needing permission-aware behavior call `useAuthorization` themselves rather than receiving `canEdit: boolean` props. Dev-only `<AuthorizationDevTool>` (mounted in `__root.tsx`, tree-shaken in prod) renders live capability matrix.
 
+## Cookie consent (Phase A.4)
+
+Trois primitifs pour appliquer le consentement dans le code front :
+
+1. **`useConsent(category: ConsentCategory): boolean`** (`shared/hooks/use-consent.ts`) — hook impératif. Usage : dans du code impératif (conditions, `useEffect`, etc.) où JSX n'est pas disponible.
+
+2. **`<ConsentGate category="analytics">`** (`shared/components/consent-gate.tsx`) — primitif déclaratif. Usage : wrapper JSX qui rend ses enfants seulement si la catégorie est consentie. Recommandé par défaut pour le code déclaratif.
+
+3. **`<AnalyticsScripts>`** (`shared/components/analytics-scripts.tsx`) — **exemple d'application** du pattern. Charge le script `VITE_ANALYTICS_SRC` (env optionnel) via `<ConsentGate category="analytics">`, cleanup React au unmount/withdraw. Monté dans `app-providers.tsx`. Env vide = composant no-op, le boilerplate ne trace rien par défaut.
+
+**`<CookieBanner>`** (`shared/components/cookie-banner.tsx`) est auto-monté dans `app-providers.tsx` — ne pas le remonter dans les features. Il se masque automatiquement quand `consentQueryOptions` retourne un état courant.
+
+**`<LegalFooter>`** (`shared/components/legal-footer.tsx`) est monté dans `AppShell` pour les users connectés. Il source `shared/legal-routes.ts` (`LEGAL_ROUTES`) — la même const que `command-palette.tsx` (DRY). **Ne pas dupliquer la liste des routes légales** : modifier `LEGAL_ROUTES` dans `shared/legal-routes.ts`, les deux surfaces se mettent à jour.
+
+**Pattern d'intégration analytics** (cloner un outil) :
+```tsx
+// shared/env.ts expose déjà VITE_ANALYTICS_SRC
+// Suffit de brancher le script dans <AnalyticsScripts> ou un composant similaire
+<ConsentGate category="analytics">
+  <script async src={env.VITE_ANALYTICS_SRC} data-website-id="..." />
+</ConsentGate>
+```
+
+**Règle** : tout script ou pixel tiers (analytics, chat, support, publicité) doit être conditionnel à la catégorie appropriée via `<ConsentGate>` ou `useConsent`. Ne pas charger un script tiers directement dans `index.html` ou `app-providers.tsx` sans gate de consentement.
+
+## Billing entitlements (Phase B.1)
+
+Three primitives for gating features and plans in front code:
+
+1. **`useEntitlements(): EntitlementsView`** — imperative hook. Server-resolved via `GET /billing/subscription`; the front **never re-declares** the `ENTITLEMENTS` config table.
+2. **`<FeatureGate feature="...">`** — declarative JSX wrapper, renders children only if the entitlement flag is active for the current org tier.
+3. **`<PlanGate min="pro">`** — renders children only if active tier ≥ `min` (rank-based comparison from server-resolved view).
+
+**`shared/api/queries/billing-types.ts`** is the shared wire contract (`Tier` / `Feature` / `PlanCatalogItem` / `EntitlementsView`). Never duplicate these types in features.
+
+**`authClient.subscription`** is deliberately loosely typed (cast keeps the Stripe SERVER SDK out of the app workspace). Consume entitlements via the `GET /billing/subscription` typed endpoint, not `authClient.subscription` directly.
+
+## Quota gating (Phase B.2)
+
+Symmetric to feature/plan gating, over `ENTITLEMENTS[tier].quotas` (exposed on the same `GET /billing/subscription` view):
+
+1. **`useQuota(key, used): { limit, used, remaining, exceeded }`** — imperative hook (from `useEntitlements()`). `used` is passed in by the caller (usage counting is server-side; the front never re-declares quota limits).
+2. **`<QuotaGate quotaKey used fallback>`** (`shared/auth/quota-gate.tsx`) — declarative wrapper, renders `fallback` when `exceeded`, children otherwise.
+
+Enforcement is backend-only (`requireQuota`/`reserveQuota`); these front primitives are UX (show remaining, hide/limit CTA). Dormant + knip-whitelisted (like `<FeatureGate>`/`<PlanGate>`).
+
 ## Org-scoping (front)
 
 1. **Org-changing mutations broadcast `broadcastAuthChange()` from call-site `onSuccess`** (not the factory): `setActive`, `create-org`, `delete-org`, `leave-org`, `transfer-and-leave`, `accept-invitation`, `remove-member`. **Why**: a tab holds stale `activeOrganizationId` up to `cookieCache.maxAge` (5 min) without a signal.

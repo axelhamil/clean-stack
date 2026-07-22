@@ -64,6 +64,48 @@
       "when": 1781291315182,
       "tag": "0008_small_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783631259914,
+      "tag": "0009_elite_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783691364964,
+      "tag": "0010_wise_arachne",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783708375080,
+      "tag": "0011_loving_liz_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783716971471,
+      "tag": "0012_aberrant_joseph",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783717539817,
+      "tag": "0013_grey_hammerhead",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1783988538476,
+      "tag": "0014_awesome_bruce_banner",
+      "breakpoints": true
     }
   ]
 }

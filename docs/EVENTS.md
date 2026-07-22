@@ -221,12 +221,15 @@ For other orchestrators (Fly Machines `--schedule`, Render Cron Job, Cloud Sched
 - `GET /admin/audit-log` — list audit events for active org. Permission: `auditLog: ["read"]`. `organizationId` always derived from session, never query string.
 - `POST /internal/sweep-{outbox,audit-log,webhook-delivery}` — retention sweeps (see § Retention above). Internal-gated (HMAC signature + optional private network).
 - `GET/POST/PATCH/DELETE /settings/webhooks` — manage endpoints. Permission: `webhooks: ["read"|"write"]`. Plaintext secret returned **once at creation** (Stripe-style), never re-exposed.
-- `GET /settings/webhooks/:id/deliveries` — list deliveries with status filter (`?status=pending|success|failed|dead_letter`).
+- `POST /settings/webhooks/:id/rotate-secret` — rotate the endpoint signing secret; returns the new secret once. Both old + new secrets sign during the `WEBHOOK_SECRET_GRACE_HOURS` grace window.
+- `POST /settings/webhooks/:id/test` — send a targeted `webhook.test` delivery to the endpoint. Also auto-fired on endpoint creation.
+- `GET /settings/webhooks/:id/deliveries` — list deliveries with status filter (`?status=pending|success|failed|dead_letter`), cursor pagination.
+- `GET /settings/webhooks/:id/deliveries/:deliveryId` — single delivery detail including `attempts[]` (per-attempt request/response headers + body).
 - `POST /settings/webhooks/:id/deliveries/:deliveryId/replay` — re-enqueue a past delivery with fresh idempotency key.
 
 ## HMAC signature format (for receivers)
 
-Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. Signed payload: `${timestamp}.${rawBody}`. Body shape: `{ id, type, data, time }` (CloudEvents-aligned).
+Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. During a secret rotation grace window the header carries multiple `v1=` values: `t=<unix>,v1=<hex_old>,v1=<hex_new>`. Accept if **any** `v1=` value verifies. Signed payload: `${timestamp}.${rawBody}`. Body shape: `{ id, type, data, time }` (CloudEvents-aligned).
 
 Reject if timestamp drift > 5 min (replay protection). Use the `x-webhook-idempotency` header (`<eventId>:<endpointId>`) to dedupe on your side.
 
@@ -254,7 +257,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **38 events automatically** (23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, 3 from `modules/webhooks/`, 1 from `modules/policies/`, 3 from security middleware/endpoint). Source of truth: `packages/events/src/event-types.ts`.
+The boilerplate emits **52 events** (48 subscribable + 4 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -292,8 +295,19 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 ### Via WebhooksService
 - `WEBHOOK_ENDPOINT_CREATED` · `WEBHOOK_ENDPOINT_UPDATED` · `WEBHOOK_ENDPOINT_DELETED` (payload carries `actorUserId` propagated from the HTTP boundary — `c.get("user").id`)
 
+**Phase C.5 — 4 new internal events** (non-subscribable, non-fanout — guarded by `INTERNAL_EVENT_TYPES` in `WebhookFanoutSubscriber`; `retention: "operational"`):
+- `WEBHOOK_TEST` (`webhook.test`) — emitted when a test delivery is triggered (`POST /settings/webhooks/:id/test` or auto-on-create). Payload: `{ endpointId, organizationId, actorUserId }`.
+- `WEBHOOK_ENDPOINT_SECRET_ROTATED` (`webhook.endpoint.secret_rotated`) — secret rotation completed. Payload: `{ endpointId, organizationId, actorUserId }`.
+- `WEBHOOK_ENDPOINT_DISABLED` (`webhook.endpoint.disabled`) — auto-disable fired after sustained failures. Payload: `{ endpointId, organizationId, consecutiveFailures: number, lastFailedAt: string }`.
+- `WEBHOOK_DELIVERY_EXHAUSTED` (`webhook.delivery.exhausted`) — delivery dead-lettered after all retry attempts. Payload: `{ deliveryId, endpointId, organizationId, eventType: string, attempts: number }`.
+
 ### Via `PolicyAcceptanceService` (Phase A.2)
 - `USER_POLICY_ACCEPTED` (`user.policy.accepted`) — payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
+
+### Via `ConsentService` (Phase A.4)
+
+- `USER_COOKIE_CONSENT_GRANTED` (`user.cookie_consent.granted`) — émis par `ConsentService.record` à chaque sauvegarde. Payload : `{ subjectId: string (device cookie), userId?: string (null pour guests), categories: ConsentCategory[], policyVersion: string, ipAddress?, userAgent? }`, retention `compliance`. L'`actorUserId` résout sur `userId` quand l'utilisateur est connecté (self-actor) ; `null` pour un guest (le `subjectId` est la seule identité disponible). Les guests obtiennent un record réconcilié au login via `ConsentService.reconcile` (hook `hooks.after` + `ctx.context.newSession`).
+- `USER_COOKIE_CONSENT_WITHDRAWN` (`user.cookie_consent.withdrawn`) — émis par `ConsentService.withdraw`. Même shape de payload. Retention `compliance`.
 
 ### Via security middleware / endpoint (Phase C.1)
 
@@ -302,6 +316,30 @@ Ces 3 events ne sont pas des state-changes métier — ils signalent des rejets 
 - `SECURITY_RATE_LIMIT_EXCEEDED` (`security.rate_limit.exceeded`) — émis par le rate-limit middleware sur rejet d'une requête auth. Payload : `{ actorUserId: string | null, ip: string (max 45), policyName: string (max 64), path: string (max 512), method: string (max 16) }`, retention `operational`.
 - `SECURITY_CSP_VIOLATION` (`security.csp.violation`) — émis par l'endpoint public `POST /csp-report`. Payload : `{ documentUri, violatedDirective, blockedUri, actorUserId? }`, retention `operational`.
 - `SECURITY_CSRF_REJECTED` (`security.csrf.rejected`) — émis par le CSRF middleware sur Origin invalide. Payload : `{ ipAddress, path, origin?, actorUserId? }`, retention `operational`.
+
+### Via abuse-prevention hooks (Phase C.1 s5a, `auth.ts` `hooks.before`)
+
+Émis via `emitEvent(outbox, ...)` dans le `hooks.before` BetterAuth, juste avant le rejet (`throw APIError`). **Piège BetterAuth** : dans un `hooks.before`, `ctx.context.request` et `ctx.context.session` sont **`undefined`** (le before-hook global tourne avant le session-middleware) — l'IP se lit sur `ctx.headers`, et l'actor authentifié (`/change-password`) via `auth.api.getSession({ headers: ctx.headers })`. Câbler sur `ctx.context.*` fait throw le calcul d'IP avant l'emit → event perdu silencieusement (les tests unitaires ne montent pas les hooks, seule une passe end-to-end le révèle).
+
+- `SECURITY_SIGNUP_REJECTED` (`security.signup.rejected`) — émis sur blocage d'un email jetable au sign-up. Payload : `{ actorUserId: null, email: string (max 254), ip: string | null, reason: "disposable_email" }`, retention `operational`.
+- `SECURITY_PASSWORD_BREACHED` (`security.password.breached`) — émis sur un mot de passe compromis HIBP au sign-up / reset / change-password (le rejet 422 vient déjà de la NIST policy). Payload : `{ actorUserId: string | null, email: string | null, ip: string | null, path }` — `actorUserId`/`email` portés par la session réelle sur `/change-password`, `null` sur sign-up/reset (pas de session). Retention `operational`.
+
+### Via subscription events (`auth.ts` `@better-auth/stripe` callbacks — Phase B.1)
+
+Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin callbacks wired in `apps/api/src/auth.ts` (`onSubscriptionComplete`, `onSubscriptionUpdate`, and the `onEvent` invoice.payment_failed handler). These are Stripe-originated lifecycle events — not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
+
+- `BILLING_SUBSCRIPTION_CREATED` (`billing.subscription.created`) — emitted on `customer.subscription.created` Stripe webhook (first active subscription for an org). Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null, currentPeriodEnd }`, retention `compliance`.
+- `BILLING_SUBSCRIPTION_UPDATED` (`billing.subscription.updated`) — emitted on `customer.subscription.updated` when the new status is not terminal. Same payload shape as `created`, retention `compliance`.
+- `BILLING_SUBSCRIPTION_CANCELLED` (`billing.subscription.cancelled`) — emitted on `customer.subscription.updated` when status is `canceled` / `incomplete_expired` / `unpaid`. Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null }`, retention `compliance`.
+- `BILLING_PAYMENT_FAILED` (`billing.payment.failed`) — emitted on `invoice.payment_failed` Stripe webhook. Payload: `{ organizationId, subscriptionId, invoiceId, actorUserId: null }`, retention `compliance` (kept long-term as part of the billing/financial audit trail — the whole `billing.*` family is `compliance` so there is no retention divergence within it).
+
+**Status mapping** — `subscriptionEventType(status)` in `apps/api/src/modules/billing/application/subscription-events.ts` maps Stripe subscription statuses to the three state events: `canceled` / `incomplete_expired` / `unpaid` → `BILLING_SUBSCRIPTION_CANCELLED`; all other statuses → `BILLING_SUBSCRIPTION_UPDATED`. `BILLING_SUBSCRIPTION_CREATED` fires only on the initial `customer.subscription.created` webhook path.
+
+### Via `requireQuota` middleware (Phase B.2)
+
+Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quota ceiling. The middleware runs before the business handler; if the quota is already at or above the limit, it returns `429 BILLING_QUOTA_EXCEEDED` and emits the event. **`reserveQuota` (the authoritative in-TX check) does NOT emit this event** — it only calls `assertQuota` which throws. A caller enforcing via `reserveQuota` inside `uow.run()` without the middleware must emit the event themselves if they want the telemetry (or mount `requireQuota` on the route).
+
+- `BILLING_QUOTA_EXCEEDED` (`billing.quota.exceeded`) — emitted on quota ceiling hit. Payload: `{ organizationId, resource: string, limit: number, attempted: number, tier: string, actorUserId: string }`, retention `operational`.
 
 ## Payload validation guarantee
 
@@ -334,7 +372,8 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (38 events) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (52 events: 48 subscribable + 4 internal) |
+| `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()` — ALS flush + nested-run guard |

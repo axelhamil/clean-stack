@@ -26,6 +26,7 @@ mock.module("@packages/drizzle", () => ({
   gt: () => ({}),
   gte: () => ({}),
   not: () => ({}),
+  asc: () => ({}),
   desc: () => ({}),
   like: () => ({}),
   inArray: () => ({}),
@@ -43,6 +44,12 @@ mock.module("@packages/drizzle", () => ({
   TransactionService: class {},
   trackEventsOnSuccess: () => {},
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");

@@ -40,7 +40,15 @@ export type AuditPage = {
   nextCursor: string | null;
 };
 
+export type ChainVerification = {
+  verified: boolean;
+  rowCount: number;
+  brokenAtId: string | null;
+  brokenAtSequence: number | null;
+};
+
 export interface IAuditPort {
   record(entry: AuditEntry, tx?: ITransaction): Promise<Result<AuditRecord, AuditError>>;
   list(filters: AuditFilters, tx?: ITransaction): Promise<Result<AuditPage, AuditError>>;
+  verifyChain(tx?: ITransaction): Promise<Result<ChainVerification, AuditError>>;
 }

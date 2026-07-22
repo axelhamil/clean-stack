@@ -6,8 +6,10 @@ import type { IPasswordBreachService } from "../ports/password-breach.port";
 describe("findPasswordViolation", () => {
   const ctx = { email: "alice@example.com", name: "Alice Dupont", appName: "clean-stack" };
 
-  it("retourne un message si le password contient l'email local-part", () => {
-    expect(findPasswordViolation("alice@supersecret!", ctx)).not.toBeNull();
+  it("retourne un objet avec message et isBreach:false si le password contient l'email local-part", () => {
+    const result = findPasswordViolation("alice@supersecret!", ctx);
+    expect(result).not.toBeNull();
+    expect(result?.isBreach).toBe(false);
   });
 
   it("ne bloque pas si l'email local-part est < 3 chars", () => {
@@ -15,8 +17,10 @@ describe("findPasswordViolation", () => {
     expect(findPasswordViolation("abXYZ1234567890!", shortEmailCtx)).toBeNull();
   });
 
-  it("retourne un message si le password contient le name", () => {
-    expect(findPasswordViolation("alice-dupont-rule2025", ctx)).not.toBeNull();
+  it("retourne un objet avec message et isBreach:false si le password contient le name", () => {
+    const result = findPasswordViolation("alice-dupont-rule2025", ctx);
+    expect(result).not.toBeNull();
+    expect(result?.isBreach).toBe(false);
   });
 
   it("ne bloque pas si le name est < 3 chars", () => {
@@ -24,8 +28,10 @@ describe("findPasswordViolation", () => {
     expect(findPasswordViolation("AlZXY1234567890!", shortNameCtx)).toBeNull();
   });
 
-  it("retourne un message si le password contient le token app (sans tiret)", () => {
-    expect(findPasswordViolation("cleanstack2025!xyz", ctx)).not.toBeNull();
+  it("retourne un objet avec message et isBreach:false si le password contient le token app (sans tiret)", () => {
+    const result = findPasswordViolation("cleanstack2025!xyz", ctx);
+    expect(result).not.toBeNull();
+    expect(result?.isBreach).toBe(false);
   });
 
   it("retourne null pour un password fort et inédit", () => {
@@ -33,7 +39,9 @@ describe("findPasswordViolation", () => {
   });
 
   it("la comparaison est case-insensitive", () => {
-    expect(findPasswordViolation("ALICE@example.com!!!", ctx)).not.toBeNull();
+    const result = findPasswordViolation("ALICE@example.com!!!", ctx);
+    expect(result).not.toBeNull();
+    expect(result?.isBreach).toBe(false);
   });
 });
 
@@ -58,15 +66,21 @@ describe("validatePassword", () => {
     expect(called).toBe(false);
   });
 
-  it("retourne la violation contextuelle avant même le check breach", async () => {
-    expect(await validatePassword("alice-secret-1234567", ctx, breachWith(false))).not.toBeNull();
+  it("retourne la violation contextuelle (isBreach:false) avant même le check breach", async () => {
+    const result = await validatePassword("alice-secret-1234567", ctx, breachWith(false));
+    expect(result).not.toBeNull();
+    expect(result?.isBreach).toBe(false);
+    expect(typeof result?.message).toBe("string");
   });
 
-  it("retourne un message quand HIBP signale un breach", async () => {
-    expect(await validatePassword("Zr!9xK#mP2@qLn8w", ctx, breachWith(true))).not.toBeNull();
+  it("retourne isBreach:true quand HIBP signale un breach", async () => {
+    const result = await validatePassword("Zr!9xK#mP2@qLn8w", ctx, breachWith(true));
+    expect(result).not.toBeNull();
+    expect(result?.isBreach).toBe(true);
+    expect(typeof result?.message).toBe("string");
   });
 
-  it("passe pour un password fort inédit non-breaché", async () => {
+  it("passe (null) pour un password fort inédit non-breaché", async () => {
     expect(await validatePassword("Zr!9xK#mP2@qLn8w", ctx, breachWith(false))).toBeNull();
   });
 

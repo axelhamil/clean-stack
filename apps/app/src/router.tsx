@@ -1,5 +1,6 @@
 import { createRouter } from "@tanstack/react-router";
 import { accountRoute } from "./features/account/account.route";
+import { adminAuditLogRoute } from "./features/admin-audit-log/admin-audit-log.route";
 import { forgotPasswordRoute } from "./features/auth/forgot-password.route";
 import { magicLinkRoute } from "./features/auth/magic-link.route";
 import { resetPasswordRoute } from "./features/auth/reset-password.route";
@@ -8,16 +9,23 @@ import { signUpRoute } from "./features/auth/sign-up.route";
 import { twoFactorRoute } from "./features/auth/two-factor.route";
 import { verifyEmailRoute } from "./features/auth/verify-email.route";
 import { billingRoute } from "./features/billing/billing.route";
-import { dangerRoute } from "./features/danger/danger.route";
+import { pricingRoute } from "./features/billing/pricing.route";
 import { dashboardRoute } from "./features/dashboard/dashboard.route";
+import { developersEventsRoute } from "./features/developers/events.route";
 import { acceptInvitationRoute } from "./features/invitations/accept.route";
 import { acceptPoliciesRoute } from "./features/legal/accept.route";
+import { accessibilityRoute } from "./features/legal/accessibility.route";
+import { cookiesRoute } from "./features/legal/cookies.route";
 import { dataRightsRoute } from "./features/legal/data-rights.route";
 import { privacyPolicyRoute } from "./features/legal/privacy-policy.route";
+import { subProcessorsRoute } from "./features/legal/sub-processors.route";
 import { termsRoute } from "./features/legal/terms.route";
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
+import { privacyRoute } from "./features/privacy/privacy.route";
+import { webhooksRoute } from "./features/webhooks/webhooks.route";
 import {
+  adminLayout,
   guestLayout,
   indexRoute,
   orgScopeLayout,
@@ -37,11 +45,12 @@ const routeTree = rootRoute.addChildren([
     shellLayout.addChildren([
       dashboardRoute,
       newOrgRoute,
+      adminLayout.addChildren([adminAuditLogRoute]),
       settingsLayout.addChildren([
         settingsIndexRoute,
         accountRoute,
-        dangerRoute,
-        orgScopeLayout.addChildren([billingRoute, organizationRoute]),
+        privacyRoute,
+        orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute]),
       ]),
     ]),
   ]),
@@ -49,6 +58,11 @@ const routeTree = rootRoute.addChildren([
   dataRightsRoute,
   privacyPolicyRoute,
   termsRoute,
+  subProcessorsRoute,
+  accessibilityRoute,
+  cookiesRoute,
+  pricingRoute,
+  developersEventsRoute,
   magicLinkRoute,
   resetPasswordRoute,
   twoFactorRoute,

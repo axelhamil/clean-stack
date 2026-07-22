@@ -63,6 +63,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
               aggregateType: scope.aggregateType ?? "unknown",
               traceparent: scope.traceparent,
               requestId,
+              id: events.length === 1 ? scope.id : undefined,
             }),
           );
           const query = exec.insert(oe).values(rows);

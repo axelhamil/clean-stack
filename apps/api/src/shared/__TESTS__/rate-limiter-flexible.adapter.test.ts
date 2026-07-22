@@ -46,6 +46,7 @@ mock.module("@packages/drizzle", () => ({
   gt: () => ({}),
   gte: () => ({}),
   not: () => ({}),
+  asc: () => ({}),
   desc: () => ({}),
   like: () => ({}),
   inArray: () => ({}),
@@ -63,6 +64,12 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
   rateLimitSchema: { rateLimitRecord: fakeRateLimitRecord },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
 }));
 
 // ── Mock rate-limiter-flexible ──────────────────────────────────────────────

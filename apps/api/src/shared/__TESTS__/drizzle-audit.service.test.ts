@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
 // Expose full export surface to avoid cross-file export-not-found errors under parallel bun test.
@@ -41,6 +42,7 @@ mock.module("@packages/drizzle", () => ({
   gt: () => ({}),
   gte: () => ({}),
   not: () => ({}),
+  asc: () => ({}),
   desc: () => ({}),
   like: () => ({}),
   inArray: () => ({}),
@@ -70,11 +72,52 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
 const { DrizzleAuditRepository } = await import("../services/drizzle-audit.service");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
+
+// ── Chain helpers ──────────────────────────────────────────────────────────
+function chainRow(seq: number, prevHash: string, over: Partial<Record<string, unknown>> = {}) {
+  const base = {
+    id: `audit-${seq}`,
+    action: "user.created",
+    actorId: null,
+    actorType: "system",
+    organizationId: null,
+    targetType: "user",
+    targetId: `u${seq}`,
+    metadata: { n: seq },
+    occurredAt: new Date("2026-07-10T00:00:00.000Z"),
+    requestId: null,
+    retention: "compliance",
+    prevHash,
+    sequence: seq,
+  };
+  const row = { ...base, ...over };
+  const hash = computeAuditHash({
+    id: row.id as string,
+    action: row.action as string,
+    actorId: row.actorId as string | null,
+    actorType: row.actorType as string,
+    organizationId: row.organizationId as string | null,
+    targetType: row.targetType as string,
+    targetId: row.targetId as string,
+    metadata: row.metadata,
+    occurredAt: row.occurredAt.toISOString(),
+    requestId: (row.requestId as string | null) ?? null,
+    retention: row.retention as string,
+    prevHash: row.prevHash as string,
+  });
+  return { ...row, hash };
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const baseEntry = {
@@ -233,6 +276,34 @@ describe("DrizzleAuditRepository", () => {
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
       expect(captureSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("verifyChain", () => {
+    it("returns verified: true for a valid two-row chain", async () => {
+      const row1 = chainRow(1, GENESIS_HASH);
+      const row2 = chainRow(2, row1.hash);
+      selectExecute.mockResolvedValueOnce([row1, row2]);
+      const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
+      const result = await repo.verifyChain();
+      expect(result.isSuccess).toBe(true);
+      const v = result.getValue();
+      expect(v.verified).toBe(true);
+      expect(v.rowCount).toBe(2);
+      expect(v.brokenAtId).toBeNull();
+    });
+
+    it("returns verified: false when a row's hash is tampered", async () => {
+      const row1 = chainRow(1, GENESIS_HASH);
+      const row2 = chainRow(2, row1.hash);
+      const tampered = { ...row2, targetId: "TAMPERED" };
+      selectExecute.mockResolvedValueOnce([row1, tampered]);
+      const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
+      const result = await repo.verifyChain();
+      expect(result.isSuccess).toBe(true);
+      const v = result.getValue();
+      expect(v.verified).toBe(false);
+      expect(v.brokenAtId).toBe(row2.id);
     });
   });
 });

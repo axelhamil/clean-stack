@@ -7,6 +7,7 @@ export type OutboxEnqueueScope = {
   organizationId?: string | null;
   aggregateType?: string;
   traceparent?: string;
+  id?: string;
 };
 
 export type OutboxRecord = {

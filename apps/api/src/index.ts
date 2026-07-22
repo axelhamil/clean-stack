@@ -8,6 +8,8 @@ import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
 import { di } from "./container";
 import { auditLogRoutes } from "./modules/audit-log/routes";
+import { billingRoutes } from "./modules/billing/routes";
+import { consentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { policyRoutes } from "./modules/policies/routes";
@@ -18,6 +20,7 @@ import { webhooksRoutes } from "./modules/webhooks/routes";
 import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
+import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
@@ -39,6 +42,7 @@ import {
   AUTH_SIGN_UP_POLICY,
   AUTH_TWO_FACTOR_POLICY,
   AUTH_VERIFY_EMAIL_POLICY,
+  CONSENT_POST_POLICY,
   CSP_REPORT_POLICY,
   GLOBAL_POLICY,
 } from "./shared/middleware/rate-limit.policies";
@@ -98,6 +102,13 @@ app.use("/uploads", csrf);
 app.use("/uploads/*", csrf);
 app.use("/settings/*", csrf);
 app.use("/admin/*", csrf);
+app.use("/consents", csrf);
+app.use("/consents/*", csrf);
+app.use("/billing/portal", csrf);
+const consentRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, CONSENT_POST_POLICY);
+app.use("/consents", (c, next) =>
+  c.req.method === "POST" || c.req.method === "DELETE" ? consentRateLimit(c, next) : next(),
+);
 app.use(
   "/api/auth/sign-in/email",
   requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_IN_POLICY),
@@ -142,6 +153,13 @@ app.use(
   ),
 );
 app.use(
+  "/api/auth/two-factor/generate-backup-codes",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
   "/api/auth/verify-email",
   requireRateLimit(
     { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
@@ -167,6 +185,7 @@ app.route("/internal", rgpdInternalRoutes);
 app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
+app.route("/internal", sweepConsentsRoutes);
 
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
@@ -174,7 +193,9 @@ const routes = app
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
   .route("/admin/audit-log", auditLogRoutes)
-  .route("/settings/webhooks", webhooksRoutes);
+  .route("/settings/webhooks", webhooksRoutes)
+  .route("/consents", consentRoutes)
+  .route("/billing", billingRoutes);
 
 app.onError(createErrorHandler(di.IInstrumentation));
 

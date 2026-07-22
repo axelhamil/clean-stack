@@ -12,6 +12,7 @@ const sweeps = [
   "/internal/sweep-webhook-delivery",
   "/internal/sweep-audit-log",
   "/internal/sweep-outbox",
+  "/internal/sweep-consents",
 ] as const;
 
 for (const path of sweeps) {

@@ -27,6 +27,11 @@ export const webhookEndpoint = pgTable(
     secretCipher: text("secret_cipher").notNull(),
     eventTypes: text("event_types").array().notNull().default(sql`'{}'::text[]`),
     enabled: boolean("enabled").notNull().default(true),
+    previousSecretCipher: text("previous_secret_cipher"),
+    previousSecretExpiresAt: timestamp("previous_secret_expires_at"),
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    firstFailedAt: timestamp("first_failed_at"),
+    disabledAt: timestamp("disabled_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -69,6 +74,28 @@ export const webhookDelivery = pgTable(
   ],
 );
 
+export const webhookDeliveryAttempt = pgTable(
+  "webhook_delivery_attempt",
+  {
+    id: text("id").primaryKey(),
+    deliveryId: text("delivery_id")
+      .notNull()
+      .references(() => webhookDelivery.id, { onDelete: "cascade" }),
+    attemptNumber: integer("attempt_number").notNull(),
+    requestHeaders: jsonb("request_headers").$type<Record<string, string>>(),
+    requestBody: text("request_body"),
+    responseStatus: integer("response_status"),
+    responseHeaders: jsonb("response_headers").$type<Record<string, string>>(),
+    responseBody: text("response_body"),
+    durationMs: integer("duration_ms"),
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("webhook_delivery_attempt_delivery_idx").on(table.deliveryId, table.attemptNumber),
+  ],
+);
+
 export const webhookEndpointRelations = relations(webhookEndpoint, ({ many, one }) => ({
   organization: one(organization, {
     fields: [webhookEndpoint.organizationId],
@@ -77,7 +104,7 @@ export const webhookEndpointRelations = relations(webhookEndpoint, ({ many, one 
   deliveries: many(webhookDelivery),
 }));
 
-export const webhookDeliveryRelations = relations(webhookDelivery, ({ one }) => ({
+export const webhookDeliveryRelations = relations(webhookDelivery, ({ one, many }) => ({
   endpoint: one(webhookEndpoint, {
     fields: [webhookDelivery.endpointId],
     references: [webhookEndpoint.id],
@@ -85,5 +112,13 @@ export const webhookDeliveryRelations = relations(webhookDelivery, ({ one }) => 
   outboxEvent: one(outboxEvent, {
     fields: [webhookDelivery.outboxEventId],
     references: [outboxEvent.id],
+  }),
+  attempts: many(webhookDeliveryAttempt),
+}));
+
+export const webhookDeliveryAttemptRelations = relations(webhookDeliveryAttempt, ({ one }) => ({
+  delivery: one(webhookDelivery, {
+    fields: [webhookDeliveryAttempt.deliveryId],
+    references: [webhookDelivery.id],
   }),
 }));

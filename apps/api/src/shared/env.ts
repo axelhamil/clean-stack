@@ -60,6 +60,11 @@ const envSchema = z.object({
   AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
   WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  WEBHOOK_SECRET_GRACE_HOURS: z.coerce.number().int().positive().default(24),
+  WEBHOOK_AUTO_DISABLE_AFTER_DAYS: z.coerce.number().int().positive().default(5),
+  WEBHOOK_AUTO_DISABLE_MIN_FAILURES: z.coerce.number().int().positive().default(2),
+  WEBHOOK_RESPONSE_CAPTURE_BYTES: z.coerce.number().int().positive().default(4096),
+  CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
   GIT_SHA: z.string().optional(),
   BUILD_TIME: z.string().optional(),
   SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),
@@ -67,6 +72,27 @@ const envSchema = z.object({
   SENTRY_ENVIRONMENT: z.string().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
   HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  AUTH_SIGN_IN_ACCOUNT_MAX: z.coerce.number().int().positive().default(5),
+  AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC: z.coerce.number().int().positive().default(900),
+  DISPOSABLE_EMAIL_BLOCK_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
+  PLATFORM_ADMIN_IDS: z
+    .string()
+    .optional()
+    .transform(
+      (v) =>
+        v
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) ?? [],
+    ),
+  PLATFORM_ADMIN_REQUIRE_MFA: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
+  DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
   RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
   TRUSTED_PROXIES: z
     .string()
@@ -77,6 +103,8 @@ const envSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const rawEnv = Object.fromEntries(
@@ -104,6 +132,11 @@ if (env.NODE_ENV === "production") {
   if (!env.WEBHOOK_MASTER_KEY) {
     throw new Error(
       "WEBHOOK_MASTER_KEY is required in production (64 hex chars). Generate: openssl rand -hex 32",
+    );
+  }
+  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
+    throw new Error(
+      "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are required in production. Without them Checkout, the Billing Portal and webhook signature verification all fail.",
     );
   }
 }

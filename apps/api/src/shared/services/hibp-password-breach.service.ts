@@ -5,7 +5,14 @@ import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IPasswordBreachService, PasswordBreachError } from "../ports/password-breach.port";
 
 export class HibpPasswordBreachService implements IPasswordBreachService {
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(
+    private readonly instrumentation: IInstrumentation,
+    fetchImpl: typeof fetch = fetch,
+  ) {
+    this.fetchImpl = fetchImpl;
+  }
 
   async isBreached(password: string): Promise<Result<boolean, PasswordBreachError>> {
     return this.instrumentation.startSpan({ name: "HibpPasswordBreachService > isBreached" }, () =>
@@ -26,7 +33,7 @@ export class HibpPasswordBreachService implements IPasswordBreachService {
           attributes: { "http.method": "GET", "http.host": "api.pwnedpasswords.com" },
         },
         () =>
-          fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+          this.fetchImpl(`https://api.pwnedpasswords.com/range/${prefix}`, {
             headers: { "Add-Padding": "true" },
             signal: AbortSignal.timeout(env.HIBP_TIMEOUT_MS),
           }),

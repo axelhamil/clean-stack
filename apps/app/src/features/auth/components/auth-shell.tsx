@@ -10,6 +10,7 @@ import { TextLink } from "@packages/ui/components/ui/text-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import type { ReactNode } from "react";
+import { LegalFooter } from "../../../shared/components/legal-footer";
 import { ThemeToggle } from "../../../shared/components/theme-toggle";
 
 interface AuthShellProps {
@@ -22,21 +23,25 @@ interface AuthShellProps {
 
 export function AuthShell({ title, description, children, footer, className }: AuthShellProps) {
   return (
-    <main className="relative flex min-h-dvh items-center justify-center">
-      <ThemeToggle className="absolute top-4 right-4" />
+    <div className="flex min-h-dvh flex-col">
+      <main className="relative flex flex-1 items-center justify-center">
+        <ThemeToggle className="absolute top-4 right-4" />
 
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
 
-          {description && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
+            {description && <CardDescription>{description}</CardDescription>}
+          </CardHeader>
 
-        <CardContent className={cn(className)}>{children}</CardContent>
+          <CardContent className={cn(className)}>{children}</CardContent>
 
-        {footer && <CardFooter>{footer}</CardFooter>}
-      </Card>
-    </main>
+          {footer && <CardFooter>{footer}</CardFooter>}
+        </Card>
+      </main>
+
+      <LegalFooter />
+    </div>
   );
 }
 

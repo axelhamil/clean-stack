@@ -1,28 +1,46 @@
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
-import { ac, isPersonalOrg, roles } from "@packages/access-control";
+import { stripe } from "@better-auth/stripe";
+import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
+import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { bearer, customSession, magicLink, organization, twoFactor } from "better-auth/plugins";
+import {
+  admin,
+  bearer,
+  customSession,
+  magicLink,
+  organization,
+  twoFactor,
+} from "better-auth/plugins";
 import { CryptoHasher } from "bun";
+import type Stripe from "stripe";
 import {
   clearConfirmedPendingEmail,
+  countActiveMembers,
   deleteOrgIfEmpty,
   findActiveMemberOrgId,
   findActiveMemberRole,
   findLatestLinkedAccount,
   findLatestPasskey,
+  findOrgOwnerUserId,
   insertPersonalOrgWithOwner,
   setPendingEmail,
 } from "./auth-queries";
 import { di } from "./container";
+import {
+  authorizeSubscriptionReference,
+  subscriptionEventType,
+} from "./modules/billing/application/subscription-events";
+import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
+import { assertSeat } from "./shared/middleware/billing.middleware";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
@@ -129,6 +147,37 @@ async function emit<TPayload>(
     { organizationId },
     tx,
   );
+}
+
+/**
+ * DRY seat-check helper used by every member-creation gate (direct add,
+ * invitation acceptance, invitation creation). Throws 402 if the org is at
+ * or over its plan seat cap. Centralised so the 3-line check is never
+ * duplicated across hooks (CLAUDE.md reusability rule, §6 two-path trap).
+ */
+async function assertSeatAvailableFor(orgId: string): Promise<void> {
+  const view = await di.EntitlementsService.getEntitlements(orgId);
+  const activeMembers = await countActiveMembers(orgId);
+  assertSeat(activeMembers, view.maxMembers);
+}
+
+/**
+ * Best-effort client IP from a BetterAuth hook's `ctx.headers` for audit-only
+ * event payloads. NOT the trusted-proxy resolver (`resolveClientIp`, Hono layer,
+ * unreachable from here) — acceptable because these emits are non-blocking audit.
+ */
+function clientIpFromHeaders(headers?: Headers): string | null {
+  return headers?.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 45) ?? null;
+}
+
+function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
+  const raw = headers?.get("cookie");
+  if (!raw) return undefined;
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq !== -1 && part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return undefined;
 }
 
 /**
@@ -246,6 +295,86 @@ const authOptions = {
   },
 
   plugins: [
+    stripe({
+      stripeClient,
+      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
+      createCustomerOnSignUp: true,
+      subscription: {
+        enabled: true,
+        plans: async () => {
+          const catalog = await di.BillingCatalogService.getCatalog();
+          return catalog
+            .filter((p) => p.priceId !== null)
+            .map((p) => ({ name: p.tier, priceId: p.priceId as string }));
+        },
+        authorizeReference: async ({ user, referenceId, action }) => {
+          if (
+            action !== "upgrade-subscription" &&
+            action !== "cancel-subscription" &&
+            action !== "restore-subscription"
+          ) {
+            return true;
+          }
+          const role = await findActiveMemberRole(user.id, referenceId);
+          return authorizeSubscriptionReference((role ?? undefined) as OrgRole | undefined);
+        },
+        onSubscriptionComplete: async ({ subscription, plan }) => {
+          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+          await emit(
+            EventTypes.BILLING_SUBSCRIPTION_CREATED,
+            "subscription",
+            subscription.id,
+            {
+              organizationId: subscription.referenceId,
+              subscriptionId: subscription.id,
+              tier: plan.name,
+              status: subscription.status,
+              actorUserId,
+              currentPeriodEnd: subscription.periodEnd ?? null,
+            },
+            subscription.referenceId,
+          );
+        },
+        onSubscriptionUpdate: async ({ subscription }) => {
+          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+          await emit(
+            subscriptionEventType(subscription.status),
+            "subscription",
+            subscription.id,
+            {
+              organizationId: subscription.referenceId,
+              subscriptionId: subscription.id,
+              tier: subscription.plan,
+              status: subscription.status,
+              actorUserId,
+              currentPeriodEnd: subscription.periodEnd ?? null,
+            },
+            subscription.referenceId,
+          );
+        },
+      },
+      onEvent: async (event) => {
+        if (event.type !== "invoice.payment_failed") return;
+        const invoice = event.data.object as Stripe.Invoice;
+        const subDetails = invoice.parent?.subscription_details;
+        const referenceId = subDetails?.metadata?.referenceId;
+        if (!referenceId) return;
+        const subscriptionId =
+          typeof subDetails?.subscription === "string" ? subDetails.subscription : "";
+        await emit(
+          EventTypes.BILLING_PAYMENT_FAILED,
+          "subscription",
+          subscriptionId || invoice.id,
+          {
+            organizationId: referenceId,
+            subscriptionId,
+            invoiceId: invoice.id,
+            actorUserId: null,
+          },
+          referenceId,
+        );
+      },
+    }),
     bearer(),
     twoFactor(),
     magicLink({
@@ -261,11 +390,27 @@ const authOptions = {
       },
     }),
     passkey({ rpName: "clean-stack" }),
+    admin({ adminUserIds: env.PLATFORM_ADMIN_IDS, defaultRole: "user", adminRoles: ["admin"] }),
     organization({
       ac,
       roles,
       creatorRole: "owner",
       organizationHooks: {
+        beforeAddMember: async ({ organization: org }) => {
+          await assertSeatAvailableFor(org.id);
+        },
+        // Gate the invite-create path so operators get early feedback when the
+        // org is already at cap (nice-to-have UX, not the authoritative gate).
+        beforeCreateInvitation: async ({ organization: org }) => {
+          await assertSeatAvailableFor(org.id);
+        },
+        // Authoritative gate for the invite→accept path. `beforeAddMember` does
+        // NOT fire on invitation acceptance (§6 two-path trap documented above).
+        // Throwing here blocks the accept endpoint with a 402 before the member
+        // row is written, closing the over-provisioning race on this path.
+        beforeAcceptInvitation: async ({ organization: org }) => {
+          await assertSeatAvailableFor(org.id);
+        },
         beforeDeleteOrganization: async ({ organization: org }) => {
           if (isPersonalOrg(org.slug)) {
             throw new Error(
@@ -429,36 +574,137 @@ const authOptions = {
     before: createAuthMiddleware(async (ctx) => {
       const path = ctx.path;
       const body = ctx.body as Record<string, unknown> | undefined;
+
+      // Credential-stuffing: per-account rate-limit on sign-in (fail-closed — store error → 503)
+      if (path === "/sign-in/email") {
+        const email = body?.email as string | undefined;
+        if (!email) return;
+        const ip = clientIpFromHeaders(ctx.headers) ?? "unknown";
+        const rl = await di.IRateLimiter.consume(`auth-sign-in:account:${email}`, [
+          {
+            policyName: "auth-sign-in-account",
+            windowSec: env.AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC,
+            maxRequests: env.AUTH_SIGN_IN_ACCOUNT_MAX,
+          },
+        ]);
+        if (rl.isFailure) {
+          throw new APIError("SERVICE_UNAVAILABLE", { message: "Service temporarily unavailable" });
+        }
+        const decision = rl.getValue();
+        if (!decision.allowed) {
+          if (decision.firstBlock) {
+            try {
+              await emit(
+                EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
+                "rate_limit",
+                `auth-sign-in-account:${email}`,
+                { actorUserId: null, ip, policyName: "auth-sign-in-account", path, method: "POST" },
+              );
+            } catch (emitErr) {
+              logger.warn({ err: emitErr }, "account rate-limit event emit failed");
+            }
+          }
+          throw new APIError("TOO_MANY_REQUESTS", { message: "Too many login attempts" });
+        }
+        return;
+      }
+
       let password: string | undefined;
       let actorEmail: string | undefined;
       let actorName: string | undefined;
+      let actorUserId: string | null = null;
 
       if (path === "/sign-up/email") {
         password = body?.password as string;
         actorEmail = body?.email as string;
         actorName = body?.name as string;
+
+        // Disposable email check (fail-open — DNS error → allow + warn)
+        if (env.DISPOSABLE_EMAIL_BLOCK_ENABLED && actorEmail) {
+          const d = await di.IDisposableEmailService.isDisposable(actorEmail);
+          if (d.isFailure) {
+            logger.warn({ err: d.getError() }, "disposable-email check failed — failing open");
+          } else if (d.getValue()) {
+            try {
+              await emit(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
+                actorUserId: null,
+                email: actorEmail,
+                ip: clientIpFromHeaders(ctx.headers),
+                reason: "disposable_email" as const,
+              });
+            } catch (emitErr) {
+              logger.warn({ err: emitErr }, "signup-rejected event emit failed");
+            }
+            throw new APIError("UNPROCESSABLE_ENTITY", {
+              message: "This email address is not accepted.",
+            });
+          }
+        }
       } else if (path === "/reset-password") {
         password = body?.newPassword as string;
       } else if (path === "/change-password") {
         password = body?.newPassword as string;
-        actorEmail = ctx.context.session?.user.email;
-        actorName = ctx.context.session?.user.name;
+        // `ctx.context.session` is not populated in a global before-hook (runs before
+        // the session middleware) — load it explicitly so the audit actor is the real user.
+        const session = ctx.headers ? await auth.api.getSession({ headers: ctx.headers }) : null;
+        actorUserId = session?.user.id ?? null;
+        actorEmail = session?.user.email;
+        actorName = session?.user.name;
       } else {
         return;
       }
 
       if (typeof password !== "string" || password.length === 0) return;
 
-      const error = await validatePassword(
+      const result = await validatePassword(
         password,
         { email: actorEmail, name: actorName, appName: "clean-stack" },
         di.IPasswordBreachService,
       );
-      if (error) throw new APIError("UNPROCESSABLE_ENTITY", { message: error });
+      if (result?.isBreach) {
+        try {
+          await emit(EventTypes.SECURITY_PASSWORD_BREACHED, "security", path, {
+            actorUserId,
+            email: actorEmail ?? null,
+            ip: clientIpFromHeaders(ctx.headers),
+            path,
+          });
+        } catch (emitErr) {
+          logger.warn({ err: emitErr }, "password-breached event emit failed");
+        }
+      }
+      if (result !== null) throw new APIError("UNPROCESSABLE_ENTITY", { message: result.message });
     }),
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.context.returned instanceof APIError) return;
+
+      const newUserId = ctx.context.newSession?.user?.id;
+      if (newUserId) {
+        const ccSid = readCookieFromHeaders(ctx.headers, CONSENT_COOKIE_NAME);
+        if (ccSid) {
+          const linked = await di.ConsentService.reconcile(ccSid, newUserId);
+          if (linked.isFailure) {
+            logger.warn(
+              { err: linked.getError(), userId: newUserId },
+              "cookie consent reconcile failed at login",
+            );
+          }
+        }
+      }
+
       const path = ctx.path;
+
+      if (path === "/two-factor/verify-backup-code") {
+        const signedInUser = ctx.context.newSession?.user ?? ctx.context.session?.user;
+        if (signedInUser) {
+          await emit(EventTypes.USER_MFA_BACKUP_CODE_USED, "user", signedInUser.id, {
+            userId: signedInUser.id,
+            email: signedInUser.email,
+          });
+        }
+        return;
+      }
+
       const userId = ctx.context.session?.user.id;
       if (!userId) return;
 
@@ -468,6 +714,10 @@ const authOptions = {
       }
       if (path === "/two-factor/disable") {
         await emit(EventTypes.USER_MFA_DISABLED, "user", userId, { userId });
+        return;
+      }
+      if (path === "/two-factor/generate-backup-codes") {
+        await emit(EventTypes.USER_MFA_BACKUP_CODES_REGENERATED, "user", userId, { userId });
         return;
       }
       if (path === "/passkey/verify-registration") {
@@ -618,12 +868,12 @@ export const auth = betterAuth({
   plugins: [
     ...authOptions.plugins,
     customSession(async ({ user, session }) => {
-      if (!session.activeOrganizationId) return { user, session };
+      const isPlatformAdmin =
+        env.PLATFORM_ADMIN_IDS.includes(user.id) || (user as { role?: string }).role === "admin";
+      const enrichedUser = { ...user, isPlatformAdmin };
+      if (!session.activeOrganizationId) return { user: enrichedUser, session };
       const role = await findActiveMemberRole(user.id, session.activeOrganizationId);
-      return {
-        user,
-        session: { ...session, activeOrganizationRole: role },
-      };
+      return { user: enrichedUser, session: { ...session, activeOrganizationRole: role } };
     }, authOptions),
   ],
 });

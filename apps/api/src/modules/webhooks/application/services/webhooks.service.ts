@@ -2,13 +2,16 @@ import { Buffer } from "node:buffer";
 import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
+import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { assertPublicUrl } from "../../../../shared/ssrf-guard";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
+  WebhookDeliveryAttemptRecord,
   WebhookDeliveryRecord,
 } from "../ports/webhook-delivery.port";
 import type {
@@ -21,7 +24,10 @@ export type WebhookSecretGenerator = () => string;
 export type MasterKeyProvider = () => Option<Uint8Array>;
 
 export type WebhookConfigError = AppError<"WEBHOOK_MASTER_KEY_UNAVAILABLE">;
-export type WebhookServiceError = WebhookConfigError | WebhookRepoError;
+export type WebhookServiceError =
+  | WebhookConfigError
+  | WebhookRepoError
+  | AppError<"WEBHOOK_URL_FORBIDDEN">;
 
 export class WebhooksService {
   constructor(
@@ -46,6 +52,10 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > createEndpoint", op: "function" },
       async () => {
+        const guard = await assertPublicUrl(args.url);
+        if (guard.isFailure)
+          return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: guard.getError().message });
+
         const masterKeyOpt = this.masterKey();
         if (masterKeyOpt.isNone()) {
           return Result.fail({
@@ -91,7 +101,14 @@ export class WebhooksService {
         });
         if (created.isFailure) return Result.fail(created.getError());
 
-        return Result.ok({ endpoint: created.getValue(), plaintextSecret });
+        const endpoint = created.getValue();
+        await this.sendTest({
+          id: endpoint.id,
+          organizationId: args.organizationId,
+          actorUserId: args.actorUserId,
+        }).catch((err) => this.instrumentation.capture(err));
+
+        return Result.ok({ endpoint, plaintextSecret });
       },
     );
   }
@@ -106,8 +123,16 @@ export class WebhooksService {
   }): Promise<Result<Option<WebhookEndpointRecord>, WebhookServiceError>> {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > updateEndpoint", op: "function" },
-      async () =>
-        this.uow.run(async (tx) => {
+      async () => {
+        if (args.url !== undefined) {
+          const guard = await assertPublicUrl(args.url);
+          if (guard.isFailure)
+            return Result.fail({
+              code: "WEBHOOK_URL_FORBIDDEN",
+              message: guard.getError().message,
+            });
+        }
+        return this.uow.run(async (tx) => {
           const updated = await this.endpoints.update(args, tx);
           if (updated.isFailure) return updated;
           const opt = updated.getValue();
@@ -131,7 +156,8 @@ export class WebhooksService {
             tx,
           );
           return updated;
-        }),
+        });
+      },
     );
   }
 
@@ -190,14 +216,139 @@ export class WebhooksService {
     );
   }
 
+  async findDelivery(
+    id: string,
+    organizationId: string,
+  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>> {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > findDelivery", op: "function" },
+      () => this.deliveries.findByIdWithAttempts(id, organizationId),
+    );
+  }
+
   async replayDelivery(
     deliveryId: string,
+    endpointId: string,
     organizationId: string,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > replayDelivery", op: "function" },
       async () =>
-        this.uow.run(async (tx) => this.deliveries.enqueueReplay(deliveryId, organizationId, tx)),
+        this.uow.run(async (tx) =>
+          this.deliveries.enqueueReplay(deliveryId, endpointId, organizationId, tx),
+        ),
+    );
+  }
+
+  async sendTest(args: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > sendTest", op: "function" },
+      async () => {
+        const endpoint = await this.endpoints.findById(args.id, args.organizationId);
+        if (endpoint.isNone()) return Result.ok(Option.none());
+        return this.uow.run(async (tx) => {
+          const outboxEventId = await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_TEST,
+            "webhook_endpoint",
+            args.id,
+            {
+              organizationId: args.organizationId,
+              endpointId: args.id,
+              actorUserId: args.actorUserId,
+            },
+            { organizationId: args.organizationId },
+            tx,
+          );
+          const delivery = await this.deliveries.enqueueTargeted(
+            {
+              endpointId: args.id,
+              outboxEventId,
+              eventType: EventTypes.WEBHOOK_TEST,
+              payload: {
+                organizationId: args.organizationId,
+                endpointId: args.id,
+                actorUserId: args.actorUserId,
+              },
+              idempotencyKey: `test:${outboxEventId}`,
+            },
+            tx,
+          );
+          if (delivery.isFailure) return Result.fail(delivery.getError());
+          return Result.ok(Option.some(delivery.getValue()));
+        });
+      },
+    );
+  }
+
+  async rotateSecret(args: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<
+    Result<
+      Option<{ endpoint: WebhookEndpointRecord; plaintextSecret: string }>,
+      WebhookServiceError
+    >
+  > {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > rotateSecret", op: "function" },
+      async () => {
+        const masterKeyOpt = this.masterKey();
+        if (masterKeyOpt.isNone()) {
+          return Result.fail({
+            code: "WEBHOOK_MASTER_KEY_UNAVAILABLE",
+            message: "WEBHOOK_MASTER_KEY env var is not configured (64 hex chars)",
+          });
+        }
+        const endpoint = await this.endpoints.findById(args.id, args.organizationId);
+        if (endpoint.isNone()) return Result.ok(Option.none());
+
+        const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), args.organizationId);
+        const newPlaintext = this.secretGen();
+        const newCipher = encryptSecret(newPlaintext, subKey);
+        const previousSecretExpiresAt = new Date(
+          Date.now() + env.WEBHOOK_SECRET_GRACE_HOURS * 3_600_000,
+        );
+
+        const rotated = await this.uow.run(async (tx) => {
+          const result = await this.endpoints.applySecretRotation(
+            {
+              id: args.id,
+              organizationId: args.organizationId,
+              secretCipher: newCipher,
+              previousSecretCipher: endpoint.unwrap().secretCipher,
+              previousSecretExpiresAt,
+            },
+            tx,
+          );
+          if (result.isFailure) return result;
+          await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED,
+            "webhook_endpoint",
+            args.id,
+            {
+              organizationId: args.organizationId,
+              endpointId: args.id,
+              actorUserId: args.actorUserId,
+            },
+            { organizationId: args.organizationId },
+            tx,
+          );
+          return result;
+        });
+        if (rotated.isFailure) return Result.fail(rotated.getError());
+        const rotatedOpt = rotated.getValue();
+        if (rotatedOpt.isNone()) return Result.ok(Option.none());
+        return Result.ok(
+          Option.some({ endpoint: rotatedOpt.unwrap(), plaintextSecret: newPlaintext }),
+        );
+      },
     );
   }
 }

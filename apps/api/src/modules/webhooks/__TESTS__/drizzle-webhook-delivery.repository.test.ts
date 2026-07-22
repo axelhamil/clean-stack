@@ -54,6 +54,7 @@ mock.module("@packages/drizzle", () => ({
   lte: () => ({}),
   gt: () => ({}),
   gte: () => ({}),
+  asc: () => ({}),
   desc: () => ({}),
   not: () => ({}),
   like: () => ({}),
@@ -87,6 +88,21 @@ mock.module("@packages/drizzle", () => ({
       $inferSelect: {},
       $inferInsert: {},
     },
+    webhookDeliveryAttempt: {
+      id: {},
+      deliveryId: {},
+      attemptNumber: {},
+      requestHeaders: {},
+      requestBody: {},
+      responseStatus: {},
+      responseHeaders: {},
+      responseBody: {},
+      durationMs: {},
+      error: {},
+      createdAt: {},
+      $inferSelect: {},
+      $inferInsert: {},
+    },
   },
   authSchema: {},
   multiTenantSchema: {},
@@ -95,6 +111,12 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   uuidv7: () => "generated-uuid",
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
 }));
 
 // All imports AFTER mock.module to ensure mocks are in place before module resolution.
@@ -382,7 +404,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns Option.none when original delivery not found", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.enqueueReplay("del-99", "org-1");
+      const result = await repo.enqueueReplay("del-99", "ep-1", "org-1");
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isNone()).toBe(true);
@@ -392,7 +414,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueReplay("del-99", "org-1");
+      await repo.enqueueReplay("del-99", "ep-1", "org-1");
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -405,7 +427,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueReplay("del-99", "org-1");
+      await repo.enqueueReplay("del-99", "ep-1", "org-1");
 
       const calls = spy.mock.calls;
       const innerSpans = calls.filter((c) => c[0]?.op === "db.query");
@@ -418,7 +440,170 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.enqueueReplay("del-1", "org-1");
+      const result = await repo.enqueueReplay("del-1", "ep-1", "org-1");
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // createAttempt
+  // -------------------------------------------------------------------------
+
+  describe("createAttempt", () => {
+    const fakeAttemptArgs = {
+      deliveryId: "del-1",
+      attemptNumber: 1,
+      requestHeaders: null,
+      requestBody: null,
+      responseStatus: 200,
+      responseHeaders: null,
+      responseBody: "ok",
+      durationMs: 123,
+      error: null,
+    };
+
+    it("happy path: returns Result.ok(void)", async () => {
+      dbBehavior = async () => [];
+
+      const result = await repo.createAttempt(fakeAttemptArgs, makeTx());
+
+      expect(result.isSuccess).toBe(true);
+    });
+
+    it("happy path: outer span name + inner db.query span", async () => {
+      dbBehavior = async () => [];
+      const spy = spyOn(instrumentation, "startSpan");
+
+      await repo.createAttempt(fakeAttemptArgs, makeTx());
+
+      const calls = spy.mock.calls;
+      const outer = calls.find(
+        (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > createAttempt",
+      );
+      const inner = calls.find((c) => c[0]?.op === "db.query");
+      expect(outer).toBeDefined();
+      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+    });
+
+    it("failure path: DB throws → capture called + Result.fail", async () => {
+      const boom = new Error("attempt boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.createAttempt(fakeAttemptArgs, makeTx());
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // findByIdWithAttempts
+  // -------------------------------------------------------------------------
+
+  describe("findByIdWithAttempts", () => {
+    const fakeAttemptRow = {
+      id: "att-1",
+      deliveryId: "del-1",
+      attemptNumber: 1,
+      requestHeaders: null,
+      requestBody: null,
+      responseStatus: 200,
+      responseHeaders: null,
+      responseBody: "ok",
+      durationMs: 100,
+      error: null,
+      createdAt: new Date("2024-01-01"),
+    };
+
+    it("happy path: returns Option.none when delivery not found", async () => {
+      dbBehavior = async () => [];
+
+      const result = await repo.findByIdWithAttempts("del-99", "org-1");
+
+      expect(result.isNone()).toBe(true);
+    });
+
+    it("happy path: returns Option.some with attempts array when delivery exists", async () => {
+      let callCount = 0;
+      dbBehavior = async () => {
+        callCount++;
+        if (callCount === 1) return [{ d: fakeDelivery }];
+        return [fakeAttemptRow];
+      };
+
+      const result = await repo.findByIdWithAttempts("del-1", "org-1");
+
+      expect(result.isSome()).toBe(true);
+      const record = result.unwrap();
+      expect(record.id).toBe("del-1");
+      expect(record.attemptHistory).toHaveLength(1);
+      expect(record.attemptHistory[0]?.attemptNumber).toBe(1);
+    });
+
+    it("happy path: outer span name + inner db.query spans", async () => {
+      dbBehavior = async () => [];
+      const spy = spyOn(instrumentation, "startSpan");
+
+      await repo.findByIdWithAttempts("del-1", "org-1");
+
+      const calls = spy.mock.calls;
+      const outer = calls.find(
+        (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > findByIdWithAttempts",
+      );
+      const inner = calls.find((c) => c[0]?.op === "db.query");
+      expect(outer).toBeDefined();
+      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // enqueueTargeted
+  // -------------------------------------------------------------------------
+
+  describe("enqueueTargeted", () => {
+    const targetedArgs = {
+      endpointId: "ep-1",
+      outboxEventId: "out-1",
+      eventType: "USER_CREATED",
+      payload: { foo: "bar" },
+      idempotencyKey: "idem-1",
+    };
+
+    it("happy path: returns Result.ok with the inserted delivery", async () => {
+      dbBehavior = async () => [fakeDelivery];
+
+      const result = await repo.enqueueTargeted(targetedArgs, makeTx());
+
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().id).toBe("del-1");
+    });
+
+    it("happy path: outer span name + inner db.query span", async () => {
+      dbBehavior = async () => [fakeDelivery];
+      const spy = spyOn(instrumentation, "startSpan");
+
+      await repo.enqueueTargeted(targetedArgs, makeTx());
+
+      const calls = spy.mock.calls;
+      const outer = calls.find(
+        (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > enqueueTargeted",
+      );
+      const inner = calls.find((c) => c[0]?.op === "db.query");
+      expect(outer).toBeDefined();
+      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+    });
+
+    it("failure path: DB throws → capture called + Result.fail", async () => {
+      const boom = new Error("targeted boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.enqueueTargeted(targetedArgs, makeTx());
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");

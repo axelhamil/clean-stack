@@ -1,21 +1,27 @@
-import type { IUnitOfWork } from "@packages/ddd-kit";
+import type { EventHandler, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
 import { auditLogModule } from "./modules/audit-log/module";
+import { billingModule } from "./modules/billing/module";
+import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
 import { policyModule } from "./modules/policies/module";
+import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
 import { env } from "./shared/env";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
+import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
 import type { IEmailService } from "./shared/ports/email.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter } from "./shared/ports/rate-limiter.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
+import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
+import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { ResendEmailService } from "./shared/services/email.service";
@@ -38,10 +44,12 @@ declare module "inwire" {
     IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
     IPasswordBreachService: IPasswordBreachService;
+    IDisposableEmailService: IDisposableEmailService;
     IRateLimiter: IRateLimiter;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
+    BackupCodeUsedNotifier: EventHandler;
   }
 }
 
@@ -69,6 +77,10 @@ export const di = container()
     (c): IPasswordBreachService => new HibpPasswordBreachService(c.IInstrumentation),
   )
   .add(
+    "IDisposableEmailService",
+    (c): IDisposableEmailService => new DisposableEmailService(c.IInstrumentation),
+  )
+  .add(
     "IRateLimiter",
     (c): IRateLimiter =>
       new RateLimiterFlexibleAdapter(
@@ -78,6 +90,7 @@ export const di = container()
   )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
+  .add("BackupCodeUsedNotifier", (c) => backupCodeUsedNotifier({ IEmailService: c.IEmailService }))
   .add(
     "OutboxDispatcher",
     (c) =>
@@ -95,4 +108,7 @@ export const di = container()
   .addModule(auditLogModule)
   .addModule(webhooksModule)
   .addModule(policyModule)
+  .addModule(consentModule)
+  .addModule(quotaModule)
+  .addModule(billingModule)
   .build();

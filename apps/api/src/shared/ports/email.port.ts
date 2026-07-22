@@ -12,6 +12,7 @@ export type EmailTemplates = {
   delete_cancelled: { name: string };
   delete_completed: { name: string };
   change_email: { name: string; newEmail: string; confirmUrl: string };
+  backup_code_used: { securityUrl: string };
 };
 
 export type EmailError =
