@@ -70,7 +70,7 @@ CNIL/RGPD Art. 7 ePrivacy — dual-layer device-scoped. `localStorage` seul est 
 EAA Art. 14 accessibility declaration + GDPR Art. 28 sub-processor disclosure, both mandatory for EU deploys. Static public pages (no auth gate, no backend touched). Contract templates for EU client onboarding. 0 domain events — event count stays at 40.
 
 **Frontend** (`apps/app/src/features/legal/`):
-- `/legal/sub-processors` (`sub-processors.{route,page}.tsx`) — 4 Cards: context, Active sub-processors (shadcn Table: Name/Purpose/Region/DPA), Planned sub-processors (same Table), Change-notice (Art. 28 §2, 30-day advance notice + `dpo@[domain]`). Typed config `SUB_PROCESSORS` in `sub-processors.config.ts` (`SubProcessor { name, purpose, region, category, url?, dpaUrl?, status }`). Active: Resend, Cloudflare R2, BetterAuth OAuth. Planned: Stripe, GrowthBook, Umami.
+- `/legal/sub-processors` (`sub-processors.{route,page}.tsx`) — 4 Cards: context, Active sub-processors (shadcn Table: Name/Purpose/Region/DPA), Planned sub-processors (same Table), Change-notice (Art. 28 §2, 30-day advance notice + `dpo@[domain]`). Typed config `SUB_PROCESSORS` in `apps/app/src/shared/sub-processors.config.ts` (`SubProcessor { name, purpose, region, category, url?, dpaUrl?, status }`). Relocated from `features/legal/` to `shared/` in A.5 (two consumers: legal page + `DataSourcesCard`). Active: Resend, Cloudflare R2, BetterAuth OAuth. Planned: Stripe, GrowthBook, Umami.
 - `/legal/accessibility` (`accessibility.{route,page}.tsx`) — 5 sections (EAA Art. 14): Compliance status (WCAG 2.1 AA / EN 301 549 v3.2.1 target), Known limitations, Technical specifications, Feedback + contact (`accessibility@[domain]`), Enforcement + escalation. Exemplary a11y: single `<h1>`, `<TypographyH2>` section headings, labelled `mailto:`.
 - Linked via `router.tsx` (2 public child routes under `rootRoute`), `command-palette.tsx` (2 `LEGAL_ROUTES` entries), `data-rights.page.tsx` (cross-link cards). Footer links deferred (no global footer yet).
 
@@ -90,7 +90,7 @@ GDPR Art. 16 rectification surface + SOTA-2026 password policy, both wired into 
 **Profile editing** (`features/account/account.page.tsx` — `ProfileCard`):
 - Edit display name (max 80 chars) + email (re-verification via BetterAuth `user.changeEmail`, confirmation sent to the **current** address) + avatar (three-step presign→PUT→confirm via `createUploadMutationOptions`, with client-side `image/*` + 5 MB guard).
 - Pending email change badge visible until the new address is verified.
-- `ChangePasswordCard` — standalone card for password update, below the profile fields. Passkeys/2FA/Sessions/DataExport cards remain unchanged.
+- `ChangePasswordCard` — standalone card for password update, below the profile fields. Passkeys/2FA/RecoveryCodes cards remain on `/settings/account` unchanged. `SessionsCard` + `DataExportCard` relocated to `/settings/privacy` in A.5; `RgpdDeletionCard` remains on `/settings/account` as a contextual danger zone.
 
 **Password baseline (NIST SP 800-63B-4)**:
 - **Min 15 chars** everywhere (`emailAndPassword.minPasswordLength: 15`). No MFA exception — 15 is universal.
@@ -108,7 +108,7 @@ End-to-end authentication on Bun + Hono, no hacks.
 - **Magic link** (passwordless email).
 - **Passkeys** (`@better-auth/passkey`, WebAuthn) — registered & managed from `/settings/account` (`passkeys-card`, `add-passkey-form`).
 - **Two-factor** (TOTP, backup codes) — enable / disable from `/settings/account` (`two-factor-card`, `enable-two-factor-form`, `disable-two-factor-form`). Recovery codes: `RecoveryCodesCard` (regenerate-only, password gate, codes natively formatted `xxxxx-xxxxx` by BetterAuth, copy + download `clean-stack-recovery-codes.txt`). Backup-code fallback on `/two-factor` (input normalization tolerant: whitespace stripped, dash auto-inserted on 10-char input). On-use email via `BackupCodeUsedNotifier` (first `onEvent` handler).
-- **Active sessions** — list & revoke from `/settings/account` (`sessions-card`).
+- **Active sessions** — list & revoke from `/settings/privacy` (`sessions-card`, relocated from `/settings/account` in A.5).
 - **Bearer tokens** alongside cookies — web stays cookie-based (httpOnly, XSS-safe), Capacitor uses bearer.
 - **Session cookie cache** (5 min signature-only check; DB is source of truth at expiry → instant revoke).
 - **Cross-tab sync** via `BroadcastChannel` (`shared/auth/auth-broadcast.ts`) — sign-in / sign-out / verify / 2FA / org change refetch live in every tab.
@@ -167,7 +167,7 @@ Deletion + export cascade built before Billing/Audit so every future feature inh
 - **Public `/legal/data-rights`** — lists what's deleted vs anonymized vs retained per legal basis.
 - **Events** — `user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}` → `compliance` audit trail.
 
-Frontend cards (`features/rgpd/`): `DataExportCard`, `RgpdDeletionCard` (+ preflight blocking list), cancel dialog. See [`HISTORY.md`](./HISTORY.md) for decisions.
+Frontend cards (source: `features/rgpd/`): `DataExportCard` renders in `features/privacy/privacy.page.tsx` (relocated in A.5); `RgpdDeletionCard` (+ preflight blocking list) + cancel dialog render in `features/account/account.page.tsx` as a contextual danger zone (relocated in A.5). See [`HISTORY.md`](./HISTORY.md) for decisions.
 
 ## API — Hono on Bun ✅
 
@@ -379,6 +379,29 @@ Full operator surface for managing webhook endpoints and inspecting deliveries, 
 - **Queries** (`_api/webhooks.queries.ts`): `endpointsQueryOptions`, `endpointDeliveriesQueryOptions` (paginated), `deliveryDetailQueryOptions` (with `attempts[]`).
 - **Mutations** (`_api/webhooks.mutations.ts`): create / update / delete / `rotateSecretMutationOptions` / `sendTestMutationOptions`.
 - Public `/developers/events` page (`developers/developers.{route,page}.tsx`, no auth, under `rootRoute`) — `EventTypesTable` component: all 48 subscribable events with group, retention, description, and expandable JSON schema per event (via `jsonSchemaForEvent` wrapping Zod 4 native `z.toJSONSchema({ unrepresentable: "any" })`). Includes a Node.js signature-verification snippet. Linked from the command palette.
+
+---
+
+## Privacy dashboard ✅ Phase A.5
+
+M3 UX hub consolidating privacy, compliance, and session surfaces into `/settings/privacy`. Pure UI composition — 0 back-end changes, 0 migrations, 0 new events.
+
+**Feature files** (`apps/app/src/features/privacy/`):
+- `privacy.route.tsx` + `privacy.page.tsx` — nested under `_protected`, personal scope (`requiresOrg: false`).
+- `components/policy-acceptance-card.tsx` — reads acceptance status via `policiesQueryOptions` (prefetched in the shell layout); shows accepted version + up-to-date badge. Acceptance history deferred.
+- `components/data-sources-card.tsx` — static list of active `SUB_PROCESSORS` from `apps/app/src/shared/sub-processors.config.ts`.
+
+**Page composition**: `<PolicyAcceptanceCard />` + `<ConsentSettings />` (A.4) + `<DataSourcesCard />` + `<DataExportCard />` (rgpd) + `<SessionsCard />` (security).
+
+**Relocations in A.5**:
+- `<DataExportCard />` + `<SessionsCard />` moved FROM `account.page.tsx` TO `privacy.page.tsx`.
+- `<RgpdDeletionCard />` stays on `account.page.tsx` (contextual danger zone at the bottom).
+- `org-danger-card.tsx` + `transfer-leave-dialog.tsx` moved FROM `features/danger/` TO `features/organization/components/`, rendered at bottom of `organization.page.tsx`. `features/danger/` deleted.
+- `sub-processors.config.ts` moved FROM `features/legal/` TO `apps/app/src/shared/` (two consumers: legal sub-processors page + `DataSourcesCard`).
+
+**Navigation**: Privacy tab added to `SETTINGS_TABS`; Danger entry removed from `SETTINGS_TABS` + command-palette.
+
+0 events. Catalog stays **54 total / 50 subscribable / 4 internal**.
 
 ---
 

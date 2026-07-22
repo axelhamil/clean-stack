@@ -36,6 +36,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Observability — Sentry** (0.4) (Sentry api+app removable, `IInstrumentation` port + NoOp default, RGPD scrubbing, source maps CI, release tracking — OTel + Prometheus deferred to D.1) | **€2 500 – €4 000** | 5-6j |
 | **Profile + NIST 800-63B-4 password** (A.1) (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15 universal — no MFA exception, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
 | **Privacy policy / Terms versioning** (A.2) (DB schema, `@packages/policies` version SSOT, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
+| **Privacy dashboard** (A.5) (`/settings/privacy` UX hub: `<PolicyAcceptanceCard />` + `<ConsentSettings />` + `<DataSourcesCard />` + `<DataExportCard />` + `<SessionsCard />`. Danger tab dissolved; contextual danger zones (account + organization pages). `sub-processors.config.ts` promoted to `shared/`. 0 events.) | **€600 – €1 000** | 1-2j |
 | **Billing — Stripe subscriptions + feature/seat gating** (B.1) (`@better-auth/stripe`, Checkout + Billing Portal hosted, subscription SSOT in plugin table, hybrid catalog Stripe+code via `ENTITLEMENTS`, 3 gate axes: role/seat/tier, `useEntitlements()` + `<FeatureGate>` + `<PlanGate>`, 4 compliance/operational events, free-tier degradation when key unset) | **€3 600 – €6 000** | 7-10j |
 | **Quota gating** (B.2) (dormant skeleton extending B.1: `ENTITLEMENTS[tier].quotas` catalog, `requireQuota` pre-check + `reserveQuota` advisory-lock atomic gate + `countScopedRows`, `quota_usage` table + `modules/quotas/` `IQuotaUsageStore`, `useQuota()` + `<QuotaGate>`, `billing.quota.exceeded` event, knip-whitelisted) | **€800 – €1 200** | 1-2j |
 
@@ -49,7 +50,6 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 |---|---|---|---|
 | A.3 | **Compliance docs bundle** (sub-processor disclosure, accessibility statement EAA, DPA template, DORA annex template) | **€400 – €800** | 1j |
 | A.4 | **Cookie consent + consent management** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped `consent_record` — infra, not DDD) | **€1 200 – €2 000** | 2-3j |
-| A.5 | **Privacy dashboard** (`/settings/privacy` aggregating consent + last export + sessions + data sources + acceptance history) | **€600 – €1 000** | 1-2j |
 | A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain, WCAG 2.1 AA gate ≥95) | **€1 200 – €2 000** | 3j |
 | C.1 | **Security perimeter** (sliding-window rate-limit per IP/user, captcha on auth-burst, strict CSP with nonce, CSRF on non-BetterAuth POST routes) | **€1 200 – €2 000** | 3j |
 | C.2 | **Audit log front UI** (page `/admin/audit-log` avec filtres + diff metadata expand, API déjà shipped) | **€500 – €1 000** | 1-2j |

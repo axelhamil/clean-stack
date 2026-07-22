@@ -257,7 +257,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **52 events** (48 subscribable + 4 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
+The boilerplate emits **54 events** (50 subscribable + 4 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -372,7 +372,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (52 events: 48 subscribable + 4 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (54 events: 50 subscribable + 4 internal) |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |

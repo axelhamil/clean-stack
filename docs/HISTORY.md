@@ -914,3 +914,32 @@ Gated `webhooks: ["read"]` (list, deliveries, detail) / `webhooks: ["write"]` (c
 4. **`formatBackupCode` removed**: BetterAuth's `generateBackupCodesFn` already returns codes pre-formatted as `xxxxx-xxxxx`; a client-side re-formatter was redundant and produced double-dashes on every real code (`abcde-fghij` became `abcde--fghij`). `BackupCodeList` now renders codes as-is.
 
 5. **Input tolerance: whitespace stripped, dash auto-inserted on 10-char input**: server comparison is exact (verified in BetterAuth source: `verifyBackupCode` does `codes.includes(data.code)`), so the canonical dashed form must reach the API. The schema transform handles three input shapes: code pasted with dash (pass-through after whitespace strip), code typed without dash (dash re-inserted on exact 10-alphanum match), anything else (passed as-is, fails server-side if wrong).
+
+---
+
+## Privacy dashboard ✅ Phase A.5 · Jul 2026
+
+**Why**: M3 hub consolidating the privacy/compliance surfaces that were scattered across `/settings/account` (RGPD export + sessions) and missing (policy acceptance status, sub-processor list). Users and auditors want one place to see and exercise all data rights. Refactor-only — composes A.2 (policy acceptance), A.3 (sub-processors), A.4 (consent), RGPD core (export + deletion), and security (sessions).
+
+- [x] **`apps/app/src/features/privacy/`** — `privacy.route.tsx` + `privacy.page.tsx` + `components/policy-acceptance-card.tsx` (new — acceptance status via `policiesQueryOptions`, already prefetched in the shell layout; shows accepted version + up-to-date badge) + `components/data-sources-card.tsx` (new — static list of active `SUB_PROCESSORS` from `shared/sub-processors.config.ts`).
+- [x] **Page composition**: `<PolicyAcceptanceCard />` + `<ConsentSettings />` (A.4) + `<DataSourcesCard />` + `<DataExportCard />` (rgpd, relocated) + `<SessionsCard />` (security, relocated from account). Source files stay in `features/rgpd/` and `features/security/`; only render location changed.
+- [x] **`<RgpdDeletionCard />`** relocated to bottom of `apps/app/src/features/account/account.page.tsx` (contextual danger zone with `<Link to="/legal/data-rights">`). Deviation from the original ROADMAP spec which placed it on the Privacy page.
+- [x] **`<SessionsCard />` + `<DataExportCard />`** removed from `account.page.tsx` (now on Privacy). Passkeys/2FA/RecoveryCodes cards remain on Account unchanged.
+- [x] **Danger tab dissolved** (`apps/app/src/features/danger/` deleted). `org-danger-card.tsx` + `transfer-leave-dialog.tsx` moved to `apps/app/src/features/organization/components/`, rendered at bottom of `organization.page.tsx`. The personal-org branch of `OrgDangerCard` (which previously pointed users to "delete your account below") was rewritten to a `<Link to="/settings/account">` since delete-account is now a contextual danger zone on the Account page.
+- [x] **`sub-processors.config.ts` promoted to `apps/app/src/shared/`** (relocated from `features/legal/`). Two route-owning features (`features/legal/` and `features/privacy/`) cannot import from each other per import-direction rule; the 2-consumer config belongs in `shared/`.
+- [x] **`SETTINGS_TABS`** — Privacy tab added (`requiresOrg: false`, personal scope); Danger entry removed from `SETTINGS_TABS` + command-palette.
+- [x] 0 new domain events. Catalog stays **54 total / 50 subscribable / 4 internal**. Pure UI composition, 0 back-end changes, 0 migrations.
+
+### Decisions (A.5)
+
+1. **GitHub-style contextual danger zones**: no separate Danger tab. Delete-account lives at the bottom of the Account page; org leave/delete at the bottom of the Organization page. SOTA convention (GitHub/Linear/Vercel put destructive actions in a contextual danger zone per page, not a dedicated tab). The org-personal branch of `OrgDangerCard` (which pointed to "delete your account below") was rewritten to a `<Link to="/settings/account">` since delete-account is now on the Account page.
+
+2. **`PolicyAcceptanceCard` = status only**: shows accepted version + up-to-date badge, driven by the existing `policiesQueryOptions` (already prefetched in the shell layout). Dated/IP acceptance history deferred — the `policy_acceptance` table has the data but it is not exposed front-side; avoided a new back-end route.
+
+3. **Direct RGPD download link dropped**: the presigned R2 export key is discarded after the email is sent, so exposing a direct link would have required a new user column + route + on-demand presign. Export stays email-only; "refactor-only" preserved.
+
+4. **`DataSourcesCard` = static list of active `SUB_PROCESSORS`**: no per-user "last-sync timestamp" (no substrate — it is config, not per-user sync state).
+
+5. **`sub-processors.config.ts` promoted to `shared/`**: `features/legal/` and `features/privacy/` are both route-owning features and cannot import from each other (import-direction rule) → the 2-consumer config belongs in `shared/`.
+
+6. **ROADMAP deviation acknowledged**: the ROADMAP placed `<RgpdDeletionCard />` in Privacy; it shipped in Account (danger zone) instead. Contextual danger zones are the SOTA convention and the better UX — the deviation is intentional.
