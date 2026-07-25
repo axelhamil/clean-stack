@@ -13,7 +13,7 @@ export class TransactionService implements IUnitOfWork<Transaction> {
   public async run<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
     if (EventCollector.hasContext()) {
       throw new Error(
-        "nested IUnitOfWork.run() is not supported — Drizzle nested transactions are independent (not savepoints), causing event/aggregate atomicity loss. Refactor to a single outer run().",
+        "nested IUnitOfWork.run() is not supported — run() always opens from `db`, never from the parent tx, so a nested call takes a separate pool connection and commits independently. Threading the parent tx (a real Drizzle savepoint) would not fix it either: `rollback to savepoint` cannot un-collect the in-memory EventCollector buffer, so rolled-back writes would still emit events. Refactor to a single outer run().",
       );
     }
     return db.transaction((tx) =>
