@@ -76,6 +76,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 - **C.4** API tokens / PATs — `/settings/tokens`, scoped + expirable, sha256 + per-row salt, `clean_<base58url-32>` prefix for GitHub secret-scanner. Unblocks D.2 + F.1.
 - **D.2** OpenAPI auto-docs (`@hono/zod-openapi` + Scalar UI at `/api/docs`) — after PATs ship (customers integrate).
 - **D.3** In-app notification center — `<Bell />` + `/settings/notifications`. Handler = 1-line `onEvent(...)` via event-driven foundation.
+- **D.5** Email delivery — Resend audit + batch sending (`resend.batch.send`, 100 emails = 1 request against the rate limit). Today `sendTemplate` is 1 email = 1 HTTP call; any fan-out (D.3 digests, org announcement) serializes into 429s. Provider facts to verify before coding are listed in the full spec.
 
 ### M5 — Lock in quality + compliance (gates over a now-complete surface — written once)
 
@@ -406,6 +407,33 @@ modules/consents/
 - [ ] `/settings/notifications` — preferences per category (security / billing / mentions / digests), per channel (email vs in-app vs both).
 - [ ] Domain event handler pattern: `OrganizationInvitationSent → InAppNotificationHandler` writes a notification row + dispatches WS-style refetch on the recipient's bell query.
 - [ ] Out of scope: native push (mobile / browser). Phase F.
+
+---
+
+## Email delivery — Resend audit + batch sending — **Phase D.5**
+
+**Why**: `ResendEmailService.sendTemplate` is 1 email = 1 HTTP call + up to 3 retries. The moment a fan-out exists (D.3 digests, org-wide announcement, invitation re-send, incident notice), N recipients = N calls against a per-team rate limit — the loop trips 429 and the exponential backoff turns a 500-recipient send into minutes of serialized I/O. `resend.batch.send()` ships up to 100 emails as **one** request against that same limit.
+
+**Verify first** — provider facts to re-check against the live dashboard/docs before writing code (SDK pinned `resend@6.12.2`):
+
+- [ ] **Rate limit** — docs quote both "5 req/s per team" and "default 2 req/s". Confirm the account's real ceiling and whether rate-limit response headers are exposed (client-side throttling needs them).
+- [ ] **Caps** — 100 emails per batch request, 50 recipients per individual email. Drives the chunk size constant.
+- [ ] **Atomicity** — a single entry failing validation fails the *whole* batch. Decides chunking granularity + partial-failure strategy.
+- [ ] **Not supported in batch** — `attachments` and `scheduled_at`. Anything needing either stays on the single-send path.
+- [ ] **Templates ARE supported** on `/emails/batch` (`template: { id, variables }`, per-entry variables) — the `TEMPLATE_IDS` design carries over unchanged. Confirm, it's the load-bearing assumption.
+- [ ] **`Idempotency-Key` is batch-level** (256 chars, 24 h TTL) — one key per batch, not per recipient. Decide the key shape (`<outbox-event-id>/<chunk-index>`), since today's keys are per-email.
+- [ ] **Broadcasts / Audiences vs batch** — broadcasts are marketing-list-scoped with unsubscribe management built in; batch is transactional. Settles which one the cross-cutting one-click unsubscribe (RFC 8058) item hangs off.
+- [ ] **Bounces / suppression** — whether hard-bounced addresses are filtered provider-side or need a local pre-filter. Decides if an `email_suppression` table is required before any bulk send.
+
+**Then implement**:
+
+- [ ] `IEmailService.sendTemplateBatch(template, recipients: Array<{ to, variables }>, options?)` — port method, same `Result<_, EmailError>` envelope. Chunks to the verified cap, one `resend.batch.send()` per chunk.
+- [ ] **Retry semantics differ from the single path**: a 429 on chunk 3 must not replay chunks 1–2. Retry the failing chunk only — the batch idempotency key makes a replayed chunk safe.
+- [ ] **Partial failure returns per-recipient outcomes**, not a bare `Result.fail` — one bad address in 500 must not silently drop 499 deliveries.
+- [ ] §8 instrumentation: outer span `ResendEmailService > sendTemplateBatch`, inner `POST https://api.resend.com/emails/batch` **per chunk** (one span per HTTP call, never per recipient).
+- [ ] Dev fallback identical to the single path: no `RESEND_API_KEY` / missing template ID → log the N recipients + links, `Result.ok()`.
+
+**First consumer**: D.3 notification center (email-channel digests). Ships with D.3 rather than dormant — an unused batch path can't be validated against the real caps.
 
 ---
 
