@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type { EmailMessageInsert } from "../ports/email-queue.port";
 import { QueuedEmailService } from "../services/email.service";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
@@ -29,7 +29,7 @@ describe("QueuedEmailService", () => {
     expect(result.isSuccess).toBe(true);
     expect(queue.rows).toHaveLength(1);
     expect(queue.rows[0]?.kind).toBe("template");
-    expect(queue.rows[0]?.template).toBe("verify_email");
+    expect(queue.rows[0]?.template).toEqual(Option.some("verify_email"));
     expect(queue.rows[0]?.subject.length).toBeGreaterThan(0);
   });
 
@@ -42,7 +42,7 @@ describe("QueuedEmailService", () => {
     });
     expect(result.isSuccess).toBe(true);
     expect(queue.rows[0]?.kind).toBe("raw");
-    expect(queue.rows[0]?.template).toBeNull();
+    expect(queue.rows[0]?.template.isNone()).toBe(true);
     expect(queue.rows[0]?.subject).toBe("Deploy done");
   });
 

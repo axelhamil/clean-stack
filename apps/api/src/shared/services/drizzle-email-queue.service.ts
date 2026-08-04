@@ -1,4 +1,4 @@
-import { Result, uuidv7 } from "@packages/ddd-kit";
+import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import { and, db, emailSchema, eq, inArray, isNull, lte, or, sql } from "@packages/drizzle";
 import type {
   EmailMessageInsert,
@@ -23,14 +23,14 @@ export class DrizzleEmailQueue implements IEmailQueue {
         const values = rows.map((r) => ({
           id: uuidv7(),
           kind: r.kind,
-          template: r.template,
+          template: r.template.isSome() ? r.template.unwrap() : null,
           toAddress: r.toAddress,
           subject: r.subject,
           payload: r.payload,
           status: "pending" as const,
           attempts: 0,
           nextAttemptAt: null,
-          idempotencyKey: r.idempotencyKey,
+          idempotencyKey: r.idempotencyKey.isSome() ? r.idempotencyKey.unwrap() : null,
         }));
         const query = exec.insert(emailSchema.emailMessage).values(values);
         await this.instrumentation.startSpan(
@@ -89,7 +89,15 @@ export class DrizzleEmailQueue implements IEmailQueue {
             },
             () => query.execute(),
           );
-          return Result.ok<EmailMessageRecord[], EmailQueueError>(rows as EmailMessageRecord[]);
+          return Result.ok<EmailMessageRecord[], EmailQueueError>(
+            rows.map((r) => ({
+              ...r,
+              template: Option.fromNullable(r.template),
+              nextAttemptAt: Option.fromNullable(r.nextAttemptAt),
+              lastError: Option.fromNullable(r.lastError),
+              idempotencyKey: Option.fromNullable(r.idempotencyKey),
+            })),
+          );
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail({
@@ -138,7 +146,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
   async markFailed(
     id: string,
     error: string,
-    nextAttempt: Date | null,
+    nextAttempt: Option<Date>,
     tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markFailed" }, async () => {
@@ -147,8 +155,8 @@ export class DrizzleEmailQueue implements IEmailQueue {
         const query = tx
           .update(em)
           .set({
-            status: nextAttempt === null ? "failed" : "pending",
-            nextAttemptAt: nextAttempt,
+            status: nextAttempt.isNone() ? "failed" : "pending",
+            nextAttemptAt: nextAttempt.isSome() ? nextAttempt.unwrap() : null,
             lastError: error.slice(0, 2000),
             attempts: sql`${em.attempts} + 1`,
           })

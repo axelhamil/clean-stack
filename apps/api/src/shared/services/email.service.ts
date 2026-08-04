@@ -1,4 +1,4 @@
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import type {
   EmailBody,
@@ -44,11 +44,13 @@ export class QueuedEmailService implements IEmailService {
           const rendered = await renderTemplate(template as EmailTemplateKey, r.variables as never);
           rows.push({
             kind: "template",
-            template: String(template),
+            template: Option.some(String(template)),
             toAddress: r.to,
             subject: rendered.subject,
             payload: r.variables,
-            idempotencyKey: options?.idempotencyKey ? `${options.idempotencyKey}/${index}` : null,
+            idempotencyKey: options?.idempotencyKey
+              ? Option.some(`${options.idempotencyKey}/${index}`)
+              : Option.none(),
           });
         }
         return this.enqueue(rows, options?.tx);
@@ -76,11 +78,13 @@ export class QueuedEmailService implements IEmailService {
       async () => {
         const rows: EmailMessageInsert[] = messages.map((m, index) => ({
           kind: "raw" as const,
-          template: null,
+          template: Option.none(),
           toAddress: m.to,
           subject: m.subject,
           payload: m.body,
-          idempotencyKey: options?.idempotencyKey ? `${options.idempotencyKey}/${index}` : null,
+          idempotencyKey: options?.idempotencyKey
+            ? Option.some(`${options.idempotencyKey}/${index}`)
+            : Option.none(),
         }));
         return this.enqueue(rows, options?.tx);
       },

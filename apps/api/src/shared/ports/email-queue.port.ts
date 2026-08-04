@@ -1,4 +1,4 @@
-import type { Result } from "@packages/ddd-kit";
+import type { Option, Result } from "@packages/ddd-kit";
 import type { ITransaction } from "../transaction";
 
 export type EmailMessageKind = "template" | "raw";
@@ -6,25 +6,25 @@ export type EmailMessageStatus = "pending" | "sent" | "failed";
 
 export interface EmailMessageInsert {
   kind: EmailMessageKind;
-  template: string | null;
+  template: Option<string>;
   toAddress: string;
   subject: string;
   payload: unknown;
-  idempotencyKey: string | null;
+  idempotencyKey: Option<string>;
 }
 
 export interface EmailMessageRecord {
   id: string;
   kind: EmailMessageKind;
-  template: string | null;
+  template: Option<string>;
   toAddress: string;
   subject: string;
   payload: unknown;
   status: EmailMessageStatus;
   attempts: number;
-  nextAttemptAt: Date | null;
-  lastError: string | null;
-  idempotencyKey: string | null;
+  nextAttemptAt: Option<Date>;
+  lastError: Option<string>;
+  idempotencyKey: Option<string>;
   createdAt: Date;
 }
 
@@ -46,7 +46,7 @@ export interface IEmailQueue {
   markFailed(
     id: string,
     error: string,
-    nextAttemptAt: Date | null,
+    nextAttemptAt: Option<Date>,
     tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>>;
 }

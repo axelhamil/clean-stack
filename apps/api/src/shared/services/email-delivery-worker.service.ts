@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
@@ -117,8 +118,8 @@ export class EmailDeliveryWorker {
 
   private async sendChunk(chunk: EmailMessageRecord[]): Promise<void> {
     const entries = await Promise.all(chunk.map((r) => this.toEntry(r)));
-    const key = chunkIdempotencyKey(chunk);
-    const result = await this.sender.batchSend(entries, key);
+    const keyOpt = chunkIdempotencyKey(chunk);
+    const result = await this.sender.batchSend(entries, keyOpt.isSome() ? keyOpt.unwrap() : null);
 
     if (result.error !== null) {
       const status = result.error.statusCode ?? 500;
@@ -153,19 +154,19 @@ export class EmailDeliveryWorker {
   }
 
   private async fail(rowRecord: EmailMessageRecord, error: string): Promise<void> {
-    return this.settle(rowRecord, error, null);
+    return this.settle(rowRecord, error, Option.none());
   }
 
   private async reschedule(rowRecord: EmailMessageRecord, error: string): Promise<void> {
     const attempts = rowRecord.attempts + 1;
     const { date } = nextAttemptAt(attempts, expectedDelayFromAttempts(attempts));
-    return this.settle(rowRecord, error, date);
+    return this.settle(rowRecord, error, Option.fromNullable(date));
   }
 
   private async settle(
     rowRecord: EmailMessageRecord,
     error: string,
-    date: Date | null,
+    date: Option<Date>,
   ): Promise<void> {
     const attempts = rowRecord.attempts + 1;
     await db.transaction(async (tx) => {
@@ -174,7 +175,7 @@ export class EmailDeliveryWorker {
         this.logger.error({ err: marked.getError(), messageId: rowRecord.id }, "markFailed failed");
         return;
       }
-      if (date !== null) return;
+      if (date.isSome()) return;
       await emitEvent(
         this.outbox,
         EventTypes.EMAIL_DELIVERY_EXHAUSTED,
@@ -182,7 +183,7 @@ export class EmailDeliveryWorker {
         rowRecord.id,
         {
           messageId: rowRecord.id,
-          template: rowRecord.template,
+          template: rowRecord.template.isSome() ? rowRecord.template.unwrap() : null,
           toHash: await sha256Hex(rowRecord.toAddress),
           attempts,
           lastError: error,
@@ -202,7 +203,8 @@ export class EmailDeliveryWorker {
       return { ...base, html: body.html ?? "", text: body.text };
     }
 
-    const templateId = rowRecord.template ? TEMPLATE_IDS[rowRecord.template] : "";
+    const templateName = rowRecord.template.isSome() ? rowRecord.template.unwrap() : null;
+    const templateId = templateName ? TEMPLATE_IDS[templateName] : "";
     if (templateId) {
       return {
         ...base,
@@ -211,23 +213,26 @@ export class EmailDeliveryWorker {
     }
 
     const rendered = await renderTemplate(
-      rowRecord.template as EmailTemplateKey,
+      templateName as EmailTemplateKey,
       rowRecord.payload as never,
     );
     return { ...base, html: rendered.html, text: rendered.text };
   }
 }
 
-export function chunkIdempotencyKey(chunk: EmailMessageRecord[]): string | null {
-  const explicit = chunk.map((r) => r.idempotencyKey).filter((k): k is string => k !== null);
-  if (explicit.length !== chunk.length) return null;
-  return explicit.sort().join("|").slice(0, 256);
+export function chunkIdempotencyKey(chunk: EmailMessageRecord[]): Option<string> {
+  const explicit = chunk
+    .map((r) => r.idempotencyKey)
+    .filter((k) => k.isSome())
+    .map((k) => k.unwrap());
+  if (explicit.length !== chunk.length) return Option.none();
+  return Option.some(explicit.sort().join("|").slice(0, 256));
 }
 
 export function groupRows(rows: EmailMessageRecord[]): EmailMessageRecord[][] {
   const groups = new Map<string, EmailMessageRecord[]>();
   for (const r of rows) {
-    const key = `${r.kind}:${r.template ?? ""}`;
+    const key = `${r.kind}:${r.template.isSome() ? r.template.unwrap() : ""}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(r);
     else groups.set(key, [r]);

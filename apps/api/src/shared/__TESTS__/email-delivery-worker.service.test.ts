@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
 
 mock.module("@packages/drizzle", () => ({
@@ -73,22 +73,22 @@ const { NoOpInstrumentation } = await import("../services/noop-instrumentation")
 const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
   id: "1",
   kind: "template",
-  template: "delete_completed",
+  template: Option.some("delete_completed"),
   toAddress: "a@x.test",
   subject: "s",
   payload: { name: "Ada" },
   status: "pending",
   attempts: 0,
-  nextAttemptAt: null,
-  lastError: null,
-  idempotencyKey: null,
+  nextAttemptAt: Option.none<Date>(),
+  lastError: Option.none<string>(),
+  idempotencyKey: Option.none<string>(),
   createdAt: new Date("2026-08-04T00:00:00Z"),
   ...over,
 });
 
 function harness(rows: EmailMessageRecord[]) {
   const sent: string[][] = [];
-  const settled: Array<{ id: string; error: string; nextAttemptAt: Date | null }> = [];
+  const settled: Array<{ id: string; error: string; nextAttemptAt: Option<Date> }> = [];
   let batchImpl: (payload: unknown[]) => Promise<{
     data: Array<{ id: string }> | null;
     errors?: Array<{ index: number; message: string }>;
@@ -104,7 +104,7 @@ function harness(rows: EmailMessageRecord[]) {
       sentProviderIds.push(providerIds);
       return Result.ok<void, never>(undefined);
     },
-    markFailed: async (id: string, error: string, nextAttemptAt: Date | null) => {
+    markFailed: async (id: string, error: string, nextAttemptAt: Option<Date>) => {
       settled.push({ id, error, nextAttemptAt });
       return Result.ok<void, never>(undefined);
     },
@@ -139,7 +139,7 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     const h = harness([
       row({ id: "1" }),
       row({ id: "2" }),
-      row({ id: "3", template: "delete_cancelled" }),
+      row({ id: "3", template: Option.some("delete_cancelled") }),
     ]);
     const requests: unknown[][] = [];
     h.setBatch(async (p) => {
@@ -182,7 +182,7 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     expect(calls).toBe(1);
     expect(h.sent.flat()).toEqual(["1"]);
     expect(h.settled.map((s) => s.id)).toEqual(["2"]);
-    expect(h.settled[0]?.nextAttemptAt).toBeNull();
+    expect(h.settled[0]?.nextAttemptAt.isNone()).toBe(true);
   });
 
   it("does not attach provider ids when data is not positionally aligned", async () => {
@@ -205,7 +205,7 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     expect(h.sent.flat()).toEqual([]);
     expect(h.settled.map((s) => s.id).sort()).toEqual(["1", "2"]);
     for (const s of h.settled) {
-      expect(s.nextAttemptAt).toBeInstanceOf(Date);
+      expect(s.nextAttemptAt.isSome()).toBe(true);
     }
   });
 });

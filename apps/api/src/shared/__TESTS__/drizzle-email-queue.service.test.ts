@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 
 const inserted: unknown[] = [];
 const execCalls: string[] = [];
@@ -84,11 +85,11 @@ describe("DrizzleEmailQueue.enqueue", () => {
     const result = await queue.enqueue([
       {
         kind: "template",
-        template: "verify_email",
+        template: Option.some("verify_email"),
         toAddress: "a@x.test",
         subject: "s",
         payload: {},
-        idempotencyKey: null,
+        idempotencyKey: Option.none(),
       },
     ]);
     expect(result.isSuccess).toBe(true);
@@ -110,11 +111,11 @@ describe("DrizzleEmailQueue.enqueue", () => {
       [
         {
           kind: "raw",
-          template: null,
+          template: Option.none(),
           toAddress: "a@x.test",
           subject: "s",
           payload: {},
-          idempotencyKey: null,
+          idempotencyKey: Option.none(),
         },
       ],
       tx as never,
