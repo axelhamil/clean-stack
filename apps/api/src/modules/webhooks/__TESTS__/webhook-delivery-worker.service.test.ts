@@ -601,8 +601,8 @@ describe("WebhookDeliveryWorker", () => {
     await runDrain(worker);
 
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt0 = fakeDeliveries.createAttempts[0]!;
-    expect(attempt0).toBeDefined();
+    const [attempt0] = fakeDeliveries.createAttempts;
+    if (!attempt0) throw new Error("expected one delivery attempt");
     expect(attempt0.responseBody.isSome()).toBe(true);
     expect(attempt0.responseBody.unwrap().length).toBeLessThanOrEqual(4096);
   });
@@ -627,8 +627,8 @@ describe("WebhookDeliveryWorker", () => {
     await runDrain(worker);
 
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt = fakeDeliveries.createAttempts[0]!;
-    expect(attempt).toBeDefined();
+    const [attempt] = fakeDeliveries.createAttempts;
+    if (!attempt) throw new Error("expected one delivery attempt");
     expect(attempt.responseStatus.isNone()).toBe(true);
     expect(attempt.error.isSome()).toBe(true);
   });
@@ -649,8 +649,8 @@ describe("WebhookDeliveryWorker", () => {
     await runDrain(worker);
 
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt = fakeDeliveries.createAttempts[0]!;
-    expect(attempt).toBeDefined();
+    const [attempt] = fakeDeliveries.createAttempts;
+    if (!attempt) throw new Error("expected one delivery attempt");
     expect(attempt.responseStatus.isNone()).toBe(true);
     expect(attempt.responseHeaders.isNone()).toBe(true);
     expect(attempt.responseBody.isNone()).toBe(true);
