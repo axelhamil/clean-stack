@@ -99,7 +99,47 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
 function makeEmail(): IEmailService {
   return {
     sendTemplate: mock(async () => Result.ok<void, RgpdError>()),
+    sendTemplateBatch: mock(async () => Result.ok<void, RgpdError>()),
+    sendRaw: mock(async () => Result.ok<void, RgpdError>()),
+    sendRawBatch: mock(async () => Result.ok<void, RgpdError>()),
   } as unknown as IEmailService;
+}
+
+function makeService(opts: {
+  email?: IEmailService;
+  readyForWipe?: string[];
+  wipeFails?: boolean;
+}): RgpdService {
+  const rows: PendingDeletionRow[] = (opts.readyForWipe ?? []).map((userId) => ({
+    userId,
+    email: `${userId}@example.com`,
+    pendingDeletionUntil: new Date(Date.now() - 1000),
+  }));
+  const repo = makeRepo({
+    findUsersReadyForWipe: mock(async () => Result.ok<PendingDeletionRow[], RgpdError>(rows)),
+    getUserDeletionState: opts.wipeFails
+      ? mock(async () => Result.ok<Option<UserDeletionState>, RgpdError>(Option.none()))
+      : mock(async (userId: string) =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(
+            Option.some({
+              email: `${userId}@example.com`,
+              name: "User",
+              twoFactorEnabled: false,
+              pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
+              deletedAt: Option.none(),
+              lastExportRequestedAt: Option.none(),
+            }),
+          ),
+        ),
+  });
+  return new RgpdService(
+    repo,
+    makeStorage(),
+    opts.email ?? makeEmail(),
+    tx,
+    noopOutbox,
+    new NoOpInstrumentation(),
+  );
 }
 
 describe("RgpdService", () => {
@@ -376,13 +416,8 @@ describe("RgpdService", () => {
       expect(repo.executeWipe).toHaveBeenCalled();
       expect(storage.listObjectKeys).toHaveBeenCalledWith("u1/");
       expect(storage.deleteObjects).toHaveBeenCalledWith(["u1/uploads/a", "u1/exports/b"]);
-      expect(email.sendTemplate).toHaveBeenCalledWith(
-        "delete_completed",
-        "u@example.com",
-        expect.objectContaining({ name: "User" }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
-      );
       expect(result.getValue().storageKeysDeleted).toBe(2);
+      expect(result.getValue().notify).toEqual({ to: "u@example.com", name: "User" });
     });
 
     it("emits ORG_DELETED for every organization destroyed in the wipe (RGPD audit completeness)", async () => {
@@ -635,6 +670,43 @@ describe("RgpdService", () => {
       expect(output.succeeded).toContain("u1");
       expect(output.succeeded).toContain("u3");
       expect(output.failed.some((f) => f.userId === "u2")).toBe(true);
+    });
+
+    it("sends one batch for all successfully wiped accounts instead of one email each", async () => {
+      const batches: Array<{ template: string; count: number }> = [];
+      const email = {
+        sendTemplate: async () => Result.ok<void, never>(undefined),
+        sendTemplateBatch: async (template: string, recipients: unknown[]) => {
+          batches.push({ template, count: recipients.length });
+          return Result.ok<void, never>(undefined);
+        },
+        sendRaw: async () => Result.ok<void, never>(undefined),
+        sendRawBatch: async () => Result.ok<void, never>(undefined),
+      };
+      const service = makeService({ email, readyForWipe: ["u1", "u2", "u3"] });
+
+      const result = await service.processPendingDeletions({ batchSize: 50 });
+
+      expect(result.getValue().succeeded).toHaveLength(3);
+      expect(batches).toEqual([{ template: "delete_completed", count: 3 }]);
+    });
+
+    it("does not send anything when every wipe fails", async () => {
+      const batches: unknown[] = [];
+      const email = {
+        sendTemplate: async () => Result.ok<void, never>(undefined),
+        sendTemplateBatch: async () => {
+          batches.push(1);
+          return Result.ok<void, never>(undefined);
+        },
+        sendRaw: async () => Result.ok<void, never>(undefined),
+        sendRawBatch: async () => Result.ok<void, never>(undefined),
+      };
+      const service = makeService({ email, readyForWipe: ["u1"], wipeFails: true });
+
+      await service.processPendingDeletions({ batchSize: 50 });
+
+      expect(batches).toHaveLength(0);
     });
 
     it("records ACCOUNT_WIPE_PROVIDER_FAILURE when the wipe transaction throws", async () => {

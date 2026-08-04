@@ -46,6 +46,7 @@ export interface ExecuteAccountWipeInput {
 export interface ExecuteAccountWipeOutput {
   deletedOrgIds: string[];
   storageKeysDeleted: number;
+  notify: { to: string; name: string } | null;
 }
 
 export interface ProcessPendingDeletionsInput {
@@ -260,7 +261,7 @@ export class RgpdService {
 
         const state = stateOpt.unwrap();
         if (state.deletedAt.isSome())
-          return Result.ok({ deletedOrgIds: [], storageKeysDeleted: 0 });
+          return Result.ok({ deletedOrgIds: [], storageKeysDeleted: 0, notify: null });
 
         if (state.pendingDeletionUntil.isNone() || state.pendingDeletionUntil.unwrap() > new Date())
           return Result.fail({
@@ -336,21 +337,10 @@ export class RgpdService {
           );
         }
 
-        const sent = await this.email.sendTemplate(
-          "delete_completed",
-          originalEmail,
-          { name: originalName },
-          { idempotencyKey: `delete-completed/${input.userId}` },
-        );
-        if (sent.isFailure)
-          logger.warn(
-            { userId: input.userId, code: sent.getError().code },
-            "wipe completed but final notification email failed",
-          );
-
         return Result.ok({
           deletedOrgIds: wipeOutput.deletedOrgIds ?? [],
           storageKeysDeleted: keysDeleted,
+          notify: { to: originalEmail, name: originalName },
         });
       },
     );
@@ -388,12 +378,15 @@ export class RgpdService {
 
         const succeeded: string[] = [];
         const failed: Array<{ userId: string; errorCode: string }> = [];
+        const recipients: Array<{ to: string; variables: { name: string } }> = [];
 
         for (const row of batch) {
           try {
             const res = await this.executeAccountWipe({ userId: row.userId });
             if (res.isSuccess) {
               succeeded.push(row.userId);
+              const notify = res.getValue().notify;
+              if (notify) recipients.push({ to: notify.to, variables: { name: notify.name } });
             } else {
               failed.push({ userId: row.userId, errorCode: res.getError().code });
             }
@@ -405,6 +398,15 @@ export class RgpdService {
               "wipe threw uncaught error — Result contract violated",
             );
           }
+        }
+
+        if (recipients.length > 0) {
+          const sent = await this.email.sendTemplateBatch("delete_completed", recipients);
+          if (sent.isFailure)
+            logger.warn(
+              { code: sent.getError().code, count: recipients.length },
+              "wipe sweep completed but final notification batch failed",
+            );
         }
 
         if (succeeded.length > 0)
