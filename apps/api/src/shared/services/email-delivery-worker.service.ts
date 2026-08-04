@@ -9,6 +9,7 @@ import type { Logger } from "../logger";
 import type { EmailMessageRecord, IEmailQueue } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import type { ITransaction } from "../transaction";
 
 export const EMAIL_BATCH_CHUNK_SIZE = 100;
 const POLL_INTERVAL_MS = 2_000;
@@ -188,7 +189,7 @@ export class EmailDeliveryWorker {
           actorUserId: null,
         },
         {},
-        tx as never,
+        tx as ITransaction,
       );
     });
   }

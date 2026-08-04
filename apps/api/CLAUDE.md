@@ -137,7 +137,7 @@ See `docs/EVENTS.md` for full spec, retention matrix, and cron recipe.
 
 **Rules**:
 - **Never call Resend directly from a request path.** Use `di.IEmailService.sendTemplate(...)` or `di.IEmailService.sendTemplateBatch(...)`.
-- **Pass `options.tx` when a transactional guarantee is needed** — e.g. the account-deletion sweep passes the write TX so the notification is enqueued atomically with the wipe.
+- **Every send today is enqueued after its transaction commits and is best-effort** — failure logs at `warn`, never rolls back the caller. `options.tx` exists so a future flow that needs the enqueue to be atomic with its own write can pass its transaction; there is no such caller yet.
 - **`@packages/emails` is the template SSOT.** `TEMPLATE_IDS` in the worker is an override; an empty string means render the in-repo React Email template. Add new templates to both the package and the `EmailTemplates` port type.
 - **Retry via decorrelated jitter** (`shared/jitter.ts`). No `retry-after` parsing — the Resend SDK does not expose response headers. Exhausted messages emit `email.delivery.exhausted` (internal, operational).
 

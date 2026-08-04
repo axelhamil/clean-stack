@@ -16,9 +16,9 @@ export class DrizzleEmailQueue implements IEmailQueue {
     rows: EmailMessageInsert[],
     tx?: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
+    const exec = tx ?? db;
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > enqueue" }, async () => {
       if (rows.length === 0) return Result.ok<void, EmailQueueError>(undefined);
-      const exec = tx ?? db;
       try {
         const values = rows.map((r) => ({
           id: uuidv7(),

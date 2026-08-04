@@ -2,11 +2,9 @@ import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
-export function DeleteRequested({
-  name,
-  cancelUrl,
-  expiresAt,
-}: EmailTemplates["delete_requested"]) {
+type DeleteRequestedVars = EmailTemplates["delete_requested"];
+interface DeleteRequestedProps extends DeleteRequestedVars {}
+export function DeleteRequested({ name, cancelUrl, expiresAt }: DeleteRequestedProps) {
   return (
     <EmailLayout preview="Account deletion requested">
       <Heading as="h1">Account deletion requested</Heading>

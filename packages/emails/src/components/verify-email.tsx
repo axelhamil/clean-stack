@@ -2,7 +2,9 @@ import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
-export function VerifyEmail({ name, verifyUrl }: EmailTemplates["verify_email"]) {
+type VerifyEmailVars = EmailTemplates["verify_email"];
+interface VerifyEmailProps extends VerifyEmailVars {}
+export function VerifyEmail({ name, verifyUrl }: VerifyEmailProps) {
   return (
     <EmailLayout preview="Confirm your email address">
       <Heading as="h1">Confirm your email</Heading>

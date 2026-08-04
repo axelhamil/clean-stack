@@ -2,7 +2,9 @@ import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
-export function BackupCodeUsed({ securityUrl }: EmailTemplates["backup_code_used"]) {
+type BackupCodeUsedVars = EmailTemplates["backup_code_used"];
+interface BackupCodeUsedProps extends BackupCodeUsedVars {}
+export function BackupCodeUsed({ securityUrl }: BackupCodeUsedProps) {
   return (
     <EmailLayout preview="A backup code was used">
       <Heading as="h1">A backup code was used</Heading>

@@ -2,11 +2,9 @@ import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
-export function DataExportReady({
-  name,
-  downloadUrl,
-  expiresAt,
-}: EmailTemplates["data_export_ready"]) {
+type DataExportReadyVars = EmailTemplates["data_export_ready"];
+interface DataExportReadyProps extends DataExportReadyVars {}
+export function DataExportReady({ name, downloadUrl, expiresAt }: DataExportReadyProps) {
   return (
     <EmailLayout preview="Your data export is ready">
       <Heading as="h1">Your data export is ready</Heading>

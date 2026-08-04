@@ -2,7 +2,9 @@ import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
-export function MagicLink({ magicUrl }: EmailTemplates["magic_link"]) {
+type MagicLinkVars = EmailTemplates["magic_link"];
+interface MagicLinkProps extends MagicLinkVars {}
+export function MagicLink({ magicUrl }: MagicLinkProps) {
   return (
     <EmailLayout preview="Your sign-in link">
       <Heading as="h1">Sign in to your account</Heading>

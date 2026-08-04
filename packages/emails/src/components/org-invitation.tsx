@@ -2,12 +2,9 @@ import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
-export function OrgInvitation({
-  inviterName,
-  orgName,
-  role,
-  inviteUrl,
-}: EmailTemplates["org_invitation"]) {
+type OrgInvitationVars = EmailTemplates["org_invitation"];
+interface OrgInvitationProps extends OrgInvitationVars {}
+export function OrgInvitation({ inviterName, orgName, role, inviteUrl }: OrgInvitationProps) {
   return (
     <EmailLayout preview={`You have been invited to ${orgName}`}>
       <Heading as="h1">You have been invited</Heading>
