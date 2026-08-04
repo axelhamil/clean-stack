@@ -383,6 +383,44 @@ export const BillingQuotaExceededPayload = OrgRef.extend({
 });
 export type BillingQuotaExceededPayload = z.infer<typeof BillingQuotaExceededPayload>;
 
+const ActorRef = z.object({ actorUserId: z.string() });
+
+export const AdminImpersonationStartedPayload = ActorRef.merge(UserRef).extend({
+  reason: z.string().min(1),
+  ticketRef: z.string().optional(),
+  ip: z.string().nullable(),
+  expiresAt: z.string(),
+});
+export type AdminImpersonationStartedPayload = z.infer<typeof AdminImpersonationStartedPayload>;
+
+export const AdminImpersonationStoppedPayload = ActorRef.merge(UserRef).extend({
+  durationMs: z.number().int().nonnegative(),
+});
+export type AdminImpersonationStoppedPayload = z.infer<typeof AdminImpersonationStoppedPayload>;
+
+export const AdminUserBannedPayload = ActorRef.merge(UserRef).extend({
+  reason: z.string().min(1),
+  expiresAt: z.string().nullable(),
+});
+export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
+
+export const AdminUserUnbannedPayload = ActorRef.merge(UserRef);
+export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
+
+export const AdminUserRoleChangedPayload = ActorRef.merge(UserRef).extend({
+  from: z.string().nullable(),
+  to: z.string(),
+});
+export type AdminUserRoleChangedPayload = z.infer<typeof AdminUserRoleChangedPayload>;
+
+export const AdminUserPasswordResetPayload = ActorRef.merge(UserRef);
+export type AdminUserPasswordResetPayload = z.infer<typeof AdminUserPasswordResetPayload>;
+
+export const AdminUserSessionsRevokedPayload = ActorRef.merge(UserRef).extend({
+  count: z.number().int().nonnegative(),
+});
+export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -439,4 +477,11 @@ export const PayloadByEventType = {
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,
   [EventTypes.BILLING_PAYMENT_FAILED]: BillingPaymentFailedPayload,
   [EventTypes.BILLING_QUOTA_EXCEEDED]: BillingQuotaExceededPayload,
+  [EventTypes.ADMIN_IMPERSONATION_STARTED]: AdminImpersonationStartedPayload,
+  [EventTypes.ADMIN_IMPERSONATION_STOPPED]: AdminImpersonationStoppedPayload,
+  [EventTypes.ADMIN_USER_BANNED]: AdminUserBannedPayload,
+  [EventTypes.ADMIN_USER_UNBANNED]: AdminUserUnbannedPayload,
+  [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
+  [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
+  [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
 } as const;
