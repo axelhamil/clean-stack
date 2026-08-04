@@ -61,8 +61,8 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
     collectUserDataForExport: mock(async () =>
       Result.ok<UserExportPayload, RgpdError>(stubExportPayload),
     ),
-    markPendingDeletion: mock(async () => Result.ok<void, RgpdError>()),
-    clearPendingDeletion: mock(async () => Result.ok<void, RgpdError>()),
+    markPendingDeletion: mock(async () => Result.ok<RgpdError>()),
+    clearPendingDeletion: mock(async () => Result.ok<RgpdError>()),
     findUsersReadyForWipe: mock(async () => Result.ok<PendingDeletionRow[], RgpdError>([])),
     executeWipe: mock(async () =>
       Result.ok<ExecuteWipeOutput, RgpdError>({
@@ -72,7 +72,7 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
     ),
     verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(true)),
     verifyTotp: mock(async () => Result.ok<boolean, RgpdError>(true)),
-    touchExportRequestedAt: mock(async () => Result.ok<void, RgpdError>()),
+    touchExportRequestedAt: mock(async () => Result.ok<RgpdError>()),
     getUserDeletionState: mock(async () =>
       Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(baseState)),
     ),
@@ -87,10 +87,10 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
       Result.ok({ url: "https://cdn.example.com/export.json", expiresAt: "2099-01-01T00:00:00Z" }),
     ),
     headObject: mock(async () => Result.ok({ size: 0, contentType: "" })),
-    deleteObject: mock(async () => Result.ok<void, RgpdError>()),
-    uploadObject: mock(async () => Result.ok<void, RgpdError>()),
+    deleteObject: mock(async () => Result.ok<RgpdError>()),
+    uploadObject: mock(async () => Result.ok<RgpdError>()),
     listObjectKeys: mock(async () => Result.ok(["u1/uploads/a", "u1/exports/b"])),
-    deleteObjects: mock(async () => Result.ok<void, RgpdError>()),
+    deleteObjects: mock(async () => Result.ok<RgpdError>()),
     publicUrlFor: mock(() => ""),
     ...overrides,
   } as unknown as IStorageService;
@@ -98,10 +98,10 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
 
 function makeEmail(): IEmailService {
   return {
-    sendTemplate: mock(async () => Result.ok<void, RgpdError>()),
-    sendTemplateBatch: mock(async () => Result.ok<void, RgpdError>()),
-    sendRaw: mock(async () => Result.ok<void, RgpdError>()),
-    sendRawBatch: mock(async () => Result.ok<void, RgpdError>()),
+    sendTemplate: mock(async () => Result.ok<RgpdError>()),
+    sendTemplateBatch: mock(async () => Result.ok<RgpdError>()),
+    sendRaw: mock(async () => Result.ok<RgpdError>()),
+    sendRawBatch: mock(async () => Result.ok<RgpdError>()),
   } as unknown as IEmailService;
 }
 

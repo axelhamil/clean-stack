@@ -14,7 +14,9 @@ export class Result<T, E = string> {
   public getValue(): T {
     if (!this.isSuccess) throw new Error("Can't get value from failure result");
 
-    // biome-ignore lint/style/noNonNullAssertion: Safe after isSuccess check
+    // Safe: the overloads prevent constructing a success Result<T,E> without a value when T ≠ void.
+    // The void overload explicitly returns Result<void,E>, so undefined IS the correct value there.
+    // biome-ignore lint/style/noNonNullAssertion: proven safe by the ok() overloads above
     return this._value!;
   }
 
@@ -25,6 +27,8 @@ export class Result<T, E = string> {
     return this._error!;
   }
 
+  public static ok<E = string>(): Result<void, E>;
+  public static ok<T, E = string>(value: T): Result<T, E>;
   public static ok<T, E = string>(value?: T): Result<T, E> {
     return new Result<T, E>(true, value);
   }
@@ -33,9 +37,9 @@ export class Result<T, E = string> {
     return new Result<T, E>(false, undefined, error);
   }
 
-  public static combine(results: Result<unknown>[]): Result<unknown> {
+  public static combine(results: Result<unknown>[]): Result<void> {
     for (const result of results) {
-      if (result.isFailure) return result;
+      if (result.isFailure) return result as Result<void>;
     }
     return Result.ok();
   }

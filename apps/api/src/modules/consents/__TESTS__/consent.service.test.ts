@@ -37,10 +37,10 @@ const activeRow: ConsentRecordRow = {
 
 function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
   return {
-    insert: mock(async () => Result.ok<void, ConsentError>()),
+    insert: mock(async () => Result.ok<ConsentError>()),
     findActiveBySubject: mock(async () => Result.ok<ConsentRecordRow | null, ConsentError>(null)),
     findActiveByUser: mock(async () => Result.ok<ConsentRecordRow | null, ConsentError>(null)),
-    linkSubjectToUser: mock(async () => Result.ok<void, ConsentError>()),
+    linkSubjectToUser: mock(async () => Result.ok<ConsentError>()),
     ...overrides,
   };
 }

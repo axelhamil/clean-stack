@@ -122,7 +122,7 @@ function makeDeliveries(
   return {
     list: mock(async () => Result.ok<DeliveryPage, WebhookRepoError>(page)),
     findById: mock(async () => Option.some(stubDelivery)),
-    updateStatus: mock(async () => Result.ok<void, WebhookRepoError>()),
+    updateStatus: mock(async () => Result.ok<WebhookRepoError>()),
     findPendingBatch: mock(async () => Result.ok([])),
     enqueueReplay: mock(async () =>
       Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.some(stubDelivery)),
