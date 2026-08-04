@@ -88,7 +88,7 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
 
 function harness(rows: EmailMessageRecord[]) {
   const sent: string[][] = [];
-  const failed: Array<{ id: string; error: string }> = [];
+  const settled: Array<{ id: string; error: string; nextAttemptAt: Date | null }> = [];
   let batchImpl: (payload: unknown[]) => Promise<{
     data: Array<{ id: string }> | null;
     errors?: Array<{ index: number; message: string }>;
@@ -104,8 +104,8 @@ function harness(rows: EmailMessageRecord[]) {
       sentProviderIds.push(providerIds);
       return Result.ok<void, never>(undefined);
     },
-    markFailed: async (id: string, error: string) => {
-      failed.push({ id, error });
+    markFailed: async (id: string, error: string, nextAttemptAt: Date | null) => {
+      settled.push({ id, error, nextAttemptAt });
       return Result.ok<void, never>(undefined);
     },
   };
@@ -113,7 +113,7 @@ function harness(rows: EmailMessageRecord[]) {
     queue,
     sent,
     sentProviderIds,
-    failed,
+    settled,
     setBatch: (f: typeof batchImpl) => {
       batchImpl = f;
     },
@@ -181,7 +181,8 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     await worker.drainOnce();
     expect(calls).toBe(1);
     expect(h.sent.flat()).toEqual(["1"]);
-    expect(h.failed.map((f) => f.id)).toEqual(["2"]);
+    expect(h.settled.map((s) => s.id)).toEqual(["2"]);
+    expect(h.settled[0]?.nextAttemptAt).toBeNull();
   });
 
   it("does not attach provider ids when data is not positionally aligned", async () => {
@@ -202,6 +203,9 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     const worker = makeWorker(h);
     await worker.drainOnce();
     expect(h.sent.flat()).toEqual([]);
-    expect(h.failed.map((f) => f.id).sort()).toEqual(["1", "2"]);
+    expect(h.settled.map((s) => s.id).sort()).toEqual(["1", "2"]);
+    for (const s of h.settled) {
+      expect(s.nextAttemptAt).toBeInstanceOf(Date);
+    }
   });
 });
