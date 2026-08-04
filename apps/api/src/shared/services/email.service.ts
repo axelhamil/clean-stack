@@ -23,7 +23,9 @@ export class QueuedEmailService implements IEmailService {
     variables: EmailTemplates[K] & TemplateVariables,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>> {
-    return this.sendTemplateBatch(template, [{ to, variables }], options);
+    return this.instrumentation.startSpan({ name: "QueuedEmailService > sendTemplate" }, () =>
+      this.sendTemplateBatch(template, [{ to, variables }], options),
+    );
   }
 
   async sendTemplateBatch<K extends keyof EmailTemplates>(
@@ -60,7 +62,9 @@ export class QueuedEmailService implements IEmailService {
     body: EmailBody,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>> {
-    return this.sendRawBatch([{ to, subject, body }], options);
+    return this.instrumentation.startSpan({ name: "QueuedEmailService > sendRaw" }, () =>
+      this.sendRawBatch([{ to, subject, body }], options),
+    );
   }
 
   async sendRawBatch(
