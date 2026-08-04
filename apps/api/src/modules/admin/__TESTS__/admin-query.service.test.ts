@@ -15,23 +15,49 @@ const rows = [
 ];
 
 mock.module("@packages/drizzle", () => ({
-  db: {},
-  authSchema: { user: {}, session: {} },
-  multiTenantSchema: { organization: {}, member: {} },
+  db: {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({
+            limit: () => ({ toSQL: () => ({ sql: "SELECT 1" }), execute: async () => [] }),
+          }),
+        }),
+      }),
+    }),
+    insert: () => ({}),
+    update: () => ({}),
+    delete: () => ({}),
+  },
+  authSchema: {
+    user: {
+      id: {},
+      email: {},
+      name: {},
+      role: {},
+      banned: {},
+      banReason: {},
+      banExpires: {},
+      twoFactorEnabled: {},
+      createdAt: {},
+    },
+    session: {},
+  },
+  multiTenantSchema: { organization: {}, member: { userId: {}, organizationId: {} } },
   outboxSchema: {},
   auditLogSchema: {},
   webhooksSchema: {},
-  and: (...a: unknown[]) => a,
-  or: (...a: unknown[]) => a,
-  eq: (...a: unknown[]) => a,
-  lt: (...a: unknown[]) => a,
-  inArray: (...a: unknown[]) => a,
-  isNull: (...a: unknown[]) => a,
-  isNotNull: (...a: unknown[]) => a,
-  ilike: (...a: unknown[]) => a,
-  desc: (...a: unknown[]) => a,
-  count: (...a: unknown[]) => a,
-  sql: (...a: unknown[]) => a,
+  and: (..._a: unknown[]) => ({}),
+  or: (..._a: unknown[]) => ({}),
+  eq: (..._a: unknown[]) => ({}),
+  lt: (..._a: unknown[]) => ({}),
+  inArray: (..._a: unknown[]) => ({}),
+  isNull: (..._a: unknown[]) => ({}),
+  isNotNull: (..._a: unknown[]) => ({}),
+  ilike: (..._a: unknown[]) => ({}),
+  desc: (..._a: unknown[]) => ({}),
+  count: (..._a: unknown[]) => ({}),
+  sql: Object.assign((_s: TemplateStringsArray, ..._v: unknown[]) => ({}), { raw: () => ({}) }),
 }));
 
 const { AdminQueryService } = await import("../application/services/admin-query.service");
