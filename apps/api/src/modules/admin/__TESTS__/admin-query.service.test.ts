@@ -17,7 +17,7 @@ const rows = [
 mock.module("@packages/drizzle", () => ({
   db: {},
   authSchema: { user: {}, session: {} },
-  orgSchema: { organization: {}, member: {} },
+  multiTenantSchema: { organization: {}, member: {} },
   outboxSchema: {},
   auditLogSchema: {},
   webhooksSchema: {},
@@ -64,6 +64,22 @@ describe("AdminQueryService", () => {
       const service = serviceReturning(rows);
       const page = (await service.listUsers({ limit: 50 })).getValue();
       expect(page.nextCursor.isNone()).toBe(true);
+    });
+
+    it("returns a cursor when the page is exactly full", async () => {
+      const service = serviceReturning(rows);
+      const page = (await service.listUsers({ limit: 1 })).getValue();
+      expect(page.nextCursor.isSome()).toBe(true);
+      expect(page.nextCursor.unwrap()).toBe(rows[0]!.createdAt.toISOString());
+    });
+
+    it("passes organizationId filter through to the store", async () => {
+      const store = { listUsers: mock(async () => rows) };
+      const service = new AdminQueryService(store as never, instrumentation as never);
+      await service.listUsers({ limit: 50, organizationId: "org-1" });
+      expect(store.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1" }),
+      );
     });
 
     it("captures the error and fails when the store throws", async () => {
