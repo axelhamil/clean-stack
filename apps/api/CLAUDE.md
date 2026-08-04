@@ -131,6 +131,16 @@ OTel + Prometheus `/metrics` are deferred to Phase D.1 (no consumer yet). The sp
 
 See `docs/EVENTS.md` for full spec, retention matrix, and cron recipe.
 
+## Email delivery (`shared/services/` — Phase D.5)
+
+**Emails are enqueued, never sent inline.** `IEmailService` (`QueuedEmailService`, bound in `container.ts`) writes rows to `email_message` inside the caller's transaction when `options.tx` is passed — the send and the triggering write are atomic. `EmailDeliveryWorker` polls every 2 s and delivers via `resend.batch.send` (100 emails/request, **10 req/s per team** ceiling, `batchValidation: "permissive"`).
+
+**Rules**:
+- **Never call Resend directly from a request path.** Use `di.IEmailService.sendTemplate(...)` or `di.IEmailService.sendTemplateBatch(...)`.
+- **Pass `options.tx` when a transactional guarantee is needed** — e.g. the account-deletion sweep passes the write TX so the notification is enqueued atomically with the wipe.
+- **`@packages/emails` is the template SSOT.** `TEMPLATE_IDS` in the worker is an override; an empty string means render the in-repo React Email template. Add new templates to both the package and the `EmailTemplates` port type.
+- **Retry via decorrelated jitter** (`shared/jitter.ts`). No `retry-after` parsing — the Resend SDK does not expose response headers. Exhausted messages emit `email.delivery.exhausted` (internal, operational).
+
 ## Policy versioning (`modules/policies/` — Phase A.2)
 
 Compliance infra, not DDD. Records which policy version each user accepted and when. Mirrors the `audit-log` module shape.

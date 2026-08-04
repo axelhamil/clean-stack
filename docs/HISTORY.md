@@ -943,3 +943,53 @@ Gated `webhooks: ["read"]` (list, deliveries, detail) / `webhooks: ["write"]` (c
 5. **`sub-processors.config.ts` promoted to `shared/`**: `features/legal/` and `features/privacy/` are both route-owning features and cannot import from each other (import-direction rule) → the 2-consumer config belongs in `shared/`.
 
 6. **ROADMAP deviation acknowledged**: the ROADMAP placed `<RgpdDeletionCard />` in Privacy; it shipped in Account (danger zone) instead. Contextual danger zones are the SOTA convention and the better UX — the deviation is intentional.
+
+---
+
+## Email delivery queue — durable outbox + batch worker + in-repo templates ✅ Phase D.5 · Aug 2026
+
+**Why**: `IEmailService.sendTemplate` was a direct Resend HTTP call — 1 email = 1 HTTP request. Any fan-out (RGPD wipe notifying N members, D.3 digests) serialized into 429s against the **10 req/s per team** ceiling. The fix mirrors what the repo already does for webhooks: a durable queue table + a background worker that batches and retries, decoupled from request paths.
+
+- [x] **`email_message` table** (`packages/drizzle/src/schema/email.ts`, migration `0015_shiny_skaar.sql`) — durable outbox for all outgoing emails. Columns: UUID v7 PK, `to_address`, `kind`, `template`, `subject`, `html_body` / `text_body` (rendered at enqueue), `variables` jsonb, `idempotency_key`, `status` (`pending` / `claimed` / `sent` / `failed`), `claimed_until`, `attempts`, `provider_message_id`, `last_error`, `created_at`, `updated_at`.
+
+- [x] **`QueuedEmailService`** (`apps/api/src/shared/services/email.service.ts`) — binds to `IEmailService`. Implements `sendTemplate`, `sendTemplateBatch`, `sendRaw`, `sendRawBatch`. Enqueues rows inside the caller's transaction when `options.tx` is passed (atomicity with the write that triggered the email). Renders React Email templates at enqueue time via `@packages/emails`.
+
+- [x] **`@packages/emails`** (`packages/emails/src/`) — one React Email component + `subject()` per template key (`welcome`, `magic_link`, `change_email`, `backup_code_used`, `account_deleted`). `TEMPLATE_IDS` in the worker is now an **override map**: empty string → render in-repo template; non-empty → use Resend dashboard ID. A fresh clone sends real emails with zero dashboard setup.
+
+- [x] **`EmailDeliveryWorker`** (`apps/api/src/shared/services/email-delivery-worker.service.ts`) — polls every 2 s, claims up to 300 rows (`FOR UPDATE SKIP LOCKED`, 120 s claim window), groups by `(kind, template)`, chunks to 100 per `resend.batch.send` call. `batchValidation: "permissive"` isolates bad entries into `errors[]` without aborting the chunk. Decorrelated jitter retry via `shared/jitter.ts` (same formula as webhook delivery). After the ceiling the row moves to `status = 'failed'` and `email.delivery.exhausted` is emitted.
+
+- [x] **Port surface** — `IEmailQueuePort` (`shared/ports/email-queue.port.ts`): `sendTemplate`, `sendTemplateBatch`, `sendRaw`, `sendRawBatch`, all accepting `options.tx?: DrizzleTransaction`. `EmailTemplates` / `TemplateVariables` types unchanged; callers keep their existing signatures.
+
+- [x] **`email.delivery.exhausted`** — 1 new internal event (non-subscribable, non-fanout, `retention: "operational"`). Payload: `{ messageId, toAddress, kind, attempts }`. Catalog: **55 total / 50 subscribable / 5 internal**.
+
+- [x] **Retention sweep** — `POST /internal/sweep-email-messages` (`EMAIL_MESSAGE_RETENTION_DAYS=7`, default 7d). Purges only `status = 'sent'`; `failed` rows are kept deliberately as the operator's only trace of a dropped email. Chained at the end of `apps/api/src/cron/sweep.ts`.
+
+- [x] **RGPD wipe sweep refactor** — `sendTemplateBatch` replaces up to 50 serial `sendTemplate` calls, removing the per-member latency fan-out in the wipe path.
+
+- [x] **Wired into DI + boot** — `EmailDeliveryWorker` is registered in `container.ts` and started in the boot sequence alongside the existing workers.
+
+### Decisions (D.5)
+
+1. **`email_message` table, not the outbox**: the outbox dispatcher's built-in subscribers run *inside* the dispatch transaction (which sets `idle_in_transaction_session_timeout = '30s'`), so an HTTP call there would hold a Postgres transaction open across network I/O. Its user handlers run post-commit with no retry. Neither slot can hold a retryable external call. `email_message` is the same pattern the repo already uses for `webhook_delivery`, for the same reason.
+
+2. **`batchValidation: "permissive"`**: the original spec proposed replaying the entire rejected chunk one recipient at a time when a batch validation error occurred (1 request + N). `"permissive"` is strictly better: the provider isolates invalid entries into `errors[]` and still sends the valid ones — 1 request, no replay required. Invalid recipients are marked `failed` individually and kept for operator review.
+
+3. **No `retry-after` parsing**: the Resend SDK returns `{ data, error }` and does not expose response headers. Decorrelated jitter (shared formula, same as `WebhookDeliveryWorker`) provides the backoff substitute. If a future SDK version exposes headers, the jitter function is the right place to condition on them.
+
+4. **Polling at 2 s, not `LISTEN/NOTIFY`**: a persistent `pg.Client` listener costs a dedicated connection plus reconnect handling. The gain is at most 2 s of latency reduction on the first delivery attempt — acceptable for email. `LISTEN/NOTIFY` would be the right call if latency SLA were < 1 s.
+
+5. **`provider_message_id` attached only when `data.length === chunk.length`**: the Resend batch API does not document positional alignment when some entries fail. Attaching `ids[i]` to row `i` when the array lengths differ would silently associate wrong IDs. Correctness never depends on `provider_message_id` (it is for debugging only), so conservatism wins.
+
+6. **`@react-email/components` deprecated mid-task**: React Email 6.0 unified everything into the `react-email` package. Migrated to `react-email@6.9.1` (`@react-email/components` re-exports from it for compat, but the canonical import is `react-email`).
+
+7. **Bounce suppression is provider-side**: Resend's domain-scoped suppression list automatically blocks future sends to hard-bounced addresses (422 + `email.suppressed` webhook). No local `email_suppression` table is needed and none was built. If a product feature ever needs suppression-list reads (e.g. show users why they stopped receiving emails), build it then.
+
+### As-built deviations (D.5)
+
+1. **`TEMPLATE_IDS` as override, not mandatory**: the ROADMAP framed template IDs as required config (boot fails if empty). Post-D.5, an empty string means render the in-repo template — the map is an override for operators who prefer Resend dashboard management. Boot no longer fails on empty `TEMPLATE_IDS`.
+
+2. **`@packages/emails` introduced**: the original ROADMAP spec did not include an in-repo template package. Added to remove the "requires Resend dashboard setup before first email" friction on a fresh clone. Templates are simple enough that React Email is the right abstraction (typed props, subject co-located with markup, same lint/type-check pipeline as the rest of the codebase).
+
+3. **`sendRaw` / `sendRawBatch` on `IEmailService`**: not in the original spec. Added to support future transactional emails that need full HTML control without a named template (e.g. operator notifications, internal alerts). No call sites exist today; the methods are public port surface.
+
+4. **Provider facts corrected from ROADMAP**: rate limit is 10 req/s per team (not per account); `scheduled_at` IS supported in batch mode; hard-bounce suppression is fully automatic provider-side. These corrections were verified against the live Resend API (SDK `resend@6.14.0`).

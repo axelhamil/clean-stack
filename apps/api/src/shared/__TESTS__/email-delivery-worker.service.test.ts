@@ -95,7 +95,7 @@ function harness(rows: EmailMessageRecord[]) {
     error: null | { statusCode?: number; message: string };
   }> = async (p) => ({ data: p.map((_, i) => ({ id: `provider-${i}` })), error: null });
 
-  const sentProviderIds: Array<Record<string, string>> = [];
+  const sentProviderIds: Record<string, string>[] = [];
   const queue = {
     enqueue: async () => Result.ok<void, never>(undefined),
     claimPending: async () => Result.ok(rows.splice(0, rows.length)),

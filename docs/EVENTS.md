@@ -257,7 +257,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **54 events** (50 subscribable + 4 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
+The boilerplate emits **55 events** (50 subscribable + 5 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`, `email.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -300,6 +300,9 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 - `WEBHOOK_ENDPOINT_SECRET_ROTATED` (`webhook.endpoint.secret_rotated`) — secret rotation completed. Payload: `{ endpointId, organizationId, actorUserId }`.
 - `WEBHOOK_ENDPOINT_DISABLED` (`webhook.endpoint.disabled`) — auto-disable fired after sustained failures. Payload: `{ endpointId, organizationId, consecutiveFailures: number, lastFailedAt: string }`.
 - `WEBHOOK_DELIVERY_EXHAUSTED` (`webhook.delivery.exhausted`) — delivery dead-lettered after all retry attempts. Payload: `{ deliveryId, endpointId, organizationId, eventType: string, attempts: number }`.
+
+**Phase D.5 — 1 new internal event** (non-subscribable, non-fanout; `retention: "operational"`):
+- `EMAIL_DELIVERY_EXHAUSTED` (`email.delivery.exhausted`) — an `email_message` row exceeded the retry ceiling and was dead-lettered. Payload: `{ messageId: string, toAddress: string, kind: string, attempts: number }`. Never fans out to user webhook endpoints — it is an infrastructure signal for operator alerting.
 
 ### Via `PolicyAcceptanceService` (Phase A.2)
 - `USER_POLICY_ACCEPTED` (`user.policy.accepted`) — payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
@@ -372,7 +375,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (54 events: 50 subscribable + 4 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (55 events: 50 subscribable + 5 internal) |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |

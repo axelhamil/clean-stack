@@ -134,14 +134,22 @@ Org-scoped from the very first migration. Migrating single-user → multi-tenant
 - **Dev-only `<AuthorizationDevTool>`** — live capability matrix per role (mounted by the app shell, tree-shaken in prod).
 - **`NO_ACTIVE_ORGANIZATION` → `null`** at the query layer (transient state, not error).
 
-## Email — Resend ✅
+## Email — Resend + queue-based delivery ✅ Phase D.5
 
-Dashboard-managed templates with retry + idempotency. Provider-side suppression guards IP reputation (hard bounces & complaints auto-blocked).
+Durable email queue with in-repo templates and batch delivery. Provider-side suppression guards IP reputation (hard bounces auto-blocked).
 
-- **Typed templates** (`EmailTemplates` type, `TemplateVariables` per template).
-- **Idempotency keys** per (template, token) — token reuse never re-sends.
+- **`email_message` table** (`packages/drizzle/src/schema/email.ts`, migration `0015_shiny_skaar.sql`) — durable outbox for all outgoing emails. `IEmailService` (`QueuedEmailService`) enqueues rows; `EmailDeliveryWorker` drains them in batches.
+- **`@packages/emails`** — in-repo React Email templates. One component + `subject()` per template key. Renders server-side at enqueue time. No Resend dashboard required on a fresh clone: `TEMPLATE_IDS` in the worker is an **override** — empty string renders the in-repo template, non-empty uses that Resend dashboard template.
+- **`EmailDeliveryWorker`** — polls every 2 s, claims up to 300 rows (`FOR UPDATE SKIP LOCKED`, 120 s window), groups by `(kind, template)`, chunks to 100, one `resend.batch.send` per chunk. Rate limit: **10 req/s per team** (verified against live Resend API). `batchValidation: "permissive"` isolates invalid entries into `errors[]` without failing the entire chunk.
+- **Port methods** — `sendTemplate`, `sendTemplateBatch`, `sendRaw`, `sendRawBatch`, all accepting `options.tx` to enqueue inside the caller's transaction (atomicity with the write that triggered the email).
+- **Retry** — decorrelated jitter via `shared/jitter.ts` (same formula as webhook delivery). No `retry-after` header access (Resend SDK exposes only `{ data, error }`, headers not surfaced). After the ceiling attempts the row moves to `status = 'failed'` and `email.delivery.exhausted` is emitted.
+- **Retention sweep** — `POST /internal/sweep-email-messages` purges `status = 'sent'` rows older than `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d). `failed` rows kept deliberately as the operator's audit trace.
+- **Typed templates** (`EmailTemplates` type, `TemplateVariables` per template — `shared/ports/email.port.ts`).
+- **Idempotency** — `options.idempotencyKey` fanned out as `${key}/${index}` per recipient; worker-level idempotency key per batch request.
 - **DNS hardening required** before production: SPF, DKIM (3 CNAMEs from Resend), DMARC. Gmail/Yahoo/Outlook reject unauthenticated bulk senders since 2024-2025. See `README.md` for records.
-- **Boundary-only**: `EmailService` adapter implements `IEmailService` port; failure logs at `warn` if transport not configured (dev), `throw` only on hard provider failure.
+- **`scheduled_at` is supported in batch** (verified Resend API 2026). Batch cap: 100 emails/request. Hard-bounce suppression is provider-side and automatic — no local `email_suppression` table needed.
+
+Files: `apps/api/src/shared/services/email.service.ts` (`QueuedEmailService`), `apps/api/src/shared/services/email-delivery-worker.service.ts`, `apps/api/src/shared/ports/email-queue.port.ts`, `packages/drizzle/src/schema/email.ts`, `packages/emails/src/`.
 
 ## Storage — S3-compatible (Cloudflare R2 prod / SeaweedFS dev, opt-in) ✅
 
