@@ -8,6 +8,25 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 
 ---
 
+## Option / Result convention back-fill ✅ Aug 2026
+
+**Why**: an audit of ports, services and the HTTP boundary found `Result` respected everywhere and `Option` respected only in recently-written code. The convention had been applied going forward and never back-applied, so `modules/webhooks` — the module the codebase treats as the reference — was inconsistent with itself: `WebhookDeliveryRecord` used `Option<T>` directly above two record types using raw `| null`.
+
+**How it was found**: not by review. The same defect had just shipped in the D.5 email queue (`Date | null` in a port whose sibling used `Option`) and survived three separate code reviews, each of which had the rule quoted verbatim in its prompt. Reviewers verify what they are asked to trace concretely — index mapping, claim concurrency, attempt accounting — and skip what is stated as a general principle. The lesson, now applied when auditing a cross-cutting convention: give the reviewer the conformant sibling file and ask for a field-by-field comparison.
+
+**Decisions**:
+
+1. **`Result.ok` overloaded.** `static ok<T, E>(value?: T)` made the value optional for *every* `T`, so `Result.ok<string>()` compiled and `getValue()` returned `undefined` typed `string` — with a `biome-ignore` comment claiming the non-null assertion was safe after the `isSuccess` check. It was not: the result is a success whose value is absent. Two overloads (`(): Result<void, E>` and `(value: T): Result<T, E>`) close it. The hole was genuinely exploited — 18 test mocks called `Result.ok<void, E>()` with no argument.
+2. **`null` stops at the store.** Ports express absence as `Option<T>`; the repository converts with `Option.fromNullable` on read and unwraps on write; routes unwrap back to `null` only when serialising, so no wire format changed.
+3. **Three residuals kept deliberately**: `OutboxEnqueueScope.organizationId` (input DTO whose callers hold raw nullables from BetterAuth), `AuditFilters.organizationId` (three-state SQL filter — `undefined` don't-filter / `null` `IS NULL` / value equality; `Option` cannot express it), and `AuditEventSubscriber` writing `audit_log` directly rather than through `IAuditPort` (infra subscriber, parallel write path by design).
+4. **The audit hash chain was never at risk** — `audit-hash.ts` was not modified, so the hashed bytes are identical on existing production rows and `GET /admin/audit-log/verify` still validates them.
+
+**Scope**: `@packages/ddd-kit` (the overloads), then consents, billing, the rate-limiter adapter, webhooks, and the shared outbox + audit ports. An adversarial closure re-audit confirmed no unguarded `unwrap`, no dropped `isFailure` check and no paper-over cast.
+
+**Trap for later**: converting a record type to `Option` tempts the implementer to satisfy the type-checker with `arr[0]!` in tests. Three such assertions were introduced and reported back as "pre-existing" — they were not. Destructure and guard instead.
+
+---
+
 ## Auth — BetterAuth (end-to-end) ✅ Phase 1 · Phase 2 (organization)
 
 **Why**: own the token, multi-provider, typed plugins (Stripe, organizations, 2FA, passkeys, magic-link), DB-backed sessions, first lib that runs natively on Bun + Hono with no hacks.

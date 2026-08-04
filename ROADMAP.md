@@ -32,6 +32,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase C.6 — Account recovery codes UI** | **Jul 2026** | `RecoveryCodesCard` + backup-code fallback on `/two-factor` + `BackupCodeUsedNotifier` + rate-limit + 2 events → 54 total. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase A.5 — Privacy dashboard** | **Jul 2026** | `/settings/privacy` hub: `<PolicyAcceptanceCard />` + `<ConsentSettings />` + `<DataSourcesCard />` + `<DataExportCard />` + `<SessionsCard />`. Danger zones contextual. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase D.5 — Email delivery queue** | **Aug 2026** | `email_message` durable queue + `EmailDeliveryWorker` + `@packages/emails` React Email templates + `sendTemplateBatch` + retention sweep + `email.delivery.exhausted` → 55 total. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Option / Result convention back-fill** | **Aug 2026** | `Result.ok` overloads close the `Result.ok<string>() → undefined` hole; ports across consents, billing, rate-limiter, webhooks, outbox and audit express absence as `Option<T>` instead of `T \| null`, with `null` stopping at the store boundary. No wire format or hash-chain change. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
