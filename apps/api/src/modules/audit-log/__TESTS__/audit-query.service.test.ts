@@ -1,5 +1,5 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type {
   AuditError,
   AuditFilters,
@@ -14,20 +14,20 @@ const stubPage: AuditPage = {
   items: [
     {
       id: "audit-1",
-      actorId: "user-1",
+      actorId: Option.some("user-1"),
       actorType: "user",
-      organizationId: "org-1",
+      organizationId: Option.some("org-1"),
       action: "user.created",
       targetType: "user",
       targetId: "user-1",
       metadata: {},
       retention: "operational",
       occurredAt: new Date("2024-01-01"),
-      prevHash: null,
-      hash: "abc123",
+      prevHash: Option.none(),
+      hash: Option.some("abc123"),
     },
   ],
-  nextCursor: null,
+  nextCursor: Option.none(),
 };
 
 function makeAuditPort(overrides: Partial<IAuditPort> = {}): IAuditPort {
@@ -43,7 +43,7 @@ function makeAuditPort(overrides: Partial<IAuditPort> = {}): IAuditPort {
 describe("AuditQueryService", () => {
   describe("listForPlatform", () => {
     it("listForPlatform forwards filters straight to the port (no org injection)", async () => {
-      const port = { list: mock(async () => Result.ok({ items: [], nextCursor: null })) };
+      const port = { list: mock(async () => Result.ok({ items: [], nextCursor: Option.none() })) };
       const svc = new AuditQueryService(port as unknown as IAuditPort, new NoOpInstrumentation());
       await svc.listForPlatform({ actionPrefix: "user." });
       expect(port.list).toHaveBeenCalledWith({ actionPrefix: "user." });
@@ -98,7 +98,7 @@ describe("AuditQueryService", () => {
     });
 
     it("returns empty items list when no audit entries match", async () => {
-      const emptyPage: AuditPage = { items: [], nextCursor: null };
+      const emptyPage: AuditPage = { items: [], nextCursor: Option.none() };
       const audit = makeAuditPort({
         list: mock(async () => Result.ok<AuditPage, AuditError>(emptyPage)),
       });
@@ -108,11 +108,14 @@ describe("AuditQueryService", () => {
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().items).toHaveLength(0);
-      expect(result.getValue().nextCursor).toBeNull();
+      expect(result.getValue().nextCursor.isNone()).toBe(true);
     });
 
     it("returns nextCursor when more pages are available", async () => {
-      const pageWithCursor: AuditPage = { items: stubPage.items, nextCursor: "next-page-cursor" };
+      const pageWithCursor: AuditPage = {
+        items: stubPage.items,
+        nextCursor: Option.some("next-page-cursor"),
+      };
       const audit = makeAuditPort({
         list: mock(async () => Result.ok<AuditPage, AuditError>(pageWithCursor)),
       });
@@ -121,7 +124,8 @@ describe("AuditQueryService", () => {
       const result = await service.listForPlatform({ limit: 1 });
 
       expect(result.isSuccess).toBe(true);
-      expect(result.getValue().nextCursor).toBe("next-page-cursor");
+      expect(result.getValue().nextCursor.isSome()).toBe(true);
+      expect(result.getValue().nextCursor.unwrap()).toBe("next-page-cursor");
     });
   });
 
@@ -130,8 +134,8 @@ describe("AuditQueryService", () => {
       const verdict: ChainVerification = {
         verified: true,
         rowCount: 2,
-        brokenAtId: null,
-        brokenAtSequence: null,
+        brokenAtId: Option.none(),
+        brokenAtSequence: Option.none(),
       };
       const audit = makeAuditPort({
         verifyChain: mock(async () => Result.ok<ChainVerification, AuditError>(verdict)),

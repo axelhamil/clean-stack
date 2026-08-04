@@ -1,4 +1,4 @@
-import { type EventHandler, type IDomainEvent, isEventHandler } from "@packages/ddd-kit";
+import { type EventHandler, type IDomainEvent, isEventHandler, Option } from "@packages/ddd-kit";
 import { db, sql } from "@packages/drizzle";
 import { Client } from "pg";
 import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../jitter";
@@ -217,7 +217,7 @@ export class OutboxDispatcher {
                     event.attempts + 1,
                     expectedDelayFromAttempts(event.attempts + 1),
                   );
-                  await this.outbox.markFailed(event.id, errMsg, date, tx);
+                  await this.outbox.markFailed(event.id, errMsg, Option.fromNullable(date), tx);
                 }
               }
               return { dispatched: ok, total: events.length };

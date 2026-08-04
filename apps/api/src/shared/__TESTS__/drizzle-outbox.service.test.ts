@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
 // Expose full export surface so parallel test files don't see missing exports.
@@ -309,7 +310,7 @@ describe("DrizzleOutboxRepository", () => {
       );
     });
 
-    it("returns rows from the DB query", async () => {
+    it("returns rows from the DB query with organizationId wrapped as Option", async () => {
       const row = {
         id: "ev-1",
         eventType: "user.created",
@@ -324,7 +325,8 @@ describe("DrizzleOutboxRepository", () => {
       selectExecute.mockResolvedValueOnce([row]);
       const repo = new DrizzleOutboxRepository(new NoOpInstrumentation());
       const result = await repo.findPendingBatch(10, fakeTx as never);
-      expect(result as unknown[]).toEqual([row]);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.organizationId.isNone()).toBe(true);
     });
 
     it("calls instrumentation.capture and rethrows on DB error", async () => {
@@ -386,7 +388,7 @@ describe("DrizzleOutboxRepository", () => {
       const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
         (cb as () => unknown)()) as typeof instr.startSpan);
       const repo = new DrizzleOutboxRepository(instr);
-      await repo.markFailed("ev-1", "some error", null, fakeTx as never);
+      await repo.markFailed("ev-1", "some error", Option.none(), fakeTx as never);
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({ name: "DrizzleOutboxRepository > markFailed" }),
         expect.any(Function),
@@ -398,7 +400,7 @@ describe("DrizzleOutboxRepository", () => {
       const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
         (cb as () => unknown)()) as typeof instr.startSpan);
       const repo = new DrizzleOutboxRepository(instr);
-      await repo.markFailed("ev-1", "boom", new Date(), fakeTx as never);
+      await repo.markFailed("ev-1", "boom", Option.some(new Date()), fakeTx as never);
       const innerCall = spy.mock.calls.find((c) => c[0]?.op === "db.query");
       expect(innerCall).toBeDefined();
     });
@@ -413,7 +415,7 @@ describe("DrizzleOutboxRepository", () => {
         return (cb as () => unknown)();
       }) as typeof instr.startSpan);
       const repo = new DrizzleOutboxRepository(instr);
-      await expect(repo.markFailed("ev-1", "err", null, fakeTx as never)).rejects.toThrow(
+      await expect(repo.markFailed("ev-1", "err", Option.none(), fakeTx as never)).rejects.toThrow(
         "db fail",
       );
       expect(captureSpy).toHaveBeenCalled();

@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 import { env as realEnv } from "../../env";
 
 mock.module("../../env", () => ({ env: { ...realEnv, AUDIT_TAMPER_EVIDENCE: true } }));
@@ -53,7 +54,7 @@ function event(id: string) {
   return {
     id,
     eventType: "billing.subscription.created",
-    organizationId: "org-1",
+    organizationId: Option.some("org-1"),
     aggregateType: "subscription",
     aggregateId: "sub-1",
     payload: { actorUserId: "op-1", foo: "bar" },
