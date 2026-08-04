@@ -1,4 +1,4 @@
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { and, billingSchema, db, eq, inArray } from "@packages/drizzle";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
@@ -25,7 +25,7 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
   async findCustomerIdByReference(
     referenceId: string,
     tx?: ITransaction,
-  ): Promise<Result<string | null, BillingError>> {
+  ): Promise<Result<Option<string>, BillingError>> {
     const invoker = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleSubscriptionReadStore > findCustomerIdByReference" },
@@ -48,7 +48,7 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
             () => query.execute(),
           );
           const r = rows[0];
-          return Result.ok(r?.stripeCustomerId ?? null);
+          return Result.ok(r ? Option.fromNullable(r.stripeCustomerId) : Option.none());
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure(err, "findCustomerIdByReference"));
@@ -60,7 +60,7 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
   async findActiveByReference(
     referenceId: string,
     tx?: ITransaction,
-  ): Promise<Result<SubscriptionRow | null, BillingError>> {
+  ): Promise<Result<Option<SubscriptionRow>, BillingError>> {
     const invoker = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleSubscriptionReadStore > findActiveByReference" },
@@ -84,7 +84,7 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
             () => query.execute(),
           );
           const r = rows[0];
-          return Result.ok(r ? { tier: r.tier, status: r.status } : null);
+          return Result.ok(r ? Option.some({ tier: r.tier, status: r.status }) : Option.none());
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure(err, "findActiveByReference"));

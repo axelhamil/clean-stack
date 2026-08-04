@@ -1,4 +1,4 @@
-import type { IDomainEvent } from "@packages/ddd-kit";
+import type { IDomainEvent, Option } from "@packages/ddd-kit";
 import type { OutboxEventMetadata } from "@packages/drizzle";
 import type { ITransaction } from "../transaction";
 
@@ -15,7 +15,7 @@ export type OutboxRecord = {
   eventType: string;
   aggregateId: string;
   aggregateType: string;
-  organizationId: string | null;
+  organizationId: Option<string>;
   payload: unknown;
   metadata: OutboxEventMetadata;
   occurredAt: Date;
@@ -29,7 +29,7 @@ export interface IOutboxRepository {
   markFailed(
     id: string,
     error: string,
-    nextAttemptAt: Date | null,
+    nextAttemptAt: Option<Date>,
     tx: ITransaction,
   ): Promise<void>;
 }

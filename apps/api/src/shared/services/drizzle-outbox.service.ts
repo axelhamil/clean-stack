@@ -1,4 +1,4 @@
-import { domainEventToOutboxRow, type IDomainEvent } from "@packages/ddd-kit";
+import { domainEventToOutboxRow, type IDomainEvent, Option } from "@packages/ddd-kit";
 import {
   and,
   db,
@@ -106,10 +106,14 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
             .orderBy(oe.occurredAt)
             .limit(limit)
             .for("update", { skipLocked: true });
-          return await this.instrumentation.startSpan(
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
+          return rows.map((r) => ({
+            ...r,
+            organizationId: Option.fromNullable(r.organizationId),
+          }));
         } catch (err) {
           this.instrumentation.capture(err);
           throw err;
@@ -139,7 +143,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
   async markFailed(
     id: string,
     error: string,
-    nextAttemptAt: Date | null,
+    nextAttemptAt: Option<Date>,
     tx: Transaction,
   ): Promise<void> {
     return this.instrumentation.startSpan(
@@ -151,7 +155,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
             .set({
               attempts: sql`${oe.attempts} + 1`,
               lastError: error,
-              nextAttemptAt,
+              nextAttemptAt: nextAttemptAt.toNull(),
             })
             .where(eq(oe.id, id));
           await this.instrumentation.startSpan(

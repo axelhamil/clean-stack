@@ -33,8 +33,8 @@ modules/<context>/
 
 | Primitive | Use when… |
 |---|---|
-| `Result<T, E>` | Domain failure (validation, not-found, business rule). |
-| `Option<T>` | Absence is a valid state. |
+| `Result<T, E>` | Domain failure (validation, not-found, business rule). `Result.ok()` with no argument is overloaded to `Result<void, E>` — a success carrying a real value must pass it, so `Result.ok<string>()` no longer compiles. |
+| `Option<T>` | Absence is a valid state. **A port never expresses absence as `T \| null`** — `Result<Option<T>, E>` for a lookup that may find nothing, `Option<T>` for a record field that may be unset. `null` exists only inside a store while mapping a driver row, and is converted with `Option.fromNullable` before it leaves. **Why**: `T \| null` forces every caller to remember a guard the type does not impose; `Option` makes the check structural. The whole API was back-filled to this in Aug 2026 after the convention was found applied only to recent code. |
 | `AppError<TCode>` | Typed error suffix auto-mapping to HTTP via `httpStatusFromCode` (`*_NOT_FOUND`→404, `*_FORBIDDEN`→403). |
 | `IUnitOfWork<TTx>` | ≥ 2 repo writes that must be atomic. |
 | `UserId` (VO) | First aggregate referencing a user. Validates UUID, prevents `OrderId`↔`UserId` confusion. |
@@ -92,7 +92,9 @@ BDD style. One test file per use case/service under `__TESTS__/` (services group
 
 ```typescript
 Result.ok(value); Result.fail(error); Result.combine([r1, r2, r3]);
+Result.ok();                        // void payload only — Result<void, E>
 Option.some(value); Option.none(); Option.fromNullable(value);
+opt.isSome() ? opt.unwrap() : null; // unwrap only behind a guard; None.unwrap() throws
 
 class Foo extends Aggregate<IFooProps> {
   get id(): FooId { return FooId.create(this._id); }

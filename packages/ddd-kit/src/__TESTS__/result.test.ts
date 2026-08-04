@@ -154,6 +154,44 @@ describe("Result", () => {
     });
   });
 
+  describe("type hole closure — Result.ok() overloads", () => {
+    // Type-level guarantee (enforced by the overloads, not assertable at runtime):
+    //   Result.ok()           → Result<void, E>   — void overload, no value required
+    //   Result.ok(value)      → Result<T, E>       — typed overload, value required
+    //   Result.ok<string>()   → compile error: no overload matches (would have been
+    //                           silent before this fix — getValue() returned undefined
+    //                           typed as string, a runtime lie)
+    //
+    // The runtime checks below verify the observable behaviour that the overloads guarantee.
+
+    it("Result.ok() produces a void-payload success (undefined at runtime)", () => {
+      const voidResult = Result.ok();
+
+      // Runtime: getValue() returns undefined — correct for void, not a lie about a non-void T
+      expect(voidResult.isSuccess).toBe(true);
+      expect(voidResult.getValue()).toBeUndefined();
+    });
+
+    it("Result.ok(value) round-trips the value through getValue()", () => {
+      const strResult = Result.ok("hello");
+      const numResult = Result.ok(42);
+
+      // Before the fix: Result.ok<string>() would compile and getValue() here would
+      // silently return undefined typed as string. Now the value overload requires an argument.
+      expect(strResult.getValue()).toBe("hello");
+      expect(numResult.getValue()).toBe(42);
+    });
+
+    it("the void and value overloads coexist without narrowing errors", () => {
+      // Ensure both paths produce a success result with the expected payload.
+      const v: Result<void, string> = Result.ok();
+      const s: Result<string, string> = Result.ok("world");
+
+      expect(v.isSuccess).toBe(true);
+      expect(s.getValue()).toBe("world");
+    });
+  });
+
   describe("type safety", () => {
     it("should preserve value type through ok()", () => {
       const stringResult = Result.ok<string>("hello");

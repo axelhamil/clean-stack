@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IStripeCatalogSource,
@@ -12,7 +13,7 @@ const proPrice: StripePriceLite = {
   tier: "pro",
   unitAmount: 2000,
   currency: "usd",
-  interval: "month",
+  interval: Option.some("month"),
   productName: "Pro",
   marketingFeatures: ["Audit log", "API access"],
 };

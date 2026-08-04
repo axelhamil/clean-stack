@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   BillingError,
@@ -13,13 +13,15 @@ function makeStore(row: SubscriptionRow | null, fail = false): ISubscriptionRead
   return {
     findActiveByReference: mock(async () =>
       fail
-        ? Result.fail<SubscriptionRow | null, BillingError>({
+        ? Result.fail<Option<SubscriptionRow>, BillingError>({
             code: "BILLING_PROVIDER_FAILURE",
             message: "db down",
           })
-        : Result.ok<SubscriptionRow | null, BillingError>(row),
+        : Result.ok<Option<SubscriptionRow>, BillingError>(Option.fromNullable(row)),
     ),
-    findCustomerIdByReference: mock(async () => Result.ok<string | null, BillingError>(null)),
+    findCustomerIdByReference: mock(async () =>
+      Result.ok<Option<string>, BillingError>(Option.none()),
+    ),
   };
 }
 

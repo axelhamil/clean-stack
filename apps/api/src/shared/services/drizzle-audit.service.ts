@@ -1,4 +1,4 @@
-import { Result, uuidv7 } from "@packages/ddd-kit";
+import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   asc,
@@ -43,9 +43,9 @@ export class DrizzleAuditRepository implements IAuditPort {
       try {
         const query = exec.insert(auditLogSchema.auditLog).values({
           id,
-          actorId: entry.actorId,
+          actorId: entry.actorId.toNull(),
           actorType: entry.actorType,
-          organizationId: entry.organizationId,
+          organizationId: entry.organizationId.toNull(),
           action: entry.action,
           targetType: entry.targetType,
           targetId: entry.targetId,
@@ -61,8 +61,8 @@ export class DrizzleAuditRepository implements IAuditPort {
         return Result.ok({
           id,
           occurredAt,
-          prevHash: null,
-          hash: null,
+          prevHash: Option.none<string>(),
+          hash: Option.none<string>(),
           ...entry,
         });
       } catch (e) {
@@ -112,9 +112,9 @@ export class DrizzleAuditRepository implements IAuditPort {
         const hasMore = rows.length > limit;
         const items = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
           id: r.id,
-          actorId: r.actorId,
+          actorId: Option.fromNullable(r.actorId),
           actorType: r.actorType,
-          organizationId: r.organizationId,
+          organizationId: Option.fromNullable(r.organizationId),
           action: r.action,
           targetType: r.targetType,
           targetId: r.targetId,
@@ -122,10 +122,12 @@ export class DrizzleAuditRepository implements IAuditPort {
           requestId: r.requestId ?? undefined,
           retention: r.retention,
           occurredAt: r.occurredAt,
-          prevHash: r.prevHash,
-          hash: r.hash,
+          prevHash: Option.fromNullable(r.prevHash),
+          hash: Option.fromNullable(r.hash),
         }));
-        const nextCursor = hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null;
+        const nextCursor = Option.fromNullable(
+          hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null,
+        );
         return Result.ok({ items, nextCursor });
       } catch (e) {
         this.instrumentation.capture(e);
@@ -166,8 +168,8 @@ export class DrizzleAuditRepository implements IAuditPort {
               return Result.ok({
                 verified: false,
                 rowCount: rows.length,
-                brokenAtId: r.id,
-                brokenAtSequence: r.sequence,
+                brokenAtId: Option.some(r.id),
+                brokenAtSequence: Option.some(r.sequence),
               });
             }
             prev = r.hash as string;
@@ -175,8 +177,8 @@ export class DrizzleAuditRepository implements IAuditPort {
           return Result.ok({
             verified: true,
             rowCount: rows.length,
-            brokenAtId: null,
-            brokenAtSequence: null,
+            brokenAtId: Option.none<string>(),
+            brokenAtSequence: Option.none<number>(),
           });
         } catch (e) {
           this.instrumentation.capture(e);

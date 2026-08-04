@@ -38,11 +38,11 @@ const stubEndpoint: WebhookEndpointRecord = {
   enabled: true,
   createdAt: new Date("2024-01-01"),
   updatedAt: new Date("2024-01-01"),
-  previousSecretCipher: null,
-  previousSecretExpiresAt: null,
+  previousSecretCipher: Option.none(),
+  previousSecretExpiresAt: Option.none(),
   consecutiveFailures: 0,
-  firstFailedAt: null,
-  disabledAt: null,
+  firstFailedAt: Option.none(),
+  disabledAt: Option.none(),
 };
 
 const stubDelivery: WebhookDeliveryRecord = {
@@ -67,13 +67,13 @@ const stubDeliveryWithAttempts = {
       id: "att-1",
       deliveryId: DELIVERY_ID,
       attemptNumber: 1,
-      requestHeaders: null,
-      requestBody: null,
-      responseStatus: null,
-      responseHeaders: null,
-      responseBody: null,
-      durationMs: null,
-      error: "connection refused",
+      requestHeaders: Option.none<Record<string, string>>(),
+      requestBody: Option.none<string>(),
+      responseStatus: Option.none<number>(),
+      responseHeaders: Option.none<Record<string, string>>(),
+      responseBody: Option.none<string>(),
+      durationMs: Option.none<number>(),
+      error: Option.some("connection refused"),
       createdAt: new Date("2024-01-01"),
     },
   ],
@@ -122,7 +122,7 @@ function makeDeliveries(
   return {
     list: mock(async () => Result.ok<DeliveryPage, WebhookRepoError>(page)),
     findById: mock(async () => Option.some(stubDelivery)),
-    updateStatus: mock(async () => Result.ok<void, WebhookRepoError>()),
+    updateStatus: mock(async () => Result.ok<WebhookRepoError>()),
     findPendingBatch: mock(async () => Result.ok([])),
     enqueueReplay: mock(async () =>
       Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.some(stubDelivery)),
@@ -294,8 +294,8 @@ describe("WebhooksService", () => {
         ...stubEndpoint,
         enabled: true,
         consecutiveFailures: 0,
-        firstFailedAt: null,
-        disabledAt: null,
+        firstFailedAt: Option.none(),
+        disabledAt: Option.none(),
       };
       const endpoints = makeEndpoints({
         update: mock(async () =>
@@ -317,7 +317,7 @@ describe("WebhooksService", () => {
       expect(opt.isSome()).toBe(true);
       const record = opt.unwrap();
       expect(record.consecutiveFailures).toBe(0);
-      expect(record.disabledAt).toBeNull();
+      expect(record.disabledAt.isNone()).toBe(true);
     });
 
     it("calls instrumentation span with op=function", async () => {

@@ -30,6 +30,7 @@
     "@packages/cookie-consent": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
     "@packages/drizzle": "workspace:*",
+    "@packages/emails": "workspace:*",
     "@packages/events": "workspace:*",
     "@packages/policies": "workspace:*",
     "@sentry/bun": "^10.61.0",

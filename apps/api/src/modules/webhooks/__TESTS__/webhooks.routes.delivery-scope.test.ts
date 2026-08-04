@@ -19,11 +19,11 @@ const stubEndpointA = {
   enabled: true,
   createdAt: new Date("2024-01-01"),
   updatedAt: new Date("2024-01-01"),
-  previousSecretCipher: null,
-  previousSecretExpiresAt: null,
+  previousSecretCipher: Option.none<string>(),
+  previousSecretExpiresAt: Option.none<Date>(),
   consecutiveFailures: 0,
-  firstFailedAt: null,
-  disabledAt: null,
+  firstFailedAt: Option.none<Date>(),
+  disabledAt: Option.none<Date>(),
 };
 
 // Delivery that belongs to endpoint B, not A

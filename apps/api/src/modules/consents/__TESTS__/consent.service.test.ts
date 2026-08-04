@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
@@ -28,19 +28,24 @@ const noopOutbox: IOutboxRepository = {
 const activeRow: ConsentRecordRow = {
   id: "row-1",
   subjectId: "subj-1",
-  userId: "u1",
+  userId: Option.some("u1"),
   categories: ["necessary", "analytics"],
   policyVersion: "2026-07-09",
   grantedAt: new Date(),
+  withdrawnAt: Option.none(),
   expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
 };
 
 function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
   return {
-    insert: mock(async () => Result.ok<void, ConsentError>()),
-    findActiveBySubject: mock(async () => Result.ok<ConsentRecordRow | null, ConsentError>(null)),
-    findActiveByUser: mock(async () => Result.ok<ConsentRecordRow | null, ConsentError>(null)),
-    linkSubjectToUser: mock(async () => Result.ok<void, ConsentError>()),
+    insert: mock(async () => Result.ok<ConsentError>()),
+    findActiveBySubject: mock(async () =>
+      Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+    ),
+    findActiveByUser: mock(async () =>
+      Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+    ),
+    linkSubjectToUser: mock(async () => Result.ok<ConsentError>()),
     ...overrides,
   };
 }
@@ -105,7 +110,7 @@ describe("ConsentService", () => {
     it("always inserts a new record when a user updates preferences (append-only)", async () => {
       const store = makeStore({
         findActiveByUser: mock(async () =>
-          Result.ok<ConsentRecordRow | null, ConsentError>(activeRow),
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
       const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
@@ -147,7 +152,7 @@ describe("ConsentService", () => {
       const insertedRow = (store.insert as ReturnType<typeof mock>).mock
         .calls[0]?.[0] as ConsentRecordRow;
       expect(insertedRow.categories).toEqual([]);
-      expect(insertedRow.withdrawnAt).toBeDefined();
+      expect(insertedRow.withdrawnAt.isSome()).toBe(true);
 
       const withdrawnEvents = enqueued.filter(
         (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_WITHDRAWN,
@@ -177,7 +182,7 @@ describe("ConsentService", () => {
     it("delegates to findActiveByUser when userId is provided", async () => {
       const store = makeStore({
         findActiveByUser: mock(async () =>
-          Result.ok<ConsentRecordRow | null, ConsentError>(activeRow),
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
       const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
@@ -187,14 +192,17 @@ describe("ConsentService", () => {
       expect(result.isSuccess).toBe(true);
       expect(store.findActiveByUser).toHaveBeenCalled();
       expect(store.findActiveBySubject).not.toHaveBeenCalled();
-      expect(result.getValue()).toEqual(activeRow);
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap()).toEqual(activeRow);
     });
 
     it("falls back to findActiveBySubject when userId is provided but has no user record", async () => {
       const store = makeStore({
-        findActiveByUser: mock(async () => Result.ok<ConsentRecordRow | null, ConsentError>(null)),
+        findActiveByUser: mock(async () =>
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+        ),
         findActiveBySubject: mock(async () =>
-          Result.ok<ConsentRecordRow | null, ConsentError>(activeRow),
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
       const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
@@ -204,13 +212,14 @@ describe("ConsentService", () => {
       expect(result.isSuccess).toBe(true);
       expect(store.findActiveByUser).toHaveBeenCalled();
       expect(store.findActiveBySubject).toHaveBeenCalled();
-      expect(result.getValue()).toEqual(activeRow);
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap()).toEqual(activeRow);
     });
 
     it("delegates to findActiveBySubject when userId is not provided", async () => {
       const store = makeStore({
         findActiveBySubject: mock(async () =>
-          Result.ok<ConsentRecordRow | null, ConsentError>(null),
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
         ),
       });
       const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
@@ -220,7 +229,7 @@ describe("ConsentService", () => {
       expect(result.isSuccess).toBe(true);
       expect(store.findActiveBySubject).toHaveBeenCalled();
       expect(store.findActiveByUser).not.toHaveBeenCalled();
-      expect(result.getValue()).toBeNull();
+      expect(result.getValue().isNone()).toBe(true);
     });
   });
 

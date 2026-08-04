@@ -27,7 +27,7 @@ const noopOutbox: IOutboxRepository = {
 
 function makeStore(overrides: Partial<IPolicyAcceptanceStore> = {}): IPolicyAcceptanceStore {
   return {
-    insert: mock(async () => Result.ok<void, PolicyError>()),
+    insert: mock(async () => Result.ok<PolicyError>()),
     findLatestVersions: mock(async () =>
       Result.ok<Partial<Record<(typeof POLICY_TYPES)[number], string>>, PolicyError>({}),
     ),

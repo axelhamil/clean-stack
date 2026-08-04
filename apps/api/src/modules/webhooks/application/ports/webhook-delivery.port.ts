@@ -8,13 +8,13 @@ export type WebhookDeliveryAttemptRecord = {
   id: string;
   deliveryId: string;
   attemptNumber: number;
-  requestHeaders: Record<string, string> | null;
-  requestBody: string | null;
-  responseStatus: number | null;
-  responseHeaders: Record<string, string> | null;
-  responseBody: string | null;
-  durationMs: number | null;
-  error: string | null;
+  requestHeaders: Option<Record<string, string>>;
+  requestBody: Option<string>;
+  responseStatus: Option<number>;
+  responseHeaders: Option<Record<string, string>>;
+  responseBody: Option<string>;
+  durationMs: Option<number>;
+  error: Option<string>;
   createdAt: Date;
 };
 

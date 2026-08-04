@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
@@ -121,9 +122,9 @@ function chainRow(seq: number, prevHash: string, over: Partial<Record<string, un
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const baseEntry = {
-  actorId: "u1",
+  actorId: Option.some("u1"),
   actorType: "user" as const,
-  organizationId: "org-1",
+  organizationId: Option.some("org-1"),
   action: "user.deleted",
   targetType: "user",
   targetId: "u2",
@@ -222,12 +223,12 @@ describe("DrizzleAuditRepository", () => {
       expect(innerCall).toBeDefined();
     });
 
-    it("returns Result.ok with empty items and null nextCursor when no rows", async () => {
+    it("returns Result.ok with empty items and None nextCursor when no rows", async () => {
       const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
       const result = await repo.list(baseFilters);
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().items).toEqual([]);
-      expect(result.getValue().nextCursor).toBeNull();
+      expect(result.getValue().nextCursor.isNone()).toBe(true);
     });
 
     it("paginates: sets nextCursor when rows exceed limit", async () => {
@@ -259,7 +260,8 @@ describe("DrizzleAuditRepository", () => {
       expect(result.isSuccess).toBe(true);
       const page = result.getValue();
       expect(page.items).toHaveLength(2);
-      expect(page.nextCursor).toBe(new Date("2024-01-02").toISOString());
+      expect(page.nextCursor.isSome()).toBe(true);
+      expect(page.nextCursor.unwrap()).toBe(new Date("2024-01-02").toISOString());
     });
 
     it("calls instrumentation.capture and returns Result.fail on DB error", async () => {
@@ -290,7 +292,7 @@ describe("DrizzleAuditRepository", () => {
       const v = result.getValue();
       expect(v.verified).toBe(true);
       expect(v.rowCount).toBe(2);
-      expect(v.brokenAtId).toBeNull();
+      expect(v.brokenAtId.isNone()).toBe(true);
     });
 
     it("returns verified: false when a row's hash is tampered", async () => {
@@ -303,7 +305,8 @@ describe("DrizzleAuditRepository", () => {
       expect(result.isSuccess).toBe(true);
       const v = result.getValue();
       expect(v.verified).toBe(false);
-      expect(v.brokenAtId).toBe(row2.id);
+      expect(v.brokenAtId.isSome()).toBe(true);
+      expect(v.brokenAtId.unwrap()).toBe(row2.id);
     });
   });
 });

@@ -1,19 +1,14 @@
 import type { Result } from "@packages/ddd-kit";
+import type { EmailTemplates } from "@packages/emails";
+import type { ITransaction } from "../transaction";
 
+export type { EmailTemplates };
 export type TemplateVariables = Record<string, string | number>;
 
-export type EmailTemplates = {
-  verify_email: { name: string; verifyUrl: string };
-  reset_password: { name: string; resetUrl: string };
-  magic_link: { magicUrl: string };
-  org_invitation: { inviterName: string; orgName: string; role: string; inviteUrl: string };
-  data_export_ready: { name: string; downloadUrl: string; expiresAt: string };
-  delete_requested: { name: string; cancelUrl: string; expiresAt: string };
-  delete_cancelled: { name: string };
-  delete_completed: { name: string };
-  change_email: { name: string; newEmail: string; confirmUrl: string };
-  backup_code_used: { securityUrl: string };
-};
+export interface EmailBody {
+  html?: string;
+  text?: string;
+}
 
 export type EmailError =
   | { code: "EMAIL_TRANSPORT_NOT_CONFIGURED"; message: string }
@@ -23,6 +18,7 @@ export interface SendTemplateOptions {
   idempotencyKey?: string;
   from?: string;
   locale?: string;
+  tx?: ITransaction;
 }
 
 export interface IEmailService {
@@ -30,6 +26,24 @@ export interface IEmailService {
     template: K,
     to: string,
     variables: EmailTemplates[K] & TemplateVariables,
+    options?: SendTemplateOptions,
+  ): Promise<Result<void, EmailError>>;
+
+  sendRaw(
+    to: string,
+    subject: string,
+    body: EmailBody,
+    options?: SendTemplateOptions,
+  ): Promise<Result<void, EmailError>>;
+
+  sendTemplateBatch<K extends keyof EmailTemplates>(
+    template: K,
+    recipients: Array<{ to: string; variables: EmailTemplates[K] & TemplateVariables }>,
+    options?: SendTemplateOptions,
+  ): Promise<Result<void, EmailError>>;
+
+  sendRawBatch(
+    messages: Array<{ to: string; subject: string; body: EmailBody }>,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>>;
 }

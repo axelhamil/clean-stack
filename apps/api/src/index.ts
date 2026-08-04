@@ -21,6 +21,7 @@ import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
+import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
@@ -186,6 +187,7 @@ app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
+app.route("/internal", sweepEmailMessagesRoutes);
 
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
@@ -204,6 +206,7 @@ EventCollector.setOutOfContextLogger((msg, meta) => logger.warn(meta ?? {}, msg)
 await di.preload();
 await di.OutboxDispatcher.start(di as unknown as Record<string, unknown>);
 await di.WebhookDeliveryWorker.start();
+await di.EmailDeliveryWorker.start();
 lifecycleState.markStarted();
 
 const SHUTDOWN_STEP_TIMEOUT_MS = 25_000;
@@ -230,6 +233,7 @@ const shutdown = async (signal: string) => {
   logger.info({ signal }, "grace period elapsed, stopping workers");
   await Promise.all([
     stopWithTimeout("webhookDeliveryWorker", () => di.WebhookDeliveryWorker.stop()),
+    stopWithTimeout("emailDeliveryWorker", () => di.EmailDeliveryWorker.stop()),
     stopWithTimeout("outboxDispatcher", () => di.OutboxDispatcher.stop()),
   ]);
   process.exit(0);
