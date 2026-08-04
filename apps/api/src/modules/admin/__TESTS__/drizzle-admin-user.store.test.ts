@@ -1,17 +1,25 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+
+type SqlMarker = { _op: string; args: unknown[] };
+const mk =
+  (op: string) =>
+  (...args: unknown[]): SqlMarker => ({ _op: op, args });
 
 let dbBehavior: () => Promise<unknown[]> = async () => [];
-let capturedInArrayCallCount = 0;
+let capturedWhereArgs: unknown[] = [];
 
 function buildQuery(result: () => Promise<unknown[]>) {
   const q: Record<string, unknown> = {
     toSQL: () => ({ sql: "SELECT 1", params: [] }),
     execute: result,
+    where: (arg: unknown) => {
+      capturedWhereArgs.push(arg);
+      return buildQuery(result);
+    },
   };
   for (const m of [
     "select",
     "from",
-    "where",
     "limit",
     "orderBy",
     "innerJoin",
@@ -61,26 +69,25 @@ mock.module("@packages/drizzle", () => ({
   outboxSchema: {},
   auditLogSchema: {},
   webhooksSchema: {},
-  and: (..._a: unknown[]) => ({}),
-  or: (..._a: unknown[]) => ({}),
-  eq: (..._a: unknown[]) => ({}),
-  lt: (..._a: unknown[]) => ({}),
-  inArray: (..._a: unknown[]) => {
-    capturedInArrayCallCount++;
-    return {};
-  },
-  isNull: (..._a: unknown[]) => ({}),
-  isNotNull: (..._a: unknown[]) => ({}),
-  ilike: (..._a: unknown[]) => ({}),
-  desc: (..._a: unknown[]) => ({}),
-  count: (..._a: unknown[]) => ({}),
-  sql: Object.assign((_s: TemplateStringsArray, ..._v: unknown[]) => ({}), { raw: () => ({}) }),
+  and: mk("and"),
+  or: mk("or"),
+  eq: mk("eq"),
+  lt: mk("lt"),
+  inArray: mk("inArray"),
+  isNull: mk("isNull"),
+  isNotNull: mk("isNotNull"),
+  ilike: mk("ilike"),
+  desc: mk("desc"),
+  count: mk("count"),
+  sql: Object.assign(mk("sql"), { raw: mk("sql.raw") }),
 }));
 
 const { DrizzleAdminUserStore } = await import(
   "../infrastructure/repositories/drizzle-admin-user.store"
 );
 const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+
+type InstrType = InstanceType<typeof NoOpInstrumentation>;
 
 const fakeRow = {
   id: "u-1",
@@ -95,12 +102,14 @@ const fakeRow = {
 };
 
 describe("DrizzleAdminUserStore", () => {
+  let instrumentation: InstrType;
   let store: InstanceType<typeof DrizzleAdminUserStore>;
 
   beforeEach(() => {
-    store = new DrizzleAdminUserStore(new NoOpInstrumentation());
+    instrumentation = new NoOpInstrumentation();
+    store = new DrizzleAdminUserStore(instrumentation);
     dbBehavior = async () => [];
-    capturedInArrayCallCount = 0;
+    capturedWhereArgs = [];
   });
 
   describe("listUsers", () => {
@@ -111,14 +120,43 @@ describe("DrizzleAdminUserStore", () => {
       expect(rows[0]?.id).toBe("u-1");
     });
 
-    it("applies the organization filter via inArray when organizationId is set", async () => {
+    it("passes and(inArray(...)) to .where() when organizationId is set", async () => {
       await store.listUsers({ limit: 50, organizationId: "org-1" });
-      expect(capturedInArrayCallCount).toBe(1);
+      const mainArg = capturedWhereArgs[capturedWhereArgs.length - 1] as SqlMarker;
+      expect(mainArg).toBeDefined();
+      expect(mainArg._op).toBe("and");
+      const hasInArray = mainArg.args.some((a) => (a as SqlMarker)?._op === "inArray");
+      expect(hasInArray).toBe(true);
     });
 
-    it("omits the inArray condition when organizationId is absent", async () => {
+    it("passes undefined to .where() when organizationId is absent", async () => {
       await store.listUsers({ limit: 50 });
-      expect(capturedInArrayCallCount).toBe(0);
+      expect(capturedWhereArgs[capturedWhereArgs.length - 1]).toBeUndefined();
+    });
+
+    it("emits outer and inner db.query spans", async () => {
+      const spy = spyOn(instrumentation, "startSpan");
+      await store.listUsers({ limit: 50 });
+      const calls = spy.mock.calls;
+      const outer = calls.find((c) => c[0]?.name === "DrizzleAdminUserStore > listUsers");
+      const inner = calls.find((c) => c[0]?.op === "db.query");
+      expect(outer).toBeDefined();
+      expect(inner).toBeDefined();
+      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+    });
+
+    it("captures the error and rethrows when the db fails", async () => {
+      const boom = new Error("db boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      let callCount = 0;
+      spyOn(instrumentation, "startSpan").mockImplementation(((opts: unknown, cb: unknown) => {
+        callCount++;
+        if (callCount === 2) throw boom;
+        return (cb as () => Promise<unknown>)();
+      }) as typeof instrumentation.startSpan);
+
+      await expect(store.listUsers({ limit: 50 })).rejects.toThrow("db boom");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
     });
   });
 });
