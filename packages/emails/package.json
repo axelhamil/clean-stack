@@ -17,8 +17,8 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.1.0",
-    "react": "^19.2.7"
+    "react": "^19.2.7",
+    "react-email": "^6.9.1"
   }
 }
