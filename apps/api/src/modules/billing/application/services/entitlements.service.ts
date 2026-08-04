@@ -18,9 +18,10 @@ export class EntitlementsService {
           return { tier: "free", status: "free", ...entitlementsForTier("free") };
         }
         const row = result.getValue();
-        if (!row) return { tier: "free", status: "free", ...entitlementsForTier("free") };
-        const tier = isTier(row.tier) ? row.tier : "free";
-        return { tier, status: row.status, ...entitlementsForTier(tier) };
+        if (row.isNone()) return { tier: "free", status: "free", ...entitlementsForTier("free") };
+        const { tier: rawTier, status } = row.unwrap();
+        const tier = isTier(rawTier) ? rawTier : "free";
+        return { tier, status, ...entitlementsForTier(tier) };
       },
     );
   }

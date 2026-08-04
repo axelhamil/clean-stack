@@ -4,7 +4,7 @@ import {
   COOKIE_CONSENT_VERSION,
   type ConsentCategory,
 } from "@packages/cookie-consent";
-import { type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -45,10 +45,11 @@ export class ConsentService {
     const row: ConsentRecordRow = {
       id: crypto.randomUUID(),
       subjectId,
-      userId,
+      userId: Option.fromNullable(userId),
       categories: allCategories,
       policyVersion: COOKIE_CONSENT_VERSION,
       grantedAt: now,
+      withdrawnAt: Option.none(),
       expiresAt,
       ipAddress: ip,
       userAgent: ua,
@@ -99,11 +100,11 @@ export class ConsentService {
     const row: ConsentRecordRow = {
       id: crypto.randomUUID(),
       subjectId,
-      userId,
+      userId: Option.fromNullable(userId),
       categories: [],
       policyVersion: COOKIE_CONSENT_VERSION,
       grantedAt: now,
-      withdrawnAt: now,
+      withdrawnAt: Option.some(now),
       expiresAt,
     };
 
@@ -146,10 +147,10 @@ export class ConsentService {
     subjectId: string,
     policyVersion: string,
     userId?: string,
-  ): Promise<Result<ConsentRecordRow | null, ConsentError>> {
+  ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
     if (userId) {
       const byUser = await this.store.findActiveByUser(userId, policyVersion);
-      if (byUser.isFailure || byUser.getValue() !== null) return byUser;
+      if (byUser.isFailure || byUser.getValue().isSome()) return byUser;
     }
     return this.store.findActiveBySubject(subjectId, policyVersion);
   }

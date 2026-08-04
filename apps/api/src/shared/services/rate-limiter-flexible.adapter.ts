@@ -73,7 +73,18 @@ export class RateLimiterFlexibleAdapter implements IRateLimiter {
           if (!tightest || decision.remaining < tightest.remaining) tightest = decision;
         }
 
-        return Result.ok<RateLimitDecision, RateLimitError>(tightest as RateLimitDecision);
+        if (!tightest) {
+          return Result.ok<RateLimitDecision, RateLimitError>({
+            allowed: true,
+            limit: 0,
+            remaining: 0,
+            resetSeconds: 0,
+            policyName: "",
+            firstBlock: false,
+          });
+        }
+
+        return Result.ok<RateLimitDecision, RateLimitError>(tightest);
       } catch (err) {
         this.instrumentation.capture(err);
         return Result.fail<RateLimitDecision, RateLimitError>({
