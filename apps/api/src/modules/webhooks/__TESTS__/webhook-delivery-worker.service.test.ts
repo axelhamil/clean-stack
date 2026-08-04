@@ -573,12 +573,13 @@ describe("WebhookDeliveryWorker", () => {
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
     const attempt = fakeDeliveries.createAttempts[0];
     expect(attempt).toBeDefined();
-    expect(attempt?.deliveryId).toBe("del-1");
-    expect(attempt?.attemptNumber).toBe(1);
-    expect(attempt?.responseStatus).toBe(200);
-    expect(attempt?.requestHeaders).toMatchObject({ "content-type": "application/json" });
-    expect(attempt?.error).toBeNull();
-    expect(typeof attempt?.durationMs).toBe("number");
+    if (!attempt) return;
+    expect(attempt.deliveryId).toBe("del-1");
+    expect(attempt.attemptNumber).toBe(1);
+    expect(attempt.responseStatus.unwrap()).toBe(200);
+    expect(attempt.requestHeaders.unwrap()).toMatchObject({ "content-type": "application/json" });
+    expect(attempt.error.isNone()).toBe(true);
+    expect(typeof attempt.durationMs.unwrap()).toBe("number");
   });
 
   it("responseBody capé à WEBHOOK_RESPONSE_CAPTURE_BYTES (4096)", async () => {
@@ -600,11 +601,10 @@ describe("WebhookDeliveryWorker", () => {
     await runDrain(worker);
 
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt0 = fakeDeliveries.createAttempts[0];
+    const attempt0 = fakeDeliveries.createAttempts[0]!;
     expect(attempt0).toBeDefined();
-    const body = attempt0?.responseBody;
-    expect(body).not.toBeNull();
-    expect(body?.length).toBeLessThanOrEqual(4096);
+    expect(attempt0.responseBody.isSome()).toBe(true);
+    expect(attempt0.responseBody.unwrap().length).toBeLessThanOrEqual(4096);
   });
 
   it("transport-error (fetch throws) → createAttempt avec responseStatus=null et error non-null", async () => {
@@ -627,10 +627,10 @@ describe("WebhookDeliveryWorker", () => {
     await runDrain(worker);
 
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt = fakeDeliveries.createAttempts[0];
+    const attempt = fakeDeliveries.createAttempts[0]!;
     expect(attempt).toBeDefined();
-    expect(attempt?.responseStatus).toBeNull();
-    expect(attempt?.error).not.toBeNull();
+    expect(attempt.responseStatus.isNone()).toBe(true);
+    expect(attempt.error.isSome()).toBe(true);
   });
 
   it("SSRF bloqué → createAttempt appelé avec error, champs réponse null", async () => {
@@ -649,12 +649,12 @@ describe("WebhookDeliveryWorker", () => {
     await runDrain(worker);
 
     expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt = fakeDeliveries.createAttempts[0];
+    const attempt = fakeDeliveries.createAttempts[0]!;
     expect(attempt).toBeDefined();
-    expect(attempt?.responseStatus).toBeNull();
-    expect(attempt?.responseHeaders).toBeNull();
-    expect(attempt?.responseBody).toBeNull();
-    expect(attempt?.error).not.toBeNull();
+    expect(attempt.responseStatus.isNone()).toBe(true);
+    expect(attempt.responseHeaders.isNone()).toBe(true);
+    expect(attempt.responseBody.isNone()).toBe(true);
+    expect(attempt.error.isSome()).toBe(true);
   });
 
   // -------------------------------------------------------------------------

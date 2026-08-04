@@ -12,11 +12,11 @@ export type WebhookEndpointRecord = {
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
-  previousSecretCipher: string | null;
-  previousSecretExpiresAt: Date | null;
+  previousSecretCipher: Option<string>;
+  previousSecretExpiresAt: Option<Date>;
   consecutiveFailures: number;
-  firstFailedAt: Date | null;
-  disabledAt: Date | null;
+  firstFailedAt: Option<Date>;
+  disabledAt: Option<Date>;
 };
 
 export type CreateEndpointArgs = {

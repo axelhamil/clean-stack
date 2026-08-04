@@ -54,13 +54,13 @@ function toAttemptRecord(row: typeof wda.$inferSelect): WebhookDeliveryAttemptRe
     id: row.id,
     deliveryId: row.deliveryId,
     attemptNumber: row.attemptNumber,
-    requestHeaders: row.requestHeaders ?? null,
-    requestBody: row.requestBody ?? null,
-    responseStatus: row.responseStatus ?? null,
-    responseHeaders: row.responseHeaders ?? null,
-    responseBody: row.responseBody ?? null,
-    durationMs: row.durationMs ?? null,
-    error: row.error ?? null,
+    requestHeaders: Option.fromNullable(row.requestHeaders),
+    requestBody: Option.fromNullable(row.requestBody),
+    responseStatus: Option.fromNullable(row.responseStatus),
+    responseHeaders: Option.fromNullable(row.responseHeaders),
+    responseBody: Option.fromNullable(row.responseBody),
+    durationMs: Option.fromNullable(row.durationMs),
+    error: Option.fromNullable(row.error),
     createdAt: row.createdAt,
   };
 }
@@ -258,7 +258,18 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
       { name: "DrizzleWebhookDeliveryRepository > createAttempt" },
       async () => {
         try {
-          const query = tx.insert(wda).values({ id: uuidv7(), ...args });
+          const query = tx.insert(wda).values({
+            id: uuidv7(),
+            deliveryId: args.deliveryId,
+            attemptNumber: args.attemptNumber,
+            requestHeaders: args.requestHeaders.toNull(),
+            requestBody: args.requestBody.toNull(),
+            responseStatus: args.responseStatus.toNull(),
+            responseHeaders: args.responseHeaders.toNull(),
+            responseBody: args.responseBody.toNull(),
+            durationMs: args.durationMs.toNull(),
+            error: args.error.toNull(),
+          });
           await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),

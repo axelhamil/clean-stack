@@ -24,11 +24,11 @@ function toRecord(row: typeof we.$inferSelect): WebhookEndpointRecord {
     enabled: row.enabled,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    previousSecretCipher: row.previousSecretCipher ?? null,
-    previousSecretExpiresAt: row.previousSecretExpiresAt ?? null,
+    previousSecretCipher: Option.fromNullable(row.previousSecretCipher),
+    previousSecretExpiresAt: Option.fromNullable(row.previousSecretExpiresAt),
     consecutiveFailures: row.consecutiveFailures,
-    firstFailedAt: row.firstFailedAt ?? null,
-    disabledAt: row.disabledAt ?? null,
+    firstFailedAt: Option.fromNullable(row.firstFailedAt),
+    disabledAt: Option.fromNullable(row.disabledAt),
   };
 }
 
