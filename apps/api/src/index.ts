@@ -204,6 +204,7 @@ EventCollector.setOutOfContextLogger((msg, meta) => logger.warn(meta ?? {}, msg)
 await di.preload();
 await di.OutboxDispatcher.start(di as unknown as Record<string, unknown>);
 await di.WebhookDeliveryWorker.start();
+await di.EmailDeliveryWorker.start();
 lifecycleState.markStarted();
 
 const SHUTDOWN_STEP_TIMEOUT_MS = 25_000;
@@ -230,6 +231,7 @@ const shutdown = async (signal: string) => {
   logger.info({ signal }, "grace period elapsed, stopping workers");
   await Promise.all([
     stopWithTimeout("webhookDeliveryWorker", () => di.WebhookDeliveryWorker.stop()),
+    stopWithTimeout("emailDeliveryWorker", () => di.EmailDeliveryWorker.stop()),
     stopWithTimeout("outboxDispatcher", () => di.OutboxDispatcher.stop()),
   ]);
   process.exit(0);

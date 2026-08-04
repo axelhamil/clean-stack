@@ -15,6 +15,7 @@ import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
 import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
 import type { IEmailService } from "./shared/ports/email.port";
+import type { IEmailQueue } from "./shared/ports/email-queue.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
@@ -26,6 +27,7 @@ import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service"
 import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { QueuedEmailService } from "./shared/services/email.service";
+import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
@@ -40,6 +42,7 @@ import type { ITransaction } from "./shared/transaction";
 declare module "inwire" {
   interface AppDeps {
     ITransactionService: IUnitOfWork<ITransaction>;
+    IEmailQueue: IEmailQueue;
     IEmailService: IEmailService;
     IOutboxRepository: IOutboxRepository;
     IAuditPort: IAuditPort;
@@ -51,6 +54,7 @@ declare module "inwire" {
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
     BackupCodeUsedNotifier: EventHandler;
+    EmailDeliveryWorker: EmailDeliveryWorker;
   }
 }
 
@@ -72,10 +76,14 @@ export const di = container()
         await c.IOutboxRepository.enqueue(events, { source: "app/api" }, tx);
       }),
   )
+  .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation))
   .add(
     "IEmailService",
-    (c): IEmailService =>
-      new QueuedEmailService(new DrizzleEmailQueue(c.IInstrumentation), c.IInstrumentation),
+    (c): IEmailService => new QueuedEmailService(c.IEmailQueue, c.IInstrumentation),
+  )
+  .add(
+    "EmailDeliveryWorker",
+    (c) => new EmailDeliveryWorker(c.IEmailQueue, c.IOutboxRepository, logger, c.IInstrumentation),
   )
   .add(
     "IPasswordBreachService",
