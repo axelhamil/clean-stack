@@ -86,6 +86,9 @@ importers:
       '@packages/drizzle':
         specifier: workspace:*
         version: link:../../packages/drizzle
+      '@packages/emails':
+        specifier: workspace:*
+        version: link:../../packages/emails
       '@packages/events':
         specifier: workspace:*
         version: link:../../packages/events

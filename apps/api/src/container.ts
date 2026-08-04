@@ -23,8 +23,9 @@ import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
+import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
-import { ResendEmailService } from "./shared/services/email.service";
+import { QueuedEmailService } from "./shared/services/email.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
@@ -71,7 +72,11 @@ export const di = container()
         await c.IOutboxRepository.enqueue(events, { source: "app/api" }, tx);
       }),
   )
-  .add("IEmailService", (c): IEmailService => new ResendEmailService(c.IInstrumentation))
+  .add(
+    "IEmailService",
+    (c): IEmailService =>
+      new QueuedEmailService(new DrizzleEmailQueue(c.IInstrumentation), c.IInstrumentation),
+  )
   .add(
     "IPasswordBreachService",
     (c): IPasswordBreachService => new HibpPasswordBreachService(c.IInstrumentation),

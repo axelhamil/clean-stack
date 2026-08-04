@@ -1,66 +1,21 @@
 import { Result } from "@packages/ddd-kit";
-import { Resend } from "resend";
-import { env } from "../env";
-import { logger } from "../logger";
+import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import type {
+  EmailBody,
   EmailError,
   EmailTemplates,
   IEmailService,
   SendTemplateOptions,
   TemplateVariables,
 } from "../ports/email.port";
+import type { EmailMessageInsert, IEmailQueue } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 
-// Resend dashboard handles — fill when cloning. Empty = transport not configured (boots with a warn, emails logged not delivered).
-const TEMPLATE_IDS: Record<keyof EmailTemplates, string> = {
-  verify_email: "",
-  reset_password: "",
-  magic_link: "",
-  org_invitation: "",
-  data_export_ready: "",
-  delete_requested: "",
-  delete_cancelled: "",
-  delete_completed: "",
-  change_email: "",
-  backup_code_used: "",
-};
-
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
-const MAX_ATTEMPTS = 3;
-const BASE_DELAY_MS = 1000;
-
-const STATUS_HINTS: Record<number, string> = {
-  401: "resend auth failure — check RESEND_API_KEY",
-  403: "resend forbidden — verify sending domain configuration",
-  409: "resend idempotency conflict — same key with different payload, check template variables",
-  422: "resend validation failure — likely template variable mismatch in dashboard",
-};
-
-type ResendSendPayload = Parameters<Resend["emails"]["send"]>[0];
-type AttemptOutcome = { ok: true } | { ok: false; status: number; message: string };
-
-export class ResendEmailService implements IEmailService {
-  private readonly resend: Resend | null;
-
-  constructor(private readonly instrumentation: IInstrumentation) {
-    this.resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
-
-    const missing = Object.entries(TEMPLATE_IDS)
-      .filter(([, id]) => !id)
-      .map(([key]) => key);
-
-    if (!this.resend) {
-      logger.warn("RESEND_API_KEY not set — emails will be logged to stdout, not delivered");
-      return;
-    }
-
-    if (missing.length > 0) {
-      logger.warn(
-        { missing },
-        "missing RESEND template IDs — emails for these templates will be logged, not delivered",
-      );
-    }
-  }
+export class QueuedEmailService implements IEmailService {
+  constructor(
+    private readonly queue: IEmailQueue,
+    private readonly instrumentation: IInstrumentation,
+  ) {}
 
   async sendTemplate<K extends keyof EmailTemplates>(
     template: K,
@@ -68,130 +23,77 @@ export class ResendEmailService implements IEmailService {
     variables: EmailTemplates[K] & TemplateVariables,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>> {
-    return this.instrumentation.startSpan(
-      { name: "ResendEmailService > sendTemplate", op: "function", attributes: { template } },
-      () => this.sendTemplateInner(template, to, variables, options),
-    );
+    return this.sendTemplateBatch(template, [{ to, variables }], options);
   }
 
-  private async sendTemplateInner<K extends keyof EmailTemplates>(
+  async sendTemplateBatch<K extends keyof EmailTemplates>(
     template: K,
-    to: string,
-    variables: EmailTemplates[K] & TemplateVariables,
+    recipients: Array<{ to: string; variables: EmailTemplates[K] & TemplateVariables }>,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>> {
-    const templateId = TEMPLATE_IDS[template];
-    if (!this.resend || !templateId) {
-      if (env.NODE_ENV !== "production") {
-        const links = Object.entries(variables)
-          .filter(
-            ([key, value]) =>
-              typeof value === "string" &&
-              (key.toLowerCase().includes("url") || value.startsWith("http")),
-          )
-          .map(([, value]) => value as string);
-        logger.info(
-          { template, to, links, variables, idempotencyKey: options?.idempotencyKey },
-          links.length > 0
-            ? `[email-dev] ${template} → ${to} — link: ${links.join(" | ")}`
-            : `[email-dev] ${template} → ${to} (no link in payload)`,
-        );
-        return Result.ok();
-      }
-      return Result.fail({
-        code: "EMAIL_TRANSPORT_NOT_CONFIGURED",
-        message: `transport missing for template "${template}"`,
-      });
-    }
-
-    if (options?.locale) {
-      logger.warn(
-        { template, locale: options.locale },
-        "locale-aware templates not yet implemented — using default template",
-      );
-    }
-
-    const payload: ResendSendPayload = {
-      from: options?.from ?? env.RESEND_FROM,
-      to,
-      template: { id: templateId, variables },
-      ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
-    };
-
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const outcome = await this.attemptSend(payload);
-      if (outcome.ok) return Result.ok();
-
-      const isLast = attempt === MAX_ATTEMPTS;
-      const retryable = outcome.status === 0 || RETRYABLE_STATUSES.has(outcome.status);
-
-      if (!retryable || isLast) {
-        const hint = STATUS_HINTS[outcome.status] ?? "resend email send failed";
-        logger.error(
-          {
-            to,
-            template,
-            status: outcome.status,
-            message: outcome.message,
-            attempt,
-          },
-          hint,
-        );
-        return Result.fail({
-          code: "EMAIL_PROVIDER_FAILURE",
-          message: outcome.message,
-        });
-      }
-
-      const delay = BASE_DELAY_MS * 2 ** (attempt - 1);
-      logger.warn(
-        {
-          to,
-          template,
-          status: outcome.status,
-          attempt,
-          nextDelayMs: delay,
-        },
-        "retrying email send",
-      );
-      await new Promise((r) => setTimeout(r, delay));
-    }
-
-    return Result.fail({
-      code: "EMAIL_PROVIDER_FAILURE",
-      message: "exhausted retries",
-    });
-  }
-
-  private async attemptSend(payload: ResendSendPayload): Promise<AttemptOutcome> {
-    if (!this.resend) {
-      return { ok: false, status: 0, message: "resend client not initialized" };
-    }
     return this.instrumentation.startSpan(
       {
-        name: "POST https://api.resend.com/emails",
-        op: "http.client",
-        attributes: { "http.method": "POST", "http.host": "api.resend.com" },
+        name: "QueuedEmailService > sendTemplateBatch",
+        attributes: { template: String(template) },
       },
       async () => {
-        if (!this.resend) {
-          return { ok: false, status: 0, message: "resend client not initialized" } as const;
+        const rows: EmailMessageInsert[] = [];
+        for (const [index, r] of recipients.entries()) {
+          const rendered = await renderTemplate(template as EmailTemplateKey, r.variables as never);
+          rows.push({
+            kind: "template",
+            template: String(template),
+            toAddress: r.to,
+            subject: rendered.subject,
+            payload: r.variables,
+            idempotencyKey: options?.idempotencyKey ? `${options.idempotencyKey}/${index}` : null,
+          });
         }
-        try {
-          const { error } = await this.resend.emails.send(payload);
-          if (!error) return { ok: true } as const;
-          const status = (error as { statusCode?: number }).statusCode ?? 500;
-          if (status >= 500) this.instrumentation.capture(error);
-          return { ok: false, status, message: error.message ?? "unknown" } as const;
-        } catch (e) {
-          this.instrumentation.capture(e);
-          return {
-            ok: false,
-            status: 0,
-            message: e instanceof Error ? e.message : "network error",
-          } as const;
-        }
+        return this.enqueue(rows, options?.tx);
       },
     );
+  }
+
+  async sendRaw(
+    to: string,
+    subject: string,
+    body: EmailBody,
+    options?: SendTemplateOptions,
+  ): Promise<Result<void, EmailError>> {
+    return this.sendRawBatch([{ to, subject, body }], options);
+  }
+
+  async sendRawBatch(
+    messages: Array<{ to: string; subject: string; body: EmailBody }>,
+    options?: SendTemplateOptions,
+  ): Promise<Result<void, EmailError>> {
+    return this.instrumentation.startSpan(
+      { name: "QueuedEmailService > sendRawBatch" },
+      async () => {
+        const rows: EmailMessageInsert[] = messages.map((m, index) => ({
+          kind: "raw" as const,
+          template: null,
+          toAddress: m.to,
+          subject: m.subject,
+          payload: m.body,
+          idempotencyKey: options?.idempotencyKey ? `${options.idempotencyKey}/${index}` : null,
+        }));
+        return this.enqueue(rows, options?.tx);
+      },
+    );
+  }
+
+  private async enqueue(
+    rows: EmailMessageInsert[],
+    tx: SendTemplateOptions["tx"],
+  ): Promise<Result<void, EmailError>> {
+    const written = await this.queue.enqueue(rows, tx);
+    if (written.isFailure) {
+      return Result.fail({
+        code: "EMAIL_PROVIDER_FAILURE",
+        message: written.getError().message,
+      });
+    }
+    return Result.ok();
   }
 }
