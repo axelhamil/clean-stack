@@ -1,0 +1,167 @@
+import { Result, uuidv7 } from "@packages/ddd-kit";
+import { and, db, emailSchema, eq, inArray, isNull, lte, or, sql } from "@packages/drizzle";
+import type {
+  EmailMessageInsert,
+  EmailMessageRecord,
+  EmailQueueError,
+  IEmailQueue,
+} from "../ports/email-queue.port";
+import type { IInstrumentation } from "../ports/instrumentation.port";
+import type { ITransaction } from "../transaction";
+
+export class DrizzleEmailQueue implements IEmailQueue {
+  constructor(private readonly instrumentation: IInstrumentation) {}
+
+  async enqueue(
+    rows: EmailMessageInsert[],
+    tx?: ITransaction,
+  ): Promise<Result<void, EmailQueueError>> {
+    return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > enqueue" }, async () => {
+      if (rows.length === 0) return Result.ok<void, EmailQueueError>(undefined);
+      const exec = tx ?? db;
+      try {
+        const values = rows.map((r) => ({
+          id: uuidv7(),
+          kind: r.kind,
+          template: r.template,
+          toAddress: r.toAddress,
+          subject: r.subject,
+          payload: r.payload,
+          status: "pending" as const,
+          attempts: 0,
+          nextAttemptAt: null,
+          idempotencyKey: r.idempotencyKey,
+        }));
+        const query = exec.insert(emailSchema.emailMessage).values(values);
+        await this.instrumentation.startSpan(
+          {
+            name: "insert into email_message",
+            op: "db.query",
+            attributes: { "db.system.name": "postgresql" },
+          },
+          () => query,
+        );
+        return Result.ok<void, EmailQueueError>(undefined);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return Result.fail({
+          code: "EMAIL_QUEUE_WRITE_FAILED",
+          message: err instanceof Error ? err.message : "enqueue failed",
+        });
+      }
+    });
+  }
+
+  async claimPending(
+    limit: number,
+    claimUntil: Date,
+    tx: ITransaction,
+  ): Promise<Result<EmailMessageRecord[], EmailQueueError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleEmailQueue > claimPending" },
+      async () => {
+        const em = emailSchema.emailMessage;
+        try {
+          const subq = tx
+            .select({ id: em.id })
+            .from(em)
+            .where(
+              and(
+                eq(em.status, "pending"),
+                or(isNull(em.nextAttemptAt), lte(em.nextAttemptAt, new Date())),
+              ),
+            )
+            .orderBy(em.createdAt)
+            .limit(limit)
+            .for("update", { skipLocked: true });
+
+          const query = tx
+            .update(em)
+            .set({ nextAttemptAt: claimUntil })
+            .where(inArray(em.id, subq))
+            .returning();
+
+          const rows = await this.instrumentation.startSpan(
+            {
+              name: query.toSQL().sql,
+              op: "db.query",
+              attributes: { "db.system.name": "postgresql" },
+            },
+            () => query.execute(),
+          );
+          return Result.ok<EmailMessageRecord[], EmailQueueError>(rows as EmailMessageRecord[]);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail({
+            code: "EMAIL_QUEUE_WRITE_FAILED",
+            message: err instanceof Error ? err.message : "claim failed",
+          });
+        }
+      },
+    );
+  }
+
+  async markSent(
+    ids: string[],
+    sentAt: Date,
+    providerMessageIds: Record<string, string>,
+    tx: ITransaction,
+  ): Promise<Result<void, EmailQueueError>> {
+    return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markSent" }, async () => {
+      const em = emailSchema.emailMessage;
+      try {
+        for (const id of ids) {
+          const query = tx
+            .update(em)
+            .set({
+              status: "sent",
+              sentAt,
+              nextAttemptAt: null,
+              lastError: null,
+              providerMessageId: providerMessageIds[id] ?? null,
+              attempts: sql`${em.attempts} + 1`,
+            })
+            .where(eq(em.id, id));
+          await query.execute();
+        }
+        return Result.ok<void, EmailQueueError>(undefined);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return Result.fail({
+          code: "EMAIL_QUEUE_WRITE_FAILED",
+          message: err instanceof Error ? err.message : "markSent failed",
+        });
+      }
+    });
+  }
+
+  async markFailed(
+    id: string,
+    error: string,
+    nextAttempt: Date | null,
+    tx: ITransaction,
+  ): Promise<Result<void, EmailQueueError>> {
+    return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markFailed" }, async () => {
+      const em = emailSchema.emailMessage;
+      try {
+        const query = tx
+          .update(em)
+          .set({
+            status: nextAttempt === null ? "failed" : "pending",
+            nextAttemptAt: nextAttempt,
+            lastError: error.slice(0, 2000),
+            attempts: sql`${em.attempts} + 1`,
+          })
+          .where(eq(em.id, id));
+        await query.execute();
+        return Result.ok<void, EmailQueueError>(undefined);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return Result.fail({
+          code: "EMAIL_QUEUE_WRITE_FAILED",
+          message: err instanceof Error ? err.message : "markFailed failed",
+        });
+      }
+    });
+  }
+}
