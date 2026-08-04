@@ -59,6 +59,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: "A subscription was cancelled.",
   [EventTypes.BILLING_PAYMENT_FAILED]: "A subscription payment failed.",
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "A plan quota was exceeded.",
+  [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
+    "An email was abandoned after exhausting all delivery attempts.",
 };
 
 export function descriptionFor(eventType: string): string {

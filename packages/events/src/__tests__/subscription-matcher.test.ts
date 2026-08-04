@@ -10,19 +10,20 @@ import {
 } from "../event-types";
 
 describe("subscription partitioning", () => {
-  it("internal set = the 4 webhook mechanics events", () => {
+  it("internal set = the 4 webhook mechanics events + email.delivery.exhausted", () => {
     expect([...INTERNAL_EVENT_TYPES].sort()).toEqual(
       [
         "webhook.test",
         "webhook.endpoint.secret_rotated",
         "webhook.endpoint.disabled",
         "webhook.delivery.exhausted",
+        "email.delivery.exhausted",
       ].sort(),
     );
   });
 
   it("subscribable = all minus internal", () => {
-    expect(SUBSCRIBABLE_EVENT_TYPES).toHaveLength(ALL_EVENT_TYPES.length - 4);
+    expect(SUBSCRIBABLE_EVENT_TYPES).toHaveLength(ALL_EVENT_TYPES.length - 5);
     expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.WEBHOOK_TEST);
     expect(SUBSCRIBABLE_EVENT_TYPES).toContain(EventTypes.WEBHOOK_ENDPOINT_CREATED);
   });

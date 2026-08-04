@@ -240,6 +240,16 @@ export const WebhookDeliveryExhaustedPayload = OrgRef.extend({
 });
 export type WebhookDeliveryExhaustedPayload = z.infer<typeof WebhookDeliveryExhaustedPayload>;
 
+export const EmailDeliveryExhaustedPayload = z.object({
+  messageId: z.string(),
+  template: z.string().nullable(),
+  toHash: z.string(),
+  attempts: z.number().int().nonnegative(),
+  lastError: z.string(),
+  actorUserId: z.string().nullable(),
+});
+export type EmailDeliveryExhaustedPayload = z.infer<typeof EmailDeliveryExhaustedPayload>;
+
 export const UserPolicyAcceptedPayload = UserRef.extend({
   policyType: z.string(),
   policyVersion: z.string(),
@@ -414,6 +424,7 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED]: WebhookEndpointSecretRotatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DISABLED]: WebhookEndpointDisabledPayload,
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]: WebhookDeliveryExhaustedPayload,
+  [EventTypes.EMAIL_DELIVERY_EXHAUSTED]: EmailDeliveryExhaustedPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,

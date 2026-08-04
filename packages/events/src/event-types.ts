@@ -53,6 +53,7 @@ export const EventTypes = {
   BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
   BILLING_PAYMENT_FAILED: "billing.payment.failed",
   BILLING_QUOTA_EXCEEDED: "billing.quota.exceeded",
+  EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -68,6 +69,7 @@ export const INTERNAL_EVENT_TYPES: readonly EventType[] = [
   EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED,
   EventTypes.WEBHOOK_ENDPOINT_DISABLED,
   EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
+  EventTypes.EMAIL_DELIVERY_EXHAUSTED,
 ];
 
 export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(
