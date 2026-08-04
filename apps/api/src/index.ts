@@ -21,6 +21,7 @@ import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
+import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
@@ -186,6 +187,7 @@ app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
+app.route("/internal", sweepEmailMessagesRoutes);
 
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))

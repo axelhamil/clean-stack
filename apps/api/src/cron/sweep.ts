@@ -9,6 +9,7 @@ if (!signingKey || signingKey.length < 32) {
 }
 
 const sweeps = [
+  "/internal/sweep-email-messages",
   "/internal/sweep-webhook-delivery",
   "/internal/sweep-audit-log",
   "/internal/sweep-outbox",
