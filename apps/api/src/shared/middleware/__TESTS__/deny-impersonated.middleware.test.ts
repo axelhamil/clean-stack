@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { denyImpersonated } from "../deny-impersonated.middleware";
 
 function ctx(session: unknown) {
@@ -22,5 +24,23 @@ describe("denyImpersonated", () => {
       called = true;
     });
     expect(called).toBe(true);
+  });
+
+  it("lets an impersonated session reach a read handler while blocking its mutation sibling", async () => {
+    const impersonatedSession = { id: "s-1", impersonatedBy: "admin-1" };
+    const injectSession = createMiddleware(async (c, next) => {
+      c.set("session" as never, impersonatedSession);
+      await next();
+    });
+    const app = new Hono()
+      .use("*", injectSession)
+      .get("/subscription", (c) => c.json({ tier: "free" }))
+      .post("/portal", denyImpersonated, (c) => c.json({ url: "https://billing.example.com" }));
+
+    const readRes = await app.request("/subscription");
+    expect(readRes.status).toBe(200);
+
+    const writeRes = await app.request("/portal", { method: "POST" });
+    expect(writeRes.status).toBe(403);
   });
 });
