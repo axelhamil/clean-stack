@@ -34,6 +34,7 @@ interface BanFormProps {
 export function BanForm({ isPending, onSubmit }: BanFormProps) {
   const form = useForm<BanFormInput>({
     resolver: zodResolver(banFormSchema),
+    mode: "onChange",
     defaultValues: { reason: "", expiresIn: undefined },
   });
 

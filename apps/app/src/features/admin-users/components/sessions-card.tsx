@@ -40,7 +40,9 @@ export function SessionsCard({ sessions }: SessionsCardProps) {
               {sessions.map((session) => (
                 <TableRow key={session.id}>
                   <TableCell>{session.ipAddress ?? "—"}</TableCell>
-                  <TableCell className="max-w-xs truncate">{session.userAgent ?? "—"}</TableCell>
+                  <TableCell className="max-w-xs overflow-hidden">
+                    {session.userAgent ?? "—"}
+                  </TableCell>
                   <TableCell>{new Date(session.createdAt).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell>{new Date(session.expiresAt).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell>

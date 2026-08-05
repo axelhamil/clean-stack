@@ -21,6 +21,7 @@ interface ImpersonateFormProps {
 export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
   const form = useForm<ImpersonateFormInput>({
     resolver: zodResolver(impersonateFormSchema),
+    mode: "onChange",
     defaultValues: { reason: "", ticketRef: "" },
   });
 

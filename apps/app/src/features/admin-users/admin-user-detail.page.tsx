@@ -222,25 +222,23 @@ export function AdminUserDetailPage() {
             )}
           </div>
         </CardContent>
-        <CardFooter>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={revokeSessionsMutation.isPending}
-              onClick={() => revokeSessionsMutation.mutate(id)}
-            >
-              Révoquer les sessions
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={resetPasswordMutation.isPending}
-              onClick={() => resetPasswordMutation.mutate(id)}
-            >
-              Réinitialiser le mot de passe
-            </Button>
-          </div>
+        <CardFooter className="flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={revokeSessionsMutation.isPending}
+            onClick={() => revokeSessionsMutation.mutate(id)}
+          >
+            Révoquer les sessions
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={resetPasswordMutation.isPending}
+            onClick={() => resetPasswordMutation.mutate(id)}
+          >
+            Réinitialiser le mot de passe
+          </Button>
         </CardFooter>
       </Card>
 
