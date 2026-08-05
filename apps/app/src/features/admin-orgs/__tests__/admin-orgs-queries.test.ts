@@ -6,10 +6,15 @@ import {
 
 describe("admin orgs query options", () => {
   it("keys the list by its search term", () => {
-    expect(adminOrgsInfiniteQueryOptions("acme").queryKey).toEqual(["admin", "orgs", "acme"]);
+    expect(adminOrgsInfiniteQueryOptions("acme").queryKey).toEqual([
+      "admin",
+      "orgs",
+      "list",
+      "acme",
+    ]);
   });
 
   it("keys the detail by org id", () => {
-    expect(adminOrgDetailQueryOptions("o-1").queryKey).toEqual(["admin", "orgs", "o-1"]);
+    expect(adminOrgDetailQueryOptions("o-1").queryKey).toEqual(["admin", "orgs", "detail", "o-1"]);
   });
 });

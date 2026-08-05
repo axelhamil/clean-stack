@@ -11,7 +11,7 @@ export type AdminOrgDetail = InferResponseType<typeof $getOrg, 200>;
 
 export const adminOrgsInfiniteQueryOptions = (search: string) =>
   infiniteQueryOptions({
-    queryKey: ["admin", "orgs", search] as const,
+    queryKey: ["admin", "orgs", "list", search] as const,
     queryFn: async ({ pageParam, signal }) => {
       const res = await $listOrgs(
         {
@@ -32,7 +32,7 @@ export const adminOrgsInfiniteQueryOptions = (search: string) =>
 
 export const adminOrgDetailQueryOptions = (id: string) =>
   queryOptions({
-    queryKey: ["admin", "orgs", id] as const,
+    queryKey: ["admin", "orgs", "detail", id] as const,
     queryFn: async ({ signal }) => {
       const res = await $getOrg({ param: { id } }, { init: { signal } });
       if (!res.ok) await throwApiError(res, "Impossible de charger l'organisation");

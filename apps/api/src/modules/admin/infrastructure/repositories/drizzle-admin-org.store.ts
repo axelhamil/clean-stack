@@ -11,6 +11,7 @@ import {
   lt,
   multiTenantSchema,
   or,
+  sql,
 } from "@packages/drizzle";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListOrgsInput } from "../../application/dto/list-orgs.dto";
@@ -154,6 +155,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
             .select({ plan: billingSchema.subscription.plan })
             .from(billingSchema.subscription)
             .where(eq(billingSchema.subscription.referenceId, organizationId))
+            .orderBy(sql`${billingSchema.subscription.periodStart} DESC NULLS LAST`)
             .limit(1);
 
           const rows = await this.instrumentation.startSpan(

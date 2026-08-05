@@ -81,6 +81,32 @@ describe("AdminActionService", () => {
     });
   });
 
+  describe("unban", () => {
+    it("emits admin.user.unbanned with the actor distinct from the subject", async () => {
+      emitted.length = 0;
+      const result = await service().unban({ actorUserId: "admin-1", userId: "u-2" });
+      expect(result.isSuccess).toBe(true);
+      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_UNBANNED);
+      expect(event?.payload.actorUserId).toBe("admin-1");
+      expect(event?.payload.userId).toBe("u-2");
+    });
+  });
+
+  describe("revokeSessions", () => {
+    it("emits admin.user.sessions_revoked with the actor distinct from the subject", async () => {
+      emitted.length = 0;
+      const result = await service().revokeSessions({
+        actorUserId: "admin-1",
+        userId: "u-2",
+        count: 3,
+      });
+      expect(result.isSuccess).toBe(true);
+      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_SESSIONS_REVOKED);
+      expect(event?.payload.actorUserId).toBe("admin-1");
+      expect(event?.payload.userId).toBe("u-2");
+    });
+  });
+
   describe("resetPassword", () => {
     it("revokes sessions before sending the reset email", async () => {
       emitted.length = 0;
