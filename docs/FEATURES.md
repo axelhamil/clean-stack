@@ -218,7 +218,7 @@ PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No 
 - **Dispatcher** — in-process Bun worker, `pg.Client` LISTEN + 30s poll fallback, `FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers inside the dispatch TX (atomic); `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`) — append-only (SOC2 / ISO 27001). `operational` (90d) vs `compliance` (7y) retention. Optional tamper-evidence hash chain (`AUDIT_TAMPER_EVIDENCE`). Operator UI at `/admin/audit-log` (filters, pagination, chain verify) — gated `requirePlatformAdmin`.
 - **Outbound webhooks** — HMAC-SHA256 signed (Stripe-style), AEAD-encrypted secrets (XChaCha20-Poly1305 + HKDF per org), decorrelated jitter retry (1m/5m/30m/2h/12h), dead-letter after 5 attempts, replay. See §Outbound webhooks for the full front-end surface.
-- **Catalog** `@packages/events` — **54 events** (50 subscribable / 4 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
+- **Catalog** `@packages/events` — **62 events** (57 subscribable / 5 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
 - **Request correlation** — `X-Request-Id` threaded into `outbox_event.metadata` and `audit_log.request_id` via `AsyncLocalStorage`.
 
 See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler, multi-tenant safety, BetterAuth bridge, HMAC verification).
@@ -278,7 +278,7 @@ Full operator surface for webhook endpoint management and delivery inspection, p
 
 **Frontend** `apps/app/src/features/webhooks/`: `/settings/webhooks` — endpoint list (enabled / paused / auto-disabled badges), create/edit Sheet with `EventTypePicker` (namespace groups + wildcards, same SSOT as the public catalog), cursor-paginated delivery list, per-delivery timeline drawer, one-shot secret reveal, rotate + test actions.
 
-**Public event catalog** `apps/app/src/features/developers/`: `/developers/events` (no auth) — all 50 subscribable events with group, retention, expandable Zod JSON schema, Node.js signature-verification snippet.
+**Public event catalog** `apps/app/src/features/developers/`: `/developers/events` (no auth) — all subscribable events (57 after C.3) with group, retention, expandable Zod JSON schema, Node.js signature-verification snippet.
 
 ---
 
@@ -292,10 +292,35 @@ UX hub consolidating privacy, compliance, and session surfaces into `/settings/p
 
 ---
 
+## Admin & impersonation ✅ Phase C.3
+
+Platform operator tooling — ban/unban users, change platform role, force password reset, revoke sessions, impersonate with justification. Every action emits a compliance-retained `admin.*` event.
+
+**Backend** `apps/api/src/modules/admin/`:
+- `AdminQueryService` — read-only platform user and org queries.
+- `AdminActionService` — ban, unban, role-change, force-password-reset, revoke-sessions. Instantiated in `routes.ts` (not inwire — real import cycle; deps from `di`).
+- `DrizzleAdminUserStore` / `DrizzleAdminOrgStore` — org-scoped reads with pagination and search.
+- `admin-impersonation.routes.ts` — `POST /admin/impersonation/:id/start` (reason required, ticketRef optional) + `POST /admin/impersonation/stop`.
+- `relay-set-cookie.ts` — proxies BetterAuth `Set-Cookie` headers to the app client.
+- `shared/middleware/impersonation-blocklist.ts` — BetterAuth `beforeHook` blocking sensitive auth endpoints.
+- `shared/middleware/deny-impersonated.middleware.ts` — per-mutation Hono middleware returning 403 `IMPERSONATION_ACTION_FORBIDDEN`.
+
+**Frontend**:
+- `features/admin-users/` — `admin-users.{route,page}.tsx`, `admin-user-detail.{route,page}.tsx`, `api/admin-users.{queries,mutations}.ts`, `forms/impersonate-form.tsx`, `admin-users.schema.ts`.
+- `features/admin-orgs/` — `admin-orgs.{route,page}.tsx`, `admin-org-detail.{route,page}.tsx`, `api/admin-orgs.queries.ts`.
+- `shared/components/impersonation-banner.tsx` — non-dismissable, live countdown, mounts in `_shell`.
+- `shared/auth/is-impersonating.ts` — derives impersonation state from the session payload.
+- `shared/api/mutations/stop-impersonation.ts` — mutation factory used by the banner.
+
+**Transparency email**: `application/event-handlers/notify-impersonated-user.ts` — `onEvent(ADMIN_IMPERSONATION_STARTED)` handler, tolerant (failure captured, does not abort).
+
+**Events** (7 new, all `compliance` retention): `admin.impersonation.{started,stopped}`, `admin.user.{banned,unbanned,role_changed,password_reset,sessions_revoked}` → catalog 55 → **62 total**.
+
+---
+
 ## Roadmap (not yet shipped)
 
 See [`../ROADMAP.md`](../ROADMAP.md) for the full plan.
 
-- Admin & impersonation (BetterAuth `admin` plugin).
 - Domain-event → telemetry subscribers (trivial `onEvent(...)` additions, lands with Phase D.1).
 - i18n (TanStack Router locale routes + typed message catalogs).

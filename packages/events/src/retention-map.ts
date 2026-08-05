@@ -58,6 +58,13 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.BILLING_PAYMENT_FAILED]: "compliance",
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "operational",
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]: "operational",
+  [EventTypes.ADMIN_IMPERSONATION_STARTED]: "compliance",
+  [EventTypes.ADMIN_IMPERSONATION_STOPPED]: "compliance",
+  [EventTypes.ADMIN_USER_BANNED]: "compliance",
+  [EventTypes.ADMIN_USER_UNBANNED]: "compliance",
+  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "compliance",
+  [EventTypes.ADMIN_USER_PASSWORD_RESET]: "compliance",
+  [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: "compliance",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

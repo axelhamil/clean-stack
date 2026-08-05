@@ -5,6 +5,7 @@ import { policiesQueryOptions } from "../shared/api/queries/policies";
 import { sessionQueryOptions } from "../shared/api/queries/session";
 import { ensurePlatformAdmin } from "../shared/auth/ensure-platform-admin";
 import { AppShell } from "../shared/components/app-shell";
+import { shouldRedirectToLegalAccept } from "./should-redirect-to-legal-accept";
 
 export type RouterContext = { queryClient: QueryClient };
 
@@ -46,10 +47,11 @@ export const shellLayout = createRoute({
   getParentRoute: () => protectedLayout,
   id: "_shell",
   beforeLoad: async ({ context, location }) => {
-    const policies = await context.queryClient
-      .ensureQueryData(policiesQueryOptions)
-      .catch(() => null);
-    if (policies && Object.values(policies).some((p) => !p.current)) {
+    const [policies, session] = await Promise.all([
+      context.queryClient.ensureQueryData(policiesQueryOptions).catch(() => null),
+      context.queryClient.ensureQueryData(sessionQueryOptions).catch(() => null),
+    ]);
+    if (shouldRedirectToLegalAccept(session, policies)) {
       throw redirect({ to: "/legal/accept", search: { redirect: location.href } });
     }
   },

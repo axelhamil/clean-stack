@@ -1,6 +1,7 @@
 import type { EventHandler, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { container } from "inwire";
+import { adminModule } from "./modules/admin/module";
 import { auditLogModule } from "./modules/audit-log/module";
 import { billingModule } from "./modules/billing/module";
 import { consentModule } from "./modules/consents/module";
@@ -115,6 +116,7 @@ export const di = container()
         c.IInstrumentation,
       ),
   )
+  .addModule(adminModule)
   .addModule(healthModule)
   .addModule(uploadsModule)
   .addModule(rgpdModule)

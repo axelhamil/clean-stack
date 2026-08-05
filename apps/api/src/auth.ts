@@ -31,6 +31,7 @@ import {
   insertPersonalOrgWithOwner,
   setPendingEmail,
 } from "./auth-queries";
+import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
 import {
   authorizeSubscriptionReference,
@@ -41,6 +42,7 @@ import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
+import { isBlockedDuringImpersonation } from "./shared/middleware/impersonation-blocklist";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
@@ -280,7 +282,7 @@ const authOptions = {
   session: {
     cookieCache: {
       enabled: true,
-      maxAge: 5 * 60,
+      maxAge: 60,
     },
   },
 
@@ -575,6 +577,13 @@ const authOptions = {
       const path = ctx.path;
       const body = ctx.body as Record<string, unknown> | undefined;
 
+      if (isBlockedDuringImpersonation(path) && ctx.headers) {
+        const current = await auth.api.getSession({ headers: ctx.headers });
+        if (current?.session?.impersonatedBy) {
+          throw new APIError("FORBIDDEN", { message: "IMPERSONATION_ACTION_FORBIDDEN" });
+        }
+      }
+
       // Credential-stuffing: per-account rate-limit on sign-in (fail-closed — store error → 503)
       if (path === "/sign-in/email") {
         const email = body?.email as string | undefined;
@@ -868,12 +877,10 @@ export const auth = betterAuth({
   plugins: [
     ...authOptions.plugins,
     customSession(async ({ user, session }) => {
-      const isPlatformAdmin =
-        env.PLATFORM_ADMIN_IDS.includes(user.id) || (user as { role?: string }).role === "admin";
-      const enrichedUser = { ...user, isPlatformAdmin };
-      if (!session.activeOrganizationId) return { user: enrichedUser, session };
-      const role = await findActiveMemberRole(user.id, session.activeOrganizationId);
-      return { user: enrichedUser, session: { ...session, activeOrganizationRole: role } };
+      const role = session.activeOrganizationId
+        ? await findActiveMemberRole(user.id, session.activeOrganizationId)
+        : undefined;
+      return buildSessionPayload(user, session, env.PLATFORM_ADMIN_IDS, role);
     }, authOptions),
   ],
 });

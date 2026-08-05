@@ -13,7 +13,7 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v?.split(",").map((s) => s.trim())),
-  APP_URL: z.url().optional(),
+  APP_URL: z.url(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
   INTERNAL_SIGNING_KEY: z.string().min(32).optional(),

@@ -53,6 +53,13 @@ export const EventTypes = {
   BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
   BILLING_PAYMENT_FAILED: "billing.payment.failed",
   BILLING_QUOTA_EXCEEDED: "billing.quota.exceeded",
+  ADMIN_IMPERSONATION_STARTED: "admin.impersonation.started",
+  ADMIN_IMPERSONATION_STOPPED: "admin.impersonation.stopped",
+  ADMIN_USER_BANNED: "admin.user.banned",
+  ADMIN_USER_UNBANNED: "admin.user.unbanned",
+  ADMIN_USER_ROLE_CHANGED: "admin.user.role_changed",
+  ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
+  ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
   EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
 } as const;
 

@@ -18,6 +18,13 @@ const STUB_VARS = {
   delete_completed: { name: "Ada" },
   change_email: { name: "Ada", newEmail: "new@x.test", confirmUrl: "https://x.test/e" },
   backup_code_used: { securityUrl: "https://x.test/s" },
+  impersonation_started: {
+    userName: "Ada",
+    startedAt: "5 août 2026 à 10:00",
+    expiresAt: "5 août 2026 à 18:00",
+    reason: "ticket #42",
+    supportUrl: "https://example.com/support",
+  },
 } as const satisfies Record<EmailTemplateKey, unknown>;
 
 describe("renderTemplate", () => {

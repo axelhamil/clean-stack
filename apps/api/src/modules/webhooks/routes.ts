@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { zV } from "../../shared/validator";
 import { createEndpointBodySchema } from "./application/dto/create-endpoint.dto";
@@ -40,6 +41,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     zV("json", createEndpointBodySchema),
@@ -79,6 +81,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .patch(
     "/:id",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     zV("json", updateEndpointBodySchema),
@@ -115,6 +118,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .delete(
     "/:id",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {
@@ -212,6 +216,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/test",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {
@@ -240,6 +245,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/rotate-secret",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {
@@ -274,6 +280,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/deliveries/:deliveryId/replay",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {

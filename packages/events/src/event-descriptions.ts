@@ -61,6 +61,18 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "A plan quota was exceeded.",
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
     "An email was abandoned after exhausting all delivery attempts.",
+  [EventTypes.ADMIN_IMPERSONATION_STARTED]:
+    "Un administrateur plateforme a démarré une session d'impersonation.",
+  [EventTypes.ADMIN_IMPERSONATION_STOPPED]: "Une session d'impersonation a pris fin.",
+  [EventTypes.ADMIN_USER_BANNED]: "Un administrateur plateforme a suspendu un compte.",
+  [EventTypes.ADMIN_USER_UNBANNED]:
+    "Un administrateur plateforme a levé la suspension d'un compte.",
+  [EventTypes.ADMIN_USER_ROLE_CHANGED]:
+    "Un administrateur plateforme a modifié le rôle d'un compte.",
+  [EventTypes.ADMIN_USER_PASSWORD_RESET]:
+    "Un administrateur plateforme a déclenché une réinitialisation de mot de passe.",
+  [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:
+    "Un administrateur plateforme a révoqué les sessions d'un compte.",
 };
 
 export function descriptionFor(eventType: string): string {

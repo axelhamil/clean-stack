@@ -171,20 +171,36 @@ function useOrganizationGroup(): CommandGroupConfig | null {
   };
 }
 
+interface OperatorRoute {
+  id: string;
+  to: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+const OPERATOR_ROUTES: readonly OperatorRoute[] = [
+  {
+    id: "operator:audit-log",
+    to: "/admin/audit-log",
+    label: "Admin — Audit log",
+    icon: ScrollText,
+  },
+  { id: "operator:users", to: "/admin/users", label: "Admin — Accounts", icon: Users },
+  { id: "operator:orgs", to: "/admin/orgs", label: "Admin — Organizations", icon: Building2 },
+];
+
 function useOperatorGroup(): CommandGroupConfig | null {
   const navigate = useNavigate();
   const { data: session } = useQuery(sessionQueryOptions);
   if (!isPlatformAdmin(session)) return null;
   return {
-    heading: "Operator",
-    items: [
-      {
-        id: "operator:audit-log",
-        label: "Operator — Audit log",
-        icon: ScrollText,
-        run: () => navigate({ to: "/admin/audit-log" }),
-      },
-    ],
+    heading: "Admin",
+    items: OPERATOR_ROUTES.map((route) => ({
+      id: route.id,
+      label: route.label,
+      icon: route.icon,
+      run: () => navigate({ to: route.to }),
+    })),
   };
 }
 
