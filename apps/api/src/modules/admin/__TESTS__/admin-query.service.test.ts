@@ -180,7 +180,7 @@ describe("AdminQueryService", () => {
       const service = serviceReturning(rows);
       const page = (await service.listUsers({ limit: 1 })).getValue();
       expect(page.nextCursor.isSome()).toBe(true);
-      expect(page.nextCursor.unwrap()).toBe(rows[0]!.createdAt.toISOString());
+      expect(page.nextCursor.unwrap()).toBe(rows[0]?.createdAt.toISOString());
     });
 
     it("passes organizationId filter through to the store", async () => {

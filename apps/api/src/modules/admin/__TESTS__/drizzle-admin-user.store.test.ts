@@ -198,7 +198,7 @@ describe("DrizzleAdminUserStore", () => {
       const boom = new Error("db boom");
       const captureSpy = spyOn(instrumentation, "capture");
       let callCount = 0;
-      spyOn(instrumentation, "startSpan").mockImplementation(((opts: unknown, cb: unknown) => {
+      spyOn(instrumentation, "startSpan").mockImplementation(((_opts: unknown, cb: unknown) => {
         callCount++;
         if (callCount === 2) throw boom;
         return (cb as () => Promise<unknown>)();
