@@ -114,8 +114,8 @@ importers:
         specifier: ^0.10.3
         version: 0.10.3(hono@4.12.27)(pino@10.3.1)
       inwire:
-        specifier: ^3.0.0
-        version: 3.0.0
+        specifier: ^3.1.3
+        version: 3.1.3
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -4479,8 +4479,8 @@ packages:
     resolution: {integrity: sha512-IBTdIkzZNOpqm7q3dRqJvMaldXjDHWkEDfrwGEQTs5eaQMWV+djAhR+wahyNNMAa+qpbDUhBMVt4ZKNwpPm7xQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
 
-  inwire@3.0.0:
-    resolution: {integrity: sha512-7klfURvDP4r64uMu51M8eF5jeSQgH/VUmdwUMcT8eBiX6lF8FKpy3vBFVe1+3OoN27PtVzvn4TZ0/jmNx9nqwg==}
+  inwire@3.1.3:
+    resolution: {integrity: sha512-nXgxKVTb4NvKDp7c04X0hhvt9izeVPH4ivWtU8963RKN+aNjrOEbOK75lPOOQ+PE2tU83fbVv6EmSjFbOM5iOw==}
 
   is-arrayish@0.2.1:
     resolution: {integrity: sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg==}
@@ -9995,7 +9995,7 @@ snapshots:
 
   ini@6.0.0: {}
 
-  inwire@3.0.0: {}
+  inwire@3.1.3: {}
 
   is-arrayish@0.2.1: {}
 
