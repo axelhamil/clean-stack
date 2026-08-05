@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@packages/ui/components/ui/select";
 import { Textarea } from "@packages/ui/components/ui/textarea";
-import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { type BanFormInput, banFormSchema } from "../admin-users.schema";
 
@@ -39,9 +38,7 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
     defaultValues: { reason: "", expiresIn: undefined },
   });
 
-  useEffect(() => {
-    void form.trigger();
-  }, [form.trigger]);
+  const reason = form.watch("reason");
 
   return (
     <Form {...form}>
@@ -86,7 +83,7 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" variant="destructive" disabled={!form.formState.isValid || isPending}>
+        <Button type="submit" variant="destructive" disabled={!reason.trim() || isPending}>
           Suspend account
         </Button>
       </form>

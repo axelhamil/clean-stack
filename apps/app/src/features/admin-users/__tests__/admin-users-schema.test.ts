@@ -3,6 +3,10 @@ import { banFormSchema, impersonateFormSchema } from "../admin-users.schema";
 
 describe("impersonateFormSchema", () => {
   it("rejects an empty reason", () => {
+    expect(impersonateFormSchema.safeParse({ reason: "" }).success).toBe(false);
+  });
+
+  it("rejects a whitespace-only reason", () => {
     expect(impersonateFormSchema.safeParse({ reason: "   " }).success).toBe(false);
   });
 
