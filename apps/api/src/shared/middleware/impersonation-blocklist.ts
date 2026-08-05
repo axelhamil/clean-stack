@@ -8,6 +8,11 @@ export const IMPERSONATION_BLOCKED_PATHS: readonly string[] = [
   "/set-password",
   "/two-factor",
   "/passkey",
+  "/link-social",
+  "/unlink-account",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
   "/admin",
 ];
 

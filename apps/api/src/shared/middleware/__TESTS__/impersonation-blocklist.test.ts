@@ -25,7 +25,20 @@ describe("isBlockedDuringImpersonation", () => {
     expect(isBlockedDuringImpersonation("/admin/stop-impersonating")).toBe(false);
   });
 
+  it("blocks social account linking and unlinking", () => {
+    expect(isBlockedDuringImpersonation("/link-social")).toBe(true);
+    expect(isBlockedDuringImpersonation("/unlink-account")).toBe(true);
+  });
+
+  it("blocks session revocation endpoints", () => {
+    expect(isBlockedDuringImpersonation("/revoke-session")).toBe(true);
+    expect(isBlockedDuringImpersonation("/revoke-sessions")).toBe(true);
+    expect(isBlockedDuringImpersonation("/revoke-other-sessions")).toBe(true);
+  });
+
   it("leaves read paths untouched", () => {
     expect(isBlockedDuringImpersonation("/get-session")).toBe(false);
+    expect(isBlockedDuringImpersonation("/list-sessions")).toBe(false);
+    expect(isBlockedDuringImpersonation("/list-accounts")).toBe(false);
   });
 });
