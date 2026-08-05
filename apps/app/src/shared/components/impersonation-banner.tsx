@@ -7,6 +7,14 @@ import { stopImpersonationMutationOptions } from "../api/mutations/stop-imperson
 import { sessionQueryOptions } from "../api/queries/session";
 import { broadcastAuthChange } from "../auth/auth-broadcast";
 import { isImpersonating } from "../auth/is-impersonating";
+import { displayName } from "../utils";
+
+function formatRemainingTime(expiresAt: Date): string {
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return "session expirée";
+  const minutes = Math.ceil(ms / 60000);
+  return `${minutes} min restante${minutes > 1 ? "s" : ""}`;
+}
 
 export function ImpersonationBanner() {
   const { data: session } = useQuery(sessionQueryOptions);
@@ -22,21 +30,20 @@ export function ImpersonationBanner() {
     },
   });
 
-  if (!isImpersonating(session)) return null;
+  if (!isImpersonating(session) || !session) return null;
 
-  const user = session?.user as { name?: string | null; email?: string } | undefined;
-  const displayName = user?.name ?? user?.email ?? "utilisateur inconnu";
+  const name = displayName(session.user);
 
   return (
-    <Alert variant="destructive" className="rounded-none border-x-0">
+    <Alert variant="banner">
       <ShieldAlert />
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>
-          Session d'impersonation active — vous agissez en tant que <strong>{displayName}</strong>
-          {"."}
+          Session d'impersonation active — vous agissez en tant que <strong>{name}</strong>
+          {`. ${formatRemainingTime(session.session.expiresAt)}`}
         </span>
         <Button
-          variant="destructive"
+          variant="secondary"
           size="sm"
           disabled={mutation.isPending}
           onClick={() => mutation.mutate()}
