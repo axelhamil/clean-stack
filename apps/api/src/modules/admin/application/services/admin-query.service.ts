@@ -17,6 +17,26 @@ export interface AdminUserListItem {
   createdAt: Date;
 }
 
+export interface AdminSessionItem {
+  id: string;
+  createdAt: Date;
+  expiresAt: Date;
+  ipAddress: Option<string>;
+  userAgent: Option<string>;
+  impersonatedBy: Option<string>;
+}
+
+export interface AdminMembershipItem {
+  organizationId: string;
+  organizationName: string;
+  role: string;
+}
+
+export type AdminUserDetail = AdminUserListItem & {
+  sessions: AdminSessionItem[];
+  memberships: AdminMembershipItem[];
+};
+
 export interface AdminUserPage {
   items: AdminUserListItem[];
   nextCursor: Option<string>;
@@ -54,6 +74,49 @@ export class AdminQueryService {
         return Result.fail<AdminUserPage, AdminQueryError>({
           code: "ADMIN_QUERY_PROVIDER_FAILURE",
           message: "Failed to list users",
+        });
+      }
+    });
+  }
+
+  async getUser(id: string): Promise<Result<Option<AdminUserDetail>, AdminQueryError>> {
+    return this.instrumentation.startSpan({ name: "AdminQueryService > getUser" }, async () => {
+      try {
+        const row = await this.store.findUserById(id);
+        if (!row) return Result.ok(Option.none<AdminUserDetail>());
+
+        const [sessions, memberships] = await Promise.all([
+          this.store.listSessionsFor(id),
+          this.store.listMembershipsFor(id),
+        ]);
+
+        return Result.ok(
+          Option.some({
+            id: row.id,
+            email: row.email,
+            name: row.name,
+            role: Option.fromNullable(row.role),
+            banned: row.banned === true,
+            banReason: Option.fromNullable(row.banReason),
+            banExpires: Option.fromNullable(row.banExpires),
+            twoFactorEnabled: row.twoFactorEnabled === true,
+            createdAt: row.createdAt,
+            sessions: sessions.map((s) => ({
+              id: s.id,
+              createdAt: s.createdAt,
+              expiresAt: s.expiresAt,
+              ipAddress: Option.fromNullable(s.ipAddress),
+              userAgent: Option.fromNullable(s.userAgent),
+              impersonatedBy: Option.fromNullable(s.impersonatedBy),
+            })),
+            memberships,
+          }),
+        );
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return Result.fail({
+          code: "ADMIN_QUERY_PROVIDER_FAILURE",
+          message: "Failed to load user",
         });
       }
     });

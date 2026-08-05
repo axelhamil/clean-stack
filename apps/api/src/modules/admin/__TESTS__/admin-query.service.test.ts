@@ -14,20 +14,43 @@ const rows = [
   },
 ];
 
+type SqlMarker = { _op: string; args: unknown[] };
+const mk =
+  (op: string) =>
+  (...args: unknown[]): SqlMarker => ({ _op: op, args });
+
+function buildQuery(result: () => Promise<unknown[]>) {
+  const q: Record<string, unknown> = {
+    toSQL: () => ({ sql: "SELECT 1", params: [] }),
+    execute: result,
+    where: () => buildQuery(result),
+  };
+  for (const m of [
+    "select",
+    "from",
+    "limit",
+    "orderBy",
+    "innerJoin",
+    "leftJoin",
+    "insert",
+    "update",
+    "delete",
+    "values",
+    "set",
+    "returning",
+    "for",
+  ]) {
+    q[m] = () => buildQuery(result);
+  }
+  return q;
+}
+
 mock.module("@packages/drizzle", () => ({
   db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          orderBy: () => ({
-            limit: () => ({ toSQL: () => ({ sql: "SELECT 1" }), execute: async () => [] }),
-          }),
-        }),
-      }),
-    }),
-    insert: () => ({}),
-    update: () => ({}),
-    delete: () => ({}),
+    select: () => buildQuery(async () => []),
+    insert: () => buildQuery(async () => []),
+    update: () => buildQuery(async () => []),
+    delete: () => buildQuery(async () => []),
   },
   authSchema: {
     user: {
@@ -41,23 +64,83 @@ mock.module("@packages/drizzle", () => ({
       twoFactorEnabled: {},
       createdAt: {},
     },
-    session: {},
+    session: {
+      id: {},
+      createdAt: {},
+      expiresAt: {},
+      ipAddress: {},
+      userAgent: {},
+      impersonatedBy: {},
+      userId: {},
+    },
   },
-  multiTenantSchema: { organization: {}, member: { userId: {}, organizationId: {} } },
-  outboxSchema: {},
-  auditLogSchema: {},
-  webhooksSchema: {},
-  and: (..._a: unknown[]) => ({}),
-  or: (..._a: unknown[]) => ({}),
-  eq: (..._a: unknown[]) => ({}),
-  lt: (..._a: unknown[]) => ({}),
-  inArray: (..._a: unknown[]) => ({}),
-  isNull: (..._a: unknown[]) => ({}),
-  isNotNull: (..._a: unknown[]) => ({}),
-  ilike: (..._a: unknown[]) => ({}),
-  desc: (..._a: unknown[]) => ({}),
-  count: (..._a: unknown[]) => ({}),
-  sql: Object.assign((_s: TemplateStringsArray, ..._v: unknown[]) => ({}), { raw: () => ({}) }),
+  multiTenantSchema: {
+    member: { userId: {}, organizationId: {}, role: {} },
+    organization: { id: {}, name: {} },
+  },
+  outboxSchema: { outboxEvent: {} },
+  auditLogSchema: { auditLog: { hash: {}, sequence: {}, id: {} } },
+  webhooksSchema: {
+    webhookEndpoint: {
+      id: {},
+      organizationId: {},
+      url: {},
+      secretCipher: {},
+      eventTypes: {},
+      enabled: {},
+      createdAt: {},
+      updatedAt: {},
+      previousSecretCipher: {},
+      previousSecretExpiresAt: {},
+      consecutiveFailures: {},
+      firstFailedAt: {},
+      disabledAt: {},
+    },
+    webhookDelivery: {
+      id: {},
+      endpointId: {},
+      outboxEventId: {},
+      eventType: {},
+      payload: {},
+      status: {},
+      attempts: {},
+      nextAttemptAt: {},
+      lastError: {},
+      lastResponseStatus: {},
+      idempotencyKey: {},
+      createdAt: {},
+    },
+  },
+  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
+  billingSchema: {},
+  quotaUsageSchema: {
+    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
+  },
+  policiesSchema: {},
+  consentSchema: {},
+  emailSchema: {},
+  schema: {},
+  TransactionService: class {},
+  trackEventsOnSuccess: () => {},
+  uuidv7: () => "generated-uuid",
+  and: mk("and"),
+  or: mk("or"),
+  eq: mk("eq"),
+  lt: mk("lt"),
+  lte: mk("lte"),
+  gt: mk("gt"),
+  gte: mk("gte"),
+  inArray: mk("inArray"),
+  isNull: mk("isNull"),
+  isNotNull: mk("isNotNull"),
+  ilike: mk("ilike"),
+  asc: mk("asc"),
+  desc: mk("desc"),
+  not: mk("not"),
+  like: mk("like"),
+  count: mk("count"),
+  arrayContains: mk("arrayContains"),
+  sql: Object.assign(mk("sql"), { raw: mk("sql.raw") }),
 }));
 
 const { AdminQueryService } = await import("../application/services/admin-query.service");
@@ -118,6 +201,45 @@ describe("AdminQueryService", () => {
       const result = await service.listUsers({ limit: 50 });
       expect(result.isFailure).toBe(true);
       expect(instrumentation.capture).toHaveBeenCalled();
+    });
+  });
+
+  describe("getUser", () => {
+    it("returns none when the user does not exist", async () => {
+      const store = {
+        listUsers: mock(async () => []),
+        findUserById: mock(async () => null),
+        listSessionsFor: mock(async () => []),
+        listMembershipsFor: mock(async () => []),
+      };
+      const service = new AdminQueryService(store as never, instrumentation as never);
+      const result = await service.getUser("missing");
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
+    });
+
+    it("assembles sessions and memberships for an existing user", async () => {
+      const store = {
+        listUsers: mock(async () => []),
+        findUserById: mock(async () => rows[0]),
+        listSessionsFor: mock(async () => [
+          {
+            id: "s-1",
+            createdAt: new Date("2026-02-01"),
+            expiresAt: new Date("2026-02-02"),
+            ipAddress: "1.2.3.4",
+            userAgent: null,
+            impersonatedBy: "admin-1",
+          },
+        ]),
+        listMembershipsFor: mock(async () => [
+          { organizationId: "o-1", organizationName: "Acme", role: "owner" },
+        ]),
+      };
+      const service = new AdminQueryService(store as never, instrumentation as never);
+      const detail = (await service.getUser("u-1")).getValue().unwrap();
+      expect(detail.sessions[0]?.impersonatedBy.unwrap()).toBe("admin-1");
+      expect(detail.memberships[0]?.organizationName).toBe("Acme");
     });
   });
 });

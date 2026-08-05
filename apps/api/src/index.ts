@@ -7,6 +7,7 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
 import { di } from "./container";
+import { adminUserRoutes } from "./modules/admin/routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
 import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
@@ -194,6 +195,7 @@ const routes = app
   .route("/me", rgpdMeRoutes)
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
+  .route("/admin/users", adminUserRoutes)
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/webhooks", webhooksRoutes)
   .route("/consents", consentRoutes)
