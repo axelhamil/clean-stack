@@ -58,6 +58,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       userId: c.req.param("id"),
       reason: body.reason,
       expiresIn: body.expiresIn,
+      headers: c.req.raw.headers,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
@@ -67,6 +68,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     const result = await actionSvc.unban({
       actorUserId: actor.id,
       userId: c.req.param("id"),
+      headers: c.req.raw.headers,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
@@ -102,6 +104,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       actorUserId: actor.id,
       userId,
       email: u.email,
+      headers: c.req.raw.headers,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
@@ -118,6 +121,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       actorUserId: actor.id,
       userId,
       count: u.sessions.length,
+      headers: c.req.raw.headers,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });

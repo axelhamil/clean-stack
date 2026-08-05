@@ -20,10 +20,12 @@ export class AdminActionService {
     userId: string;
     reason: string;
     expiresIn?: number;
+    headers: Headers;
   }): ActionResult {
     return this.run("ban", async () => {
       await auth.api.banUser({
         body: { userId: input.userId, banReason: input.reason, banExpiresIn: input.expiresIn },
+        headers: input.headers,
       });
       const expiresAt = input.expiresIn
         ? new Date(Date.now() + input.expiresIn * 1000).toISOString()
@@ -37,9 +39,9 @@ export class AdminActionService {
     });
   }
 
-  async unban(input: { actorUserId: string; userId: string }): ActionResult {
+  async unban(input: { actorUserId: string; userId: string; headers: Headers }): ActionResult {
     return this.run("unban", async () => {
-      await auth.api.unbanUser({ body: { userId: input.userId } });
+      await auth.api.unbanUser({ body: { userId: input.userId }, headers: input.headers });
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_UNBANNED, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
@@ -72,9 +74,10 @@ export class AdminActionService {
     actorUserId: string;
     userId: string;
     count: number;
+    headers: Headers;
   }): ActionResult {
     return this.run("revokeSessions", async () => {
-      await auth.api.revokeUserSessions({ body: { userId: input.userId } });
+      await auth.api.revokeUserSessions({ body: { userId: input.userId }, headers: input.headers });
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_SESSIONS_REVOKED, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
@@ -83,9 +86,14 @@ export class AdminActionService {
     });
   }
 
-  async resetPassword(input: { actorUserId: string; userId: string; email: string }): ActionResult {
+  async resetPassword(input: {
+    actorUserId: string;
+    userId: string;
+    email: string;
+    headers: Headers;
+  }): ActionResult {
     return this.run("resetPassword", async () => {
-      await auth.api.revokeUserSessions({ body: { userId: input.userId } });
+      await auth.api.revokeUserSessions({ body: { userId: input.userId }, headers: input.headers });
       await auth.api.requestPasswordReset({ body: { email: input.email } });
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_PASSWORD_RESET, "user", input.userId, {
         actorUserId: input.actorUserId,
