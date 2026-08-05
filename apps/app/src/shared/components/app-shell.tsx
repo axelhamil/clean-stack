@@ -13,6 +13,7 @@ import { AuthorizationDevTool } from "../auth/authorization-devtool";
 import { isPlatformAdmin } from "../auth/is-platform-admin";
 import { CommandPalette } from "./command-palette";
 import { ContextualTabs } from "./contextual-tabs";
+import { ImpersonationBanner } from "./impersonation-banner";
 import { LegalFooter } from "./legal-footer";
 import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
@@ -113,6 +114,8 @@ export function AppShell({ user, children }: AppShellProps) {
           <ContextualTabs className="border-t mx-auto max-w-7xl px-4 sm:px-6" />
         )}
       </header>
+
+      <ImpersonationBanner />
 
       <div className="flex-1">{children}</div>
 
