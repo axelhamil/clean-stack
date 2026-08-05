@@ -12,9 +12,9 @@ import { displayName } from "../utils";
 
 function formatRemainingTime(expiresAt: Date, now: number): string {
   const ms = new Date(expiresAt).getTime() - now;
-  if (ms <= 0) return "session expirée";
+  if (ms <= 0) return "session expired";
   const minutes = Math.ceil(ms / 60000);
-  return `${minutes} min restante${minutes > 1 ? "s" : ""}`;
+  return `${minutes} min remaining`;
 }
 
 export function ImpersonationBanner() {
@@ -46,7 +46,7 @@ export function ImpersonationBanner() {
       <ShieldAlert />
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>
-          Session d'impersonation active — vous agissez en tant que <strong>{name}</strong>
+          Active impersonation session — acting as <strong>{name}</strong>
           {`. ${formatRemainingTime(session.session.expiresAt, now)}`}
         </span>
         <Button
@@ -55,7 +55,7 @@ export function ImpersonationBanner() {
           disabled={mutation.isPending}
           onClick={() => mutation.mutate()}
         >
-          Quitter l'impersonation
+          End impersonation
         </Button>
       </AlertDescription>
     </Alert>

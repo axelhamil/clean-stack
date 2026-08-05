@@ -50,7 +50,7 @@ export function AdminUserDetailPage() {
   const banMutation = useMutation({
     ...banUserMutationOptions,
     onSuccess: () => {
-      toast.success("Compte suspendu.");
+      toast.success("Account suspended.");
       setBanOpen(false);
       void invalidateUser();
     },
@@ -60,7 +60,7 @@ export function AdminUserDetailPage() {
   const unbanMutation = useMutation({
     ...unbanUserMutationOptions,
     onSuccess: () => {
-      toast.success("Compte réactivé.");
+      toast.success("Account reactivated.");
       void invalidateUser();
     },
     onError: (err) => toast.error(err.message),
@@ -69,7 +69,7 @@ export function AdminUserDetailPage() {
   const impersonateMutation = useMutation({
     ...startImpersonationMutationOptions,
     onSuccess: async () => {
-      toast.success("Impersonation démarrée.");
+      toast.success("Impersonation started.");
       setImpersonateOpen(false);
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
       broadcastAuthChange();
@@ -81,7 +81,7 @@ export function AdminUserDetailPage() {
   const revokeSessionsMutation = useMutation({
     ...revokeSessionsMutationOptions,
     onSuccess: () => {
-      toast.success("Sessions révoquées.");
+      toast.success("Sessions revoked.");
       void invalidateUser();
     },
     onError: (err) => toast.error(err.message),
@@ -89,14 +89,14 @@ export function AdminUserDetailPage() {
 
   const resetPasswordMutation = useMutation({
     ...resetPasswordMutationOptions,
-    onSuccess: () => toast.success("Email de réinitialisation envoyé."),
+    onSuccess: () => toast.success("Password reset email sent."),
     onError: (err) => toast.error(err.message),
   });
 
   if (query.isLoading) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Chargement…</p>
+        <p>Loading…</p>
       </main>
     );
   }
@@ -104,7 +104,7 @@ export function AdminUserDetailPage() {
   if (query.isError || !query.data) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Impossible de charger le compte.</p>
+        <p>Failed to load account.</p>
       </main>
     );
   }
@@ -119,7 +119,7 @@ export function AdminUserDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Identité</CardTitle>
+          <CardTitle>Identity</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
@@ -128,16 +128,16 @@ export function AdminUserDetailPage() {
               <span>{user.email}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Rôle</span>
+              <span>Role</span>
               <span>{user.role ? <Badge variant="secondary">{user.role}</Badge> : "—"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Double authentification</span>
-              <span>{user.twoFactorEnabled ? "Activée" : "Désactivée"}</span>
+              <span>Two-factor auth</span>
+              <span>{user.twoFactorEnabled ? "Enabled" : "Disabled"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Membre depuis</span>
-              <span>{new Date(user.createdAt).toLocaleDateString("fr-FR")}</span>
+              <span>Member since</span>
+              <span>{new Date(user.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
         </CardContent>
@@ -145,7 +145,7 @@ export function AdminUserDetailPage() {
 
       <Card variant={user.banned ? "destructive" : "default"}>
         <CardHeader>
-          <CardTitle variant={user.banned ? "destructive" : "default"}>État du compte</CardTitle>
+          <CardTitle variant={user.banned ? "destructive" : "default"}>Account status</CardTitle>
           <CardAction>
             <div className="flex flex-wrap gap-2">
               {user.banned ? (
@@ -155,18 +155,18 @@ export function AdminUserDetailPage() {
                   disabled={unbanMutation.isPending}
                   onClick={() => unbanMutation.mutate(id)}
                 >
-                  Réactiver
+                  Reactivate
                 </Button>
               ) : (
                 <Dialog open={banOpen} onOpenChange={setBanOpen}>
                   <DialogTrigger asChild>
                     <Button variant="destructive" size="sm">
-                      Suspendre
+                      Suspend
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Suspendre le compte</DialogTitle>
+                      <DialogTitle>Suspend account</DialogTitle>
                     </DialogHeader>
                     <BanForm
                       isPending={banMutation.isPending}
@@ -178,12 +178,12 @@ export function AdminUserDetailPage() {
               <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
-                    Impersonner
+                    Impersonate
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Impersonner ce compte</DialogTitle>
+                    <DialogTitle>Impersonate account</DialogTitle>
                   </DialogHeader>
                   <ImpersonateForm
                     isPending={impersonateMutation.isPending}
@@ -197,30 +197,30 @@ export function AdminUserDetailPage() {
         <CardContent>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span>Statut</span>
+              <span>Status</span>
               <span>
                 {user.banned ? (
-                  <Badge variant="destructive">Suspendu</Badge>
+                  <Badge variant="destructive">Suspended</Badge>
                 ) : (
-                  <Badge variant="outline">Actif</Badge>
+                  <Badge variant="outline">Active</Badge>
                 )}
               </span>
             </div>
             {user.banReason && (
               <div className="flex items-center justify-between">
-                <span>Motif</span>
+                <span>Reason</span>
                 <span>{user.banReason}</span>
               </div>
             )}
             {user.banExpires !== null && (
               <div className="flex items-center justify-between">
-                <span>Expiration</span>
-                <span>{new Date(user.banExpires).toLocaleDateString("fr-FR")}</span>
+                <span>Expires</span>
+                <span>{new Date(user.banExpires).toLocaleDateString()}</span>
               </div>
             )}
             {user.banned && user.banExpires === null && (
               <div className="flex items-center justify-between">
-                <span>Expiration</span>
+                <span>Expires</span>
                 <span>Permanent</span>
               </div>
             )}
@@ -233,7 +233,7 @@ export function AdminUserDetailPage() {
             disabled={revokeSessionsMutation.isPending}
             onClick={() => revokeSessionsMutation.mutate(id)}
           >
-            Révoquer les sessions
+            Revoke sessions
           </Button>
           <Button
             variant="outline"
@@ -241,7 +241,7 @@ export function AdminUserDetailPage() {
             disabled={resetPasswordMutation.isPending}
             onClick={() => resetPasswordMutation.mutate(id)}
           >
-            Réinitialiser le mot de passe
+            Reset password
           </Button>
         </CardFooter>
       </Card>

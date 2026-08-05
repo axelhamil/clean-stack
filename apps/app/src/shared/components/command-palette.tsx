@@ -182,11 +182,11 @@ const OPERATOR_ROUTES: readonly OperatorRoute[] = [
   {
     id: "operator:audit-log",
     to: "/admin/audit-log",
-    label: "Operator — Audit log",
+    label: "Admin — Audit log",
     icon: ScrollText,
   },
-  { id: "operator:users", to: "/admin/users", label: "Operator — Accounts", icon: Users },
-  { id: "operator:orgs", to: "/admin/orgs", label: "Operator — Organisations", icon: Building2 },
+  { id: "operator:users", to: "/admin/users", label: "Admin — Accounts", icon: Users },
+  { id: "operator:orgs", to: "/admin/orgs", label: "Admin — Organizations", icon: Building2 },
 ];
 
 function useOperatorGroup(): CommandGroupConfig | null {
@@ -194,7 +194,7 @@ function useOperatorGroup(): CommandGroupConfig | null {
   const { data: session } = useQuery(sessionQueryOptions);
   if (!isPlatformAdmin(session)) return null;
   return {
-    heading: "Operator",
+    heading: "Admin",
     items: OPERATOR_ROUTES.map((route) => ({
       id: route.id,
       label: route.label,

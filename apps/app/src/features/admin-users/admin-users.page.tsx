@@ -33,12 +33,12 @@ export function AdminUsersPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <header>
-        <TypographyH1 variant="page">Comptes</TypographyH1>
+        <TypographyH1 variant="page">Accounts</TypographyH1>
       </header>
 
       <div className="flex flex-wrap gap-3">
         <Input
-          placeholder="Rechercher…"
+          placeholder="Search…"
           className="w-64"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
@@ -54,12 +54,12 @@ export function AdminUsersPage() {
           }
         >
           <SelectTrigger className="w-36">
-            <SelectValue placeholder="Tous les rôles" />
+            <SelectValue placeholder="All roles" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Tous</SelectItem>
+            <SelectItem value="">All</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="user">Utilisateur</SelectItem>
+            <SelectItem value="user">User</SelectItem>
           </SelectContent>
         </Select>
 
@@ -73,30 +73,30 @@ export function AdminUsersPage() {
           }
         >
           <SelectTrigger className="w-36">
-            <SelectValue placeholder="Tous les statuts" />
+            <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Tous</SelectItem>
-            <SelectItem value="false">Actif</SelectItem>
-            <SelectItem value="true">Suspendu</SelectItem>
+            <SelectItem value="">All</SelectItem>
+            <SelectItem value="false">Active</SelectItem>
+            <SelectItem value="true">Suspended</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {query.isLoading ? (
-        <p>Chargement…</p>
+        <p>Loading…</p>
       ) : query.isError ? (
-        <p>Impossible de charger les comptes.</p>
+        <p>Failed to load accounts.</p>
       ) : (
         <>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>Nom</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Créé le</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,7 +114,7 @@ export function AdminUsersPage() {
               disabled={query.isFetchingNextPage}
               onClick={() => void query.fetchNextPage()}
             >
-              Charger plus
+              Load more
             </Button>
           )}
         </>

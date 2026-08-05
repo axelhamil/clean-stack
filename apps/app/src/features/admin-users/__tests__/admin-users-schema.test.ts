@@ -7,7 +7,7 @@ describe("impersonateFormSchema", () => {
   });
 
   it("accepts a reason with an optional ticket reference", () => {
-    const parsed = impersonateFormSchema.parse({ reason: "upload cassé", ticketRef: "SUP-42" });
+    const parsed = impersonateFormSchema.parse({ reason: "broken upload", ticketRef: "SUP-42" });
     expect(parsed.ticketRef).toBe("SUP-42");
   });
 });

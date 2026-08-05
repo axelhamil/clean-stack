@@ -24,12 +24,12 @@ export function UserRow({ item }: UserRowProps) {
       </TableCell>
       <TableCell>
         {item.banned ? (
-          <Badge variant="destructive">Suspendu</Badge>
+          <Badge variant="destructive">Suspended</Badge>
         ) : (
-          <Badge variant="outline">Actif</Badge>
+          <Badge variant="outline">Active</Badge>
         )}
       </TableCell>
-      <TableCell>{new Date(item.createdAt).toLocaleDateString("fr-FR")}</TableCell>
+      <TableCell>{new Date(item.createdAt).toLocaleDateString()}</TableCell>
     </TableRow>
   );
 }

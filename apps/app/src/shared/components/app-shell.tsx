@@ -77,7 +77,7 @@ export function AppShell({ user, children }: AppShellProps) {
             })}
             {platformAdmin && (
               <NavLink variant="pill" active={pathname.startsWith("/admin")} asChild>
-                <Link to="/admin/audit-log">Operator</Link>
+                <Link to="/admin/users">Admin</Link>
               </NavLink>
             )}
           </nav>

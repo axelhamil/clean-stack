@@ -21,9 +21,9 @@ import { useForm } from "react-hook-form";
 import { type BanFormInput, banFormSchema } from "../admin-users.schema";
 
 const DURATION_OPTIONS = [
-  { label: "24 heures", value: String(86400) },
-  { label: "7 jours", value: String(604800) },
-  { label: "30 jours", value: String(2592000) },
+  { label: "24 hours", value: String(86400) },
+  { label: "7 days", value: String(604800) },
+  { label: "30 days", value: String(2592000) },
   { label: "Permanent", value: "permanent" },
 ] as const;
 
@@ -51,9 +51,9 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
           name="reason"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Motif</FormLabel>
+              <FormLabel>Reason</FormLabel>
               <FormControl>
-                <Textarea placeholder="Raison de la suspension…" {...field} />
+                <Textarea placeholder="Reason for suspension…" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -64,7 +64,7 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
           name="expiresIn"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Durée</FormLabel>
+              <FormLabel>Duration</FormLabel>
               <Select
                 value={field.value !== undefined ? String(field.value) : "permanent"}
                 onValueChange={(v) => field.onChange(v === "permanent" ? undefined : Number(v))}
@@ -87,7 +87,7 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
           )}
         />
         <Button type="submit" variant="destructive" disabled={!form.formState.isValid || isPending}>
-          Suspendre le compte
+          Suspend account
         </Button>
       </form>
     </Form>

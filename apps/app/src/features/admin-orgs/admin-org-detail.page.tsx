@@ -22,7 +22,7 @@ export function AdminOrgDetailPage() {
   if (query.isLoading) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Chargement…</p>
+        <p>Loading…</p>
       </main>
     );
   }
@@ -30,7 +30,7 @@ export function AdminOrgDetailPage() {
   if (query.isError || !query.data) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Impossible de charger l'organisation.</p>
+        <p>Failed to load organization.</p>
       </main>
     );
   }
@@ -45,12 +45,12 @@ export function AdminOrgDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Identité</CardTitle>
+          <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span>Identifiant</span>
+              <span>Slug</span>
               <span>{org.slug}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -58,8 +58,8 @@ export function AdminOrgDetailPage() {
               <span>{org.plan ?? "—"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Créé le</span>
-              <span>{new Date(org.createdAt).toLocaleDateString("fr-FR")}</span>
+              <span>Created</span>
+              <span>{new Date(org.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
         </CardContent>
@@ -67,14 +67,14 @@ export function AdminOrgDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Membres</CardTitle>
+          <CardTitle>Members</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>Rôle</TableHead>
+                <TableHead>Role</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

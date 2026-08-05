@@ -25,7 +25,7 @@ export const adminUsersInfiniteQueryOptions = (filters: UserFilters) =>
         },
         { init: { signal } },
       );
-      if (!res.ok) await throwApiError(res, "Impossible de charger les comptes");
+      if (!res.ok) await throwApiError(res, "Failed to load accounts");
       return (await res.json()) as AdminUsersPage;
     },
     initialPageParam: undefined as string | undefined,
@@ -37,7 +37,7 @@ export const adminUserQueryOptions = (id: string) =>
     queryKey: ["admin", "users", id] as const,
     queryFn: async ({ signal }) => {
       const res = await $getUser({ param: { id } }, { init: { signal } });
-      if (!res.ok) await throwApiError(res, "Impossible de charger le compte");
+      if (!res.ok) await throwApiError(res, "Failed to load account");
       return (await res.json()) as AdminUserDetail;
     },
   });

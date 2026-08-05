@@ -13,23 +13,22 @@ export function ImpersonationStarted({
   supportUrl,
 }: ImpersonationStartedProps) {
   return (
-    <EmailLayout preview="Accès support à votre compte">
-      <Heading as="h1">Accès support à votre compte</Heading>
-      <Text>Bonjour {userName},</Text>
+    <EmailLayout preview="Support access to your account">
+      <Heading as="h1">Support access to your account</Heading>
       <Text>
-        Un membre de notre équipe de support a accédé à votre compte à titre de diagnostic, le{" "}
-        {startedAt}. Cet accès expirera automatiquement le {expiresAt}.
+        Hi {userName}, a member of our support team accessed your account for diagnostic purposes on{" "}
+        {startedAt}. This access will automatically expire on {expiresAt}.
       </Text>
-      <Text>Motif indiqué : {reason}</Text>
+      <Text>Stated reason: {reason}</Text>
       <Text>
-        Cet accès est limité dans le temps et ne permet pas de modifier votre mot de passe, vos
-        données de paiement ni vos informations de connexion.
+        This access is time-limited and does not allow changes to your password, payment details, or
+        login credentials.
       </Text>
       <Text>
-        Si vous n'avez pas sollicité notre support ou si vous avez le moindre doute sur cet accès,
-        contactez-nous immédiatement.
+        If you did not contact our support team or have any concerns about this access, please reach
+        out to us immediately.
       </Text>
-      <Button href={supportUrl}>Contacter le support</Button>
+      <Button href={supportUrl}>Contact support</Button>
       <Text>{supportUrl}</Text>
     </EmailLayout>
   );

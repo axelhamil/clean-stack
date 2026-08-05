@@ -23,7 +23,7 @@ export const adminOrgsInfiniteQueryOptions = (search: string) =>
         },
         { init: { signal } },
       );
-      if (!res.ok) await throwApiError(res, "Impossible de charger les organisations");
+      if (!res.ok) await throwApiError(res, "Failed to load organizations");
       return (await res.json()) as AdminOrgsPage;
     },
     initialPageParam: undefined as string | undefined,
@@ -35,7 +35,7 @@ export const adminOrgDetailQueryOptions = (id: string) =>
     queryKey: ["admin", "orgs", "detail", id] as const,
     queryFn: async ({ signal }) => {
       const res = await $getOrg({ param: { id } }, { init: { signal } });
-      if (!res.ok) await throwApiError(res, "Impossible de charger l'organisation");
+      if (!res.ok) await throwApiError(res, "Failed to load organization");
       return (await res.json()) as AdminOrgDetail;
     },
   });

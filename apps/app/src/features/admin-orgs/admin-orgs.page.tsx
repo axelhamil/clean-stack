@@ -23,29 +23,29 @@ export function AdminOrgsPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <header>
-        <TypographyH1 variant="page">Organisations</TypographyH1>
+        <TypographyH1 variant="page">Organizations</TypographyH1>
       </header>
 
       <Input
-        placeholder="Rechercher…"
+        placeholder="Search…"
         className="w-64"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
 
       {query.isLoading ? (
-        <p>Chargement…</p>
+        <p>Loading…</p>
       ) : query.isError ? (
-        <p>Impossible de charger les organisations.</p>
+        <p>Failed to load organizations.</p>
       ) : (
         <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Identifiant</TableHead>
-                <TableHead>Membres</TableHead>
-                <TableHead>Créé le</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Slug</TableHead>
+                <TableHead>Members</TableHead>
+                <TableHead>Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -62,7 +62,7 @@ export function AdminOrgsPage() {
                     </TableCell>
                     <TableCell>{org.slug}</TableCell>
                     <TableCell>{org.memberCount}</TableCell>
-                    <TableCell>{new Date(org.createdAt).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableCell>{new Date(org.createdAt).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))}
             </TableBody>
@@ -74,7 +74,7 @@ export function AdminOrgsPage() {
               disabled={query.isFetchingNextPage}
               onClick={() => void query.fetchNextPage()}
             >
-              Charger plus
+              Load more
             </Button>
           )}
         </>

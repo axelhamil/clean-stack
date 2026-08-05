@@ -16,7 +16,7 @@ export const banUserMutationOptions = mutationOptions({
   mutationKey: ["admin", "users", "ban"] as const,
   mutationFn: async ({ id, ...json }: BanBody & { id: string }) => {
     const res = await $ban({ param: { id }, json });
-    if (!res.ok) await throwApiError(res, "Impossible de suspendre ce compte");
+    if (!res.ok) await throwApiError(res, "Failed to suspend account");
     return (await res.json()) as InferResponseType<typeof $ban, 200>;
   },
 });
@@ -25,7 +25,7 @@ export const unbanUserMutationOptions = mutationOptions({
   mutationKey: ["admin", "users", "unban"] as const,
   mutationFn: async (id: string) => {
     const res = await $unban({ param: { id } });
-    if (!res.ok) await throwApiError(res, "Impossible de réactiver ce compte");
+    if (!res.ok) await throwApiError(res, "Failed to reactivate account");
     return (await res.json()) as InferResponseType<typeof $unban, 200>;
   },
 });
@@ -34,7 +34,7 @@ export const revokeSessionsMutationOptions = mutationOptions({
   mutationKey: ["admin", "users", "revoke-sessions"] as const,
   mutationFn: async (id: string) => {
     const res = await $revokeSessions({ param: { id } });
-    if (!res.ok) await throwApiError(res, "Impossible de révoquer les sessions");
+    if (!res.ok) await throwApiError(res, "Failed to revoke sessions");
     return (await res.json()) as InferResponseType<typeof $revokeSessions, 200>;
   },
 });
@@ -43,7 +43,7 @@ export const resetPasswordMutationOptions = mutationOptions({
   mutationKey: ["admin", "users", "reset-password"] as const,
   mutationFn: async (id: string) => {
     const res = await $resetPassword({ param: { id } });
-    if (!res.ok) await throwApiError(res, "Impossible d'envoyer la réinitialisation");
+    if (!res.ok) await throwApiError(res, "Failed to send password reset");
     return (await res.json()) as InferResponseType<typeof $resetPassword, 200>;
   },
 });
@@ -52,7 +52,7 @@ export const startImpersonationMutationOptions = mutationOptions({
   mutationKey: ["admin", "impersonation", "start"] as const,
   mutationFn: async ({ id, ...json }: StartImpersonationBody & { id: string }) => {
     const res = await $startImpersonation({ param: { id }, json });
-    if (!res.ok) await throwApiError(res, "Impossible de démarrer l'impersonation");
+    if (!res.ok) await throwApiError(res, "Failed to start impersonation");
     return (await res.json()) as InferResponseType<typeof $startImpersonation, 200>;
   },
 });

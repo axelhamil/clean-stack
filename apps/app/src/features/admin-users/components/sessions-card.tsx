@@ -20,19 +20,19 @@ export function SessionsCard({ sessions }: SessionsCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sessions actives ({sessions.length})</CardTitle>
+        <CardTitle>Active sessions ({sessions.length})</CardTitle>
       </CardHeader>
       <CardContent>
         {sessions.length === 0 ? (
-          <p>Aucune session active.</p>
+          <p>No active sessions.</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>IP</TableHead>
-                <TableHead>Navigateur</TableHead>
-                <TableHead>Créée le</TableHead>
-                <TableHead>Expire le</TableHead>
+                <TableHead>Browser</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Expires</TableHead>
                 <TableHead>Type</TableHead>
               </TableRow>
             </TableHeader>
@@ -43,8 +43,8 @@ export function SessionsCard({ sessions }: SessionsCardProps) {
                   <TableCell className="max-w-xs overflow-hidden">
                     {session.userAgent ?? "—"}
                   </TableCell>
-                  <TableCell>{new Date(session.createdAt).toLocaleDateString("fr-FR")}</TableCell>
-                  <TableCell>{new Date(session.expiresAt).toLocaleDateString("fr-FR")}</TableCell>
+                  <TableCell>{new Date(session.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(session.expiresAt).toLocaleDateString()}</TableCell>
                   <TableCell>
                     {session.impersonatedBy ? (
                       <Badge variant="secondary">Impersonation</Badge>

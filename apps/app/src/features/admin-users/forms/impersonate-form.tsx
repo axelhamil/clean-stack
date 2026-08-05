@@ -38,9 +38,9 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
           name="reason"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Justification</FormLabel>
+              <FormLabel>Reason</FormLabel>
               <FormControl>
-                <Textarea placeholder="Décrivez la raison de l'impersonation…" {...field} />
+                <Textarea placeholder="Describe the reason for impersonation…" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -51,7 +51,7 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
           name="ticketRef"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Référence ticket (optionnel)</FormLabel>
+              <FormLabel>Ticket reference (optional)</FormLabel>
               <FormControl>
                 <Input placeholder="SUP-42" {...field} />
               </FormControl>
@@ -60,7 +60,7 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
           )}
         />
         <Button type="submit" disabled={!form.formState.isValid || isPending}>
-          Démarrer l'impersonation
+          Start impersonation
         </Button>
       </form>
     </Form>
