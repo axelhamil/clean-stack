@@ -694,3 +694,15 @@ La réconciliation guest→user se fait **entièrement côté serveur**, sans ro
 - Org mutations (member kick, org delete) from the admin back-office.
 - IP allowlist for admin access.
 - Session-length alerting.
+
+### QA-phase corrections (post-initial delivery)
+
+1. **`APP_URL` promoted to required** — Five call sites in `auth.ts` (auth email links) and the impersonation notification already assumed `APP_URL` was present and produced `undefined/...` links when it was absent. The optional declaration was the anomaly. Changed from `z.url().optional()` to `z.url()` in `shared/env.ts`. The task-15 deferred concern about `supportUrl` being inoperable is closed by this change.
+
+2. **MFA gate on the front-side back-office entry** — The server already required MFA (`PLATFORM_ADMIN_REQUIRE_MFA`), but the front-side gate checked only the platform role. `canAccessPlatformAdmin` (`shared/auth/can-access-platform-admin.ts`) was extracted to combine `isPlatformAdmin` (role) with `twoFactorEnabled` (MFA). A platform admin without 2FA sees neither the "Admin" nav entry nor the `_admin` route zone — `ensure-platform-admin.ts` redirects them to `/settings/account` rather than `/`, so the required action is explicit. `isPlatformAdmin` is kept as a separate predicate for call sites that only need the role check (e.g. event payloads).
+
+3. **Policy acceptance blocked during impersonation** — `denyImpersonated` was added to `POST /me/policies/accept` (defense-in-depth: an admin in impersonation session must not countersign legal terms on behalf of the user, which would write a legally false acceptance). The Decision 1 enumeration above used the collective term "the blocklist" for both layers; this item falls under the `denyImpersonated` Hono layer, not the BetterAuth hook. Mirrored on the front: `shouldRedirectToLegalAccept` (`router/should-redirect-to-legal-accept.ts`) returns `false` when `isImpersonating(session)` is true, so the legal acceptance gate does not trap the admin on a page whose only exit is to consent.
+
+4. **Nav entry renamed "Operator" → "Admin", re-pointed to `/admin/users`** — The shell nav entry linked to `/admin/audit-log` under the label "Operator". Post-QA it links to `/admin/users` (the accounts list) under the label "Admin", consistent with the product's English convention and with the primary use-case (looking up a specific user before impersonating). The `pathname.startsWith("/admin")` active-state check already covered all sub-pages. The term "operator" remains accurate in conceptual contexts — this log, the C.2 section header — where it describes the human role, not a UI label.
+
+5. **Admin UI translated to English** — The admin features were initially written in French, inconsistent with the rest of the product. All UI copy (column headers, button labels, form placeholders, error messages, date locales) was translated to English (commit `27ccbff`).

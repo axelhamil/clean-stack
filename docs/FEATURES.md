@@ -302,14 +302,16 @@ Platform operator tooling — ban/unban users, change platform role, force passw
 - `DrizzleAdminUserStore` / `DrizzleAdminOrgStore` — org-scoped reads with pagination and search.
 - `admin-impersonation.routes.ts` — `POST /admin/impersonation/:id/start` (reason required, ticketRef optional) + `POST /admin/impersonation/stop`.
 - `relay-set-cookie.ts` — proxies BetterAuth `Set-Cookie` headers to the app client.
-- `shared/middleware/impersonation-blocklist.ts` — BetterAuth `beforeHook` blocking sensitive auth endpoints.
-- `shared/middleware/deny-impersonated.middleware.ts` — per-mutation Hono middleware returning 403 `IMPERSONATION_ACTION_FORBIDDEN`.
+- `shared/middleware/impersonation-blocklist.ts` — BetterAuth `beforeHook` blocking BetterAuth-owned auth paths: password/email change, MFA, passkey, social account link/unlink (`/link-social`, `/unlink-account`), session revocations (`/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions`), and the `/admin` prefix.
+- `shared/middleware/deny-impersonated.middleware.ts` — per-mutation Hono middleware blocking 11 custom routes (RGPD export/delete, all webhook mutations, billing portal, and `POST /me/policies/accept` — an admin must not countersign legal terms on behalf of the user); returns 403 `IMPERSONATION_ACTION_FORBIDDEN`.
 
-**Frontend**:
-- `features/admin-users/` — `admin-users.{route,page}.tsx`, `admin-user-detail.{route,page}.tsx`, `api/admin-users.{queries,mutations}.ts`, `forms/impersonate-form.tsx`, `admin-users.schema.ts`.
+**Frontend** (all UI copy in English):
+- `features/admin-users/` — `admin-users.{route,page}.tsx`, `admin-user-detail.{route,page}.tsx`, `api/admin-users.{queries,mutations}.ts`, `forms/impersonate-form.tsx`, `admin-users.schema.ts`. "Admin" nav entry links to `/admin/users`.
 - `features/admin-orgs/` — `admin-orgs.{route,page}.tsx`, `admin-org-detail.{route,page}.tsx`, `api/admin-orgs.queries.ts`.
 - `shared/components/impersonation-banner.tsx` — non-dismissable, live countdown, mounts in `_shell`.
 - `shared/auth/is-impersonating.ts` — derives impersonation state from the session payload.
+- `shared/auth/can-access-platform-admin.ts` — combines `isPlatformAdmin` (role) with `twoFactorEnabled` (MFA); gates the "Admin" nav entry in `app-shell.tsx` and `ensure-platform-admin.ts`; a platform admin without 2FA active is redirected to `/settings/account`.
+- `router/should-redirect-to-legal-accept.ts` — returns `false` when `isImpersonating(session)` is true, so the legal acceptance gate does not trap the admin on a page whose only exit is to consent.
 - `shared/api/mutations/stop-impersonation.ts` — mutation factory used by the banner.
 
 **Transparency email**: `application/event-handlers/notify-impersonated-user.ts` — `onEvent(ADMIN_IMPERSONATION_STARTED)` handler, tolerant (failure captured, does not abort).
