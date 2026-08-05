@@ -33,6 +33,7 @@ Forward-looking work for clean-stack. **All SOTA 2026, outside DDD** (DDD reserv
 | **Phase A.5 — Privacy dashboard** | **Jul 2026** | `/settings/privacy` hub: `<PolicyAcceptanceCard />` + `<ConsentSettings />` + `<DataSourcesCard />` + `<DataExportCard />` + `<SessionsCard />`. Danger zones contextual. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase D.5 — Email delivery queue** | **Aug 2026** | `email_message` durable queue + `EmailDeliveryWorker` + `@packages/emails` React Email templates + `sendTemplateBatch` + retention sweep + `email.delivery.exhausted` → 55 total. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Option / Result convention back-fill** | **Aug 2026** | `Result.ok` overloads close the `Result.ok<string>() → undefined` hole; ports across consents, billing, rate-limiter, webhooks, outbox and audit express absence as `Option<T>` instead of `T \| null`, with `null` stopping at the store boundary. No wire format or hash-chain change. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase C.3 — Admin & impersonation** | **Aug 2026** | `modules/admin/` (back) + `features/admin-users/` + `features/admin-orgs/` (front) — audited ban / unban / role-change / force-password-reset / revoke-sessions; justified impersonation (reason required, ticketRef optional); server-side blocklist (11 mutation routes); non-dismissable banner with live countdown; transparency email to impersonated user. 7 `admin.*` events (`compliance`) → **62 total / 57 subscribable / 5 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
@@ -74,7 +75,7 @@ As-built record + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md). Per-are
 
 ### M4 — Operate the product + paying customers
 
-- **C.3** Admin & impersonation (BetterAuth `admin` plugin) — real dep (audit write-path) already shipped; every admin action auto-audited the moment it lands (needs `admin.*` events declared, rule §6).
+- **C.3** Admin & impersonation ✅ **shipped** (Aug 2026 — `modules/admin/` back + `features/admin-users/` + `features/admin-orgs/` front; audited ban/unban/role/reset/revoke-sessions, justified impersonation, server-side blocklist, live banner, transparency email; 7 `admin.*` events → **62 total**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).)
 - **C.4** API tokens / PATs — `/settings/tokens`, scoped + expirable, sha256 + per-row salt, `clean_<base58url-32>` prefix for GitHub secret-scanner. Unblocks D.2 + F.1.
 - **D.2** OpenAPI auto-docs (`@hono/zod-openapi` + Scalar UI at `/api/docs`) — after PATs ship (customers integrate).
 - **D.3** In-app notification center — `<Bell />` + `/settings/notifications`. Handler = 1-line `onEvent(...)` via event-driven foundation.
@@ -205,20 +206,11 @@ HIPAA tooling, real-time WebSocket/SSE bus, third-party app marketplace, A/B tes
 
 ---
 
-## Admin & impersonation — BetterAuth `admin` plugin — **Phase C.3**
+## Admin & impersonation — BetterAuth `admin` plugin — **Phase C.3** ✅ SHIPPED (Aug 2026)
 
-**Why**: every paid SaaS needs (1) staff debugging a paying user's issue without "share your password" gymnastics, (2) ban abusive users without DB surgery, (3) read-only support access. BetterAuth ships an official `admin` plugin (late 2025) wrapping these primitives — no rolling our own. Stays infra (no DDD), gated by platform-level role, every action audited.
+**Shipped (Aug 2026).** `modules/admin/` (back) + `features/admin-users/` + `features/admin-orgs/` (front). Audited ban / unban / role-change / force-password-reset / revoke-sessions via `AdminActionService` (not registered in inwire — real import cycle; deps from `di`). Justified impersonation (`reason` required, `ticketRef` optional); `/stop` validates BetterAuth before emitting the event. Server-side blocklist: BetterAuth `beforeHook` + per-mutation `denyImpersonated` on 11 mutation routes. Non-dismissable banner with live countdown in `_shell`. Transparency email (`NotifyImpersonatedUserHandler`, tolerant). `cookieCache.maxAge` reduced to 60 s. 7 `admin.*` events, all `compliance` retention → **62 total / 57 subscribable / 5 internal**. As-built + all decisions in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-- [ ] `admin` plugin enabled in `auth` config (server) + on `authClient` (client)
-- [ ] Drizzle schema regenerated (adds platform `role` on `user` + ban fields). Platform roles `admin` / `support` (read-only) are **distinct from org roles** (`owner` / `admin` / `member`).
-- [ ] `requireAdmin` Hono middleware (mirror of `requireAuth`, throws 403 when role ∉ allowed set). Composable per-route like the rest.
-- [ ] **Impersonation flow** — `authClient.admin.impersonateUser(id)` issues a short-lived impersonation session (default 1h, configurable). Original admin session preserved server-side, restored on `stopImpersonating()`. Front banner non-dismissable, distinct color (`bg-destructive`), visible on every page during impersonation. Start + stop emit `admin.impersonation.{started,stopped}` events → auto-audited via `AuditEventSubscriber`.
-- [ ] **Ban / unban** — `authClient.admin.banUser(id, reason)` revokes all sessions and blocks future sign-in (BetterAuth handles the session invalidation). `unbanUser(id)` symmetric. Reason captured in audit log.
-- [ ] **Force password reset** — `authClient.admin.setUserPassword(id)` invalidates current sessions, sends magic-link via existing Resend template.
-- [ ] Pages in `features/admin/`: `/admin/users` (list, search, filter by org / status / role), `/admin/users/:id` (detail + actions), `/admin/orgs`, `/admin/orgs/:id`.
-- [ ] **Front gate** `_admin` layout route inline in `apps/app/src/router.tsx` (id `_admin`, no path) — `beforeLoad` checks `session.user.role ∈ ["admin", "support"]`, **else 404, not 403** (don't leak the existence of `/admin/*` to non-admins).
-- [ ] **Never serve `/admin/*` from the public hostname in production** — separate subdomain (`admin.<APP_DOMAIN>`) or env-flagged. Reduces credential-stuffing surface on a known URL.
-- [ ] No new DDD here — `admin` lives in `features/admin/` (front) + `modules/admin/` (api), guarded by `requireAdmin`. Same pragmatic shape as gating.
+**Out of scope** (explicit): dedicated admin subdomain (`admin.<APP_DOMAIN>`); platform `support` role (read-only — BetterAuth plugin supports one platform role); org mutations from the back-office; IP allowlist for admin access; session-length alerting.
 
 ---
 

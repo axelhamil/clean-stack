@@ -654,3 +654,43 @@ La réconciliation guest→user se fait **entièrement côté serveur**, sans ro
 1. **`TEMPLATE_IDS` as override, not mandatory**: the ROADMAP framed template IDs as required config (boot fails if empty). Post-D.5, an empty string means render the in-repo template. Boot no longer fails on empty `TEMPLATE_IDS`.
 2. **`@packages/emails` introduced**: the original ROADMAP spec did not include an in-repo template package. Added to remove the "requires Resend dashboard setup before first email" friction on a fresh clone.
 3. **`sendRaw` / `sendRawBatch` on `IEmailService`**: not in the original spec. Added to support future transactional emails needing full HTML control without a named template. No call sites exist today; public port surface.
+
+---
+
+## Admin & impersonation — BetterAuth `admin` plugin ✅ Phase C.3 · Aug 2026
+
+**Why**: every paid SaaS needs staff-level tooling to debug a paying user's issue without asking for their credentials, and a one-click ban path for abuse without DB surgery. BetterAuth ships an official `admin` plugin covering these primitives — no rolling our own. The phase is infra (no DDD), gated by the platform role enforced since C.2.
+
+**What was already in place before this phase**: the `admin` plugin wired in `auth.ts`, the Drizzle schema ban columns and platform `role` column on `user`, the `requirePlatformAdmin` gate, and the `_admin` layout zone in the front. The phase delivered the rest.
+
+**What this phase delivered**:
+
+- **Read-only user and org back-office** — `GET /admin/users`, `GET /admin/users/:id`, `GET /admin/orgs`, `GET /admin/orgs/:id` (paginated, search-filtered), backed by `DrizzleAdminUserStore`, `DrizzleAdminOrgStore`, `AdminQueryService`. Front: `features/admin-users/` + `features/admin-orgs/`.
+- **Five audited admin actions** (`AdminActionService`) — ban (with reason + optional expiry), unban, platform role change, force password reset (sends reset email via BetterAuth), revoke all sessions — each emits an `admin.*` event via `emitEvent`.
+- **Justified impersonation** — `POST /admin/start-impersonating` requires `reason` (min 1 char) and accepts optional `ticketRef`. `POST /admin/stop-impersonating` validates the BetterAuth response before emitting the audit event (no false audit trail on BetterAuth failure).
+- **Server-side blocklist** — two layers: a BetterAuth `beforeHook` in `auth.ts` (`impersonation-blocklist.ts`) blocking the most sensitive auth endpoints, and per-mutation `denyImpersonated` middleware on 11 business mutation routes. Six read-only routes left open. Exit route `POST /admin/stop-impersonating` always preserved.
+- **Non-dismissable impersonation banner** — `ImpersonationBanner` component mounted in `_shell`, live countdown from session expiry (`setInterval`, recalculated every second), `variant="banner"` added to the Alert primitive in `@packages/ui`.
+- **Transparency email** — `NotifyImpersonatedUserHandler` (`onEvent(ADMIN_IMPERSONATION_STARTED)`) sends the impersonated user a "someone accessed your account" email. Failure captured to telemetry, does not abort impersonation.
+- **Session payload extended** — `isImpersonating` + `impersonatedBy` (normalized from `undefined` to `null`) exposed via `GET /admin/session-info`.
+- **Event catalog 55 → 62** — seven new `admin.*` events added to `@packages/events`, all `compliance` retention.
+
+**Structural decision — `AdminActionService` outside inwire**:
+
+`AdminActionService` is instantiated in `routes.ts` rather than registered in the inwire container. The reason is a real import cycle (`service → auth.ts → container.ts → module.ts`) that cannot be resolved without touching `auth.ts`, which is protected by its own module boundary. Its dependencies (`IOutboxRepository`, `IInstrumentation`) are still resolved from `di`. The same pattern applies to the impersonation routes. Validated and accepted in review.
+
+**Decisions**:
+
+1. **Write-enabled impersonation with server-side blocklist** — read-only impersonation cannot reproduce write-path bugs. The blocklist specifically targets irreversible or identity-mutating operations: change-email, change-password, MFA enable/disable, link/unlink social account, revoke-sessions, billing portal. Read operations and the exit route stay open.
+2. **Mandatory justification** — `reason` is a required field on `/start-impersonating`. No reason = 400 before any impersonation session is issued. Optional `ticketRef` links to a support ticket.
+3. **Transparency email** — the impersonated user is notified at impersonation start. Failure is captured to telemetry and logged but does not block the action. `supportUrl` is derived from `APP_URL`.
+4. **No `support` platform role** — the original plan mentioned a read-only `support` role. BetterAuth's `admin` plugin supports a single platform role column. Adding a `support` role would require custom middleware with zero library support. Deferred out of scope.
+5. **`cookieCache.maxAge` reduced to 60 s** — makes a ban effective within approximately 60 s without adding a session revocation list lookup to every request. Updated in `apps/api/CLAUDE.md`. Near-instant ban (< 1 s) would require a revocation list checked in the session middleware — out of scope.
+6. **Actions through custom API routes, not the BetterAuth admin client** — wrapping `auth.api.*` in custom Hono routes lets the implementation inject `actorUserId` into every event, enforce `reason` on impersonation, and validate BetterAuth responses before emitting the audit event. Two API deviations found during implementation: `auth.api.forgetPassword` does not exist — the correct method is `auth.api.requestPasswordReset`; `auth.api.setRole` requires `{ requireHeaders: true }` and a `headers` argument from `c.req.raw.headers`.
+7. **`/stop` validates BetterAuth before emitting** — if BetterAuth's `stopImpersonating` returns an error, the `ADMIN_IMPERSONATION_STOPPED` event is not emitted. This prevents a false audit trail entry when the stop actually failed.
+
+**Out of scope** (explicit):
+- Dedicated admin subdomain (`admin.<APP_DOMAIN>`).
+- Platform `support` role (read-only).
+- Org mutations (member kick, org delete) from the admin back-office.
+- IP allowlist for admin access.
+- Session-length alerting.
