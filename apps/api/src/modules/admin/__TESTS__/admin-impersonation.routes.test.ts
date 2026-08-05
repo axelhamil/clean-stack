@@ -210,6 +210,23 @@ describe("POST /admin/impersonation/stop", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 403 and emits no event when BetterAuth refuses stop", async () => {
+    emitted.length = 0;
+    currentSession = {
+      impersonatedBy: "admin-1",
+      userId: "target-2",
+      createdAt: new Date(Date.now() - 5_000),
+    };
+    mockStopImpersonating.mockImplementationOnce(
+      async () => new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }),
+    );
+    const res = await adminImpersonationRoutes.request("/stop", {
+      method: "POST",
+    });
+    expect(res.status).toBe(403);
+    expect(emitted.some((e) => e.type === EventTypes.ADMIN_IMPERSONATION_STOPPED)).toBe(false);
+  });
+
   it("relays the restore cookie and emits the stop event", async () => {
     emitted.length = 0;
     currentSession = {

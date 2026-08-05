@@ -64,6 +64,9 @@ export const adminImpersonationRoutes = new Hono<{ Variables: AuthVariables }>()
       headers: c.req.raw.headers,
       asResponse: true,
     });
+    if (!upstream.ok) {
+      throw new HTTPException(403, { message: "ADMIN_STOP_IMPERSONATION_REFUSED" });
+    }
 
     await emitEvent(
       di.IOutboxRepository,
