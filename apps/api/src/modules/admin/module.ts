@@ -1,4 +1,6 @@
+import type { EventHandler } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
+import { notifyImpersonatedUser } from "./application/event-handlers/notify-impersonated-user";
 import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
 import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
 import { AdminQueryService } from "./application/services/admin-query.service";
@@ -10,6 +12,7 @@ declare module "inwire" {
     IAdminUserStore: IAdminUserStore;
     IAdminOrgStore: IAdminOrgStore;
     AdminQueryService: AdminQueryService;
+    NotifyImpersonatedUser: EventHandler;
   }
 }
 
@@ -20,5 +23,11 @@ export const adminModule = defineModule()((b) =>
     .add(
       "AdminQueryService",
       (c) => new AdminQueryService(c.IAdminUserStore, c.IInstrumentation, c.IAdminOrgStore),
+    )
+    .add("NotifyImpersonatedUser", (c) =>
+      notifyImpersonatedUser({
+        IEmailService: c.IEmailService,
+        AdminQueryService: c.AdminQueryService,
+      }),
     ),
 );

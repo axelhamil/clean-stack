@@ -9,6 +9,12 @@ export type EmailTemplates = {
   delete_completed: { name: string };
   change_email: { name: string; newEmail: string; confirmUrl: string };
   backup_code_used: { securityUrl: string };
+  impersonation_started: {
+    userName: string;
+    startedAt: string;
+    expiresAt: string;
+    reason: string;
+  };
 };
 
 export type EmailTemplateKey = keyof EmailTemplates;

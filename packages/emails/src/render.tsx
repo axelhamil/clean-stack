@@ -6,6 +6,7 @@ import { DataExportReady } from "./components/data-export-ready";
 import { DeleteCancelled } from "./components/delete-cancelled";
 import { DeleteCompleted } from "./components/delete-completed";
 import { DeleteRequested } from "./components/delete-requested";
+import { ImpersonationStarted } from "./components/impersonation-started";
 import { MagicLink } from "./components/magic-link";
 import { OrgInvitation } from "./components/org-invitation";
 import { ResetPassword } from "./components/reset-password";
@@ -37,6 +38,10 @@ const TEMPLATES: { [K in EmailTemplateKey]: TemplateEntry<K> } = {
   delete_completed: { component: DeleteCompleted, subject: () => "Your account has been deleted" },
   change_email: { component: ChangeEmail, subject: () => "Confirm your new email address" },
   backup_code_used: { component: BackupCodeUsed, subject: () => "A backup code was used" },
+  impersonation_started: {
+    component: ImpersonationStarted,
+    subject: () => "Accès support à votre compte",
+  },
 };
 
 export const EMAIL_TEMPLATE_KEYS = Object.keys(TEMPLATES) as EmailTemplateKey[];
