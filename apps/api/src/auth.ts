@@ -577,7 +577,7 @@ const authOptions = {
       const path = ctx.path;
       const body = ctx.body as Record<string, unknown> | undefined;
 
-      if (isBlockedDuringImpersonation(path)) {
+      if (isBlockedDuringImpersonation(path) && ctx.headers) {
         const current = await auth.api.getSession({ headers: ctx.headers });
         if (current?.session?.impersonatedBy) {
           throw new APIError("FORBIDDEN", { message: "IMPERSONATION_ACTION_FORBIDDEN" });
