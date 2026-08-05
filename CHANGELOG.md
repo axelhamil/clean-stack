@@ -1,3 +1,83 @@
+## [1.23.0](https://github.com/axelhamil/clean-stack/compare/v1.22.0...v1.23.0) (2026-08-05)
+
+### Features
+
+* **admin:** add audited ban, role, reset and session actions ([69cc344](https://github.com/axelhamil/clean-stack/commit/69cc3447bb24333f3ebc9ce7612e0edc08dce472))
+* **admin:** add justified impersonation start and stop routes ([4cb2101](https://github.com/axelhamil/clean-stack/commit/4cb2101249df3a80f1ba0a8f268226d1e2a7b576))
+* **admin:** add non-dismissable impersonation banner ([188b14e](https://github.com/axelhamil/clean-stack/commit/188b14e8a2d5d53fd9846acb4a905c69893629ec))
+* **admin:** add platform user query service ([b76402f](https://github.com/axelhamil/clean-stack/commit/b76402f274b403d519f69daa21022d4511d51022))
+* **admin:** add platform users list page ([96e1d67](https://github.com/axelhamil/clean-stack/commit/96e1d671ee96102dfe20c450e40cde29505b709d))
+* **admin:** add read-only organization back-office pages ([345cb1c](https://github.com/axelhamil/clean-stack/commit/345cb1cf0f1b96397a8d55cb0b86f19925a50618))
+* **admin:** add set-cookie relay primitive for impersonation ([e46688e](https://github.com/axelhamil/clean-stack/commit/e46688e5649475ad5075a700ee6bb831054e466b))
+* **admin:** add user detail page with ban and impersonation flows ([469211c](https://github.com/axelhamil/clean-stack/commit/469211c946cd7c359b8aea9f92c6ff52f0d1e646))
+* **admin:** block sensitive auth endpoints during impersonation ([5633702](https://github.com/axelhamil/clean-stack/commit/5633702017eca56dc3d2d806438ca65fe1eb811c))
+* **admin:** deny sensitive business routes during impersonation ([f7bf43a](https://github.com/axelhamil/clean-stack/commit/f7bf43a5df03ecb76009bb3894db1c8ef011aad5))
+* **admin:** expose impersonated-by on the session payload ([4d19ec2](https://github.com/axelhamil/clean-stack/commit/4d19ec28a27a5c640ed3a38982e3edf98d943c2f))
+* **admin:** expose platform user list and detail routes ([367fdf7](https://github.com/axelhamil/clean-stack/commit/367fdf72c60a89994384cd6bc97440709cab458b))
+* **admin:** expose read-only organization list and detail routes ([2b11433](https://github.com/axelhamil/clean-stack/commit/2b11433c38c9cedc216335f305aa9f90259a5bbd))
+* **admin:** notify impersonated users by email ([d81af1c](https://github.com/axelhamil/clean-stack/commit/d81af1c54ff933513f367759805d9035ab4cf328))
+* **api:** add email delivery worker with batch chunking ([d2ba5e8](https://github.com/axelhamil/clean-stack/commit/d2ba5e87c0ee128813f20344d0b8d62c3336f652))
+* **api:** add email queue port and drizzle store ([f1e7963](https://github.com/axelhamil/clean-stack/commit/f1e79634b5e23b74997268b2cdef81c91cb79976))
+* **api:** add email_message retention sweep ([2fa2b62](https://github.com/axelhamil/clean-stack/commit/2fa2b623e79a23bd089a2633fdeb162162f648ab))
+* **api:** turn email service into a queue facade (sendraw, batch methods) ([92267ee](https://github.com/axelhamil/clean-stack/commit/92267ee7464c36cc83c1e461b4562d274cd17ce6))
+* **api:** wire email queue and delivery worker into di and boot ([7cb1705](https://github.com/axelhamil/clean-stack/commit/7cb170540246b078add60d49fc7c1749f691301f))
+* **drizzle:** add email_message queue table ([720308e](https://github.com/axelhamil/clean-stack/commit/720308ecacb47627c1c8e002870a6ceb508d7dca))
+* **emails:** add in-repo react email templates package ([0257f2a](https://github.com/axelhamil/clean-stack/commit/0257f2ab969c7b21d42fee41ca9912ae1b902194))
+* **events:** declare email.delivery.exhausted internal event ([494200d](https://github.com/axelhamil/clean-stack/commit/494200da328ad9158c5d033521bd2aac190a1b42))
+* **events:** declare seven admin.* platform events ([20086d9](https://github.com/axelhamil/clean-stack/commit/20086d9ec0b1c001c7ede234ffdb7ba33470e42a))
+
+### Bug Fixes
+
+* **admin:** address task-13 round-1 review feedback ([5f9475e](https://github.com/axelhamil/clean-stack/commit/5f9475ed6236ef59aff155158cc1ae1f55eef026))
+* **admin:** align iadminorgstore port to option<t> contract, remove nullable leak ([6dad9fa](https://github.com/axelhamil/clean-stack/commit/6dad9fa89bce14e46ad1382a39112fe3d1afdac7))
+* **admin:** apply deny-impersonated per-mutation route, not globally ([af7a20b](https://github.com/axelhamil/clean-stack/commit/af7a20b86965a1497c792ee5d0d42310a87ac44a))
+* **admin:** correct route names and session payload mechanism in docs ([9b5062f](https://github.com/axelhamil/clean-stack/commit/9b5062f0022e6ec7ec1a32bb7ed17a2c5322650a))
+* **admin:** enforce option absence on the find-user port instead of nullable ([c8bd9da](https://github.com/axelhamil/clean-stack/commit/c8bd9da86f1d2eee216024e68d4a9c15fdcbae7f))
+* **admin:** extend impersonation blocklist with social and session paths ([d63184e](https://github.com/axelhamil/clean-stack/commit/d63184ee7a10a991f1a5d3c67c031a89a91e6c02))
+* **admin:** four qa defects on impersonation flow ([4ce660a](https://github.com/axelhamil/clean-stack/commit/4ce660a0a3378984e17090efb3e0ed6c18b8160f))
+* **admin:** guard /stop against betterauth failure before emitting audit event ([5e59f75](https://github.com/axelhamil/clean-stack/commit/5e59f756e058543a0ac112ac66325a29b00f9743))
+* **admin:** guard optional headers before loading session in the before-hook ([eb869ab](https://github.com/axelhamil/clean-stack/commit/eb869abfbcee63866c72a42649ef4e635d68e630))
+* **admin:** live countdown and guard order in impersonation banner ([c020381](https://github.com/axelhamil/clean-stack/commit/c02038176d0ec7c2db6c557f2404ab2319bed941))
+* **admin:** remove platform-admin mock leak in impersonation route test ([30b99a2](https://github.com/axelhamil/clean-stack/commit/30b99a2346335507e3d22184339eb1fee9b732a3))
+* **admin:** resolve four pre-merge review items ([871381d](https://github.com/axelhamil/clean-stack/commit/871381dbb1d37ffacd0d4e383b4f7e86f374f91c))
+* **admin:** strip out-of-scope actions from users list page ([2d53263](https://github.com/axelhamil/clean-stack/commit/2d5326358346f346ee9646b154386a95fac7fcc8))
+* **admin:** surface email errors to telemetry and add support url ([87e9532](https://github.com/axelhamil/clean-stack/commit/87e953235e2a17b5c159293cb8fac235a5676f1b))
+* **admin:** thread request headers to all auth.api calls in admin action service ([1980cb0](https://github.com/axelhamil/clean-stack/commit/1980cb0c194ecce0d8b16e15382e3ca27599bd42))
+* **admin:** translate ui copy to english, fix nav routing and naming ([27ccbff](https://github.com/axelhamil/clean-stack/commit/27ccbff5044051d25f47ad02b662348087650d27))
+* **admin:** translate validation messages and fix eager error display on form open ([bb179ab](https://github.com/axelhamil/clean-stack/commit/bb179ab8b73441dee742ad2c231b44b1467fd863))
+* **admin:** unblock submit buttons and remove spurious wrappers ([99e4dd3](https://github.com/axelhamil/clean-stack/commit/99e4dd3c2d3b8fb22cd2a18c9545e66d5676d38c))
+* **admin:** wire organization filter and add missing test coverage ([f52d873](https://github.com/axelhamil/clean-stack/commit/f52d87360e349f1a4b5953636032d8bc2d99693d))
+* **api:** add outer spans to sendtemplate and sendraw in queued email service ([c4627d2](https://github.com/axelhamil/clean-stack/commit/c4627d210f0d77e3b4bf151d2c1e7f5f84ae0eaf))
+* **email:** apply final pre-merge fixes for d5 email delivery ([41b59f8](https://github.com/axelhamil/clean-stack/commit/41b59f8c1ac0ae9b4893c1abdc2938f9fa9e81ef))
+* **emails:** migrate from deprecated @react-email/components to react-email ([44e7c45](https://github.com/axelhamil/clean-stack/commit/44e7c456c9dc8414d2d9f138193f672940a3bb4e))
+
+### Performance
+
+* **rgpd:** batch deletion notifications in the wipe sweep ([9582f20](https://github.com/axelhamil/clean-stack/commit/9582f2073ccba516b08f443c5c7ae48ad613aec4))
+
+### Refactor
+
+* **ddd-kit:** close result.ok() type hole with overloads ([aa3d2c2](https://github.com/axelhamil/clean-stack/commit/aa3d2c2a45c94595b2d31011a076613028e97288))
+* **email:** convert nullable queue port fields to option ([9e2a3e0](https://github.com/axelhamil/clean-stack/commit/9e2a3e07aaf9507b2a2113280420b7151cf588b9))
+* **option:** apply option convention to consents, billing, rate-limiter (lot b) ([73e9808](https://github.com/axelhamil/clean-stack/commit/73e9808368b71307ce8921fcdc37437d0b9ddb24))
+* **option:** apply option convention to outbox and audit ports (lot d) ([f8db14f](https://github.com/axelhamil/clean-stack/commit/f8db14f60d22275aefcca3bdf29d1835e0699b79))
+* **webhooks:** convert nullable record fields to option ([452206c](https://github.com/axelhamil/clean-stack/commit/452206c6e32af512030be19a598cdf000bd00402))
+
+### Build
+
+* **api:** upgrade inwire to 3.1.3 ([7e518ed](https://github.com/axelhamil/clean-stack/commit/7e518ed1428214567854b02965a642652fdd8672))
+
+### Documentation
+
+* **admin:** record c.3 as-built and flip the roadmap ([e3fa516](https://github.com/axelhamil/clean-stack/commit/e3fa5166bf0c1d8683694621bcfe60eb2726c35a))
+* **admin:** reflect qa-phase changes in c.3 documentation ([cb49c27](https://github.com/axelhamil/clean-stack/commit/cb49c27ffc4e98287f4bde85f66a83582d1cb5b7))
+* as-built record for phase d.5 email delivery queue ([ca7e18f](https://github.com/axelhamil/clean-stack/commit/ca7e18f221b8ea3e235d22baa88591738adce120))
+* compact roadmap, history, features and api rules ([68e1f26](https://github.com/axelhamil/clean-stack/commit/68e1f266941672f0f0f6d6556cb6c6f67506becc))
+* **drizzle:** correct nested transaction error rationale ([b29dd36](https://github.com/axelhamil/clean-stack/commit/b29dd3690bfad3999f1e4d2a10a5d3fb79991efd))
+* record privacy dashboard as-built + fix stale references ([6e8ab8e](https://github.com/axelhamil/clean-stack/commit/6e8ab8eb872ada1eefdd76fc2ecdec561fa92689))
+* record the option/result convention back-fill ([b24d50d](https://github.com/axelhamil/clean-stack/commit/b24d50da4a3aaa256df6bf5f19d85323ea9cfbc9))
+* **roadmap:** plan email batch sending + resend provider audit ([d31fa55](https://github.com/axelhamil/clean-stack/commit/d31fa550163e2c59a09331cae890aeec9a57f4f9))
+
 ## [1.22.0](https://github.com/axelhamil/clean-stack/compare/v1.21.0...v1.22.0) (2026-07-22)
 
 ### Features
