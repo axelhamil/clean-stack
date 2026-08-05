@@ -31,6 +31,7 @@ import {
   insertPersonalOrgWithOwner,
   setPendingEmail,
 } from "./auth-queries";
+import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
 import {
   authorizeSubscriptionReference,
@@ -876,12 +877,10 @@ export const auth = betterAuth({
   plugins: [
     ...authOptions.plugins,
     customSession(async ({ user, session }) => {
-      const isPlatformAdmin =
-        env.PLATFORM_ADMIN_IDS.includes(user.id) || (user as { role?: string }).role === "admin";
-      const enrichedUser = { ...user, isPlatformAdmin };
-      if (!session.activeOrganizationId) return { user: enrichedUser, session };
-      const role = await findActiveMemberRole(user.id, session.activeOrganizationId);
-      return { user: enrichedUser, session: { ...session, activeOrganizationRole: role } };
+      const role = session.activeOrganizationId
+        ? await findActiveMemberRole(user.id, session.activeOrganizationId)
+        : undefined;
+      return buildSessionPayload(user, session, env.PLATFORM_ADMIN_IDS, role);
     }, authOptions),
   ],
 });
