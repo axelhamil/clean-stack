@@ -41,6 +41,7 @@ import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
+import { isBlockedDuringImpersonation } from "./shared/middleware/impersonation-blocklist";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
@@ -574,6 +575,13 @@ const authOptions = {
     before: createAuthMiddleware(async (ctx) => {
       const path = ctx.path;
       const body = ctx.body as Record<string, unknown> | undefined;
+
+      if (isBlockedDuringImpersonation(path)) {
+        const current = await auth.api.getSession({ headers: ctx.headers });
+        if (current?.session?.impersonatedBy) {
+          throw new APIError("FORBIDDEN", { message: "IMPERSONATION_ACTION_FORBIDDEN" });
+        }
+      }
 
       // Credential-stuffing: per-account rate-limit on sign-in (fail-closed — store error → 503)
       if (path === "/sign-in/email") {
