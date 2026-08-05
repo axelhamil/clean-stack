@@ -156,7 +156,7 @@ function serviceReturning(result: unknown[]) {
   const store = {
     listUsers: mock(async () => result),
   };
-  return new AdminQueryService(store as never, instrumentation as never);
+  return new AdminQueryService(store as never, instrumentation as never, {} as never);
 }
 
 describe("AdminQueryService", () => {
@@ -185,7 +185,7 @@ describe("AdminQueryService", () => {
 
     it("passes organizationId filter through to the store", async () => {
       const store = { listUsers: mock(async () => rows) };
-      const service = new AdminQueryService(store as never, instrumentation as never);
+      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
       await service.listUsers({ limit: 50, organizationId: "org-1" });
       expect(store.listUsers).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org-1" }),
@@ -198,7 +198,7 @@ describe("AdminQueryService", () => {
           throw new Error("boom");
         }),
       };
-      const service = new AdminQueryService(store as never, instrumentation as never);
+      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
       const result = await service.listUsers({ limit: 50 });
       expect(result.isFailure).toBe(true);
       expect(instrumentation.capture).toHaveBeenCalled();
@@ -213,7 +213,7 @@ describe("AdminQueryService", () => {
         listSessionsFor: mock(async () => []),
         listMembershipsFor: mock(async () => []),
       };
-      const service = new AdminQueryService(store as never, instrumentation as never);
+      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
       const result = await service.getUser("missing");
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isNone()).toBe(true);
@@ -237,7 +237,7 @@ describe("AdminQueryService", () => {
           { organizationId: "o-1", organizationName: "Acme", role: "owner" },
         ]),
       };
-      const service = new AdminQueryService(store as never, instrumentation as never);
+      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
       const detail = (await service.getUser("u-1")).getValue().unwrap();
       expect(detail.sessions[0]?.impersonatedBy.unwrap()).toBe("admin-1");
       expect(detail.memberships[0]?.organizationName).toBe("Acme");
