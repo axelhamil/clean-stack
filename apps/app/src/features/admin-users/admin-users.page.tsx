@@ -15,11 +15,9 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { toast } from "sonner";
 import type { UserFilters } from "./admin-user-filters";
-import { stopImpersonationMutationOptions } from "./api/admin-users.mutations";
 import { adminUsersInfiniteQueryOptions } from "./api/admin-users.queries";
 import { UserRow } from "./components/user-row";
 
@@ -32,24 +30,10 @@ export function AdminUsersPage() {
 
   const query = useInfiniteQuery(adminUsersInfiniteQueryOptions(filters));
 
-  const stopImpersonation = useMutation({
-    ...stopImpersonationMutationOptions,
-    onSuccess: () => toast.success("Impersonation terminée"),
-    onError: (err) => toast.error(err.message),
-  });
-
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-center justify-between gap-4">
+      <header>
         <TypographyH1 variant="page">Comptes</TypographyH1>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={stopImpersonation.isPending}
-          onClick={() => stopImpersonation.mutate()}
-        >
-          Quitter l'impersonation
-        </Button>
       </header>
 
       <div className="flex flex-wrap gap-3">
@@ -113,7 +97,6 @@ export function AdminUsersPage() {
                 <TableHead>Rôle</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Créé le</TableHead>
-                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
