@@ -7,6 +7,7 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
 import { di } from "./container";
+import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
@@ -198,6 +199,7 @@ const routes = app
   .route("/uploads", uploadsRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
+  .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/webhooks", webhooksRoutes)
   .route("/consents", consentRoutes)
