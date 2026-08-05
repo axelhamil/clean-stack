@@ -34,6 +34,7 @@ import {
   sessionMiddleware,
 } from "./shared/middleware/auth.middleware";
 import { requireCsrf } from "./shared/middleware/csrf.middleware";
+import { denyImpersonated } from "./shared/middleware/deny-impersonated.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
 import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
@@ -109,6 +110,12 @@ app.use("/admin/*", csrf);
 app.use("/consents", csrf);
 app.use("/consents/*", csrf);
 app.use("/billing/portal", csrf);
+app.use("/billing", denyImpersonated);
+app.use("/billing/*", denyImpersonated);
+app.use("/me", denyImpersonated);
+app.use("/me/*", denyImpersonated);
+app.use("/settings/webhooks", denyImpersonated);
+app.use("/settings/webhooks/*", denyImpersonated);
 const consentRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, CONSENT_POST_POLICY);
 app.use("/consents", (c, next) =>
   c.req.method === "POST" || c.req.method === "DELETE" ? consentRateLimit(c, next) : next(),

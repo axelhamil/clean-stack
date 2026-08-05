@@ -281,7 +281,7 @@ const authOptions = {
   session: {
     cookieCache: {
       enabled: true,
-      maxAge: 5 * 60,
+      maxAge: 60,
     },
   },
 
