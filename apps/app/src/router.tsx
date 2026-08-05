@@ -1,6 +1,7 @@
 import { createRouter } from "@tanstack/react-router";
 import { accountRoute } from "./features/account/account.route";
 import { adminAuditLogRoute } from "./features/admin-audit-log/admin-audit-log.route";
+import { adminUsersRoute } from "./features/admin-users/admin-users.route";
 import { forgotPasswordRoute } from "./features/auth/forgot-password.route";
 import { magicLinkRoute } from "./features/auth/magic-link.route";
 import { resetPasswordRoute } from "./features/auth/reset-password.route";
@@ -45,7 +46,7 @@ const routeTree = rootRoute.addChildren([
     shellLayout.addChildren([
       dashboardRoute,
       newOrgRoute,
-      adminLayout.addChildren([adminAuditLogRoute]),
+      adminLayout.addChildren([adminAuditLogRoute, adminUsersRoute]),
       settingsLayout.addChildren([
         settingsIndexRoute,
         accountRoute,
