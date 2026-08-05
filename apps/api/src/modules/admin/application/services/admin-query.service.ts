@@ -130,11 +130,11 @@ export class AdminQueryService {
   async getOrg(id: string): Promise<Result<Option<AdminOrgDetail>, AdminQueryError>> {
     return this.instrumentation.startSpan({ name: "AdminQueryService > getOrg" }, async () => {
       try {
-        const maybeRow = Option.fromNullable(await this.orgStore.findOrgById(id));
+        const maybeRow = await this.orgStore.findOrgById(id);
         if (maybeRow.isNone()) return Result.ok(Option.none<AdminOrgDetail>());
         const row = maybeRow.unwrap();
 
-        const [members, planRaw] = await Promise.all([
+        const [members, plan] = await Promise.all([
           this.orgStore.listMembersOf(id),
           this.orgStore.findPlanFor(id),
         ]);
@@ -147,7 +147,7 @@ export class AdminQueryService {
             memberCount: row.memberCount,
             createdAt: row.createdAt,
             members,
-            plan: Option.fromNullable(planRaw),
+            plan,
           }),
         );
       } catch (err) {

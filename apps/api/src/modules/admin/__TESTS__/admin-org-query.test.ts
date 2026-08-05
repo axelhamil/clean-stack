@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 
 type SqlMarker = { _op: string; args: unknown[] };
 const mk =
@@ -150,9 +151,9 @@ describe("AdminQueryService orgs", () => {
           createdAt: new Date("2026-01-01"),
         },
       ]),
-      findOrgById: mock(async () => null),
+      findOrgById: mock(async () => Option.none()),
       listMembersOf: mock(async () => []),
-      findPlanFor: mock(async () => null),
+      findPlanFor: mock(async () => Option.none()),
     };
     const service = new AdminQueryService({} as never, instrumentation as never, orgStore as never);
     const page = (await service.listOrgs({ limit: 50 })).getValue();
@@ -162,9 +163,9 @@ describe("AdminQueryService orgs", () => {
   it("returns none for an unknown org", async () => {
     const orgStore = {
       listOrgs: mock(async () => []),
-      findOrgById: mock(async () => null),
+      findOrgById: mock(async () => Option.none()),
       listMembersOf: mock(async () => []),
-      findPlanFor: mock(async () => null),
+      findPlanFor: mock(async () => Option.none()),
     };
     const service = new AdminQueryService({} as never, instrumentation as never, orgStore as never);
     expect((await service.getOrg("nope")).getValue().isNone()).toBe(true);
@@ -173,15 +174,17 @@ describe("AdminQueryService orgs", () => {
   it("exposes the plan as an Option when the org has no subscription", async () => {
     const orgStore = {
       listOrgs: mock(async () => []),
-      findOrgById: mock(async () => ({
-        id: "o-1",
-        name: "Acme",
-        slug: "acme",
-        memberCount: 1,
-        createdAt: new Date("2026-01-01"),
-      })),
+      findOrgById: mock(async () =>
+        Option.some({
+          id: "o-1",
+          name: "Acme",
+          slug: "acme",
+          memberCount: 1,
+          createdAt: new Date("2026-01-01"),
+        }),
+      ),
       listMembersOf: mock(async () => [{ userId: "u-1", email: "a@example.com", role: "owner" }]),
-      findPlanFor: mock(async () => null),
+      findPlanFor: mock(async () => Option.none<string>()),
     };
     const service = new AdminQueryService({} as never, instrumentation as never, orgStore as never);
     const detail = (await service.getOrg("o-1")).getValue().unwrap();

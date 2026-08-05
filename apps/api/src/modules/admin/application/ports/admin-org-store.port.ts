@@ -1,3 +1,4 @@
+import type { Option } from "@packages/ddd-kit";
 import type { ListOrgsInput } from "../dto/list-orgs.dto";
 
 export interface AdminOrgRow {
@@ -16,7 +17,7 @@ export interface AdminOrgMemberRow {
 
 export interface IAdminOrgStore {
   listOrgs(input: ListOrgsInput): Promise<AdminOrgRow[]>;
-  findOrgById(id: string): Promise<AdminOrgRow | null>;
+  findOrgById(id: string): Promise<Option<AdminOrgRow>>;
   listMembersOf(organizationId: string): Promise<AdminOrgMemberRow[]>;
-  findPlanFor(organizationId: string): Promise<string | null>;
+  findPlanFor(organizationId: string): Promise<Option<string>>;
 }

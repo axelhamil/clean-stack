@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -74,7 +75,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
     }
   }
 
-  async findOrgById(id: string): Promise<AdminOrgRow | null> {
+  async findOrgById(id: string): Promise<Option<AdminOrgRow>> {
     try {
       return await this.instrumentation.startSpan(
         { name: "DrizzleAdminOrgStore > findOrgById" },
@@ -104,7 +105,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
             },
             () => query.execute(),
           );
-          return rows[0] ?? null;
+          return Option.fromNullable(rows[0] ?? null);
         },
       );
     } catch (err) {
@@ -144,7 +145,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
     }
   }
 
-  async findPlanFor(organizationId: string): Promise<string | null> {
+  async findPlanFor(organizationId: string): Promise<Option<string>> {
     try {
       return await this.instrumentation.startSpan(
         { name: "DrizzleAdminOrgStore > findPlanFor" },
@@ -163,7 +164,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
             },
             () => query.execute(),
           );
-          return rows[0]?.plan ?? null;
+          return Option.fromNullable(rows[0]?.plan ?? null);
         },
       );
     } catch (err) {
