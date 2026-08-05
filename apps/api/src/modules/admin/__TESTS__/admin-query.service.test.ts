@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 
 const rows = [
   {
@@ -208,7 +209,7 @@ describe("AdminQueryService", () => {
     it("returns none when the user does not exist", async () => {
       const store = {
         listUsers: mock(async () => []),
-        findUserById: mock(async () => null),
+        findUserById: mock(async () => Option.none()),
         listSessionsFor: mock(async () => []),
         listMembershipsFor: mock(async () => []),
       };
@@ -221,7 +222,7 @@ describe("AdminQueryService", () => {
     it("assembles sessions and memberships for an existing user", async () => {
       const store = {
         listUsers: mock(async () => []),
-        findUserById: mock(async () => rows[0]),
+        findUserById: mock(async () => Option.some(rows[0])),
         listSessionsFor: mock(async () => [
           {
             id: "s-1",

@@ -1,3 +1,4 @@
+import type { Option } from "@packages/ddd-kit";
 import type { ListUsersInput } from "../dto/list-users.dto";
 
 export interface AdminUserRow {
@@ -29,7 +30,7 @@ export interface AdminMembershipRow {
 
 export interface IAdminUserStore {
   listUsers(input: ListUsersInput): Promise<AdminUserRow[]>;
-  findUserById(id: string): Promise<AdminUserRow | null>;
+  findUserById(id: string): Promise<Option<AdminUserRow>>;
   listSessionsFor(userId: string): Promise<AdminSessionRow[]>;
   listMembershipsFor(userId: string): Promise<AdminMembershipRow[]>;
 }

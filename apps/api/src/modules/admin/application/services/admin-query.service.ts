@@ -82,8 +82,9 @@ export class AdminQueryService {
   async getUser(id: string): Promise<Result<Option<AdminUserDetail>, AdminQueryError>> {
     return this.instrumentation.startSpan({ name: "AdminQueryService > getUser" }, async () => {
       try {
-        const row = await this.store.findUserById(id);
-        if (!row) return Result.ok(Option.none<AdminUserDetail>());
+        const maybeRow = await this.store.findUserById(id);
+        if (maybeRow.isNone()) return Result.ok(Option.none<AdminUserDetail>());
+        const row = maybeRow.unwrap();
 
         const [sessions, memberships] = await Promise.all([
           this.store.listSessionsFor(id),

@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -84,7 +85,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
     }
   }
 
-  async findUserById(id: string): Promise<AdminUserRow | null> {
+  async findUserById(id: string): Promise<Option<AdminUserRow>> {
     try {
       return await this.instrumentation.startSpan(
         { name: "DrizzleAdminUserStore > findUserById" },
@@ -113,7 +114,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
             },
             () => query.execute(),
           );
-          return rows[0] ?? null;
+          return Option.fromNullable(rows[0] ?? null);
         },
       );
     } catch (err) {
