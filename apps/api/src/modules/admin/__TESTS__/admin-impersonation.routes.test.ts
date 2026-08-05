@@ -144,17 +144,11 @@ let currentSession: Record<string, unknown> = {
 
 mock.module("../../../shared/middleware/auth.middleware", () => ({
   requireAuth: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
-    c.set("user", { id: "admin-1", twoFactorEnabled: true });
+    c.set("user", { id: "admin-1", role: "admin", twoFactorEnabled: true });
     c.set("session", currentSession);
     await next();
   },
   AuthVariables: {},
-}));
-
-mock.module("../../../shared/middleware/platform-admin.middleware", () => ({
-  requirePlatformAdmin: async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  },
 }));
 
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
