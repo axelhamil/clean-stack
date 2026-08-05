@@ -10,6 +10,7 @@ import {
 } from "@packages/ui/components/ui/form";
 import { Input } from "@packages/ui/components/ui/input";
 import { Textarea } from "@packages/ui/components/ui/textarea";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { type ImpersonateFormInput, impersonateFormSchema } from "../admin-users.schema";
 
@@ -24,6 +25,10 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
     mode: "onChange",
     defaultValues: { reason: "", ticketRef: "" },
   });
+
+  useEffect(() => {
+    void form.trigger();
+  }, [form.trigger]);
 
   return (
     <Form {...form}>

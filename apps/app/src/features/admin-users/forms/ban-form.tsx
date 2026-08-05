@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@packages/ui/components/ui/select";
 import { Textarea } from "@packages/ui/components/ui/textarea";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { type BanFormInput, banFormSchema } from "../admin-users.schema";
 
@@ -37,6 +38,10 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
     mode: "onChange",
     defaultValues: { reason: "", expiresIn: undefined },
   });
+
+  useEffect(() => {
+    void form.trigger();
+  }, [form.trigger]);
 
   return (
     <Form {...form}>

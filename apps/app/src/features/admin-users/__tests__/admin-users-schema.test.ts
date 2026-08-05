@@ -20,4 +20,8 @@ describe("banFormSchema", () => {
   it("rejects a non-positive expiry", () => {
     expect(banFormSchema.safeParse({ reason: "spam", expiresIn: 0 }).success).toBe(false);
   });
+
+  it("rejects a whitespace-only reason", () => {
+    expect(banFormSchema.safeParse({ reason: "   " }).success).toBe(false);
+  });
 });

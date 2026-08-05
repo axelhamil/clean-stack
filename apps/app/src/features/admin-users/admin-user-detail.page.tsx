@@ -20,6 +20,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { sessionQueryOptions } from "../../shared/api/queries/session";
+import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
 import {
   banUserMutationOptions,
   resetPasswordMutationOptions,
@@ -66,9 +68,11 @@ export function AdminUserDetailPage() {
 
   const impersonateMutation = useMutation({
     ...startImpersonationMutationOptions,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Impersonation démarrée.");
       setImpersonateOpen(false);
+      await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
+      broadcastAuthChange();
       void navigate({ to: "/dashboard" });
     },
     onError: (err) => toast.error(err.message),
