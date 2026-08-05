@@ -667,11 +667,11 @@ La réconciliation guest→user se fait **entièrement côté serveur**, sans ro
 
 - **Read-only user and org back-office** — `GET /admin/users`, `GET /admin/users/:id`, `GET /admin/orgs`, `GET /admin/orgs/:id` (paginated, search-filtered), backed by `DrizzleAdminUserStore`, `DrizzleAdminOrgStore`, `AdminQueryService`. Front: `features/admin-users/` + `features/admin-orgs/`.
 - **Five audited admin actions** (`AdminActionService`) — ban (with reason + optional expiry), unban, platform role change, force password reset (sends reset email via BetterAuth), revoke all sessions — each emits an `admin.*` event via `emitEvent`.
-- **Justified impersonation** — `POST /admin/start-impersonating` requires `reason` (min 1 char) and accepts optional `ticketRef`. `POST /admin/stop-impersonating` validates the BetterAuth response before emitting the audit event (no false audit trail on BetterAuth failure).
-- **Server-side blocklist** — two layers: a BetterAuth `beforeHook` in `auth.ts` (`impersonation-blocklist.ts`) blocking the most sensitive auth endpoints, and per-mutation `denyImpersonated` middleware on 11 business mutation routes. Six read-only routes left open. Exit route `POST /admin/stop-impersonating` always preserved.
+- **Justified impersonation** — `POST /admin/impersonation/:id/start` requires `reason` (min 1 char) and accepts optional `ticketRef`. `POST /admin/impersonation/stop` validates the BetterAuth response before emitting the audit event (no false audit trail on BetterAuth failure).
+- **Server-side blocklist** — two layers: a BetterAuth `beforeHook` in `auth.ts` (`impersonation-blocklist.ts`) blocking the most sensitive auth endpoints, and per-mutation `denyImpersonated` middleware on 11 business mutation routes. Six read-only routes left open. Exit route `POST /admin/impersonation/stop` always preserved.
 - **Non-dismissable impersonation banner** — `ImpersonationBanner` component mounted in `_shell`, live countdown from session expiry (`setInterval`, recalculated every second), `variant="banner"` added to the Alert primitive in `@packages/ui`.
 - **Transparency email** — `NotifyImpersonatedUserHandler` (`onEvent(ADMIN_IMPERSONATION_STARTED)`) sends the impersonated user a "someone accessed your account" email. Failure captured to telemetry, does not abort impersonation.
-- **Session payload extended** — `isImpersonating` + `impersonatedBy` (normalized from `undefined` to `null`) exposed via `GET /admin/session-info`.
+- **Session payload extended** — `buildSessionPayload` (`auth-session-payload.ts`) enriches BetterAuth's own session response with `impersonatedBy` (normalized from `undefined` to `null`) and `isPlatformAdmin`. The front reads these fields from the existing session query; no dedicated admin session endpoint exists.
 - **Event catalog 55 → 62** — seven new `admin.*` events added to `@packages/events`, all `compliance` retention.
 
 **Structural decision — `AdminActionService` outside inwire**:
@@ -681,7 +681,7 @@ La réconciliation guest→user se fait **entièrement côté serveur**, sans ro
 **Decisions**:
 
 1. **Write-enabled impersonation with server-side blocklist** — read-only impersonation cannot reproduce write-path bugs. The blocklist specifically targets irreversible or identity-mutating operations: change-email, change-password, MFA enable/disable, link/unlink social account, revoke-sessions, billing portal. Read operations and the exit route stay open.
-2. **Mandatory justification** — `reason` is a required field on `/start-impersonating`. No reason = 400 before any impersonation session is issued. Optional `ticketRef` links to a support ticket.
+2. **Mandatory justification** — `reason` is a required field on `POST /admin/impersonation/:id/start`. No reason = 400 before any impersonation session is issued. Optional `ticketRef` links to a support ticket.
 3. **Transparency email** — the impersonated user is notified at impersonation start. Failure is captured to telemetry and logged but does not block the action. `supportUrl` is derived from `APP_URL`.
 4. **No `support` platform role** — the original plan mentioned a read-only `support` role. BetterAuth's `admin` plugin supports a single platform role column. Adding a `support` role would require custom middleware with zero library support. Deferred out of scope.
 5. **`cookieCache.maxAge` reduced to 60 s** — makes a ban effective within approximately 60 s without adding a session revocation list lookup to every request. Updated in `apps/api/CLAUDE.md`. Near-instant ban (< 1 s) would require a revocation list checked in the session middleware — out of scope.

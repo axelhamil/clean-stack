@@ -278,7 +278,7 @@ Full operator surface for webhook endpoint management and delivery inspection, p
 
 **Frontend** `apps/app/src/features/webhooks/`: `/settings/webhooks` — endpoint list (enabled / paused / auto-disabled badges), create/edit Sheet with `EventTypePicker` (namespace groups + wildcards, same SSOT as the public catalog), cursor-paginated delivery list, per-delivery timeline drawer, one-shot secret reveal, rotate + test actions.
 
-**Public event catalog** `apps/app/src/features/developers/`: `/developers/events` (no auth) — all 50 subscribable events with group, retention, expandable Zod JSON schema, Node.js signature-verification snippet.
+**Public event catalog** `apps/app/src/features/developers/`: `/developers/events` (no auth) — all subscribable events (57 after C.3) with group, retention, expandable Zod JSON schema, Node.js signature-verification snippet.
 
 ---
 
@@ -300,7 +300,7 @@ Platform operator tooling — ban/unban users, change platform role, force passw
 - `AdminQueryService` — read-only platform user and org queries.
 - `AdminActionService` — ban, unban, role-change, force-password-reset, revoke-sessions. Instantiated in `routes.ts` (not inwire — real import cycle; deps from `di`).
 - `DrizzleAdminUserStore` / `DrizzleAdminOrgStore` — org-scoped reads with pagination and search.
-- `admin-impersonation.routes.ts` — `POST /admin/start-impersonating` (reason required, ticketRef optional) + `POST /admin/stop-impersonating`.
+- `admin-impersonation.routes.ts` — `POST /admin/impersonation/:id/start` (reason required, ticketRef optional) + `POST /admin/impersonation/stop`.
 - `relay-set-cookie.ts` — proxies BetterAuth `Set-Cookie` headers to the app client.
 - `shared/middleware/impersonation-blocklist.ts` — BetterAuth `beforeHook` blocking sensitive auth endpoints.
 - `shared/middleware/deny-impersonated.middleware.ts` — per-mutation Hono middleware returning 403 `IMPERSONATION_ACTION_FORBIDDEN`.
