@@ -8,6 +8,9 @@ export function buildSessionPayload<
     ...session,
     impersonatedBy: session.impersonatedBy ?? null,
     ...(activeOrganizationRole !== undefined ? { activeOrganizationRole } : {}),
-  } as S & { impersonatedBy: string | null; activeOrganizationRole?: string | null };
+  } as Omit<S, "impersonatedBy"> & {
+    impersonatedBy: string | null;
+    activeOrganizationRole?: string | null;
+  };
   return { user: enrichedUser, session: enrichedSession };
 }

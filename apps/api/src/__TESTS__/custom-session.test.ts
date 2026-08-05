@@ -19,4 +19,13 @@ describe("buildSessionPayload", () => {
     );
     expect(payload.session.impersonatedBy).toBeNull();
   });
+
+  it("normalises undefined impersonatedBy to null", () => {
+    const payload = buildSessionPayload(
+      { id: "u-1", role: "user", twoFactorEnabled: false },
+      { id: "s-1", impersonatedBy: undefined, activeOrganizationId: null },
+      [],
+    );
+    expect(payload.session.impersonatedBy).toBeNull();
+  });
 });
