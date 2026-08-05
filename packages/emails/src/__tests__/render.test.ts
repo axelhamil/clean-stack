@@ -23,6 +23,7 @@ const STUB_VARS = {
     startedAt: "5 août 2026 à 10:00",
     expiresAt: "5 août 2026 à 18:00",
     reason: "ticket #42",
+    supportUrl: "https://example.com/support",
   },
 } as const satisfies Record<EmailTemplateKey, unknown>;
 

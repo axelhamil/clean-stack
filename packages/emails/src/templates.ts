@@ -14,6 +14,7 @@ export type EmailTemplates = {
     startedAt: string;
     expiresAt: string;
     reason: string;
+    supportUrl: string;
   };
 };
 

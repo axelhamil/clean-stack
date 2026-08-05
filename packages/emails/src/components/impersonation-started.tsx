@@ -1,4 +1,4 @@
-import { Heading, Text } from "react-email";
+import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
@@ -10,6 +10,7 @@ export function ImpersonationStarted({
   startedAt,
   expiresAt,
   reason,
+  supportUrl,
 }: ImpersonationStartedProps) {
   return (
     <EmailLayout preview="Accès support à votre compte">
@@ -26,8 +27,10 @@ export function ImpersonationStarted({
       </Text>
       <Text>
         Si vous n'avez pas sollicité notre support ou si vous avez le moindre doute sur cet accès,
-        contactez-nous immédiatement en répondant à cet e-mail.
+        contactez-nous immédiatement.
       </Text>
+      <Button href={supportUrl}>Contacter le support</Button>
+      <Text>{supportUrl}</Text>
     </EmailLayout>
   );
 }
