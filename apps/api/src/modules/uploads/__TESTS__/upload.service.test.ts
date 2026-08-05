@@ -39,12 +39,12 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
   return {
     presignUpload: mock(async () => Result.ok<PresignedUrl, StorageError>(stubPresignedUrl)),
     presignDownload: mock(async () => Result.ok<PresignedUrl, StorageError>(stubPresignedUrl)),
-    headBucket: mock(async () => Result.ok<void, StorageError>()),
+    headBucket: mock(async () => Result.ok<StorageError>()),
     headObject: mock(async () => Result.ok<ObjectMetadata, StorageError>(stubMeta)),
-    deleteObject: mock(async () => Result.ok<void, StorageError>()),
-    uploadObject: mock(async () => Result.ok<void, StorageError>()),
+    deleteObject: mock(async () => Result.ok<StorageError>()),
+    uploadObject: mock(async () => Result.ok<StorageError>()),
     listObjectKeys: mock(async () => Result.ok<string[], StorageError>([])),
-    deleteObjects: mock(async () => Result.ok<void, StorageError>()),
+    deleteObjects: mock(async () => Result.ok<StorageError>()),
     publicUrlFor: mock(() => "https://cdn.example.com/key"),
     ...overrides,
   } as unknown as IStorageService;

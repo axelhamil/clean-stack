@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 
 // ---------------------------------------------------------------------------
 // Query-chain factories — called fresh on each tx.select / tx.insert
@@ -128,7 +129,7 @@ function makeEvent(eventType: string, organizationId = "org-1") {
     eventType,
     aggregateId: "agg-1",
     aggregateType: "test",
-    organizationId,
+    organizationId: Option.some(organizationId),
     payload: {},
     metadata: {
       specversion: "1.0" as const,

@@ -50,7 +50,8 @@ export const consentRoutes = new Hono<{ Variables: AuthVariables }>()
     const r = await di.ConsentService.getActive(subjectId, COOKIE_CONSENT_VERSION, userId);
     if (r.isFailure) throw new AppErrorException(r.getError());
 
-    const row = r.getValue();
+    const opt = r.getValue();
+    const row = opt.isSome() ? opt.unwrap() : null;
     return c.json({
       categories: row?.categories ?? null,
       policyVersion: row?.policyVersion ?? null,

@@ -12,16 +12,15 @@ see [`CRON.md`](./CRON.md).
 
 ---
 
-## 1. Resend — email templates
+## 1. Resend — email delivery queue + templates
 
-Resend templates are managed **in the dashboard**, not in code. The API only
-references them by ID. Each template must exist with the exact variables the
-codebase passes — Resend returns a 422 on mismatch.
+**Phase D.5 changed the delivery model.** `IEmailService` (`QueuedEmailService`) no longer calls Resend directly — every send enqueues one or more rows in the `email_message` table (inside the caller's transaction when `options.tx` is passed). `EmailDeliveryWorker` polls every 2 s, claims up to 300 pending rows (`FOR UPDATE SKIP LOCKED`, 120 s claim window), groups by `(kind, template)`, chunks to 100, and sends each chunk via `resend.batch.send`. Batch cap is 100 emails/request against a **10 req/s per team** Resend ceiling. This makes fan-out (RGPD wipe sweep, org announcements, D.3 digests) safe under the rate limit: N recipients → ⌈N/100⌉ HTTP calls, not N.
 
-Template IDs live in a single hashmap at the top of
-`apps/api/src/shared/services/email.service.ts` (`TEMPLATE_IDS`). Edit it
-once when cloning. They aren't secrets — just opaque dashboard handles — so
-keeping them in code is simpler than 8 env vars.
+### Template rendering (Phase D.5 — in-repo React Email)
+
+`@packages/emails` ships one React Email component + `subject()` per template key. Templates render server-side at enqueue time — no Resend dashboard required on a fresh clone.
+
+`TEMPLATE_IDS` in `apps/api/src/shared/services/email-delivery-worker.service.ts` is now an **override map**: an empty string means render the in-repo template; a non-empty string means use that Resend dashboard template ID instead. A fresh clone therefore sends real emails with zero dashboard setup.
 
 ### Template inventory
 
@@ -35,6 +34,8 @@ keeping them in code is simpler than 8 env vars.
 | `delete_requested` | Account-deletion grace started | `name`, `cancelUrl`, `expiresAt` |
 | `delete_cancelled` | User cancelled deletion in time | `name` |
 | `delete_completed` | Account anonymized after grace | `name` |
+| `change_email` | Email address change confirmation | `name`, `confirmUrl` |
+| `backup_code_used` | Backup MFA code consumption alert | `name`, `email` |
 
 ### Authoring rules
 
@@ -47,8 +48,15 @@ keeping them in code is simpler than 8 env vars.
   re-autolink visible URL text and break `?token=...`.
 - **`expiresAt` is an ISO string** (`new Date(...).toISOString()`); render it
   with the user's locale on the template side.
-- Boot fails hard in production if `RESEND_API_KEY` is missing or any
-  `TEMPLATE_IDS` entry is empty — see `ResendEmailService` constructor.
+- **Never call Resend directly from a request path** — always go through `IEmailService.sendTemplate` or `sendTemplateBatch`. The worker owns batching and retry.
+
+### Bounce suppression
+
+Hard bounces are filtered **provider-side and automatically** — Resend's domain-scoped suppression list blocks future sends to bounced addresses with a 422 + `email.suppressed` webhook event. No local `email_suppression` table is needed (build one only when a product feature consumes it).
+
+### Idempotency
+
+`Idempotency-Key` is **per batch request** (not per recipient). The worker derives a key from the chunk's claim window; callers can pass `options.idempotencyKey` which the queue service fans out as `${key}/${index}` per recipient.
 
 ### DNS hardening (mandatory before sending in production)
 

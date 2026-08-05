@@ -1,9 +1,11 @@
+import type { Option } from "@packages/ddd-kit";
+
 export interface StripePriceLite {
   priceId: string;
   tier: string;
   unitAmount: number;
   currency: string;
-  interval: string | null;
+  interval: Option<string>;
   productName: string;
   marketingFeatures: string[];
 }

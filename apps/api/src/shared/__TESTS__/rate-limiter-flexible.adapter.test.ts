@@ -170,6 +170,16 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
     });
   });
 
+  describe("empty windows", () => {
+    it("returns allowed when no windows are configured", async () => {
+      const result = await makeAdapter().consume("ip-empty", []);
+      expect(result.isSuccess).toBe(true);
+      const v = result.getValue();
+      expect(v.allowed).toBe(true);
+      expect(v.firstBlock).toBe(false);
+    });
+  });
+
   describe("multi-window fail-fast", () => {
     it("stops at first blocked window even if longer window would allow", async () => {
       const tightWindow: WindowConfig = { policyName: "tight", windowSec: 2, maxRequests: 1 };

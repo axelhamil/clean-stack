@@ -13,7 +13,7 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v?.split(",").map((s) => s.trim())),
-  APP_URL: z.url().optional(),
+  APP_URL: z.url(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
   INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
@@ -57,6 +57,7 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
   OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+  EMAIL_MESSAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
   WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),

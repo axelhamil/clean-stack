@@ -14,6 +14,7 @@ The non-obvious failure modes that crash a fresh deploy. Every one below was hit
 
 - `NODE_ENV=production` (see the trap below)
 - `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
+- `APP_URL` (public app URL, e.g. `https://app.example.com`) — Zod-required in `env.ts` at any `NODE_ENV`; the API refuses to boot if the value is absent or not a valid URL. Auth email links, the CSP-report origin filter, and the impersonation notification email all derive from it. The `.env.example` provides `http://localhost:5173` as the dev default.
 
 **Boot degrades gracefully on these — the API starts, the feature stays inert until configured:**
 
@@ -121,7 +122,7 @@ PORT=${{PORT}}                                # Railway injects automatically
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 BETTER_AUTH_URL=https://api.<your-domain>     # or ${{RAILWAY_PUBLIC_DOMAIN}}
 BETTER_AUTH_SECRET=${{shared.BETTER_AUTH_SECRET}}
-APP_URL=https://app.<your-domain>
+APP_URL=https://app.<your-domain>             # REQUIRED — Zod env schema (any env); email links + CSP filter + impersonation email
 CORS_ORIGIN=https://app.<your-domain>     # REQUIRED — api fails hard at boot without it (no localhost fallback)
 TRUSTED_PROXIES=private                       # trusts Railway's edge-proxy private range → real client IP from XFF (else: collective lockout)
 RATE_LIMIT_STORE=postgres                     # durable + shared across replicas; "memory" is per-replica (under-counts when scaled)

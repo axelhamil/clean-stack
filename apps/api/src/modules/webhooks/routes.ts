@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { zV } from "../../shared/validator";
 import { createEndpointBodySchema } from "./application/dto/create-endpoint.dto";
@@ -17,12 +18,30 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
     const result = await di.WebhooksService.listEndpoints(orgId);
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({
-      items: result.getValue().map(({ secretCipher: _s, ...rest }) => rest),
+      items: result
+        .getValue()
+        .map(
+          ({
+            secretCipher: _s,
+            previousSecretCipher,
+            previousSecretExpiresAt,
+            firstFailedAt,
+            disabledAt,
+            ...rest
+          }) => ({
+            ...rest,
+            previousSecretCipher: previousSecretCipher.toNull(),
+            previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
+            firstFailedAt: firstFailedAt.toNull(),
+            disabledAt: disabledAt.toNull(),
+          }),
+        ),
     });
   })
   .post(
     "/",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     zV("json", createEndpointBodySchema),
@@ -38,13 +57,31 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       });
       if (result.isFailure) throw new AppErrorException(result.getError());
       const { endpoint, plaintextSecret } = result.getValue();
-      const { secretCipher: _s, ...rest } = endpoint;
-      return c.json({ ...rest, secret: plaintextSecret }, 201);
+      const {
+        secretCipher: _s,
+        previousSecretCipher,
+        previousSecretExpiresAt,
+        firstFailedAt,
+        disabledAt,
+        ...rest
+      } = endpoint;
+      return c.json(
+        {
+          ...rest,
+          previousSecretCipher: previousSecretCipher.toNull(),
+          previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
+          firstFailedAt: firstFailedAt.toNull(),
+          disabledAt: disabledAt.toNull(),
+          secret: plaintextSecret,
+        },
+        201,
+      );
     },
   )
   .patch(
     "/:id",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     zV("json", updateEndpointBodySchema),
@@ -61,13 +98,27 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const { secretCipher: _s, ...rest } = opt.unwrap();
-      return c.json(rest);
+      const {
+        secretCipher: _s,
+        previousSecretCipher,
+        previousSecretExpiresAt,
+        firstFailedAt,
+        disabledAt,
+        ...rest
+      } = opt.unwrap();
+      return c.json({
+        ...rest,
+        previousSecretCipher: previousSecretCipher.toNull(),
+        previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
+        firstFailedAt: firstFailedAt.toNull(),
+        disabledAt: disabledAt.toNull(),
+      });
     },
   )
   .delete(
     "/:id",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {
@@ -138,13 +189,34 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
         nextAttemptAt: nextAttemptAt.toNull(),
         lastError: lastError.toNull(),
         lastResponseStatus: lastResponseStatus.toNull(),
-        attemptHistory,
+        attemptHistory: attemptHistory.map(
+          ({
+            requestHeaders,
+            requestBody,
+            responseStatus,
+            responseHeaders,
+            responseBody,
+            durationMs,
+            error,
+            ...a
+          }) => ({
+            ...a,
+            requestHeaders: requestHeaders.toNull(),
+            requestBody: requestBody.toNull(),
+            responseStatus: responseStatus.toNull(),
+            responseHeaders: responseHeaders.toNull(),
+            responseBody: responseBody.toNull(),
+            durationMs: durationMs.toNull(),
+            error: error.toNull(),
+          }),
+        ),
       });
     },
   )
   .post(
     "/:id/test",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {
@@ -173,6 +245,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/rotate-secret",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {
@@ -187,13 +260,27 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const { endpoint, plaintextSecret } = opt.unwrap();
-      const { secretCipher: _s, previousSecretCipher: _p, ...rest } = endpoint;
-      return c.json({ ...rest, secret: plaintextSecret });
+      const {
+        secretCipher: _s,
+        previousSecretCipher: _p,
+        previousSecretExpiresAt,
+        firstFailedAt,
+        disabledAt,
+        ...rest
+      } = endpoint;
+      return c.json({
+        ...rest,
+        previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
+        firstFailedAt: firstFailedAt.toNull(),
+        disabledAt: disabledAt.toNull(),
+        secret: plaintextSecret,
+      });
     },
   )
   .post(
     "/:id/deliveries/:deliveryId/replay",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
     async (c) => {

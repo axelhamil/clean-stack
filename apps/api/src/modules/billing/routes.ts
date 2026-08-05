@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { di } from "../../container";
 import type { AuthVariables } from "../../shared/middleware/auth.middleware";
 import { requireAuth } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { stripeClient } from "./infrastructure/stripe-client";
 
@@ -19,6 +20,7 @@ export const billingRoutes = new Hono<{ Variables: AuthVariables }>()
   .post(
     "/portal",
     requireAuth,
+    denyImpersonated,
     requireOrg,
     requireOrgPermission({ billing: ["manage"] }),
     async (c) => {
@@ -30,8 +32,8 @@ export const billingRoutes = new Hono<{ Variables: AuthVariables }>()
           message: "Failed to retrieve subscription data.",
         });
       }
-      const customerId = customerResult.getValue();
-      if (!customerId) {
+      const customerOpt = customerResult.getValue();
+      if (customerOpt.isNone()) {
         throw new AppErrorException({
           code: "BILLING_NOT_FOUND",
           message: "No paid subscription to manage.",
@@ -41,7 +43,7 @@ export const billingRoutes = new Hono<{ Variables: AuthVariables }>()
         { name: "billingPortal.sessions.create", op: "http.client" },
         () =>
           stripeClient.billingPortal.sessions.create({
-            customer: customerId,
+            customer: customerOpt.unwrap(),
             return_url: `${c.req.header("origin") ?? ""}/settings/billing`,
           }),
       );

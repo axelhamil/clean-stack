@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import type Stripe from "stripe";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
@@ -30,7 +31,7 @@ export class StripeCatalogSource implements IStripeCatalogSource {
                 tier,
                 unitAmount: price.unit_amount ?? 0,
                 currency: price.currency,
-                interval: price.recurring?.interval ?? null,
+                interval: Option.fromNullable(price.recurring?.interval ?? null),
                 productName: product.name,
                 marketingFeatures: (product.marketing_features ?? [])
                   .map((f) => f.name)

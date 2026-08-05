@@ -41,11 +41,27 @@ export const auditLogRoutes = new Hono<{ Variables: AuthVariables }>()
           {},
         );
       }
-      return c.json(result.getValue());
+      const page = result.getValue();
+      return c.json({
+        items: page.items.map((r) => ({
+          ...r,
+          actorId: r.actorId.toNull(),
+          organizationId: r.organizationId.toNull(),
+          prevHash: r.prevHash.toNull(),
+          hash: r.hash.toNull(),
+        })),
+        nextCursor: page.nextCursor.toNull(),
+      });
     },
   )
   .get("/verify", requireAuth, requirePlatformAdmin, async (c) => {
     const result = await di.AuditQueryService.verifyChain();
     if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json(result.getValue());
+    const v = result.getValue();
+    return c.json({
+      verified: v.verified,
+      rowCount: v.rowCount,
+      brokenAtId: v.brokenAtId.toNull(),
+      brokenAtSequence: v.brokenAtSequence.toNull(),
+    });
   });

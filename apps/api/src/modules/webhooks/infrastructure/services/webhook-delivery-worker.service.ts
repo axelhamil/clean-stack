@@ -267,13 +267,13 @@ export class WebhookDeliveryWorker {
               {
                 deliveryId: delivery.id,
                 attemptNumber: ssrfAttempts,
-                requestHeaders: null,
-                requestBody: null,
-                responseStatus: null,
-                responseHeaders: null,
-                responseBody: null,
-                durationMs: 0,
-                error: "destination not publicly routable",
+                requestHeaders: Option.none(),
+                requestBody: Option.none(),
+                responseStatus: Option.none(),
+                responseHeaders: Option.none(),
+                responseBody: Option.none(),
+                durationMs: Option.some(0),
+                error: Option.some("destination not publicly routable"),
               },
               tx,
             );
@@ -313,11 +313,11 @@ export class WebhookDeliveryWorker {
           const current = decryptSecret(endpointAndOrg.secretCipher, subKey);
           secrets = [current];
           if (
-            endpointAndOrg.previousSecretCipher != null &&
-            endpointAndOrg.previousSecretExpiresAt &&
-            endpointAndOrg.previousSecretExpiresAt > new Date()
+            endpointAndOrg.previousSecretCipher.isSome() &&
+            endpointAndOrg.previousSecretExpiresAt.isSome() &&
+            endpointAndOrg.previousSecretExpiresAt.unwrap() > new Date()
           ) {
-            const previous = decryptSecret(endpointAndOrg.previousSecretCipher, subKey);
+            const previous = decryptSecret(endpointAndOrg.previousSecretCipher.unwrap(), subKey);
             secrets.push(previous);
           }
         } catch (err) {
@@ -436,13 +436,16 @@ export class WebhookDeliveryWorker {
             {
               deliveryId: delivery.id,
               attemptNumber: delivery.attempts + 1,
-              requestHeaders,
-              requestBody: rawBody,
-              responseStatus: responseStatus.isSome() ? responseStatus.unwrap() : null,
-              responseHeaders: Object.keys(responseHeaders).length > 0 ? responseHeaders : null,
-              responseBody,
-              durationMs,
-              error: errorMessage.isSome() ? errorMessage.unwrap() : null,
+              requestHeaders: Option.some(requestHeaders),
+              requestBody: Option.some(rawBody),
+              responseStatus,
+              responseHeaders:
+                Object.keys(responseHeaders).length > 0
+                  ? Option.some(responseHeaders)
+                  : Option.none(),
+              responseBody: Option.fromNullable(responseBody),
+              durationMs: Option.some(durationMs),
+              error: errorMessage,
             },
             tx,
           );
@@ -565,8 +568,8 @@ export class WebhookDeliveryWorker {
           url: string;
           organizationId: string;
           secretCipher: string;
-          previousSecretCipher: string | null;
-          previousSecretExpiresAt: Date | null;
+          previousSecretCipher: Option<string>;
+          previousSecretExpiresAt: Option<Date>;
           enabled: boolean;
         };
       }
@@ -599,7 +602,18 @@ export class WebhookDeliveryWorker {
             () => query.execute(),
           );
           if (!row?.enabled) return { ok: false, reason: "not_found" } as const;
-          return { ok: true, row } as const;
+          return {
+            ok: true,
+            row: {
+              id: row.id,
+              url: row.url,
+              organizationId: row.organizationId,
+              secretCipher: row.secretCipher,
+              previousSecretCipher: Option.fromNullable(row.previousSecretCipher),
+              previousSecretExpiresAt: Option.fromNullable(row.previousSecretExpiresAt),
+              enabled: row.enabled,
+            },
+          } as const;
         } catch (err) {
           this.instrumentation.capture(err);
           return { ok: false, reason: "db_error" } as const;

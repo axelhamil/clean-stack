@@ -2,11 +2,12 @@ import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { zV } from "../../shared/validator";
 import { acceptPoliciesDto } from "./application/dto/accept-policies.dto";
 
 export const policyRoutes = new Hono<{ Variables: AuthVariables }>()
-  .post("/accept", requireAuth, zV("json", acceptPoliciesDto), async (c) => {
+  .post("/accept", requireAuth, denyImpersonated, zV("json", acceptPoliciesDto), async (c) => {
     const user = c.get("user");
     const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
     const body = c.req.valid("json");

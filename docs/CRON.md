@@ -163,6 +163,10 @@ Three endpoints purge the derived tables of the event pipeline. Defaults: outbox
 
 Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix and env knobs. Reference cron entrypoint chaining the three in order: `apps/api/src/cron/sweep.ts` (bundled to `dist/cron/sweep.js`). Wire it via the wiring options above — Railway Cron is the reference deploy (see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)).
 
+### `POST /internal/sweep-email-messages` — email queue retention sweep (Phase D.5)
+
+Purges `email_message` rows with `status = 'sent'` older than `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d). `failed` rows are kept deliberately — they are the operator's only trace of a dropped email and must be reviewed manually. All take `{ batchSize?: 1–50000, dryRun?: boolean }`. Chained at the end of `apps/api/src/cron/sweep.ts` (runs after the event-pipeline sweeps).
+
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken — fix that, not the window.
 

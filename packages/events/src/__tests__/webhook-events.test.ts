@@ -9,8 +9,8 @@ import {
 import { RETENTION_MAP } from "../retention-map";
 
 describe("webhook SOTA events", () => {
-  it("catalog contains exactly 54 event types", () => {
-    expect(ALL_EVENT_TYPES).toHaveLength(54);
+  it("catalog contains exactly 62 event types", () => {
+    expect(ALL_EVENT_TYPES).toHaveLength(62);
   });
 
   it("declares the 4 new event constants", () => {

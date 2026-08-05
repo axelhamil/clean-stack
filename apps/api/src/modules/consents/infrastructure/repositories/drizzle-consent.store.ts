@@ -1,4 +1,4 @@
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { and, consentSchema, db, desc, eq, gt, isNull } from "@packages/drizzle";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
@@ -28,11 +28,11 @@ export class DrizzleConsentStore implements IConsentStore {
         const query = invoker.insert(consentSchema.consentRecord).values({
           id: row.id,
           subjectId: row.subjectId,
-          userId: row.userId ?? null,
+          userId: row.userId.isSome() ? row.userId.unwrap() : null,
           categories: row.categories,
           policyVersion: row.policyVersion,
           grantedAt: row.grantedAt,
-          withdrawnAt: row.withdrawnAt ?? null,
+          withdrawnAt: row.withdrawnAt.isSome() ? row.withdrawnAt.unwrap() : null,
           expiresAt: row.expiresAt,
           ipAddress: row.ipAddress ?? null,
           userAgent: row.userAgent ?? null,
@@ -53,7 +53,7 @@ export class DrizzleConsentStore implements IConsentStore {
     subjectId: string,
     policyVersion: string,
     tx?: ITransaction,
-  ): Promise<Result<ConsentRecordRow | null, ConsentError>> {
+  ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
     const invoker = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleConsentStore > findActiveBySubject" },
@@ -80,8 +80,7 @@ export class DrizzleConsentStore implements IConsentStore {
           );
 
           const r = rows[0];
-          if (!r) return Result.ok(null);
-          return Result.ok(this.toRow(r));
+          return Result.ok(Option.fromNullable(r ? this.toRow(r) : null));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure(err, "findActiveBySubject"));
@@ -94,7 +93,7 @@ export class DrizzleConsentStore implements IConsentStore {
     userId: string,
     policyVersion: string,
     tx?: ITransaction,
-  ): Promise<Result<ConsentRecordRow | null, ConsentError>> {
+  ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
     const invoker = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleConsentStore > findActiveByUser" },
@@ -121,8 +120,7 @@ export class DrizzleConsentStore implements IConsentStore {
           );
 
           const r = rows[0];
-          if (!r) return Result.ok(null);
-          return Result.ok(this.toRow(r));
+          return Result.ok(Option.fromNullable(r ? this.toRow(r) : null));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure(err, "findActiveByUser"));
@@ -167,11 +165,11 @@ export class DrizzleConsentStore implements IConsentStore {
     return {
       id: r.id,
       subjectId: r.subjectId,
-      userId: r.userId ?? undefined,
+      userId: Option.fromNullable(r.userId),
       categories: r.categories,
       policyVersion: r.policyVersion,
       grantedAt: r.grantedAt,
-      withdrawnAt: r.withdrawnAt ?? undefined,
+      withdrawnAt: Option.fromNullable(r.withdrawnAt),
       expiresAt: r.expiresAt,
       ipAddress: r.ipAddress ?? undefined,
       userAgent: r.userAgent ?? undefined,

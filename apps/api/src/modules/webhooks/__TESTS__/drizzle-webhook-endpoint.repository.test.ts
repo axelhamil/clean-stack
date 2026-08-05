@@ -464,7 +464,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       expect(r.isSuccess).toBe(true);
       expect(r.getValue().isSome()).toBe(true);
       expect(r.getValue().unwrap().secretCipher).toBe("new-cipher");
-      expect(r.getValue().unwrap().previousSecretCipher).toBe("old-cipher");
+      expect(r.getValue().unwrap().previousSecretCipher.unwrap()).toBe("old-cipher");
     });
 
     it("happy path: returns Option.none when no row matched", async () => {
@@ -619,7 +619,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isSome()).toBe(true);
       expect(result.getValue().unwrap().consecutiveFailures).toBe(0);
-      expect(result.getValue().unwrap().disabledAt).toBeNull();
+      expect(result.getValue().unwrap().disabledAt.isNone()).toBe(true);
     });
   });
 });

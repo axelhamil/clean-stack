@@ -456,13 +456,13 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     const fakeAttemptArgs = {
       deliveryId: "del-1",
       attemptNumber: 1,
-      requestHeaders: null,
-      requestBody: null,
-      responseStatus: 200,
-      responseHeaders: null,
-      responseBody: "ok",
-      durationMs: 123,
-      error: null,
+      requestHeaders: Option.none<Record<string, string>>(),
+      requestBody: Option.none<string>(),
+      responseStatus: Option.some(200),
+      responseHeaders: Option.none<Record<string, string>>(),
+      responseBody: Option.some("ok"),
+      durationMs: Option.some(123),
+      error: Option.none<string>(),
     };
 
     it("happy path: returns Result.ok(void)", async () => {

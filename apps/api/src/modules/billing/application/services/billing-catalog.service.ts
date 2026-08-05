@@ -60,7 +60,7 @@ export class BillingCatalogService {
                 priceId: p.priceId,
                 unitAmount: p.unitAmount,
                 currency: p.currency,
-                interval: p.interval,
+                interval: p.interval.isSome() ? p.interval.unwrap() : null,
                 marketingFeatures: p.marketingFeatures,
                 rank: ent.rank,
                 features: ent.features,

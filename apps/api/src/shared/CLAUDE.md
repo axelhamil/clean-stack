@@ -34,6 +34,7 @@ Decisor = *who consumes the port*, not where the impl lives.
 
 ## Anti-patterns
 
+- Letting `null` past the store. A port signature never says `T | null` for absence — the store converts with `Option.fromNullable` on read and unwraps on write, and routes unwrap back to `null` only when serialising JSON. **Why**: `T | null` leaves the guard to the caller's memory, `Option` makes it structural; the same defect shipped twice (email queue, then webhooks) before the API was back-filled. Exceptions that are not violations: an input DTO whose caller legitimately holds a raw nullable, and a SQL filter where `undefined`/`null`/value mean don't-filter / `IS NULL` / equality.
 - Creating `modules/<x>/` when a context has only an infra adapter (no domain, no use-cases, no aggregate, no DTO, no routes) — that's *shared kernel infra*, not a bounded context. Live in `shared/ports/`+`shared/services/`. Test: removing the "module" leaves only `module.ts`+a single port impl → not a module.
 - Importing a port from another module's `application/ports/` — exactly the cross-module coupling `shared/ports/` exists to prevent. Promote first.
 - Letting a `shared/ports/` port become orphan after removing its only remaining consumer → demote back to a module's `application/ports/` or delete. Shared kernel always has ≥ 2 consumers OR is cross-cutting infra.

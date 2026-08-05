@@ -7,6 +7,7 @@ export {
   eq,
   gt,
   gte,
+  ilike,
   inArray,
   isNotNull,
   isNull,
@@ -33,6 +34,7 @@ export * as consentSchema from "./schema/consent";
 export * as multiTenantSchema from "./schema/multi-tenant";
 export const schema = { ...authSchema, ...multiTenantSchema };
 export * as billingSchema from "./schema/billing";
+export * as emailSchema from "./schema/email";
 export type { OutboxEventMetadata } from "./schema/outbox";
 export * as outboxSchema from "./schema/outbox";
 export * as policiesSchema from "./schema/policies";

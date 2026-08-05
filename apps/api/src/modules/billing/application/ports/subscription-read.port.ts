@@ -1,4 +1,4 @@
-import type { AppError, Result } from "@packages/ddd-kit";
+import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { ITransaction } from "../../../../shared/transaction";
 
 export type BillingError = AppError<"BILLING_PROVIDER_FAILURE">;
@@ -12,9 +12,9 @@ export interface ISubscriptionReadStore {
   findActiveByReference(
     referenceId: string,
     tx?: ITransaction,
-  ): Promise<Result<SubscriptionRow | null, BillingError>>;
+  ): Promise<Result<Option<SubscriptionRow>, BillingError>>;
   findCustomerIdByReference(
     referenceId: string,
     tx?: ITransaction,
-  ): Promise<Result<string | null, BillingError>>;
+  ): Promise<Result<Option<string>, BillingError>>;
 }

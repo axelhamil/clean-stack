@@ -1,13 +1,13 @@
-import type { AppError, Result } from "@packages/ddd-kit";
+import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { AuditActorType, AuditRetention } from "@packages/drizzle";
 import type { ITransaction } from "../transaction";
 
 export type AuditError = AppError<"AUDIT_PERSISTENCE_PROVIDER_FAILURE">;
 
 export type AuditEntry = {
-  actorId: string | null;
+  actorId: Option<string>;
   actorType: AuditActorType;
-  organizationId: string | null;
+  organizationId: Option<string>;
   action: string;
   targetType: string;
   targetId: string;
@@ -19,8 +19,8 @@ export type AuditEntry = {
 export type AuditRecord = AuditEntry & {
   id: string;
   occurredAt: Date;
-  prevHash: string | null;
-  hash: string | null;
+  prevHash: Option<string>;
+  hash: Option<string>;
 };
 
 export type AuditFilters = {
@@ -37,14 +37,14 @@ export type AuditFilters = {
 
 export type AuditPage = {
   items: AuditRecord[];
-  nextCursor: string | null;
+  nextCursor: Option<string>;
 };
 
 export type ChainVerification = {
   verified: boolean;
   rowCount: number;
-  brokenAtId: string | null;
-  brokenAtSequence: number | null;
+  brokenAtId: Option<string>;
+  brokenAtSequence: Option<number>;
 };
 
 export interface IAuditPort {

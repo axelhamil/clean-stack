@@ -15,13 +15,13 @@ export class WebhookFanoutSubscriber implements OutboxSubscriber {
       { name: "WebhookFanoutSubscriber > handle" },
       async () => {
         try {
-          if (!event.organizationId) return;
+          if (event.organizationId.isNone()) return;
           if (INTERNAL_EVENT_TYPES.includes(event.eventType as EventType)) return;
           const ep = webhooksSchema.webhookEndpoint;
           const endpointsQuery = tx
             .select({ id: ep.id, eventTypes: ep.eventTypes })
             .from(ep)
-            .where(and(eq(ep.organizationId, event.organizationId), eq(ep.enabled, true)));
+            .where(and(eq(ep.organizationId, event.organizationId.unwrap()), eq(ep.enabled, true)));
           const endpointRows = await this.instrumentation.startSpan(
             {
               name: endpointsQuery.toSQL().sql,
