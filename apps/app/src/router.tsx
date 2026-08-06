@@ -5,6 +5,7 @@ import { adminOrgDetailRoute } from "./features/admin-orgs/admin-org-detail.rout
 import { adminOrgsRoute } from "./features/admin-orgs/admin-orgs.route";
 import { adminUserDetailRoute } from "./features/admin-users/admin-user-detail.route";
 import { adminUsersRoute } from "./features/admin-users/admin-users.route";
+import { apiTokensRoute } from "./features/api-tokens/api-tokens.route";
 import { forgotPasswordRoute } from "./features/auth/forgot-password.route";
 import { magicLinkRoute } from "./features/auth/magic-link.route";
 import { resetPasswordRoute } from "./features/auth/reset-password.route";
@@ -60,6 +61,7 @@ const routeTree = rootRoute.addChildren([
         settingsIndexRoute,
         accountRoute,
         privacyRoute,
+        apiTokensRoute,
         orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute]),
       ]),
     ]),
