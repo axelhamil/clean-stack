@@ -191,7 +191,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     );
   }
 
-  async touchLastUsed(id: string, bucketFloor: Date): Promise<Result<void, ApiTokenError>> {
+  async touchLastUsed(id: string, bucketFloor: Date): Promise<Result<boolean, ApiTokenError>> {
     const invoker = db;
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > touchLastUsed" },
@@ -200,12 +200,13 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           const query = invoker
             .update(t)
             .set({ lastUsedAt: new Date() })
-            .where(and(eq(t.id, id), or(isNull(t.lastUsedAt), lt(t.lastUsedAt, bucketFloor))));
-          await this.instrumentation.startSpan(
+            .where(and(eq(t.id, id), or(isNull(t.lastUsedAt), lt(t.lastUsedAt, bucketFloor))))
+            .returning({ id: t.id });
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok();
+          return Result.ok(rows.length > 0);
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure(err, "touchLastUsed"));

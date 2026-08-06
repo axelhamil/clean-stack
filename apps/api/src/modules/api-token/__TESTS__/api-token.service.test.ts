@@ -16,7 +16,7 @@ function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository 
     findByHmac: mock(async () => Result.ok(Option.none<ApiTokenRecord>())),
     revoke: mock(async () => Result.ok()),
     revokeAllForMembership: mock(async () => Result.ok<string[]>([])),
-    touchLastUsed: mock(async () => Result.ok()),
+    touchLastUsed: mock(async () => Result.ok(false)),
     rehash: mock(async () => Result.ok()),
     ...over,
   } as IApiTokenRepository;

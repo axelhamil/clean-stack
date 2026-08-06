@@ -147,3 +147,10 @@ export async function countActiveMembers(organizationId: string): Promise<number
     .where(eq(schema.member.organizationId, organizationId));
   return row?.count ?? 0;
 }
+
+// ── #8 – api-token middleware ──────────────────────────────────────────────
+
+export async function findUserById(id: string) {
+  const [row] = await db.select().from(schema.user).where(eq(schema.user.id, id)).limit(1);
+  return row;
+}
