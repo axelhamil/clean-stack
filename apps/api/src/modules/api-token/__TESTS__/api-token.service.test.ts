@@ -63,7 +63,7 @@ describe("ApiTokenService", () => {
       expiresInDays: 400,
     });
     expect(result.isFailure).toBe(true);
-    expect(result.getError().code).toBe("API_TOKEN_EXPIRY_TOO_LONG");
+    expect(result.getError().code).toBe("API_TOKEN_EXPIRY_INVALID");
     expect(repo.insert).not.toHaveBeenCalled();
   });
 

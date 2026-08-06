@@ -10,6 +10,7 @@ import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
+import { apiTokenRoutes } from "./modules/api-token/routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
 import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
@@ -205,6 +206,7 @@ const routes = app
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", auditLogRoutes)
+  .route("/settings/tokens", apiTokenRoutes)
   .route("/settings/webhooks", webhooksRoutes)
   .route("/consents", consentRoutes)
   .route("/billing", billingRoutes);

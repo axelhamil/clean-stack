@@ -43,7 +43,7 @@ export class ApiTokenService {
     return this.instrumentation.startSpan({ name: "ApiTokenService > create" }, async () => {
       if (input.expiresInDays != null && input.expiresInDays > this.config.maxExpiryDays) {
         return Result.fail<{ record: ApiTokenRecord; raw: string }, ApiTokenError>({
-          code: "API_TOKEN_EXPIRY_TOO_LONG",
+          code: "API_TOKEN_EXPIRY_INVALID",
           message: `Expiry cannot exceed ${this.config.maxExpiryDays} days.`,
         });
       }
