@@ -36,6 +36,7 @@ see [`CRON.md`](./CRON.md).
 | `delete_completed` | Account anonymized after grace | `name` |
 | `change_email` | Email address change confirmation | `name`, `confirmUrl` |
 | `backup_code_used` | Backup MFA code consumption alert | `name`, `email` |
+| `api_token_leaked` | Notifies owner when GitHub Secret Scanning reports a token match | `name`, `tokenName`, `revokedAt` |
 
 ### Authoring rules
 
@@ -233,6 +234,12 @@ fast on missing/invalid values.
 - `RGPD_EXPORT_RATE_LIMIT_HOURS` (default `24`)
 - `RGPD_SWEEP_BATCH_SIZE` (default `50`)
 
+### API tokens (required when the public API surface is active)
+
+- `API_TOKEN_PEPPER` (min 32, `openssl rand -hex 32`) — server-side HMAC pepper. Required in production; a missing or weak pepper means a database dump yields usable tokens.
+- `API_TOKEN_PREFIX` — prefix for all generated tokens (default `clean_`). **Set a unique value per product** (e.g. `myapp_`) so GitHub Secret Scanning can distinguish your tokens from other boilerplate clones.
+- `API_TOKEN_PEPPER_PREVIOUS` + `API_TOKEN_PEPPER_VERSION` — optional; needed only during pepper rotation (leave unset otherwise).
+
 ### Billing (required when Stripe is configured)
 
 - `STRIPE_SECRET_KEY` — Stripe secret key (`sk_live_...` or `sk_test_...`). Omit → free-only catalog, no Checkout/Portal.
@@ -271,9 +278,54 @@ These aren't blockers for launch but pay off quickly:
 
 ---
 
+## 8. GitHub Secret Scanning — token leak protection
+
+GitHub scans every public repository for secrets. If a token matching your
+prefix appears in a commit or file, GitHub calls your registered webhook
+endpoint; the boilerplate handles the rest: ECDSA P-256 signature
+verification, token revocation in the same transaction, and an email to the
+owner (via the `api_token_leaked` Resend template).
+
+**What the boilerplate ships**: the receiving endpoint `POST /api/token-scanning/github`
+in `apps/api/src/modules/api-token/scanning.routes.ts`, ready to deploy. The
+endpoint verifies the `GITHUB-PUBLIC-KEY-SIGNATURE` + `GITHUB-PUBLIC-KEY-IDENTIFIER`
+headers against GitHub's live public keys (`https://api.github.com/meta/public_keys/secret_scanning`),
+revokes the matched token, and sends the owner an email. No extra env var is
+required on the receiving side.
+
+**What each clone must do** — GitHub's Secret Scanning Partner Program requires a
+publicly accessible HTTPS endpoint and a GitHub review of the integration:
+
+1. **Set your token prefix** — `API_TOKEN_PREFIX` (default `clean_`, but every
+   production clone needs a distinct prefix so GitHub's regex uniquely
+   identifies your tokens). Choose something like `myapp_` and set it in
+   `.env.example` before shipping.
+
+2. **Deploy the endpoint** — `POST https://<your-api-domain>/api/token-scanning/github`
+   must be reachable from GitHub's IP ranges (no auth beyond the ECDSA
+   signature the boilerplate already verifies).
+
+3. **Register with GitHub** — follow the [Partner Program enrolment](https://docs.github.com/en/developers/overview/secret-scanning-partner-program):
+   - Go to **github.com → Settings → Developer settings → Secret scanning**.
+   - Provide: the HTTPS endpoint URL, a regex that matches your prefix
+     (e.g. `clean_[1-9A-HJ-NP-Za-km-z]{44}[1-9A-HJ-NP-Za-km-z]{6}`), and a
+     test token payload.
+   - GitHub reviews and enables your pattern; once live, any public repo push
+     that contains a matching token triggers your webhook within minutes.
+
+4. **Verify the integration** — GitHub sends a test payload after enabling the
+   pattern. Check that the endpoint returns `200` and that the test token
+   appears in the `api_token` table with `revokedReason = 'leaked'`.
+
+> **Note**: the Partner Program is for public SaaS products. If your clone is
+> an internal tool or a private deployment, skip this step — GitHub will only
+> scan *public* repositories for your prefix.
+
+---
+
 ## TL;DR — pre-production checklist
 
-- [ ] 8 Resend templates created with exact variable names; IDs filled in
+- [ ] 9 Resend templates created with exact variable names; IDs filled in
       `TEMPLATE_IDS` in `apps/api/src/shared/services/email.service.ts`
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC) — green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
@@ -284,8 +336,10 @@ These aren't blockers for launch but pay off quickly:
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`
       set per infra (`signature` everywhere, add `private-network` on Railway/Fly)
 - [ ] `BETTER_AUTH_SECRET` generated (≥32 chars)
+- [ ] `API_TOKEN_PEPPER` generated (`openssl rand -hex 32`); `API_TOKEN_PREFIX` set to your app's unique prefix (not `clean_`)
 - [ ] All env vars set per §5
 - [ ] Cron service chosen and wired to `/internal/rgpd-sweep` (daily)
 - [ ] DB migrations applied; backups verified
+- [ ] GitHub Secret Scanning enrolment submitted (see §8) — skip for private/internal deployments
 - [ ] `pnpm ci:check` green; smoke test on staging (signup → invite → upload →
       export → request deletion → cancel → expire grace → sweep → billing checkout)

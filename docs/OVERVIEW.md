@@ -142,12 +142,23 @@ The app provides a public `/pricing` page (plan grid fed from the live Stripe ca
 - **One command to clone and run**, Docker for either native hot-reload or a fully containerized dev loop with file-sync, and Turborepo caching
 - **A zero-warning pipeline** — lint, format, dead-code and duplication checks, type-check, Conventional Commits, and automated releases (semantic-release) enforced by git hooks — with no `--no-verify` escape hatch
 
+## Machine-to-machine access — Personal Access Tokens
+
+When a customer's system needs to call your API, it needs a durable credential that is not a browser session. Personal Access Tokens fill that role: scoped, expirable bearer tokens that the user creates from `/settings/tokens` and revokes at any time.
+
+The token format follows GitHub's convention: a configurable prefix (`clean_` by default, so cloners can set their own), 44 base58 body characters, and a 6-character CRC32 checksum. The checksum is verified before any database call — a mistyped or truncated token costs no round-trip.
+
+Tokens are never stored in plaintext. The server stores `HMAC-SHA256(pepper, raw_token)` in a unique-indexed column. The pepper is a server-side secret (`API_TOKEN_PEPPER`), so a database dump alone yields no usable tokens. Rotation is zero-downtime: a second pepper slot (`API_TOKEN_PEPPER_PREVIOUS`) lets the server accept tokens hashed with the old pepper and transparently rehash them on next use.
+
+**Why a separate sub-app rather than a flag on existing routes**: the token-reachable API lives at `/api/v1` inside a dedicated `Hono` instance that is mounted before the main app and is deliberately absent from `AppType` (the RPC type that the front uses). `sessionMiddleware` skips `/api/v1/*` entirely; token authentication is the only entry. This makes the contract structural rather than conditional — a route that serves token clients is in `/api/v1`, everything else is session-only. A flag-based approach drifts: a new route gets the flag in one team member's PR and not in another's, silently exposing session-only surfaces to token holders.
+
+Tokens are revoked automatically when the issuing user loses org membership, and GitHub's Secret Scanning partner program is supported: a `POST /api/token-scanning/github` endpoint verifies the ECDSA P-256 signature, revokes the matching token, and emails the owner.
+
 ## What's next
 
-The roadmap follows a boilerplate's natural order — deploy-safety and legal first, revenue, then finish and polish.
-
-- **Operate** — admin and impersonation, API tokens, OpenAPI docs, in-app notifications
-- **Reach** — SSO (SAML / OIDC) with SCIM, internationalization, Capacitor mobile, and a marketing site
+- **OpenAPI docs** — `@hono/zod-openapi` + Scalar UI at `/api/docs`. The `/api/v1` sub-app is the natural source: every token-reachable route gets documented, and nothing else does.
+- **In-app notifications** — persistent inbox behind a bell icon, per-category opt-out, transactional vs marketing.
+- **Reach** — SSO (SAML / OIDC) with SCIM, internationalization, Capacitor mobile, and a marketing site.
 
 The full plan, with constraints and extension points, lives in [`../ROADMAP.md`](../ROADMAP.md).
 

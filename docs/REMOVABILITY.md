@@ -118,3 +118,22 @@ If you hit any of these, the removal is a **2-step process**: first decouple the
 - Commit on a throwaway branch after each axis if you want bisect-friendly checkpoints.
 - After the migration is emitted, **read** the SQL before committing — a wrong `DROP COLUMN` on production data is irreversible.
 - Validate end-to-end via `pnpm build` + `pnpm test`, then revert the worktree if this is a dry-run, or merge to `dev` if real.
+
+---
+
+## Removal map — `modules/api-token` (Phase C.4)
+
+Reference cartography for removing the Personal Access Tokens module. Walk the 6-axis checklist above; this table fills in the file names.
+
+| Axis | Touch-points |
+|---|---|
+| 1. **Back code** | `trash apps/api/src/modules/api-token/`. `container.ts` — remove `.addModule(apiTokenModule)` and the `import`. `index.ts` — remove `/api/v1` mount, `/api/token-scanning/*` scanning mount, and `apiTokenRoutes` + `createApiTokenScanningRoutes` imports. Remove `apps/api/src/public-api/` entirely (sub-app, no other consumers). |
+| 2. **Events** | `packages/events/src/event-types.ts` — 3 types: `api_token.created`, `api_token.revoked`, `api_token.used`. `payloads.ts` — 3 payload types. `retention-map.ts` — 3 entries. `visibility-map.ts` — 3 entries (`public`, `public`, `internal`). Event count: 65 → 62. |
+| 3. **Shared ports / middleware** | `apps/api/src/shared/middleware/api-token.middleware.ts` — delete (no other consumers). `apps/api/src/shared/crypto/api-token.ts` — delete (only used by `api-token.middleware.ts` and `scanning.routes.ts`). `apps/api/src/shared/middleware/auth.middleware.ts` — remove the `/api/v1/` path exclusion from `sessionMiddleware` (the sub-app bypass). `apps/api/src/shared/middleware/rate-limit.policies.ts` — remove `API_TOKEN_POLICY` + `API_TOKEN_IP_POLICY`. `apps/api/src/auth-queries.ts` — verify `findUserById` is still consumed by other modules (webhooks, admin) before removing. |
+| 4. **Env vars** | `apps/api/src/shared/env.ts` — remove `API_TOKEN_PEPPER`, `API_TOKEN_PEPPER_PREVIOUS`, `API_TOKEN_PREFIX`, `API_TOKEN_MAX_EXPIRY_DAYS`, `API_TOKEN_LAST_USED_BUCKET_MIN`, `API_TOKEN_PEPPER_VERSION` and the production boot guard that requires `API_TOKEN_PEPPER`. `apps/api/.env.example` — same 6 keys. |
+| 5. **Schema** | `packages/drizzle/src/schema/api-token.ts` — delete. Remove barrel re-export from `packages/drizzle/src/index.ts`. Run `pnpm db:generate` — expect 1 `DROP TABLE api_token` migration. Read the SQL before committing. |
+| 6. **Access-control + front + docs** | `packages/access-control/src/index.ts` — remove `apiToken: ["create", "read", "revoke"]` from `statement` and all role definitions. `packages/emails/src/components/api-token-leaked.tsx` — delete. `packages/emails/src/render.tsx` + `src/templates.ts` — remove `api-token-leaked` entries. `apps/app/src/features/api-tokens/` — delete entirely (6 files). `apps/app/src/router.tsx` — remove import + route registration. `apps/app/src/shared/components/contextual-tabs.tsx` — remove "Tokens" tab entry. Docs: `FEATURES.md` (api-token section), `MODULES.md` (api-token row in shipped table), `REMOVABILITY.md` (this section), `OVERVIEW.md` (PAT paragraph), `EVENT_PIPELINE.md` (visibility-map section), `INTEGRATIONS.md` (GitHub Secret Scanning section), `README.md` (M4 note), `ROADMAP.md` (C.4 spec). |
+
+**What you do NOT touch**:
+- `shared/services/webhook-fanout-subscriber.ts` — the `isPublicEvent` guard (from `visibility-map.ts`) is called here. Once `visibility-map.ts` is gone you must inline the equivalent filtering or remove the feature guard entirely — decide before committing.
+- `apps/app/src/features/developers/` (`/developers/events` catalog) — it reads `VISIBILITY` from `packages/events`. Once removed, the catalog page shows all events again (no longer filtered); this is a UI regression, not a crash. Either remove the page or drop the filter guard.

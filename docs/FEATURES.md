@@ -320,6 +320,46 @@ Platform operator tooling — ban/unban users, change platform role, force passw
 
 ---
 
+## Personal Access Tokens (API tokens) ✅ Phase C.4
+
+Machine-to-machine access with scoped, expirable tokens. Tokens are shown once at creation and never stored in plaintext.
+
+**Format**: `clean_` prefix (configurable via `API_TOKEN_PREFIX`) + 44 base58 body characters + 6-character CRC32 checksum. The checksum rejects malformed tokens before any database call. `apps/api/src/shared/crypto/api-token.ts` — `generateToken`, `parseToken`, `hmacToken`.
+
+**Storage**: `HMAC-SHA256(pepper, raw_token)` in a unique-indexed column (`api_token.tokenHmac`). The pepper (`API_TOKEN_PEPPER`) is a server-side secret: a database dump alone yields no usable tokens. `pepperVersion` column enables rotation without downtime via `API_TOKEN_PEPPER_PREVIOUS` — tokens found by the old pepper are transparently rehashed on next use.
+
+**Schema** `packages/drizzle/src/schema/api-token.ts` — `api_token(id, userId FK, organizationId FK nullable, name, tokenHmac unique, pepperVersion, tokenStart, scopes jsonb, lastUsedAt, expiresAt, revokedAt, revokedReason, createdAt, updatedAt)`.
+
+**Backend** `apps/api/src/modules/api-token/`:
+- `ApiTokenService` — `create`, `list`, `revoke`. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).
+- `DrizzleApiTokenRepository` implements `ScopedRepository<ApiToken, RepoScope>` (wrong-owner → `Option.none()` / `NOT_FOUND`, never 403).
+- `revokeTokensOnMembershipLost` event handler — cascades revocation on `org.member.removed`.
+- Routes `apps/api/src/modules/api-token/routes.ts` — `GET/POST /settings/tokens`, `DELETE /settings/tokens/:id` (session-auth; `denyImpersonated` on writes).
+- Scanning route `apps/api/src/modules/api-token/scanning.routes.ts` — `POST /api/token-scanning/github` (ECDSA P-256 signature verification against GitHub's live public-key endpoint; revokes + emails owner on match).
+
+**Public API sub-app** `apps/api/src/public-api/` — a separate `Hono` instance mounted at `/api/v1`, outside `AppType`. `sessionMiddleware` skips `/api/v1/*` entirely; the sub-app mounts `requireApiToken` on all routes. Token-reachable routes: `GET /api/v1/me`, `GET /api/v1/organizations`. **Why a separate sub-app rather than a flag on existing routes**: any route that mounts both `requireAuth` and `requireApiToken` eventually drifts — a new route gets one but not the other. The sub-app makes the contract structural: what is in `/api/v1` is reachable by token, everything else is session-only. The global rate-limit policy is also bypassed at `/api/v1/*` and replaced with per-token + per-IP axes.
+
+**Middleware** `apps/api/src/shared/middleware/api-token.middleware.ts` — `requireApiToken(deps, { scopes })`. Validates checksum, resolves HMAC (with previous-pepper fallback + transparent rehash), checks expiry, checks ban, sets `c.var.{user, tokenScopes, orgId, apiTokenId}`.
+
+**Scopes** `API_SCOPES = ["read:profile", "write:profile", "read:organizations"]` — typed const. Per-token subset; no wildcard `*`. Anti-escalation is structural: token management lives outside `/api/v1`, so a token can never mint a token.
+
+**Access-control** `@packages/access-control` — `apiToken: ["create", "read", "revoke"]` in the org capability statement.
+
+**Frontend** `apps/app/src/features/api-tokens/`:
+- `api-tokens.{route,page}.tsx` — `/settings/tokens` (within Settings tabs).
+- `forms/token-form.tsx` — name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
+- `api/api-tokens.{queries,mutations}.ts` — list + create + revoke.
+
+**Event visibility** `packages/events/src/visibility-map.ts` — 65-event catalog with explicit `public` / `internal` classification (28 public / 37 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+
+**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **65 total / 28 public / 37 internal**.
+
+**Email** `packages/emails/src/components/api-token-leaked.tsx` — template sent to the token owner when GitHub Secret Scanning reports a match.
+
+**Env** `apps/api/.env.example`: `API_TOKEN_PEPPER` (required prod, min 32 chars), `API_TOKEN_PEPPER_PREVIOUS` (rotation), `API_TOKEN_PEPPER_VERSION` (default 1), `API_TOKEN_PREFIX` (default `clean_`), `API_TOKEN_MAX_EXPIRY_DAYS` (default 365), `API_TOKEN_LAST_USED_BUCKET_MIN` (default 15).
+
+---
+
 ## Roadmap (not yet shipped)
 
 See [`../ROADMAP.md`](../ROADMAP.md) for the full plan.

@@ -39,8 +39,9 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Privacy dashboard** (A.5) (`/settings/privacy` UX hub: `<PolicyAcceptanceCard />` + `<ConsentSettings />` + `<DataSourcesCard />` + `<DataExportCard />` + `<SessionsCard />`. Danger tab dissolved; contextual danger zones (account + organization pages). `sub-processors.config.ts` promoted to `shared/`. 0 events.) | **€600 – €1 000** | 1-2j |
 | **Billing — Stripe subscriptions + feature/seat gating** (B.1) (`@better-auth/stripe`, Checkout + Billing Portal hosted, subscription SSOT in plugin table, hybrid catalog Stripe+code via `ENTITLEMENTS`, 3 gate axes: role/seat/tier, `useEntitlements()` + `<FeatureGate>` + `<PlanGate>`, 4 compliance/operational events, free-tier degradation when key unset) | **€3 600 – €6 000** | 7-10j |
 | **Quota gating** (B.2) (dormant skeleton extending B.1: `ENTITLEMENTS[tier].quotas` catalog, `requireQuota` pre-check + `reserveQuota` advisory-lock atomic gate + `countScopedRows`, `quota_usage` table + `modules/quotas/` `IQuotaUsageStore`, `useQuota()` + `<QuotaGate>`, `billing.quota.exceeded` event, knip-whitelisted) | **€800 – €1 200** | 1-2j |
+| **API tokens / PATs** (C.4) (`/settings/tokens` CRUD, name + scope picker + optional expiry, `denyImpersonated` on writes; `clean_` + 44-char base58 body + 6-char CRC32 checksum; HMAC-SHA256 + server pepper (`API_TOKEN_PEPPER`), pepper rotation via `API_TOKEN_PEPPER_PREVIOUS` / `API_TOKEN_PEPPER_VERSION`; `/api/v1` sub-app outside `AppType` (token-auth only, no session middleware); cascade revocation on org membership loss; `POST /api/token-scanning/github` ECDSA P-256; `visibility-map.ts` public/internal classification; 3 events → **65 total / 28 public / 37 internal**) | **€1 000 – €1 800** | 2-3j |
 
-**Subtotal Core (shipped)**: **€20 200 – €34 200** of senior-dev value already in the repo on day zero. ~43-62 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€21 200 – €36 000** of senior-dev value already in the repo on day zero. ~45-65 days of focused senior work compressed into a clone.
 
 ---
 
@@ -54,7 +55,6 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | C.1 | **Security perimeter** (sliding-window rate-limit per IP/user, captcha on auth-burst, strict CSP with nonce, CSRF on non-BetterAuth POST routes) | **€1 200 – €2 000** | 3j |
 | C.2 | **Audit log front UI** (page `/admin/audit-log` avec filtres + diff metadata expand, API déjà shipped) | **€500 – €1 000** | 1-2j |
 | C.3 | **Admin & impersonation** (BetterAuth `admin` plugin, `/admin/*` separate hostname, audit-logged actions) | **€1 500 – €2 500** | 3-4j |
-| C.4 | **API tokens / PATs** (`/settings/tokens`, scoped + expirable, sha256 + per-row salt, GitHub secret-scanner prefix) | **€1 000 – €1 800** | 2-3j |
 | C.5 | **Webhooks front UI + `webhook.test` event** (page `/settings/webhooks` CRUD, deliveries view, replay button — API + worker déjà shipped) | **€800 – €1 500** | 2j |
 | C.6 | **Account recovery codes** (UI for the BetterAuth `twoFactor` codes already supported server-side) | **€200 – €400** | 0.5j |
 | C.7 | **SSO SAML/OIDC + SCIM provisioning** (BetterAuth `sso` plugin + SCIM endpoint + audit-logged provisioning) | **€5 000 – €8 000** | 10-12j |
@@ -67,13 +67,13 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€26 900 – €44 900** committed to ship.
+**Subtotal Roadmap**: **€25 900 – €43 100** committed to ship.
 
 ---
 
 ## Total value-in-box once roadmap is shipped
 
-**Core + Roadmap = €46 300 – €77 900** of realistic senior-dev value packaged.
+**Core + Roadmap = €47 100 – €79 100** of realistic senior-dev value packaged.
 
 That's ~3-5 months of focused senior work compressed into a clone. Honest, defensible to clients, no inflated SOW pricing.
 
