@@ -6,12 +6,13 @@ import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
+import { findUserById } from "./auth-queries";
 import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
-import { apiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
+import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
 import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
@@ -22,7 +23,7 @@ import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
-import { publicApiV1 } from "./public-api";
+import { createPublicApiV1 } from "./public-api";
 import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
@@ -39,6 +40,7 @@ import {
 import { requireCsrf } from "./shared/middleware/csrf.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
+import { resolveClientIp } from "./shared/middleware/rate-limit.ip";
 import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
 import {
   AUTH_FORGOT_PASSWORD_POLICY,
@@ -197,13 +199,40 @@ app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
 
-app.route("/api/v1", publicApiV1);
+app.route(
+  "/api/v1",
+  createPublicApiV1({
+    repo: di.IApiTokenRepository,
+    outbox: di.IOutboxRepository,
+    prefix: env.API_TOKEN_PREFIX,
+    pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+    pepperVersion: env.API_TOKEN_PEPPER_VERSION,
+    pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
+    bucketMin: env.API_TOKEN_LAST_USED_BUCKET_MIN,
+    platformAdminIds: env.PLATFORM_ADMIN_IDS,
+    limiter: di.IRateLimiter,
+    resolveIp: resolveClientIp,
+  }),
+);
 
 app.use(
   "/api/token-scanning/*",
   requireRateLimit({ limiter: di.IRateLimiter }, GITHUB_SCANNING_POLICY),
 );
-app.route("/api/token-scanning", apiTokenScanningRoutes);
+app.route(
+  "/api/token-scanning",
+  createApiTokenScanningRoutes({
+    githubKeyVerifier: di.GithubKeyVerifier,
+    apiTokenRepository: di.IApiTokenRepository,
+    transactionService: di.ITransactionService,
+    outboxRepository: di.IOutboxRepository,
+    emailService: di.IEmailService,
+    instrumentation: di.IInstrumentation,
+    findUserById,
+    prefix: env.API_TOKEN_PREFIX,
+    pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+  }),
+);
 
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))

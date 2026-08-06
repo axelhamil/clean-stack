@@ -6,10 +6,12 @@ import type {
   IApiTokenRepository,
 } from "../../modules/api-token/application/ports/api-token.port";
 import { generateToken, hmacToken } from "../../shared/crypto/api-token";
+import { createPublicApiV1 } from "../index";
 
-// ── Mocks registered before any dynamic import ───────────────────────────
-// Factories are called lazily at the first `await import(...)` that needs
-// the mocked module; they may safely close over variables defined below.
+// ── Module mocks (only auth surface — no container/env/rate-limit.ip) ─────
+// auth and auth-queries are mocked because they import DB clients at module
+// load time. container and env are NOT mocked (apps/api/.env is loaded by
+// the Bun test runner, avoiding global state pollution across the test suite).
 
 mock.module("../../auth", () => ({
   auth: { api: { getSession: mock(async () => null) } },
@@ -118,46 +120,26 @@ const mockLimiter = {
     }),
 };
 
-// ── Container and env mocks (factories close over variables above) ────────
-
-const mockDi = {
-  IApiTokenRepository: makeRepo(),
-  IOutboxRepository: mockOutbox,
-  IRateLimiter: mockLimiter,
-};
-
-mock.module("../../container", () => ({ di: mockDi }));
-
-mock.module("../../shared/env", () => ({
-  env: {
-    API_TOKEN_PREFIX: PREFIX,
-    API_TOKEN_PEPPER: PEPPER,
-    API_TOKEN_PEPPER_VERSION: 1,
-    API_TOKEN_PEPPER_PREVIOUS: undefined,
-    API_TOKEN_LAST_USED_BUCKET_MIN: 15,
-    PLATFORM_ADMIN_IDS: [],
-    NODE_ENV: "test",
-    TRUSTED_PROXIES: undefined,
-  },
-}));
-
-// `hono/bun` getConnInfo requires a live Bun server — unavailable in app.request().
-// Stub IP resolution so the rate-limit policy keyFn doesn't crash.
-mock.module("../../shared/middleware/rate-limit.ip", () => ({
-  resolveClientIp: () => "127.0.0.1",
-  normalizeHop: (s: string) => s,
-}));
-
-// ── Imports AFTER all mocks ───────────────────────────────────────────────
+// ── Imports AFTER module mocks ────────────────────────────────────────────
 
 const { sessionMiddleware, requireAuth } = await import("../../shared/middleware/auth.middleware");
 const { requireScope } = await import("../require-scope");
-// Import the real publicApiV1 — exercises the actual middleware order
-// (requireApiToken → API_TOKEN_POLICY → API_TOKEN_IP_POLICY → routes).
-// Structural note: the always-allow mock limiter means an inverted auth/rate-limit
-// order would still pass; that ordering guarantee lives in code review and the
-// real index.ts owning the mount, not in these tests.
-const { publicApiV1 } = await import("../index");
+
+// ── Build the real sub-app via factory (exercises actual middleware order) ─
+// resolveIp is injected to avoid calling hono/bun getConnInfo which requires
+// a live Bun server — no mock.module needed, zero global side effects.
+
+const publicApiV1 = createPublicApiV1({
+  repo: makeRepo(),
+  outbox: mockOutbox,
+  prefix: PREFIX,
+  pepper: PEPPER,
+  pepperVersion: 1,
+  bucketMin: 15,
+  platformAdminIds: [],
+  limiter: mockLimiter,
+  resolveIp: () => "127.0.0.1",
+});
 
 // ── Test app ─────────────────────────────────────────────────────────────
 
