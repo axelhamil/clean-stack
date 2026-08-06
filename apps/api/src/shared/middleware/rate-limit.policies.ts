@@ -141,6 +141,19 @@ export const API_TOKEN_IP_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
+// GitHub Secret Scanning webhook — machine-to-machine, low frequency, public.
+// fail-open: a store outage must not block revocation notifications.
+export const GITHUB_SCANNING_POLICY: PolicyConfig = {
+  name: "github-scanning",
+  keyFn: ipKeyFn("github-scanning"),
+  windows: [
+    { policyName: "github-scanning", windowSec: 60, maxRequests: 10 },
+    { policyName: "github-scanning", windowSec: 3600, maxRequests: 100 },
+  ],
+  emitSecurityEvent: false,
+  advertiseBudget: false,
+};
+
 // Browser-sent CSP violation reports — no user identity, keyed by IP.
 // emitSecurityEvent=false: the violation itself is the signal (emitted unconditionally per report).
 // advertiseBudget=false: no RateLimit headers exposed to browsers.

@@ -1,5 +1,6 @@
 import { render } from "@react-email/render";
 import type { ComponentType } from "react";
+import { ApiTokenLeaked } from "./components/api-token-leaked";
 import { BackupCodeUsed } from "./components/backup-code-used";
 import { ChangeEmail } from "./components/change-email";
 import { DataExportReady } from "./components/data-export-ready";
@@ -41,6 +42,10 @@ const TEMPLATES: { [K in EmailTemplateKey]: TemplateEntry<K> } = {
   impersonation_started: {
     component: ImpersonationStarted,
     subject: () => "Accès support à votre compte",
+  },
+  api_token_leaked: {
+    component: ApiTokenLeaked,
+    subject: () => "Your API token was automatically revoked",
   },
 };
 

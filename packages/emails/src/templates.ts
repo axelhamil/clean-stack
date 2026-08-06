@@ -16,6 +16,11 @@ export type EmailTemplates = {
     reason: string;
     supportUrl: string;
   };
+  api_token_leaked: {
+    name: string;
+    tokenName: string;
+    revokedAt: string;
+  };
 };
 
 export type EmailTemplateKey = keyof EmailTemplates;

@@ -5,18 +5,21 @@ import { revokeTokensOnMembershipLost } from "./application/event-handlers/revok
 import type { IApiTokenRepository } from "./application/ports/api-token.port";
 import { ApiTokenService } from "./application/services/api-token.service";
 import { DrizzleApiTokenRepository } from "./infrastructure/repositories/drizzle-api-token.repository";
+import { GithubKeyVerifier } from "./infrastructure/services/github-key-verifier";
 
 declare module "inwire" {
   interface AppDeps {
     IApiTokenRepository: IApiTokenRepository;
     ApiTokenService: ApiTokenService;
     RevokeTokensOnMembershipLost: EventHandler;
+    GithubKeyVerifier: GithubKeyVerifier;
   }
 }
 
 export const apiTokenModule = defineModule()((b) =>
   b
     .add("IApiTokenRepository", (c) => new DrizzleApiTokenRepository(c.IInstrumentation))
+    .add("GithubKeyVerifier", (c) => new GithubKeyVerifier(c.IInstrumentation))
     .add(
       "ApiTokenService",
       (c) =>

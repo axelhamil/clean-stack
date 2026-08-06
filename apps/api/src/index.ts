@@ -11,6 +11,7 @@ import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.ro
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
+import { apiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
 import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
@@ -50,6 +51,7 @@ import {
   AUTH_VERIFY_EMAIL_POLICY,
   CONSENT_POST_POLICY,
   CSP_REPORT_POLICY,
+  GITHUB_SCANNING_POLICY,
   GLOBAL_POLICY,
 } from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
@@ -196,6 +198,12 @@ app.route("/internal", sweepConsentsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
 
 app.route("/api/v1", publicApiV1);
+
+app.use(
+  "/api/token-scanning/*",
+  requireRateLimit({ limiter: di.IRateLimiter }, GITHUB_SCANNING_POLICY),
+);
+app.route("/api/token-scanning", apiTokenScanningRoutes);
 
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
