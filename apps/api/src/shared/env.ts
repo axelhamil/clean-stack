@@ -106,6 +106,14 @@ const envSchema = z.object({
     ),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  API_TOKEN_PEPPER: z.string().min(32).optional(),
+  API_TOKEN_PEPPER_PREVIOUS: z.string().min(32).optional(),
+  API_TOKEN_PREFIX: z
+    .string()
+    .regex(/^[a-z][a-z0-9]*_$/)
+    .default("clean_"),
+  API_TOKEN_MAX_EXPIRY_DAYS: z.coerce.number().int().positive().default(365),
+  API_TOKEN_LAST_USED_BUCKET_MIN: z.coerce.number().int().positive().default(15),
 });
 
 const rawEnv = Object.fromEntries(
@@ -138,6 +146,11 @@ if (env.NODE_ENV === "production") {
   if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
     throw new Error(
       "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are required in production. Without them Checkout, the Billing Portal and webhook signature verification all fail.",
+    );
+  }
+  if (!env.API_TOKEN_PEPPER) {
+    throw new Error(
+      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret — a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
     );
   }
 }
