@@ -25,6 +25,7 @@ export interface ScanningDeps {
   findUserById: (id: string) => Promise<{ email: string; name?: string | null } | undefined>;
   prefix: string;
   pepper: string;
+  pepperPrevious?: string;
 }
 
 type ScanEntry = { token: string; type: string; url?: string };
@@ -67,7 +68,17 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
           throw new HTTPException(500, { message: "DB_ERROR" });
         }
 
-        const opt = findResult.getValue();
+        let opt = findResult.getValue();
+
+        if (opt.isNone() && deps.pepperPrevious) {
+          const prevHmac = hmacToken(entry.token, deps.pepperPrevious);
+          const prevFindResult = await deps.apiTokenRepository.findByHmac(prevHmac);
+          if (prevFindResult.isFailure) {
+            throw new HTTPException(500, { message: "DB_ERROR" });
+          }
+          opt = prevFindResult.getValue();
+        }
+
         if (opt.isNone()) {
           return {
             token_raw: entry.token,

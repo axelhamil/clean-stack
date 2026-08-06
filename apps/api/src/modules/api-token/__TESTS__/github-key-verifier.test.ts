@@ -332,6 +332,61 @@ describe("POST /api/token-scanning/github", () => {
     );
   });
 
+  it("revokes a token hashed under the previous pepper and returns true_positive", async () => {
+    const PREV_PEPPER = "b".repeat(32);
+    const { raw: prevRaw } = generateToken(TOKEN_PREFIX);
+    const prevHmac = hmacToken(prevRaw, PREV_PEPPER);
+    const prevRecord: ApiTokenRecord = { ...RECORD, id: "tok-prev", tokenHmac: prevHmac };
+
+    const localFindByHmac = mock(async (hmac: string) => {
+      if (hmac === prevHmac) {
+        return Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.some(prevRecord));
+      }
+      return Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none());
+    });
+    const localRevoke = mock(async () => Result.ok<void, ApiTokenError>());
+    const localEnqueue = mock(async () => {});
+    const localSendTemplate = mock(async () => Result.ok());
+    const localFindUser = mock(async () => ({
+      id: "user-1",
+      email: "user@example.com",
+      name: "Alice",
+    }));
+
+    const appWithPrev = new Hono()
+      .route(
+        "/api/token-scanning",
+        createApiTokenScanningRoutes({
+          githubKeyVerifier: { verify: async () => true },
+          apiTokenRepository: { findByHmac: localFindByHmac, revoke: localRevoke },
+          transactionService: { run: async (cb) => cb({} as never) },
+          outboxRepository: { enqueue: localEnqueue } as never,
+          emailService: { sendTemplate: localSendTemplate },
+          instrumentation: new NoOpInstrumentation(),
+          findUserById: localFindUser,
+          prefix: TOKEN_PREFIX,
+          pepper: TOKEN_PEPPER,
+          pepperPrevious: PREV_PEPPER,
+        }),
+      )
+      .onError(createErrorHandler(new NoOpInstrumentation()));
+
+    const res = await appWithPrev.request("/api/token-scanning/github", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "GITHUB-PUBLIC-KEY-IDENTIFIER": "key-1",
+        "GITHUB-PUBLIC-KEY-SIGNATURE": "valid-sig",
+      },
+      body: JSON.stringify([{ token: prevRaw, type: "clean_token" }]),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { label: string }[];
+    expect(body[0]?.label).toBe("true_positive");
+    expect(localRevoke).toHaveBeenCalledWith(prevRecord.id, "leaked", expect.anything());
+  });
+
   it("returns true_positive and skips revoke for an already-revoked token", async () => {
     const revoked: ApiTokenRecord = {
       ...RECORD,

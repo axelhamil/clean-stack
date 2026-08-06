@@ -99,6 +99,12 @@ export function requireApiToken(
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
+    const isBanned =
+      userRow.banned === true && (userRow.banExpires === null || userRow.banExpires > now);
+    if (isBanned) {
+      throw new HTTPException(401, { message: "Unauthorized" });
+    }
+
     const user = {
       ...userRow,
       isPlatformAdmin: deps.platformAdminIds.includes(userRow.id) || userRow.role === "admin",

@@ -214,6 +214,78 @@ describe("requireApiToken", () => {
     expect(repo.rehash).toHaveBeenCalledWith(record.id, currentHmac, 3);
   });
 
+  it("returns 401 for a valid token whose owner is banned", async () => {
+    const { raw } = generateToken(PREFIX);
+    const record = makeRecord({ tokenHmac: hmacToken(raw, PEPPER) });
+    const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
+
+    findUserByIdSpy.mockImplementationOnce(async () => ({
+      id: "u1",
+      name: "Test",
+      email: "t@example.com",
+      emailVerified: true as boolean,
+      image: null as string | null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      twoFactorEnabled: false as boolean | null,
+      pendingDeletionUntil: null as Date | null,
+      deletedAt: null as Date | null,
+      lastExportRequestedAt: null as Date | null,
+      pendingEmail: null as string | null,
+      stripeCustomerId: null as string | null,
+      role: null as string | null,
+      banned: true as boolean | null,
+      banReason: "policy violation" as string | null,
+      banExpires: null as Date | null,
+    }));
+
+    const deps = makeDeps(repo);
+    const app = new Hono()
+      .use(requireApiToken(deps, { scopes: [] }))
+      .get("/x", (c) => c.text("ok"));
+
+    const res = await app.request("/x", {
+      headers: { authorization: `Bearer ${raw}` },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("lets a token through when the ban has already expired", async () => {
+    const { raw } = generateToken(PREFIX);
+    const record = makeRecord({ tokenHmac: hmacToken(raw, PEPPER) });
+    const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
+
+    findUserByIdSpy.mockImplementationOnce(async () => ({
+      id: "u1",
+      name: "Test",
+      email: "t@example.com",
+      emailVerified: true as boolean,
+      image: null as string | null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      twoFactorEnabled: false as boolean | null,
+      pendingDeletionUntil: null as Date | null,
+      deletedAt: null as Date | null,
+      lastExportRequestedAt: null as Date | null,
+      pendingEmail: null as string | null,
+      stripeCustomerId: null as string | null,
+      role: null as string | null,
+      banned: true as boolean | null,
+      banReason: null as string | null,
+      banExpires: new Date(Date.now() - 1000) as Date | null,
+    }));
+
+    const deps = makeDeps(repo);
+    const app = new Hono()
+      .use(requireApiToken(deps, { scopes: [] }))
+      .get("/x", (c) => c.text("ok"));
+
+    const res = await app.request("/x", {
+      headers: { authorization: `Bearer ${raw}` },
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("does not rehash a revoked token found via the previous pepper", async () => {
     const { raw } = generateToken(PREFIX);
     const prevHmac = hmacToken(raw, PREV_PEPPER);

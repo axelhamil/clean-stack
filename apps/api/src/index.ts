@@ -231,6 +231,7 @@ app.route(
     findUserById,
     prefix: env.API_TOKEN_PREFIX,
     pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+    pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
   }),
 );
 

@@ -88,7 +88,7 @@ export function ApiTokensPage() {
                 key={token.id}
                 token={token}
                 onRevoke={(id) => revoke.mutate(id)}
-                isRevoking={revoke.isPending}
+                isRevoking={revoke.isPending && revoke.variables === token.id}
               />
             ))}
           </TableBody>
