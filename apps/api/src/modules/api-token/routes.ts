@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { zV } from "../../shared/validator";
 import { createTokenBodySchema } from "./application/dto/create-token.dto";
@@ -24,7 +25,7 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
       items: result.getValue().map(({ tokenHmac: _hmac, pepperVersion: _pv, ...rest }) => rest),
     });
   })
-  .post("/", requireAuth, zV("json", createTokenBodySchema), async (c) => {
+  .post("/", requireAuth, denyImpersonated, zV("json", createTokenBodySchema), async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
     const session = c.get("session");
@@ -53,7 +54,7 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
     const { tokenHmac: _hmac, pepperVersion: _pv, ...safeRecord } = record;
     return c.json({ token: raw, record: safeRecord }, 201);
   })
-  .delete("/:id", requireAuth, async (c) => {
+  .delete("/:id", requireAuth, denyImpersonated, async (c) => {
     const user = c.get("user");
     const session = c.get("session");
     const id = c.req.param("id");

@@ -32,11 +32,13 @@ mock.module("../../../container", () => ({
   },
 }));
 
+let currentSession: Record<string, unknown> = { activeOrganizationId: null };
+
 mock.module("../../../shared/middleware/auth.middleware", () => ({
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   requireAuth: async (c: any, next: () => Promise<void>) => {
     c.set("user", { id: "user-1" });
-    c.set("session", { activeOrganizationId: null });
+    c.set("session", currentSession);
     await next();
   },
   AuthVariables: {},
@@ -71,6 +73,7 @@ function makeApp() {
 
 describe("POST /settings/tokens — create", () => {
   it("returns 201 with raw token and safe record (no tokenHmac, no pepperVersion)", async () => {
+    currentSession = { activeOrganizationId: null };
     const app = makeApp();
     const res = await app.request("/settings/tokens", {
       method: "POST",
@@ -90,10 +93,29 @@ describe("POST /settings/tokens — create", () => {
     expect(body.record.tokenHmac).toBeUndefined();
     expect(body.record.pepperVersion).toBeUndefined();
   });
+
+  it("returns 403 when the session is impersonated", async () => {
+    currentSession = { activeOrganizationId: null, impersonatedBy: "admin-99" };
+    mockCreate.mockClear();
+    const app = makeApp();
+    const res = await app.request("/settings/tokens", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "ci",
+        scopes: ["read:profile"],
+        organizationId: null,
+        expiresInDays: null,
+      }),
+    });
+    expect(res.status).toBe(403);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /settings/tokens — list", () => {
   it("never exposes tokenHmac or the raw token value", async () => {
+    currentSession = { activeOrganizationId: null };
     const app = makeApp();
     const res = await app.request("/settings/tokens", { method: "GET" });
     expect(res.status).toBe(200);
@@ -110,6 +132,7 @@ describe("GET /settings/tokens — list", () => {
 
 describe("DELETE /settings/tokens/:id — wrong owner returns 404", () => {
   it("returns 404 when the service reports API_TOKEN_NOT_FOUND", async () => {
+    currentSession = { activeOrganizationId: null };
     mockRevoke.mockImplementationOnce(async () =>
       Result.fail({ code: "API_TOKEN_NOT_FOUND", message: "Token not found." }),
     );
