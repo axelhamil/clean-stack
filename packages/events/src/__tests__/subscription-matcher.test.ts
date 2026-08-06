@@ -3,29 +3,19 @@ import {
   ALL_EVENT_TYPES,
   EventTypes,
   eventGroupOf,
-  INTERNAL_EVENT_TYPES,
   isSubscribableSelector,
   matchesSubscription,
   SUBSCRIBABLE_EVENT_TYPES,
 } from "../event-types";
 
 describe("subscription partitioning", () => {
-  it("internal set = the 4 webhook mechanics events + email.delivery.exhausted", () => {
-    expect([...INTERNAL_EVENT_TYPES].sort()).toEqual(
-      [
-        "webhook.test",
-        "webhook.endpoint.secret_rotated",
-        "webhook.endpoint.disabled",
-        "webhook.delivery.exhausted",
-        "email.delivery.exhausted",
-      ].sort(),
-    );
-  });
-
-  it("subscribable = all minus internal", () => {
-    expect(SUBSCRIBABLE_EVENT_TYPES).toHaveLength(ALL_EVENT_TYPES.length - 5);
+  it("subscribable set excludes webhook, security, and admin groups", () => {
     expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.WEBHOOK_TEST);
-    expect(SUBSCRIBABLE_EVENT_TYPES).toContain(EventTypes.WEBHOOK_ENDPOINT_CREATED);
+    expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.WEBHOOK_ENDPOINT_CREATED);
+    expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.SECURITY_CSRF_REJECTED);
+    expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.ADMIN_USER_BANNED);
+    expect(SUBSCRIBABLE_EVENT_TYPES).toContain(EventTypes.USER_CREATED);
+    expect(SUBSCRIBABLE_EVENT_TYPES.length).toBeLessThan(ALL_EVENT_TYPES.length);
   });
 });
 

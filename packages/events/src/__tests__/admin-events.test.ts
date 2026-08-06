@@ -14,8 +14,8 @@ describe("admin events", () => {
     }
   });
 
-  it("keeps admin events subscribable by webhook consumers", () => {
-    expect(SUBSCRIBABLE_EVENT_TYPES).toContain(EventTypes.ADMIN_USER_BANNED);
+  it("keeps admin events out of the public subscribable set", () => {
+    expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.ADMIN_USER_BANNED);
   });
 
   it("requires a non-empty reason on impersonation start", () => {

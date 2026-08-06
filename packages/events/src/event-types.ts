@@ -1,3 +1,5 @@
+import { isPublicEvent } from "./visibility-map";
+
 export const EventTypes = {
   USER_CREATED: "user.created",
   USER_SIGNED_IN: "user.signed_in",
@@ -74,17 +76,7 @@ export function isKnownEventType(value: string): value is EventType {
   return ALL_EVENT_TYPES.includes(value as EventType);
 }
 
-export const INTERNAL_EVENT_TYPES: readonly EventType[] = [
-  EventTypes.WEBHOOK_TEST,
-  EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED,
-  EventTypes.WEBHOOK_ENDPOINT_DISABLED,
-  EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
-  EventTypes.EMAIL_DELIVERY_EXHAUSTED,
-];
-
-export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(
-  (t) => !INTERNAL_EVENT_TYPES.includes(t),
-);
+export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(isPublicEvent);
 
 export function eventGroupOf(eventType: string): string {
   const dot = eventType.indexOf(".");
@@ -95,7 +87,7 @@ export function matchesSubscription(
   eventType: EventType,
   subscriptions: readonly string[],
 ): boolean {
-  if (INTERNAL_EVENT_TYPES.includes(eventType)) return false;
+  if (!isPublicEvent(eventType)) return false;
   if (subscriptions.includes("*")) return true;
   if (subscriptions.includes(eventType)) return true;
   return subscriptions.includes(`${eventGroupOf(eventType)}.*`);
