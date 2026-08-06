@@ -36,12 +36,19 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Observability — Sentry** (0.4) (Sentry api+app removable, `IInstrumentation` port + NoOp default, RGPD scrubbing, source maps CI, release tracking — OTel + Prometheus deferred to D.1) | **€2 500 – €4 000** | 5-6j |
 | **Profile + NIST 800-63B-4 password** (A.1) (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15 universal — no MFA exception, ban complexity rules) | **€1 200 – €2 000** | 3-4j |
 | **Privacy policy / Terms versioning** (A.2) (DB schema, `@packages/policies` version SSOT, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 – €1 000** | 1-2j |
+| **Compliance docs bundle** (A.3) (`/legal/sub-processors` Art. 28 — typed `SUB_PROCESSORS` const + `/legal/accessibility` EAA Art. 14 WCAG 2.1 AA / EN 301 549 + `docs/legal/DPA-template.md` + `docs/legal/DORA-annex-template.md` + `docs/legal/README.md` + command-palette links + `data-rights` cross-links. RSS change history + re-acceptance trigger deferred. 0 events.) | **€400 – €800** | 1j |
+| **Cookie consent + consent management** (A.4) (device-scoped dual-layer: `cc_sid` httpOnly cookie + `consent_record` append-only; `@packages/cookie-consent` SSOT + `ConsentService` + `/consents` routes (CSRF-exempt, rate-limited) + `<CookieBanner>` CNIL Reject/Accept + `<ConsentSettings>` + `<ConsentGate category>` + `<AnalyticsScripts>` + `<LegalFooter>` + `/legal/cookies`; guest→user reconciliation at login; `CONSENT_GRANT_TTL_DAYS`/`CONSENT_REFUSAL_TTL_DAYS`. GPC/DNT requalified out of EU scope. 2 events → 42 total.) | **€1 200 – €2 000** | 2-3j |
 | **Privacy dashboard** (A.5) (`/settings/privacy` UX hub: `<PolicyAcceptanceCard />` + `<ConsentSettings />` + `<DataSourcesCard />` + `<DataExportCard />` + `<SessionsCard />`. Danger tab dissolved; contextual danger zones (account + organization pages). `sub-processors.config.ts` promoted to `shared/`. 0 events.) | **€600 – €1 000** | 1-2j |
 | **Billing — Stripe subscriptions + feature/seat gating** (B.1) (`@better-auth/stripe`, Checkout + Billing Portal hosted, subscription SSOT in plugin table, hybrid catalog Stripe+code via `ENTITLEMENTS`, 3 gate axes: role/seat/tier, `useEntitlements()` + `<FeatureGate>` + `<PlanGate>`, 4 compliance/operational events, free-tier degradation when key unset) | **€3 600 – €6 000** | 7-10j |
 | **Quota gating** (B.2) (dormant skeleton extending B.1: `ENTITLEMENTS[tier].quotas` catalog, `requireQuota` pre-check + `reserveQuota` advisory-lock atomic gate + `countScopedRows`, `quota_usage` table + `modules/quotas/` `IQuotaUsageStore`, `useQuota()` + `<QuotaGate>`, `billing.quota.exceeded` event, knip-whitelisted) | **€800 – €1 200** | 1-2j |
+| **Security perimeter** (C.1) (`rate-limiter-flexible` fail-closed on auth — IETF `RateLimit` headers, memory + Postgres dedicated-pool stores; strict CSP via Caddy nonce injection (`{http.request.uuid}`); CSRF via Origin-allowlist (Bearer exempt); S5a: per-account credential-stuffing counter, disposable-email block, HIBP breached-password telemetry. 5 `security.*` events. S5b advanced signals + S6 captcha deferred.) | **€1 200 – €2 000** | 3j |
+| **Audit log front UI** (C.2) (`/admin/audit-log` operator page — cursor pagination, filters, `MetadataSheet` before/after diff, `ChainBadge`; tamper-evidence hash chain env-gated (`AUDIT_TAMPER_EVIDENCE`); `requirePlatformAdmin`; `security.operator.audit_accessed` event → 48 total at ship, 52 after C.5.) | **€500 – €1 000** | 1-2j |
+| **Admin & impersonation** (C.3) (`modules/admin/` back + `features/admin-users/` + `features/admin-orgs/` front; audited ban / unban / role-change / force-password-reset / revoke-sessions; justified impersonation (reason + optional ticketRef); two-layer blocklist: BetterAuth hook + 11 `denyImpersonated` routes (incl. policy acceptance); non-dismissable banner with live countdown; transparency email to impersonated user; MFA-gated "Admin" nav → `/admin/users`; legal acceptance gate disabled during impersonation; `APP_URL` promoted to required. 7 `admin.*` events → 62 total / 57 subscribable / 5 internal.) | **€1 500 – €2 500** | 3-4j |
 | **API tokens / PATs** (C.4) (`/settings/tokens` CRUD, name + scope picker + optional expiry, `denyImpersonated` on writes; `clean_` + 44-char base58 body + 6-char CRC32 checksum; HMAC-SHA256 + server pepper (`API_TOKEN_PEPPER`), pepper rotation via `API_TOKEN_PEPPER_PREVIOUS` / `API_TOKEN_PEPPER_VERSION`; `/api/v1` sub-app outside `AppType` (token-auth only, no session middleware); cascade revocation on org membership loss; `POST /api/token-scanning/github` ECDSA P-256; `visibility-map.ts` public/internal classification; 3 events → **65 total / 28 public / 37 internal**) | **€1 000 – €1 800** | 2-3j |
+| **Webhooks front UI + event catalog** (C.5) (`/settings/webhooks` CRUD — per-attempt timeline drawer, one-shot secret reveal, rotate-secret dialog, send-test, auto-disabled badge; SSRF guard; dual-secret rotation (`WEBHOOK_SECRET_GRACE_HOURS`); `webhook_delivery_attempt` table; auto-disable after `WEBHOOK_AUTO_DISABLE_AFTER_DAYS`; public `/developers/events` catalog (JSON schemas, Node signature-verification snippet). 4 internal events → 52 total / 48 subscribable / 4 internal.) | **€800 – €1 500** | 2j |
+| **Account recovery codes UI** (C.6) (`RecoveryCodesCard` regenerate-only + password gate + `xxxxx-xxxxx` format + copy/download; backup-code fallback on `/two-factor` (whitespace stripped, dash auto-inserted); `BackupCodeUsedNotifier` first `onEvent` handler; rate-limit on `generate-backup-codes`. 2 compliance events → 54 total / 50 subscribable / 4 internal.) | **€200 – €400** | 0.5j |
 
-**Subtotal Core (shipped)**: **€21 200 – €36 000** of senior-dev value already in the repo on day zero. ~45-65 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€34 600 – €58 200** of senior-dev value already in the repo on day zero. ~75-99 days of focused senior work compressed into a clone.
 
 ---
 
@@ -49,14 +56,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 
 | Phase | Module | Realistic value | Time |
 |---|---|---|---|
-| A.3 | **Compliance docs bundle** (sub-processor disclosure, accessibility statement EAA, DPA template, DORA annex template) | **€400 – €800** | 1j |
-| A.4 | **Cookie consent + consent management** (CNIL/EDPB-conform banner, granular categories, `Sec-GPC`/`DNT` auto-decline, version-stamped `consent_record` — infra, not DDD) | **€1 200 – €2 000** | 2-3j |
 | A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain, WCAG 2.1 AA gate ≥95) | **€1 200 – €2 000** | 3j |
-| C.1 | **Security perimeter** (sliding-window rate-limit per IP/user, captcha on auth-burst, strict CSP with nonce, CSRF on non-BetterAuth POST routes) | **€1 200 – €2 000** | 3j |
-| C.2 | **Audit log front UI** (page `/admin/audit-log` avec filtres + diff metadata expand, API déjà shipped) | **€500 – €1 000** | 1-2j |
-| C.3 | **Admin & impersonation** (BetterAuth `admin` plugin, `/admin/*` separate hostname, audit-logged actions) | **€1 500 – €2 500** | 3-4j |
-| C.5 | **Webhooks front UI + `webhook.test` event** (page `/settings/webhooks` CRUD, deliveries view, replay button — API + worker déjà shipped) | **€800 – €1 500** | 2j |
-| C.6 | **Account recovery codes** (UI for the BetterAuth `twoFactor` codes already supported server-side) | **€200 – €400** | 0.5j |
 | C.7 | **SSO SAML/OIDC + SCIM provisioning** (BetterAuth `sso` plugin + SCIM endpoint + audit-logged provisioning) | **€5 000 – €8 000** | 10-12j |
 | D.1 | **Status page + SLO dashboards + alerting** (Cachet/Astro, Grafana SLO consuming 0.4 `/metrics`, Sentry → Slack/PagerDuty, runbook-linked) | **€1 500 – €2 500** | 3-4j |
 | D.2 | **OpenAPI auto-docs** (`@hono/zod-openapi`, Scalar UI at `/api/docs`) | **€400 – €700** | 1j |
@@ -67,15 +67,15 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€25 900 – €43 100** committed to ship.
+**Subtotal Roadmap**: **€16 500 – €27 200** committed to ship.
 
 ---
 
 ## Total value-in-box once roadmap is shipped
 
-**Core + Roadmap = €47 100 – €79 100** of realistic senior-dev value packaged.
+**Core + Roadmap = €51 100 – €85 400** of realistic senior-dev value packaged.
 
-That's ~3-5 months of focused senior work compressed into a clone. Honest, defensible to clients, no inflated SOW pricing.
+That's ~5.5-7 months of focused senior work compressed into a clone. Honest, defensible to clients, no inflated SOW pricing.
 
 ---
 
@@ -87,15 +87,15 @@ When clean-stack is commercialized as a product (ShipFast / Bullet Train / Maker
 - Makerkit charges €499-999 against ~€15-25k of value (~3%).
 - Bullet Train charges €1499 against ~€25-40k of value (~4%).
 
-Applying the same ratio bands to clean-stack's €46k–€78k value:
+Applying the same ratio bands to clean-stack's €51k–€85k value:
 
-- **1.5% floor** (ShipFast aggressive entry) → **€699 – €1 200** one-time.
-- **3% market median** → **€1 400 – €2 300** one-time.
-- **4% premium** (Bullet Train upper) → **€1 800 – €3 100**, only justified with included support / customization.
+- **1.5% floor** (ShipFast aggressive entry) → **€800 – €1 300** one-time.
+- **3% market median** → **€1 500 – €2 600** one-time.
+- **4% premium** (Bullet Train upper) → **€2 000 – €3 400**, only justified with included support / customization.
 
 **Recommended initial positioning**: single tier at **€699 – €999** lifetime license, lifetime updates within current major. Reasoning:
 - Anchors near Makerkit's lower tier — signals "more architecturally serious than ShipFast, less than Bullet Train premium"
-- Clean round number, easy to anchor against the €50-80k value delivered ("you save 50-100× the price on day one")
+- Clean round number, easy to anchor against the €50-85k value delivered ("you save 50-100× the price on day one")
 - Single tier eliminates funnel friction — the whole stack is the product
 - Premium tier (~€1 999) only when a course / community / 1-on-1 onboarding is included — pure license alone doesn't justify it
 
