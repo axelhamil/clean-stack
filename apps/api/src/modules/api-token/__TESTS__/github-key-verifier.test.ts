@@ -344,7 +344,7 @@ describe("POST /api/token-scanning/github", () => {
       }
       return Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none());
     });
-    const localRevoke = mock(async () => Result.ok<void, ApiTokenError>());
+    const localRevoke = mock(async (): Promise<Result<void, ApiTokenError>> => Result.ok());
     const localEnqueue = mock(async () => {});
     const localSendTemplate = mock(async () => Result.ok());
     const localFindUser = mock(async () => ({
