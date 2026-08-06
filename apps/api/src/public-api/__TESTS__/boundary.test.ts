@@ -6,6 +6,7 @@ import type {
   IApiTokenRepository,
 } from "../../modules/api-token/application/ports/api-token.port";
 import { generateToken, hmacToken } from "../../shared/crypto/api-token";
+import type { RateLimitDecision, RateLimitError } from "../../shared/ports/rate-limiter.port";
 import { createPublicApiV1 } from "../index";
 
 // ── Module mocks (only auth surface — no container/env/rate-limit.ip) ─────
@@ -110,13 +111,13 @@ const mockOutbox = { enqueue: async () => {} } as never;
 // Always-allow rate limiter — boundary tests target auth/scope, not throttling.
 const mockLimiter = {
   consume: async () =>
-    Result.ok({
-      allowed: true as const,
+    Result.ok<RateLimitDecision, RateLimitError>({
+      allowed: true,
       limit: 600,
       remaining: 599,
       resetSeconds: 60,
       policyName: "api-token",
-      firstBlock: false as const,
+      firstBlock: false,
     }),
 };
 

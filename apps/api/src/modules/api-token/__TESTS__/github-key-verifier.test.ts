@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import { generateToken } from "../../../shared/crypto/api-token";
+import { generateToken, hmacToken } from "../../../shared/crypto/api-token";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { ApiTokenError, ApiTokenRecord } from "../application/ports/api-token.port";
@@ -26,7 +26,9 @@ async function exportPublicKeyAsPem(key: CryptoKey): Promise<string> {
 function rawToDer(raw: Uint8Array): Uint8Array {
   const r = raw.subarray(0, 32);
   const s = raw.subarray(32);
+  // biome-ignore lint/style/noNonNullAssertion: r/s are 32-byte fixed-length slices
   const rPad = r[0]! >= 0x80 ? new Uint8Array([0, ...r]) : r;
+  // biome-ignore lint/style/noNonNullAssertion: r/s are 32-byte fixed-length slices
   const sPad = s[0]! >= 0x80 ? new Uint8Array([0, ...s]) : s;
   const seqLen = 2 + rPad.length + 2 + sPad.length;
   const der = new Uint8Array(2 + seqLen);
@@ -152,10 +154,14 @@ describe("GithubKeyVerifier", () => {
 });
 
 // ── scanning.routes.ts endpoint tests ────────────────────────────────────────
+// Uses factory injection — no mock.module for container or auth-queries,
+// so no global state pollution across the test suite.
 
 const TOKEN_PREFIX = "clean_";
+const TOKEN_PEPPER = "a".repeat(32);
 
 const { raw: KNOWN_RAW } = generateToken(TOKEN_PREFIX);
+const KNOWN_HMAC = hmacToken(KNOWN_RAW, TOKEN_PEPPER);
 
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
@@ -163,7 +169,7 @@ const RECORD: ApiTokenRecord = {
   organizationId: null,
   name: "ci-token",
   scopes: ["read:profile"],
-  tokenHmac: "hmac-of-known",
+  tokenHmac: KNOWN_HMAC,
   pepperVersion: 1,
   tokenStart: KNOWN_RAW.slice(0, 14),
   lastUsedAt: null,
@@ -177,34 +183,32 @@ const mockVerify = mock(async () => true);
 const mockFindByHmac = mock(async (_hmac: string) =>
   Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none()),
 );
-const mockRevoke = mock(async () => Result.ok());
+const mockRevoke = mock(async () => Result.ok<ApiTokenError>());
 const mockEnqueue = mock(async () => {});
 const mockSendTemplate = mock(async () => Result.ok());
-
-mock.module("../../../container", () => ({
-  di: {
-    GithubKeyVerifier: { verify: mockVerify },
-    IApiTokenRepository: {
-      findByHmac: mockFindByHmac,
-      revoke: mockRevoke,
-    },
-    ITransactionService: {
-      run: async (cb: (tx: unknown) => Promise<void>) => cb({}),
-    },
-    IOutboxRepository: { enqueue: mockEnqueue },
-    IEmailService: { sendTemplate: mockSendTemplate },
-    IInstrumentation: new NoOpInstrumentation(),
-  },
+const mockFindUserById = mock(async () => ({
+  id: "user-1",
+  email: "user@example.com",
+  name: "Alice",
 }));
 
-mock.module("../../../auth-queries", () => ({
-  findUserById: mock(async () => ({ id: "user-1", email: "user@example.com", name: "Alice" })),
-}));
-
-const { apiTokenScanningRoutes } = await import("../scanning.routes");
+const { createApiTokenScanningRoutes } = await import("../scanning.routes");
 
 const app = new Hono()
-  .route("/api/token-scanning", apiTokenScanningRoutes)
+  .route(
+    "/api/token-scanning",
+    createApiTokenScanningRoutes({
+      githubKeyVerifier: { verify: mockVerify },
+      apiTokenRepository: { findByHmac: mockFindByHmac, revoke: mockRevoke },
+      transactionService: { run: async (cb) => cb({} as never) },
+      outboxRepository: { enqueue: mockEnqueue } as never,
+      emailService: { sendTemplate: mockSendTemplate },
+      instrumentation: new NoOpInstrumentation(),
+      findUserById: mockFindUserById,
+      prefix: TOKEN_PREFIX,
+      pepper: TOKEN_PEPPER,
+    }),
+  )
   .onError(createErrorHandler(new NoOpInstrumentation()));
 
 function makeBody(entries: { token: string; type: string }[]) {
@@ -231,12 +235,18 @@ describe("POST /api/token-scanning/github", () => {
     mockRevoke.mockReset();
     mockEnqueue.mockReset();
     mockSendTemplate.mockReset();
+    mockFindUserById.mockReset();
     mockVerify.mockImplementation(async () => true);
     mockFindByHmac.mockImplementation(async (_hmac: string) =>
       Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none()),
     );
     mockRevoke.mockImplementation(async () => Result.ok());
     mockSendTemplate.mockImplementation(async () => Result.ok());
+    mockFindUserById.mockImplementation(async () => ({
+      id: "user-1",
+      email: "user@example.com",
+      name: "Alice",
+    }));
   });
 
   it("returns 403 when signature headers are missing", async () => {
@@ -260,15 +270,15 @@ describe("POST /api/token-scanning/github", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { token_raw: string; token_type: string; label: string }[];
     expect(body).toHaveLength(1);
-    expect(body[0]!.label).toBe("false_positive");
-    expect(body[0]!.token_raw).toBe(KNOWN_RAW);
+    expect(body[0]?.label).toBe("false_positive");
+    expect(body[0]?.token_raw).toBe(KNOWN_RAW);
     expect(mockRevoke).not.toHaveBeenCalled();
   });
 
   it("returns false_positive for a token with wrong format", async () => {
     const res = await postScan(makeBody([{ token: "bad-format-token", type: "clean_token" }]));
     const body = (await res.json()) as { label: string }[];
-    expect(body[0]!.label).toBe("false_positive");
+    expect(body[0]?.label).toBe("false_positive");
     expect(mockFindByHmac).not.toHaveBeenCalled();
   });
 
@@ -280,9 +290,10 @@ describe("POST /api/token-scanning/github", () => {
     const res = await postScan(makeBody([{ token: KNOWN_RAW, type: "clean_token" }]));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { label: string }[];
-    expect(body[0]!.label).toBe("true_positive");
+    expect(body[0]?.label).toBe("true_positive");
     expect(mockRevoke).toHaveBeenCalledWith("tok-1", "leaked", expect.anything());
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    // biome-ignore lint/style/noNonNullAssertion: guarded by toHaveBeenCalledTimes(1) above
     const [events] = (mockEnqueue as ReturnType<typeof mock>).mock.calls[0]!;
     const event = events[0];
     expect(event.eventType).toBe("api_token.revoked");
@@ -307,7 +318,7 @@ describe("POST /api/token-scanning/github", () => {
 
     const res = await postScan(makeBody([{ token: KNOWN_RAW, type: "clean_token" }]));
     const body = (await res.json()) as { label: string }[];
-    expect(body[0]!.label).toBe("true_positive");
+    expect(body[0]?.label).toBe("true_positive");
     expect(mockRevoke).not.toHaveBeenCalled();
     expect(mockSendTemplate).not.toHaveBeenCalled();
   });
@@ -315,7 +326,7 @@ describe("POST /api/token-scanning/github", () => {
   it("handles multiple entries, mixing true and false positives", async () => {
     const { raw: unknownRaw } = generateToken(TOKEN_PREFIX);
     mockFindByHmac.mockImplementation(async (hmac: string) => {
-      if (hmac === "hmac-of-known")
+      if (hmac === KNOWN_HMAC)
         return Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.some(RECORD));
       return Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none());
     });

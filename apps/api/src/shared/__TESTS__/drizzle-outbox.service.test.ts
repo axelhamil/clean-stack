@@ -93,6 +93,24 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  apiTokenSchema: {
+    apiToken: {
+      id: {},
+      userId: {},
+      organizationId: {},
+      name: {},
+      scopes: {},
+      tokenHmac: {},
+      pepperVersion: {},
+      tokenStart: {},
+      lastUsedAt: {},
+      expiresAt: {},
+      revokedAt: {},
+      revokedReason: {},
+      createdAt: {},
+      updatedAt: {},
+    },
+  },
 }));
 
 // ── Mock @packages/events ──────────────────────────────────────────────────
@@ -107,6 +125,8 @@ const EventTypesMock = {
   USER_MAGIC_LINK_REQUESTED: "user.magic_link.requested",
   USER_MFA_ENABLED: "user.mfa.enabled",
   USER_MFA_DISABLED: "user.mfa.disabled",
+  USER_MFA_BACKUP_CODES_REGENERATED: "user.mfa.backup_codes_regenerated",
+  USER_MFA_BACKUP_CODE_USED: "user.mfa.backup_code_used",
   USER_PASSKEY_ADDED: "user.passkey.added",
   USER_PASSKEY_REMOVED: "user.passkey.removed",
   USER_ACCOUNT_LINKED: "user.account.linked",
@@ -150,8 +170,19 @@ const EventTypesMock = {
   BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
   BILLING_PAYMENT_FAILED: "billing.payment.failed",
   BILLING_QUOTA_EXCEEDED: "billing.quota.exceeded",
+  ADMIN_IMPERSONATION_STARTED: "admin.impersonation.started",
+  ADMIN_IMPERSONATION_STOPPED: "admin.impersonation.stopped",
+  ADMIN_USER_BANNED: "admin.user.banned",
+  ADMIN_USER_UNBANNED: "admin.user.unbanned",
+  ADMIN_USER_ROLE_CHANGED: "admin.user.role_changed",
+  ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
+  ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
+  API_TOKEN_CREATED: "api_token.created",
+  API_TOKEN_REVOKED: "api_token.revoked",
+  API_TOKEN_USED: "api_token.used",
+  EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
 } as const;
-const stubPayload = { safeParse: () => ({ success: true }) };
+const stubPayload = { safeParse: () => ({ success: true as const, data: {} as never }) };
 mock.module("@packages/events", () => ({
   EventTypes: EventTypesMock,
   ALL_EVENT_TYPES: Object.values(EventTypesMock),
@@ -214,6 +245,19 @@ mock.module("@packages/events", () => ({
   BillingSubscriptionCancelledPayload: stubPayload,
   BillingPaymentFailedPayload: stubPayload,
   BillingQuotaExceededPayload: stubPayload,
+  AdminImpersonationStartedPayload: stubPayload,
+  AdminImpersonationStoppedPayload: stubPayload,
+  AdminUserBannedPayload: stubPayload,
+  AdminUserUnbannedPayload: stubPayload,
+  AdminUserRoleChangedPayload: stubPayload,
+  AdminUserPasswordResetPayload: stubPayload,
+  AdminUserSessionsRevokedPayload: stubPayload,
+  ApiTokenCreatedPayload: stubPayload,
+  ApiTokenRevokedPayload: stubPayload,
+  ApiTokenUsedPayload: stubPayload,
+  UserMfaBackupCodesRegeneratedPayload: stubPayload,
+  UserMfaBackupCodeUsedPayload: stubPayload,
+  EmailDeliveryExhaustedPayload: stubPayload,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
