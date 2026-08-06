@@ -8,6 +8,8 @@ import type {
 import { generateToken, hmacToken } from "../../shared/crypto/api-token";
 
 // ── Mocks registered before any dynamic import ───────────────────────────
+// Factories are called lazily at the first `await import(...)` that needs
+// the mocked module; they may safely close over variables defined below.
 
 mock.module("../../auth", () => ({
   auth: { api: { getSession: mock(async () => null) } },
@@ -103,33 +105,66 @@ function makeRepo(): IApiTokenRepository {
 
 const mockOutbox = { enqueue: async () => {} } as never;
 
-// ── Import middleware AFTER mocks ─────────────────────────────────────────
-
-const { sessionMiddleware, requireAuth } = await import("../../shared/middleware/auth.middleware");
-const { requireApiToken } = await import("../../shared/middleware/api-token.middleware");
-const { mePublicRoutes } = await import("../v1/me.routes");
-const { orgsPublicRoutes } = await import("../v1/organizations.routes");
-
-const apiTokenDeps = {
-  repo: makeRepo(),
-  outbox: mockOutbox,
-  prefix: PREFIX,
-  pepper: PEPPER,
-  pepperVersion: 1,
-  bucketMin: 15,
-  platformAdminIds: [] as string[],
+// Always-allow rate limiter — boundary tests target auth/scope, not throttling.
+const mockLimiter = {
+  consume: async () =>
+    Result.ok({
+      allowed: true as const,
+      limit: 600,
+      remaining: 599,
+      resetSeconds: 60,
+      policyName: "api-token",
+      firstBlock: false as const,
+    }),
 };
 
-// ── Test app replicating the pipeline boundary ────────────────────────────
-// sessionMiddleware skips /api/v1/* (per auth.middleware change);
-// /me is session-gated; /api/v1/* is token-gated with per-route scope checks.
+// ── Container and env mocks (factories close over variables above) ────────
+
+const mockDi = {
+  IApiTokenRepository: makeRepo(),
+  IOutboxRepository: mockOutbox,
+  IRateLimiter: mockLimiter,
+};
+
+mock.module("../../container", () => ({ di: mockDi }));
+
+mock.module("../../shared/env", () => ({
+  env: {
+    API_TOKEN_PREFIX: PREFIX,
+    API_TOKEN_PEPPER: PEPPER,
+    API_TOKEN_PEPPER_VERSION: 1,
+    API_TOKEN_PEPPER_PREVIOUS: undefined,
+    API_TOKEN_LAST_USED_BUCKET_MIN: 15,
+    PLATFORM_ADMIN_IDS: [],
+    NODE_ENV: "test",
+    TRUSTED_PROXIES: undefined,
+  },
+}));
+
+// `hono/bun` getConnInfo requires a live Bun server — unavailable in app.request().
+// Stub IP resolution so the rate-limit policy keyFn doesn't crash.
+mock.module("../../shared/middleware/rate-limit.ip", () => ({
+  resolveClientIp: () => "127.0.0.1",
+  normalizeHop: (s: string) => s,
+}));
+
+// ── Imports AFTER all mocks ───────────────────────────────────────────────
+
+const { sessionMiddleware, requireAuth } = await import("../../shared/middleware/auth.middleware");
+const { requireScope } = await import("../require-scope");
+// Import the real publicApiV1 — exercises the actual middleware order
+// (requireApiToken → API_TOKEN_POLICY → API_TOKEN_IP_POLICY → routes).
+// Structural note: the always-allow mock limiter means an inverted auth/rate-limit
+// order would still pass; that ordering guarantee lives in code review and the
+// real index.ts owning the mount, not in these tests.
+const { publicApiV1 } = await import("../index");
+
+// ── Test app ─────────────────────────────────────────────────────────────
 
 const app = new Hono()
   .use("*", sessionMiddleware)
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user" as never) }))
-  .use("/api/v1/*", requireApiToken(apiTokenDeps, { scopes: [] }))
-  .route("/api/v1/me", mePublicRoutes as never)
-  .route("/api/v1/organizations", orgsPublicRoutes as never);
+  .route("/api/v1", publicApiV1 as never);
 
 const validToken = validRaw;
 const profileOnlyToken = profileOnlyRaw;
@@ -159,6 +194,12 @@ describe("public API boundary", () => {
     const res = await app.request("/api/v1/organizations", {
       headers: { authorization: `Bearer ${profileOnlyToken}` },
     });
+    expect(res.status).toBe(403);
+  });
+
+  it("requireScope returns 403 (not 500) when tokenScopes is absent", async () => {
+    const isolated = new Hono().get("/", requireScope("read:profile"), (c) => c.json({ ok: true }));
+    const res = await isolated.request("/");
     expect(res.status).toBe(403);
   });
 });

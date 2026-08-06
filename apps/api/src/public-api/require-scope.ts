@@ -5,7 +5,8 @@ import type { ApiTokenVariables } from "../shared/middleware/api-token.middlewar
 
 export const requireScope = (scope: ApiScope) =>
   createMiddleware<{ Variables: ApiTokenVariables }>(async (c, next) => {
-    if (!(c.get("tokenScopes") as ApiScope[]).includes(scope)) {
+    const scopes: ApiScope[] = (c.get("tokenScopes") as ApiScope[] | undefined) ?? [];
+    if (!scopes.includes(scope)) {
       throw new HTTPException(403, { message: "Forbidden" });
     }
     await next();
