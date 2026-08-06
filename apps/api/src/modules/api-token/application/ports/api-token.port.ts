@@ -3,7 +3,7 @@ import type { ApiTokenRevokedReason } from "@packages/drizzle";
 import type { ITransaction } from "../../../../shared/transaction";
 
 export type ApiTokenError = {
-  code: "API_TOKEN_PROVIDER_FAILURE" | "API_TOKEN_NOT_FOUND";
+  code: "API_TOKEN_PROVIDER_FAILURE" | "API_TOKEN_NOT_FOUND" | "API_TOKEN_EXPIRY_TOO_LONG";
   message: string;
   metadata?: Record<string, unknown>;
 };
