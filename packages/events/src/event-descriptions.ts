@@ -73,6 +73,9 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "Un administrateur plateforme a déclenché une réinitialisation de mot de passe.",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:
     "Un administrateur plateforme a révoqué les sessions d'un compte.",
+  [EventTypes.API_TOKEN_CREATED]: "A personal access token was created.",
+  [EventTypes.API_TOKEN_REVOKED]: "A personal access token was revoked.",
+  [EventTypes.API_TOKEN_USED]: "A personal access token was used to authenticate a request.",
 };
 
 export function descriptionFor(eventType: string): string {

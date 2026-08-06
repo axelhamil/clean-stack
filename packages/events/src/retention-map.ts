@@ -65,6 +65,9 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.ADMIN_USER_ROLE_CHANGED]: "compliance",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: "compliance",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: "compliance",
+  [EventTypes.API_TOKEN_CREATED]: "compliance",
+  [EventTypes.API_TOKEN_REVOKED]: "compliance",
+  [EventTypes.API_TOKEN_USED]: "operational",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

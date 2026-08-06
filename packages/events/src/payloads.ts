@@ -421,6 +421,35 @@ export const AdminUserSessionsRevokedPayload = ActorRef.merge(UserRef).extend({
 });
 export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
 
+export const ApiTokenCreatedPayload = z.object({
+  userId: z.string(),
+  actorUserId: z.string(),
+  organizationId: z.string().nullable(),
+  tokenId: z.string(),
+  name: z.string(),
+  scopes: z.array(z.string()),
+  expiresAt: z.date().nullable(),
+});
+export type ApiTokenCreatedPayload = z.infer<typeof ApiTokenCreatedPayload>;
+
+export const ApiTokenRevokedPayload = z.object({
+  userId: z.string(),
+  actorUserId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  tokenId: z.string(),
+  reason: z.enum(["user", "membership_lost", "leaked"]),
+});
+export type ApiTokenRevokedPayload = z.infer<typeof ApiTokenRevokedPayload>;
+
+export const ApiTokenUsedPayload = z.object({
+  userId: z.string(),
+  actorUserId: z.string(),
+  organizationId: z.string().nullable(),
+  tokenId: z.string(),
+  scopes: z.array(z.string()),
+});
+export type ApiTokenUsedPayload = z.infer<typeof ApiTokenUsedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -484,4 +513,7 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
+  [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
+  [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
+  [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
 } as const;
