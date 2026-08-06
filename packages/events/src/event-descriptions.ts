@@ -62,17 +62,16 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
     "An email was abandoned after exhausting all delivery attempts.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
-    "Un administrateur plateforme a démarré une session d'impersonation.",
-  [EventTypes.ADMIN_IMPERSONATION_STOPPED]: "Une session d'impersonation a pris fin.",
-  [EventTypes.ADMIN_USER_BANNED]: "Un administrateur plateforme a suspendu un compte.",
-  [EventTypes.ADMIN_USER_UNBANNED]:
-    "Un administrateur plateforme a levé la suspension d'un compte.",
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]:
-    "Un administrateur plateforme a modifié le rôle d'un compte.",
+    "A platform administrator started an impersonation session.",
+  [EventTypes.ADMIN_IMPERSONATION_STOPPED]:
+    "A platform administrator ended an impersonation session.",
+  [EventTypes.ADMIN_USER_BANNED]: "A platform administrator banned a user account.",
+  [EventTypes.ADMIN_USER_UNBANNED]: "A platform administrator lifted the ban on a user account.",
+  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "A platform administrator changed a user's platform role.",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]:
-    "Un administrateur plateforme a déclenché une réinitialisation de mot de passe.",
+    "A platform administrator triggered a password reset for a user.",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:
-    "Un administrateur plateforme a révoqué les sessions d'un compte.",
+    "A platform administrator revoked all active sessions for a user.",
   [EventTypes.API_TOKEN_CREATED]: "A personal access token was created.",
   [EventTypes.API_TOKEN_REVOKED]: "A personal access token was revoked.",
   [EventTypes.API_TOKEN_USED]: "A personal access token was used to authenticate a request.",

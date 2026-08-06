@@ -9,4 +9,3 @@ export const createTokenBodySchema = z.object({
   organizationId: z.string().nullable().default(null),
   expiresInDays: z.number().int().positive().nullable().default(null),
 });
-export type CreateTokenInput = z.infer<typeof createTokenBodySchema>;

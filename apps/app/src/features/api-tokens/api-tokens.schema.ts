@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const API_SCOPES = ["read:profile", "write:profile", "read:organizations"] as const;
-export type ApiScope = (typeof API_SCOPES)[number];
 
 export const EXPIRY_OPTIONS = [
   { label: "30 days", value: 30 },

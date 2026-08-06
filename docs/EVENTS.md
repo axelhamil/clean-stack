@@ -255,9 +255,36 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 - **Claim window pattern** in delivery worker — claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
 - **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id` — captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context — Phase D.1 OTel.)
 
+## Visibility — public vs internal events
+
+`packages/events/src/visibility-map.ts` is the **single-source allowlist** that determines whether an event is a public contract or an internal signal. Every `EventType` is classified as `"public"` or `"internal"`.
+
+```ts
+// visibility-map.ts
+export const VISIBILITY = {
+  "api_token.created": "public",
+  "api_token.revoked": "public",
+  "api_token.used":    "internal", // sampled high-volume signal, not a customer contract
+  "webhook.endpoint.created": "internal", // operational plumbing, not customer-observable state
+  // ...
+} satisfies Record<EventType, Visibility>;
+```
+
+**Why the allowlist matters.** An event that is "public" is a **contract**: once a customer writes an integration against it, renaming the event type or dropping a payload field is a breaking change. Internal events can be renamed, reshaped, or removed at any time without notice. The classification forces a deliberate review in every PR that promotes an event to public — that's the point.
+
+Three surfaces consume the visibility map simultaneously:
+
+| Consumer | Where | Effect |
+|---|---|---|
+| `WebhookFanoutSubscriber` | `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Only public events are fanned out to customer webhook endpoints. Internal events skip fanout entirely. |
+| `EventTypePicker` + `webhookFormSchema` | `apps/app/src/features/webhooks/forms/event-type-picker.tsx` + `webhooks.schema.ts` | The subscription picker shows only `SUBSCRIBABLE_EVENT_TYPES` (public events). The Zod schema rejects any internal event type as a selector. |
+| `/developers/events` catalog | `apps/app/src/features/developers/components/event-types-table.tsx` | Only public events are listed in the public-facing event catalog page. |
+
+Changing a public event type string or removing a payload field requires a changelog entry and a deprecation window. Promoting a new event to public is permanent — plan for it in the PR review.
+
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **62 events** (57 subscribable + 5 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`, `email.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
+The boilerplate emits **65 events** (28 public + 37 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -387,7 +414,8 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (62 events: 57 subscribable + 5 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (65 events: 28 public + 37 internal) |
+| `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |

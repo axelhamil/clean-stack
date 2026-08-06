@@ -127,6 +127,3 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
     return c.json(results);
   });
 }
-
-// Convenience export for type inference used in `client.ts`.
-export type ApiTokenScanningRoutes = ReturnType<typeof createApiTokenScanningRoutes>;

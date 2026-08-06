@@ -15,10 +15,10 @@ function derToRaw(der: Uint8Array): Uint8Array<ArrayBuffer> {
   let offset = 2;
   if (der[1] === 0x81) offset = 3;
 
-  const rLen = der[offset + 1]!;
+  const rLen = der[offset + 1] ?? 0;
   const rBytes = der.subarray(offset + 2, offset + 2 + rLen);
   const sOffset = offset + 2 + rLen;
-  const sLen = der[sOffset + 1]!;
+  const sLen = der[sOffset + 1] ?? 0;
   const sBytes = der.subarray(sOffset + 2, sOffset + 2 + sLen);
 
   // Strip any leading 0x00 sign-byte, then left-pad to 32 bytes.
@@ -85,7 +85,8 @@ export class GithubKeyVerifier {
   }
 
   private async resolveKey(keyIdentifier: string): Promise<CryptoKey | null> {
-    if (this.keys.has(keyIdentifier)) return this.keys.get(keyIdentifier)!;
+    const cached = this.keys.get(keyIdentifier);
+    if (cached) return cached;
     await this.refreshKeys();
     return this.keys.get(keyIdentifier) ?? null;
   }
