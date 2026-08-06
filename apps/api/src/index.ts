@@ -20,6 +20,7 @@ import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
+import { publicApiV1 } from "./public-api";
 import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
@@ -95,7 +96,8 @@ app.use(
 
 app.use("*", sessionMiddleware);
 
-app.use("*", requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY));
+const globalRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY);
+app.use("*", (c, next) => (c.req.path.startsWith("/api/v1/") ? next() : globalRateLimit(c, next)));
 const csrf = requireCsrf({
   outbox: di.IOutboxRepository,
   allowedOrigins: env.CORS_ORIGIN ?? ["http://localhost:5173"],
@@ -191,6 +193,8 @@ app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
+
+app.route("/api/v1", publicApiV1);
 
 const routes = app
   .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
