@@ -78,6 +78,7 @@ describe("DrizzleApiTokenRepository", () => {
     const floor = new Date(Date.now() - 15 * 60_000);
     await repo.touchLastUsed(row.id, floor);
     const first = (await repo.findByHmac(row.tokenHmac)).getValue().unwrap().lastUsedAt;
+    expect(first).not.toBeNull();
 
     await repo.touchLastUsed(row.id, floor);
     const second = (await repo.findByHmac(row.tokenHmac)).getValue().unwrap().lastUsedAt;
