@@ -28,6 +28,8 @@ export type { AuditActorType, AuditRetention } from "./schema/audit-log";
 import * as authSchema from "./schema/auth";
 import * as multiTenantSchema from "./schema/multi-tenant";
 
+export type { ApiTokenRevokedReason } from "./schema/api-token";
+export * as apiTokenSchema from "./schema/api-token";
 export * as auditLogSchema from "./schema/audit-log";
 export * as authSchema from "./schema/auth";
 export * as consentSchema from "./schema/consent";

@@ -27,6 +27,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Can } from "../../shared/auth/can";
 import { useAuthorization } from "../../shared/auth/use-authorization";
+import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
 import {
   createEndpointMutationOptions,
   deleteEndpointMutationOptions,
@@ -42,7 +43,6 @@ import {
 } from "./api/webhooks.queries";
 import { DeliverySheet } from "./components/delivery-sheet";
 import { EndpointRow } from "./components/endpoint-row";
-import { SecretRevealDialog } from "./components/secret-reveal-dialog";
 import { VerifySnippet } from "./components/verify-snippet";
 import { WebhookForm } from "./forms/webhook-form";
 import type { DeliveryFilters } from "./webhook-delivery-filters";

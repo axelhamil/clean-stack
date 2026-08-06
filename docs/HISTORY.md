@@ -8,6 +8,39 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 
 ---
 
+## API tokens / Personal Access Tokens ✅ Phase C.4 · Aug 2026
+
+**Why**: any B2B SaaS needs a machine-to-machine auth primitive that can't be session-stolen. Session cookies work for browsers; PATs work for CI, CLI, and customer integrations. Without them, customers resort to screen-scraping or long-lived session abuse — both unauditable. PATs also unblock C.4's opt-in public API surface, which is the prerequisite for D.2 (OpenAPI docs) and F.1 (Capacitor bearer).
+
+**Why hand-rolled over `@better-auth/api-key`**: the plugin covers table + SHA-256 + expiry + CRUD but has no lifecycle hooks — rule §6 requires the event to commit in the same TX as the write. Wrapping every endpoint to add event emission would leave only a table with 8 dead columns. `ScopedRepository<ApiToken, RepoScope>` + `emitEvent` in-TX cost fewer LOC than the wrapper, and gives native §8 instrumentation. Scopes format and column names borrowed from the plugin.
+
+**What this phase delivered**:
+
+- **Token format** — `clean_` prefix (configurable via `API_TOKEN_PREFIX`) + 32 bytes CSPRNG as 44-char base58 + 6-char CRC32 checksum. The prefix makes tokens greppable in logs; the checksum rejects typos/truncations before the DB hit and sharpens the GitHub secret-scanner regex.
+- **Storage** — `HMAC-SHA256(pepper, token)` in a unique-indexed `token_hmac` column. No per-row salt — a 256-bit HMAC key makes rainbow tables inconceivable, and per-row salt destroys the O(1) lookup. The pepper (`API_TOKEN_PEPPER`) is the SOC2 argument: a DB dump alone yields no usable token. `pepper_version` column enables zero-downtime rotation via `API_TOKEN_PEPPER_PREVIOUS`.
+- **Schema** — `api_token(id, userId, organizationId, name, tokenHmac, pepperVersion, tokenStart, scopes, lastUsedAt, expiresAt, createdAt, revokedAt, revokedReason)`. `userId` = creator + owner. `ScopedRepository<ApiToken, RepoScope>` — wrong-owner returns `Option.none()` / `NOT_FOUND`, never 403.
+- **Scopes** — typed const `API_SCOPES = ["read:profile", "write:profile", "read:organizations"]`. Per-token subset. No global `*`. No `admin` scope — platform-admin surface is token-unreachable by construction (token management lives outside `/api/v1`; a token cannot mint a token).
+- **`requireApiToken` middleware** — accepts `Authorization: Bearer clean_<…>`, verifies checksum, HMACs both peppers, sets `c.var.user` + `c.var.tokenScopes`. `lastUsedAt` updated via time-bucket write (`WHERE last_used_at < now() - interval '15 min'`) to avoid hot-row contention.
+- **`/api/v1` sub-app** — mounted in `index.ts` outside the `const routes = ...` chain, deliberately outside `AppType`. Token-auth only; no `sessionMiddleware`. Dual rate-limit: per-token (detect compromised-key abuse) + per-IP (detect distributed rotation). See `apps/api/CLAUDE.md` for the AppType exception note.
+- **`/settings/tokens` CRUD** — create (name + scope picker + optional expiry, token shown once in `<SecretRevealDialog>`), list (last-used timestamps), revoke. `denyImpersonated` on create + revoke — the admin blocklist grows from 11 to 13 routes.
+- **Cascade revocation** — `onEvent(ORG_MEMBER_REMOVED)` handler revokes all org-scoped tokens for the departed member in a single pass. Emits one `api_token.revoked` per token.
+- **`POST /api/token-scanning/github`** — ECDSA P-256 signature verification (`GITHUB-PUBLIC-KEY-SIGNATURE` + `GITHUB-PUBLIC-KEY-IDENTIFIER` against `api.github.com/meta/public_keys/secret_scanning`). Matching tokens are revoked + owner notified by email.
+- **Event catalog 62 → 65** — three new events: `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal — sampled, high-volume). `visibility-map.ts` introduced as the explicit public/internal allowlist (28 public, 37 internal). Publishing an event is now a deliberate PR-reviewed decision, not the default.
+
+**Structural decisions**:
+
+1. **`/api/v1` outside `AppType`** — chaining it into `routes` would impose `AuthVariables` on routes that carry `ApiTokenVariables`, and expose every public-API route to `hcWithType` which the internal RPC client never needs. The boundary is structural, not config — a route under `/api/v1` is unreachable by session auth.
+2. **`api_token.used` is internal** — sampled at ~1 event per 15-min bucket per token. Making it public would create a contract on a high-volume, lossy signal: customers could never build a reliable audit trail from it anyway, and subscribing would flood their endpoints. `audit_log` is the reliable trail.
+3. **All `webhook.*` events reclassified to internal during C.5 curation** — `webhook.endpoint.created/updated/deleted` are operational plumbing, not customer-observable state. This means the subscription picker and `/developers/events` show no "webhook" group. Test `webhooks-schema.test.ts` documents this decision assertively.
+4. **`visibility-map.ts` as the gate, not a naming convention** — a `webhook.` prefix doesn't make an event internal; only an explicit `"internal"` entry in the map does. New events default to nothing — they must be added to the map (TypeScript `satisfies Record<EventType, Visibility>` enforces this).
+
+**Out of scope** (explicit):
+- OAuth app flow (next natural step after PATs, requires a separate spec).
+- `read:uploads` scope — the uploads module has no listing route and storage is opt-in; the scope would guard a route that can't exist without out-of-scope work.
+- GitHub Secret Scanning Partner Program registration — requires a public service; each clone registers independently. The boilerplate ships the verifier + endpoint + prefix convention so registration is a 30-minute job.
+
+---
+
 ## Option / Result convention back-fill ✅ Aug 2026
 
 **Why**: an audit of ports, services and the HTTP boundary found `Result` respected everywhere and `Option` respected only in recently-written code. The convention had been applied going forward and never back-applied, so `modules/webhooks` — the module the codebase treats as the reference — was inconsistent with itself: `WebhookDeliveryRecord` used `Option<T>` directly above two record types using raw `| null`.

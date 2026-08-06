@@ -14,6 +14,10 @@ apps/api/src/
     env.ts, logger.ts           Process-level singletons
     transaction.ts              `type ITransaction = Transaction` — single swap-point exception
   modules/<context>/            See src/modules/CLAUDE.md for layered rules
+  public-api/                   External API surface (`/api/v1/*`) — token-authenticated, no session middleware. See AppType exception below.
+    v1/                         Route files exposed to PAT consumers (opt-in only — each route file is explicit)
+    index.ts                    `createPublicApiV1(deps)` factory — mounts `requireApiToken` + dual rate-limit
+    require-scope.ts            `requireScope(scope)` guard used inside `/api/v1/*` route files
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   auth.ts                       BetterAuth singleton — deliberate exception to modules/ rule (config-as-code, lib owns model). Routes auto-mount via plugin (`/api/auth/*`).
   auth-queries.ts               Typed Drizzle data-access for the bridge — plain functions (no port/DI/aggregate; auth is not domain), `tx?`-aware. Keeps `auth.ts` config + event-wiring only, never inline `db.*`.
@@ -53,6 +57,8 @@ export const xModule = defineModule()((b) =>
 ## Hono RPC (end-to-end type safety)
 
 API exports `AppType`; app consumes via `hono/client`. Routes **must be chained** — `app.use`/`app.onError` don't accumulate types. Don't reintroduce `registerXxx(c, app)` — loses chained `.route()` and breaks `AppType`.
+
+**Exception — `/api/v1` is deliberately outside `AppType`.** `createPublicApiV1(deps)` is mounted with `app.route("/api/v1", ...)` before the `const routes = app.get(...).route(...)` chain. It is **not** chained into `routes` and therefore not part of `AppType`. This is intentional: `/api/v1` serves external PAT consumers, not the typed RPC client. Adding it to the chain would expose every public-API route to `hcWithType`, which the internal client does not need, and would impose `AppType`'s session-based `Variables` shape on routes that carry `ApiTokenVariables`. If you see a new route file under `public-api/` that isn't in `AppType`, this is correct — do not chain it.
 
 `apps/api/package.json` subpath exports: `.` → `AppType`+runtime; `./client` → `hcWithType`.
 

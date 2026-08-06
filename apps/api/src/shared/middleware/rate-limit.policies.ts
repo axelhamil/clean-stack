@@ -122,6 +122,38 @@ export const CONSENT_POST_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
+// API token access — two separate policies mounted in sequence.
+// One policy per axis prevents an attacker with N tokens from bypassing the IP
+// ceiling by rotating tokens (a composite key would merge both counters).
+// failClosed=true: authenticated surface; a store outage must not disable the guard.
+export const API_TOKEN_POLICY: PolicyConfig = {
+  name: "api-token",
+  keyFn: (c) => `tok:${c.get("apiTokenId") as string}`,
+  windows: [{ policyName: "api-token", windowSec: 60, maxRequests: 600 }],
+  failClosed: true,
+  advertiseBudget: true,
+};
+
+export const API_TOKEN_IP_POLICY: PolicyConfig = {
+  name: "api-token-ip",
+  keyFn: (c) => `tokip:${resolveClientIp(c)}`,
+  windows: [{ policyName: "api-token-ip", windowSec: 60, maxRequests: 1200 }],
+  failClosed: true,
+};
+
+// GitHub Secret Scanning webhook — machine-to-machine, low frequency, public.
+// fail-open: a store outage must not block revocation notifications.
+export const GITHUB_SCANNING_POLICY: PolicyConfig = {
+  name: "github-scanning",
+  keyFn: ipKeyFn("github-scanning"),
+  windows: [
+    { policyName: "github-scanning", windowSec: 60, maxRequests: 10 },
+    { policyName: "github-scanning", windowSec: 3600, maxRequests: 100 },
+  ],
+  emitSecurityEvent: false,
+  advertiseBudget: false,
+};
+
 // Browser-sent CSP violation reports — no user identity, keyed by IP.
 // emitSecurityEvent=false: the violation itself is the signal (emitted unconditionally per report).
 // advertiseBudget=false: no RateLimit headers exposed to browsers.

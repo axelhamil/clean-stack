@@ -25,6 +25,11 @@ const STUB_VARS = {
     reason: "ticket #42",
     supportUrl: "https://example.com/support",
   },
+  api_token_leaked: {
+    name: "Ada",
+    tokenName: "CI token",
+    revokedAt: "6 août 2026 à 10:00",
+  },
 } as const satisfies Record<EmailTemplateKey, unknown>;
 
 describe("renderTemplate", () => {

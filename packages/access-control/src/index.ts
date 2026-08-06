@@ -13,6 +13,7 @@ const statement = {
   billing: ["read", "manage"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
+  apiToken: ["create", "read", "revoke"],
 } as const;
 
 const _ac = createAccessControl(statement);
@@ -23,6 +24,7 @@ const _owner = _ac.newRole({
   billing: ["read", "manage"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
+  apiToken: ["create", "read", "revoke"],
 });
 
 const _admin = _ac.newRole({
@@ -31,6 +33,7 @@ const _admin = _ac.newRole({
   billing: ["read"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
+  apiToken: ["create", "read", "revoke"],
 });
 
 const _member = _ac.newRole({

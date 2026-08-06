@@ -13,9 +13,16 @@ import { toast } from "sonner";
 interface SecretRevealDialogProps {
   secret: string | null;
   onClose: () => void;
+  title?: string;
+  description?: string;
 }
 
-export function SecretRevealDialog({ secret, onClose }: SecretRevealDialogProps) {
+export function SecretRevealDialog({
+  secret,
+  onClose,
+  title = "Signing secret",
+  description = "Copy this now — it is shown only once and cannot be retrieved later.",
+}: SecretRevealDialogProps) {
   const copy = () => {
     if (!secret) return;
     void navigator.clipboard.writeText(secret);
@@ -25,10 +32,8 @@ export function SecretRevealDialog({ secret, onClose }: SecretRevealDialogProps)
     <Dialog open={secret !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Signing secret</DialogTitle>
-          <DialogDescription>
-            Copy this now — it is shown only once and cannot be retrieved later.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2 rounded-md border bg-muted p-3 font-mono text-sm break-all">
           <span className="flex-1">{secret}</span>

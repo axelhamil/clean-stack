@@ -10,7 +10,11 @@ type AuthVariables = {
 export const sessionMiddleware = createMiddleware<{
   Variables: AuthVariables;
 }>(async (c, next) => {
-  if (c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/internal/")) {
+  if (
+    c.req.path.startsWith("/api/auth/") ||
+    c.req.path.startsWith("/internal/") ||
+    c.req.path.startsWith("/api/v1/")
+  ) {
     c.set("user", null);
     c.set("session", null);
     return next();

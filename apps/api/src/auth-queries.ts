@@ -147,3 +147,31 @@ export async function countActiveMembers(organizationId: string): Promise<number
     .where(eq(schema.member.organizationId, organizationId));
   return row?.count ?? 0;
 }
+
+// ── #8 – api-token middleware ──────────────────────────────────────────────
+
+export async function findUserById(id: string) {
+  const [row] = await db.select().from(schema.user).where(eq(schema.user.id, id)).limit(1);
+  return row;
+}
+
+// ── #9 – public API v1 ────────────────────────────────────────────────────
+
+export async function updateUserName(userId: string, name: string): Promise<void> {
+  await db.update(schema.user).set({ name }).where(eq(schema.user.id, userId));
+}
+
+export async function findUserOrganizations(
+  userId: string,
+): Promise<{ id: string; name: string; slug: string; role: string }[]> {
+  return db
+    .select({
+      id: schema.organization.id,
+      name: schema.organization.name,
+      slug: schema.organization.slug,
+      role: schema.member.role,
+    })
+    .from(schema.member)
+    .innerJoin(schema.organization, eq(schema.member.organizationId, schema.organization.id))
+    .where(eq(schema.member.userId, userId));
+}

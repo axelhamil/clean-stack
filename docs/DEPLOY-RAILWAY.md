@@ -100,6 +100,7 @@ Set these **once at project level**, then reference from each service:
 | `BETTER_AUTH_SECRET`    | `openssl rand -base64 32`             | api             |
 | `INTERNAL_SIGNING_KEY`  | `openssl rand -hex 32` (min 32 chars) | api + cron      |
 | `WEBHOOK_MASTER_KEY`    | `openssl rand -hex 32` (64 hex chars) | api             |
+| `API_TOKEN_PEPPER`      | `openssl rand -hex 32` (min 32 chars) | api             |
 | `RESEND_API_KEY`        | Resend dashboard (live key)           | api             |
 | `RESEND_FROM`           | `onboarding@<your-verified-domain>`   | api             |
 | `S3_ENDPOINT`           | `https://<account>.r2.cloudflarestorage.com` | api      |
@@ -131,6 +132,10 @@ RESEND_FROM=${{shared.RESEND_FROM}}
 INTERNAL_SIGNING_KEY=${{shared.INTERNAL_SIGNING_KEY}}
 INTERNAL_AUTH_LAYERS=signature                # add ",private-network" if Railway private mesh is on
 WEBHOOK_MASTER_KEY=${{shared.WEBHOOK_MASTER_KEY}}
+API_TOKEN_PEPPER=${{shared.API_TOKEN_PEPPER}}    # required — HMAC key for token storage
+API_TOKEN_PEPPER_PREVIOUS=                       # set during pepper rotation (see below)
+API_TOKEN_PEPPER_VERSION=1                       # increment when rotating
+API_TOKEN_PREFIX=clean_                          # prefix every clone should change
 S3_ENDPOINT=${{shared.S3_ENDPOINT}}
 S3_REGION=${{shared.S3_REGION}}
 S3_BUCKET=${{shared.S3_BUCKET}}
@@ -145,6 +150,16 @@ BUILD_TIME=${{RAILWAY_GIT_COMMIT_MESSAGE}}    # Railway has no build-timestamp r
 ```
 
 > Both `GIT_SHA`/`BUILD_TIME` only resolve on a **branch deploy** (GitHub push / redeploy). A `railway up` from your machine leaves them empty → build-info shows `unknown`. That's expected, not a bug.
+
+### API token pepper rotation
+
+The pepper is the HMAC key for token storage — a compromised pepper means a DB dump can brute-force tokens offline. Rotate it annually or on suspected exposure:
+
+1. Generate a new pepper: `openssl rand -hex 32`
+2. Set `API_TOKEN_PEPPER` = new value, `API_TOKEN_PEPPER_PREVIOUS` = old value, `API_TOKEN_PEPPER_VERSION` = `<n+1>`. Redeploy.
+3. Traffic will now accept tokens verified against both peppers (`PREVIOUS` as fallback). New tokens are stored with the new pepper; existing rows migrate lazily on next use (the middleware re-HMACs on successful `PREVIOUS` verify).
+4. When all rows have migrated: `SELECT pepper_version, count(*) FROM api_token WHERE revoked_at IS NULL GROUP BY 1`. Once no rows show the old version, clear `API_TOKEN_PEPPER_PREVIOUS`. Redeploy.
+5. Clients never see the pepper — rotation is zero-downtime and transparent to PAT holders.
 
 **`app`** service:
 

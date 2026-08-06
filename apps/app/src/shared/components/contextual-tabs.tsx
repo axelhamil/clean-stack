@@ -29,6 +29,7 @@ const SETTINGS_TABS: readonly TabItem[] = [
   },
   { to: "/settings/account", label: "Account" },
   { to: "/settings/privacy", label: "Privacy" },
+  { to: "/settings/api-tokens", label: "API tokens" },
 ];
 
 interface ContextualTabsProps {
