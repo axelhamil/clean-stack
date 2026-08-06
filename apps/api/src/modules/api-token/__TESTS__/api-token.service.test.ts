@@ -52,7 +52,8 @@ describe("ApiTokenService", () => {
   });
 
   it("refuses an expiry beyond the configured maximum", async () => {
-    const result = await makeService().create({
+    const repo = makeRepo();
+    const result = await makeService(repo).create({
       userId: "u1",
       actorUserId: "u1",
       name: "ci",
@@ -61,6 +62,8 @@ describe("ApiTokenService", () => {
       expiresInDays: 400,
     });
     expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("API_TOKEN_EXPIRY_TOO_LONG");
+    expect(repo.insert).not.toHaveBeenCalled();
   });
 
   it("revokes nothing when the token belongs to someone else", async () => {
