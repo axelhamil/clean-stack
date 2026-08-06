@@ -30,6 +30,7 @@ function makeService(repo = makeRepo()) {
     prefix: "clean_",
     pepper: "a".repeat(32),
     maxExpiryDays: 365,
+    pepperVersion: 1,
   });
 }
 

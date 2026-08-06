@@ -8,6 +8,7 @@ const PREFIX = "clean_";
 const PEPPER = "a".repeat(32);
 const PREV_PEPPER = "b".repeat(32);
 const BUCKET_MIN = 15;
+const PEPPER_VERSION = 1;
 
 const findUserByIdSpy = mock(async (_id: string) => ({
   id: "u1",
@@ -82,6 +83,7 @@ function makeDeps(repoOverride?: ReturnType<typeof makeRepo>["repo"]) {
     outbox: outbox as never,
     prefix: PREFIX,
     pepper: PEPPER,
+    pepperVersion: PEPPER_VERSION,
     bucketMin: BUCKET_MIN,
     platformAdminIds: [] as string[],
   };
@@ -171,11 +173,39 @@ describe("requireApiToken", () => {
     expect(res.status).toBe(403);
   });
 
-  it("accepts a token hashed under the previous pepper and triggers rehash", async () => {
+  it("accepts a token hashed under the previous pepper and rehashes to the configured version", async () => {
     const { raw } = generateToken(PREFIX);
     const currentHmac = hmacToken(raw, PEPPER);
     const prevHmac = hmacToken(raw, PREV_PEPPER);
+    // Stored pepperVersion is 1 (old); current configured version is 3.
+    // Rehash must use deps.pepperVersion (3), not record.pepperVersion + 1 (2).
     const record = makeRecord({ tokenHmac: prevHmac, pepperVersion: 1 });
+
+    const { repo } = makeRepo(async (hmac) => {
+      if (hmac === prevHmac) return Result.ok(Option.some(record));
+      return Result.ok(Option.none<ApiTokenRecord>());
+    });
+
+    const deps = {
+      ...makeDeps(repo),
+      pepperVersion: 3,
+      pepperPrevious: PREV_PEPPER,
+    };
+    const app = new Hono()
+      .use(requireApiToken(deps, { scopes: [] }))
+      .get("/x", (c) => c.text("ok"));
+
+    const res = await app.request("/x", {
+      headers: { authorization: `Bearer ${raw}` },
+    });
+    expect(res.status).toBe(200);
+    expect(repo.rehash).toHaveBeenCalledWith(record.id, currentHmac, 3);
+  });
+
+  it("does not rehash a revoked token found via the previous pepper", async () => {
+    const { raw } = generateToken(PREFIX);
+    const prevHmac = hmacToken(raw, PREV_PEPPER);
+    const record = makeRecord({ tokenHmac: prevHmac, pepperVersion: 1, revokedAt: new Date() });
 
     const { repo } = makeRepo(async (hmac) => {
       if (hmac === prevHmac) return Result.ok(Option.some(record));
@@ -193,7 +223,7 @@ describe("requireApiToken", () => {
     const res = await app.request("/x", {
       headers: { authorization: `Bearer ${raw}` },
     });
-    expect(res.status).toBe(200);
-    expect(repo.rehash).toHaveBeenCalledWith(record.id, currentHmac, 2);
+    expect(res.status).toBe(401);
+    expect(repo.rehash).not.toHaveBeenCalled();
   });
 });

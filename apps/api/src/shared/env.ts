@@ -114,6 +114,7 @@ const envSchema = z.object({
     .default("clean_"),
   API_TOKEN_MAX_EXPIRY_DAYS: z.coerce.number().int().positive().default(365),
   API_TOKEN_LAST_USED_BUCKET_MIN: z.coerce.number().int().positive().default(15),
+  API_TOKEN_PEPPER_VERSION: z.coerce.number().int().positive().default(1),
 });
 
 const rawEnv = Object.fromEntries(

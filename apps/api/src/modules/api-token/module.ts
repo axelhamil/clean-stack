@@ -26,6 +26,7 @@ export const apiTokenModule = defineModule()((b) =>
             prefix: env.API_TOKEN_PREFIX,
             pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
             maxExpiryDays: env.API_TOKEN_MAX_EXPIRY_DAYS,
+            pepperVersion: env.API_TOKEN_PEPPER_VERSION,
           },
         ),
     ),

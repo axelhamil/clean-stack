@@ -25,6 +25,7 @@ type ApiTokenServiceConfig = {
   prefix: string;
   pepper: string;
   maxExpiryDays: number;
+  pepperVersion: number;
 };
 
 export class ApiTokenService {
@@ -60,7 +61,7 @@ export class ApiTokenService {
         name: input.name,
         scopes: input.scopes,
         tokenHmac: hmacToken(raw, this.config.pepper),
-        pepperVersion: 1,
+        pepperVersion: this.config.pepperVersion,
         tokenStart: start,
         lastUsedAt: null,
         expiresAt,

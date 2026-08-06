@@ -22,6 +22,7 @@ export interface ApiTokenDeps {
   outbox: IOutboxRepository;
   prefix: string;
   pepper: string;
+  pepperVersion: number;
   pepperPrevious?: string;
   bucketMin: number;
   platformAdminIds: string[];
@@ -54,8 +55,9 @@ export function requireApiToken(
 
     let record = currentLookup.getValue().isSome() ? currentLookup.getValue().unwrap() : null;
 
-    // Transparent pepper rotation: if the current pepper yields no match and a
-    // previous pepper is configured, try it once and rehash on hit.
+    // Track whether the token was found via the previous pepper so we can rehash
+    // AFTER validity checks — never write to the DB for a revoked or expired token.
+    let needsRehash = false;
     if (!record && deps.pepperPrevious) {
       const previousHmac = hmacToken(raw, deps.pepperPrevious);
       const previousLookup = await deps.repo.findByHmac(previousHmac);
@@ -64,7 +66,7 @@ export function requireApiToken(
       }
       if (previousLookup.getValue().isSome()) {
         record = previousLookup.getValue().unwrap();
-        await deps.repo.rehash(record.id, currentHmac, record.pepperVersion + 1);
+        needsRehash = true;
       }
     }
 
@@ -78,6 +80,12 @@ export function requireApiToken(
     }
     if (record.expiresAt !== null && record.expiresAt < now) {
       throw new HTTPException(401, { message: "Unauthorized" });
+    }
+
+    // Rehash only after the token is confirmed valid — avoids writing to the DB
+    // for revoked or expired tokens that happened to use the previous pepper.
+    if (needsRehash) {
+      await deps.repo.rehash(record.id, currentHmac, deps.pepperVersion);
     }
 
     const recordScopes = record.scopes as ApiScope[];
