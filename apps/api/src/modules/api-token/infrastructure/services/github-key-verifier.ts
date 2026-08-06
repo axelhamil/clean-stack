@@ -60,18 +60,15 @@ export class GithubKeyVerifier {
 
   async verify(keyIdentifier: string, signatureB64: string, body: string): Promise<boolean> {
     return this.instrumentation.startSpan({ name: "GithubKeyVerifier > verify" }, async () => {
-      const key = await this.resolveKey(keyIdentifier);
-      if (!key) return false;
-
       try {
+        const key = await this.resolveKey(keyIdentifier);
+        if (!key) return false;
+
         const sigBuf = Buffer.from(signatureB64, "base64");
         const der = new Uint8Array(sigBuf.buffer, sigBuf.byteOffset, sigBuf.byteLength);
         const raw = derToRaw(der);
         return await this.instrumentation.startSpan(
-          {
-            name: "crypto.subtle.verify ECDSA P-256",
-            op: "http.client",
-          },
+          { name: "crypto.subtle.verify ECDSA P-256" },
           () =>
             crypto.subtle.verify(
               { name: "ECDSA", hash: "SHA-256" },

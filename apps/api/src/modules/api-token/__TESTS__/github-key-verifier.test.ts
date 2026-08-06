@@ -114,6 +114,19 @@ describe("GithubKeyVerifier", () => {
     expect(result).toBe(false);
   });
 
+  it("returns false (not throws) when the GitHub key endpoint is unreachable", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () => {
+      throw new Error("network failure");
+    }) as unknown as typeof fetch;
+    const verifier = new GithubKeyVerifier(new NoOpInstrumentation());
+
+    const result = await verifier.verify("key-1", "any-sig", "any-body");
+
+    globalThis.fetch = originalFetch;
+    expect(result).toBe(false);
+  });
+
   it("caches keys and does not re-fetch on subsequent verifications", async () => {
     const pair = await generateKeyPair();
     const pem = await exportPublicKeyAsPem(pair.publicKey);
