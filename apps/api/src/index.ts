@@ -32,11 +32,7 @@ import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-m
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
-import {
-  type AuthVariables,
-  requireAuth,
-  sessionMiddleware,
-} from "./shared/middleware/auth.middleware";
+import { type AuthVariables, sessionMiddleware } from "./shared/middleware/auth.middleware";
 import { requireCsrf } from "./shared/middleware/csrf.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
 import { httpLogger } from "./shared/middleware/logger.middleware";
@@ -236,7 +232,6 @@ app.route(
 );
 
 const routes = app
-  .get("/me", requireAuth, (c) => c.json({ user: c.get("user") }))
   .route("/me", rgpdMeRoutes)
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
