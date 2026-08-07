@@ -16,6 +16,7 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
+    "@packages/access-control": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
