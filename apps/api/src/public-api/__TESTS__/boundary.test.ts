@@ -32,6 +32,10 @@ const testUser = {
   banExpires: null,
   twoFactorEnabled: null,
   pendingEmail: null,
+  stripeCustomerId: "cus_123",
+  pendingDeletionUntil: null,
+  deletedAt: null,
+  lastExportRequestedAt: null,
 };
 
 mock.module("../../auth-queries", () => ({
@@ -184,5 +188,47 @@ describe("public API boundary", () => {
     const isolated = new Hono().get("/", requireScope("read:profile"), (c) => c.json({ ok: true }));
     const res = await isolated.request("/");
     expect(res.status).toBe(403);
+  });
+});
+
+describe("public API response shape", () => {
+  it("GET /me exposes only the public profile fields", async () => {
+    const res = await app.request("/api/v1/me", {
+      headers: { authorization: `Bearer ${validToken}` },
+    });
+    const body = (await res.json()) as { user: Record<string, unknown> };
+
+    expect(Object.keys(body.user).sort()).toEqual([
+      "createdAt",
+      "email",
+      "emailVerified",
+      "id",
+      "image",
+      "name",
+      "updatedAt",
+    ]);
+  });
+
+  it("GET /me leaks no moderation, billing or lifecycle field", async () => {
+    const res = await app.request("/api/v1/me", {
+      headers: { authorization: `Bearer ${validToken}` },
+    });
+    const body = (await res.json()) as { user: Record<string, unknown> };
+
+    for (const leaked of [
+      "role",
+      "banned",
+      "banReason",
+      "banExpires",
+      "twoFactorEnabled",
+      "pendingEmail",
+      "stripeCustomerId",
+      "pendingDeletionUntil",
+      "deletedAt",
+      "lastExportRequestedAt",
+      "isPlatformAdmin",
+    ]) {
+      expect(body.user).not.toHaveProperty(leaked);
+    }
   });
 });
