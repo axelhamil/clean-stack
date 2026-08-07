@@ -23,7 +23,12 @@ export function resolveAudience(audience: Audience, event: OutboxRecord): Audien
   }
 
   if (audience === "actor") {
-    const userId = readUserId(event.payload, ["actorUserId", "inviterUserId", "userId"]);
+    const userId = readUserId(event.payload, [
+      "actorUserId",
+      "inviterUserId",
+      "ownerUserId",
+      "userId",
+    ]);
     return userId ? { kind: "user", userId } : null;
   }
 

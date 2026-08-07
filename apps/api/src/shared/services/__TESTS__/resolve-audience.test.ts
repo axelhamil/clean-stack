@@ -26,6 +26,18 @@ describe("resolveAudience", () => {
     expect(target).toEqual({ kind: "user", userId: "acteur" });
   });
 
+  test("actor respecte la priorite complete de extractActor", () => {
+    expect(
+      resolveAudience("actor", baseEvent({ userId: "sujet", ownerUserId: "proprio" })),
+    ).toEqual({ kind: "user", userId: "proprio" });
+    expect(
+      resolveAudience(
+        "actor",
+        baseEvent({ userId: "sujet", ownerUserId: "proprio", inviterUserId: "invitant" }),
+      ),
+    ).toEqual({ kind: "user", userId: "invitant" });
+  });
+
   test("org:all cible toute l'org", () => {
     const target = resolveAudience("org:all", baseEvent({}, "org-1"));
     expect(target).toEqual({ kind: "org", organizationId: "org-1", roles: "all" });
