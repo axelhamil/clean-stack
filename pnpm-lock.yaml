@@ -383,6 +383,9 @@ importers:
 
   packages/events:
     dependencies:
+      '@packages/access-control':
+        specifier: workspace:*
+        version: link:../access-control
       zod:
         specifier: ^4.4.3
         version: 4.4.3
