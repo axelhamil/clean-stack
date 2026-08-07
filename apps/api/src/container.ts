@@ -32,6 +32,7 @@ import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
+import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
 import {
   RateLimiterFlexibleAdapter,
@@ -54,6 +55,7 @@ declare module "inwire" {
     IRateLimiter: IRateLimiter;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
+    NotificationFanoutSubscriber: NotificationFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
     BackupCodeUsedNotifier: EventHandler;
     EmailDeliveryWorker: EmailDeliveryWorker;
@@ -105,13 +107,14 @@ export const di = container()
   )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
+  .add("NotificationFanoutSubscriber", (c) => new NotificationFanoutSubscriber(c.IInstrumentation))
   .add("BackupCodeUsedNotifier", (c) => backupCodeUsedNotifier({ IEmailService: c.IEmailService }))
   .add(
     "OutboxDispatcher",
     (c) =>
       new OutboxDispatcher(
         c.IOutboxRepository,
-        [c.AuditEventSubscriber, c.WebhookFanoutSubscriber],
+        [c.AuditEventSubscriber, c.WebhookFanoutSubscriber, c.NotificationFanoutSubscriber],
         logger,
         env.DATABASE_URL,
         c.IInstrumentation,
