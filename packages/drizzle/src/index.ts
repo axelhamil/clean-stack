@@ -34,6 +34,7 @@ export * as auditLogSchema from "./schema/audit-log";
 export * as authSchema from "./schema/auth";
 export * as consentSchema from "./schema/consent";
 export * as multiTenantSchema from "./schema/multi-tenant";
+export * as notificationSchema from "./schema/notification";
 export const schema = { ...authSchema, ...multiTenantSchema };
 export * as billingSchema from "./schema/billing";
 export * as emailSchema from "./schema/email";
