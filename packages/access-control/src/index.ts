@@ -69,6 +69,10 @@ export function authorizeRole(
   return policy.authorize(permissions, connector).success;
 }
 
+export function rolesWith(permissions: OrgPermissions): OrgRole[] {
+  return ORG_ROLES.filter((role) => authorizeRole(role, permissions));
+}
+
 export const ac = _ac as unknown as AccessControl;
 export const roles = _roles;
 
