@@ -282,6 +282,29 @@ Three surfaces consume the visibility map simultaneously:
 
 Changing a public event type string or removing a payload field requires a changelog entry and a deprecation window. Promoting a new event to public is permanent — plan for it in the PR review.
 
+## Notifications — catalogue de notifiabilité
+
+`packages/events/src/notification-map.ts` est la **troisième projection** du catalogue d'événements, après `visibility-map.ts` (webhooks) et `retention-map.ts` (purge).
+
+```ts
+// notification-map.ts
+export const NOTIFICATION_MAP = {
+  "billing.payment.failed": { audience: { can: { billing: ["read"] } }, category: "billing", forced: true },
+  "org.member.joined":      { audience: { can: { organization: ["update"] } }, category: "org", groupBy: "resource" },
+  // ...
+} satisfies Partial<Record<EventType, NotificationConfig>>;
+```
+
+**Ce que cette projection projette.** Pour chaque type d'événement listé, elle déclare :
+- `audience` — qui doit recevoir la notification : `"self"` (l'utilisateur concerné), `"actor"`, `"org:all"`, ou `{ can: OrgPermissions }` (les membres dont le rôle porte la capability). La résolution capability→roles est faite par `rolesWith(audience.can)` (`@packages/access-control`) et reste cohérente avec le reste des gates de l'app.
+- `category` — regroupement UI (`security`, `org`, `billing`, `activity`).
+- `forced?: true` — contourne les préférences utilisateur et le batching email (bypass critique du SOTA).
+- `groupBy` et `dedupWindow` — fenêtre de déduplication et clé de regroupement lecteur (style Linear "X et 3 autres").
+
+**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. Le catalogue reste à **65 événements / 28 publics / 37 internes** — D.3 consomme le catalogue, il ne l'étend pas.
+
+**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 65 événements sont audit-only).
+
 ## BetterAuth bridge — what fires what
 
 The boilerplate emits **65 events** (28 public + 37 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.

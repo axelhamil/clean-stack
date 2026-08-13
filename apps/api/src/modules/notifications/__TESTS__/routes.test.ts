@@ -126,7 +126,7 @@ function makeApp() {
   return app;
 }
 
-describe("GET /notifications — list", () => {
+describe("GET /notifications - list", () => {
   it("renvoie les items avec les Options serialises en null", async () => {
     currentSession = {};
     const app = makeApp();
@@ -153,7 +153,7 @@ describe("GET /notifications/unread-count", () => {
   });
 });
 
-describe("POST /notifications/read — mark-read", () => {
+describe("POST /notifications/read - mark-read", () => {
   it("retourne ok quand les ids sont valides", async () => {
     currentSession = {};
     mockMarkRead.mockClear();
