@@ -12,6 +12,7 @@ export class NotificationStreamHub {
   private listenClient: Client | null = null;
   private readonly subscribers = new Map<string, Set<() => void>>();
   private stopping = false;
+  private started = false;
   private reconnectBackoff = RECONNECT_BACKOFF_MS;
 
   constructor(
@@ -48,6 +49,8 @@ export class NotificationStreamHub {
   }
 
   async start(): Promise<void> {
+    if (this.started) return;
+    this.started = true;
     this.stopping = false;
     await ensureNotificationTrigger(db);
     await this.connectListener();
@@ -55,6 +58,7 @@ export class NotificationStreamHub {
   }
 
   async stop(): Promise<void> {
+    this.started = false;
     this.stopping = true;
     if (this.listenClient) {
       try {
