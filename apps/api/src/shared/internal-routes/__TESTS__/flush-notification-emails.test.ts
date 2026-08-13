@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildDigests } from "../flush-notification-emails.route";
+import { buildDigests, digestIdempotencyKey } from "../flush-notification-emails.route";
 
 const row = (userId: string, category: string, id: string) => ({
   id,
@@ -26,5 +26,14 @@ describe("buildDigests", () => {
 
   test("un lot vide ne produit aucun digest", () => {
     expect(buildDigests([])).toEqual([]);
+  });
+});
+
+describe("digestIdempotencyKey", () => {
+  test("produit une cle de longueur constante quel que soit le nombre d'ids", async () => {
+    const key2 = await digestIdempotencyKey(["n1", "n2"]);
+    const key500 = await digestIdempotencyKey(Array.from({ length: 500 }, (_, i) => `n${i}`));
+    expect(key2).toHaveLength(64);
+    expect(key500).toHaveLength(64);
   });
 });

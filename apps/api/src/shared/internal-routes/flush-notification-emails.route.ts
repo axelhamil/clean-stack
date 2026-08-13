@@ -66,6 +66,14 @@ export function buildDigests(rows: PendingRow[]): DigestGroup[] {
   return [...map.values()];
 }
 
+export async function digestIdempotencyKey(ids: string[]): Promise<string> {
+  const raw = ids.slice().sort().join("|");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 const DEFAULT_BATCH_SIZE = 500;
 
 export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
@@ -111,10 +119,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
 
       const digests = buildDigests(rows as PendingRow[]);
 
-      const idempotencyKey = rows
-        .map((r) => r.id)
-        .sort()
-        .join("|");
+      const idempotencyKey = await digestIdempotencyKey(rows.map((r) => r.id));
 
       const enqueued = await di.IEmailService.sendTemplateBatch(
         "notification_digest",
