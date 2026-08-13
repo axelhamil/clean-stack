@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { logger } from "../../logger";
-import { NotificationStreamHub } from "../notification-stream-hub";
+import { MAX_STREAMS_PER_USER, NotificationStreamHub } from "../notification-stream-hub";
 
 describe("NotificationStreamHub", () => {
   test("distribue un signal au seul destinataire concerne", () => {
@@ -57,5 +57,16 @@ describe("NotificationStreamHub", () => {
     hub.dispatchSignal("u1");
 
     expect(recus).toEqual(["second"]);
+  });
+
+  test("le compteur declenche le plafond apres MAX_STREAMS_PER_USER abonnements", () => {
+    const hub = new NotificationStreamHub(logger, "postgres://unused");
+
+    for (let i = 0; i < MAX_STREAMS_PER_USER; i++) {
+      expect(hub.subscriberCount("u1") >= MAX_STREAMS_PER_USER).toBe(false);
+      hub.subscribe("u1", () => {});
+    }
+
+    expect(hub.subscriberCount("u1") >= MAX_STREAMS_PER_USER).toBe(true);
   });
 });

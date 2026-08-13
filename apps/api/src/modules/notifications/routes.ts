@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
 import { di } from "../../container";
+import { logger } from "../../shared/logger";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
@@ -119,15 +120,20 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
 
     return streamSSE(c, async (stream) => {
       const unsubscribe = hub.subscribe(userId, () => {
-        void stream.writeSSE({ event: "notification", data: "1" });
+        stream.writeSSE({ event: "notification", data: "1" }).catch((err) => {
+          logger.warn({ err }, "notification sse write failed");
+        });
       });
 
       stream.onAbort(unsubscribe);
 
-      while (!stream.closed) {
-        await stream.writeSSE({ event: "ping", data: "" });
-        await stream.sleep(25_000);
+      try {
+        while (!stream.closed) {
+          await stream.writeSSE({ event: "ping", data: "" });
+          await stream.sleep(25_000);
+        }
+      } finally {
+        unsubscribe();
       }
-      unsubscribe();
     });
   });
