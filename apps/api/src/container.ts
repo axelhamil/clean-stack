@@ -34,6 +34,7 @@ import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.ser
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
+import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
 import {
   RateLimiterFlexibleAdapter,
@@ -60,6 +61,7 @@ declare module "inwire" {
     OutboxDispatcher: OutboxDispatcher;
     BackupCodeUsedNotifier: EventHandler;
     EmailDeliveryWorker: EmailDeliveryWorker;
+    NotificationStreamHub: NotificationStreamHub;
   }
 }
 
@@ -133,4 +135,5 @@ export const di = container()
   .addModule(quotaModule)
   .addModule(billingModule)
   .addModule(notificationsModule)
+  .add("NotificationStreamHub", () => new NotificationStreamHub(logger, env.DATABASE_URL))
   .build();

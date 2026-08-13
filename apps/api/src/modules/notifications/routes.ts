@@ -1,9 +1,12 @@
 import { AppErrorException, Option } from "@packages/ddd-kit";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { streamSSE } from "hono/streaming";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { MAX_STREAMS_PER_USER } from "../../shared/services/notification-stream-hub";
 import { zV } from "../../shared/validator";
 import {
   listQuerySchema,
@@ -105,4 +108,26 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       return c.json({ ok: true as const });
     },
-  );
+  )
+  .get("/stream", requireAuth, (c) => {
+    const userId = c.get("user").id;
+    const hub = di.NotificationStreamHub;
+
+    if (hub.subscriberCount(userId) >= MAX_STREAMS_PER_USER) {
+      throw new HTTPException(429, { message: "NOTIFICATION_STREAM_LIMIT" });
+    }
+
+    return streamSSE(c, async (stream) => {
+      const unsubscribe = hub.subscribe(userId, () => {
+        void stream.writeSSE({ event: "notification", data: "1" });
+      });
+
+      stream.onAbort(unsubscribe);
+
+      while (!stream.closed) {
+        await stream.writeSSE({ event: "ping", data: "" });
+        await stream.sleep(25_000);
+      }
+      unsubscribe();
+    });
+  });
