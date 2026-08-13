@@ -64,6 +64,8 @@ const mockUpsertPreference = mock(
   async (): Promise<Result<void, NotificationError>> => Result.ok(),
 );
 
+const mockEnqueue = mock(async () => {});
+
 mock.module("../../../container", () => ({
   di: {
     INotificationStore: {
@@ -73,6 +75,9 @@ mock.module("../../../container", () => ({
       markAllRead: mockMarkAllRead,
       listPreferences: mockListPreferences,
       upsertPreference: mockUpsertPreference,
+    },
+    IOutboxRepository: {
+      enqueue: mockEnqueue,
     },
   },
 }));
