@@ -78,6 +78,7 @@ mock.module("../../../container", () => ({
 }));
 
 let currentSession: Record<string, unknown> = {};
+let allowOrgPermission = true;
 
 mock.module("../../../shared/middleware/auth.middleware", () => ({
   // biome-ignore lint/suspicious/noExplicitAny: test stub
@@ -101,6 +102,10 @@ mock.module("../../../shared/middleware/org.middleware", () => ({
     await next();
   },
   requireOrgPermission: () => async (_c: unknown, next: () => Promise<void>) => {
+    if (!allowOrgPermission) {
+      const { HTTPException } = await import("hono/http-exception");
+      throw new HTTPException(403, { message: "Insufficient permission" });
+    }
     await next();
   },
 }));
@@ -246,13 +251,24 @@ describe("PUT /notifications/preferences", () => {
 describe("GET /notifications/org-preferences", () => {
   it("exige un org actif (403 sans org)", async () => {
     currentSession = {};
+    allowOrgPermission = true;
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences");
     expect(res.status).toBe(403);
   });
 
-  it("renvoie les preferences org quand un org est actif", async () => {
+  it("rejette un membre sans la capability organization:update (403)", async () => {
     currentSession = { activeOrganizationId: "org-1" };
+    allowOrgPermission = false;
+    const app = makeApp();
+    const res = await app.request("/notifications/org-preferences");
+    expect(res.status).toBe(403);
+    allowOrgPermission = true;
+  });
+
+  it("renvoie les preferences org quand la capability est presente", async () => {
+    currentSession = { activeOrganizationId: "org-1" };
+    allowOrgPermission = true;
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences");
     expect(res.status).toBe(200);

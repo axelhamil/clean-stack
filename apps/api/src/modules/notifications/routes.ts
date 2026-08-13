@@ -71,12 +71,18 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true as const });
   })
-  .get("/org-preferences", requireAuth, requireOrg, async (c) => {
-    const orgId = c.get("orgId");
-    const result = await di.INotificationStore.listPreferences("org", orgId);
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ items: result.getValue() });
-  })
+  .get(
+    "/org-preferences",
+    requireAuth,
+    requireOrg,
+    requireOrgPermission({ organization: ["update"] }),
+    async (c) => {
+      const orgId = c.get("orgId");
+      const result = await di.INotificationStore.listPreferences("org", orgId);
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      return c.json({ items: result.getValue() });
+    },
+  )
   .put(
     "/org-preferences",
     requireAuth,
