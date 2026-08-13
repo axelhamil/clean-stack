@@ -7,6 +7,7 @@ import { auditLogModule } from "./modules/audit-log/module";
 import { billingModule } from "./modules/billing/module";
 import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
+import { notificationsModule } from "./modules/notifications/module";
 import { policyModule } from "./modules/policies/module";
 import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
@@ -131,4 +132,5 @@ export const di = container()
   .addModule(consentModule)
   .addModule(quotaModule)
   .addModule(billingModule)
+  .addModule(notificationsModule)
   .build();
