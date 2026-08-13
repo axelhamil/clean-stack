@@ -5,14 +5,26 @@ import { throwApiError } from "../errors/api-error";
 
 const $list = api.notifications.$get;
 const $unreadCount = api.notifications["unread-count"].$get;
-const $preferences = api.notifications.preferences.$get;
-const $orgPreferences = api.notifications["org-preferences"].$get;
 
 export type NotificationsResponse = InferResponseType<typeof $list, 200>;
 export type Notification = NotificationsResponse["items"][number];
 
-export type NotificationPreferencesResponse = InferResponseType<typeof $preferences, 200>;
-export type NotificationPreference = NotificationPreferencesResponse["items"][number];
+export type UnreadCountResponse = InferResponseType<typeof $unreadCount, 200>;
+
+// Preference types are defined explicitly because the server's port types
+// (NotificationChannel, NotificationFrequency, PreferenceScope) are private
+// to the api module and cannot be referenced portably from the front (TS2883).
+export type NotificationPreference = {
+  scope: "user" | "org";
+  scopeId: string;
+  category: string;
+  channel: "in_app" | "email";
+  enabled: boolean;
+  frequency: "immediate" | "hourly" | "daily";
+  locked: boolean;
+};
+
+export type NotificationPreferencesResponse = { items: NotificationPreference[] };
 
 export const notificationsQueryOptions = (cursor?: string) =>
   queryOptions({
@@ -29,24 +41,24 @@ export const unreadCountQueryOptions = queryOptions({
   queryFn: async ({ signal }) => {
     const res = await $unreadCount({}, { init: { signal } });
     if (!res.ok) await throwApiError(res, "Failed to load unread count");
-    return (await res.json()) as InferResponseType<typeof $unreadCount, 200>;
+    return (await res.json()) as UnreadCountResponse;
   },
 });
 
 export const notificationPreferencesQueryOptions = queryOptions({
   queryKey: ["notifications", "preferences"] as const,
-  queryFn: async ({ signal }) => {
-    const res = await $preferences({}, { init: { signal } });
+  queryFn: async ({ signal }): Promise<NotificationPreferencesResponse> => {
+    const res = await api.notifications.preferences.$get({}, { init: { signal } });
     if (!res.ok) await throwApiError(res, "Failed to load notification preferences");
-    return (await res.json()) as NotificationPreferencesResponse;
+    return res.json() as Promise<NotificationPreferencesResponse>;
   },
 });
 
 export const orgNotificationPreferencesQueryOptions = queryOptions({
   queryKey: ["notifications", "org-preferences"] as const,
-  queryFn: async ({ signal }) => {
-    const res = await $orgPreferences({}, { init: { signal } });
+  queryFn: async ({ signal }): Promise<NotificationPreferencesResponse> => {
+    const res = await api.notifications["org-preferences"].$get({}, { init: { signal } });
     if (!res.ok) await throwApiError(res, "Failed to load org notification preferences");
-    return (await res.json()) as InferResponseType<typeof $orgPreferences, 200>;
+    return res.json() as Promise<NotificationPreferencesResponse>;
   },
 });
