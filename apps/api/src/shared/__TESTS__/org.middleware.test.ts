@@ -51,7 +51,14 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
-  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
+  notificationSchema: {
+    notification: {
+      dedupKey: { name: "dedup_key" },
+      readAt: { name: "read_at" },
+      createdAt: { name: "created_at" },
+      id: {},
+    },
+  },
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");

@@ -31,6 +31,7 @@ import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-no
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
 import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
+import { sweepNotificationsRoutes } from "./shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
@@ -196,6 +197,7 @@ app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
+app.route("/internal", sweepNotificationsRoutes);
 app.route("/internal", flushNotificationEmailsRoutes);
 
 app.route(

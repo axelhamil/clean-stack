@@ -118,7 +118,14 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
-  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
+  notificationSchema: {
+    notification: {
+      dedupKey: { name: "dedup_key" },
+      readAt: { name: "read_at" },
+      createdAt: { name: "created_at" },
+      id: {},
+    },
+  },
 }));
 
 // All imports AFTER mock.module to ensure mocks are in place before module resolution.

@@ -8,6 +8,8 @@ internal endpoints (`POST /internal/<job>`); you wire your own scheduler.
 | Endpoint | Body | What it does |
 |---|---|---|
 | `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun }`. |
+| `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups pending notification emails into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Note: "immediate" frequency means "at the next cron tick" — true real-time delivery is handled by the SSE event stream, not email. |
+| `POST /internal/sweep-notifications` | `{ batchSize?: number; dryRun?: boolean }` | Purges read notifications older than `NOTIFICATION_RETENTION_DAYS` (default 30d). Unread notifications are never purged regardless of age. Recommended cadence: daily. |
 
 ## Authentication
 
