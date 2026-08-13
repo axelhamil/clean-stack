@@ -27,6 +27,7 @@ import { webhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
 import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
+import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-notification-emails.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
 import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
@@ -195,6 +196,7 @@ app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
+app.route("/internal", flushNotificationEmailsRoutes);
 
 app.route(
   "/api/v1",

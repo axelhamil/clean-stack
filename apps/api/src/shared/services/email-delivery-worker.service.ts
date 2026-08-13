@@ -29,6 +29,7 @@ export const TEMPLATE_IDS: Record<string, string> = {
   delete_completed: "",
   change_email: "",
   backup_code_used: "",
+  notification_digest: "",
 };
 
 type BatchEntry = Record<string, unknown>;

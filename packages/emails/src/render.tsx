@@ -9,6 +9,7 @@ import { DeleteCompleted } from "./components/delete-completed";
 import { DeleteRequested } from "./components/delete-requested";
 import { ImpersonationStarted } from "./components/impersonation-started";
 import { MagicLink } from "./components/magic-link";
+import { NotificationDigest } from "./components/notification-digest";
 import { OrgInvitation } from "./components/org-invitation";
 import { ResetPassword } from "./components/reset-password";
 import { VerifyEmail } from "./components/verify-email";
@@ -46,6 +47,11 @@ const TEMPLATES: { [K in EmailTemplateKey]: TemplateEntry<K> } = {
   api_token_leaked: {
     component: ApiTokenLeaked,
     subject: () => "Your API token was automatically revoked",
+  },
+  notification_digest: {
+    component: NotificationDigest,
+    subject: (v) =>
+      `${v.itemCount} new ${v.category} notification${v.itemCount === "1" ? "" : "s"}`,
   },
 };
 
