@@ -28,13 +28,18 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       limit,
     );
     if (result.isFailure) throw new AppErrorException(result.getError());
+    const notifications = result.getValue();
+    const lastItem = notifications.at(-1);
+    const nextCursor =
+      notifications.length === limit && lastItem ? lastItem.createdAt.toISOString() : null;
     return c.json({
-      items: result.getValue().map((n) => ({
+      items: notifications.map((n) => ({
         ...n,
         organizationId: n.organizationId.toNull(),
         groupKey: n.groupKey.toNull(),
         readAt: n.readAt.toNull(),
       })),
+      nextCursor,
     });
   })
   .get("/unread-count", requireAuth, async (c) => {
