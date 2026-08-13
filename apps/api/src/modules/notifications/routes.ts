@@ -1,8 +1,10 @@
 import { AppErrorException, Option } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
 import { di } from "../../container";
+import { emitEvent } from "../../shared/event-emitter";
 import { logger } from "../../shared/logger";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
@@ -73,6 +75,19 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       locked: false,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());
+    await emitEvent(
+      di.IOutboxRepository,
+      EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
+      "notification_preference",
+      userId,
+      {
+        userId,
+        category: body.category,
+        channel: body.channel,
+        enabled: body.enabled,
+        frequency: body.frequency,
+      },
+    );
     return c.json({ ok: true as const });
   })
   .get(
@@ -96,6 +111,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     zV("json", orgPreferenceSchema),
     async (c) => {
       const body = c.req.valid("json");
+      const userId = c.get("user").id;
       const orgId = c.get("orgId");
       const result = await di.INotificationStore.upsertPreference({
         scope: "org",
@@ -107,6 +123,22 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
         locked: body.locked,
       });
       if (result.isFailure) throw new AppErrorException(result.getError());
+      await emitEvent(
+        di.IOutboxRepository,
+        EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED,
+        "notification_preference",
+        orgId,
+        {
+          organizationId: orgId,
+          actorUserId: userId,
+          category: body.category,
+          channel: body.channel,
+          enabled: body.enabled,
+          frequency: body.frequency,
+          locked: body.locked,
+        },
+        { organizationId: orgId },
+      );
       return c.json({ ok: true as const });
     },
   )

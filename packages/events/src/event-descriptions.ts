@@ -75,6 +75,10 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.API_TOKEN_CREATED]: "A personal access token was created.",
   [EventTypes.API_TOKEN_REVOKED]: "A personal access token was revoked.",
   [EventTypes.API_TOKEN_USED]: "A personal access token was used to authenticate a request.",
+  [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]:
+    "A user updated their personal notification preferences.",
+  [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]:
+    "An organization administrator updated the organization notification preferences.",
 };
 
 export function descriptionFor(eventType: string): string {
