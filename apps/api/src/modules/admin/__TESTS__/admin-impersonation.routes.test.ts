@@ -68,6 +68,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
   emailSchema: {},
   schema: {},
   TransactionService: class {},
@@ -90,7 +91,7 @@ mock.module("@packages/drizzle", () => ({
   like: mk("like"),
   count: mk("count"),
   arrayContains: mk("arrayContains"),
-  sql: Object.assign(mk("sql"), { raw: mk("sql.raw") }),
+  sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
 }));
 
 mock.module("hono/bun", () => ({

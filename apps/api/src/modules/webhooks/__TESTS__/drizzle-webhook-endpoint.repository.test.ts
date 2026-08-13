@@ -78,6 +78,7 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
@@ -127,6 +128,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
 }));
 
 const { DrizzleWebhookEndpointRepository } = await import(

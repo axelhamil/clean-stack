@@ -36,6 +36,7 @@ mock.module("@packages/drizzle", () => ({
     },
     {
       raw: () => ({}),
+      identifier: () => ({}),
     },
   ),
   outboxSchema: {
@@ -74,6 +75,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
 }));
 
 const { DrizzleEmailQueue } = await import("../services/drizzle-email-queue.service");

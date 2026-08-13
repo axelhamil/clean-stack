@@ -34,6 +34,7 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   schema: { member: { role: {}, organizationId: {}, userId: {} } },
   outboxSchema: { outboxEvent: {} },
@@ -50,6 +51,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");

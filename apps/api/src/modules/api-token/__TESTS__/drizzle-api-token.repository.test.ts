@@ -65,6 +65,7 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   apiTokenSchema: {
     apiToken: {
@@ -125,6 +126,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
   emailSchema: {},
   schema: {},
   TransactionService: class {},

@@ -23,7 +23,10 @@ mock.module("@packages/drizzle", () => ({
   like: (...a: unknown[]) => a,
   count: (...a: unknown[]) => a,
   arrayContains: (...a: unknown[]) => a,
-  sql: Object.assign((s: TemplateStringsArray) => s.join(""), { raw: () => ({}) }),
+  sql: Object.assign((s: TemplateStringsArray) => s.join(""), {
+    raw: () => ({}),
+    identifier: () => ({}),
+  }),
   outboxSchema: {
     outboxEvent: {
       id: {},
@@ -60,6 +63,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
 }));
 
 mock.module("@packages/emails", () => ({

@@ -77,6 +77,7 @@ mock.module("@packages/drizzle", () => ({
   alias: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   schema: {},
   authSchema: {},
@@ -90,6 +91,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
   webhooksSchema: {
     webhookEndpoint: {
       id: "id",

@@ -29,6 +29,7 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: { notification: { dedupKey: { name: "dedup_key" } } },
   inArray: () => {},
   eq: () => {},
   lt: () => {},
@@ -36,7 +37,7 @@ mock.module("@packages/drizzle", () => ({
   asc: () => {},
   desc: () => {},
   and: () => {},
-  sql: () => {},
+  sql: Object.assign(() => {}, { raw: () => ({}), identifier: () => ({}) }),
 }));
 
 const { cspReportCors, makeCspReportApp } = await import("../internal-routes/csp-report.route");
