@@ -350,9 +350,9 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx` — name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts` — list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts` — 65-event catalog with explicit `public` / `internal` classification (28 public / 37 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts` — 67-event catalog with explicit `public` / `internal` classification (28 public / 39 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
-**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **65 total / 28 public / 37 internal**.
+**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **67 total / 28 public / 39 internal**.
 
 **Email** `packages/emails/src/components/api-token-leaked.tsx` — template sent to the token owner when GitHub Secret Scanning reports a match.
 
