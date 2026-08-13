@@ -23,7 +23,7 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 
 const bodySchema = z
   .object({
-    batchSize: z.number().int().min(1).max(50000).optional(),
+    batchSize: z.number().int().min(1).max(5000).optional(),
     dryRun: z.boolean().optional(),
   })
   .default({});
