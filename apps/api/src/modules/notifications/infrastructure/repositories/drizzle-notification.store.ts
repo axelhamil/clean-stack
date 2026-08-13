@@ -24,14 +24,14 @@ const dbAttrs = { "db.system.name": "postgresql" } as const;
 
 function readFailure(err: unknown): NotificationError {
   return {
-    code: "NOTIFICATION_READ_FAILED",
+    code: "NOTIFICATION_PROVIDER_FAILURE",
     message: err instanceof Error ? err.message : "unknown",
   };
 }
 
 function writeFailure(err: unknown): NotificationError {
   return {
-    code: "NOTIFICATION_WRITE_FAILED",
+    code: "NOTIFICATION_WRITE_PROVIDER_FAILURE",
     message: err instanceof Error ? err.message : "unknown",
   };
 }

@@ -18,6 +18,7 @@ import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
+import { notificationsRoutes } from "./modules/notifications/routes";
 import { policyRoutes } from "./modules/policies/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
@@ -242,7 +243,8 @@ const routes = app
   .route("/settings/tokens", apiTokenRoutes)
   .route("/settings/webhooks", webhooksRoutes)
   .route("/consents", consentRoutes)
-  .route("/billing", billingRoutes);
+  .route("/billing", billingRoutes)
+  .route("/notifications", notificationsRoutes);
 
 app.onError(createErrorHandler(di.IInstrumentation));
 

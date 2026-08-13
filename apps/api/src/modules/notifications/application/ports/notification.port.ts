@@ -29,8 +29,8 @@ export type PreferenceRecord = {
 export type PreferenceInput = PreferenceRecord;
 
 export type NotificationError =
-  | { code: "NOTIFICATION_READ_FAILED"; message: string }
-  | { code: "NOTIFICATION_WRITE_FAILED"; message: string };
+  | { code: "NOTIFICATION_PROVIDER_FAILURE"; message: string }
+  | { code: "NOTIFICATION_WRITE_PROVIDER_FAILURE"; message: string };
 
 export interface INotificationStore {
   list(
