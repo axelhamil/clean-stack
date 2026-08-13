@@ -2,23 +2,36 @@ import { describe, expect, test, vi } from "vitest";
 import { createBroadcastChannel } from "../use-broadcast-channel";
 
 describe("createBroadcastChannel", () => {
-  test("livre le message aux abonnes", () => {
-    const channel = createBroadcastChannel<{ type: string }>("test-livraison");
-    const recus: string[] = [];
-    channel.subscribe((m) => recus.push(m.type));
+  test("livre le message aux abonnes", async () => {
+    const publisher = createBroadcastChannel<{ type: string }>("test-livraison");
+    const receiver = createBroadcastChannel<{ type: string }>("test-livraison");
 
-    channel.post({ type: "ping" });
+    const received = new Promise<string>((resolve, reject) => {
+      const guard = setTimeout(
+        () => reject(new Error("message non recu dans le delai imparti")),
+        500,
+      );
+      receiver.subscribe((m) => {
+        clearTimeout(guard);
+        resolve(m.type);
+      });
+    });
 
-    expect(recus).toEqual(["ping"]);
+    publisher.post({ type: "ping" });
+
+    await expect(received).resolves.toBe("ping");
   });
 
-  test("le desabonnement arrete la livraison", () => {
-    const channel = createBroadcastChannel<{ type: string }>("test-desabo");
+  test("le desabonnement arrete la livraison", async () => {
+    const publisher = createBroadcastChannel<{ type: string }>("test-desabo");
+    const receiver = createBroadcastChannel<{ type: string }>("test-desabo");
     const handler = vi.fn();
-    const unsubscribe = channel.subscribe(handler);
+    const unsubscribe = receiver.subscribe(handler);
 
     unsubscribe();
-    channel.post({ type: "ping" });
+    publisher.post({ type: "ping" });
+
+    await new Promise((r) => setTimeout(r, 100));
 
     expect(handler).not.toHaveBeenCalled();
   });
