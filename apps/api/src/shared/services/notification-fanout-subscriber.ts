@@ -45,7 +45,7 @@ export class NotificationFanoutSubscriber implements OutboxSubscriber {
             groupKey: config.groupBy ? `${event.eventType}:${event.aggregateId}` : null,
             dedupKey: dedupKeyFor(event, config.dedupWindow),
             payload: event.payload,
-            emailPendingAt: config.forced ? null : event.occurredAt,
+            emailPendingAt: event.occurredAt,
           };
 
           const conflictWhere = sql`${sql.identifier(n.dedupKey.name)} IS NOT NULL`;

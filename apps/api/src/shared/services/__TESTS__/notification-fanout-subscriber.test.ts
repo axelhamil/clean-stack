@@ -18,21 +18,25 @@ const event = (eventType: string, payload: unknown, orgId?: string): OutboxRecor
 
 function fakeTx() {
   const calls: string[] = [];
+  let lastInsertValues: Record<string, unknown> | null = null;
   const tx = {
     insert: mock(() => {
       calls.push("insert");
       return {
-        values: mock(() => ({
-          onConflictDoNothing: mock(() => ({
-            execute: mock(async () => undefined),
-            toSQL: () => ({ sql: "insert into notification" }),
-          })),
-        })),
+        values: mock((vals: Record<string, unknown>) => {
+          lastInsertValues = vals;
+          return {
+            onConflictDoNothing: mock(() => ({
+              execute: mock(async () => undefined),
+              toSQL: () => ({ sql: "insert into notification" }),
+            })),
+          };
+        }),
         select: mock(() => ({})),
       };
     }),
   };
-  return { tx, calls };
+  return { tx, calls, getLastValues: () => lastInsertValues };
 }
 
 describe("NotificationFanoutSubscriber", () => {
@@ -61,5 +65,21 @@ describe("NotificationFanoutSubscriber", () => {
     await subscriber.handle(event("user.password_changed", { userId: "u1" }), tx as never);
 
     expect(calls).toEqual(["insert"]);
+  });
+
+  test("emailPendingAt est toujours non-null, meme pour un event force", async () => {
+    const { tx, getLastValues } = fakeTx();
+    const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation());
+
+    const occurredAt = new Date("2026-08-07T10:00:00Z");
+    await subscriber.handle(
+      { ...event("user.password_changed", { userId: "u1" }), occurredAt },
+      tx as never,
+    );
+
+    const values = getLastValues();
+    expect(values).not.toBeNull();
+    expect((values as Record<string, unknown>).emailPendingAt).not.toBeNull();
+    expect((values as Record<string, unknown>).emailPendingAt).toEqual(occurredAt);
   });
 });
