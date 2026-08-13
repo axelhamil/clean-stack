@@ -1,11 +1,12 @@
+import {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_FREQUENCIES,
+  NOTIFICATION_PREFERENCE_SCOPES,
+} from "@packages/events";
 import { sql } from "drizzle-orm";
 import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { organization } from "./multi-tenant";
-
-export const NOTIFICATION_CHANNELS = ["in_app", "email"] as const;
-export const NOTIFICATION_FREQUENCIES = ["immediate", "hourly", "daily"] as const;
-export const NOTIFICATION_PREFERENCE_SCOPES = ["user", "org"] as const;
 
 export const notification = pgTable(
   "notification",

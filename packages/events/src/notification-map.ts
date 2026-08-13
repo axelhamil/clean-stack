@@ -3,6 +3,15 @@ import type { EventType } from "./event-types";
 
 export type Audience = "self" | "actor" | "org:all" | { can: OrgPermissions };
 
+export const NOTIFICATION_CHANNELS = ["in_app", "email"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const NOTIFICATION_FREQUENCIES = ["immediate", "hourly", "daily"] as const;
+export type NotificationFrequency = (typeof NOTIFICATION_FREQUENCIES)[number];
+
+export const NOTIFICATION_PREFERENCE_SCOPES = ["user", "org"] as const;
+export type NotificationPreferenceScope = (typeof NOTIFICATION_PREFERENCE_SCOPES)[number];
+
 export const NOTIFICATION_CATEGORIES = ["security", "org", "billing", "activity"] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 

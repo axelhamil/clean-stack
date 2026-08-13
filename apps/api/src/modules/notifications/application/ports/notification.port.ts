@@ -1,8 +1,12 @@
 import type { Option, Result } from "@packages/ddd-kit";
+import type {
+  NotificationChannel,
+  NotificationFrequency,
+  NotificationPreferenceScope,
+} from "@packages/events";
 
-export type NotificationChannel = "in_app" | "email";
-export type NotificationFrequency = "immediate" | "hourly" | "daily";
-export type PreferenceScope = "user" | "org";
+export type { NotificationChannel, NotificationFrequency };
+export type PreferenceScope = NotificationPreferenceScope;
 
 export type NotificationRecord = {
   id: string;

@@ -1,4 +1,8 @@
-import { NOTIFICATION_CATEGORIES } from "@packages/events";
+import {
+  NOTIFICATION_CATEGORIES,
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_FREQUENCIES,
+} from "@packages/events";
 import { z } from "zod";
 
 export const listQuerySchema = z.object({
@@ -12,9 +16,9 @@ export const markReadSchema = z.object({
 
 export const preferenceSchema = z.object({
   category: z.enum(NOTIFICATION_CATEGORIES),
-  channel: z.enum(["in_app", "email"]),
+  channel: z.enum(NOTIFICATION_CHANNELS),
   enabled: z.boolean(),
-  frequency: z.enum(["immediate", "hourly", "daily"]).default("immediate"),
+  frequency: z.enum(NOTIFICATION_FREQUENCIES).default("immediate"),
 });
 
 export const orgPreferenceSchema = preferenceSchema.extend({

@@ -327,6 +327,9 @@ importers:
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../ddd-kit
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../events
       '@packages/policies':
         specifier: workspace:*
         version: link:../policies
