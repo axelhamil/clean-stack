@@ -28,6 +28,7 @@ const SETTINGS_TABS: readonly TabItem[] = [
     requiresOrg: true,
   },
   { to: "/settings/account", label: "Account" },
+  { to: "/settings/notifications", label: "Notifications" },
   { to: "/settings/privacy", label: "Privacy" },
   { to: "/settings/api-tokens", label: "API tokens" },
 ];

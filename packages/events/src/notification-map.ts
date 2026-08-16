@@ -75,3 +75,14 @@ export function notificationConfigOf(eventType: string): NotificationConfig | un
 export function isNotifiable(eventType: string): boolean {
   return notificationConfigOf(eventType) !== undefined;
 }
+
+export type ForcedLevel = "all" | "some" | "none";
+
+export function forcedLevelOf(category: NotificationCategory): ForcedLevel {
+  const configs = Object.values(_map).filter((config) => config.category === category);
+  if (configs.length === 0) return "none";
+
+  const forced = configs.filter((config) => "forced" in config && config.forced).length;
+  if (forced === configs.length) return "all";
+  return forced > 0 ? "some" : "none";
+}

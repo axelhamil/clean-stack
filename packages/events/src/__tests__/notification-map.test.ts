@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { ALL_EVENT_TYPES } from "../event-types";
-import { isNotifiable, NOTIFICATION_MAP, notificationConfigOf } from "../notification-map";
+import {
+  forcedLevelOf,
+  isNotifiable,
+  NOTIFICATION_MAP,
+  notificationConfigOf,
+} from "../notification-map";
 
 describe("NOTIFICATION_MAP", () => {
   test("les events d'audit purs ne sont pas notifiables", () => {
@@ -31,6 +36,13 @@ describe("NOTIFICATION_MAP", () => {
       if (!config.forced) continue;
       expect(config.audience, `${type} forced vers toute l'org`).not.toBe("org:all");
     }
+  });
+
+  test("forcedLevelOf distingue une categorie entierement forcee d'une categorie mixte", () => {
+    expect(forcedLevelOf("security")).toBe("all");
+    expect(forcedLevelOf("billing")).toBe("some");
+    expect(forcedLevelOf("org")).toBe("none");
+    expect(forcedLevelOf("activity")).toBe("none");
   });
 
   test("un event forced n'est jamais batche par dedupWindow", () => {
