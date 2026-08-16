@@ -399,6 +399,13 @@ const authOptions = {
       ac,
       roles,
       creatorRole: "owner",
+      schema: {
+        organization: {
+          additionalFields: {
+            ssoEnforced: { type: "boolean", required: false, returned: true, input: false },
+          },
+        },
+      },
       organizationHooks: {
         beforeAddMember: async ({ organization: org }) => {
           await assertSeatAvailableFor(org.id);

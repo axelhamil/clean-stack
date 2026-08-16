@@ -120,6 +120,13 @@
       "when": 1786916487701,
       "tag": "0016_aberrant_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786917715364,
+      "tag": "0017_blue_speed_demon",
+      "breakpoints": true
     }
   ]
 }
