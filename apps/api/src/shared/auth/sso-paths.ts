@@ -1,13 +1,7 @@
-// Path constants for the `sso` and `scim` BetterAuth plugins (apps/api/src/auth.ts).
-// Observed by dumping `auth.api` with both plugins mounted (Task 1, J0) and cross-checked
-// against @better-auth/sso/scim's route source under node_modules. Two SSO paths
-// (`requestDomainVerification`, `verifyDomain`) are registered only when
-// `domainVerification.enabled` is set — absent from the live dump because Task 1 mounts
-// `sso()` unconfigured, but present unconditionally in the plugin's route table source
-// (`routes/domain-verification.ts`), so they are safe to record here ahead of Task 4/5.
-//
-// Single source of truth for downstream tasks (5, 6, 7, 9) — nothing downstream should
-// hardcode a route string; import from here instead.
+// Observed by dumping `auth.api` with both plugins mounted (Task 1, J0). The two
+// domainVerification paths are absent from that dump (only registered once Task 4 sets
+// `domainVerification.enabled`) and were instead confirmed by reading @better-auth/sso's
+// route source (`routes/domain-verification.ts`).
 
 export const SSO_PATHS = {
   register: "/sso/register",
