@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { describe, expect, test, vi } from "vitest";
-import { handleStreamChunk } from "../hooks/use-notification-stream";
+import { handleStreamChunk } from "../use-notification-stream";
 
 const fakeClient = () => {
   const invalidate = vi.fn();

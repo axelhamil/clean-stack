@@ -1,7 +1,7 @@
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { api } from "../../../shared/api/api-client";
-import { addBreadcrumb } from "../../../shared/observability/sentry";
+import { api } from "../api/api-client";
+import { addBreadcrumb } from "../observability/sentry";
 
 const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
 const FRAME_SEPARATOR = /\r?\n\r?\n/;

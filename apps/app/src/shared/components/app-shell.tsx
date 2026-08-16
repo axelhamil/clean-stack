@@ -9,6 +9,7 @@ import { Search } from "lucide-react";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { LogoMark } from "../../shared/components/logo-mark";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
+import { NotificationBell } from "../../shared/notifications/notification-bell";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
 import { canAccessPlatformAdmin } from "../auth/can-access-platform-admin";
 import { CommandPalette } from "./command-palette";
@@ -103,6 +104,8 @@ export function AppShell({ user, children }: AppShellProps) {
             >
               <Search />
             </Button>
+
+            <NotificationBell />
 
             <ThemeToggle />
 
