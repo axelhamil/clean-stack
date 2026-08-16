@@ -14,6 +14,8 @@ export const IMPERSONATION_BLOCKED_PATHS: readonly string[] = [
   "/revoke-sessions",
   "/revoke-other-sessions",
   "/admin",
+  "/sso",
+  "/scim",
 ];
 
 export function isBlockedDuringImpersonation(path: string): boolean {
