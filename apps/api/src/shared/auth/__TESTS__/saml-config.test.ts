@@ -28,4 +28,43 @@ describe("normalizeSamlConfig", () => {
     const result = normalizeSamlConfig({ cert: "MII…", audience: "https://app.example.com" });
     expect(result.getValue().audience).toBe("https://app.example.com");
   });
+
+  it("rejects the rsa-sha1 short form accepted by the plugin", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "rsa-sha1" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("rejects the sha1 xmldsig URI form", () => {
+    const result = normalizeSamlConfig({
+      cert: "MII…",
+      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+    });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("rejects sha1 regardless of case", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "RSA-SHA1" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("accepts sha256 short form without false-positiving on the sha1 family match", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "sha256" });
+    expect(result.isSuccess).toBe(true);
+  });
+
+  it("accepts the rsa-sha256 short form", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "rsa-sha256" });
+    expect(result.isSuccess).toBe(true);
+  });
+
+  it("accepts the sha256 xmldsig URI form", () => {
+    const result = normalizeSamlConfig({
+      cert: "MII…",
+      digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+    });
+    expect(result.isSuccess).toBe(true);
+  });
 });
