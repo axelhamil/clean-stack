@@ -45,14 +45,6 @@ export const SUB_PROCESSORS: readonly SubProcessor[] = [
     status: "planned",
   },
   {
-    name: "GrowthBook",
-    purpose: "Feature flags and A/B testing",
-    region: "US (self-hostable option)",
-    category: "analytics",
-    url: "https://www.growthbook.io",
-    status: "planned",
-  },
-  {
     name: "Umami",
     purpose: "Privacy-friendly web analytics",
     region: "Configurable (self-hostable)",

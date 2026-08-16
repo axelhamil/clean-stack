@@ -72,6 +72,7 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
         ref={inputRef}
         type="file"
         accept="image/*"
+        aria-label="Upload a new avatar image"
         className="sr-only"
         tabIndex={-1}
         onChange={handleFileChange}

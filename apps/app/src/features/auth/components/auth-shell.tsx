@@ -29,7 +29,9 @@ export function AuthShell({ title, description, children, footer, className }: A
 
         <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle>{title}</CardTitle>
+            <CardTitle asChild>
+              <h1>{title}</h1>
+            </CardTitle>
 
             {description && <CardDescription>{description}</CardDescription>}
           </CardHeader>

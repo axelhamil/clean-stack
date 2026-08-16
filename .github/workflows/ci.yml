@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  HUSKY: 0
+
+jobs:
+  a11y:
+    name: Accessibility gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clean_stack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_stack
+      # The preview server, not the dev server — CORS, CSRF and BetterAuth all read this.
+      CORS_ORIGIN: http://localhost:4173
+      APP_URL: http://localhost:4173
+      # The guard resolves MX records; leaving it on would make the seed depend on DNS.
+      DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Resolve pnpm store
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
+
+      - name: Bootstrap env files
+        run: pnpm bootstrap
+
+      - name: Push schema
+        run: pnpm db:push
+
+      - name: Seed the audited account
+        run: pnpm --filter api db:seed
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      - name: Install Chromium
+        run: pnpm --filter app exec playwright install --with-deps chromium
+
+      - name: Start the API
+        working-directory: apps/api
+        run: |
+          bun src/index.ts > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3000/readyz > /dev/null; then
+              echo "api ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "api never became ready"; cat /tmp/api.log; exit 1
+
+      - name: Audit
+        run: pnpm turbo run check:a11y --filter=app
+
+      - name: API log
+        if: failure()
+        run: cat /tmp/api.log
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: a11y-traces
+          path: apps/app/test-results/
+          retention-days: 7

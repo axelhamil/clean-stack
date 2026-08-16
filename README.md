@@ -86,7 +86,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 
 ## Features
 
-Everything wired today, and the build order for what's next. Prefer prose? [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the guided tour. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
+Everything wired today, and the short list of what's left. Prefer prose? [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the guided tour. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
 
 ### Shipped
 
@@ -149,17 +149,19 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 - Disaster-recovery runbook (PITR-first) · Railway reference deploy (config-as-code)
 - `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
 - Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
+- WCAG 2.1 AA gate on every PR — `@axe-core/playwright` over 7 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
 
 ### Roadmap
 
-Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
+The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, the 67-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
-- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF + abuse quick-wins (s5a) **shipped** (Phase C.1 — see Security & hardening above; captcha + advanced abuse signals impossible-travel/geo still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
-- **M2 — Revenue** · ✅ **B.1 billing via `@better-auth/stripe` shipped** (Stripe Checkout + Billing Portal + idempotent webhooks + seat gate + 3-tier entitlements + `/pricing` + `/settings/billing` — see Billing section above) · feature & quota gating (config + middleware, no DDD)
-- **M3 — Finish half-shipped UIs** · ✅ **C.5 webhooks front shipped** (`/settings/webhooks` operator UI + public `/developers/events` catalog — see Event-driven section; SSRF guard + dual-secret rotation + auto-disable also landed) · audit-log admin page shipped (`/admin/audit-log`) · ✅ **C.6 recovery-codes UI shipped** (`RecoveryCodesCard` + backup-code fallback + `BackupCodeUsedNotifier` + 2 events → 54 total) · privacy dashboard
-- **M4 — Operate** · ✅ **C.3 admin & impersonation shipped** (BetterAuth `admin` plugin, justified impersonation, 7 `admin.*` compliance events) · ✅ **C.4 API tokens / PATs shipped** (HMAC-SHA256 + pepper rotation, `/api/v1` public sub-app, GitHub Secret Scanning — `@better-auth/api-key` evaluated and rejected, see [`ROADMAP.md`](ROADMAP.md#api-tokens--personal-access-tokens--phase-c4)) · ✅ **D.3 in-app notifications shipped** (outbox fan-out into a `<Bell />` inbox, SSE signal stream, org-lock → user → org-default preference cascade resolved inside the insert, `forced` bypass for critical alerts — no new event type, the catalog is consumed) · OpenAPI docs (Scalar)
-- **M5 — Quality & compliance gates** · Playwright e2e (full legal chain) + Lighthouse a11y CI · SOC2 Type II checklist · status page + SLO dashboards + OTel/Prometheus
-- **M6 — Enterprise & reach** · SSO SAML/OIDC + SCIM (BetterAuth `sso`) · i18n (TanStack locale routes + Lingui; `@better-auth/i18n` for auth errors) · Capacitor mobile · feature flags · marketing site
+- **A manual review pass** over the shipped surface — the last step before this is genuinely clone-ready.
+- **C.7 SSO SAML/OIDC + SCIM** — the one remaining feature with a price tag; enterprise procurement blocks without it.
+- **E.1 i18n** — locale routes + Lingui, with build-time key checking.
+- **C.1 S5b/S6** — impossible-travel, ASN deny-list, captcha hook. Deferred for calibration: these need real traffic to tune.
+- **D.5 known debts** — three, including a duplicate deletion email if the worker crashes mid-batch.
+
+Cut and not returning: marketing site, status page + SLO dashboards, SOC2 checklist, OpenAPI docs, Capacitor shell, feature flags, GPC. Each was a per-clone decision, a third-party service to wire, or an ambition with nothing to exercise it. The specs live in git history.
 
 ---
 
@@ -323,7 +325,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 |---|---|
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅; build order: M1 security perimeter + consent → M2 billing → M3 finish audit/webhooks/recovery UI → M4 admin + PATs → M5 e2e/a11y gates → M6 SSO/i18n/mobile |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, a11y gate, SSO/SCIM, i18n, abuse signals, D.5 debts |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |

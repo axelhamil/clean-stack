@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { Slot } from "radix-ui";
 import type * as React from "react";
 
 import { cn } from "../../libs/utils";
@@ -47,11 +48,15 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
 
 interface CardTitleProps
   extends React.ComponentProps<"div">,
-    VariantProps<typeof cardTitleVariants> {}
+    VariantProps<typeof cardTitleVariants> {
+  asChild?: boolean;
+}
 
-function CardTitle({ className, variant, ...props }: CardTitleProps) {
+function CardTitle({ className, variant, asChild = false, ...props }: CardTitleProps) {
+  const Comp = asChild ? Slot.Root : "div";
+
   return (
-    <div
+    <Comp
       data-slot="card-title"
       className={cn(cardTitleVariants({ variant }), className)}
       {...props}

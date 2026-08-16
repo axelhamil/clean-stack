@@ -75,8 +75,13 @@
     },
     "type-check": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "common/**", "package.json", "tsconfig*.json"],
+      "inputs": ["src/**", "common/**", "a11y/**", "package.json", "tsconfig*.json"],
       "outputs": []
+    },
+    "check:a11y": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "env": ["A11Y_BASE_URL", "SEED_EMAIL", "SEED_PASSWORD"]
     },
     "format": { "outputs": [] },
     "lint": { "outputs": [] },

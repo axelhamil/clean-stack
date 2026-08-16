@@ -24,7 +24,9 @@
         "src/shared/auth/plan-gate.tsx",
         "src/shared/auth/quota-gate.tsx",
         "src/shared/observability/noop.ts",
-        "src/shared/observability/sentry.ts"
+        "src/shared/observability/sentry.ts",
+        "a11y/*.setup.ts",
+        "a11y/*.spec.ts"
       ],
       "project": ["**/*.ts", "**/*.tsx"]
     },
@@ -46,6 +48,7 @@
       "project": ["src/**/*.ts"]
     }
   },
+  "ignoreBinaries": ["src/index.ts"],
   "ignoreDependencies": [
     "@packages/test",
     "@packages/typescript-config",

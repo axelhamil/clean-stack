@@ -11,6 +11,9 @@
 
 # Testing
 **/coverage
+**/a11y/.auth
+**/playwright-report
+**/test-results
 
 # Env
 **/.env

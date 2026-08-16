@@ -49,8 +49,8 @@ Compliance is built into the foundation, before any feature, so a clone deployed
 - **Rectification (Art. 16)** — users edit their profile, change their email (with re-verification), and change their password.
 - **Erasure (Art. 17)** — a self-service delete that requires 2FA, holds a 7-day grace window (signing in cancels it), verifies the user isn't the sole owner of a shared organization, then a scheduled job wipes personal data and anonymizes references so shared audit trails stay intact.
 - **Portability (Art. 20)** — a self-service export that emails a signed, 7-day download link, throttled to once a day.
-- **Sub-processor disclosure (Art. 28)** — a public `/legal/sub-processors` page lists every sub-processor (active: Resend, Cloudflare R2, BetterAuth OAuth; planned: Stripe, GrowthBook, Umami) with purpose, region, and DPA link. The active/planned split keeps cloners aware of which additions require the 30-day advance notice to DPA contacts before going live.
-- **Accessibility statement (EAA Art. 14, mandatory since June 2025)** — a public `/legal/accessibility` page declares WCAG 2.1 AA / EN 301 549 v3.2.1 conformance, known limitations, and a contact alias for accessibility complaints. The page itself follows the pattern it prescribes: one `<h1>`, real `<h2>` section headings, a labelled mailto link.
+- **Sub-processor disclosure (Art. 28)** — a public `/legal/sub-processors` page lists every sub-processor (active: Resend, Cloudflare R2, BetterAuth OAuth; planned: Stripe, Umami) with purpose, region, and DPA link. The active/planned split keeps cloners aware of which additions require the 30-day advance notice to DPA contacts before going live.
+- **Accessibility statement (EAA Art. 14, mandatory since June 2025)** — a public `/legal/accessibility` page declares WCAG 2.1 AA / EN 301 549 v3.2.1 conformance, known limitations, and a contact alias for accessibility complaints. The page itself follows the pattern it prescribes: one `<h1>`, real `<h2>` section headings, a labelled mailto link. The claim is backed by a CI gate — every PR runs axe over seven pages in both colour schemes, plus keyboard, focus-trap and reduced-motion checks, and a `serious` violation blocks the merge.
 
 Public compliance pages cover data rights (`/legal/data-rights`), cookie categories (`/legal/cookies`), sub-processor disclosure (`/legal/sub-processors`), and the accessibility statement (`/legal/accessibility`). DPA and DORA-annex contract templates in `docs/legal/` cover EU enterprise client onboarding (a decision table routes: fintech → DPA + DORA annex; non-fintech EU B2B → DPA only).
 
@@ -158,8 +158,12 @@ Tokens are revoked automatically when the issuing user loses org membership, and
 
 ## What's next
 
-- **OpenAPI docs** — `@hono/zod-openapi` + Scalar UI at `/api/docs`. The `/api/v1` sub-app is the natural source: every token-reachable route gets documented, and nothing else does.
-- **Reach** — SSO (SAML / OIDC) with SCIM, internationalization, Capacitor mobile, and a marketing site.
+Short, and short on purpose — the plumbing is done, so the list is a review pass plus three items rather than a phase catalogue.
+
+- **A manual review pass** over everything shipped, before calling the stack clone-ready.
+- **SSO (SAML / OIDC) with SCIM** — the remaining feature that unblocks enterprise procurement.
+- **Internationalization** — locale-prefixed routes with build-time key checking.
+- **Abuse signals and a captcha hook** — deferred until there's real traffic to calibrate them against.
 
 The full plan, with constraints and extension points, lives in [`../ROADMAP.md`](../ROADMAP.md).
 

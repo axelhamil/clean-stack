@@ -196,7 +196,7 @@ Primitives for business domain only (never DDD for billing / auth / gating — s
 - **`pino`** + **`hono-pino`** — JSON prod, `pino-pretty` dev. `info` prod / `debug` dev. Status-driven HTTP log level (`5xx`→`error`, `4xx`→`warn`). Every line carries `requestId`.
 - **Single `app.onError(errorHandler)`** — `HTTPException` → `{ error: { code, message, requestId } }`. No per-route try/catch.
 - **Sentry** (`@sentry/bun` api + `@sentry/react` app) — NoOp without `SENTRY_DSN`. Captures ≥500 errors with `requestId/userId/orgId` tags, RGPD scrubbing (drops Cookie, Authorization, email, ip_address). Source maps in CI via `@sentry/vite-plugin`.
-- OTel + Prometheus `/metrics` deferred to Phase D.1. See [`./OBSERVABILITY.md`](./OBSERVABILITY.md).
+- OTel + Prometheus `/metrics` deferred until a tracing/scrape backend exists. See [`./OBSERVABILITY.md`](./OBSERVABILITY.md).
 
 ---
 
@@ -388,7 +388,7 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 
 **Frontend** — everything cross-cutting is in `apps/app/src/shared/notifications/`, because `shared/` may not import `features/` (the bell mounts in `app-shell`) and the preference matrix has two route-owning consumers that may not import each other:
 - `notification-bell.tsx` / `notification-item.tsx` — bell, badge, dropdown inbox. Row labels reuse `EVENT_DESCRIPTIONS`; grouped rows read "and N more".
-- `use-notification-stream.ts` — `fetch` + `ReadableStream`, **not `EventSource`** (which cannot carry an `Authorization` header, breaking F.1's Capacitor bearer). Exponential backoff with jitter, `AbortController` on unmount. `handleStreamChunk` is pure and returns its trailing partial frame, because a stream splits SSE frames wherever it likes.
+- `use-notification-stream.ts` — `fetch` + `ReadableStream`, **not `EventSource`** (which cannot carry an `Authorization` header, breaking any bearer-authenticated client). Exponential backoff with jitter, `AbortController` on unmount. `handleStreamChunk` is pure and returns its trailing partial frame, because a stream splits SSE frames wherever it likes.
 - `notification-broadcast.ts` — mark-as-read propagates cross-tab over `createBroadcastChannel` and applies to the cache without refetching.
 - `preference-matrix.tsx` / `build-preference-matrix.ts` — the grid is rebuilt for all four categories from the explicitly-stored rows alone; an absent cell renders as enabled/immediate, which is what the fan-out applies. A fully-forced category renders disabled **with its reason**, never hidden.
 - Polling is a fallback only: `refetchInterval: connected ? false : 30_000` plus `refetchIntervalInBackground: false`, so a forgotten tab whose stream died stops polling.
@@ -397,13 +397,28 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 
 **Events**: none added. Notification creation deliberately emits nothing (it would loop with its own subscriber). Preference *mutations* do emit `notification.preference.updated` / `notification.org_preference.updated` — they are persistent state changes. Catalog stays **67 / 28 public / 39 internal**.
 
-**Dev seed** `apps/api/scripts/seed-dev-user.ts` (`pnpm --filter api db:seed`) — creates a verified account through `auth.api.signUpEmail`, so it crosses the real sign-up hooks. `SEED_EMAIL` must use a domain with a real MX record; the disposable-email guard rejects `.test`.
+**Dev seed** `apps/api/scripts/seed-dev-user.ts` (`pnpm --filter api db:seed`) — creates a verified account through `auth.api.signUpEmail`, so it crosses the real sign-up hooks. `SEED_EMAIL` must use a domain with a real MX record (default `dev@example.com`); the disposable-email guard rejects `.test`. `SEED_PASSWORD` must contain neither the email local part, the user name, nor the app name — `shared/password-policy.ts` rejects all three. The script records the initial policy acceptance itself: verifying the email in SQL bypasses the `/verify-email` hook that normally does it, and without it every sign-in lands on `/legal/accept`.
+
+---
+
+## Accessibility gate (A.6)
+
+`apps/app/a11y/` — Playwright as an axe driver, not an E2E suite. Run by `.github/workflows/ci.yml` on every PR into `dev`/`main`, and locally with `pnpm --filter app check:a11y`. Details and local setup in [`apps/app/a11y/README.md`](../apps/app/a11y/README.md).
+
+- `pages.ts` — 4 public + 3 authenticated pages, each audited in light **and** dark (18 tests). Adding a page is one array entry.
+- `a11y.spec.ts` — zero `serious`/`critical` WCAG 2.1 A/AA violations, exactly one `<main>` and one `<h1>`, and an assertion on the **final URL**: a gate redirect (no session, stale policies) renders a page that passes every other check, so without it the suite audits the redirect target and reports green. Dark is a `colorScheme` loop over the same page lists — `next-themes` defaults to `system`, so emulating the preference is all it takes, and it caught a contrast failure light never shows.
+- `interaction.spec.ts` — tab order across every `/sign-in` control, command-palette focus trap (10 Tab presses, released on Escape), and `prefers-reduced-motion: reduce` skipping the theme view transition (watched with a `MutationObserver`, since `theme-transitioning` is removed once the transition ends).
+- `auth.setup.ts` — signs in **with the keyboard** and stores `storageState`. One sign-in per run is a hard budget: `/sign-in` allows 5 per 15 min per IP and the block is held in the API process, so a second one would lock a developer out after three local runs.
+- Lighthouse is deliberately absent — its a11y category runs a subset of axe.
 
 ---
 
 ## Roadmap (not yet shipped)
 
-See [`../ROADMAP.md`](../ROADMAP.md) for the full plan.
+See [`../ROADMAP.md`](../ROADMAP.md) — the list is short by design; anything not on it was cut rather than deferred.
 
-- Domain-event → telemetry subscribers (trivial `onEvent(...)` additions, lands with Phase D.1).
-- i18n (TanStack Router locale routes + typed message catalogs).
+- Manual review pass over the shipped surface.
+- C.7 — SSO SAML/OIDC + SCIM.
+- E.1 — i18n (TanStack Router locale routes + typed message catalogs).
+- C.1 S5b/S6 — abuse signals + captcha hook, pending real traffic to calibrate.
+- D.5 known debts — `failed` rows never purged, per-row `markSent`, lost idempotency key on `delete_completed`.

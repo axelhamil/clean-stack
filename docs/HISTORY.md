@@ -8,6 +8,48 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 
 ---
 
+## Accessibility gate — axe in CI ✅ Phase A.6 · Aug 2026
+
+**Why**: `/legal/accessibility` publishes a WCAG 2.1 AA conformance claim, and the EAA has been in force since 28 June 2025. A11y regressions ship invisibly — nobody files a bug, the complaint arrives through a different channel. A published claim with nothing enforcing it is the worst of both worlds.
+
+**What this phase delivered**:
+
+- **`apps/app/a11y/`** — Playwright as an axe driver, not an E2E suite. `pages.ts` lists 4 public + 3 authenticated pages, audited in **both colour schemes** (a `test.use({ colorScheme })` loop; `next-themes` defaults to `system`, so emulating the preference is enough). Adding a page is one array entry. `auth.setup.ts` produces the `storageState` the authenticated tests reuse.
+- **`.github/workflows/ci.yml`** — the repo's **first PR-triggered CI**. Until this phase every gate (`ci:check`, `type-check`, `test`, `knip`, `jscpd`) ran only in the local pre-push hook, so a PR opened from anywhere else was never checked by a machine. The job stands up postgres, `bootstrap`s the env files, pushes the schema, seeds, starts the API, and runs `turbo run check:a11y --filter=app` (which builds first through `dependsOn`).
+- **Blocking checks**: zero `serious`/`critical` WCAG 2.1 A/AA violations in light and dark; exactly one `<main>` and one `<h1>` per page; tab order across every `/sign-in` control; command-palette focus trap; reduced-motion skipping the theme view transition.
+
+**Key decisions**:
+
+- **Lighthouse dropped**, against the original spec. Its accessibility category runs a subset of axe-core, so an `a11y = 100` budget restates what a zero-violation axe run already proves — at the cost of ~2 min of CI and one more flake source. Perf/SEO budgets remain a separate, unmade decision.
+- **`audit()` asserts the final URL.** A gate redirect (no session, stale policies) renders a page with a `<main>`, an `<h1>` and no violations — it passes every other assertion. This was not hypothetical: the authenticated tests were green while auditing `/legal/accept` three times, because the seeded account had never accepted the policies. Without a URL assertion the whole authenticated half of the suite is theatre.
+- **One sign-in per run, by construction.** `/sign-in` allows 5 attempts per 15 min per IP, and `RateLimiterFlexibleAdapter` sets `inMemoryBlockDuration`, so the block lives in the API process — clearing the `rate_limit` table does not lift it. Two sign-ins per run means three consecutive local runs lock the developer out. The setup therefore signs in *with the keyboard* (covering WCAG 2.1.1 operability) and the interaction spec asserts tab order without submitting.
+- **Reduced motion is observed, not inferred.** `theme-transitioning` is added and removed within one transition, so polling for it is a race. An `addInitScript` `MutationObserver` records whether the class ever appeared; the assertion is on that record.
+- **`a11y/` excluded from vitest.** Its default glob collects `*.spec.ts`, and a Playwright `test.describe()` outside the Playwright runner throws. It also carries its own `tsconfig.json` (`types: ["node"]` over the react base) and a second `tsc` invocation in `type-check` — the app's `include` is `src/**` only, so the specs would otherwise never be type-checked.
+
+**Seven real defects**:
+
+1. **Every password field in the app had no accessible label** (`label`, critical). `FormTextField` wrapped `<FormControl>` around the `<div class="relative">` holding the input *and* the reveal button. `FormControl` is a Slot: it forwards the generated `id` to its single child, so `<label for>` pointed at the div. Fixed by wrapping the `<Input>` itself.
+2. **`/sign-in` and `/sign-up` had no `<h1>`.** `AuthShell` passes its title to `CardTitle`, which renders a `<div>`. `CardTitle` now accepts `asChild` (the shadcn Slot pattern already used by `Button` and `NavLink`), so the visible title *is* the heading — rather than bolting on an `sr-only` duplicate the way pages with no visible title do.
+3. **`--accent-foreground` on `--accent` measured 4.27:1** in light (active nav pill). L 0.5445 → 0.52 (4.75:1). Dark measured 7.5:1, untouched.
+4. **`--destructive` measured 3.85:1** both as text on a card and behind white on a button, and the destructive `Alert` compounded it with `/90` opacity on the description → 3.36:1. The opacity is gone (no red dark enough to absorb ~0.9 of ratio stays readable) and the token went L 0.629 → 0.58 (4.72:1).
+5. **The avatar `input[type=file]`** was `sr-only`, `tabIndex={-1}` and unlabelled. Given an `aria-label`.
+6. **Dark only — `--primary` measured 4.12:1** under white, i.e. every default button in the app. L 0.6132 → 0.58 (4.75:1). Light was already 5.82:1.
+7. **Dark only — the impersonation banner measured 2.76:1.** `Alert variant="banner"` used `bg-destructive` at full opacity; `Button` and `Badge` had long carried `dark:bg-destructive/60` for exactly this reason, and the banner now does too.
+
+**Why the arithmetic was not enough.** The first pass computed contrast by hand (oklch → linear sRGB → relative luminance) and concluded the opposite of the truth: that every destructive button was broken in dark, and that `--primary` was fine. Tailwind mixes opacity in **oklab**, so `bg-destructive/60` lands far darker than a linear-sRGB blend predicts. Hand calculation is useful to *propose* a candidate L; only axe against the rendered page decides. Every number above is a measurement.
+
+**A defect the gate cannot guard.** The impersonation banner only renders inside an impersonated session, so no audited page contains it. It was measured by injecting the markup into a live page and running axe on that node — enough to find and fix it, not enough to keep it fixed. Same blind spot for any surface behind a specific session state.
+
+**Two clone-blocking `db:seed` bugs**, surfaced by needing a real account to audit authenticated pages — `pnpm --filter api db:seed` failed on a fresh clone:
+
+- `dev@clean-stack.test` is rejected by the S5a disposable-email guard: `.test` is IANA-reserved and can never carry an MX record, which `DisposableEmailService` reads as throwaway. Default now `dev@example.com`.
+- The default password `DevSeed!2026-clean` contains the email local part (`dev`), which `findPasswordViolation` rejects. Default now `Nimbus-Harbor-42-Quartz`.
+- The script also now records the initial policy acceptance. Forcing `emailVerified` in SQL bypasses the `/verify-email` hook that normally writes it, so every seeded account landed on `/legal/accept` at first sign-in.
+
+**Deliberately not covered**: Lighthouse perf/SEO budgets, and screen-reader behaviour (no automated tool covers it).
+
+---
+
 ## In-app notification center ✅ Phase D.3 · Aug 2026
 
 **Why**: transactional email is asynchronous and users miss it. An in-app inbox is the SaaS default (Linear, GitHub, Stripe) and is the last piece F.1 (Capacitor) depends on. The interesting part is not the inbox — it is that the event backbone already resolves *what happened*; notifications only add *who should hear about it*.

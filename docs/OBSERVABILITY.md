@@ -1,6 +1,6 @@
 # Observability — Phase 0.4 (Sentry only)
 
-clean-stack ships error tracking + tracing primitives via Sentry on the API (`@sentry/bun`) and the front (`@sentry/react`). Prometheus `/metrics` is **deferred** to Phase D.1 — see [Deferred](#deferred-otel-prometheus).
+clean-stack ships error tracking + tracing primitives via Sentry on the API (`@sentry/bun`) and the front (`@sentry/react`). Prometheus `/metrics` is **deferred** until a scrape target exists — see [Deferred](#deferred-otel-prometheus).
 
 ## What you get out of the box
 
@@ -9,7 +9,7 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 - **Tags** auto-populated on every event: `requestId`, `userId`, `orgId`, `path`, `method`.
 - **Payload scrubbing** RGPD-clean by default — `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address` are stripped before transmission.
 - **Pino integration** — every `logger.warn` / `logger.error` becomes a Sentry breadcrumb attached to the next captured event. Single source of truth for logs.
-- **Repository / service spans** — every Drizzle repo, S3, Resend method is wrapped with a Sentry span (`startSpan`) for distributed tracing. `tracesSampleRate=0` by default keeps overhead near zero; flip > 0 in Phase D.1 once a tracing backend consumes them.
+- **Repository / service spans** — every Drizzle repo, S3, Resend method is wrapped with a Sentry span (`startSpan`) for distributed tracing. `tracesSampleRate=0` by default keeps overhead near zero; flip > 0 once a tracing backend consumes them.
 - **Request correlation across the stack** — each request's `X-Request-Id` (Hono `requestId()`) flows through an `AsyncLocalStorage` context (`shared/request-context.ts`) and is stamped onto every emitted event (`outbox_event.metadata.requestId`) → copied into `audit_log.request_id`. The same id tags the pino logs and the Sentry event, so an audit entry, its logs, and its error all join on one key — even for events emitted deep inside a BetterAuth hook where the Hono `c` isn't in scope.
 - **Release tracking** ties to `GIT_SHA` injected at CI build (shared with the `/livez` payload from Phase 0.2).
 - **NoOp by default** — without `SENTRY_DSN`, zero telemetry leaves the host. Binary on/off via env.
@@ -108,7 +108,7 @@ export class DrizzleFooRepository implements IFooRepository {
 - **Multi-query methods** (e.g., `executeWipe` running 7+ DELETEs): keep only the outer span — 7 inner spans = noise. Single-statement methods always get an inner span.
 - **Span composition**: don't call sibling repo methods that themselves open spans from within a span — the inner spans become orphaned siblings rather than children. Inline the query instead.
 - **Why no-op without `SENTRY_DSN`**: `IInstrumentation` resolves to `NoOpInstrumentation` (callback passthrough, no allocation). Zero cost beyond the function call.
-- **Tracing dormant**: `SENTRY_TRACES_SAMPLE_RATE=0` (default) means even when `SENTRY_DSN` is set, spans aren't exported — they're recorded in memory by the SDK and dropped. Set > 0 only when a tracing backend consumes them (Phase D.1).
+- **Tracing dormant**: `SENTRY_TRACES_SAMPLE_RATE=0` (default) means even when `SENTRY_DSN` is set, spans aren't exported — they're recorded in memory by the SDK and dropped. Set > 0 only when a tracing backend consumes them.
 
 Applied to: `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `ResendEmailService`, `DrizzleRgpdRepository`, `S3StorageService`, `DrizzleWebhookEndpointRepository`, `DrizzleWebhookDeliveryRepository`, `AuditQueryService`. Use-case / application services are not wrapped — they orchestrate repos that already are.
 
@@ -191,13 +191,13 @@ Phase 0.4 ships **only** Sentry. The other observability pieces are intentionall
 
 ### OpenTelemetry tracing — deferred
 
-**Why**: under Bun 1.3+ in 2026, OTel auto-instrumentation for `Bun.serve()` is broken; spans must be added manually for HTTP, DB, and outbound fetch. `@hono/otel` + `@kubiks/otel-drizzle` exist and work, but the wiring cost buys no value until a consumer (Grafana Tempo, Jaeger, Sentry Performance) is wired in Phase D.1. Bun is also expected to ship native OTel — waiting avoids a refactor. **The spans already shipped via `IInstrumentation.startSpan` will be reused** — they sit in the Sentry SDK and become live the moment `SENTRY_TRACES_SAMPLE_RATE > 0`.
+**Why**: under Bun 1.3+ in 2026, OTel auto-instrumentation for `Bun.serve()` is broken; spans must be added manually for HTTP, DB, and outbound fetch. `@hono/otel` + `@kubiks/otel-drizzle` exist and work, but the wiring cost buys no value until a consumer (Grafana Tempo, Jaeger, Sentry Performance) is actually wired. Bun is also expected to ship native OTel — waiting avoids a refactor. **The spans already shipped via `IInstrumentation.startSpan` will be reused** — they sit in the Sentry SDK and become live the moment `SENTRY_TRACES_SAMPLE_RATE > 0`.
 
 ### Prometheus `/metrics` — deferred
 
-**Why**: `prom-client` is the SOTA pick for `/metrics` (Julius Volz confirmed native Prometheus instrumentation over OTel push in 2025/2026), but exposing `/metrics` without a Grafana scrape is code with no consumer. The 30 LOC + `X-Metrics-Token` gate are trivial to add when D.1 lands.
+**Why**: `prom-client` is the SOTA pick for `/metrics` (Julius Volz confirmed native Prometheus instrumentation over OTel push in 2025/2026), but exposing `/metrics` without a Grafana scrape is code with no consumer. The 30 LOC + `X-Metrics-Token` gate are trivial to add the day a scrape target exists.
 
-**When to wire**: at Phase D.1, alongside SLO dashboards. The health check registry from Phase 0.2 already exports `up{check}` state — drop-in for the metric.
+**When to wire**: alongside whatever dashboard stack a clone picks. The health check registry from Phase 0.2 already exports `up{check}` state — drop-in for the metric.
 
 ### Sentry Performance / `tracesSampleRate > 0` — coupled to OTel
 

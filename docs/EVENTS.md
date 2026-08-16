@@ -257,7 +257,7 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 - **AEAD secret encryption** (`@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key) for webhook secrets at rest.
 - **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`) — `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Dead-letter after 5 attempts.
 - **Claim window pattern** in delivery worker — claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
-- **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id` — captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context — Phase D.1 OTel.)
+- **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id` — captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context, unused until OTel is wired.)
 
 ## Visibility — public vs internal events
 
