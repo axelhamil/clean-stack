@@ -137,3 +137,23 @@ Reference cartography for removing the Personal Access Tokens module. Walk the 6
 **What you do NOT touch**:
 - `shared/services/webhook-fanout-subscriber.ts` — the `isPublicEvent` guard (from `visibility-map.ts`) is called here. Once `visibility-map.ts` is gone you must inline the equivalent filtering or remove the feature guard entirely — decide before committing.
 - `apps/app/src/features/developers/` (`/developers/events` catalog) — it reads `VISIBILITY` from `packages/events`. Once removed, the catalog page shows all events again (no longer filtered); this is a UI regression, not a crash. Either remove the page or drop the filter guard.
+
+---
+
+## Removal map — `modules/notifications` (Phase D.3)
+
+Reference cartography for removing the in-app notification center. Walk the 6-axis checklist above.
+
+| Axis | Touch-points |
+|---|---|
+| 1. **Back code** | `trash apps/api/src/modules/notifications/`. `container.ts` — remove `.addModule(notificationsModule)`, the `NotificationFanoutSubscriber` registration, and the `NotificationStreamHub` binding. `index.ts` — remove `notificationsRoutes` mount, the hub start-up call, and the internal-route mounts. `trash apps/api/src/shared/services/{notification-fanout-subscriber,notification-stream-hub,notification-trigger,resolve-audience}.ts` and `apps/api/src/shared/internal-routes/{flush-notification-emails,sweep-notifications}.route.ts`. `trash apps/api/scripts/check-fanout-preferences.ts` + its `check:fanout` script entry. |
+| 2. **Events** | **No event type to remove for the inbox itself** — D.3 consumes the catalog rather than extending it. Only the 2 preference-mutation events go: `notification.preference.updated`, `notification.org_preference.updated` in `event-types.ts`, `payloads.ts`, `retention-map.ts`, `visibility-map.ts`. Event count: 67 → 65. `packages/events/src/notification-map.ts` — delete the whole projection (`NOTIFICATION_MAP`, `notificationConfigOf`, `isNotifiable`, `forcedLevelOf`, the channel/frequency/scope const arrays and their types). |
+| 3. **Shared ports / cross-refs** | `packages/drizzle/src/schema/notification.ts` imports the channel/frequency/scope arrays from `@packages/events` — inline them there or delete the schema first. Check whether `@packages/events` is still a dependency of `@packages/drizzle` afterwards; if not, drop it from `packages/drizzle/package.json`. |
+| 4. **Env vars** | `apps/api/src/shared/env.ts` + `.env.example` — `NOTIFICATION_RETENTION_DAYS`. |
+| 5. **Schema** | `packages/drizzle/src/schema/notification.ts` — delete (both tables). Remove the barrel re-export. The `pg_notify` trigger is created at runtime by `ensureNotificationTrigger`, **not by a migration** — `pnpm db:generate` will not drop it. Drop it by hand (`DROP TRIGGER … ON notification`) before dropping the table, or the migration fails on a live database. |
+| 6. **Front + docs** | `trash apps/app/src/shared/notifications/` (bell, item, matrix, grouping, labels, broadcast, stream hook) and `apps/app/src/features/notifications/`. `apps/app/src/shared/components/app-shell.tsx` — remove `<NotificationBell />`. `apps/app/src/router.tsx` — remove import + registration. `contextual-tabs.tsx` — remove the "Notifications" tab. `features/organization/organization.page.tsx` + `components/org-notification-defaults-card.tsx` — remove the card. `shared/api/{queries,mutations}/notifications.ts` — delete. Docs: `FEATURES.md` (D.3 section), `OVERVIEW.md` (notification bullet), `EVENTS.md` (third-projection section), `CRON.md` (2 rows), `ROADMAP.md` (D.3 spec), `README.md` (M4 note), this section. |
+
+**What you do NOT touch**:
+- `shared/hooks/use-broadcast-channel.ts` — promoted out of `auth-broadcast.ts` and still used by the auth flow. Removing notifications does not orphan it.
+- `EVENT_DESCRIPTIONS` in `@packages/events` — the inbox reuses it for row labels, but `/developers/events` and the webhook picker own it.
+- The outbox dispatcher and its subscriber list — removing one subscriber must leave audit and webhook fan-out untouched. That is the whole point of the rail.

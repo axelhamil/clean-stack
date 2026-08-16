@@ -305,6 +305,18 @@ export const NOTIFICATION_MAP = {
 
 **`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 67 événements sont audit-only).
 
+**La cascade de préférences est résolue dans la requête d'insertion**, jamais en amont ni destinataire par destinataire : un `LEFT JOIN notification_preference` par portée et par canal, sur le même `INSERT ... SELECT`.
+
+```
+ligne org verrouillée  >  ligne utilisateur  >  ligne org (défaut non verrouillé)  >  activé
+```
+
+Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du tout), le canal email décide d'un `CASE` qui remplit ou non `emailPendingAt` : couper l'email sans couper l'in-app produit donc une notification sans envoi en attente. Un événement `forced` court-circuite les quatre niveaux et n'émet même pas les jointures.
+
+**Pourquoi dans le SQL et pas dans un service.** L'audience d'organisation est un `INSERT ... SELECT` sur `member` : résoudre les préférences en TypeScript imposerait soit une boucle par destinataire, soit un pré-chargement de toutes les lignes de préférence de l'organisation. Un service `resolve()` a existé en parallèle du fan-out sans jamais être appelé, et sa cascade avait déjà divergé (il ignorait les défauts d'organisation non verrouillés) — il a été supprimé. **Une seule implémentation, à l'endroit où elle s'applique.**
+
+**Vérification.** `pnpm --filter api check:fanout` (`apps/api/scripts/check-fanout-preferences.ts`) exécute 8 cas contre Postgres : in-app coupé, email coupé seul, `forced`, aucune préférence, filtrage d'un membre dans une audience d'organisation, verrou d'organisation contre choix utilisateur, défaut d'organisation appliqué, choix utilisateur prioritaire sur un défaut. **À relancer après toute modification du fan-out** : aucun test unitaire ne peut couvrir ces cas, une transaction mockée n'évalue aucun `WHERE` et le dépôt n'a pas de harnais d'intégration base. C'est ce script, et lui seul, qui a révélé qu'un `CASE WHEN ... THEN $date` casse l'inférence de type de Postgres (cast `::timestamp` obligatoire).
+
 ## BetterAuth bridge — what fires what
 
 The boilerplate emits **67 events** (28 public + 39 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used), **2 from `modules/notifications/`** (Phase D.3 — preference.updated, org_preference.updated). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.

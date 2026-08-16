@@ -23,6 +23,8 @@ apps/app/src/
 - `features/<library-feature>/` → `shared/`, `@packages/*`. Never imports from other features.
 - `shared/<sub>/` → `shared/<sibling>/`, `shared/env.ts`, `shared/utils.ts` (no upward imports)
 
+**Placement decisor — the two questions that settle it.** Before writing a component under `features/<x>/`, ask: (1) *is it mounted by the shell or any `shared/` code?* (2) *will a second route-owning feature render it?* Either yes → it belongs in `shared/<domain>/`, not in the feature. **Why**: both answers make the feature location structurally impossible, not merely untidy — `shared/` may never import `features/`, and two route-owning features may never import each other, so the import you would need does not exist. Group it as `shared/<domain>/` (like `auth/`, `notifications/`) once it spans more than a component or two; the feature then keeps only its route and page. A component that is *cross-cutting* is not the same as one that is *reusable*: reusable-and-presentational belongs in `@packages/ui`, cross-cutting-and-app-aware belongs in `shared/`.
+
 ## Naming
 
 Files `kebab-case.tsx`; components `PascalCase` named exports; hooks `use-<verb>-<noun>.ts` → `useVerbNoun`; schemas `<feature>.schema.ts` → `<noun>Schema`+`<Noun>Input` (z.infer).
