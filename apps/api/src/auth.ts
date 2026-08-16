@@ -30,6 +30,7 @@ import {
   findLatestLinkedAccount,
   findLatestPasskey,
   findOrgOwnerUserId,
+  findSsoProviderByProviderId,
   insertPersonalOrgWithOwner,
   setPendingEmail,
 } from "./auth-queries";
@@ -176,6 +177,19 @@ async function assertSeatAvailableFor(orgId: string): Promise<void> {
 function clientIpFromHeaders(headers?: Headers): string | null {
   return headers?.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 45) ?? null;
 }
+
+/**
+ * `hooks.before` snapshots a provider's org/domain right before `/sso/delete-provider`
+ * removes the row — the endpoint's response is `{ success: true }` with no provider
+ * data, and the row is already gone by the time `hooks.after` runs. Keyed on
+ * `providerId` (unique per row) rather than the hook's `ctx.context`, since better-call
+ * rebuilds parts of that object between `hooks.before` and `hooks.after` and reference
+ * identity across the two isn't guaranteed. Read-and-delete in the after hook.
+ */
+const ssoProviderDeleteSnapshots = new Map<
+  string,
+  { organizationId: string | null; domain: string; issuer: string }
+>();
 
 function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
   const raw = headers?.get("cookie");
@@ -670,6 +684,15 @@ const authOptions = {
         return;
       }
 
+      if (path === SSO_PATHS.deleteProvider) {
+        const providerId = body?.providerId as string | undefined;
+        if (providerId) {
+          const provider = await findSsoProviderByProviderId(providerId);
+          if (provider) ssoProviderDeleteSnapshots.set(providerId, provider);
+        }
+        return;
+      }
+
       let password: string | undefined;
       let actorEmail: string | undefined;
       let actorName: string | undefined;
@@ -737,6 +760,28 @@ const authOptions = {
       if (result !== null) throw new APIError("UNPROCESSABLE_ENTITY", { message: result.message });
     }),
     after: createAuthMiddleware(async (ctx) => {
+      const path = ctx.path;
+
+      // sso.login.failure is the one event this hook emits on a rejected call, so it
+      // must run before the early-return below — every other branch only sees success.
+      if (
+        ctx.context.returned instanceof APIError &&
+        (path === SSO_PATHS.callback ||
+          path === SSO_PATHS.callbackWithProvider ||
+          path === SSO_PATHS.samlCallback ||
+          path === SSO_PATHS.samlAcs)
+      ) {
+        const providerId = (ctx.params as Record<string, string> | undefined)?.providerId ?? null;
+        const provider = providerId ? await findSsoProviderByProviderId(providerId) : undefined;
+        await emit(EventTypes.SSO_LOGIN_FAILURE, "sso_provider", providerId ?? "unknown", {
+          actorUserId: null,
+          providerId,
+          domain: provider?.domain ?? "unknown",
+          reason: ctx.context.returned.message,
+          ip: clientIpFromHeaders(ctx.headers) ?? "unknown",
+        });
+      }
+
       if (ctx.context.returned instanceof APIError) return;
 
       const newUserId = ctx.context.newSession?.user?.id;
@@ -753,8 +798,6 @@ const authOptions = {
         }
       }
 
-      const path = ctx.path;
-
       if (path === "/two-factor/verify-backup-code") {
         const signedInUser = ctx.context.newSession?.user ?? ctx.context.session?.user;
         if (signedInUser) {
@@ -762,6 +805,38 @@ const authOptions = {
             userId: signedInUser.id,
             email: signedInUser.email,
           });
+        }
+        return;
+      }
+
+      if (
+        path === SSO_PATHS.callback ||
+        path === SSO_PATHS.callbackWithProvider ||
+        path === SSO_PATHS.samlCallback ||
+        path === SSO_PATHS.samlAcs
+      ) {
+        const session = ctx.context.newSession;
+        if (session) {
+          const params = ctx.params as Record<string, string> | undefined;
+          const isSaml = path === SSO_PATHS.samlCallback || path === SSO_PATHS.samlAcs;
+          let providerId = params?.providerId;
+          if (!providerId) {
+            const latest = await findLatestLinkedAccount(session.user.id);
+            providerId = latest?.providerId;
+          }
+          await emit(
+            EventTypes.SSO_LOGIN_SUCCESS,
+            "user",
+            session.user.id,
+            {
+              userId: session.user.id,
+              providerId: providerId ?? "unknown",
+              organizationId: session.session.activeOrganizationId ?? null,
+              protocol: isSaml ? "saml" : "oidc",
+              jitProvisioned: session.user.createdAt.getTime() > Date.now() - 10_000,
+            },
+            session.session.activeOrganizationId,
+          );
         }
         return;
       }
@@ -847,6 +922,100 @@ const authOptions = {
             providerId: latest.providerId,
             accountId: latest.accountId,
           });
+        }
+        return;
+      }
+
+      if (path === SSO_PATHS.register) {
+        const provider = ctx.context.returned as {
+          providerId: string;
+          organizationId: string | null;
+          domain: string;
+          issuer: string;
+          samlConfig?: unknown;
+        };
+        if (provider.organizationId) {
+          await emit(
+            EventTypes.SSO_PROVIDER_REGISTERED,
+            "sso_provider",
+            provider.providerId,
+            {
+              actorUserId: userId,
+              organizationId: provider.organizationId,
+              providerId: provider.providerId,
+              protocol: provider.samlConfig ? "saml" : "oidc",
+              domain: provider.domain,
+              issuer: provider.issuer,
+            },
+            provider.organizationId,
+          );
+        }
+        return;
+      }
+      if (path === SSO_PATHS.updateProvider) {
+        const provider = ctx.context.returned as {
+          providerId: string;
+          organizationId: string | null;
+        };
+        if (provider.organizationId) {
+          const body = (ctx.body as Record<string, unknown> | undefined) ?? {};
+          const changedFields = Object.keys(body).filter((key) => key !== "providerId");
+          await emit(
+            EventTypes.SSO_PROVIDER_UPDATED,
+            "sso_provider",
+            provider.providerId,
+            {
+              actorUserId: userId,
+              organizationId: provider.organizationId,
+              providerId: provider.providerId,
+              changedFields,
+            },
+            provider.organizationId,
+          );
+        }
+        return;
+      }
+      if (path === SSO_PATHS.deleteProvider) {
+        const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
+          | string
+          | undefined;
+        const snapshot = providerId ? ssoProviderDeleteSnapshots.get(providerId) : undefined;
+        if (providerId) ssoProviderDeleteSnapshots.delete(providerId);
+        if (providerId && snapshot?.organizationId) {
+          await emit(
+            EventTypes.SSO_PROVIDER_DELETED,
+            "sso_provider",
+            providerId,
+            {
+              actorUserId: userId,
+              organizationId: snapshot.organizationId,
+              providerId,
+            },
+            snapshot.organizationId,
+          );
+        }
+        return;
+      }
+      if (path === SSO_PATHS.verifyDomain) {
+        const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
+          | string
+          | undefined;
+        if (providerId) {
+          const provider = await findSsoProviderByProviderId(providerId);
+          if (provider?.organizationId) {
+            await emit(
+              EventTypes.SSO_DOMAIN_VERIFIED,
+              "sso_provider",
+              providerId,
+              {
+                actorUserId: userId,
+                organizationId: provider.organizationId,
+                providerId,
+                domain: provider.domain,
+              },
+              provider.organizationId,
+            );
+          }
         }
         return;
       }

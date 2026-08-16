@@ -4,7 +4,7 @@
  * Plain functions, no DI, no repository class, no port interface — auth is
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
-import { and, count, db, desc, eq, schema, type Transaction } from "@packages/drizzle";
+import { and, count, db, desc, eq, schema, ssoSchema, type Transaction } from "@packages/drizzle";
 
 // ── #1 – ensurePersonalOrgFor queries ──────────────────────────────────────
 
@@ -174,4 +174,21 @@ export async function findUserOrganizations(
     .from(schema.member)
     .innerJoin(schema.organization, eq(schema.member.organizationId, schema.organization.id))
     .where(eq(schema.member.userId, userId));
+}
+
+// ── #10 – hooks.after SSO bridge ────────────────────────────────────────────
+
+export async function findSsoProviderByProviderId(
+  providerId: string,
+): Promise<{ organizationId: string | null; domain: string; issuer: string } | undefined> {
+  const [row] = await db
+    .select({
+      organizationId: ssoSchema.ssoProvider.organizationId,
+      domain: ssoSchema.ssoProvider.domain,
+      issuer: ssoSchema.ssoProvider.issuer,
+    })
+    .from(ssoSchema.ssoProvider)
+    .where(eq(ssoSchema.ssoProvider.providerId, providerId))
+    .limit(1);
+  return row;
 }
