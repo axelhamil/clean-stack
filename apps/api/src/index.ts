@@ -18,6 +18,7 @@ import { billingRoutes } from "./modules/billing/routes";
 import { consentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
+import { notificationsRoutes } from "./modules/notifications/routes";
 import { policyRoutes } from "./modules/policies/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
@@ -26,9 +27,11 @@ import { webhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
 import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
+import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-notification-emails.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
 import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
+import { sweepNotificationsRoutes } from "./shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
@@ -194,6 +197,8 @@ app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
+app.route("/internal", sweepNotificationsRoutes);
+app.route("/internal", flushNotificationEmailsRoutes);
 
 app.route(
   "/api/v1",
@@ -242,7 +247,8 @@ const routes = app
   .route("/settings/tokens", apiTokenRoutes)
   .route("/settings/webhooks", webhooksRoutes)
   .route("/consents", consentRoutes)
-  .route("/billing", billingRoutes);
+  .route("/billing", billingRoutes)
+  .route("/notifications", notificationsRoutes);
 
 app.onError(createErrorHandler(di.IInstrumentation));
 
@@ -252,6 +258,7 @@ await di.preload();
 await di.OutboxDispatcher.start(di as unknown as Record<string, unknown>);
 await di.WebhookDeliveryWorker.start();
 await di.EmailDeliveryWorker.start();
+await di.NotificationStreamHub.start();
 lifecycleState.markStarted();
 
 const SHUTDOWN_STEP_TIMEOUT_MS = 25_000;
@@ -280,6 +287,7 @@ const shutdown = async (signal: string) => {
     stopWithTimeout("webhookDeliveryWorker", () => di.WebhookDeliveryWorker.stop()),
     stopWithTimeout("emailDeliveryWorker", () => di.EmailDeliveryWorker.stop()),
     stopWithTimeout("outboxDispatcher", () => di.OutboxDispatcher.stop()),
+    stopWithTimeout("notificationStreamHub", () => di.NotificationStreamHub.stop()),
   ]);
   process.exit(0);
 };

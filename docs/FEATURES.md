@@ -350,13 +350,54 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx` — name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts` — list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts` — 65-event catalog with explicit `public` / `internal` classification (28 public / 37 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts` — 67-event catalog with explicit `public` / `internal` classification (28 public / 39 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
-**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **65 total / 28 public / 37 internal**.
+**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **67 total / 28 public / 39 internal**.
 
 **Email** `packages/emails/src/components/api-token-leaked.tsx` — template sent to the token owner when GitHub Secret Scanning reports a match.
 
 **Env** `apps/api/.env.example`: `API_TOKEN_PEPPER` (required prod, min 32 chars), `API_TOKEN_PEPPER_PREVIOUS` (rotation), `API_TOKEN_PEPPER_VERSION` (default 1), `API_TOKEN_PREFIX` (default `clean_`), `API_TOKEN_MAX_EXPIRY_DAYS` (default 365), `API_TOKEN_LAST_USED_BUCKET_MIN` (default 15).
+
+---
+
+## In-app notification center ✅ Phase D.3
+
+Persistent inbox behind a bell, real-time over SSE, three-level preferences. No new event type: D.3 *consumes* the catalog.
+
+**Catalog projection** `packages/events/src/notification-map.ts` — third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 67 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced — `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
+
+**Audience by capability, never by role tuple**: `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `ORG_ROLES.filter(authorizeRole)` resolves at boot, leaving `WHERE member.role = ANY($1)`.
+
+**Schema** `packages/drizzle/src/schema/notification.ts` — `notification(id, userId FK, organizationId FK nullable, category, eventType, groupKey, dedupKey, payload jsonb, readAt, emailPendingAt, emailSentAt, createdAt)` + `notification_preference(scope 'user'|'org', scopeId, category, channel, enabled, frequency, locked)`. Five indexes, three partial: unread count, email-pending, and the dedup unique index `(userId, dedupKey) WHERE dedup_key IS NOT NULL`. **`organizationId` nullable is a documented exception to org-scoping rule #3** — `user.password_changed` belongs to no org.
+
+**Fan-out** `apps/api/src/shared/services/notification-fanout-subscriber.ts` — an `OutboxSubscriber` running inside the dispatch TX beside audit and webhook fan-out, not an `onEvent` post-commit handler (which is best-effort, so a lost notification would fail silently). One `INSERT ... SELECT` over the recipient set, never N inserts in a loop. The recipient set is either a single user or `SELECT user_id FROM member WHERE ...`; everything downstream is shared.
+
+**Preference cascade, applied in that same statement** via one `LEFT JOIN notification_preference` per scope per channel:
+
+```
+org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
+```
+
+`forced: true` short-circuits all four and emits no joins at all. The in-app decision is the `WHERE`; the email decision is a `CASE` filling `emailPendingAt`, so a user who keeps in-app but drops email simply gets a row with no pending mail. **Verified against Postgres via `pnpm --filter api check:fanout`** (`apps/api/scripts/check-fanout-preferences.ts`, 8 cases): a mocked transaction evaluates no `WHERE`, so unit tests structurally cannot cover this, and the repo has no DB integration harness. Re-run it after touching the fan-out.
+
+**Real-time** `apps/api/src/shared/services/notification-stream-hub.ts` + `GET /notifications/stream` — Postgres trigger `pg_notify('notification_created', user_id)`, one `LISTEN` connection per instance (never per client), `streamSSE` with a 25 s heartbeat, capped at `MAX_STREAMS_PER_USER`. **The stream carries a signal, never data**: the client's only reaction is `invalidateQueries(["notifications"])`, which makes reconnection self-healing and removes `Last-Event-ID`, replay, and merge logic entirely.
+
+**Routes** `apps/api/src/modules/notifications/routes.ts` — `GET /notifications`, `GET /unread-count`, `POST /read`, `POST /read-all`, `GET|PUT /preferences`, `GET|PUT /org-preferences` (the org pair gated by `requireOrgPermission({ organization: ["update"] })`), `GET /stream`. Writes carry `denyImpersonated`.
+
+**Crons** on the `/internal/*` rail: `flush-notification-emails` (1 min, batch capped at 5000) and `sweep-notifications` (**read rows only** — an unread notification outlives retention).
+
+**Frontend** — everything cross-cutting is in `apps/app/src/shared/notifications/`, because `shared/` may not import `features/` (the bell mounts in `app-shell`) and the preference matrix has two route-owning consumers that may not import each other:
+- `notification-bell.tsx` / `notification-item.tsx` — bell, badge, dropdown inbox. Row labels reuse `EVENT_DESCRIPTIONS`; grouped rows read "and N more".
+- `use-notification-stream.ts` — `fetch` + `ReadableStream`, **not `EventSource`** (which cannot carry an `Authorization` header, breaking F.1's Capacitor bearer). Exponential backoff with jitter, `AbortController` on unmount. `handleStreamChunk` is pure and returns its trailing partial frame, because a stream splits SSE frames wherever it likes.
+- `notification-broadcast.ts` — mark-as-read propagates cross-tab over `createBroadcastChannel` and applies to the cache without refetching.
+- `preference-matrix.tsx` / `build-preference-matrix.ts` — the grid is rebuilt for all four categories from the explicitly-stored rows alone; an absent cell renders as enabled/immediate, which is what the fan-out applies. A fully-forced category renders disabled **with its reason**, never hidden.
+- Polling is a fallback only: `refetchInterval: connected ? false : 30_000` plus `refetchIntervalInBackground: false`, so a forgotten tab whose stream died stops polling.
+
+`apps/app/src/features/notifications/` keeps only `/settings/notifications` (route + page); the org defaults card lives in `features/organization/components/org-notification-defaults-card.tsx` behind `<Can requires={{ organization: ["update"] }}>` — a route under `orgScopeLayout` would collide, since it flattens children under `settings/`.
+
+**Events**: none added. Notification creation deliberately emits nothing (it would loop with its own subscriber). Preference *mutations* do emit `notification.preference.updated` / `notification.org_preference.updated` — they are persistent state changes. Catalog stays **67 / 28 public / 39 internal**.
+
+**Dev seed** `apps/api/scripts/seed-dev-user.ts` (`pnpm --filter api db:seed`) — creates a verified account through `auth.api.signUpEmail`, so it crosses the real sign-up hooks. `SEED_EMAIL` must use a domain with a real MX record; the disposable-email guard rejects `.test`.
 
 ---
 

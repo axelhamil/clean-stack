@@ -450,6 +450,28 @@ export const ApiTokenUsedPayload = z.object({
 });
 export type ApiTokenUsedPayload = z.infer<typeof ApiTokenUsedPayload>;
 
+export const NotificationPreferenceUpdatedPayload = UserRef.extend({
+  category: z.string(),
+  channel: z.string(),
+  enabled: z.boolean(),
+  frequency: z.string(),
+});
+export type NotificationPreferenceUpdatedPayload = z.infer<
+  typeof NotificationPreferenceUpdatedPayload
+>;
+
+export const NotificationOrgPreferenceUpdatedPayload = OrgRef.extend({
+  actorUserId: z.string(),
+  category: z.string(),
+  channel: z.string(),
+  enabled: z.boolean(),
+  frequency: z.string(),
+  locked: z.boolean(),
+});
+export type NotificationOrgPreferenceUpdatedPayload = z.infer<
+  typeof NotificationOrgPreferenceUpdatedPayload
+>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -516,4 +538,6 @@ export const PayloadByEventType = {
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
+  [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: NotificationPreferenceUpdatedPayload,
+  [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: NotificationOrgPreferenceUpdatedPayload,
 } as const;

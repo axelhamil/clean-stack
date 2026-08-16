@@ -7,6 +7,7 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 - `api/` — api-client, query-client, queries/, mutations/, errors/
 - `auth/` — auth-client, auth-broadcast, can, use-authorization, use-set-active-org, use-sign-out, schemas/
 - `components/` — cross-feature UI (app-shell, org-switcher, command-palette, …)
+- `notifications/` — bell + inbox item, preference matrix, grouping, labels, read-broadcast, SSE stream hook (D.3)
 - `observability/` — sentry.ts (init + captureError/addBreadcrumb/setUser/ErrorBoundary/reactErrorHandler) + noop.ts mirror, error-classifier, query-error-handler (QueryCache/MutationCache onError), session-watcher (setUser sync)
 - `app-providers.tsx` — provider tree
 - `env.ts` — validated env

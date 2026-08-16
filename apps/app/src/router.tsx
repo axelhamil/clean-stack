@@ -25,6 +25,7 @@ import { dataRightsRoute } from "./features/legal/data-rights.route";
 import { privacyPolicyRoute } from "./features/legal/privacy-policy.route";
 import { subProcessorsRoute } from "./features/legal/sub-processors.route";
 import { termsRoute } from "./features/legal/terms.route";
+import { notificationsRoute } from "./features/notifications/notifications.route";
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
 import { privacyRoute } from "./features/privacy/privacy.route";
@@ -62,6 +63,7 @@ const routeTree = rootRoute.addChildren([
         accountRoute,
         privacyRoute,
         apiTokensRoute,
+        notificationsRoute,
         orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute]),
       ]),
     ]),

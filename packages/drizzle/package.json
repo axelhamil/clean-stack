@@ -21,6 +21,7 @@
   "dependencies": {
     "@packages/cookie-consent": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
+    "@packages/events": "workspace:*",
     "@packages/policies": "workspace:*",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",

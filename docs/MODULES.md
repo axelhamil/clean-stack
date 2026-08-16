@@ -48,7 +48,9 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Webhooks front UI + event catalog** (C.5) (`/settings/webhooks` CRUD — per-attempt timeline drawer, one-shot secret reveal, rotate-secret dialog, send-test, auto-disabled badge; SSRF guard; dual-secret rotation (`WEBHOOK_SECRET_GRACE_HOURS`); `webhook_delivery_attempt` table; auto-disable after `WEBHOOK_AUTO_DISABLE_AFTER_DAYS`; public `/developers/events` catalog (JSON schemas, Node signature-verification snippet). 4 internal events → 52 total / 48 subscribable / 4 internal.) | **€800 – €1 500** | 2j |
 | **Account recovery codes UI** (C.6) (`RecoveryCodesCard` regenerate-only + password gate + `xxxxx-xxxxx` format + copy/download; backup-code fallback on `/two-factor` (whitespace stripped, dash auto-inserted); `BackupCodeUsedNotifier` first `onEvent` handler; rate-limit on `generate-backup-codes`. 2 compliance events → 54 total / 50 subscribable / 4 internal.) | **€200 – €400** | 0.5j |
 
-**Subtotal Core (shipped)**: **€34 600 – €58 200** of senior-dev value already in the repo on day zero. ~75-99 days of focused senior work compressed into a clone.
+| **Notification center** (D.3) (`<Bell />` + dropdown inbox in the app shell, unread badge, read/read-all with cross-tab propagation, rows grouped by `groupKey`; `/settings/notifications` preference matrix (category × channel + email frequency) and org defaults card behind `organization:["update"]`; fan-out as an outbox subscriber inside the dispatch TX, one `INSERT ... SELECT` resolving the org-lock → user → org-default → enabled cascade in-statement, `forced` bypass for critical alerts; SSE signal stream (`pg_notify` + one `LISTEN` per instance, `fetch`+`ReadableStream` not `EventSource`) with polling only as fallback; dedup via partial unique index; 2 crons (digest flush + read-only sweep). No new event type — the catalog is consumed, so it stays **67 total / 28 public / 39 internal**.) | **€1 200 – €2 000** | 3j |
+
+**Subtotal Core (shipped)**: **€35 800 – €60 200** of senior-dev value already in the repo on day zero. ~78-102 days of focused senior work compressed into a clone.
 
 ---
 
@@ -60,14 +62,13 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | C.7 | **SSO SAML/OIDC + SCIM provisioning** (BetterAuth `sso` plugin + SCIM endpoint + audit-logged provisioning) | **€5 000 – €8 000** | 10-12j |
 | D.1 | **Status page + SLO dashboards + alerting** (Cachet/Astro, Grafana SLO consuming 0.4 `/metrics`, Sentry → Slack/PagerDuty, runbook-linked) | **€1 500 – €2 500** | 3-4j |
 | D.2 | **OpenAPI auto-docs** (`@hono/zod-openapi`, Scalar UI at `/api/docs`) | **€400 – €700** | 1j |
-| D.3 | **Notification center** (persistent inbox `<Bell />`, `/settings/notifications`, transactional vs marketing per category) | **€1 200 – €2 000** | 3j |
 | D.4 | **SOC2 Type II readiness checklist** (mapping shipped controls, Vanta/Drata-ready) | **€600 – €1 000** | 1-2j |
 | E.1 | **i18n** (TanStack locale routes + Lingui, full string refactor, fallback locale) | **€1 500 – €2 500** | 3-4j |
 | E.2 | **Marketing site** (Astro 5 + Payload 3 self-hosted, separate deploy, content modeling, blog) | **€2 500 – €4 000** | 5-7j |
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€16 500 – €27 200** committed to ship.
+**Subtotal Roadmap**: **€15 300 – €25 200** committed to ship.
 
 ---
 

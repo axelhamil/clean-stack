@@ -66,6 +66,7 @@ const envSchema = z.object({
   WEBHOOK_AUTO_DISABLE_MIN_FAILURES: z.coerce.number().int().positive().default(2),
   WEBHOOK_RESPONSE_CAPTURE_BYTES: z.coerce.number().int().positive().default(4096),
   CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   GIT_SHA: z.string().optional(),
   BUILD_TIME: z.string().optional(),
   SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),

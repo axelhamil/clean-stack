@@ -128,7 +128,7 @@ Reference cartography for removing the Personal Access Tokens module. Walk the 6
 | Axis | Touch-points |
 |---|---|
 | 1. **Back code** | `trash apps/api/src/modules/api-token/`. `container.ts` — remove `.addModule(apiTokenModule)` and the `import`. `index.ts` — remove `/api/v1` mount, `/api/token-scanning/*` scanning mount, and `apiTokenRoutes` + `createApiTokenScanningRoutes` imports. Remove `apps/api/src/public-api/` entirely (sub-app, no other consumers). |
-| 2. **Events** | `packages/events/src/event-types.ts` — 3 types: `api_token.created`, `api_token.revoked`, `api_token.used`. `payloads.ts` — 3 payload types. `retention-map.ts` — 3 entries. `visibility-map.ts` — 3 entries (`public`, `public`, `internal`). Event count: 65 → 62. |
+| 2. **Events** | `packages/events/src/event-types.ts` — 3 types: `api_token.created`, `api_token.revoked`, `api_token.used`. `payloads.ts` — 3 payload types. `retention-map.ts` — 3 entries. `visibility-map.ts` — 3 entries (`public`, `public`, `internal`). Event count: 67 → 64. |
 | 3. **Shared ports / middleware** | `apps/api/src/shared/middleware/api-token.middleware.ts` — delete (no other consumers). `apps/api/src/shared/crypto/api-token.ts` — delete (only used by `api-token.middleware.ts` and `scanning.routes.ts`). `apps/api/src/shared/middleware/auth.middleware.ts` — remove the `/api/v1/` path exclusion from `sessionMiddleware` (the sub-app bypass). `apps/api/src/shared/middleware/rate-limit.policies.ts` — remove `API_TOKEN_POLICY` + `API_TOKEN_IP_POLICY`. `apps/api/src/auth-queries.ts` — verify `findUserById` is still consumed by other modules (webhooks, admin) before removing. |
 | 4. **Env vars** | `apps/api/src/shared/env.ts` — remove `API_TOKEN_PEPPER`, `API_TOKEN_PEPPER_PREVIOUS`, `API_TOKEN_PREFIX`, `API_TOKEN_MAX_EXPIRY_DAYS`, `API_TOKEN_LAST_USED_BUCKET_MIN`, `API_TOKEN_PEPPER_VERSION` and the production boot guard that requires `API_TOKEN_PEPPER`. `apps/api/.env.example` — same 6 keys. |
 | 5. **Schema** | `packages/drizzle/src/schema/api-token.ts` — delete. Remove barrel re-export from `packages/drizzle/src/index.ts`. Run `pnpm db:generate` — expect 1 `DROP TABLE api_token` migration. Read the SQL before committing. |
@@ -137,3 +137,23 @@ Reference cartography for removing the Personal Access Tokens module. Walk the 6
 **What you do NOT touch**:
 - `shared/services/webhook-fanout-subscriber.ts` — the `isPublicEvent` guard (from `visibility-map.ts`) is called here. Once `visibility-map.ts` is gone you must inline the equivalent filtering or remove the feature guard entirely — decide before committing.
 - `apps/app/src/features/developers/` (`/developers/events` catalog) — it reads `VISIBILITY` from `packages/events`. Once removed, the catalog page shows all events again (no longer filtered); this is a UI regression, not a crash. Either remove the page or drop the filter guard.
+
+---
+
+## Removal map — `modules/notifications` (Phase D.3)
+
+Reference cartography for removing the in-app notification center. Walk the 6-axis checklist above.
+
+| Axis | Touch-points |
+|---|---|
+| 1. **Back code** | `trash apps/api/src/modules/notifications/`. `container.ts` — remove `.addModule(notificationsModule)`, the `NotificationFanoutSubscriber` registration, and the `NotificationStreamHub` binding. `index.ts` — remove `notificationsRoutes` mount, the hub start-up call, and the internal-route mounts. `trash apps/api/src/shared/services/{notification-fanout-subscriber,notification-stream-hub,notification-trigger,resolve-audience}.ts` and `apps/api/src/shared/internal-routes/{flush-notification-emails,sweep-notifications}.route.ts`. `trash apps/api/scripts/check-fanout-preferences.ts` + its `check:fanout` script entry. |
+| 2. **Events** | **No event type to remove for the inbox itself** — D.3 consumes the catalog rather than extending it. Only the 2 preference-mutation events go: `notification.preference.updated`, `notification.org_preference.updated` in `event-types.ts`, `payloads.ts`, `retention-map.ts`, `visibility-map.ts`. Event count: 67 → 65. `packages/events/src/notification-map.ts` — delete the whole projection (`NOTIFICATION_MAP`, `notificationConfigOf`, `isNotifiable`, `forcedLevelOf`, the channel/frequency/scope const arrays and their types). |
+| 3. **Shared ports / cross-refs** | `packages/drizzle/src/schema/notification.ts` imports the channel/frequency/scope arrays from `@packages/events` — inline them there or delete the schema first. Check whether `@packages/events` is still a dependency of `@packages/drizzle` afterwards; if not, drop it from `packages/drizzle/package.json`. |
+| 4. **Env vars** | `apps/api/src/shared/env.ts` + `.env.example` — `NOTIFICATION_RETENTION_DAYS`. |
+| 5. **Schema** | `packages/drizzle/src/schema/notification.ts` — delete (both tables). Remove the barrel re-export. The `pg_notify` trigger is created at runtime by `ensureNotificationTrigger`, **not by a migration** — `pnpm db:generate` will not drop it. Drop it by hand (`DROP TRIGGER … ON notification`) before dropping the table, or the migration fails on a live database. |
+| 6. **Front + docs** | `trash apps/app/src/shared/notifications/` (bell, item, matrix, grouping, labels, broadcast, stream hook) and `apps/app/src/features/notifications/`. `apps/app/src/shared/components/app-shell.tsx` — remove `<NotificationBell />`. `apps/app/src/router.tsx` — remove import + registration. `contextual-tabs.tsx` — remove the "Notifications" tab. `features/organization/organization.page.tsx` + `components/org-notification-defaults-card.tsx` — remove the card. `shared/api/{queries,mutations}/notifications.ts` — delete. Docs: `FEATURES.md` (D.3 section), `OVERVIEW.md` (notification bullet), `EVENTS.md` (third-projection section), `CRON.md` (2 rows), `ROADMAP.md` (D.3 spec), `README.md` (M4 note), this section. |
+
+**What you do NOT touch**:
+- `shared/hooks/use-broadcast-channel.ts` — promoted out of `auth-broadcast.ts` and still used by the auth flow. Removing notifications does not orphan it.
+- `EVENT_DESCRIPTIONS` in `@packages/events` — the inbox reuses it for row labels, but `/developers/events` and the webhook picker own it.
+- The outbox dispatcher and its subscriber list — removing one subscriber must leave audit and webhook fan-out untouched. That is the whole point of the rail.

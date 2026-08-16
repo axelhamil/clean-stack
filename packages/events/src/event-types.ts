@@ -66,6 +66,8 @@ export const EventTypes = {
   ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
   ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
   EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
+  NOTIFICATION_PREFERENCE_UPDATED: "notification.preference.updated",
+  NOTIFICATION_ORG_PREFERENCE_UPDATED: "notification.org_preference.updated",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

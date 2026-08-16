@@ -30,6 +30,11 @@ const STUB_VARS = {
     tokenName: "CI token",
     revokedAt: "6 août 2026 à 10:00",
   },
+  notification_digest: {
+    category: "billing",
+    itemCount: "2",
+    itemsSummary: "billing.payment.failed, billing.payment.failed",
+  },
 } as const satisfies Record<EmailTemplateKey, unknown>;
 
 describe("renderTemplate", () => {

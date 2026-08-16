@@ -68,6 +68,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.API_TOKEN_CREATED]: "compliance",
   [EventTypes.API_TOKEN_REVOKED]: "compliance",
   [EventTypes.API_TOKEN_USED]: "operational",
+  [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: "compliance",
+  [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: "compliance",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

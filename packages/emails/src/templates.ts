@@ -21,6 +21,11 @@ export type EmailTemplates = {
     tokenName: string;
     revokedAt: string;
   };
+  notification_digest: {
+    category: string;
+    itemCount: string;
+    itemsSummary: string;
+  };
 };
 
 export type EmailTemplateKey = keyof EmailTemplates;

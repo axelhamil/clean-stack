@@ -7,6 +7,7 @@ import { auditLogModule } from "./modules/audit-log/module";
 import { billingModule } from "./modules/billing/module";
 import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
+import { notificationsModule } from "./modules/notifications/module";
 import { policyModule } from "./modules/policies/module";
 import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
@@ -32,6 +33,8 @@ import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
+import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
+import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
 import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
 import {
   RateLimiterFlexibleAdapter,
@@ -54,9 +57,11 @@ declare module "inwire" {
     IRateLimiter: IRateLimiter;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
+    NotificationFanoutSubscriber: NotificationFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
     BackupCodeUsedNotifier: EventHandler;
     EmailDeliveryWorker: EmailDeliveryWorker;
+    NotificationStreamHub: NotificationStreamHub;
   }
 }
 
@@ -105,13 +110,14 @@ export const di = container()
   )
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
+  .add("NotificationFanoutSubscriber", (c) => new NotificationFanoutSubscriber(c.IInstrumentation))
   .add("BackupCodeUsedNotifier", (c) => backupCodeUsedNotifier({ IEmailService: c.IEmailService }))
   .add(
     "OutboxDispatcher",
     (c) =>
       new OutboxDispatcher(
         c.IOutboxRepository,
-        [c.AuditEventSubscriber, c.WebhookFanoutSubscriber],
+        [c.AuditEventSubscriber, c.WebhookFanoutSubscriber, c.NotificationFanoutSubscriber],
         logger,
         env.DATABASE_URL,
         c.IInstrumentation,
@@ -128,4 +134,6 @@ export const di = container()
   .addModule(consentModule)
   .addModule(quotaModule)
   .addModule(billingModule)
+  .addModule(notificationsModule)
+  .add("NotificationStreamHub", () => new NotificationStreamHub(logger, env.DATABASE_URL))
   .build();

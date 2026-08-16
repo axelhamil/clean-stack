@@ -68,6 +68,8 @@ export const VISIBILITY = {
   "admin.user.password_reset": "internal",
   "admin.user.sessions_revoked": "internal",
   "email.delivery.exhausted": "internal",
+  "notification.preference.updated": "internal",
+  "notification.org_preference.updated": "internal",
 } satisfies Record<EventType, Visibility>;
 
 export function isPublicEvent(eventType: EventType): boolean {

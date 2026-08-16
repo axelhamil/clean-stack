@@ -1,17 +1,15 @@
+import { createBroadcastChannel } from "../hooks/use-broadcast-channel";
+
 type AuthEvent = { type: "session-changed" };
 
-const channel =
-  typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("clean-stack-auth") : null;
+const channel = createBroadcastChannel<AuthEvent>("clean-stack-auth");
 
 export function broadcastAuthChange(): void {
-  channel?.postMessage({ type: "session-changed" } satisfies AuthEvent);
+  channel.post({ type: "session-changed" });
 }
 
 export function onAuthChange(handler: () => void): () => void {
-  if (!channel) return () => {};
-  const listener = (event: MessageEvent<AuthEvent>) => {
-    if (event.data.type === "session-changed") handler();
-  };
-  channel.addEventListener("message", listener);
-  return () => channel.removeEventListener("message", listener);
+  return channel.subscribe((event) => {
+    if (event.type === "session-changed") handler();
+  });
 }
