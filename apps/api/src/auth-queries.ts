@@ -161,18 +161,6 @@ export async function updateUserName(userId: string, name: string): Promise<void
   await db.update(schema.user).set({ name }).where(eq(schema.user.id, userId));
 }
 
-// ── #10 – sso providersLimit business-tier gate ────────────────────────────
-
-export async function activeOrganizationIdFor(userId: string): Promise<string | null> {
-  const [row] = await db
-    .select({ organizationId: schema.session.activeOrganizationId })
-    .from(schema.session)
-    .where(eq(schema.session.userId, userId))
-    .orderBy(desc(schema.session.createdAt))
-    .limit(1);
-  return row?.organizationId ?? null;
-}
-
 export async function findUserOrganizations(
   userId: string,
 ): Promise<{ id: string; name: string; slug: string; role: string }[]> {

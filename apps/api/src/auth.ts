@@ -22,7 +22,6 @@ import {
 import { CryptoHasher } from "bun";
 import type Stripe from "stripe";
 import {
-  activeOrganizationIdFor,
   clearConfirmedPendingEmail,
   countActiveMembers,
   deleteOrgIfEmpty,
@@ -40,6 +39,7 @@ import {
   authorizeSubscriptionReference,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
+import { hasFeature } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
@@ -584,15 +584,11 @@ const authOptions = {
       domainVerification: { enabled: true },
       defaultOverrideUserInfo: false,
       organizationProvisioning: { disabled: false, defaultRole: "member" },
-      // Returning 0 (not throwing) is what makes this the plan gate: the plugin's own
-      // "!limit" check turns any falsy return into a 403, so an unresolved org or a
-      // rejected getEntitlements() call both deny registration rather than allow it.
-      providersLimit: async (user) => {
-        const orgId = await activeOrganizationIdFor(user.id);
-        if (!orgId) return 0;
-        const entitlements = await di.EntitlementsService.getEntitlements(orgId);
-        return entitlements.features.includes("sso") ? 10 : 0;
-      },
+      // `providersLimit` only ever receives `user` (no ctx, no request body — verified
+      // against the plugin's dist), so it cannot see which org a registration targets.
+      // The business-tier gate lives in hooks.before on "/sso/register" instead, where
+      // body.organizationId is available; this stays a flat anti-abuse ceiling per user.
+      providersLimit: 10,
     }),
     scim({
       requiredRole: ["owner"],
@@ -643,6 +639,21 @@ const authOptions = {
             }
           }
           throw new APIError("TOO_MANY_REQUESTS", { message: "Too many login attempts" });
+        }
+        return;
+      }
+
+      // D4 business-tier gate: `providersLimit` cannot see the target org (only `user`
+      // is passed), so the gate lives here where `body.organizationId` is the one the
+      // request actually names — never inferred from session history.
+      if (path === "/sso/register") {
+        const organizationId = body?.organizationId as string | undefined;
+        if (!organizationId) {
+          throw new APIError("FORBIDDEN", { message: "SSO_ORGANIZATION_REQUIRED" });
+        }
+        const entitlements = await di.EntitlementsService.getEntitlements(organizationId);
+        if (!hasFeature(entitlements, "sso")) {
+          throw new APIError("FORBIDDEN", { message: "SSO_PLAN_REQUIRED" });
         }
         return;
       }
