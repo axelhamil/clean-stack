@@ -70,6 +70,19 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.API_TOKEN_USED]: "operational",
   [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: "compliance",
   [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: "compliance",
+  [EventTypes.SSO_PROVIDER_REGISTERED]: "compliance",
+  [EventTypes.SSO_PROVIDER_UPDATED]: "compliance",
+  [EventTypes.SSO_PROVIDER_DELETED]: "compliance",
+  [EventTypes.SSO_DOMAIN_VERIFIED]: "compliance",
+  [EventTypes.SSO_ENFORCEMENT_CHANGED]: "compliance",
+  [EventTypes.SSO_LOGIN_SUCCESS]: "compliance",
+  [EventTypes.SSO_LOGIN_FAILURE]: "compliance",
+  [EventTypes.SCIM_CONNECTION_CREATED]: "compliance",
+  [EventTypes.SCIM_CONNECTION_DELETED]: "compliance",
+  [EventTypes.SCIM_USER_CREATED]: "compliance",
+  [EventTypes.SCIM_USER_UPDATED]: "compliance",
+  [EventTypes.SCIM_USER_DEACTIVATED]: "compliance",
+  [EventTypes.SCIM_USER_DEPROVISIONED]: "compliance",
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {

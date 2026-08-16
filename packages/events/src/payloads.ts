@@ -472,6 +472,89 @@ export type NotificationOrgPreferenceUpdatedPayload = z.infer<
   typeof NotificationOrgPreferenceUpdatedPayload
 >;
 
+const SsoProviderRef = z.object({
+  actorUserId: z.string(),
+  organizationId: z.string(),
+  providerId: z.string(),
+});
+
+export const SsoProviderRegisteredPayload = SsoProviderRef.extend({
+  protocol: z.enum(["saml", "oidc"]),
+  domain: z.string(),
+  issuer: z.string(),
+});
+export type SsoProviderRegisteredPayload = z.infer<typeof SsoProviderRegisteredPayload>;
+
+export const SsoProviderUpdatedPayload = SsoProviderRef.extend({
+  changedFields: z.array(z.string()),
+});
+export type SsoProviderUpdatedPayload = z.infer<typeof SsoProviderUpdatedPayload>;
+
+export const SsoProviderDeletedPayload = SsoProviderRef;
+export type SsoProviderDeletedPayload = z.infer<typeof SsoProviderDeletedPayload>;
+
+export const SsoDomainVerifiedPayload = SsoProviderRef.extend({ domain: z.string() });
+export type SsoDomainVerifiedPayload = z.infer<typeof SsoDomainVerifiedPayload>;
+
+export const SsoEnforcementChangedPayload = z.object({
+  actorUserId: z.string(),
+  organizationId: z.string(),
+  enforced: z.boolean(),
+  viaPlatformAdmin: z.boolean(),
+});
+export type SsoEnforcementChangedPayload = z.infer<typeof SsoEnforcementChangedPayload>;
+
+export const SsoLoginSuccessPayload = UserRef.extend({
+  providerId: z.string(),
+  organizationId: z.string().nullable(),
+  protocol: z.enum(["saml", "oidc"]),
+  jitProvisioned: z.boolean(),
+});
+export type SsoLoginSuccessPayload = z.infer<typeof SsoLoginSuccessPayload>;
+
+export const SsoLoginFailurePayload = z.object({
+  actorUserId: z.string().nullable(),
+  providerId: z.string().nullable(),
+  domain: z.string(),
+  reason: z.string(),
+  ip: z.string(),
+});
+export type SsoLoginFailurePayload = z.infer<typeof SsoLoginFailurePayload>;
+
+const ScimConnectionRef = z.object({
+  actorUserId: z.string(),
+  organizationId: z.string(),
+  providerId: z.string(),
+});
+
+export const ScimConnectionCreatedPayload = ScimConnectionRef;
+export type ScimConnectionCreatedPayload = z.infer<typeof ScimConnectionCreatedPayload>;
+
+export const ScimConnectionDeletedPayload = ScimConnectionRef;
+export type ScimConnectionDeletedPayload = z.infer<typeof ScimConnectionDeletedPayload>;
+
+const ScimUserRef = z.object({
+  userId: z.string(),
+  actorUserId: z.string().nullable(),
+  organizationId: z.string(),
+  scimProviderId: z.string(),
+  externalId: z.string().nullable(),
+});
+
+export const ScimUserCreatedPayload = ScimUserRef;
+export type ScimUserCreatedPayload = z.infer<typeof ScimUserCreatedPayload>;
+
+export const ScimUserUpdatedPayload = ScimUserRef.extend({
+  changedFields: z.array(z.string()),
+});
+export type ScimUserUpdatedPayload = z.infer<typeof ScimUserUpdatedPayload>;
+
+export const ScimUserDeactivatedPayload = ScimUserRef;
+export type ScimUserDeactivatedPayload = z.infer<typeof ScimUserDeactivatedPayload>;
+
+export const ScimUserDeprovisionedPayload = ScimUserRef;
+export type ScimUserDeprovisionedPayload = z.infer<typeof ScimUserDeprovisionedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -540,4 +623,17 @@ export const PayloadByEventType = {
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
   [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: NotificationPreferenceUpdatedPayload,
   [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: NotificationOrgPreferenceUpdatedPayload,
+  [EventTypes.SSO_PROVIDER_REGISTERED]: SsoProviderRegisteredPayload,
+  [EventTypes.SSO_PROVIDER_UPDATED]: SsoProviderUpdatedPayload,
+  [EventTypes.SSO_PROVIDER_DELETED]: SsoProviderDeletedPayload,
+  [EventTypes.SSO_DOMAIN_VERIFIED]: SsoDomainVerifiedPayload,
+  [EventTypes.SSO_ENFORCEMENT_CHANGED]: SsoEnforcementChangedPayload,
+  [EventTypes.SSO_LOGIN_SUCCESS]: SsoLoginSuccessPayload,
+  [EventTypes.SSO_LOGIN_FAILURE]: SsoLoginFailurePayload,
+  [EventTypes.SCIM_CONNECTION_CREATED]: ScimConnectionCreatedPayload,
+  [EventTypes.SCIM_CONNECTION_DELETED]: ScimConnectionDeletedPayload,
+  [EventTypes.SCIM_USER_CREATED]: ScimUserCreatedPayload,
+  [EventTypes.SCIM_USER_UPDATED]: ScimUserUpdatedPayload,
+  [EventTypes.SCIM_USER_DEACTIVATED]: ScimUserDeactivatedPayload,
+  [EventTypes.SCIM_USER_DEPROVISIONED]: ScimUserDeprovisionedPayload,
 } as const;

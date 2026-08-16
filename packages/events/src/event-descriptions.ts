@@ -79,6 +79,21 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A user updated their personal notification preferences.",
   [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]:
     "An organization administrator updated the organization notification preferences.",
+  [EventTypes.SSO_PROVIDER_REGISTERED]:
+    "An SSO identity provider was registered for an organization.",
+  [EventTypes.SSO_PROVIDER_UPDATED]: "An SSO identity provider's configuration was changed.",
+  [EventTypes.SSO_PROVIDER_DELETED]: "An SSO identity provider was removed from an organization.",
+  [EventTypes.SSO_DOMAIN_VERIFIED]: "An organization proved ownership of an SSO domain.",
+  [EventTypes.SSO_ENFORCEMENT_CHANGED]: "An organization turned SSO-only sign-in on or off.",
+  [EventTypes.SSO_LOGIN_SUCCESS]: "A user signed in through an SSO identity provider.",
+  [EventTypes.SSO_LOGIN_FAILURE]: "An SSO sign-in attempt was rejected.",
+  [EventTypes.SCIM_CONNECTION_CREATED]:
+    "A SCIM provisioning connection was created and its token issued.",
+  [EventTypes.SCIM_CONNECTION_DELETED]: "A SCIM provisioning connection was deleted.",
+  [EventTypes.SCIM_USER_CREATED]: "A user was provisioned into an organization through SCIM.",
+  [EventTypes.SCIM_USER_UPDATED]: "A user's attributes were updated through SCIM.",
+  [EventTypes.SCIM_USER_DEACTIVATED]: "A user was deactivated through SCIM.",
+  [EventTypes.SCIM_USER_DEPROVISIONED]: "A user was removed from an organization through SCIM.",
 };
 
 export function descriptionFor(eventType: string): string {
