@@ -117,7 +117,7 @@ Domain & application use `Result<T, E>` (no throw); controller translates → `H
 
 ## Events (transactional outbox)
 
-`IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg, tx)` calls `trackEventsOnSuccess` → events flushed via `outbox.enqueue` in the same TX (atomicity). Post-commit, `pg_notify` wakes `OutboxDispatcher` → built-in subscribers (audit, webhook) in the dispatch TX, then `onEvent(...)` handlers post-commit (best-effort, isolated).
+`IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg, tx)` calls `trackEventsOnSuccess` → events flushed via `outbox.enqueue` in the same TX (atomicity). Post-commit, `pg_notify` wakes `OutboxDispatcher` → built-in subscribers (audit, webhook, notification fan-out) in the dispatch TX, then `onEvent(...)` handlers post-commit (best-effort, isolated).
 
 **BetterAuth → outbox bridge** (`auth.ts`):
 - **`databaseHooks` for core models** (user/session/account/verification) — TX-bound, all flows. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.

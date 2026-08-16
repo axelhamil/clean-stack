@@ -118,7 +118,7 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 
 **Event-driven core & transactions** — *the hard distributed-systems part, already solved*
 - Transactional outbox — domain events persisted in the **same DB transaction** as the state change (`IUnitOfWork.run()` + `EventCollector` AsyncLocalStorage) → no event ever lost, none emitted for a rolled-back write (the dual-write problem, solved)
-- Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout), user `onEvent(...)` handlers isolated post-commit
+- Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout + notification fanout), user `onEvent(...)` handlers isolated post-commit
 - **52 typed events** (48 subscribable + 4 internal), append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay, SSRF guard, dual-secret rotation), `X-Request-Id` correlation
 - **Zero plumbing post-clone** — declare the event in `@packages/events` → `addEvent()` in the aggregate → run via `uow.run()`; the audit row, webhook fanout, and in-process handlers (auto-discovered via inwire) come for free
 - Internal `/internal/*` endpoints — HMAC-signed, optional private-network layer

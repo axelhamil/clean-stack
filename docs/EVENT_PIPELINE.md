@@ -65,6 +65,7 @@ zero divergence.
 │     │   for each event:                                             │
 │     │     ├─ AuditEventSubscriber.handle(event, tx)                 │
 │     │     ├─ WebhookFanoutSubscriber.handle(event, tx)              │
+│     │     ├─ NotificationFanoutSubscriber.handle(event, tx)         │
 │     │     └─ markDispatched(event.id, tx)                           │
 │     │                                                                │
 │     │   on failure: markFailed + exponential backoff w/ jitter      │
@@ -125,7 +126,7 @@ purpose:
 
 | Tier | Runs | Guarantees | Use for |
 |---|---|---|---|
-| **Built-in subscribers** | Inside the drain TX | Atomic with `markDispatched`. A failure retries the whole event. | Audit log, webhook fan-out, anything where dropping a row is a compliance bug. |
+| **Built-in subscribers** | Inside the drain TX | Atomic with `markDispatched`. A failure retries the whole event. | Audit log, webhook fan-out, notification fan-out, anything where dropping a row is a compliance bug. |
 | **User handlers** | After the drain commits | Isolated; a throw is logged but the event stays marked dispatched. | Emails, push notifications, search-index updates — side effects that have their own retry logic. |
 
 If a future handler *cannot* tolerate at-most-once semantics, promote it to a

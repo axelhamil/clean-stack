@@ -44,6 +44,10 @@ your code           ─►  uow.run(async tx => repo.save(aggregate, tx))
   → audit_log row               → webhook_delivery rows              (auto-discovered via
   (idempotent via               (HMAC POST → consumers via            EVENT_HANDLER_SYMBOL)
   audit-${eventId})             WebhookDeliveryWorker)
+
+  NotificationFanoutSubscriber
+  → notification rows (preference cascade resolved
+    in the INSERT; forced events bypass it)
 ```
 
 **Key invariant**: built-in subscribers run inside the same DB transaction as `markDispatched` — atomic. User handlers run **post-commit**, best-effort, isolated from each other (one handler throwing doesn't fail the outbox dispatch).
