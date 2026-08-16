@@ -8,6 +8,38 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 
 ---
 
+## In-app notification center ✅ Phase D.3 · Aug 2026
+
+**Why**: transactional email is asynchronous and users miss it. An in-app inbox is the SaaS default (Linear, GitHub, Stripe) and is the last piece F.1 (Capacitor) depends on. The interesting part is not the inbox — it is that the event backbone already resolves *what happened*; notifications only add *who should hear about it*.
+
+**Why a typed catalog projection over a workflow DSL**: Knock / Novu / Courier all ship a workflow engine because they do not own the emitting system. Here the outbox already resolves fan-out, so the entire "engine" collapses into `Partial<Record<EventType, NotificationConfig>>` — the third projection of the catalog after `visibility-map` (webhooks) and `retention-map` (purge). 21 of 67 events are notifiable; the rest stay audit-only by default.
+
+**What this phase delivered**:
+
+- **Audience by capability, never by role tuple** — `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `audience: "org:admins"` is exactly the hardcoded tuple org-scoping rule §6 forbids. Costs nothing at runtime: roles are static, so `ORG_ROLES.filter(authorizeRole)` resolves at boot into `WHERE member.role = ANY($1)`. **Trap**: `billing:["manage"]` is owner-only — a notification asks *who needs to know*, not *who may act*, so `read` is nearly always the right level.
+- **Fan-out inside the dispatch TX** (`NotificationFanoutSubscriber implements OutboxSubscriber`), beside audit and webhook fan-out — not the `onEvent` post-commit handler the design first suggested. `onEvent` is best-effort and isolated, so a lost notification fails silently.
+- **Preference cascade resolved in the insert statement**: `org locked > user > org default > enabled`, one `LEFT JOIN notification_preference` per scope per channel on a single `INSERT ... SELECT`. In-app decides the `WHERE`; email decides a `CASE` filling `emailPendingAt`. `forced: true` short-circuits all four and emits no joins.
+- **SSE carries a signal, never data** — `pg_notify('notification_created', user_id)` + one `LISTEN` connection per instance (never per client, which exhausts the pool at a few hundred users). The client's only reaction is `invalidateQueries`, which makes reconnection self-healing and deletes `Last-Event-ID`, replay and merge logic outright. Client uses `fetch` + `ReadableStream`, **not `EventSource`** — it cannot carry an `Authorization` header, which would break F.1's bearer.
+- **Throttling by partial unique index** `(userId, dedupKey) WHERE dedup_key IS NOT NULL`, window baked into the key. Dedup at insert inside the TX is concurrency-correct; a counter would need a lock for the same guarantee.
+- **Front** — bell + inbox in the shell, `/settings/notifications` matrix, org defaults card in `/settings/organization` (a route under `orgScopeLayout` would collide, it flattens children under `settings/`). Cross-tab read propagation over `BroadcastChannel`, applied to the cache without refetching. Polling only as fallback, with `refetchIntervalInBackground: false` so a forgotten tab whose stream died stops asking.
+- **No new event type.** Notification creation emits nothing — it would loop with its own subscriber. Only the two preference *mutations* emit (`notification.preference.updated`, `notification.org_preference.updated`). Catalog stays **67 / 28 public / 39 internal**.
+
+**Structural decisions**:
+
+1. **The preference cascade shipped inert, and was found only when building the UI on top of it.** The fan-out never read the preference table, `forced` was read nowhere, and `NotificationPreferenceService.resolve` was registered in inwire with zero callers — the backend phase had been marked complete with a green suite. The settings page would have written rows that changed nothing, while telling users security alerts could not be disabled (nothing was ever disabled). Branched into the insert statement, and the dead service deleted: **two implementations of one cascade, only one of them wired, diverge by construction** — and this one already had, since `resolve()` ignored unlocked org rows.
+2. **`org default` is a fourth cascade level, added deliberately.** An unlocked org row now applies when the member expressed no choice. Without it, the "organization defaults" card would set values that never take effect — a default that never defaults.
+3. **`forcedLevelOf` returns `all | some | none`, not a boolean** — `security` is fully forced, `billing` only partly (payment failed and cancellation are, subscription created is not). A boolean would have to lie about billing. The UI disables a fully-forced row *with its reason* rather than hiding the switch: a hidden option is one the user hunts for forever.
+4. **SQL logic cannot be covered by this repo's unit tests, and pretending otherwise is the real risk.** A mocked `tx` evaluates no `WHERE`; there is no DB integration harness. Verification lives in `apps/api/scripts/check-fanout-preferences.ts` (`pnpm --filter api check:fanout`, 8 cases against Postgres) — re-run it after touching the fan-out. Two tests asserting on generated SQL text were written and removed: they depend on the real `sql`, which another file's `mock.module` replaces process-wide, so they passed or failed on execution order. That script is also what caught `CASE WHEN … THEN $date` breaking Postgres type inference (cast `::timestamp` required).
+5. **Everything cross-cutting lives in `apps/app/src/shared/notifications/`, not in the feature.** `shared/` may not import `features/` (the bell mounts in `app-shell`), and two route-owning features may not import each other (the matrix serves both `features/notifications` and `features/organization`). The import the feature layout would need does not exist. Promoted to a placement decisor in `apps/app/CLAUDE.md`.
+6. **Row labels reuse `EVENT_DESCRIPTIONS`** rather than restating 21 strings in the front. Payloads carry ids, not names, so there is no human detail to render beyond the sentence the catalog already owns.
+
+**Out of scope** (explicit):
+- Native push (mobile / browser) — Phase F, needs a device-token registry.
+- Frequency-driven digest windows: the column and the UI exist, the flush cron still treats every pending row the same. Honouring `hourly` / `daily` is a cron change, not a schema change.
+- Generalized real-time bus. The stream is notification-shaped on purpose; a generic bus is a different product.
+
+---
+
 ## API tokens / Personal Access Tokens ✅ Phase C.4 · Aug 2026
 
 **Why**: any B2B SaaS needs a machine-to-machine auth primitive that can't be session-stolen. Session cookies work for browsers; PATs work for CI, CLI, and customer integrations. Without them, customers resort to screen-scraping or long-lived session abuse — both unauditable. PATs also unblock C.4's opt-in public API surface, which is the prerequisite for D.2 (OpenAPI docs) and F.1 (Capacitor bearer).
