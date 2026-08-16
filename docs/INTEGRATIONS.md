@@ -84,6 +84,12 @@ endpoints; you wire your own scheduler.
 | Endpoint | Recommended cadence | Purpose |
 |---|---|---|
 | `POST /internal/rgpd-sweep` | Daily, e.g. `0 3 * * *` UTC | Wipes accounts whose 7-day grace window has elapsed. Idempotent — safe to over-schedule. |
+| `POST /internal/flush-notification-emails` | Every minute | Groups pending notification emails into per-user/category digests and enqueues them. This cadence is what `immediate` means for email; true real-time is the SSE stream's job. |
+| `POST /internal/sweep-notifications` | Daily | Purges **read** notifications past `NOTIFICATION_RETENTION_DAYS`. Unread rows are never purged, whatever their age. |
+| `POST /internal/sweep-email-messages` | Daily | Purges delivered/exhausted queue rows past `EMAIL_MESSAGE_RETENTION_DAYS`. |
+| `POST /internal/sweep-{webhook-delivery,audit-log,outbox}` | Daily, **in this order** | Retention purge of the event pipeline tables. The order is not cosmetic: `ON DELETE RESTRICT` foreign keys make the reverse order fail. |
+
+Only the first row is strictly required to be compliant; the rest keep tables from growing without bound. Full request/response contracts in [`CRON.md`](./CRON.md).
 
 All `/internal/*` endpoints are protected by HMAC-signed requests
 (`X-Internal-Signature: t=<unix>,v1=<hex>` over a canonical message — see

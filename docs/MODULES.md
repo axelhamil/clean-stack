@@ -21,6 +21,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Auth** (BetterAuth singleton wired Bun-native + 2FA + passkey + magic-link + bearer + customSession + email hooks idempotents) | **€800 – €1 500** | 2-3j |
 | **Multi-tenant + access-control SSOT** (organization plugin, Personal org auto-creation/self-heal, capability-based predicate api/route/UI, `<Can>`, `useAuthorization`, `requireOrgPermission`) | **€1 000 – €1 800** | 3-4j |
 | **Email** (Resend port + adapter, template registry typed, idempotency, retry, EU region option, SPF/DKIM/DMARC deploy doc) | **€400 – €700** | 1j |
+| **Email delivery queue** (D.5) (`email_message` durable table written **inside the caller's TX**, so a queued email cannot survive a rolled-back write; `EmailDeliveryWorker` polls every 2 s, claims 300, chunks 100 into `resend.batch.send` (10 req/s ceiling, permissive batch validation); decorrelated-jitter retry with `email.delivery.exhausted` on give-up; batch-level `Idempotency-Key`; `@packages/emails` in-repo React Email templates as the SSOT with `TEMPLATE_IDS` as override; `sweep-email-messages` retention cron. No email is ever sent inline from a request path.) | **€800 – €1 400** | 2j |
 | **Storage S3-compatible** (R2/SeaweedFS, three-step presign→PUT→confirm, owner-scoped key, server-verified `HeadObject` on confirm, boot-time fail-hard) | **€800 – €1 500** | 2j |
 | **RGPD complet** (Art. 17 erasure with 7-day grace + Art. 20 portability + 2FA-gated + sole-owner preflight + automated cron sweep + `/legal/data-rights` Art. 13/14) | **€2 500 – €4 000** | 5-7j |
 | **DDD-kit** (Result, Option, Entity, Aggregate, ValueObject, UUID v7, WatchedList, BaseRepository, ScopedRepository, IUnitOfWork avec ALS event-collector flush, BaseDomainEvent, onEvent factory, EventCollector, AppErrorException, 275 vitest cases) | **€1 500 – €2 500** | 4-5j |
@@ -50,7 +51,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 
 | **Notification center** (D.3) (`<Bell />` + dropdown inbox in the app shell, unread badge, read/read-all with cross-tab propagation, rows grouped by `groupKey`; `/settings/notifications` preference matrix (category × channel + email frequency) and org defaults card behind `organization:["update"]`; fan-out as an outbox subscriber inside the dispatch TX, one `INSERT ... SELECT` resolving the org-lock → user → org-default → enabled cascade in-statement, `forced` bypass for critical alerts; SSE signal stream (`pg_notify` + one `LISTEN` per instance, `fetch`+`ReadableStream` not `EventSource`) with polling only as fallback; dedup via partial unique index; 2 crons (digest flush + read-only sweep). No new event type — the catalog is consumed, so it stays **67 total / 28 public / 39 internal**.) | **€1 200 – €2 000** | 3j |
 
-**Subtotal Core (shipped)**: **€35 800 – €60 200** of senior-dev value already in the repo on day zero. ~78-102 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€36 600 – €61 600** of senior-dev value already in the repo on day zero. ~80-104 days of focused senior work compressed into a clone.
 
 ---
 
@@ -74,7 +75,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 
 ## Total value-in-box once roadmap is shipped
 
-**Core + Roadmap = €51 100 – €85 400** of realistic senior-dev value packaged.
+**Core + Roadmap = €51 900 – €86 800** of realistic senior-dev value packaged.
 
 That's ~5.5-7 months of focused senior work compressed into a clone. Honest, defensible to clients, no inflated SOW pricing.
 
