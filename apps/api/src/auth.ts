@@ -1,6 +1,8 @@
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
+import { scim } from "@better-auth/scim";
+import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
@@ -570,6 +572,8 @@ const authOptions = {
         );
       },
     }),
+    sso(),
+    scim(),
   ],
 
   hooks: {
