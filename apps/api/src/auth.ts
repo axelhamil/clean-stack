@@ -41,6 +41,8 @@ import {
 } from "./modules/billing/application/subscription-events";
 import { hasFeature } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
+import { normalizeSamlConfig } from "./shared/auth/saml-config";
+import { SSO_PATHS } from "./shared/auth/sso-paths";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
@@ -646,7 +648,9 @@ const authOptions = {
       // D4 business-tier gate: `providersLimit` cannot see the target org (only `user`
       // is passed), so the gate lives here where `body.organizationId` is the one the
       // request actually names — never inferred from session history.
-      if (path === "/sso/register") {
+      // D8 SAML hardening runs after the gate: a request refused for lack of
+      // entitlement need not have its body rewritten first.
+      if (path === SSO_PATHS.register) {
         const organizationId = body?.organizationId as string | undefined;
         if (!organizationId) {
           throw new APIError("FORBIDDEN", { message: "SSO_ORGANIZATION_REQUIRED" });
@@ -654,6 +658,14 @@ const authOptions = {
         const entitlements = await di.EntitlementsService.getEntitlements(organizationId);
         if (!hasFeature(entitlements, "sso")) {
           throw new APIError("FORBIDDEN", { message: "SSO_PLAN_REQUIRED" });
+        }
+
+        if (body?.samlConfig && typeof body.samlConfig === "object") {
+          const normalized = normalizeSamlConfig(body.samlConfig as Record<string, unknown>);
+          if (normalized.isFailure) {
+            throw new APIError("BAD_REQUEST", { message: normalized.getError().message });
+          }
+          body.samlConfig = normalized.getValue();
         }
         return;
       }
