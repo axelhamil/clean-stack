@@ -53,6 +53,7 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 | **E.1** | i18n (locale routes + Lingui) | Real ask for EU clones; the routing shape has to be decided before features multiply |
 | **C.1** | S5b behavioural signals + S6 captcha hook | Deferred for calibration, not abandoned — needs real traffic |
 | **D.5** | Known debts (3) | Actual defects, including a duplicate deletion email on worker crash |
+| **G.1** | Toolchain refresh — TS 7, Postgres 18, pnpm 11, file-based routing | This file opens with "All SOTA 2026". Measured on 2026-08-17, it isn't: TypeScript is a major behind, the pinned pnpm contradicts `packageManager`, and E.1 is about to freeze a routing shape that TanStack no longer recommends |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058 — Gmail/Yahoo require it for bulk senders) and SPF + DKIM + DMARC `p=reject` (DNS, doc only).
 
@@ -226,6 +227,61 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 - [ ] **Auth errors**: BetterAuth returns stable `code`s — map them front-side to Lingui entries so there is a single translation store. Switch to `@better-auth/i18n` only if a non-web client appears; the plugin's server-side mapping would otherwise duplicate the catalog.
 - [ ] Per-lang email templates in `@packages/emails`, picked from the user's preferred lang.
 - [ ] CI gate: `lingui extract --clean` + git diff check — any drift fails the build.
+
+---
+
+## Toolchain refresh — **Phase G.1**
+
+**Why**: a boilerplate's version floor is a feature. The cloner inherits whatever is pinned here, and "All SOTA 2026" at the top of this file is a claim that decays silently. Versions below were read from the npm registry, nodejs.org and Docker Hub on **2026-08-17** — not from memory. Re-measure before executing; do not trust this table blind.
+
+### G.1a — Runtime and package manager
+
+| | Pinned today | Latest | Note |
+|---|---|---|---|
+| pnpm | `10.33.2` (`mise.toml`) vs `11.0.9` (`packageManager`) | `11.22.0` | **The two disagree** — `corepack` follows `packageManager`, `mise` follows itself. Whichever wins is accidental. Single source of truth, then bump. |
+| Node | `24.15.0` | `24.19.0` LTS | 26.7.0 is *Current*, not LTS — Node only runs the tooling here, no reason to take that risk. |
+| Bun | `1.3.6` | `1.3.14` | runtime of `apps/api` |
+
+- [ ] Make `mise.toml` and `package.json#packageManager` agree on `pnpm@11.22.0`, bump `engines.node` to `>=24.19.0`, regenerate `pnpm-lock.yaml`, re-run `pnpm bootstrap` from a clean clone.
+
+### G.1b — TypeScript 7
+
+The native (Go) compiler. The published package is ~2.5 MB against ~22 MB for 6.x, and `tsc` remains the binary name.
+
+- [ ] Bump `typescript` to `^7.0.2` across the 12 workspaces, run `turbo type-check`, triage what the stricter/faster checker surfaces.
+- [ ] Low blast radius by construction: nothing here *builds* with `tsc` — `apps/api` builds with Bun, `apps/app` with Vite, `@packages/ddd-kit` with tsup, tests run through esbuild. TS is the type-check gate only, so a regression fails CI rather than production.
+- [ ] Watch `tsup` (`@packages/ddd-kit` `prepublishOnly`) — it uses the TS API for `.d.ts` emit, the one place where the native port's API surface is not yet 1:1. If it breaks, pin `tsup`'s own TS or emit declarations with `tsc` explicitly.
+
+### G.1c — Postgres 18
+
+- [ ] `postgres:17-alpine` → `postgres:18-alpine` in `docker-compose.yaml`, plus the three README occurrences and the Railway reference deploy (bump the Railway plugin version *before* the compose file — the doc must not describe a version the reference deploy can't run).
+- [ ] **Primary keys stay `text`.** Postgres 18 ships a native `uuidv7()`, and time-ordered UUIDs are the right default for insert-heavy tables — but every PK in `packages/drizzle/src/schema/` is `text("id").primaryKey()` filled by BetterAuth, which generates its own ids. Converting them is a BetterAuth question, not a Postgres one. Do not open it as part of a version bump.
+- [ ] Where it does apply: **new** application tables owned by the cloner. Document `uuid("id").primaryKey().default(sql\`uuidv7()\`)` as the recommended shape for those in `docs/MODULES.md`, and say plainly that the auth-adjacent tables are `text` for a reason.
+- [ ] The real 18 payoff here is operational, not schema-side: async I/O and B-tree skip scan. Verify the outbox drain (`SELECT ... FOR UPDATE SKIP LOCKED` on `outbox_event_pending_idx`) and the notification fan-out `INSERT ... SELECT` still plan the way they do on 17 — `EXPLAIN (ANALYZE, BUFFERS)` before and after, recorded in `docs/HISTORY.md`.
+
+### G.1d — Dependency floor
+
+Two distinct problems, and conflating them wastes a day. Most deps here are declared with `^`, so a fresh `pnpm install` already resolves to the newest minor — what is stale is the **lockfile**, not the range. Only three ranges genuinely block.
+
+**Blocked by the range (edit `package.json`):**
+
+- `typescript` `^6.0.3` → `^7.0.2` (G.1b)
+- `@hono/zod-validator` `^0.8.0` → `^0.9.0` — a `^` does not cross a `0.x` minor
+- `@types/pg` `^8.20.0` → `^8.21.0`
+
+**Everything else is a lockfile refresh** — `pnpm up -r --latest`, then the full gate (`ci:check` + a11y + `check:fanout`). Where it lands as of 2026-08-17: biome 2.5.8, turbo 2.10.10, vitest 4.1.10, vite 8.2.1, `@vitejs/plugin-react` 6.0.5, hono 4.13.2 (from 4.12.27), pg 8.23.0, react/react-dom 19.2.8, tailwind + `@tailwindcss/vite` 4.3.3, `@types/node` 26.2.0, `@tanstack/react-router` 1.170.29, `@tanstack/react-query` 5.101.4. `drizzle-orm` (0.45.2), `drizzle-kit` (0.31.10) and `zod` (4.4.3) are already current.
+
+- [ ] Bump the `$schema` URL in `biome.json` alongside the binary — it still points at `2.5.1` and silently under-validates the config against newer rules.
+- [ ] `@hono/zod-validator` 0.8 → 0.9 is the only bump with a real chance of touching behaviour — it wraps every input on the API surface through `zV`. Re-read `apps/api/src/shared/validator.ts` after the bump: the point of that wrapper is that it throws `HTTPException(400)` instead of returning a Response inline, and the RPC types depend on it staying that way.
+- [ ] Zod 4 deprecates the string-method form of format checks (`z.string().uuid()` → `z.uuid()`). Sweep `@packages/events/payloads.ts` and the module DTOs; deprecated today, gone in 5.
+
+### G.1e — File-based routing (do this before E.1, or not at all)
+
+`apps/app` composes its route tree by hand: `router.tsx` + `router/layouts.tsx` + ~39 `createRoute()` calls across 32 feature files. TanStack now recommends file-based routing through `@tanstack/router-plugin/vite` (`^1.168.32`), with `routeTree.gen.ts` generated and gitignored.
+
+- [ ] The forcing function is **E.1**, which plans a `langLayout` (`path: "$lang"`) re-parenting *every* layout and leaf. Doing that by hand across 32 files, then migrating the result to file-based later, is the same work twice. Sequence: G.1e, then E.1 — or accept code-based permanently and delete this item.
+- [ ] Migration is mechanical but not small: `src/routes/__root.tsx` + one file per route, `createRoute` → `createFileRoute`, `addChildren` deleted, `routeTree.gen.ts` gitignored, `autoCodeSplitting: true`. The vertical-slice layout (`features/<x>/<x>.route.tsx`) is worth preserving via the plugin's `routesDirectory` / virtual routes rather than flattening features into `src/routes/`.
+- [ ] Gate: the a11y suite (7 pages × 2 schemes) and the legal-accept redirect (`should-redirect-to-legal-accept.ts`) must pass unchanged. Route-level redirects are exactly what a routing migration breaks silently.
 
 ---
 
