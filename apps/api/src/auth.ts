@@ -32,6 +32,7 @@ import {
   findOrgOwnerUserId,
   findSsoProviderByProviderId,
   insertPersonalOrgWithOwner,
+  scimConnectionOwner,
   setPendingEmail,
 } from "./auth-queries";
 import { buildSessionPayload } from "./auth-session-payload";
@@ -43,7 +44,13 @@ import {
 import { hasFeature } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
-import { SSO_PATHS } from "./shared/auth/sso-paths";
+import {
+  changedFieldsFrom,
+  isDeactivation,
+  SCIM_PATHS,
+  SSO_PATHS,
+  scimProviderIdFromToken,
+} from "./shared/auth/sso-paths";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
@@ -190,6 +197,14 @@ const ssoProviderDeleteSnapshots = new Map<
   string,
   { organizationId: string | null; domain: string; issuer: string }
 >();
+
+/**
+ * Same read-before-delete snapshot as `ssoProviderDeleteSnapshots`, for
+ * `/scim/delete-provider-connection`: the request body only carries `providerId`
+ * (no `organizationId` — see `deleteSCIMProviderConnectionBodySchema`), and the row
+ * is gone by the time `hooks.after` runs. Keyed on `providerId`.
+ */
+const scimConnectionDeleteSnapshots = new Map<string, string>();
 
 function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
   const raw = headers?.get("cookie");
@@ -693,6 +708,16 @@ const authOptions = {
         return;
       }
 
+      if (path === SCIM_PATHS.deleteConnection) {
+        const providerId = body?.providerId as string | undefined;
+        if (providerId) {
+          const owner = await scimConnectionOwner(providerId);
+          if (owner.organizationId)
+            scimConnectionDeleteSnapshots.set(providerId, owner.organizationId);
+        }
+        return;
+      }
+
       let password: string | undefined;
       let actorEmail: string | undefined;
       let actorName: string | undefined;
@@ -837,6 +862,57 @@ const authOptions = {
             },
             session.session.activeOrganizationId,
           );
+        }
+        return;
+      }
+
+      // SCIM endpoints authenticate with a bearer token — `ctx.context.session` is
+      // empty here, so this branch must run before the session-actor early-return
+      // below, and the actor is resolved from the connection row instead.
+      if (path.startsWith(SCIM_PATHS.users) && ctx.method !== "GET") {
+        const body = ctx.body as Record<string, unknown> | undefined;
+        const providerId = scimProviderIdFromToken(ctx.headers);
+        const owner = await scimConnectionOwner(providerId);
+        const params = ctx.params as Record<string, string> | undefined;
+        // POST/PUT return the SCIM user resource (`{ id, externalId }`); PATCH/DELETE
+        // reply 204 with no body, so the subject id has to come from the route param.
+        const returned = ctx.context.returned as { id: string; externalId?: string } | undefined;
+        const subjectId = returned?.id ?? params?.userId;
+        if (subjectId && owner.organizationId) {
+          const base = {
+            userId: subjectId,
+            actorUserId: owner.userId,
+            organizationId: owner.organizationId,
+            scimProviderId: providerId,
+            externalId: returned?.externalId ?? null,
+          };
+          if (ctx.method === "POST") {
+            await emit(EventTypes.SCIM_USER_CREATED, "user", subjectId, base, owner.organizationId);
+          } else if (ctx.method === "DELETE") {
+            await emit(
+              EventTypes.SCIM_USER_DEPROVISIONED,
+              "user",
+              subjectId,
+              base,
+              owner.organizationId,
+            );
+          } else if (isDeactivation(body)) {
+            await emit(
+              EventTypes.SCIM_USER_DEACTIVATED,
+              "user",
+              subjectId,
+              base,
+              owner.organizationId,
+            );
+          } else {
+            await emit(
+              EventTypes.SCIM_USER_UPDATED,
+              "user",
+              subjectId,
+              { ...base, changedFields: changedFieldsFrom(body) },
+              owner.organizationId,
+            );
+          }
         }
         return;
       }
@@ -1016,6 +1092,42 @@ const authOptions = {
               provider.organizationId,
             );
           }
+        }
+        return;
+      }
+
+      // A SCIM token is an issued credential: its creation/revocation audits like a PAT.
+      if (path === SCIM_PATHS.generateToken) {
+        const body = ctx.body as Record<string, unknown> | undefined;
+        const providerId = body?.providerId as string | undefined;
+        const organizationId = body?.organizationId as string | undefined;
+        if (providerId && organizationId) {
+          await emit(
+            EventTypes.SCIM_CONNECTION_CREATED,
+            "scim_provider",
+            providerId,
+            { actorUserId: userId, organizationId, providerId },
+            organizationId,
+          );
+        }
+        return;
+      }
+      if (path === SCIM_PATHS.deleteConnection) {
+        const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
+          | string
+          | undefined;
+        const organizationId = providerId
+          ? scimConnectionDeleteSnapshots.get(providerId)
+          : undefined;
+        if (providerId) scimConnectionDeleteSnapshots.delete(providerId);
+        if (providerId && organizationId) {
+          await emit(
+            EventTypes.SCIM_CONNECTION_DELETED,
+            "scim_provider",
+            providerId,
+            { actorUserId: userId, organizationId, providerId },
+            organizationId,
+          );
         }
         return;
       }

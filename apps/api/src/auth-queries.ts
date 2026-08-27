@@ -192,3 +192,19 @@ export async function findSsoProviderByProviderId(
     .limit(1);
   return row;
 }
+
+// ── #11 – hooks.after SCIM bridge ───────────────────────────────────────────
+
+export async function scimConnectionOwner(
+  providerId: string,
+): Promise<{ userId: string | null; organizationId: string | null }> {
+  const [row] = await db
+    .select({
+      userId: ssoSchema.scimProvider.userId,
+      organizationId: ssoSchema.scimProvider.organizationId,
+    })
+    .from(ssoSchema.scimProvider)
+    .where(eq(ssoSchema.scimProvider.providerId, providerId))
+    .limit(1);
+  return { userId: row?.userId ?? null, organizationId: row?.organizationId ?? null };
+}

@@ -34,3 +34,41 @@ export const SCIM_PATHS = {
   resourceTypes: "/scim/v2/ResourceTypes",
   resourceType: "/scim/v2/ResourceTypes/:resourceTypeId",
 } as const;
+
+/**
+ * The SCIM bearer token is base64 of `token:providerId[:organizationId]` (the shape
+ * @better-auth/scim issues via `generate-token`). SCIM endpoints authenticate with
+ * this token — `ctx.context.session` is empty — so the provider id has to be read
+ * back out of the `Authorization` header rather than the session.
+ */
+export function scimProviderIdFromToken(headers: Headers | undefined): string {
+  const raw = headers?.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!raw) return "unknown";
+  try {
+    return atob(raw).split(":")[1] ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Detects a deactivation across both shapes SCIM clients send: Entra ID issues a
+ * `PATCH` with an `Operations` array (`{ op: "replace", path: "active", value: false }`),
+ * while a plain `PUT` (Okta and others) carries `active` at the top level. Missing
+ * either shape silently drops that IdP's deactivations from the audit trail.
+ */
+export function isDeactivation(body: Record<string, unknown> | undefined): boolean {
+  if (body?.active === false) return true;
+  const operations = body?.Operations as Array<{ path?: string; value?: unknown }> | undefined;
+  return operations?.some((op) => op.path === "active" && op.value === false) ?? false;
+}
+
+/**
+ * Lists the SCIM attributes touched by an update: PATCH operation paths when present,
+ * otherwise every top-level key of a PUT body minus the `schemas` envelope.
+ */
+export function changedFieldsFrom(body: Record<string, unknown> | undefined): string[] {
+  const operations = body?.Operations as Array<{ path?: string }> | undefined;
+  if (operations) return operations.map((op) => op.path ?? "unknown");
+  return Object.keys(body ?? {}).filter((k) => k !== "schemas");
+}

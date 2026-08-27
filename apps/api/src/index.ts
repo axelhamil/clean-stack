@@ -188,7 +188,10 @@ app.use(
   requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
 );
 
-app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+// SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId — BetterAuth's
+// own router 404s any method/path it hasn't registered, so widening the verb list here
+// exposes no surface beyond what the mounted plugins already declare.
+app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/internal", healthInternalRoutes);
 app.route("/internal", rgpdInternalRoutes);
