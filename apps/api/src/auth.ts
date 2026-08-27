@@ -25,6 +25,8 @@ import {
   clearConfirmedPendingEmail,
   countActiveMembers,
   deleteOrgIfEmpty,
+  emailFor,
+  enforcedProviderForDomain,
   findActiveMemberOrgId,
   findActiveMemberRole,
   findLatestLinkedAccount,
@@ -44,6 +46,7 @@ import {
 import { hasFeature } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
+import { isSsoEnforcedFor } from "./shared/auth/sso-enforcement";
 import {
   changedFieldsFrom,
   isDeactivation,
@@ -640,6 +643,25 @@ const authOptions = {
         }
       }
 
+      // SSO enforcement: an org whose domain is verified and enforced rejects every
+      // non-SSO email-bearing sign-in/sign-up path. Placed before the rate-limit
+      // branch below — that branch `return`s for "/sign-in/email", so anything
+      // added after it never runs for that path. Passkey (no email) is closed
+      // separately in `databaseHooks.session.create.before`.
+      const emailBearingPaths = ["/sign-in/email", "/sign-up/email", "/sign-in/magic-link"];
+      if (emailBearingPaths.includes(path)) {
+        const candidateEmail = body?.email as string | undefined;
+        if (candidateEmail) {
+          const enforced = await isSsoEnforcedFor(candidateEmail, enforcedProviderForDomain);
+          if (enforced.isSome()) {
+            throw new APIError("FORBIDDEN", {
+              message: "SSO_REQUIRED",
+              providerId: enforced.unwrap().providerId,
+            });
+          }
+        }
+      }
+
       // Credential-stuffing: per-account rate-limit on sign-in (fail-closed — store error → 503)
       if (path === "/sign-in/email") {
         const email = body?.email as string | undefined;
@@ -1176,6 +1198,28 @@ const authOptions = {
     session: {
       create: {
         before: async (session) => {
+          // SSO enforcement, passkey leg: passkey sign-in carries no email (Step 1
+          // above only sees the email-bearing paths), and this hook fires for every
+          // session creation regardless of path. The account's real providerId (set
+          // by the SSO plugin to the registered provider's own id, never a fixed
+          // "sso"/"oidc" string — confirmed against handleOAuthUserInfo) tells us
+          // whether the account backing this session was ever linked through SSO;
+          // if it was, this session creation IS (or descends from) SSO's own login
+          // and must not be blocked by the guard meant to keep it out.
+          const account = await findLatestLinkedAccount(session.userId);
+          const linkedToSso = account
+            ? Boolean(await findSsoProviderByProviderId(account.providerId))
+            : false;
+          if (!linkedToSso) {
+            const email = await emailFor(session.userId);
+            if (email) {
+              const enforced = await isSsoEnforcedFor(email, enforcedProviderForDomain);
+              if (enforced.isSome()) {
+                throw new APIError("FORBIDDEN", { message: "SSO_REQUIRED" });
+              }
+            }
+          }
+
           if (session.activeOrganizationId) return { data: session };
           try {
             const orgId = await ensurePersonalOrgFor(session.userId);

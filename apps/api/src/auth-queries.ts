@@ -220,7 +220,18 @@ export async function scimConnectionOwner(
   return { userId: row?.userId ?? null, organizationId: row?.organizationId ?? null };
 }
 
-// ── #12 – SSO enforcement predicate lookup ─────────────────────────────────
+// ── #12 – SSO enforcement: session-creation guard (Task 9) ─────────────────
+
+export async function emailFor(userId: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ email: schema.user.email })
+    .from(schema.user)
+    .where(eq(schema.user.id, userId))
+    .limit(1);
+  return row?.email;
+}
+
+// ── #13 – SSO enforcement predicate lookup ─────────────────────────────────
 
 export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
   const [row] = await db
