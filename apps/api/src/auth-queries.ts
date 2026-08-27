@@ -5,6 +5,7 @@
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
 import { and, count, db, desc, eq, schema, ssoSchema, type Transaction } from "@packages/drizzle";
+import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
 
 // ── #1 – ensurePersonalOrgFor queries ──────────────────────────────────────
 
@@ -208,3 +209,29 @@ export async function scimConnectionOwner(
     .limit(1);
   return { userId: row?.userId ?? null, organizationId: row?.organizationId ?? null };
 }
+
+// ── #12 – SSO enforcement predicate lookup ─────────────────────────────────
+
+export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
+  const [row] = await db
+    .select({
+      providerId: ssoSchema.ssoProvider.providerId,
+      organizationId: ssoSchema.ssoProvider.organizationId,
+    })
+    .from(ssoSchema.ssoProvider)
+    .innerJoin(
+      schema.organization,
+      eq(schema.organization.id, ssoSchema.ssoProvider.organizationId),
+    )
+    .where(
+      and(
+        eq(ssoSchema.ssoProvider.domain, domain),
+        eq(ssoSchema.ssoProvider.domainVerified, true),
+        eq(schema.organization.ssoEnforced, true),
+      ),
+    )
+    .limit(1);
+  return row?.organizationId
+    ? { providerId: row.providerId, organizationId: row.organizationId }
+    : null;
+};
