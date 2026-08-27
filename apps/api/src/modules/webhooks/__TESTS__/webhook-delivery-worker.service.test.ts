@@ -89,7 +89,7 @@ mock.module("@packages/drizzle", () => ({
   }),
   schema: {},
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },

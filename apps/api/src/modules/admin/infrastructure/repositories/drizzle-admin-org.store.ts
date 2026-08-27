@@ -48,6 +48,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
               name: multiTenantSchema.organization.name,
               slug: multiTenantSchema.organization.slug,
               createdAt: multiTenantSchema.organization.createdAt,
+              ssoEnforced: multiTenantSchema.organization.ssoEnforced,
               memberCount: count(multiTenantSchema.member.id),
             })
             .from(multiTenantSchema.organization)
@@ -87,6 +88,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
               name: multiTenantSchema.organization.name,
               slug: multiTenantSchema.organization.slug,
               createdAt: multiTenantSchema.organization.createdAt,
+              ssoEnforced: multiTenantSchema.organization.ssoEnforced,
               memberCount: count(multiTenantSchema.member.id),
             })
             .from(multiTenantSchema.organization)

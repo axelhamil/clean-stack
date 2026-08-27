@@ -4,13 +4,17 @@ import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
+import { AdminActionService } from "../../shared/services/admin-action.service";
 import { zV } from "../../shared/validator";
 import { banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import { setRoleBodySchema } from "./application/dto/set-role.dto";
-import { AdminActionService } from "./application/services/admin-action.service";
 
-const actionSvc = new AdminActionService(di.IOutboxRepository, di.IInstrumentation);
+const actionSvc = new AdminActionService(
+  di.IOutboxRepository,
+  di.ITransactionService,
+  di.IInstrumentation,
+);
 
 export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
   .get("/", requireAuth, requirePlatformAdmin, zV("query", listUsersQuerySchema), async (c) => {

@@ -63,7 +63,7 @@ mock.module("@packages/drizzle", () => ({
     },
   },
   webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   authSchema: {},
   schema: {},
   trackEventsOnSuccess: () => {},

@@ -1,17 +1,32 @@
-import { type AppError, Result } from "@packages/ddd-kit";
+import { type AppError, type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { eq, multiTenantSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { auth } from "../../../../auth";
-import { emitEvent } from "../../../../shared/event-emitter";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { auth } from "../../auth";
+import { emitEvent } from "../event-emitter";
+import type { IInstrumentation } from "../ports/instrumentation.port";
+import type { IOutboxRepository } from "../ports/outbox.port";
+import type { ITransaction } from "../transaction";
 
 export type AdminActionError = AppError<"ADMIN_ACTION_PROVIDER_FAILURE">;
 
 type ActionResult = Promise<Result<void, AdminActionError>>;
 
+/**
+ * Lives in `shared/services/` rather than a module because it has two
+ * consumers on opposite sides of a permission boundary: the platform-admin
+ * routes (`modules/admin/admin-orgs.routes.ts`) and the org-owner settings
+ * routes (`modules/organization/routes.ts`) both call `setSsoEnforcement`.
+ * It also imports the BetterAuth singleton (`auth.ts`) directly, which
+ * itself depends on the DI container — registering this class inside a
+ * module's `defineModule()` would create an import cycle
+ * (`module.ts` → this file → `auth.ts` → `container.ts` → `module.ts`).
+ * Route files instantiate it ad hoc from already-built `di` bindings
+ * instead of resolving it through the container.
+ */
 export class AdminActionService {
   constructor(
     private readonly outbox: IOutboxRepository,
+    private readonly uow: IUnitOfWork<ITransaction>,
     private readonly instrumentation: IInstrumentation,
   ) {}
 
@@ -98,6 +113,37 @@ export class AdminActionService {
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_PASSWORD_RESET, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
+      });
+    });
+  }
+
+  async setSsoEnforcement(input: {
+    organizationId: string;
+    enforced: boolean;
+    actorUserId: string;
+    viaPlatformAdmin: boolean;
+  }): ActionResult {
+    return this.run("setSsoEnforcement", async () => {
+      await this.uow.run(async (tx) => {
+        await tx
+          .update(multiTenantSchema.organization)
+          .set({ ssoEnforced: input.enforced })
+          .where(eq(multiTenantSchema.organization.id, input.organizationId));
+
+        await emitEvent(
+          this.outbox,
+          EventTypes.SSO_ENFORCEMENT_CHANGED,
+          "organization",
+          input.organizationId,
+          {
+            actorUserId: input.actorUserId,
+            organizationId: input.organizationId,
+            enforced: input.enforced,
+            viaPlatformAdmin: input.viaPlatformAdmin,
+          },
+          { organizationId: input.organizationId },
+          tx,
+        );
       });
     });
   }

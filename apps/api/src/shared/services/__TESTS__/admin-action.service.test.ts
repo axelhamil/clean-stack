@@ -3,7 +3,7 @@ import { EventTypes } from "@packages/events";
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
-mock.module("../../../shared/event-emitter", () => ({
+mock.module("../../event-emitter", () => ({
   emitEvent: mock(
     async (
       _o: unknown,
@@ -28,7 +28,7 @@ const authApi = {
 
 mock.module("../../../auth", () => ({ auth: { api: authApi } }));
 
-const { AdminActionService } = await import("../application/services/admin-action.service");
+const { AdminActionService } = await import("../admin-action.service");
 
 const instrumentation = {
   startSpan: <T>(_o: unknown, fn: () => T) => fn(),
@@ -36,8 +36,17 @@ const instrumentation = {
   addBreadcrumb: mock(() => {}),
 };
 
+const fakeTx = {
+  update: () => ({ set: () => ({ where: async () => undefined }) }),
+} as never;
+
+const noopUow = {
+  startTransaction: async (cb: (tx: unknown) => unknown) => cb(fakeTx),
+  run: async (cb: (tx: unknown) => unknown) => cb(fakeTx),
+};
+
 function service() {
-  return new AdminActionService({} as never, instrumentation as never);
+  return new AdminActionService({} as never, noopUow as never, instrumentation as never);
 }
 
 function makeHeaders(token = "tok-1") {
@@ -180,6 +189,46 @@ describe("AdminActionService", () => {
       expect(authApi.revokeUserSessions).toHaveBeenCalled();
       expect(authApi.requestPasswordReset).toHaveBeenCalled();
       expect(emitted.some((e) => e.type === EventTypes.ADMIN_USER_PASSWORD_RESET)).toBe(true);
+    });
+  });
+
+  describe("setSsoEnforcement", () => {
+    it("records the platform admin as actor when lifting sso enforcement", async () => {
+      emitted.length = 0;
+      const result = await service().setSsoEnforcement({
+        organizationId: "org-1",
+        enforced: false,
+        actorUserId: "admin-9",
+        viaPlatformAdmin: true,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(emitted[0]?.type).toBe(EventTypes.SSO_ENFORCEMENT_CHANGED);
+      expect(emitted[0]?.payload).toMatchObject({
+        actorUserId: "admin-9",
+        organizationId: "org-1",
+        enforced: false,
+        viaPlatformAdmin: true,
+      });
+    });
+
+    it("records the org owner as actor when enabling sso enforcement", async () => {
+      emitted.length = 0;
+      const result = await service().setSsoEnforcement({
+        organizationId: "org-1",
+        enforced: true,
+        actorUserId: "owner-1",
+        viaPlatformAdmin: false,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(emitted[0]?.type).toBe(EventTypes.SSO_ENFORCEMENT_CHANGED);
+      expect(emitted[0]?.payload).toMatchObject({
+        actorUserId: "owner-1",
+        organizationId: "org-1",
+        enforced: true,
+        viaPlatformAdmin: false,
+      });
     });
   });
 });

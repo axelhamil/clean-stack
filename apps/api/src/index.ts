@@ -19,6 +19,7 @@ import { consentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { notificationsRoutes } from "./modules/notifications/routes";
+import { organizationSettingsRoutes } from "./modules/organization/routes";
 import { policyRoutes } from "./modules/policies/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
@@ -249,6 +250,7 @@ const routes = app
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/tokens", apiTokenRoutes)
   .route("/settings/webhooks", webhooksRoutes)
+  .route("/settings/organization", organizationSettingsRoutes)
   .route("/consents", consentRoutes)
   .route("/billing", billingRoutes)
   .route("/notifications", notificationsRoutes);
