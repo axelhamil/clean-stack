@@ -706,6 +706,15 @@ const authOptions = {
         return;
       }
 
+      // R26: /sso/update-provider also persists `domain` verbatim (plugin source,
+      // update-provider route) — same casing trap as /sso/register, same fix.
+      if (path === SSO_PATHS.updateProvider) {
+        if (typeof body?.domain === "string") {
+          body.domain = body.domain.toLowerCase();
+        }
+        return;
+      }
+
       if (path === SSO_PATHS.deleteProvider) {
         const providerId = body?.providerId as string | undefined;
         if (providerId) {
