@@ -689,6 +689,13 @@ const authOptions = {
           throw new APIError("FORBIDDEN", { message: "SSO_PLAN_REQUIRED" });
         }
 
+        // The plugin persists `domain` verbatim (no casing normalization on its side),
+        // and every domain-based lookup (enforcedProviderForDomain) compares against a
+        // lowercased email domain — normalize here so newly written rows are canonical.
+        if (typeof body?.domain === "string") {
+          body.domain = body.domain.toLowerCase();
+        }
+
         if (body?.samlConfig && typeof body.samlConfig === "object") {
           const normalized = normalizeSamlConfig(body.samlConfig as Record<string, unknown>);
           if (normalized.isFailure) {

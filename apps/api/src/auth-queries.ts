@@ -4,7 +4,17 @@
  * Plain functions, no DI, no repository class, no port interface — auth is
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
-import { and, count, db, desc, eq, schema, ssoSchema, type Transaction } from "@packages/drizzle";
+import {
+  and,
+  count,
+  db,
+  desc,
+  eq,
+  schema,
+  sql,
+  ssoSchema,
+  type Transaction,
+} from "@packages/drizzle";
 import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
 
 // ── #1 – ensurePersonalOrgFor queries ──────────────────────────────────────
@@ -225,7 +235,7 @@ export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
     )
     .where(
       and(
-        eq(ssoSchema.ssoProvider.domain, domain),
+        eq(sql`lower(${ssoSchema.ssoProvider.domain})`, domain),
         eq(ssoSchema.ssoProvider.domainVerified, true),
         eq(schema.organization.ssoEnforced, true),
       ),
