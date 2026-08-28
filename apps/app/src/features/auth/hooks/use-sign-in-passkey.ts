@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { redirectToSsoIfRequired, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
 
 export function useSignInPasskey(redirectTo?: string) {
   const queryClient = useQueryClient();
@@ -24,6 +25,9 @@ export function useSignInPasskey(redirectTo?: string) {
       if (result?.error) {
         const msg = result.error.message?.toLowerCase() ?? "";
         if (msg.includes("not allowed") || msg.includes("cancel")) throw new Error("Cancelled");
+        // The passkey leg is server-enforced like the three email-bearing ones, so it
+        // gets the same redirect rather than a bare `SSO_REQUIRED` toast.
+        if (await redirectToSsoIfRequired(result.error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
         throw new Error(result.error.message ?? "Passkey sign-in failed");
       }
     },
@@ -36,7 +40,12 @@ export function useSignInPasskey(redirectTo?: string) {
       void navigate({ to: redirectTo ?? "/" });
     },
     onError: (err) => {
-      if (err.name === "AbortError" || err.message === "Cancelled") return;
+      if (
+        err.name === "AbortError" ||
+        err.message === "Cancelled" ||
+        err.message === SSO_REDIRECT_IN_PROGRESS
+      )
+        return;
       toast.error(err.message);
     },
   });
