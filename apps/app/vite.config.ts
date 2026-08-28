@@ -17,7 +17,7 @@ export default defineConfig({
       routesDirectory: "./src",
       generatedRouteTree: "./src/routeTree.gen.ts",
       virtualRouteConfig: "./routes.ts",
-      autoCodeSplitting: false,
+      autoCodeSplitting: true,
     }),
     react(),
     tailwindcss(),

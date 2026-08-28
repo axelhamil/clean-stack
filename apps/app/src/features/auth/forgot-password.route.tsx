@@ -1,5 +1,24 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { EmailRequestForm } from "./forms/email-request-form";
+import { useForgotPassword } from "./hooks/use-forgot-password";
 
 export const Route = createFileRoute("/_guest/forgot-password")({
-  component: lazyRouteComponent(() => import("./forgot-password.page"), "ForgotPasswordPage"),
+  component: ForgotPasswordPage,
 });
+
+function ForgotPasswordPage() {
+  const mutation = useForgotPassword();
+
+  return (
+    <AuthShell
+      title="Reset your password"
+      description="Enter your email — we'll send you a reset link."
+      footer={
+        <AuthShellFooter lead="Remembered it?" link={<Link to="/sign-in">Back to sign in</Link>} />
+      }
+    >
+      <EmailRequestForm mutation={mutation} submitLabel="Send reset link" pendingLabel="Sending…" />
+    </AuthShell>
+  );
+}
