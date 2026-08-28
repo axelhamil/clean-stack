@@ -37,6 +37,7 @@ import {
   insertPersonalOrgWithOwner,
   scimConnectionOwner,
   setPendingEmail,
+  verifiedScimConnectionOwner,
 } from "./auth-queries";
 import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
@@ -861,9 +862,33 @@ const authOptions = {
 
       // R26: /sso/update-provider also persists `domain` verbatim (plugin source,
       // update-provider route) — same casing trap as /sso/register, same fix.
+      //
+      // Post-review hardening: the plugin's own update handler (`mergeSAMLConfig`)
+      // merges every SAML field as `updates.X ?? current.X` and only re-validates
+      // `signatureAlgorithm`/`digestAlgorithm` when the caller sends them — an admin
+      // could PATCH `{ wantAssertionsSigned: false, signatureAlgorithm: "sha1" }` and
+      // it would persist untouched, undoing the register-time hardening below. Run
+      // the same `normalizeSamlConfig` here. It is deliberately safe for a *partial*
+      // update because of how it's written: identity fields (entryPoint, issuer,
+      // cert, …) pass through the `{ ...input }` spread only when the caller sent
+      // them — an update that never mentions `entryPoint` still merges to
+      // `current.entryPoint` on the plugin side, unclobbered. Security fields
+      // (`wantAssertionsSigned`, `authnRequestsSigned`, `signatureAlgorithm`,
+      // `digestAlgorithm`) are unconditionally forced to their strong values every
+      // time `samlConfig` is touched at all, whether or not the caller sent them —
+      // that's intentional, not a bug: a partial update is exactly the vector this
+      // finding used, so "untouched" security fields get re-affirmed, not skipped.
       if (path === SSO_PATHS.updateProvider) {
         if (typeof body?.domain === "string") {
           body.domain = body.domain.toLowerCase();
+        }
+
+        if (body?.samlConfig && typeof body.samlConfig === "object") {
+          const normalized = normalizeSamlConfig(body.samlConfig as Record<string, unknown>);
+          if (normalized.isFailure) {
+            throw new APIError("BAD_REQUEST", { message: normalized.getError().message });
+          }
+          body.samlConfig = normalized.getValue();
         }
         return;
       }
@@ -905,12 +930,23 @@ const authOptions = {
       // the organization hooks ask through `assertSeatAvailableFor` — and only the
       // refusal differs: this is a SCIM protocol endpoint, so it owes an RFC 7644 error
       // body rather than the app's own.
+      //
+      // Post-review hardening: this used to resolve the owner from the *decoded but
+      // unverified* bearer header (`scimConnectionOwner(scimProviderIdFromToken(...))`)
+      // — `hooks.before` runs ahead of the plugin's own token verification, so a
+      // forged header naming a real, guessable `providerId` reached `seatCapFor` and
+      // leaked seat capacity pre-auth, cross-tenant (402 with `maxMembers` when full,
+      // vs. 401 when not — an oracle). `verifiedScimConnectionOwner` hashes the token
+      // and compares it to the stored connection before returning anything, so a
+      // request that fails verification here simply skips the seat check and falls
+      // through to the endpoint's own 401 — it can't write a member row without a
+      // valid token, so there is nothing to gate.
       if (path === SCIM_PATHS.users && ctx.method === "POST") {
-        const owner = await scimConnectionOwner(scimProviderIdFromToken(ctx.headers));
+        const owner = await verifiedScimConnectionOwner(ctx.headers);
         // No org on the connection means no member row is written at all (the plugin's
-        // `createOrgMembership` no-ops), and an unresolvable token is the endpoint's
-        // own 401 to raise — neither is a seat concern.
-        if (owner.organizationId) {
+        // `createOrgMembership` no-ops), and an unresolvable/unverified token is the
+        // endpoint's own 401 to raise — neither is a seat concern.
+        if (owner?.organizationId) {
           const { available, maxMembers } = await seatCapFor(owner.organizationId);
           if (!available) {
             throw scimError("PAYMENT_REQUIRED", `Seat limit reached (${maxMembers ?? "∞"}).`);
@@ -925,10 +961,17 @@ const authOptions = {
       // its own actor. Snapshot the real actor — the connection owner — here, where the
       // bearer token is still readable, and let the hook prefer it (rule #7: the subject
       // is not the actor). Read-and-delete, same pattern as the snapshots above.
+      //
+      // Post-review hardening: same unverified-token issue as the seat cap above, but
+      // worse here — an unauthenticated caller who merely guessed a real `providerId`
+      // could plant a fabricated actor in `scimDeprovisionActors`, later attributed
+      // (within the 30s TTL) to an unrelated admin's ordinary removal of that same
+      // user in the same org — audit-log forgery. `verifiedScimConnectionOwner`
+      // closes it the same way: no verified token, no snapshot.
       if (path === SCIM_PATHS.user && ctx.method === "DELETE") {
         const userId = (ctx.params as Record<string, string> | undefined)?.userId;
-        const owner = await scimConnectionOwner(scimProviderIdFromToken(ctx.headers));
-        if (userId && owner.userId && owner.organizationId) {
+        const owner = await verifiedScimConnectionOwner(ctx.headers);
+        if (userId && owner?.userId && owner.organizationId) {
           scimDeprovisionActors.set(userId, {
             actorUserId: owner.userId,
             organizationId: owner.organizationId,

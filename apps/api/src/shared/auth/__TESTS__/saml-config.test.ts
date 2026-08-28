@@ -67,4 +67,47 @@ describe("normalizeSamlConfig", () => {
     });
     expect(result.isSuccess).toBe(true);
   });
+
+  // /sso/update-provider hardening (post-PR review finding): the plugin merges every
+  // SAML field as `updates.X ?? current.X`, so a partial update body must not leave a
+  // gap that either clobbers an untouched identity field or lets a security field slip
+  // through unvalidated.
+  describe("partial-update safety (/sso/update-provider)", () => {
+    it("a weakening PATCH (only the signing flags, no identity fields) is corrected", () => {
+      const result = normalizeSamlConfig({
+        wantAssertionsSigned: false,
+        authnRequestsSigned: false,
+        signatureAlgorithm: "sha1",
+      });
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+    });
+
+    it("a legitimate identity-only PATCH (entryPoint) still succeeds and forces strong security fields", () => {
+      const result = normalizeSamlConfig({ entryPoint: "https://idp.acme.com/sso/v2" });
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue()).toMatchObject({
+        entryPoint: "https://idp.acme.com/sso/v2",
+        wantAssertionsSigned: true,
+        authnRequestsSigned: true,
+        signatureAlgorithm: "sha256",
+        digestAlgorithm: "sha256",
+      });
+    });
+
+    it("an identity-only PATCH never introduces fields the caller did not send", () => {
+      const result = normalizeSamlConfig({ cert: "MII-new-cert" });
+      const value = result.getValue();
+      expect(Object.keys(value).sort()).toEqual(
+        [
+          "authnRequestsSigned",
+          "cert",
+          "digestAlgorithm",
+          "signatureAlgorithm",
+          "wantAssertionsSigned",
+        ].sort(),
+      );
+      expect(value.entryPoint).toBeUndefined();
+    });
+  });
 });
