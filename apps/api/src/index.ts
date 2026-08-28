@@ -47,6 +47,7 @@ import {
   AUTH_MAGIC_LINK_POLICY,
   AUTH_PASSKEY_POLICY,
   AUTH_RESET_PASSWORD_POLICY,
+  AUTH_SEND_VERIFICATION_POLICY,
   AUTH_SIGN_IN_POLICY,
   AUTH_SIGN_UP_POLICY,
   AUTH_TWO_FACTOR_POLICY,
@@ -168,6 +169,13 @@ app.use(
   requireRateLimit(
     { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
     AUTH_TWO_FACTOR_POLICY,
+  ),
+);
+app.use(
+  "/api/auth/send-verification-email",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_SEND_VERIFICATION_POLICY,
   ),
 );
 app.use(

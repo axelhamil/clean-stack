@@ -68,6 +68,20 @@ export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
+// /send-verification-email: public POST taking an arbitrary email, no session — the
+// same "make the server email a stranger" primitive as request-password-reset and
+// sign-in/magic-link, and it gets the same ceiling. Without its own policy the global
+// burst window is its only bound, which is not a bound on abuse: that window exists to
+// let one legitimate user navigate quickly, not to cap how many strangers one IP can
+// have mailed.
+export const AUTH_SEND_VERIFICATION_POLICY: PolicyConfig = {
+  name: "auth-send-verification",
+  keyFn: ipKeyFn("auth-send-verification"),
+  windows: [{ policyName: "auth-send-verification", windowSec: 900, maxRequests: 3 }],
+  emitSecurityEvent: true,
+  failClosed: true,
+};
+
 export const AUTH_SIGN_UP_POLICY: PolicyConfig = {
   name: "auth-sign-up",
   keyFn: ipKeyFn("auth-sign-up"),
