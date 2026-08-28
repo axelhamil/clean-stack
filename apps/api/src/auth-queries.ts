@@ -256,3 +256,28 @@ export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
     ? { providerId: row.providerId, organizationId: row.organizationId }
     : null;
 };
+
+// ── #13 – SCIM provisioning: membership event bridge ───────────────────────
+
+/**
+ * The member row `@better-auth/scim` writes with a raw `adapter.create` (no
+ * organization-plugin hook fires), so the SCIM after-hook has to read it back
+ * to emit `org.member.joined` with the same shape `afterAddMember` produces:
+ * the aggregate id is the member id, and `createdAt` is what tells a row this
+ * request created apart from one that already existed.
+ */
+export async function findMemberOf(
+  userId: string,
+  organizationId: string,
+): Promise<{ id: string; role: string; createdAt: Date } | undefined> {
+  const [row] = await db
+    .select({
+      id: schema.member.id,
+      role: schema.member.role,
+      createdAt: schema.member.createdAt,
+    })
+    .from(schema.member)
+    .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)))
+    .limit(1);
+  return row;
+}

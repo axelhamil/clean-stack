@@ -31,6 +31,7 @@ import {
   findActiveMemberRole,
   findLatestLinkedAccount,
   findLatestPasskey,
+  findMemberOf,
   findOrgOwnerUserId,
   findSsoProviderByProviderId,
   insertPersonalOrgWithOwner,
@@ -43,7 +44,7 @@ import {
   authorizeSubscriptionReference,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
-import { hasFeature } from "./modules/billing/config";
+import { hasFeature, hasSeatAvailable } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { isSsoEnforcedFor } from "./shared/auth/sso-enforcement";
@@ -58,7 +59,10 @@ import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
-import { isBlockedDuringImpersonation } from "./shared/middleware/impersonation-blocklist";
+import {
+  IMPERSONATE_PATH,
+  isBlockedDuringImpersonation,
+} from "./shared/middleware/impersonation-blocklist";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 
@@ -168,6 +172,22 @@ async function emit<TPayload>(
 }
 
 /**
+ * The enterprise entitlement gate shared by `/sso/register` and
+ * `/scim/generate-token`: both unlock the same paid capability, so both must refuse
+ * the same way. Takes the org the REQUEST names — never one inferred from session
+ * history — because that is the only org whose plan is actually being spent.
+ */
+async function assertSsoEntitlementFor(organizationId: string | undefined): Promise<void> {
+  if (!organizationId) {
+    throw new APIError("FORBIDDEN", { message: "SSO_ORGANIZATION_REQUIRED" });
+  }
+  const entitlements = await di.EntitlementsService.getEntitlements(organizationId);
+  if (!hasFeature(entitlements, "sso")) {
+    throw new APIError("FORBIDDEN", { message: "SSO_PLAN_REQUIRED" });
+  }
+}
+
+/**
  * DRY seat-check helper used by every member-creation gate (direct add,
  * invitation acceptance, invitation creation). Throws 402 if the org is at
  * or over its plan seat cap. Centralised so the 3-line check is never
@@ -177,6 +197,43 @@ async function assertSeatAvailableFor(orgId: string): Promise<void> {
   const view = await di.EntitlementsService.getEntitlements(orgId);
   const activeMembers = await countActiveMembers(orgId);
   assertSeat(activeMembers, view.maxMembers);
+}
+
+const SCIM_MEMBER_CREATED_WINDOW_MS = 30_000;
+
+/**
+ * Bridges `org.member.joined` for the SCIM provisioning path. `@better-auth/scim`
+ * writes the member row with a raw `adapter.create({ model: "member" })`, so
+ * `organizationHooks.afterAddMember` — where every other surface emits this event —
+ * never fires: without this bridge an IdP-provisioned member leaves no audit row and
+ * no webhook delivery (rule #6). Same aggregate and same payload shape as
+ * `afterAddMember`; the provisioned user is the subject, the connection owner is the
+ * actor (rule #7).
+ *
+ * The plugin's `createOrgMembership` silently no-ops when the user is already a member
+ * (SCIM linking someone who joined by invitation), and an after-hook cannot tell the
+ * two apart — `createdAt` can: a row this request wrote is seconds old. Without the
+ * window, re-provisioning an existing member would emit a false "joined".
+ */
+async function emitScimMemberJoined(
+  userId: string,
+  organizationId: string,
+  actorUserId: string | null,
+): Promise<void> {
+  const member = await findMemberOf(userId, organizationId);
+  if (!member || member.createdAt.getTime() < Date.now() - SCIM_MEMBER_CREATED_WINDOW_MS) return;
+  await emit(
+    EventTypes.ORG_MEMBER_JOINED,
+    "member",
+    member.id,
+    {
+      organizationId,
+      userId,
+      role: member.role,
+      actorUserId: actorUserId ?? undefined,
+    },
+    organizationId,
+  );
 }
 
 /**
@@ -208,6 +265,15 @@ const ssoProviderDeleteSnapshots = new Map<
  * is gone by the time `hooks.after` runs. Keyed on `providerId`.
  */
 const scimConnectionDeleteSnapshots = new Map<string, string>();
+
+/**
+ * `DELETE /scim/v2/Users/:userId` is authenticated by a bearer token, so the real
+ * actor (the connection owner) is only resolvable from `hooks.before`, while the
+ * `org.member.removed` emit happens inside `organizationHooks.afterRemoveMember`,
+ * which the organization plugin calls with the *removed* user as `user`. Keyed on
+ * the deprovisioned user id; read-and-delete in the hook.
+ */
+const scimDeprovisionActors = new Map<string, string>();
 
 function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
   const raw = headers?.get("cookie");
@@ -518,11 +584,17 @@ const authOptions = {
           );
         },
         afterRemoveMember: async ({ member, user, organization: org }) => {
+          // SCIM deprovisioning reaches this hook too (`@better-auth/scim` calls it
+          // after its own transaction), but bearer-token requests have no session, so
+          // the plugin can only pass the removed user. `hooks.before` snapshotted the
+          // connection owner — the real actor — under the deprovisioned user id.
+          const scimActor = scimDeprovisionActors.get(member.userId);
+          scimDeprovisionActors.delete(member.userId);
           await emit(
             EventTypes.ORG_MEMBER_REMOVED,
             "member",
             member.id,
-            { organizationId: org.id, actorUserId: user.id, userId: member.userId },
+            { organizationId: org.id, actorUserId: scimActor ?? user.id, userId: member.userId },
             org.id,
           );
           if (isPersonalOrg(org.slug)) return;
@@ -702,14 +774,7 @@ const authOptions = {
       // D8 SAML hardening runs after the gate: a request refused for lack of
       // entitlement need not have its body rewritten first.
       if (path === SSO_PATHS.register) {
-        const organizationId = body?.organizationId as string | undefined;
-        if (!organizationId) {
-          throw new APIError("FORBIDDEN", { message: "SSO_ORGANIZATION_REQUIRED" });
-        }
-        const entitlements = await di.EntitlementsService.getEntitlements(organizationId);
-        if (!hasFeature(entitlements, "sso")) {
-          throw new APIError("FORBIDDEN", { message: "SSO_PLAN_REQUIRED" });
-        }
+        await assertSsoEntitlementFor(body?.organizationId as string | undefined);
 
         // The plugin persists `domain` verbatim (no casing normalization on its side),
         // and every domain-based lookup (enforcedProviderForDomain) compares against a
@@ -753,6 +818,52 @@ const authOptions = {
           if (owner.organizationId)
             scimConnectionDeleteSnapshots.set(providerId, owner.organizationId);
         }
+        return;
+      }
+
+      // SCIM directory sync is part of the same enterprise entitlement as SSO, and
+      // the token minted here is what unlocks `/scim/v2/*` for an IdP. Gated on the
+      // same feature and in the same place as `/sso/register`: without this, a
+      // Free-tier owner mints a token and provisions members through a surface that
+      // never passes any billing gate.
+      if (path === SCIM_PATHS.generateToken) {
+        await assertSsoEntitlementFor(body?.organizationId as string | undefined);
+        return;
+      }
+
+      // Seat cap for SCIM provisioning. `@better-auth/scim` writes the member row with
+      // a raw `adapter.create({ model: "member" })`, so neither `beforeAddMember` nor
+      // `beforeAcceptInvitation` — the two authoritative seat gates — ever fires. An
+      // after-hook cannot cap anything (the row is already written), so the gate has to
+      // live here, before the endpoint runs. Same `assertSeatAvailableFor` as every
+      // other member-creation path, so the cap can never drift between surfaces.
+      if (path === SCIM_PATHS.users && ctx.method === "POST") {
+        const owner = await scimConnectionOwner(scimProviderIdFromToken(ctx.headers));
+        // No org on the connection means no member row is written at all (the plugin's
+        // `createOrgMembership` no-ops), and an unresolvable token is the endpoint's
+        // own 401 to raise — neither is a seat concern.
+        if (owner.organizationId) {
+          const view = await di.EntitlementsService.getEntitlements(owner.organizationId);
+          const activeMembers = await countActiveMembers(owner.organizationId);
+          if (!hasSeatAvailable(activeMembers, view.maxMembers)) {
+            throw new APIError("PAYMENT_REQUIRED", {
+              message: `Seat limit reached (${view.maxMembers ?? "∞"}).`,
+            });
+          }
+        }
+        return;
+      }
+
+      // `organizationHooks.afterRemoveMember` DOES fire on SCIM deprovisioning, but the
+      // organization plugin passes the *removed* user as its `user` argument on every
+      // path, so the emitted `org.member.removed` would name the deprovisioned user as
+      // its own actor. Snapshot the real actor — the connection owner — here, where the
+      // bearer token is still readable, and let the hook prefer it (rule #7: the subject
+      // is not the actor). Read-and-delete, same pattern as the snapshots above.
+      if (path === SCIM_PATHS.user && ctx.method === "DELETE") {
+        const userId = (ctx.params as Record<string, string> | undefined)?.userId;
+        const owner = await scimConnectionOwner(scimProviderIdFromToken(ctx.headers));
+        if (userId && owner.userId) scimDeprovisionActors.set(userId, owner.userId);
         return;
       }
 
@@ -836,13 +947,24 @@ const authOptions = {
       ) {
         const providerId = (ctx.params as Record<string, string> | undefined)?.providerId ?? null;
         const provider = providerId ? await findSsoProviderByProviderId(providerId) : undefined;
-        await emit(EventTypes.SSO_LOGIN_FAILURE, "sso_provider", providerId ?? "unknown", {
-          actorUserId: null,
-          providerId,
-          domain: provider?.domain ?? "unknown",
-          reason: ctx.context.returned.message,
-          ip: clientIpFromHeaders(ctx.headers) ?? "unknown",
-        });
+        // `organizationId` is what makes a public event deliverable: WebhookFanoutSubscriber
+        // drops every event whose organizationId is none before it even reads the
+        // visibility map, so a public `sso.login.failure` without it is undeliverable
+        // and invisible in the customer's audit view. The provider row loaded above
+        // already carries it — pass it, exactly like SSO_LOGIN_SUCCESS does.
+        await emit(
+          EventTypes.SSO_LOGIN_FAILURE,
+          "sso_provider",
+          providerId ?? "unknown",
+          {
+            actorUserId: null,
+            providerId,
+            domain: provider?.domain ?? "unknown",
+            reason: ctx.context.returned.message,
+            ip: clientIpFromHeaders(ctx.headers) ?? "unknown",
+          },
+          provider?.organizationId ?? null,
+        );
       }
 
       if (ctx.context.returned instanceof APIError) return;
@@ -926,6 +1048,7 @@ const authOptions = {
           };
           if (ctx.method === "POST") {
             await emit(EventTypes.SCIM_USER_CREATED, "user", subjectId, base, owner.organizationId);
+            await emitScimMemberJoined(subjectId, owner.organizationId, owner.userId);
           } else if (ctx.method === "DELETE") {
             await emit(
               EventTypes.SCIM_USER_DEPROVISIONED,
@@ -1197,20 +1320,31 @@ const authOptions = {
     },
     session: {
       create: {
-        before: async (session) => {
-          // SSO enforcement, passkey leg: passkey sign-in carries no email (Step 1
-          // above only sees the email-bearing paths), and this hook fires for every
-          // session creation regardless of path. The account's real providerId (set
-          // by the SSO plugin to the registered provider's own id, never a fixed
-          // "sso"/"oidc" string — confirmed against handleOAuthUserInfo) tells us
-          // whether the account backing this session was ever linked through SSO;
-          // if it was, this session creation IS (or descends from) SSO's own login
-          // and must not be blocked by the guard meant to keep it out.
-          const account = await findLatestLinkedAccount(session.userId);
-          const linkedToSso = account
-            ? Boolean(await findSsoProviderByProviderId(account.providerId))
-            : false;
-          if (!linkedToSso) {
+        before: async (session, context) => {
+          // SSO enforcement, non-email-bearing leg: passkey sign-in carries no email
+          // (the `hooks.before` step only sees the email-bearing paths), and this hook
+          // fires for every session creation whatever the path.
+          //
+          // The discriminator is the REQUEST, never the user. Any user-linkage query
+          // ("does this user own an SSO account?") answers a different question: once
+          // a user has signed in through the IdP once, they own an SSO `account` row
+          // forever, so a later passkey ceremony for the same user would be waved
+          // through — which is exactly the deprovisioning guarantee enforcement sells.
+          // BetterAuth passes the endpoint context as the second argument
+          // (`createWithHooks` → `getCurrentAuthContext()`, better-auth/dist/db/with-hooks.mjs),
+          // and its `path` is the endpoint's own registered path — so the SSO callback
+          // is identifiable, and every other path is enforced.
+          //
+          // Impersonation is exempt because it is not the enforced user authenticating:
+          // the session is minted for a platform admin who already passed the admin
+          // gate, and blocking it would only remove a support capability.
+          const createdBySso =
+            context?.path === SSO_PATHS.callback ||
+            context?.path === SSO_PATHS.callbackWithProvider ||
+            context?.path === SSO_PATHS.samlCallback ||
+            context?.path === SSO_PATHS.samlAcs ||
+            context?.path === IMPERSONATE_PATH;
+          if (!createdBySso) {
             const email = await emailFor(session.userId);
             if (email) {
               const enforced = await isSsoEnforcedFor(email, enforcedProviderForDomain);
