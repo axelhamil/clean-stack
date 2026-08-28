@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { adminLayout } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const adminOrgsRoute = createRoute({
-  getParentRoute: () => adminLayout,
-  path: "admin/orgs",
+export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs")({
   component: lazyRouteComponent(() => import("./admin-orgs.page"), "AdminOrgsPage"),
 });

@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { rootRoute } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const developersEventsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "developers/events",
+export const Route = createFileRoute("/developers/events")({
   component: lazyRouteComponent(() => import("./events.page"), "DevelopersEventsPage"),
 });

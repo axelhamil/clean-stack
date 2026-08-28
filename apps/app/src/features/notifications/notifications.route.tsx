@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { settingsLayout } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const notificationsRoute = createRoute({
-  getParentRoute: () => settingsLayout,
-  path: "notifications",
+export const Route = createFileRoute("/_protected/_shell/settings/notifications")({
   component: lazyRouteComponent(() => import("./notifications.page"), "NotificationsPage"),
 });

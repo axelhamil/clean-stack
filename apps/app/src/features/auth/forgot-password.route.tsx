@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { guestLayout } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const forgotPasswordRoute = createRoute({
-  getParentRoute: () => guestLayout,
-  path: "forgot-password",
+export const Route = createFileRoute("/_guest/forgot-password")({
   component: lazyRouteComponent(() => import("./forgot-password.page"), "ForgotPasswordPage"),
 });

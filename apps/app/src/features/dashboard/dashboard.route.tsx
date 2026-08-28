@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { shellLayout } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const dashboardRoute = createRoute({
-  getParentRoute: () => shellLayout,
-  path: "dashboard",
+export const Route = createFileRoute("/_protected/_shell/dashboard")({
   component: lazyRouteComponent(() => import("./dashboard.page"), "DashboardPage"),
 });

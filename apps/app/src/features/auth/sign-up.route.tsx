@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { guestLayout } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const signUpRoute = createRoute({
-  getParentRoute: () => guestLayout,
-  path: "sign-up",
+export const Route = createFileRoute("/_guest/sign-up")({
   component: lazyRouteComponent(() => import("./sign-up.page"), "SignUpPage"),
 });

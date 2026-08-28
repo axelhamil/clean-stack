@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -11,6 +12,13 @@ const release = process.env.VITE_GIT_SHA;
 
 export default defineConfig({
   plugins: [
+    tanstackRouter({
+      target: "react",
+      routesDirectory: "./src",
+      generatedRouteTree: "./src/routeTree.gen.ts",
+      virtualRouteConfig: "./routes.ts",
+      autoCodeSplitting: false,
+    }),
     react(),
     tailwindcss(),
     sentryAuthToken && sentryOrg && sentryProject

@@ -1,8 +1,5 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { rootRoute } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
-export const dataRightsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "legal/data-rights",
+export const Route = createFileRoute("/legal/data-rights")({
   component: lazyRouteComponent(() => import("./data-rights.page"), "DataRightsPage"),
 });

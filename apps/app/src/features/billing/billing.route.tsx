@@ -1,10 +1,7 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { orgScopeLayout } from "../../router/layouts";
+import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 
-export const billingRoute = createRoute({
-  getParentRoute: () => orgScopeLayout,
-  path: "billing",
+export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/billing")({
   beforeLoad: ensureOrgPermission({ billing: ["manage"] }),
   component: lazyRouteComponent(() => import("./billing.page"), "BillingPage"),
 });
