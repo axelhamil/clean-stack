@@ -46,8 +46,8 @@
       "biome format --write --no-errors-on-unmatched"
     ]
   },
-  "packageManager": "pnpm@11.0.9",
+  "packageManager": "pnpm@11.24.0",
   "engines": {
-    "node": ">=24.15.0"
+    "node": ">=24.20.0"
   }
 }
