@@ -98,6 +98,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 **Multi-tenant & authorization**
 - `organization` plugin — Personal org auto-heal, team orgs, email invitations, role-based members, ownership transfer
 - Capability-based authorization SSOT (`@packages/access-control`) — same predicate at server middleware, route `beforeLoad` gate, and `<Can>` UI
+- Enterprise SSO + SCIM (`business` tier) — per-org OIDC/SAML providers with DNS domain verification, JIT provisioning, a domain-wide enforce-SSO toggle closing all four sign-in paths, SCIM 2.0 `Users` CRUD (RFC 7644) for directory-driven provisioning and deprovisioning, local Keycloak profile for development
 
 **Security & hardening** — *the deploy-safe perimeter (Phase C.1)*
 - Unified rate-limit — one Hono middleware (`rate-limiter-flexible`, BetterAuth built-in disabled) → global + 8 auth-burst policies, multi-window, IETF `RateLimit`/`RateLimit-Policy`/`Retry-After` headers, **fail-closed on auth** (a store outage can't silently disable brute-force protection — OWASP A10:2025), trusted-proxy IP resolution (`private`/CIDR/exact, OWASP rightmost-non-trusted), memory → Postgres (dedicated pool) stores
@@ -153,10 +154,9 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 
 ### Roadmap
 
-The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, the 67-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
+The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, the 80-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
 - **A manual review pass** over the shipped surface — the last step before this is genuinely clone-ready.
-- **C.7 SSO SAML/OIDC + SCIM** — the one remaining feature with a price tag; enterprise procurement blocks without it.
 - **E.1 i18n** — locale routes + Lingui, with build-time key checking.
 - **C.1 S5b/S6** — impossible-travel, ASN deny-list, captcha hook. Deferred for calibration: these need real traffic to tune.
 - **D.5 known debts** — three, including a duplicate deletion email if the worker crashes mid-batch.
@@ -325,7 +325,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 |---|---|
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, a11y gate, SSO/SCIM, i18n, abuse signals, D.5 debts |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, i18n, abuse signals, D.5 debts |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
