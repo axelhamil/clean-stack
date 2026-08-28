@@ -365,8 +365,8 @@ describe("WebhookDeliveryWorker", () => {
     const successUpdate = fakeDeliveries.updates.find(
       (u) => (u.update as { status: string }).status === "success",
     );
-    expect(successUpdate).toBeDefined();
-    expect((successUpdate?.update as { attempts: number }).attempts).toBe(1);
+    if (!successUpdate) throw new Error("successUpdate not found");
+    expect((successUpdate.update as { attempts: number }).attempts).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -527,7 +527,7 @@ describe("WebhookDeliveryWorker", () => {
     ];
     let sig: string | undefined;
     const mockFetch = async (_u: unknown, init?: RequestInit) => {
-      sig = (init?.headers as Record<string, string>)["x-webhook-signature"];
+      sig = (init?.headers as Record<string, string> | undefined)?.["x-webhook-signature"];
       return new Response(null, { status: 200 });
     };
 

@@ -7,7 +7,7 @@ const domain = z
 
 export const oidcProviderSchema = z.object({
   domain,
-  issuer: z.string().url().startsWith("https://", "The issuer must be served over HTTPS"),
+  issuer: z.url().startsWith("https://", "The issuer must be served over HTTPS"),
   clientId: z.string().min(1),
   clientSecret: z.string().min(1),
 });
@@ -15,7 +15,7 @@ export type OidcProviderInput = z.infer<typeof oidcProviderSchema>;
 
 export const samlProviderSchema = z.object({
   domain,
-  entryPoint: z.string().url().startsWith("https://", "The entry point must be served over HTTPS"),
+  entryPoint: z.url().startsWith("https://", "The entry point must be served over HTTPS"),
   issuer: z.string().min(1),
   cert: z.string().min(1, "Paste the IdP signing certificate"),
 });

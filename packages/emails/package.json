@@ -12,13 +12,13 @@
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
-    "@types/react": "^19.2.17",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "@types/react": "^19.2.18",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@react-email/render": "^2.1.0",
-    "react": "^19.2.7",
-    "react-email": "^6.9.1"
+    "react": "^19.2.8",
+    "react-email": "^6.9.3"
   }
 }

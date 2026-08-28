@@ -2,7 +2,7 @@ import { isSubscribableSelector } from "@packages/events";
 import { z } from "zod";
 
 export const webhookFormSchema = z.object({
-  url: z.string().url({ message: "Enter a valid https URL" }),
+  url: z.url({ message: "Enter a valid https URL" }),
   eventTypes: z
     .array(z.string())
     .min(1, { message: "Select at least one event" })
