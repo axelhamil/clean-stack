@@ -8,6 +8,7 @@ import { authClient } from "../../../shared/auth/auth-client";
 import { resolveAuthError } from "../auth-error";
 
 const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
+const SSO_REDIRECT_IN_PROGRESS = "sso-redirect-in-progress";
 
 export function useSignIn(redirectTo?: string) {
   const queryClient = useQueryClient();
@@ -29,6 +30,21 @@ export function useSignIn(redirectTo?: string) {
           throw new Error(EMAIL_NOT_VERIFIED_REDIRECT);
         }
 
+        // The user did nothing wrong — their organization enforces SSO for this
+        // domain. Redirect straight into the SSO flow instead of showing an error;
+        // `providerId` comes straight off the server's rejection, no re-derivation
+        // from the email (the API confirms it survives serialization).
+        if (error.message === "SSO_REQUIRED") {
+          const providerId = (error as { providerId?: string }).providerId;
+          if (providerId) {
+            const { error: ssoError } = await authClient.signIn.sso({
+              providerId,
+              callbackURL: `${window.location.origin}/dashboard`,
+            });
+            if (!ssoError) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+          }
+        }
+
         throw new Error(resolveAuthError(error, "Sign-in failed"));
       }
 
@@ -46,7 +62,8 @@ export function useSignIn(redirectTo?: string) {
       void navigate({ to: redirectTo ?? "/" });
     },
     onError: (err) => {
-      if (err.message === EMAIL_NOT_VERIFIED_REDIRECT) return;
+      if (err.message === EMAIL_NOT_VERIFIED_REDIRECT || err.message === SSO_REDIRECT_IN_PROGRESS)
+        return;
       toast.error(err.message);
     },
   });

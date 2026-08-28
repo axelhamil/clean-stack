@@ -401,6 +401,25 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 
 ---
 
+## Enterprise SSO (OIDC + SAML) + SCIM provisioning ✅ Phase C.7
+
+`@better-auth/sso` (OIDC + SAML 2.0) and `@better-auth/scim` (SCIM 2.0, RFC 7644) enabled in `apps/api/src/auth.ts`. Gated behind the `business`-tier `sso` feature entitlement (checked inline in `hooks.before` on `/sso/register`, keyed off `body.organizationId` — no dedicated `sso: [...]` access-control statement exists; the existing `organization:["update"]` permission covers `/settings/sso` instead).
+
+**Backend** `apps/api/src/auth.ts` + `apps/api/src/shared/auth/{sso-paths,sso-enforcement}.ts` + `apps/api/src/auth-queries.ts`:
+- Per-org OIDC/SAML provider registration (`/sso/register`, `/sso/update-provider`, `/sso/delete-provider`), domain ownership verification (DNS TXT), SCIM bearer-token generation scoped per provider (`providerOwnership: { enabled: true }`, distinct namespace from SSO `providerId`s — a collision is rejected).
+- **JIT provisioning**: first SSO sign-in creates the `member` row directly (`organizationProvisioning.defaultRole: "member"`) — no invitation step.
+- **Domain-based enforcement**: an org can force SSO-only sign-in for its verified domain (`isSsoEnforcedFor` predicate, `apps/api/src/shared/auth/sso-enforcement.ts`) via `POST /settings/organization/sso-enforcement` (`organization:["update"]`, platform admins can also flip it per D3's ruling). Enforcement rejects `/sign-in/email`, `/sign-up/email`, `/sign-in/magic-link` (checked in `hooks.before`, before the rate-limit branch) **and** the passkey path (checked in `databaseHooks.session.create.before`, since passkey sign-in carries no email for the path-based check) with `403 { message: "SSO_REQUIRED", providerId }`.
+- **SCIM `Users` CRUD** at `/scim/v2/Users` — `POST`/`GET`/`PUT`/`PATCH`/`DELETE`, bearer-token authenticated (`base64(token:providerId[:organizationId])`, no session). `DELETE` is an **org departure, not an account deletion**: it removes only the `member` row for the owning org — the global `user` row (and any other org membership) survives untouched, and it does not route through the RGPD grace-period wipe.
+- 13 events (`sso.provider.{registered,updated,deleted}`, `sso.domain.verified`, `sso.enforcement.changed`, `sso.login.{success,failure}`, `scim.connection.{created,deleted}`, `scim.user.{created,updated,deactivated,deprovisioned}`) — full source list in [`docs/EVENTS.md`](EVENTS.md#via-authts-hooksafter-phase-c7--better-authsso--better-authscim). Catalog now **80 / 34 public / 46 internal**.
+
+**Frontend** `apps/app/src/features/sso/` — `/settings/sso` page: provider registration forms (OIDC + SAML, `forms/{oidc,saml}-provider-form.tsx`), `<DomainVerificationCard>`, `<ScimConnectionCard>`, `<SsoEnforcementCard>`. `apps/app/src/shared/auth/auth-client.ts` adds `ssoClient({ domainVerification: { enabled: true } })` + `scimClient()`.
+
+**Sign-in entry** `apps/app/src/features/auth/sign-in.page.tsx` — a collapsible "Sign in with SSO" control (email → `authClient.signIn.sso({ email, callbackURL })`, which better-auth's redirect fetch-plugin turns into a full-page redirect to the IdP). `useSignIn` (`hooks/use-sign-in.ts`) redirects straight into the SSO flow — using the `providerId` the `SSO_REQUIRED` rejection already carries, no re-derivation from the email — instead of showing an error when a password sign-in hits an SSO-enforced org: the user did nothing wrong, their organization changed the rules.
+
+**Local IdP for development**: Keycloak under the opt-in `sso` Docker profile (`docker compose --profile sso up keycloak -d`) — never runs on a bare `docker compose up`. Setup, the OIDC/SAML client gotchas, and the smoke-test commands are in [`docs/SSO-LOCAL.md`](SSO-LOCAL.md).
+
+---
+
 ## Accessibility gate (A.6)
 
 `apps/app/a11y/` — Playwright as an axe driver, not an E2E suite. Run by `.github/workflows/ci.yml` on every PR into `dev`/`main`, and locally with `pnpm --filter app check:a11y`. Details and local setup in [`apps/app/a11y/README.md`](../apps/app/a11y/README.md).
@@ -418,7 +437,6 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 See [`../ROADMAP.md`](../ROADMAP.md) — the list is short by design; anything not on it was cut rather than deferred.
 
 - Manual review pass over the shipped surface.
-- C.7 — SSO SAML/OIDC + SCIM.
 - E.1 — i18n (TanStack Router locale routes + typed message catalogs).
 - C.1 S5b/S6 — abuse signals + captcha hook, pending real traffic to calibrate.
 - D.5 known debts — `failed` rows never purged, per-row `markSent`, lost idempotency key on `delete_completed`.
