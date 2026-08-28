@@ -5,7 +5,6 @@
 **/dist
 **/build
 **/*.tsbuildinfo
-apps/app/src/routeTree.gen.ts
 
 # Turbo
 **/.turbo

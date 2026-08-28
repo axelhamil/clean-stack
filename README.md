@@ -78,7 +78,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **67 typed events** auto-emitted on every state change (28 public + 39 internal), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter) — operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
-| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
+| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
 | **AI-pair ready** | `CLAUDE.md` at the root + per-layer sub-`CLAUDE.md`. Your agent already knows the rules — Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
 | **Zero-warning pipeline** | Husky + lint-staged + commitlint + pre-push CI (Biome, knip, jscpd, type-check). Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
 
@@ -139,8 +139,8 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 
 **Frontend & UI**
 - App shell — sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
-- TanStack Router code-based 2-file pattern (`route` + lazy `page`) — no codegen, no `routeTree.gen.ts`, near-zero TanStack Start migration
-- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~588 KB, route chunks 1–43 KB)
+- TanStack Router file-based routing (`routes.ts` virtual config → generated, versioned `routeTree.gen.ts`) with a 2-file feature pattern (`route` + lazy component), near-zero TanStack Start migration
+- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~355 KB, route chunks 1–43 KB)
 - TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
 - shadcn-pure UI kit (`@packages/ui`) — typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
 

@@ -4,7 +4,7 @@ Shipped phases — full architectural log. The roadmap stays forward-looking; ev
 
 Each section preserves the **why** and the **non-obvious decisions** baked into the codebase. New contributors read this to understand *why the code looks like it does*.
 
-> **Note on paths**: file paths in entries below reflect the layout at the time of shipping. The codebase has since migrated to vertical-slice on both sides (front: `features/<x>/<x>.route.tsx` + `shared/`, code-based routing via `apps/app/src/router.tsx`; api: `modules/<context>/{application,infrastructure,routes.ts,module.ts}` + `shared/`, inwire `defineModule()` per context). For the current canonical layout see `CLAUDE.md` `## Layout`. The decisions and rationales below stay accurate — only the directory containers moved.
+> **Note on paths**: file paths in entries below reflect the layout at the time of shipping. The codebase has since migrated to vertical-slice on both sides (front: `features/<x>/<x>.route.tsx` + `shared/`, file-based routing via `apps/app/routes.ts` + generated `src/routeTree.gen.ts`; api: `modules/<context>/{application,infrastructure,routes.ts,module.ts}` + `shared/`, inwire `defineModule()` per context). For the current canonical layout see `CLAUDE.md` `## Layout`. The decisions and rationales below stay accurate — only the directory containers moved.
 
 ---
 
@@ -1077,7 +1077,7 @@ Execution Time: 0.855 ms
 
 ### G.1d — Dependency floor
 
-The three range-blocked bumps (`typescript` `^6.0.3` → `^7.0.2`, `@hono/zod-validator` `^0.8.0` → `^0.9.0`, `@types/pg`), plus a full `pnpm up -r --latest` lockfile refresh landing Biome `2.5.11` (`$schema` moved with it — it had pointed at `2.5.1` and was silently under-validating the config), Turbo, Vitest, Vite, `@vitejs/plugin-react`, Hono, `pg`, React/React-DOM, Tailwind, `@types/node`, `@tanstack/react-router` and `@tanstack/react-query`.
+The three range-blocked bumps (`typescript` `^6.0.3` → `^7.0.2`, `@hono/zod-validator` `^0.8.0` → `^0.9.0`, `@types/pg`), plus a full `pnpm up -r --latest` lockfile refresh landing Biome `2.5.10` (`$schema` moved with it — it had pointed at `2.5.1` and was silently under-validating the config), Turbo, Vitest, Vite, `@vitejs/plugin-react`, Hono, `pg`, React/React-DOM, Tailwind, `@types/node`, `@tanstack/react-router` and `@tanstack/react-query`.
 
 **One open point, surfaced rather than hidden**: `pnpm up -r --latest` also pulled the `@better-auth/*` family toward `1.7.2` via their caret ranges. `@better-auth/scim@1.7.x` turns out to be a full config-shape rewrite — `requiredRole`, `providerOwnership`, `storeSCIMToken` all removed — a real breaking change riding a semver-minor. Re-implementing the SCIM integration C.7 shipped against a different contract was out of scope for a toolchain refresh, so the whole `better-auth` family was rolled back and **pinned to exact `1.6.30`** (the newest 1.6.x patch, still ahead of the repo's starting point): `better-auth`, `@better-auth/passkey` and `@better-auth/stripe` moved from caret ranges to exact pins; `@better-auth/scim` and `@better-auth/sso` were already pinned and stayed that way. **Migrating to `@better-auth/scim@1.7.x` is deferred debt** — a dedicated task against the C.7 SCIM surface, not something to fold into a version bump.
 
