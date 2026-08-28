@@ -135,7 +135,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - DDD-kit (`@packages/ddd-kit`) — `Result` / `Option`, `Entity` / `Aggregate` / `ValueObject` (zod-validated) / `UUID` / `DomainEvent`, `BaseRepository` / `ScopedRepository` / `IUnitOfWork`
 - Vertical-slice modular monolith — `modules/<context>/{domain,application,infrastructure}` + per-feature front slices
 - CQRS (commands via use-cases, queries direct to Drizzle) · inwire DI (type-inference container, no declared interfaces)
-- Drizzle + Postgres 17 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
+- Drizzle + Postgres 18 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
 
 **Frontend & UI**
 - App shell — sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
@@ -169,16 +169,18 @@ Cut and not returning: marketing site, status page + SLO dashboards, SOC2 checkl
 
 What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
 
-### Database — Postgres 17
+### Database — Postgres 18
 
 | | |
 |---|---|
 | **Image** | [`postgres:18-alpine`](https://hub.docker.com/_/postgres) |
 | **Host port** | `5433` (deliberately not the default `5432` — avoids collision with a system Postgres) |
 | **In-network** | `postgres:5432` (used by the api container) |
-| **Volume** | `postgres_data` (persistent across `compose down`) |
+| **Volume** | `postgres_data` (persistent across `compose down` — **not** across a Postgres major bump, see below) |
 | **Healthcheck** | `pg_isready` every 5 s — api waits for healthy before starting |
 | **Schema** | [Drizzle ORM](https://orm.drizzle.team) — sources in `packages/drizzle/src/schema/` |
+
+> **Action required if you already had `postgres_data` populated before this branch**: the volume mount moved from `/var/lib/postgresql/data` to `/var/lib/postgresql` (Postgres 18+ images store `PGDATA` in a major-version-specific subdirectory — [docker-library/postgres#1259](https://github.com/docker-library/postgres/pull/1259)). An existing volume won't crash on `docker compose up` — it will **silently reinitialize as an empty database**, since the image finds nothing at the new mount point and just creates a fresh one. Run `docker volume rm clean-stack_postgres_data` once before the first `up` on this branch, then rebuild dev data with `pnpm db:push && pnpm db:seed`.
 
 ```bash
 pnpm db:push            # dev — push schema directly (drizzle-kit push --force, non-TTY safe)
@@ -312,7 +314,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Auth** | BetterAuth + `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
 | **Email** | Resend (typed templates, idempotency, provider-side suppression) |
 | **Storage** | Cloudflare R2 prod · SeaweedFS dev (S3-compatible, opt-in) |
-| **DB** | Drizzle ORM + Postgres 17 |
+| **DB** | Drizzle ORM + Postgres 18 |
 | **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
 | **Tooling** | pnpm 10 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |

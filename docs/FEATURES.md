@@ -173,7 +173,7 @@ Primitives for business domain only (never DDD for billing / auth / gating — s
 
 ---
 
-## Database — Drizzle + Postgres 17 ✅
+## Database — Drizzle + Postgres 18 ✅
 
 - Postgres on `localhost:5433` (dedicated port) via `docker compose up postgres -d`.
 - Schemas: `packages/drizzle/src/schema/*.ts` — auth, multi-tenant, policies, consent, billing, webhooks, audit-log, outbox, email, quota-usage, rate-limit.
