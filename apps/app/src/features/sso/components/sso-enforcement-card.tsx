@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
-import { ssoProvidersQueryOptions } from "../api/sso.queries";
+import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 
 // `ssoEnforced` is a server-only additionalField on the organization schema
 // (apps/api/src/auth.ts) — the organization client isn't generated with knowledge
@@ -25,7 +25,7 @@ export function SsoEnforcementCard() {
   const qc = useQueryClient();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
-  const provider = providers?.find((p) => p.organizationId === org?.id);
+  const provider = primaryProviderFor(providers, org?.id);
   const hasVerifiedProvider = provider?.domainVerified === true;
   const enforced = (org as OrgWithSsoEnforcement | undefined)?.ssoEnforced ?? false;
 

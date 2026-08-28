@@ -15,7 +15,7 @@ import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
 import { generateScimTokenMutationOptions } from "../api/sso.mutations";
-import { ssoProvidersQueryOptions } from "../api/sso.queries";
+import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 import { CopyRow } from "./copy-row";
 
 const SCIM_BASE_URL = `${env.VITE_API_URL}/api/auth/scim/v2`;
@@ -26,7 +26,7 @@ export function ScimConnectionCard() {
   const { role } = useAuthorization();
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
-  const provider = providers?.find((p) => p.organizationId === org?.id);
+  const provider = primaryProviderFor(providers, org?.id);
   // The `scim` plugin is configured with `requiredRole: ["owner"]` in apps/api/src/auth.ts
   // — showing this to an admin would only ever end in a 403.
   const canGenerate = role === "owner";

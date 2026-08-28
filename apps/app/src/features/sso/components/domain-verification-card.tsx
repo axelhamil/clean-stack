@@ -12,14 +12,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { verifyDomainMutationOptions } from "../api/sso.mutations";
-import { domainVerificationTokenQueryOptions, ssoProvidersQueryOptions } from "../api/sso.queries";
+import {
+  domainVerificationTokenQueryOptions,
+  primaryProviderFor,
+  ssoProvidersQueryOptions,
+} from "../api/sso.queries";
 import { CopyRow } from "./copy-row";
 
 export function DomainVerificationCard() {
   const qc = useQueryClient();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
-  const provider = providers?.find((p) => p.organizationId === org?.id);
+  const provider = primaryProviderFor(providers, org?.id);
 
   const token = useQuery({
     ...domainVerificationTokenQueryOptions(provider?.providerId ?? ""),
