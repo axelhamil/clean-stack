@@ -5,21 +5,25 @@ Vite+React 19+TanStack Router/Query+Tailwind 4+shadcn. Loaded automatically by C
 ## Layout
 
 ```
-apps/app/src/
-  main.tsx                      createRoot + <AppProviders />
-  router/layouts.tsx            Layouts + gates (root + pathless `_guest`/`_protected`/`_shell`/`_org-scope` + settings)
-  router.tsx                    Pure assembly: imports + `routeTree.addChildren(...)` → `createRouter`
-  shared/                       Cross-cutting (no business) — see src/shared/CLAUDE.md
-  features/<feature>/           Sub-domain — see src/features/CLAUDE.md
+apps/app/
+  routes.ts                     Virtual route tree — rootRoute/layout/route/index, paths relative to routesDirectory "./src"
+  src/
+    main.tsx                    createRoot + <AppProviders />
+    router.tsx                  Pure assembly: createRouter({ routeTree }) — routeTree.gen.ts is generated + gitignored
+    router/                     One file per layout/gate (`__root.tsx`, `_guest.tsx`, `_protected.tsx`, `_shell.tsx`, `_admin.tsx`, `_org-scope.tsx`, `settings.tsx`) + non-route leaves (`index.route.tsx`, `settings-index.route.tsx`)
+    shared/                     Cross-cutting (no business) — see src/shared/CLAUDE.md
+    features/<feature>/         Sub-domain — see src/features/CLAUDE.md
 ```
+
+Routing is file-based via `@tanstack/router-plugin/vite`'s `virtualRouteConfig` (`apps/app/vite.config.ts`), not directory-mounted: `routes.ts` declares the tree once so the vertical-slice layout (`features/<x>/<x>.route.tsx`) stays intact instead of being flattened into a `src/routes/` directory. `autoCodeSplitting: true` — each route file's component chunks on its own as long as it stays unexported (see `src/features/CLAUDE.md`).
 
 ## Import direction
 
-`router.tsx` → `features/` → `shared/`. No cross-feature imports between route-owning features. No barrels.
+`routes.ts` → `features/` → `shared/`. No cross-feature imports between route-owning features. No barrels.
 
-- `router.tsx` → `router/layouts`, `features/<x>/<x>.route.tsx`, `shared/`
-- `router/layouts.tsx` → `shared/`, `@packages/*` (features import FROM here)
-- `features/<x>/` (route-owning) → `router/layouts`, `shared/`, `@packages/*`, `features/<library-feature>/`
+- `routes.ts` → `router/*.tsx`, `features/<x>/<x>.route.tsx`
+- `router/*.tsx` → `shared/`, `@packages/*` (features import FROM here)
+- `features/<x>/` (route-owning) → `router/*.tsx`, `shared/`, `@packages/*`, `features/<library-feature>/`
 - `features/<library-feature>/` → `shared/`, `@packages/*`. Never imports from other features.
 - `shared/<sub>/` → `shared/<sibling>/`, `shared/env.ts`, `shared/utils.ts` (no upward imports)
 
