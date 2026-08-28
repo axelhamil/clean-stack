@@ -4,6 +4,9 @@
  * Plain functions, no DI, no repository class, no port interface — auth is
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
+
+import { base64Url } from "@better-auth/utils/base64";
+import { createHash } from "@better-auth/utils/hash";
 import {
   and,
   count,
@@ -15,7 +18,9 @@ import {
   ssoSchema,
   type Transaction,
 } from "@packages/drizzle";
+import { constantTimeEqual } from "better-auth/crypto";
 import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
+import { scimTokenPartsFromHeader } from "./shared/auth/sso-paths";
 
 // ── #1 – ensurePersonalOrgFor queries ──────────────────────────────────────
 
@@ -218,6 +223,59 @@ export async function scimConnectionOwner(
     .where(eq(ssoSchema.scimProvider.providerId, providerId))
     .limit(1);
   return { userId: row?.userId ?? null, organizationId: row?.organizationId ?? null };
+}
+
+/**
+ * Mirrors `storeSCIMToken: "hashed"` — the fixed mode `scim()` is mounted with in
+ * `auth.ts`. @better-auth/scim doesn't export its own hasher, so this reimplements
+ * the one deterministic algorithm that mount config actually uses: a SHA-256 digest,
+ * base64url-encoded without padding. If that mount option ever changes to
+ * "encrypted" or a custom hasher, this must change with it.
+ */
+async function hashScimToken(token: string): Promise<string> {
+  const digest = await createHash("SHA-256").digest(new TextEncoder().encode(token));
+  return base64Url.encode(new Uint8Array(digest), { padding: false });
+}
+
+/**
+ * Post-review hardening: `scimConnectionOwner(scimProviderIdFromToken(...))` resolves
+ * an actor/org from the bearer header's *claimed* provider id without ever checking
+ * the token against the stored hash. `hooks.before` runs ahead of the SCIM plugin's
+ * own bearer verification (`runBeforeHooks` executes before `endpoint(...)`, which is
+ * where the plugin's `authMiddleware` lives), so a forged `Authorization` header with
+ * a real (guessable — `providerId` is a deterministic slug of the org's domain)
+ * provider id let an unauthenticated caller: (a) plant a fabricated actor in the
+ * SCIM-deprovisioning audit snapshot before the request 401s, later attributed to an
+ * unrelated admin's ordinary member removal within the snapshot TTL; (b) probe seat
+ * capacity pre-auth cross-tenant (402 leaking `maxMembers` vs 401), since the seat
+ * gate ran on the same unverified resolution.
+ *
+ * Any `hooks.before` branch that needs the connection owner MUST use this instead of
+ * `scimConnectionOwner` + `scimProviderIdFromToken` — it hashes the decoded token and
+ * constant-time-compares it against the stored connection before returning anything.
+ * Returns `null` on a missing/malformed header, an unknown provider, or a token that
+ * doesn't match — the caller then must fall through to the endpoint's own 401 rather
+ * than act on unverified input, and the seat cap simply isn't checked here for that
+ * request (it 401s before ever writing a member row, so there is nothing to gate).
+ */
+export async function verifiedScimConnectionOwner(
+  headers: Headers | undefined,
+): Promise<{ userId: string | null; organizationId: string | null } | null> {
+  const parts = scimTokenPartsFromHeader(headers);
+  if (!parts) return null;
+  const [row] = await db
+    .select({
+      userId: ssoSchema.scimProvider.userId,
+      organizationId: ssoSchema.scimProvider.organizationId,
+      scimToken: ssoSchema.scimProvider.scimToken,
+    })
+    .from(ssoSchema.scimProvider)
+    .where(eq(ssoSchema.scimProvider.providerId, parts.providerId))
+    .limit(1);
+  if (!row) return null;
+  const hashed = await hashScimToken(parts.token);
+  if (!constantTimeEqual(hashed, row.scimToken)) return null;
+  return { userId: row.userId, organizationId: row.organizationId };
 }
 
 // ── #12 – SSO enforcement: session-creation guard (Task 9) ─────────────────

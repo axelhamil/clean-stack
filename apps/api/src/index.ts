@@ -56,6 +56,7 @@ import {
   CSP_REPORT_POLICY,
   GITHUB_SCANNING_POLICY,
   GLOBAL_POLICY,
+  SCIM_POLICY,
 } from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
 import { lifecycleState } from "./shared/shutdown";
@@ -195,6 +196,10 @@ app.use(
 app.use(
   "/api/auth/passkey/verify-authentication",
   requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
+);
+app.use(
+  "/api/auth/scim/*",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, SCIM_POLICY),
 );
 
 // SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId — BetterAuth's
