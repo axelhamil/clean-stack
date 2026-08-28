@@ -18,6 +18,20 @@ function ipKeyFn(name: string): (c: Context) => string {
   return (c) => `${name}:${resolveClientIp(c)}`;
 }
 
+// Two windows with two different jobs: the minute window bounds a BURST, the hour
+// window is the sustained anti-abuse ceiling. They must be tuned against what one
+// page view actually costs — measured here, a signed-in page view fires up to 8 API
+// calls (session, consents, policies, notifications stream + count, three
+// organization endpoints), so a 60/min burst window meant ~7 navigations per minute
+// before a legitimate user got a 429. 300/min tolerates ~35 navigations in a burst
+// while the hour window (1800 = 30/min sustained) still caps real abuse, unchanged.
+// Loosening the burst window costs nothing at the surfaces that matter: every
+// credential path carries its own far tighter, fail-closed policy below.
+//
+// `sessionMiddleware` deliberately nulls the user for `/api/auth/*`, so BetterAuth
+// traffic — including a signed-in user's session and organization queries — keys on
+// the IP, not the user. Two signed-in users behind one NAT therefore share this
+// bucket for that traffic.
 export const GLOBAL_POLICY: PolicyConfig = {
   name: "global",
   keyFn: (c) => {
@@ -25,7 +39,7 @@ export const GLOBAL_POLICY: PolicyConfig = {
     return `global:${user?.id ?? resolveClientIp(c)}`;
   },
   windows: [
-    { policyName: "global", windowSec: 60, maxRequests: 60 },
+    { policyName: "global", windowSec: 60, maxRequests: 300 },
     { policyName: "global", windowSec: 3600, maxRequests: 1800 },
   ],
 };

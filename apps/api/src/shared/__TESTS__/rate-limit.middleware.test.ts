@@ -98,7 +98,7 @@ describe("requireRateLimit middleware", () => {
       expect(res.headers.get("RateLimit")).toMatch(/^"global";r=\d+;t=\d+$/);
       // GLOBAL_POLICY has 2 windows — both must appear in comma-joined RateLimit-Policy
       expect(res.headers.get("RateLimit-Policy")).toMatch(
-        /^"global";q=60;w=60, "global";q=1800;w=3600$/,
+        /^"global";q=300;w=60, "global";q=1800;w=3600$/,
       );
     });
 
@@ -114,7 +114,7 @@ describe("requireRateLimit middleware", () => {
       const app = makeApp(makeLimiter(allowDecision()));
       const res = await app.request("/ok");
       const rlp = res.headers.get("RateLimit-Policy") ?? "";
-      expect(rlp).toContain("q=60");
+      expect(rlp).toContain("q=300");
       expect(rlp).toContain("w=60");
     });
   });

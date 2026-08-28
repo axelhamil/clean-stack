@@ -9,18 +9,18 @@ export const STORAGE_STATE = fileURLToPath(new URL(".auth/state.json", import.me
 export default defineConfig({
   testDir: fileURLToPath(new URL(".", import.meta.url)),
   fullyParallel: true,
-  // Every authenticated-page test shares one seeded identity (`auth.setup.ts`),
-  // and the API's global rate limit is keyed per-user (60 req/min), not per
-  // browser context — so a high worker count turns "N pages loading in
-  // parallel" into "N pages' worth of requests landing in one shared bucket
-  // within the same second". `/settings/sso` alone fires ~5 queries per load
-  // (providers, domain verification token, SCIM connections, entitlements),
-  // so it's the first page to trip that ceiling once enough pages queue up
-  // behind it. Capped low and fixed (not `50%` of the host's core count,
-  // Playwright's own default) so the burst never gets close to the ceiling on
-  // any machine — verified serially at `workers: 1` (20/20 pass, ~19s) before
-  // landing on this number, which keeps a meaningful amount of parallelism
-  // without reintroducing the flake.
+  // `workers` is a courtesy cap on machine load, NOT what keeps the API's global
+  // rate limit off this suite — an earlier comment here claimed otherwise and was
+  // wrong. The bucket this sweep fills is the IP-keyed one (`global:<ip>`), not the
+  // per-user one: `sessionMiddleware` nulls the user for `/api/auth/*`, so a
+  // signed-in page's session and organization queries land on the IP alongside every
+  // unauthenticated page load. A full sweep measured 61 requests in that bucket
+  // against a then-60/min ceiling — one over, deterministically — while the per-user
+  // bucket sat at 39. Worker count does not bound either: the ceiling is per minute
+  // over the whole run, and the IP is the same from every worker. The fix was to
+  // tune the API's burst window to what a page view actually costs
+  // (`GLOBAL_POLICY`, apps/api/src/shared/middleware/rate-limit.policies.ts); this
+  // number just keeps the host from being swamped.
   workers: 4,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
