@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@better-auth/passkey": "^1.6.20",
+    "@better-auth/scim": "1.6.29",
+    "@better-auth/sso": "1.6.29",
     "@better-auth/stripe": "^1.6.23",
     "@hookform/resolvers": "^5.4.0",
     "@packages/access-control": "workspace:*",

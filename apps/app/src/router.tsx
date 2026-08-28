@@ -29,6 +29,7 @@ import { notificationsRoute } from "./features/notifications/notifications.route
 import { newOrgRoute } from "./features/organization/new.route";
 import { organizationRoute } from "./features/organization/organization.route";
 import { privacyRoute } from "./features/privacy/privacy.route";
+import { ssoRoute } from "./features/sso/sso.route";
 import { webhooksRoute } from "./features/webhooks/webhooks.route";
 import {
   adminLayout,
@@ -64,7 +65,7 @@ const routeTree = rootRoute.addChildren([
         privacyRoute,
         apiTokensRoute,
         notificationsRoute,
-        orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute]),
+        orgScopeLayout.addChildren([billingRoute, organizationRoute, webhooksRoute, ssoRoute]),
       ]),
     ]),
   ]),

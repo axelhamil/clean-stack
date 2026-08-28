@@ -18,4 +18,5 @@ export const AUTHENTICATED_PAGES: readonly AuditedPage[] = [
   { name: "dashboard", path: "/dashboard" },
   { name: "account settings", path: "/settings/account" },
   { name: "privacy settings", path: "/settings/privacy" },
+  { name: "sso settings", path: "/settings/sso" },
 ];

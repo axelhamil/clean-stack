@@ -1,4 +1,6 @@
 import { passkeyClient } from "@better-auth/passkey/client";
+import { scimClient } from "@better-auth/scim/client";
+import { ssoClient } from "@better-auth/sso/client";
 import { stripeClient } from "@better-auth/stripe/client";
 import { ac, roles } from "@packages/access-control";
 import type { BetterAuthClientPlugin } from "better-auth/client";
@@ -34,5 +36,10 @@ export const authClient = createAuthClient({
       roles,
     }),
     _stripeClientPlugin,
+    // `domainVerification: { enabled: true }` must mirror the server's `sso()` config
+    // in apps/api/src/auth.ts — it gates whether the client's inferred types include
+    // requestDomainVerification/verifyDomain at all.
+    ssoClient({ domainVerification: { enabled: true } }),
+    scimClient(),
   ],
 });
