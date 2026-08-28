@@ -156,12 +156,22 @@ Tokens are never stored in plaintext. The server stores `HMAC-SHA256(pepper, raw
 
 Tokens are revoked automatically when the issuing user loses org membership, and GitHub's Secret Scanning partner program is supported: a `POST /api/token-scanning/github` endpoint verifies the ECDSA P-256 signature, revokes the matching token, and emails the owner.
 
+## Enterprise SSO (OIDC / SAML) with SCIM provisioning
+
+The single biggest item procurement checks for at enterprise deal size — and the one most templates skip entirely. clean-stack ships it: per-organization identity provider registration (OIDC or SAML 2.0), domain ownership verification, and just-in-time account provisioning on first sign-in, from `/settings/sso`.
+
+- An org owner registers their identity provider once — issuer, client credentials for OIDC or entry point and certificate for SAML — and verifies they own the domain before it takes effect
+- The first person who signs in through that provider is provisioned automatically, landing as a member with no invitation step
+- An org can require SSO for its verified domain — every other sign-in path (password, magic-link, passkey) then redirects the user straight into the identity provider instead of showing them a dead end, because they did nothing wrong; their organization changed the rules
+- SCIM 2.0 keeps the org's roster in sync with the identity provider's own user directory — create, update, deactivate, and remove members without anyone touching `/settings/organization` by hand. Removing a SCIM user is an org departure: it ends that membership, not the person's account
+
+SAML registrations are hardened server-side regardless of what the client sends — SHA-256 signatures and signed assertions are forced, never optional. A local Keycloak profile (`docker compose --profile sso up keycloak -d`) makes the whole round-trip testable without a real Okta or Entra ID tenant.
+
 ## What's next
 
 Short, and short on purpose — the plumbing is done, so the list is a review pass plus three items rather than a phase catalogue.
 
 - **A manual review pass** over everything shipped, before calling the stack clone-ready.
-- **SSO (SAML / OIDC) with SCIM** — the remaining feature that unblocks enterprise procurement.
 - **Internationalization** — locale-prefixed routes with build-time key checking.
 - **Abuse signals and a captcha hook** — deferred until there's real traffic to calibrate them against.
 

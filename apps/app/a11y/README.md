@@ -46,6 +46,21 @@ Two things bite when running repeatedly:
 - **A page audited after a gate redirect still looks green.** `audit()` asserts
   the final URL for that reason; if a session or policy gate fires, the failure
   names the redirect instead of silently auditing the wrong page.
+- **`workers` is pinned to `4`, not left to Playwright's default.** Every
+  authenticated-page test shares one seeded identity, and the API's global
+  rate limit is keyed per-user (60 req/min) — not per browser context — so
+  a high worker count turns "N pages loading in parallel" into a burst
+  landing in one shared bucket. `/settings/sso` fires the most queries per
+  load of any audited page (providers, domain verification token, SCIM
+  connections, entitlements), so it was the first to trip that ceiling once
+  local core counts pushed Playwright's own `50%`-of-cores default past
+  it — the failure showed a "Too many requests" toast and the app's global
+  error boundary, not a rendering bug. Confirmed by reproducing it against a
+  **freshly built** preview (this bites the moment you run `check:a11y`
+  directly instead of through `turbo`, since only turbo's `dependsOn:
+  ["build"]` rebuilds first) and clearing it entirely at `--workers=1`
+  before settling on `4` as a parallelism/margin balance. If a future page
+  is heavier still, lower it again before raising the rate limit.
 
 ## Adding a page
 

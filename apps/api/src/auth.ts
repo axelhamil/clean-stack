@@ -1215,7 +1215,10 @@ const authOptions = {
             if (email) {
               const enforced = await isSsoEnforcedFor(email, enforcedProviderForDomain);
               if (enforced.isSome()) {
-                throw new APIError("FORBIDDEN", { message: "SSO_REQUIRED" });
+                throw new APIError("FORBIDDEN", {
+                  message: "SSO_REQUIRED",
+                  providerId: enforced.unwrap().providerId,
+                });
               }
             }
           }
