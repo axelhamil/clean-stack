@@ -27,6 +27,12 @@ const SETTINGS_TABS: readonly TabItem[] = [
     requires: { webhooks: ["read"] },
     requiresOrg: true,
   },
+  {
+    to: "/settings/sso",
+    label: "Single sign-on",
+    requires: { organization: ["update"] },
+    requiresOrg: true,
+  },
   { to: "/settings/account", label: "Account" },
   { to: "/settings/notifications", label: "Notifications" },
   { to: "/settings/privacy", label: "Privacy" },

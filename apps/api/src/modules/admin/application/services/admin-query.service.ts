@@ -13,6 +13,7 @@ export interface AdminOrgListItem {
   slug: string;
   memberCount: number;
   createdAt: Date;
+  ssoEnforced: boolean;
 }
 
 export type AdminOrgDetail = AdminOrgListItem & {
@@ -110,6 +111,7 @@ export class AdminQueryService {
           slug: row.slug,
           memberCount: row.memberCount,
           createdAt: row.createdAt,
+          ssoEnforced: row.ssoEnforced,
         }));
         const last = items.at(-1);
         const nextCursor =
@@ -146,6 +148,7 @@ export class AdminQueryService {
             slug: row.slug,
             memberCount: row.memberCount,
             createdAt: row.createdAt,
+            ssoEnforced: row.ssoEnforced,
             members,
             plan,
           }),

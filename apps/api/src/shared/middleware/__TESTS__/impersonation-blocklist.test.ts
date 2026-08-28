@@ -41,4 +41,15 @@ describe("isBlockedDuringImpersonation", () => {
     expect(isBlockedDuringImpersonation("/list-sessions")).toBe(false);
     expect(isBlockedDuringImpersonation("/list-accounts")).toBe(false);
   });
+
+  it("blocks sso and scim mutations during impersonation", () => {
+    expect(isBlockedDuringImpersonation("/sso/register")).toBe(true);
+    expect(isBlockedDuringImpersonation("/sso/verify-domain")).toBe(true);
+    expect(isBlockedDuringImpersonation("/scim/generate-token")).toBe(true);
+    expect(isBlockedDuringImpersonation("/scim/v2/Users")).toBe(true);
+  });
+
+  it("still allows unrelated paths", () => {
+    expect(isBlockedDuringImpersonation("/session")).toBe(false);
+  });
 });

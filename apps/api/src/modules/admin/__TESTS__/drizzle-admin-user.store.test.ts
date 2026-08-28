@@ -64,7 +64,7 @@ mock.module("@packages/drizzle", () => ({
   },
   multiTenantSchema: {
     member: { userId: {}, organizationId: {} },
-    organization: {},
+    organization: { id: {} },
   },
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: { hash: {}, sequence: {}, id: {} } },

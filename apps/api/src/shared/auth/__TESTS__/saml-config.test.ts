@@ -1,0 +1,113 @@
+import { describe, expect, it } from "bun:test";
+import { normalizeSamlConfig } from "../saml-config";
+
+describe("normalizeSamlConfig", () => {
+  it("forces assertion and request signing", () => {
+    const result = normalizeSamlConfig({ entryPoint: "https://idp.acme.com/sso", cert: "MII…" });
+    expect(result.isSuccess).toBe(true);
+    expect(result.getValue()).toMatchObject({
+      wantAssertionsSigned: true,
+      authnRequestsSigned: true,
+      signatureAlgorithm: "sha256",
+      digestAlgorithm: "sha256",
+    });
+  });
+
+  it("overrides a caller-supplied weakening of the signing flags", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", wantAssertionsSigned: false });
+    expect(result.getValue().wantAssertionsSigned).toBe(true);
+  });
+
+  it("rejects sha1 outright rather than silently upgrading it", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "sha1" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("preserves fields it does not govern", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", audience: "https://app.example.com" });
+    expect(result.getValue().audience).toBe("https://app.example.com");
+  });
+
+  it("rejects the rsa-sha1 short form accepted by the plugin", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "rsa-sha1" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("rejects the sha1 xmldsig URI form", () => {
+    const result = normalizeSamlConfig({
+      cert: "MII…",
+      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+    });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("rejects sha1 regardless of case", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "RSA-SHA1" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+  });
+
+  it("accepts sha256 short form without false-positiving on the sha1 family match", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "sha256" });
+    expect(result.isSuccess).toBe(true);
+  });
+
+  it("accepts the rsa-sha256 short form", () => {
+    const result = normalizeSamlConfig({ cert: "MII…", signatureAlgorithm: "rsa-sha256" });
+    expect(result.isSuccess).toBe(true);
+  });
+
+  it("accepts the sha256 xmldsig URI form", () => {
+    const result = normalizeSamlConfig({
+      cert: "MII…",
+      digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+    });
+    expect(result.isSuccess).toBe(true);
+  });
+
+  // /sso/update-provider hardening (post-PR review finding): the plugin merges every
+  // SAML field as `updates.X ?? current.X`, so a partial update body must not leave a
+  // gap that either clobbers an untouched identity field or lets a security field slip
+  // through unvalidated.
+  describe("partial-update safety (/sso/update-provider)", () => {
+    it("a weakening PATCH (only the signing flags, no identity fields) is corrected", () => {
+      const result = normalizeSamlConfig({
+        wantAssertionsSigned: false,
+        authnRequestsSigned: false,
+        signatureAlgorithm: "sha1",
+      });
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEAK_SIGNATURE_ALGORITHM");
+    });
+
+    it("a legitimate identity-only PATCH (entryPoint) still succeeds and forces strong security fields", () => {
+      const result = normalizeSamlConfig({ entryPoint: "https://idp.acme.com/sso/v2" });
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue()).toMatchObject({
+        entryPoint: "https://idp.acme.com/sso/v2",
+        wantAssertionsSigned: true,
+        authnRequestsSigned: true,
+        signatureAlgorithm: "sha256",
+        digestAlgorithm: "sha256",
+      });
+    });
+
+    it("an identity-only PATCH never introduces fields the caller did not send", () => {
+      const result = normalizeSamlConfig({ cert: "MII-new-cert" });
+      const value = result.getValue();
+      expect(Object.keys(value).sort()).toEqual(
+        [
+          "authnRequestsSigned",
+          "cert",
+          "digestAlgorithm",
+          "signatureAlgorithm",
+          "wantAssertionsSigned",
+        ].sort(),
+      );
+      expect(value.entryPoint).toBeUndefined();
+    });
+  });
+});

@@ -50,8 +50,9 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Account recovery codes UI** (C.6) (`RecoveryCodesCard` regenerate-only + password gate + `xxxxx-xxxxx` format + copy/download; backup-code fallback on `/two-factor` (whitespace stripped, dash auto-inserted); `BackupCodeUsedNotifier` first `onEvent` handler; rate-limit on `generate-backup-codes`. 2 compliance events → 54 total / 50 subscribable / 4 internal.) | **€200 – €400** | 0.5j |
 
 | **Notification center** (D.3) (`<Bell />` + dropdown inbox in the app shell, unread badge, read/read-all with cross-tab propagation, rows grouped by `groupKey`; `/settings/notifications` preference matrix (category × channel + email frequency) and org defaults card behind `organization:["update"]`; fan-out as an outbox subscriber inside the dispatch TX, one `INSERT ... SELECT` resolving the org-lock → user → org-default → enabled cascade in-statement, `forced` bypass for critical alerts; SSE signal stream (`pg_notify` + one `LISTEN` per instance, `fetch`+`ReadableStream` not `EventSource`) with polling only as fallback; dedup via partial unique index; 2 crons (digest flush + read-only sweep). No new event type — the catalog is consumed, so it stays **67 total / 28 public / 39 internal**.) | **€1 200 – €2 000** | 3j |
+| **Enterprise SSO + SCIM provisioning** (C.7) (`@better-auth/sso` OIDC + SAML 2.0 + `@better-auth/scim`; per-org provider registration + domain verification; JIT provisioning on first sign-in; domain-based SSO enforcement across all four sign-in paths — password, sign-up, magic-link, passkey — with a "Sign in with SSO" redirect on the front instead of a dead-end error; SAML forced to SHA-256 signed assertions server-side regardless of client input; SCIM `Users` CRUD, `DELETE` as an org departure (member row only, account survives); `/settings/sso`; local Keycloak dev profile. 13 events → **80 total / 34 public / 46 internal**.) | **€5 000 – €8 000** | 10-12j |
 
-**Subtotal Core (shipped)**: **€36 600 – €61 600** of senior-dev value already in the repo on day zero. ~80-104 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€41 600 – €69 600** of senior-dev value already in the repo on day zero. ~90-116 days of focused senior work compressed into a clone.
 
 ---
 
@@ -60,7 +61,6 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | Phase | Module | Realistic value | Time |
 |---|---|---|---|
 | A.6 | **E2E gates Playwright + Lighthouse a11y CI** (full legal chain, WCAG 2.1 AA gate ≥95) | **€1 200 – €2 000** | 3j |
-| C.7 | **SSO SAML/OIDC + SCIM provisioning** (BetterAuth `sso` plugin + SCIM endpoint + audit-logged provisioning) | **€5 000 – €8 000** | 10-12j |
 | D.1 | **Status page + SLO dashboards + alerting** (Cachet/Astro, Grafana SLO consuming 0.4 `/metrics`, Sentry → Slack/PagerDuty, runbook-linked) | **€1 500 – €2 500** | 3-4j |
 | D.2 | **OpenAPI auto-docs** (`@hono/zod-openapi`, Scalar UI at `/api/docs`) | **€400 – €700** | 1j |
 | D.4 | **SOC2 Type II readiness checklist** (mapping shipped controls, Vanta/Drata-ready) | **€600 – €1 000** | 1-2j |
@@ -69,7 +69,7 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€15 300 – €25 200** committed to ship.
+**Subtotal Roadmap**: **€10 300 – €17 200** committed to ship.
 
 ---
 

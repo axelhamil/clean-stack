@@ -20,7 +20,7 @@ mock.module("@packages/drizzle", () => ({
   auditLogSchema: {},
   webhooksSchema: {},
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   schema: {},
   rateLimitSchema: {},
   billingSchema: {},

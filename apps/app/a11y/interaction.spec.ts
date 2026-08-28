@@ -20,6 +20,34 @@ test("reaches every sign-in control in order with the keyboard", async ({ page }
   await expect(form.getByRole("button", { name: "Sign in", exact: true })).toBeFocused();
 });
 
+test("reaches and operates the SSO entry with the keyboard", async ({ page }) => {
+  await page.goto("/sign-in");
+
+  // The passkey button only renders once `PublicKeyCredential` support resolves
+  // (async, conditional) — `tabTo` rather than a fixed Tab count skips past it
+  // whether or not it showed up, same as every other control on this page.
+  const ssoTrigger = page.getByRole("button", { name: "Sign in with SSO", exact: true });
+  await tabTo(page, ssoTrigger);
+
+  // Space activates a focused button the same way a click does — this both proves
+  // the trigger is keyboard-operable and expands the collapsible for the next step.
+  await page.keyboard.press(" ");
+
+  const ssoForm = page
+    .locator("form")
+    .filter({ has: page.getByRole("button", { name: "Continue", exact: true }) });
+  const ssoEmail = ssoForm.getByLabel("Email", { exact: true });
+  await expect(ssoEmail).toBeVisible();
+
+  // Revealing the field must not break focus order: the very next stop from the
+  // trigger has to be the field it just revealed.
+  await page.keyboard.press("Tab");
+  await expect(ssoEmail).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(ssoForm.getByRole("button", { name: "Continue", exact: true })).toBeFocused();
+});
+
 test.describe("signed in", () => {
   test.use({ storageState: STORAGE_STATE });
 

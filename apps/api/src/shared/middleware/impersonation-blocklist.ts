@@ -14,6 +14,8 @@ export const IMPERSONATION_BLOCKED_PATHS: readonly string[] = [
   "/revoke-sessions",
   "/revoke-other-sessions",
   "/admin",
+  "/sso",
+  "/scim",
 ];
 
 export function isBlockedDuringImpersonation(path: string): boolean {
@@ -22,3 +24,12 @@ export function isBlockedDuringImpersonation(path: string): boolean {
     (blocked) => path === blocked || path.startsWith(`${blocked}/`),
   );
 }
+
+/**
+ * BetterAuth's admin-plugin endpoint that mints a session for another user.
+ * Named here (rather than inlined at the call site) because the SSO-enforcement
+ * guard in `databaseHooks.session.create.before` has to recognize it: that
+ * session is minted for a platform admin who already passed the admin gate, not
+ * by the enforced user authenticating, so enforcement does not apply to it.
+ */
+export const IMPERSONATE_PATH = "/admin/impersonate-user";

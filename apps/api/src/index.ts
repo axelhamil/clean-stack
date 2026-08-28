@@ -19,6 +19,7 @@ import { consentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { notificationsRoutes } from "./modules/notifications/routes";
+import { organizationSettingsRoutes } from "./modules/organization/routes";
 import { policyRoutes } from "./modules/policies/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
@@ -46,6 +47,7 @@ import {
   AUTH_MAGIC_LINK_POLICY,
   AUTH_PASSKEY_POLICY,
   AUTH_RESET_PASSWORD_POLICY,
+  AUTH_SEND_VERIFICATION_POLICY,
   AUTH_SIGN_IN_POLICY,
   AUTH_SIGN_UP_POLICY,
   AUTH_TWO_FACTOR_POLICY,
@@ -54,6 +56,7 @@ import {
   CSP_REPORT_POLICY,
   GITHUB_SCANNING_POLICY,
   GLOBAL_POLICY,
+  SCIM_POLICY,
 } from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
 import { lifecycleState } from "./shared/shutdown";
@@ -170,6 +173,13 @@ app.use(
   ),
 );
 app.use(
+  "/api/auth/send-verification-email",
+  requireRateLimit(
+    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+    AUTH_SEND_VERIFICATION_POLICY,
+  ),
+);
+app.use(
   "/api/auth/verify-email",
   requireRateLimit(
     { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
@@ -187,8 +197,15 @@ app.use(
   "/api/auth/passkey/verify-authentication",
   requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
 );
+app.use(
+  "/api/auth/scim/*",
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, SCIM_POLICY),
+);
 
-app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+// SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId — BetterAuth's
+// own router 404s any method/path it hasn't registered, so widening the verb list here
+// exposes no surface beyond what the mounted plugins already declare.
+app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/internal", healthInternalRoutes);
 app.route("/internal", rgpdInternalRoutes);
@@ -246,6 +263,7 @@ const routes = app
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/tokens", apiTokenRoutes)
   .route("/settings/webhooks", webhooksRoutes)
+  .route("/settings/organization", organizationSettingsRoutes)
   .route("/consents", consentRoutes)
   .route("/billing", billingRoutes)
   .route("/notifications", notificationsRoutes);

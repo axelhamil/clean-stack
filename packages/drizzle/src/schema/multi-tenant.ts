@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export const organization = pgTable(
@@ -11,6 +11,7 @@ export const organization = pgTable(
     logo: text("logo"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     metadata: text("metadata"),
+    ssoEnforced: boolean("sso_enforced").default(false).notNull(),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );

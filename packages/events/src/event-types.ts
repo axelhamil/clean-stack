@@ -68,6 +68,19 @@ export const EventTypes = {
   EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
   NOTIFICATION_PREFERENCE_UPDATED: "notification.preference.updated",
   NOTIFICATION_ORG_PREFERENCE_UPDATED: "notification.org_preference.updated",
+  SSO_PROVIDER_REGISTERED: "sso.provider.registered",
+  SSO_PROVIDER_UPDATED: "sso.provider.updated",
+  SSO_PROVIDER_DELETED: "sso.provider.deleted",
+  SSO_DOMAIN_VERIFIED: "sso.domain.verified",
+  SSO_ENFORCEMENT_CHANGED: "sso.enforcement.changed",
+  SSO_LOGIN_SUCCESS: "sso.login.success",
+  SSO_LOGIN_FAILURE: "sso.login.failure",
+  SCIM_CONNECTION_CREATED: "scim.connection.created",
+  SCIM_CONNECTION_DELETED: "scim.connection.deleted",
+  SCIM_USER_CREATED: "scim.user.created",
+  SCIM_USER_UPDATED: "scim.user.updated",
+  SCIM_USER_DEACTIVATED: "scim.user.deactivated",
+  SCIM_USER_DEPROVISIONED: "scim.user.deprovisioned",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

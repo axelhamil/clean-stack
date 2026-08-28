@@ -305,9 +305,9 @@ export const NOTIFICATION_MAP = {
 - `forced?: true` — contourne les préférences utilisateur et le batching email (bypass critique du SOTA).
 - `groupBy` et `dedupWindow` — fenêtre de déduplication et clé de regroupement lecteur (style Linear "X et 3 autres").
 
-**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement — une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **67 événements / 28 publics / 39 internes**.
+**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement — une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **80 événements / 34 publics / 46 internes**.
 
-**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 67 événements sont audit-only).
+**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 80 événements sont audit-only).
 
 **La cascade de préférences est résolue dans la requête d'insertion**, jamais en amont ni destinataire par destinataire : un `LEFT JOIN notification_preference` par portée et par canal, sur le même `INSERT ... SELECT`.
 
@@ -323,7 +323,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **67 events** (28 public + 39 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used), **2 from `modules/notifications/`** (Phase D.3 — preference.updated, org_preference.updated). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **80 events** (34 public + 46 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used), **2 from `modules/notifications/`** (Phase D.3 — preference.updated, org_preference.updated), **13 from `sso`/`scim`** (Phase C.7 — 7 `sso.*` provider/domain/enforcement/login events + 6 `scim.*` connection/user lifecycle events). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -422,6 +422,24 @@ Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quo
 
 - `BILLING_QUOTA_EXCEEDED` (`billing.quota.exceeded`) — emitted on quota ceiling hit. Payload: `{ organizationId, resource: string, limit: number, attempted: number, tier: string, actorUserId: string }`, retention `operational`.
 
+### Via `auth.ts` `hooks.after` (Phase C.7 — `@better-auth/sso` / `@better-auth/scim`)
+
+All 13 events emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth.ts`'s `hooks.after`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). SCIM endpoints authenticate with a bearer token, not a session — the actor is resolved from the connection row (`scimConnectionOwner`), not `ctx.context.session`.
+
+- `SSO_PROVIDER_REGISTERED` (`sso.provider.registered`) — `path === SSO_PATHS.register`. Payload: `{ actorUserId, organizationId, providerId, protocol: "oidc" | "saml", domain }`, retention `internal`.
+- `SSO_PROVIDER_UPDATED` (`sso.provider.updated`) — `path === SSO_PATHS.updateProvider`. Payload includes `changedFields: string[]`.
+- `SSO_PROVIDER_DELETED` (`sso.provider.deleted`) — `path === SSO_PATHS.deleteProvider`. The provider row is gone by the time `hooks.after` runs, so a pre-delete snapshot (`ssoProviderDeleteSnapshots`, keyed on `providerId`) supplies `organizationId` for the payload.
+- `SSO_DOMAIN_VERIFIED` (`sso.domain.verified`) — `path === SSO_PATHS.verifyDomain`, only after the endpoint's own DNS TXT check succeeds.
+- `SSO_ENFORCEMENT_CHANGED` (`sso.enforcement.changed`) — emitted by `AdminActionService.setSsoEnforcement` (`POST /settings/organization/sso-enforcement`, `organization:["update"]`), not a `hooks.after` path — the only one of the 13 not routed through the SSO/SCIM plugin's own endpoints.
+- `SSO_LOGIN_SUCCESS` (`sso.login.success`) — public. Payload: `{ userId, providerId, organizationId, protocol, jitProvisioned: boolean }`. `jitProvisioned` is a heuristic (`user.createdAt` within the last 10s of the login), not a plugin-native flag.
+- `SSO_LOGIN_FAILURE` (`sso.login.failure`) — public. Emitted from the plugin's own error redirect path; `providerId` may be `"unknown"` when the failure happens before a provider is resolved.
+- `SCIM_CONNECTION_CREATED` (`scim.connection.created`) — `path === SCIM_PATHS.generateToken`.
+- `SCIM_CONNECTION_DELETED` (`scim.connection.deleted`) — `path === SCIM_PATHS.deleteConnection`. Same pre-delete-snapshot pattern as `SSO_PROVIDER_DELETED` (`scimConnectionDeleteSnapshots`).
+- `SCIM_USER_CREATED` (`scim.user.created`) — public. `path.startsWith(SCIM_PATHS.users) && method === "POST"`.
+- `SCIM_USER_UPDATED` (`scim.user.updated`) — public. `PUT`/`PATCH` that is not a deactivation (`isDeactivation(body)` false). Payload carries `changedFields` (`changedFieldsFrom(body)` — PATCH `Operations[].path`, or top-level PUT keys minus `schemas`).
+- `SCIM_USER_DEACTIVATED` (`scim.user.deactivated`) — public. `PUT`/`PATCH` where `isDeactivation(body)` is true (`active: false`, either as a top-level PUT field or a PATCH `replace` operation on `path: "active"` — both shapes IdPs actually send, per `sso-paths.ts`).
+- `SCIM_USER_DEPROVISIONED` (`scim.user.deprovisioned`) — public. `DELETE`. **This removes only the `member` row for the owning org** — the global `user` row (and any other org membership) is untouched. A SCIM deprovision is an org departure, not an account deletion; it does not route through the RGPD grace-period wipe.
+
 ## Payload validation guarantee
 
 Every `outbox.enqueue(...)` call validates each event against `PayloadByEventType[eventType]` via Zod `safeParse` **before** the INSERT. A failure throws, which rolls back the surrounding TX (UoW or BetterAuth hook). **Why**: the audit trail is only as good as the payloads it stores — a missing `actorUserId`, an extra field, a wrong type silently corrupts compliance. Failing the mutation forces the bug to surface at the call site, atomically (the business write and the bad event are rejected together, never half-applied).
@@ -453,7 +471,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (67 events: 28 public + 39 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (80 events: 34 public + 46 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |

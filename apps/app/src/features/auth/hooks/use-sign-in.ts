@@ -5,7 +5,7 @@ import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { SignInInput } from "../../../shared/auth/auth.schema";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { resolveAuthError } from "../auth-error";
+import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
 
 const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
 
@@ -29,6 +29,8 @@ export function useSignIn(redirectTo?: string) {
           throw new Error(EMAIL_NOT_VERIFIED_REDIRECT);
         }
 
+        if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+
         throw new Error(resolveAuthError(error, "Sign-in failed"));
       }
 
@@ -46,7 +48,8 @@ export function useSignIn(redirectTo?: string) {
       void navigate({ to: redirectTo ?? "/" });
     },
     onError: (err) => {
-      if (err.message === EMAIL_NOT_VERIFIED_REDIRECT) return;
+      if (err.message === EMAIL_NOT_VERIFIED_REDIRECT || err.message === SSO_REDIRECT_IN_PROGRESS)
+        return;
       toast.error(err.message);
     },
   });

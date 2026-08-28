@@ -116,7 +116,7 @@ mock.module("@packages/drizzle", () => ({
     },
   },
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   schema: {},
   TransactionService: class {},
   trackEventsOnSuccess: () => {},

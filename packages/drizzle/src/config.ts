@@ -6,6 +6,7 @@ import * as auditLogSchema from "./schema/audit-log";
 import * as authSchema from "./schema/auth";
 import * as multiTenantSchema from "./schema/multi-tenant";
 import * as outboxSchema from "./schema/outbox";
+import * as ssoSchema from "./schema/sso";
 import * as webhooksSchema from "./schema/webhooks";
 
 const schema = {
@@ -14,6 +15,7 @@ const schema = {
   ...outboxSchema,
   ...auditLogSchema,
   ...webhooksSchema,
+  ...ssoSchema,
 };
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;

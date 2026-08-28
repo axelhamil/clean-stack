@@ -18,6 +18,20 @@ function ipKeyFn(name: string): (c: Context) => string {
   return (c) => `${name}:${resolveClientIp(c)}`;
 }
 
+// Two windows with two different jobs: the minute window bounds a BURST, the hour
+// window is the sustained anti-abuse ceiling. They must be tuned against what one
+// page view actually costs — measured here, a signed-in page view fires up to 8 API
+// calls (session, consents, policies, notifications stream + count, three
+// organization endpoints), so a 60/min burst window meant ~7 navigations per minute
+// before a legitimate user got a 429. 300/min tolerates ~35 navigations in a burst
+// while the hour window (1800 = 30/min sustained) still caps real abuse, unchanged.
+// Loosening the burst window costs nothing at the surfaces that matter: every
+// credential path carries its own far tighter, fail-closed policy below.
+//
+// `sessionMiddleware` deliberately nulls the user for `/api/auth/*`, so BetterAuth
+// traffic — including a signed-in user's session and organization queries — keys on
+// the IP, not the user. Two signed-in users behind one NAT therefore share this
+// bucket for that traffic.
 export const GLOBAL_POLICY: PolicyConfig = {
   name: "global",
   keyFn: (c) => {
@@ -25,7 +39,7 @@ export const GLOBAL_POLICY: PolicyConfig = {
     return `global:${user?.id ?? resolveClientIp(c)}`;
   },
   windows: [
-    { policyName: "global", windowSec: 60, maxRequests: 60 },
+    { policyName: "global", windowSec: 60, maxRequests: 300 },
     { policyName: "global", windowSec: 3600, maxRequests: 1800 },
   ],
 };
@@ -50,6 +64,20 @@ export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
   name: "auth-magic-link",
   keyFn: ipKeyFn("auth-magic-link"),
   windows: [{ policyName: "auth-magic-link", windowSec: 900, maxRequests: 3 }],
+  emitSecurityEvent: true,
+  failClosed: true,
+};
+
+// /send-verification-email: public POST taking an arbitrary email, no session — the
+// same "make the server email a stranger" primitive as request-password-reset and
+// sign-in/magic-link, and it gets the same ceiling. Without its own policy the global
+// burst window is its only bound, which is not a bound on abuse: that window exists to
+// let one legitimate user navigate quickly, not to cap how many strangers one IP can
+// have mailed.
+export const AUTH_SEND_VERIFICATION_POLICY: PolicyConfig = {
+  name: "auth-send-verification",
+  keyFn: ipKeyFn("auth-send-verification"),
+  windows: [{ policyName: "auth-send-verification", windowSec: 900, maxRequests: 3 }],
   emitSecurityEvent: true,
   failClosed: true,
 };
@@ -152,6 +180,24 @@ export const GITHUB_SCANNING_POLICY: PolicyConfig = {
   ],
   emitSecurityEvent: false,
   advertiseBudget: false,
+};
+
+// SCIM (RFC 7644) directory sync — bearer-token protocol surface with no session,
+// so it previously ran at the loose 300/min GLOBAL_POLICY (tuned for smoothing a
+// signed-in user's page navigation, not for bounding a machine client). Also the
+// surface the post-PR-review SCIM hardening closed (`auth.ts`: `hooks.before` reads
+// the bearer header before the plugin's own token verification to gate seat cap and
+// snapshot the deprovisioning actor) — a tight, fail-closed ceiling here is defense
+// in depth on top of that fix, not a substitute for it. Keyed by IP.
+export const SCIM_POLICY: PolicyConfig = {
+  name: "scim",
+  keyFn: ipKeyFn("scim"),
+  windows: [
+    { policyName: "scim", windowSec: 60, maxRequests: 60 },
+    { policyName: "scim", windowSec: 3600, maxRequests: 1000 },
+  ],
+  emitSecurityEvent: true,
+  failClosed: true,
 };
 
 // Browser-sent CSP violation reports — no user identity, keyed by IP.

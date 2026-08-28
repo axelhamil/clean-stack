@@ -70,6 +70,19 @@ export const VISIBILITY = {
   "email.delivery.exhausted": "internal",
   "notification.preference.updated": "internal",
   "notification.org_preference.updated": "internal",
+  "sso.provider.registered": "internal",
+  "sso.provider.updated": "internal",
+  "sso.provider.deleted": "internal",
+  "sso.domain.verified": "internal",
+  "sso.enforcement.changed": "internal",
+  "sso.login.success": "public",
+  "sso.login.failure": "public",
+  "scim.connection.created": "internal",
+  "scim.connection.deleted": "internal",
+  "scim.user.created": "public",
+  "scim.user.updated": "public",
+  "scim.user.deactivated": "public",
+  "scim.user.deprovisioned": "public",
 } satisfies Record<EventType, Visibility>;
 
 export function isPublicEvent(eventType: EventType): boolean {

@@ -40,7 +40,7 @@ mock.module("@packages/drizzle", () => ({
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   authSchema: {},
   TransactionService: class {},
   trackEventsOnSuccess: () => {},
