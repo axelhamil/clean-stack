@@ -46,6 +46,7 @@ import {
 } from "./modules/billing/application/subscription-events";
 import { hasFeature, hasSeatAvailable } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
+import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { isSsoEnforcedFor } from "./shared/auth/sso-enforcement";
 import {
@@ -188,18 +189,63 @@ async function assertSsoEntitlementFor(organizationId: string | undefined): Prom
 }
 
 /**
- * DRY seat-check helper used by every member-creation gate (direct add,
- * invitation acceptance, invitation creation). Throws 402 if the org is at
- * or over its plan seat cap. Centralised so the 3-line check is never
- * duplicated across hooks (CLAUDE.md reusability rule, §6 two-path trap).
+ * The seat cap itself: one question, one answer, for every surface that creates a
+ * member. Callers differ only in how they refuse — the organization hooks throw
+ * `AppErrorException` through `assertSeat`, the SCIM branch has to throw a
+ * BetterAuth `APIError` with a SCIM-shaped body — and that difference must never
+ * be allowed to become two different definitions of "is there a seat".
+ * Centralised so the check is never duplicated across hooks (CLAUDE.md
+ * reusability rule, §6 two-path trap).
  */
-async function assertSeatAvailableFor(orgId: string): Promise<void> {
+async function seatCapFor(
+  orgId: string,
+): Promise<{ available: boolean; activeMembers: number; maxMembers: number | null }> {
   const view = await di.EntitlementsService.getEntitlements(orgId);
   const activeMembers = await countActiveMembers(orgId);
-  assertSeat(activeMembers, view.maxMembers);
+  return {
+    available: hasSeatAvailable(activeMembers, view.maxMembers),
+    activeMembers,
+    maxMembers: view.maxMembers,
+  };
 }
 
-const SCIM_MEMBER_CREATED_WINDOW_MS = 30_000;
+/**
+ * The seat gate for every member-creation path that refuses with the app's own
+ * error type (direct add, invitation acceptance, invitation creation).
+ */
+async function assertSeatAvailableFor(orgId: string): Promise<void> {
+  const { activeMembers, maxMembers } = await seatCapFor(orgId);
+  assertSeat(activeMembers, maxMembers);
+}
+
+/**
+ * How long a value captured in `hooks.before`, or a row written by the request in
+ * flight, may still be treated as belonging to that request. Generous enough that
+ * no legitimate before→after round trip is ever cut off, short enough that a
+ * stranded value cannot be picked up by a later, unrelated request.
+ */
+const SNAPSHOT_TTL_MS = 30_000;
+
+/**
+ * An RFC 7644 §3.12 error body. Every `/scim/v2/*` response an IdP parses has to
+ * carry `schemas`/`status`/`detail` — Okta and Entra surface a generic "provider
+ * error" for anything else, hiding the actual reason from the operator who has to
+ * act on it. `@better-auth/scim` has its own `SCIMAPIError` for exactly this and
+ * uses it throughout, but does not export it (the package exports `scim` and
+ * `scimClient`, nothing else), so the shape is reproduced rather than imported.
+ * `message` is carried alongside `detail` so the thrown error is not blank in logs
+ * and telemetry — better-call reads `Error.message` from the body.
+ */
+const SCIM_ERROR_STATUS = { PAYMENT_REQUIRED: 402 } as const;
+
+function scimError(status: keyof typeof SCIM_ERROR_STATUS, detail: string): APIError {
+  return new APIError(status, {
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    status: String(SCIM_ERROR_STATUS[status]),
+    detail,
+    message: detail,
+  });
+}
 
 /**
  * Bridges `org.member.joined` for the SCIM provisioning path. `@better-auth/scim`
@@ -221,7 +267,7 @@ async function emitScimMemberJoined(
   actorUserId: string | null,
 ): Promise<void> {
   const member = await findMemberOf(userId, organizationId);
-  if (!member || member.createdAt.getTime() < Date.now() - SCIM_MEMBER_CREATED_WINDOW_MS) return;
+  if (!member || member.createdAt.getTime() < Date.now() - SNAPSHOT_TTL_MS) return;
   await emit(
     EventTypes.ORG_MEMBER_JOINED,
     "member",
@@ -253,27 +299,42 @@ function clientIpFromHeaders(headers?: Headers): string | null {
  * rebuilds parts of that object between `hooks.before` and `hooks.after` and reference
  * identity across the two isn't guaranteed. Read-and-delete in the after hook.
  */
-const ssoProviderDeleteSnapshots = new Map<
-  string,
-  { organizationId: string | null; domain: string; issuer: string }
->();
+const ssoProviderDeleteSnapshots = new RequestSnapshots<{
+  organizationId: string | null;
+  domain: string;
+  issuer: string;
+}>(SNAPSHOT_TTL_MS);
 
 /**
  * Same read-before-delete snapshot as `ssoProviderDeleteSnapshots`, for
- * `/scim/delete-provider-connection`: the request body only carries `providerId`
- * (no `organizationId` — see `deleteSCIMProviderConnectionBodySchema`), and the row
- * is gone by the time `hooks.after` runs. Keyed on `providerId`.
+ * `/scim/delete-provider-connection`: the connection row (and its
+ * `organizationId`) is gone by the time `hooks.after` runs. Keyed on
+ * `providerId` and consumed only in that path's own after-branch — the key is
+ * unique per row and the consumer is the same request, so freshness is the only
+ * guard it needs.
  */
-const scimConnectionDeleteSnapshots = new Map<string, string>();
+const scimConnectionDeleteSnapshots = new RequestSnapshots<string>(SNAPSHOT_TTL_MS);
 
 /**
  * `DELETE /scim/v2/Users/:userId` is authenticated by a bearer token, so the real
  * actor (the connection owner) is only resolvable from `hooks.before`, while the
  * `org.member.removed` emit happens inside `organizationHooks.afterRemoveMember`,
- * which the organization plugin calls with the *removed* user as `user`. Keyed on
- * the deprovisioned user id; read-and-delete in the hook.
+ * which the organization plugin calls with the *removed* user as `user`.
+ *
+ * This one carries the organization id as well as the actor, and the consumer
+ * checks it, because its key is the least trustworthy of the three: `userId`
+ * comes straight off the request URL, the consumer fires on *every* member
+ * removal in *every* org, and the SCIM endpoint has two paths that reach neither
+ * `afterRemoveMember` nor any other consumer — a 404 for an unknown user, and a
+ * user who holds no member row. Without the org check, one 404-ing DELETE from
+ * any valid SCIM token would strand an entry that then names that token's owner
+ * as the actor of an unrelated admin's kick, in an unrelated org — fabricated
+ * provenance on a compliance-retention event.
  */
-const scimDeprovisionActors = new Map<string, string>();
+const scimDeprovisionActors = new RequestSnapshots<{
+  actorUserId: string;
+  organizationId: string;
+}>(SNAPSHOT_TTL_MS);
 
 function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
   const raw = headers?.get("cookie");
@@ -588,8 +649,13 @@ const authOptions = {
           // after its own transaction), but bearer-token requests have no session, so
           // the plugin can only pass the removed user. `hooks.before` snapshotted the
           // connection owner — the real actor — under the deprovisioned user id.
-          const scimActor = scimDeprovisionActors.get(member.userId);
-          scimDeprovisionActors.delete(member.userId);
+          // The org check is what makes that safe to trust: this hook fires for every
+          // removal in every org, and a snapshot whose org is not this one belongs to
+          // some other request (see `scimDeprovisionActors`).
+          const scimActor = scimDeprovisionActors.take(
+            member.userId,
+            (snapshot) => snapshot.organizationId === org.id,
+          )?.actorUserId;
           await emit(
             EventTypes.ORG_MEMBER_REMOVED,
             "member",
@@ -835,20 +901,19 @@ const authOptions = {
       // a raw `adapter.create({ model: "member" })`, so neither `beforeAddMember` nor
       // `beforeAcceptInvitation` — the two authoritative seat gates — ever fires. An
       // after-hook cannot cap anything (the row is already written), so the gate has to
-      // live here, before the endpoint runs. Same `assertSeatAvailableFor` as every
-      // other member-creation path, so the cap can never drift between surfaces.
+      // live here, before the endpoint runs. It asks `seatCapFor` — the same predicate
+      // the organization hooks ask through `assertSeatAvailableFor` — and only the
+      // refusal differs: this is a SCIM protocol endpoint, so it owes an RFC 7644 error
+      // body rather than the app's own.
       if (path === SCIM_PATHS.users && ctx.method === "POST") {
         const owner = await scimConnectionOwner(scimProviderIdFromToken(ctx.headers));
         // No org on the connection means no member row is written at all (the plugin's
         // `createOrgMembership` no-ops), and an unresolvable token is the endpoint's
         // own 401 to raise — neither is a seat concern.
         if (owner.organizationId) {
-          const view = await di.EntitlementsService.getEntitlements(owner.organizationId);
-          const activeMembers = await countActiveMembers(owner.organizationId);
-          if (!hasSeatAvailable(activeMembers, view.maxMembers)) {
-            throw new APIError("PAYMENT_REQUIRED", {
-              message: `Seat limit reached (${view.maxMembers ?? "∞"}).`,
-            });
+          const { available, maxMembers } = await seatCapFor(owner.organizationId);
+          if (!available) {
+            throw scimError("PAYMENT_REQUIRED", `Seat limit reached (${maxMembers ?? "∞"}).`);
           }
         }
         return;
@@ -863,7 +928,12 @@ const authOptions = {
       if (path === SCIM_PATHS.user && ctx.method === "DELETE") {
         const userId = (ctx.params as Record<string, string> | undefined)?.userId;
         const owner = await scimConnectionOwner(scimProviderIdFromToken(ctx.headers));
-        if (userId && owner.userId) scimDeprovisionActors.set(userId, owner.userId);
+        if (userId && owner.userId && owner.organizationId) {
+          scimDeprovisionActors.set(userId, {
+            actorUserId: owner.userId,
+            organizationId: owner.organizationId,
+          });
+        }
         return;
       }
 
@@ -1216,8 +1286,7 @@ const authOptions = {
         const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
           | string
           | undefined;
-        const snapshot = providerId ? ssoProviderDeleteSnapshots.get(providerId) : undefined;
-        if (providerId) ssoProviderDeleteSnapshots.delete(providerId);
+        const snapshot = providerId ? ssoProviderDeleteSnapshots.take(providerId) : undefined;
         if (providerId && snapshot?.organizationId) {
           await emit(
             EventTypes.SSO_PROVIDER_DELETED,
@@ -1278,9 +1347,8 @@ const authOptions = {
           | string
           | undefined;
         const organizationId = providerId
-          ? scimConnectionDeleteSnapshots.get(providerId)
+          ? scimConnectionDeleteSnapshots.take(providerId)
           : undefined;
-        if (providerId) scimConnectionDeleteSnapshots.delete(providerId);
         if (providerId && organizationId) {
           await emit(
             EventTypes.SCIM_CONNECTION_DELETED,
