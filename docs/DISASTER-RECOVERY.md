@@ -50,7 +50,7 @@ docker run --rm -d \
   -p 5436:5432 \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=postgres \
-  postgres:17-alpine
+  postgres:18-alpine
 ```
 
 ### 2. Download the dump
@@ -177,7 +177,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: dump
-              image: postgres:17-alpine
+              image: postgres:18-alpine
               command: ["sh", "-c"]
               args:
                 - |
@@ -205,7 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
         ports: ["5436:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 5

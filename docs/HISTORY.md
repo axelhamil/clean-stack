@@ -884,3 +884,176 @@ A security-focused review of the whole branch was run after the PR was opened an
 **Merged** after this round: PR #61 into `dev` as a merge commit, all gates green (718 api tests, 147 app tests, type-check 12/12, Biome clean, knip clean, jscpd 28 clones, a11y 21/21).
 
 **Gaps this phase never closed, carried forward**: `sso.domain.verified` is still never exercised live (it needs DNS TXT control over a real domain); no real WebAuthn ceremony has been driven; the SSO-callback success path after the final enforcement change rests on construction plus a probe rather than a Keycloak round-trip; `enforcedProviderForDomain` and the `auth.ts` wiring have no automated coverage, since the repo has no real-DB test harness; the a11y suite stays coupled to an IP-keyed rate limit; SAML SLO is declared but unwired; and there is no operator runbook for recovering an org that locks itself out with enforcement.
+
+## Toolchain — Postgres 18 ✅ Phase G.1c · Aug 2026
+
+Dev compose, the CI service image, both README mentions and `docs/DISASTER-RECOVERY.md`'s three runnable examples move from `postgres:17-alpine` to `postgres:18-alpine`. `docs/DEPLOY-RAILWAY.md` turned out to pin no version at all — it runs `railway add --database postgres-ssl` and lets Railway pick — so it gains an explicit minimum instead of a version bump.
+
+**Undocumented breaking change discovered while recreating the dev volume**: the `postgres:18-alpine` image refuses to start against a bind mount at `/var/lib/postgresql/data` — the 18+ images store data one directory up, at `/var/lib/postgresql/<major>/docker`, to align with `pg_ctlcluster`-style layouts. `docker-compose.yaml`'s `postgres` service now mounts the named volume at `/var/lib/postgresql` (was `/var/lib/postgresql/data`); without this the container loops in `Restarting` with `Error: in 18+, these Docker images are configured to store database data in a format which is compatible with "pg_ctlcluster"...`. Neither the task brief nor the ROADMAP entry that scoped this work anticipated this — it's a genuine image-level change, not something to have caught by reading `docker-compose.yaml` alone.
+
+Primary keys stay `text`: every PK in `packages/drizzle/src/schema/` is filled by BetterAuth, which generates its own ids, so `uuidv7()` is a BetterAuth question rather than a Postgres one. It's documented in `docs/MODULES.md` as the shape for new cloner-owned tables instead.
+
+### Before/after query plans
+
+The payoff of 18 here is operational (async I/O, B-tree skip scan), so the two hot paths that touch the outbox were `EXPLAIN (ANALYZE, BUFFERS)`'d before the bump (Postgres 17.x, `docker compose exec postgres psql`) and again after (Postgres 18.6-alpine, same commands, dev DB recreated from scratch per the brief since a major version doesn't read the previous major's data directory).
+
+**1. Outbox drain** — mirrors `apps/api/src/shared/services/drizzle-outbox.service.ts:95-108`, which reads `outbox_event_pending_idx` (`packages/drizzle/src/schema/outbox.ts:30`):
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM outbox_event
+WHERE dispatched_at IS NULL
+  AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+ORDER BY occurred_at
+LIMIT 100
+FOR UPDATE SKIP LOCKED;
+```
+
+Postgres 17 (0 pending rows at capture time — dev DB had already drained the seeded events):
+
+```
+Limit  (cost=8.15..8.17 rows=1 width=582) (actual time=0.024..0.025 rows=0 loops=1)
+  Buffers: shared hit=4
+  ->  LockRows  (cost=8.15..8.17 rows=1 width=582) (actual time=0.023..0.024 rows=0 loops=1)
+        Buffers: shared hit=4
+        ->  Sort  (cost=8.15..8.16 rows=1 width=582) (actual time=0.023..0.023 rows=0 loops=1)
+              Sort Key: occurred_at
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=4
+              ->  Index Scan using outbox_event_pending_idx on outbox_event  (cost=0.12..8.14 rows=1 width=582) (actual time=0.006..0.006 rows=0 loops=1)
+                    Filter: ((dispatched_at IS NULL) AND ((next_attempt_at IS NULL) OR (next_attempt_at <= now())))
+                    Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=197
+Planning Time: 0.662 ms
+Execution Time: 0.075 ms
+```
+
+Postgres 18.6 (5 pending rows — fresh seed, dispatcher not yet run):
+
+```
+Limit  (cost=8.17..8.19 rows=1 width=290) (actual time=0.040..0.043 rows=5.00 loops=1)
+  Buffers: shared hit=10
+  ->  LockRows  (cost=8.17..8.19 rows=1 width=290) (actual time=0.039..0.041 rows=5.00 loops=1)
+        Buffers: shared hit=10
+        ->  Sort  (cost=8.17..8.18 rows=1 width=290) (actual time=0.028..0.029 rows=5.00 loops=1)
+              Sort Key: occurred_at
+              Sort Method: quicksort  Memory: 27kB
+              Buffers: shared hit=5
+              ->  Index Scan using outbox_event_pending_idx on outbox_event  (cost=0.14..8.16 rows=1 width=290) (actual time=0.009..0.011 rows=5.00 loops=1)
+                    Filter: ((dispatched_at IS NULL) AND ((next_attempt_at IS NULL) OR (next_attempt_at <= now())))
+                    Index Searches: 1
+                    Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=161
+Planning Time: 0.553 ms
+Execution Time: 0.079 ms
+```
+
+**Access path unchanged**: both plans drive the drain through `Index Scan using outbox_event_pending_idx`, wrapped in the same `LockRows`/`Sort`/`Limit` shape — no fallback to a sequential scan. The only textual diff is Postgres 18 printing a new `Index Searches: 1` line under each index node (a genuine 18 addition to `EXPLAIN`'s index-scan output, not a plan change) and the row counts differing because the two captures ran against different data volumes (see caveat below). This is the query that matters most for this bump — confirmed stable.
+
+**2. Notification fan-out** — the `INSERT … SELECT` at `apps/api/src/shared/services/notification-fanout-subscriber.ts:103-132`, captured by instrumenting a `CapturingInstrumentation` that records the span name the code already builds for `query.getQuery().sql` (the same value the production Sentry span carries), driving it with a real `org.member.invited` event inside a rolled-back transaction against the seeded dev user/org, then re-running the captured SQL + params through `EXPLAIN (ANALYZE, BUFFERS)` in a second rolled-back transaction (`pg.Pool`, `BEGIN`/`ROLLBACK` bracketing — no data mutated in either DB).
+
+Postgres 17 (org with 12 members across the accumulated 11h-old dev dataset):
+
+```
+Insert on notification  (cost=0.59..34.02 rows=0 width=0) (actual time=0.078..0.078 rows=0 loops=1)
+  Conflict Resolution: NOTHING
+  Conflict Arbiter Indexes: notification_dedup_uidx
+  Tuples Inserted: 1
+  Conflicting Tuples: 0
+  Buffers: shared hit=20
+  ->  Subquery Scan on "*SELECT*"  (cost=0.59..34.02 rows=1 width=283) (actual time=0.031..0.033 rows=1 loops=1)
+        Buffers: shared hit=9
+        ->  Nested Loop Left Join  (cost=0.59..34.00 rows=1 width=259) (actual time=0.030..0.031 rows=1 loops=1)
+              Buffers: shared hit=9
+              ->  Nested Loop Left Join  (cost=0.44..25.81 rows=1 width=28) (actual time=0.018..0.020 rows=1 loops=1)
+                    Join Filter: (up_mail.scope_id = member.user_id)
+                    Buffers: shared hit=7
+                    ->  Nested Loop Left Join  (cost=0.29..17.62 rows=1 width=27) (actual time=0.015..0.016 rows=1 loops=1)
+                          Filter: COALESCE(CASE WHEN op_app.locked THEN op_app.enabled ELSE NULL::boolean END, up_app.enabled, op_app.enabled, true)
+                          Buffers: shared hit=5
+                          ->  Nested Loop Left Join  (cost=0.15..9.44 rows=1 width=28) (actual time=0.011..0.012 rows=1 loops=1)
+                                Join Filter: (up_app.scope_id = member.user_id)
+                                Buffers: shared hit=3
+                                ->  Seq Scan on member  (cost=0.00..1.24 rows=1 width=27) (actual time=0.006..0.007 rows=1 loops=1)
+                                      Filter: ((role = ANY ('{owner,admin}'::text[])) AND (organization_id = 'cd51d944-2022-4038-b6ce-064af9a5be4e'::text))
+                                      Rows Removed by Filter: 11
+                                      Buffers: shared hit=1
+                                ->  Index Scan using notification_preference_uidx on notification_preference up_app  (cost=0.15..8.18 rows=1 width=33) (actual time=0.004..0.004 rows=0 loops=1)
+                                      Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                      Buffers: shared hit=2
+                          ->  Index Scan using notification_preference_uidx on notification_preference op_app  (cost=0.15..8.17 rows=1 width=2) (actual time=0.003..0.003 rows=0 loops=1)
+                                Index Cond: ((scope = 'org'::text) AND (scope_id = 'cd51d944-2022-4038-b6ce-064af9a5be4e'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                Buffers: shared hit=2
+                    ->  Index Scan using notification_preference_uidx on notification_preference up_mail  (cost=0.15..8.18 rows=1 width=33) (actual time=0.003..0.003 rows=0 loops=1)
+                          Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                          Buffers: shared hit=2
+              ->  Index Scan using notification_preference_uidx on notification_preference op_mail  (cost=0.15..8.17 rows=1 width=2) (actual time=0.004..0.004 rows=0 loops=1)
+                    Index Cond: ((scope = 'org'::text) AND (scope_id = 'cd51d944-2022-4038-b6ce-064af9a5be4e'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                    Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=359
+Planning Time: 0.895 ms
+Trigger for constraint notification_user_id_user_id_fk: time=0.253 calls=1
+Trigger for constraint notification_organization_id_organization_id_fk: time=0.194 calls=1
+Trigger notification_notify_trigger: time=0.293 calls=1
+Execution Time: 0.874 ms
+```
+
+Postgres 18.6 (org with 1 member — freshly reseeded dev volume, per Step 6):
+
+```
+Insert on notification  (cost=4.75..42.29 rows=0 width=0) (actual time=0.117..0.118 rows=0.00 loops=1)
+  Conflict Resolution: NOTHING
+  Conflict Arbiter Indexes: notification_dedup_uidx
+  Tuples Inserted: 1
+  Conflicting Tuples: 0
+  Buffers: shared hit=22
+  ->  Subquery Scan on "*SELECT*"  (cost=4.75..42.29 rows=1 width=288) (actual time=0.056..0.057 rows=1.00 loops=1)
+        Buffers: shared hit=12
+        ->  Nested Loop Left Join  (cost=4.75..42.27 rows=1 width=264) (actual time=0.051..0.052 rows=1.00 loops=1)
+              Buffers: shared hit=12
+              ->  Nested Loop Left Join  (cost=4.61..34.08 rows=1 width=33) (actual time=0.041..0.042 rows=1.00 loops=1)
+                    Join Filter: (up_mail.scope_id = member.user_id)
+                    Buffers: shared hit=10
+                    ->  Nested Loop Left Join  (cost=4.46..25.89 rows=1 width=32) (actual time=0.035..0.036 rows=1.00 loops=1)
+                          Filter: COALESCE(CASE WHEN op_app.locked THEN op_app.enabled ELSE NULL::boolean END, up_app.enabled, op_app.enabled, true)
+                          Buffers: shared hit=8
+                          ->  Nested Loop Left Join  (cost=4.31..17.70 rows=1 width=33) (actual time=0.029..0.030 rows=1.00 loops=1)
+                                Join Filter: (up_app.scope_id = member.user_id)
+                                Buffers: shared hit=6
+                                ->  Bitmap Heap Scan on member  (cost=4.16..9.51 rows=1 width=32) (actual time=0.012..0.012 rows=1.00 loops=1)
+                                      Recheck Cond: (organization_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text)
+                                      Filter: (role = ANY ('{owner,admin}'::text[]))
+                                      Heap Blocks: exact=1
+                                      Buffers: shared hit=2
+                                      ->  Bitmap Index Scan on "member_organizationId_idx"  (cost=0.00..4.16 rows=2 width=0) (actual time=0.005..0.006 rows=1.00 loops=1)
+                                            Index Cond: (organization_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text)
+                                            Index Searches: 1
+                                            Buffers: shared hit=1
+                                ->  Index Scan using notification_preference_uidx on notification_preference up_app  (cost=0.15..8.18 rows=1 width=33) (actual time=0.016..0.016 rows=0.00 loops=1)
+                                      Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                      Index Searches: 1
+                                      Buffers: shared hit=4
+                          ->  Index Scan using notification_preference_uidx on notification_preference op_app  (cost=0.15..8.17 rows=1 width=2) (actual time=0.005..0.005 rows=0.00 loops=1)
+                                Index Cond: ((scope = 'org'::text) AND (scope_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                Index Searches: 1
+                                Buffers: shared hit=2
+                    ->  Index Scan using notification_preference_uidx on notification_preference up_mail  (cost=0.15..8.18 rows=1 width=33) (actual time=0.006..0.006 rows=0.00 loops=1)
+                          Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                          Index Searches: 1
+                          Buffers: shared hit=2
+              ->  Index Scan using notification_preference_uidx on notification_preference op_mail  (cost=0.15..8.17 rows=1 width=2) (actual time=0.004..0.004 rows=0.00 loops=1)
+                    Index Cond: ((scope = 'org'::text) AND (scope_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                    Index Searches: 1
+                    Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=348
+Planning Time: 1.250 ms
+Trigger for constraint notification_user_id_user_id_fk: time=0.406 calls=1
+Trigger for constraint notification_organization_id_organization_id_fk: time=0.248 calls=1
+Execution Time: 0.855 ms
+```
+
+**Access path partly changed, and it's not a clean read on Postgres 18 alone**: the four `notification_preference` lookups (`up_app`/`op_app`/`up_mail`/`op_mail`) stayed `Index Scan using notification_preference_uidx` on both versions. The `member` lookup did change shape — `Seq Scan on member` (17) vs `Bitmap Heap Scan` through `member_organizationId_idx` (18) — **but the two captures ran against different data volumes**: the 17 capture reused an 11-hour-old dev DB with 12 accumulated member rows across several orgs, while the 18 capture ran against the freshly reseeded, single-org, single-member DB the brief's Step 6 requires (`docker volume rm` + `db:push && db:seed`). A `member` table with 1 row choosing an index path over a seq scan is exactly the kind of small-table plan choice that's sensitive to `ANALYZE` timing right after a fresh seed, not evidence of a genuine Postgres 18 planner regression — the estimated costs (`4.16..9.51` for the bitmap path) are still tiny in absolute terms. Re-running both captures against matched row counts, on the same major, is the only way to attribute this cleanly to the version bump rather than to dataset drift; it wasn't repeated here because the outbox-drain query is the one the brief calls the primary signal, and that one is unambiguous. Recorded here rather than silently dropped, per the instruction that an unexplained plan change is the thing this step exists to catch.

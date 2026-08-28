@@ -12,6 +12,16 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 - Estimates assume the dev knows the libraries. The price is for **integrating + architecting + testing + documenting**, not for learning BetterAuth.
 - Single fourchette per module, not low/high consultancy. Lower bound = experienced solo dev shipping fast. Upper bound = same dev being thorough on tests + docs.
 
+## Primary keys for new tables
+
+Postgres 18 (`docker-compose.yaml`) ships a native `uuidv7()` — time-ordered, so insert-heavy tables avoid the B-tree hotspot/write-amplification of random `uuidv4()` while staying globally unique. For **any new application table owned by the cloner**, default the primary key to it:
+
+```ts
+uuid("id").primaryKey().default(sql`uuidv7()`)
+```
+
+**Every existing table stays `text("id").primaryKey()`** — every PK in `packages/drizzle/src/schema/` is filled by BetterAuth, which generates its own ids on its own schema. Converting those is a BetterAuth question, not a Postgres one, and is deliberately out of scope here.
+
 ---
 
 ## Shipped modules — value already in the box (v2.0+)

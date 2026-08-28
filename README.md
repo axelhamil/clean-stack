@@ -173,7 +173,7 @@ What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
 
 | | |
 |---|---|
-| **Image** | [`postgres:17-alpine`](https://hub.docker.com/_/postgres) |
+| **Image** | [`postgres:18-alpine`](https://hub.docker.com/_/postgres) |
 | **Host port** | `5433` (deliberately not the default `5432` — avoids collision with a system Postgres) |
 | **In-network** | `postgres:5432` (used by the api container) |
 | **Volume** | `postgres_data` (persistent across `compose down`) |
@@ -258,7 +258,7 @@ Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `app
 
 | Service | Image | Port (host) | Profile | Persistent volume |
 |---|---|---|---|---|
-| `postgres` | `postgres:17-alpine` | `5433` | default | `postgres_data` |
+| `postgres` | `postgres:18-alpine` | `5433` | default | `postgres_data` |
 | `api` | built (`apps/api/dev.Dockerfile`) | `3000` | default | — |
 | `app` | built (`apps/app/dev.Dockerfile`) | `5173` | default | — |
 | `seaweedfs` | `chrislusf/seaweedfs` | `8333` | `storage` | `seaweedfs_data` |
