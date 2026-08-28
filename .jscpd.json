@@ -10,7 +10,8 @@
     "**/*.d.ts",
     "**/__TESTS__/**",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "**/routeTree.gen.ts"
   ],
   "format": ["typescript", "javascript", "tsx", "jsx"],
   "minLines": 10,
