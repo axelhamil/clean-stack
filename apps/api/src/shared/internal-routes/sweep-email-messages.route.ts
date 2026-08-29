@@ -16,7 +16,12 @@ import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
-import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
+import {
+  type RetentionPass,
+  runRetentionSweep,
+  type SweepBody,
+  sweepBodySchema,
+} from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
@@ -53,25 +58,29 @@ async function purgeBatch(
   });
 }
 
+export function buildEmailSweepPasses(): RetentionPass[] {
+  return [
+    {
+      label: "sent",
+      retentionDays: env.EMAIL_MESSAGE_RETENTION_DAYS,
+      countEligible: (cutoff) => countEligible(sentPredicate(cutoff)),
+      purgeBatch: (cutoff, size) => purgeBatch(sentPredicate(cutoff), em.sentAt, size),
+    },
+    {
+      label: "failed",
+      retentionDays: env.EMAIL_MESSAGE_FAILED_RETENTION_DAYS,
+      countEligible: (cutoff) => countEligible(failedPredicate(cutoff)),
+      purgeBatch: (cutoff, size) => purgeBatch(failedPredicate(cutoff), em.createdAt, size),
+    },
+  ];
+}
+
 export const sweepEmailMessagesRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/sweep-email-messages", zV("json", sweepBodySchema), async (c) => {
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      passes: [
-        {
-          label: "sent",
-          retentionDays: env.EMAIL_MESSAGE_RETENTION_DAYS,
-          countEligible: (cutoff) => countEligible(sentPredicate(cutoff)),
-          purgeBatch: (cutoff, size) => purgeBatch(sentPredicate(cutoff), em.sentAt, size),
-        },
-        {
-          label: "failed",
-          retentionDays: env.EMAIL_MESSAGE_FAILED_RETENTION_DAYS,
-          countEligible: (cutoff) => countEligible(failedPredicate(cutoff)),
-          purgeBatch: (cutoff, size) => purgeBatch(failedPredicate(cutoff), em.createdAt, size),
-        },
-      ],
+      passes: buildEmailSweepPasses(),
       logger: c.var.logger,
       label: "sweep-email-messages",
     });
