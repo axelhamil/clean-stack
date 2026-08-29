@@ -22,7 +22,7 @@ export function ImpersonationBanner() {
     ...stopImpersonationMutationOptions,
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
+      broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/admin/users" });
     },
   });

@@ -76,7 +76,7 @@ function AdminUserDetailPage() {
       toast.success("Impersonation started.");
       setImpersonateOpen(false);
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
+      broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/dashboard" });
     },
     onError: (err) => toast.error(err.message),
