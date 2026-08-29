@@ -124,23 +124,21 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
 
       const digests = buildDigests(rows as PendingRow[]);
 
-      const idempotencyKey = await digestIdempotencyKey(rows.map((r) => r.id));
-
       const enqueued = await di.IEmailService.sendTemplateBatch(
         "notification_digest",
-        digests.map((d) => ({
-          to: d.email,
-          variables: {
-            category: d.category,
-            itemCount: String(d.items.length),
-            itemsSummary: d.items.map((i) => i.eventType).join(", "),
-          },
-          locale: toLocale(d.locale),
-        })),
-        {
-          tx: tx as unknown as import("../transaction").ITransaction,
-          idempotencyKey,
-        },
+        await Promise.all(
+          digests.map(async (d) => ({
+            to: d.email,
+            variables: {
+              category: d.category,
+              itemCount: String(d.items.length),
+              itemsSummary: d.items.map((i) => i.eventType).join(", "),
+            },
+            locale: toLocale(d.locale),
+            idempotencyKey: await digestIdempotencyKey(d.notificationIds),
+          })),
+        ),
+        { tx: tx as unknown as import("../transaction").ITransaction },
       );
 
       if (enqueued.isFailure) {

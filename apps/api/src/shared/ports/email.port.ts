@@ -31,6 +31,12 @@ export interface EmailRecipient<K extends keyof EmailTemplates> {
   to: string;
   variables: EmailTemplates[K] & TemplateVariables;
   locale?: Locale;
+  /**
+   * Per-recipient idempotency key. Overrides the batch-level
+   * `SendTemplateOptions.idempotencyKey`, whose positional suffix is unstable when
+   * the batch is rebuilt from a partially-successful set. Must not contain `#`.
+   */
+  idempotencyKey?: string;
 }
 
 export interface IEmailService {

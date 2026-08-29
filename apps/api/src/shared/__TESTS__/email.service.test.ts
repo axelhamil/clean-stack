@@ -83,4 +83,49 @@ describe("QueuedEmailService", () => {
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("EMAIL_PROVIDER_FAILURE");
   });
+
+  it("uses a recipient-level key verbatim", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch("delete_completed", [
+      { to: "a@example.com", variables: { name: "A" }, idempotencyKey: "wipe/user-1" },
+    ]);
+    expect(queue.rows[0]?.idempotencyKey.unwrap()).toBe("wipe/user-1");
+  });
+
+  it("falls back to the batch key namespaced with #", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch(
+      "delete_completed",
+      [
+        { to: "a@example.com", variables: { name: "A" } },
+        { to: "b@example.com", variables: { name: "B" } },
+      ],
+      { idempotencyKey: "batch" },
+    );
+    const rows = queue.rows;
+    expect(rows[0]?.idempotencyKey.unwrap()).toBe("batch#0");
+    expect(rows[1]?.idempotencyKey.unwrap()).toBe("batch#1");
+  });
+
+  it("prefers the recipient key over the batch key", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch(
+      "delete_completed",
+      [{ to: "a@example.com", variables: { name: "A" }, idempotencyKey: "explicit" }],
+      { idempotencyKey: "batch" },
+    );
+    expect(queue.rows[0]?.idempotencyKey.unwrap()).toBe("explicit");
+  });
+
+  it("leaves the key absent when neither form is supplied", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch("delete_completed", [
+      { to: "a@example.com", variables: { name: "A" } },
+    ]);
+    expect(queue.rows[0]?.idempotencyKey.isNone()).toBe(true);
+  });
 });
