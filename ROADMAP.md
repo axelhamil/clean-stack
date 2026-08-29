@@ -210,16 +210,13 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 
 ---
 
-## i18n — TanStack Router locale routes + typed catalogs — **Phase E.1**
+## i18n — typed catalogs, locale outside the URL — **Phase E.1**
 
-**Why**: most i18n stacks ship as runtime plugins that crash production with missing keys at the worst moment. Bake locale into routing (`/en/...`, `/fr/...`), enforce keys at build time, detect on the server. Zero "Translation missing" string ever shipped.
+**Why**: most i18n stacks ship as runtime plugins that crash production with missing keys at the worst moment. Enforce keys at build time and resolve the locale from the user, not the path.
 
-- [ ] `@lingui/{core,react,cli}` (CLDR plurals + AST extraction). Catalogs as `.po` per lang, compiled at build time, with a generated `.d.ts` so `tsc` rejects an unknown key.
-- [ ] **G.1e is done** (file-based routing via `virtualRouteConfig`), so the `langLayout` (`path: "$lang"`) lands as one `layout(...)` entry in `apps/app/routes.ts`, re-parenting every existing node under it, instead of the ~40 hand-edited `createRoute(...)` calls this item originally scoped. Validate against `["en", "fr"]`. Hono middleware 302s a root request per `Accept-Language`. `/api/*` stays lang-agnostic — locale comes from the user record.
-- [ ] Lang switcher (cookie + same path under the new lang), Zod `setErrorMap` per lang at the providers boundary, `Intl.*` for dates/numbers (no extra dep).
-- [ ] **Auth errors**: BetterAuth returns stable `code`s — map them front-side to Lingui entries so there is a single translation store. Switch to `@better-auth/i18n` only if a non-web client appears; the plugin's server-side mapping would otherwise duplicate the catalog.
-- [ ] Per-lang email templates in `@packages/emails`, picked from the user's preferred lang.
-- [ ] CI gate: `lingui extract --clean` + git diff check — any drift fails the build.
+**E.1a — foundation (shipped)**: `@packages/i18n` with `.ts … as const` catalogs typed through `CustomTypeOptions.resources`, so an unknown key is a `tsc` error. `i18next` + `react-i18next`, chosen over Lingui and Paraglide — see `docs/HISTORY.md`. Locale resolves from a cookie then `user.locale`; **it is not in the URL**, so the 34 route files and 62 navigation call sites were untouched. Language switcher in `/settings/account`, `PUT /me/locale` + `user.locale.changed` (catalog 80 → 81), per-recipient email locale frozen at enqueue, localized API/BetterAuth/Zod messages, `<html lang>` asserted in the a11y gate.
+
+- [ ] **E.1b — remaining extraction**: `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, and per-locale legal content modules (English filled, French a stub the cloner replaces with its own legal text).
 
 ---
 

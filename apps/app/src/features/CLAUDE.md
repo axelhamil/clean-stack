@@ -64,3 +64,7 @@ Raw `<a className="text-…">`, `<span className="…rounded-full bg-…">`, `<d
 - **Numbered/iconic markers**: `Badge variant="secondary"` with layout. Not hand-rolled spans.
 - **Styled links/nav items**: `NavLink` from `@packages/ui` (`plain`/`pill`/`underline`, `active` flag). Compose via `asChild`. Never raw `<a className="text-…">`.
 - **List bullets**: lucide icons over custom spans.
+
+## i18n
+
+- **No user-visible text is a literal at its call site.** Every string that reaches the DOM, a `toast()`, an `aria-label` or an email subject comes from a catalog key through `t()`. **Why**: a literal is invisible to both the type-checker and the parity gate, so it can never be translated and its absence can never be detected — it is a defect no CI run will ever surface. **Test before merging**: search the diff for a quoted string sitting in JSX text, in a `label`/`placeholder`/`title`/`aria-label` attribute, or in a `toast` argument. If one is there, it is wrong. English is the source of truth: add the key to `packages/i18n/src/catalogs/en/` first, or `tsc` rejects the call site.

@@ -22,6 +22,12 @@ export const COOKIE_INVENTORY: Record<ConsentCategory, readonly CookieInfo[]> = 
       purpose: "Authenticates the signed-in user session.",
       retention: "7 days (standard) / 30 days (remember me)",
     },
+    {
+      name: "locale",
+      provider: "This application",
+      purpose: "Remembers the language you chose so the interface loads in it.",
+      retention: "1 year",
+    },
   ],
   functional: [
     {
