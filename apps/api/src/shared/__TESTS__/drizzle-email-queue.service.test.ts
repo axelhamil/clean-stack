@@ -53,6 +53,7 @@ mock.module("@packages/drizzle", () => ({
     {
       raw: () => ({}),
       identifier: () => ({}),
+      join: (chunks: unknown[]) => chunks,
     },
   ),
   outboxSchema: {
@@ -204,5 +205,53 @@ describe("DrizzleEmailQueue.enqueue", () => {
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     insertReturns = null;
+  });
+});
+
+describe("DrizzleEmailQueue.markSent", () => {
+  it("issues a single statement for many ids", async () => {
+    const updates: unknown[] = [];
+    const tx = {
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            toSQL: () => ({ sql: "update" }),
+            execute: async () => {
+              updates.push(1);
+            },
+          }),
+        }),
+      }),
+    };
+
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
+      ["a", "b", "c"],
+      new Date(),
+      { a: "p1", b: "p2" },
+      tx as never,
+    );
+
+    expect(result.isSuccess).toBe(true);
+    expect(updates).toHaveLength(1);
+  });
+
+  it("is a no-op for an empty id list", async () => {
+    let called = false;
+    const tx = {
+      update: () => {
+        called = true;
+        return {} as never;
+      },
+    };
+
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
+      [],
+      new Date(),
+      {},
+      tx as never,
+    );
+
+    expect(result.isSuccess).toBe(true);
+    expect(called).toBe(false);
   });
 });

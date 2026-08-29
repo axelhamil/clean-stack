@@ -130,22 +130,36 @@ export class DrizzleEmailQueue implements IEmailQueue {
     tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markSent" }, async () => {
+      if (ids.length === 0) return Result.ok<void, EmailQueueError>(undefined);
+
       const em = emailSchema.emailMessage;
       try {
-        for (const id of ids) {
-          const query = tx
-            .update(em)
-            .set({
-              status: "sent",
-              sentAt,
-              nextAttemptAt: null,
-              lastError: null,
-              providerMessageId: providerMessageIds[id] ?? null,
-              attempts: sql`${em.attempts} + 1`,
-            })
-            .where(eq(em.id, id));
-          await query.execute();
-        }
+        const cases = ids.map(
+          (id) => sql`WHEN ${em.id} = ${id} THEN ${providerMessageIds[id] ?? null}`,
+        );
+        const providerCase = sql`CASE ${sql.join(cases, sql` `)} ELSE NULL END`;
+
+        const query = tx
+          .update(em)
+          .set({
+            status: "sent",
+            sentAt,
+            nextAttemptAt: null,
+            lastError: null,
+            providerMessageId: providerCase,
+            attempts: sql`${em.attempts} + 1`,
+          })
+          .where(inArray(em.id, ids));
+
+        await this.instrumentation.startSpan(
+          {
+            name: query.toSQL().sql,
+            op: "db.query",
+            attributes: { "db.system.name": "postgresql" },
+          },
+          () => query.execute(),
+        );
+
         return Result.ok<void, EmailQueueError>(undefined);
       } catch (err) {
         this.instrumentation.capture(err);
