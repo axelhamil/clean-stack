@@ -13,6 +13,7 @@
     "migrate": "bun src/migrate.ts",
     "db:seed": "bun scripts/seed-dev-user.ts",
     "check:fanout": "bun scripts/check-fanout-preferences.ts",
+    "check:wipe-rollback": "bun scripts/check-wipe-rollback.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --pass-with-no-tests",
