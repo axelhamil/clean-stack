@@ -1,6 +1,16 @@
 // `/internal/sweep-email-messages` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, count, db, emailSchema, eq, inArray, lt, sql } from "@packages/drizzle";
+import {
+  type AnyPgColumn,
+  and,
+  count,
+  db,
+  emailSchema,
+  eq,
+  inArray,
+  lt,
+  sql,
+} from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
@@ -10,17 +20,21 @@ import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runn
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-async function countEligible(cutoff: Date): Promise<number> {
-  const em = emailSchema.emailMessage;
-  const rows = await db
-    .select({ count: count() })
-    .from(em)
-    .where(and(eq(em.status, "sent"), lt(em.sentAt, cutoff)));
+const em = emailSchema.emailMessage;
+
+const sentPredicate = (cutoff: Date) => and(eq(em.status, "sent"), lt(em.sentAt, cutoff));
+const failedPredicate = (cutoff: Date) => and(eq(em.status, "failed"), lt(em.createdAt, cutoff));
+
+async function countEligible(where: ReturnType<typeof sentPredicate>): Promise<number> {
+  const rows = await db.select({ count: count() }).from(em).where(where);
   return rows[0]?.count ?? 0;
 }
 
-async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
-  const em = emailSchema.emailMessage;
+async function purgeBatch(
+  where: ReturnType<typeof sentPredicate>,
+  orderBy: AnyPgColumn,
+  batchSize: number,
+): Promise<number> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
     await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
@@ -29,8 +43,8 @@ async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
     const subq = tx
       .select({ id: em.id })
       .from(em)
-      .where(and(eq(em.status, "sent"), lt(em.sentAt, cutoff)))
-      .orderBy(em.sentAt)
+      .where(where)
+      .orderBy(orderBy)
       .limit(batchSize)
       .for("update", { skipLocked: true });
 
@@ -48,8 +62,14 @@ export const sweepEmailMessagesRoutes = new Hono<HonoEnv>()
         {
           label: "sent",
           retentionDays: env.EMAIL_MESSAGE_RETENTION_DAYS,
-          purgeBatch,
-          countEligible,
+          countEligible: (cutoff) => countEligible(sentPredicate(cutoff)),
+          purgeBatch: (cutoff, size) => purgeBatch(sentPredicate(cutoff), em.sentAt, size),
+        },
+        {
+          label: "failed",
+          retentionDays: env.EMAIL_MESSAGE_FAILED_RETENTION_DAYS,
+          countEligible: (cutoff) => countEligible(failedPredicate(cutoff)),
+          purgeBatch: (cutoff, size) => purgeBatch(failedPredicate(cutoff), em.createdAt, size),
         },
       ],
       logger: c.var.logger,

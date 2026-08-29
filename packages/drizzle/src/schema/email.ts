@@ -29,5 +29,8 @@ export const emailMessage = pgTable(
       .on(table.nextAttemptAt, table.createdAt)
       .where(sql`${table.status} = 'pending'`),
     index("email_message_sweep_idx").on(table.sentAt).where(sql`${table.status} = 'sent'`),
+    index("email_message_failed_sweep_idx")
+      .on(table.createdAt)
+      .where(sql`${table.status} = 'failed'`),
   ],
 );
