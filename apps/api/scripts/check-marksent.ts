@@ -5,12 +5,17 @@
  * `apps/api/src/shared/CLAUDE.md` on asserting call shape only against a mock).
  */
 
+import { requireLocalDatabase } from "./require-local-database";
+
+requireLocalDatabase("check-marksent");
+
 import { db, emailSchema, inArray } from "@packages/drizzle";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const em = emailSchema.emailMessage;
 const ids = ["check-marksent-a", "check-marksent-b", "check-marksent-c"];
+const allNullIds = ["check-marksent-d", "check-marksent-e"];
 
 let failures = 0;
 
@@ -24,26 +29,28 @@ function assert(condition: boolean, label: string): void {
 }
 
 async function cleanup(): Promise<void> {
-  await db.delete(em).where(inArray(em.id, ids));
+  await db.delete(em).where(inArray(em.id, [...ids, ...allNullIds]));
+}
+
+function seedRows(rowIds: string[]) {
+  return rowIds.map((id) => ({
+    id,
+    kind: "raw" as const,
+    template: null,
+    toAddress: `${id}@example.test`,
+    subject: "check-marksent",
+    locale: "en" as const,
+    payload: {},
+    status: "pending" as const,
+    attempts: 2,
+    nextAttemptAt: new Date(Date.now() + 60_000),
+    lastError: "prior failure",
+    idempotencyKey: null,
+  }));
 }
 
 async function seed(): Promise<void> {
-  await db.insert(em).values(
-    ids.map((id) => ({
-      id,
-      kind: "raw" as const,
-      template: null,
-      toAddress: `${id}@example.test`,
-      subject: "check-marksent",
-      locale: "en" as const,
-      payload: {},
-      status: "pending" as const,
-      attempts: 2,
-      nextAttemptAt: new Date(Date.now() + 60_000),
-      lastError: "prior failure",
-      idempotencyKey: null,
-    })),
-  );
+  await db.insert(em).values(seedRows(ids));
 }
 
 async function main(): Promise<void> {
@@ -103,6 +110,34 @@ async function main(): Promise<void> {
   assert(
     rows.every((r) => r.lastError === null),
     "lastError is cleared",
+  );
+
+  // All-NULL branch: ids are present but the provider-message-id map is empty, so every
+  // `WHEN id = ... THEN ...` arm of the CASE is absent and the expression degenerates to a
+  // bare `ELSE NULL` — the one shape Postgres can fail to resolve a type for. This is
+  // distinct from the `c` case above (map non-empty, one id absent from it).
+  await db.insert(em).values(seedRows(allNullIds));
+  const allNullResult = await db.transaction(async (tx) =>
+    queue.markSent(allNullIds, sentAt, {}, tx),
+  );
+  console.log(
+    "[3] all-NULL markSent result ->",
+    allNullResult.isFailure ? allNullResult.getError() : "success",
+  );
+  assert(allNullResult.isSuccess, "markSent with an empty provider-message-id map reports success");
+
+  const allNullRows = await db
+    .select({ id: em.id, status: em.status, providerMessageId: em.providerMessageId })
+    .from(em)
+    .where(inArray(em.id, allNullIds));
+  assert(allNullRows.length === 2, "both all-NULL rows still exist");
+  assert(
+    allNullRows.every((r) => r.status === "sent"),
+    "both all-NULL rows still land sent",
+  );
+  assert(
+    allNullRows.every((r) => r.providerMessageId === null),
+    "both all-NULL rows have provider_message_id IS NULL",
   );
 
   // Empty ids must be a no-op — no `WHERE id IN ()` should be emitted, and no row touched.

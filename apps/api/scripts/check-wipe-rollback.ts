@@ -22,17 +22,9 @@
  * caps the lock wait with `lock_timeout` so a stuck lock fails fast instead of hanging.
  */
 
-const databaseUrl = process.env.DATABASE_URL ?? "";
-const isLocalDatabase = /^(?:postgres(?:ql)?:\/\/)[^/]*@?(localhost|127\.0\.0\.1)(?::\d+)?\//.test(
-  databaseUrl,
-);
-if (!isLocalDatabase) {
-  console.error(
-    "check-wipe-rollback refuses to run: DATABASE_URL does not point at localhost/127.0.0.1. " +
-      "This script takes an ACCESS EXCLUSIVE lock on email_message — never point it at a shared database.",
-  );
-  process.exit(1);
-}
+import { requireLocalDatabase } from "./require-local-database";
+
+requireLocalDatabase("check-wipe-rollback");
 
 import { authSchema, db, eq, sql, TransactionService } from "@packages/drizzle";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";

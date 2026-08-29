@@ -17,6 +17,10 @@
  * This script is that proof.
  */
 
+import { requireLocalDatabase } from "./require-local-database";
+
+requireLocalDatabase("check-enqueue");
+
 import { Option } from "@packages/ddd-kit";
 import { db, emailSchema, inArray } from "@packages/drizzle";
 import type { EmailMessageInsert } from "../src/shared/ports/email-queue.port";
