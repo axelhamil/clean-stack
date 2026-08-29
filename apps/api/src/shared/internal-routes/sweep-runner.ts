@@ -93,7 +93,7 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
     `${opts.label} started`,
   );
 
-  if (opts.lock && !(await opts.lock.acquire())) {
+  if (!(await opts.lock.acquire())) {
     opts.logger.warn({ label: opts.label }, `${opts.label} skipped — another run holds the lease`);
     return {
       deleted: 0,
@@ -144,12 +144,10 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
       stopReasons[pass.label] = run.stopReason;
     }
   } finally {
-    if (opts.lock) {
-      try {
-        await opts.lock.release();
-      } catch (err) {
-        opts.logger.error({ err, label: opts.label }, "lease release failed");
-      }
+    try {
+      await opts.lock.release();
+    } catch (err) {
+      opts.logger.error({ err, label: opts.label }, "lease release failed");
     }
   }
 
