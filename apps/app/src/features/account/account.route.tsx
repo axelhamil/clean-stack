@@ -1,12 +1,12 @@
-import { navLinkVariants } from "@packages/ui/components/ui/nav-link";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Trans, useTranslation } from "react-i18next";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { RgpdDeletionCard } from "../rgpd/components/rgpd-deletion-card";
 import { PasskeysCard } from "../security/components/passkeys-card";
 import { RecoveryCodesCard } from "../security/components/recovery-codes-card";
 import { TwoFactorCard } from "../security/components/two-factor-card";
 import { ChangePasswordCard } from "./components/change-password-card";
+import { DataRightsNotice } from "./components/data-rights-notice";
 import { LanguageCard } from "./components/language-card";
 import { ProfileCard } from "./components/profile-card";
 
@@ -31,17 +31,7 @@ function AccountPage() {
         pendingDeletionUntil={user.pendingDeletionUntil}
         twoFactorEnabled={user.twoFactorEnabled === true}
       />
-      <TypographyMuted>
-        <Trans
-          ns="settings"
-          i18nKey="account.dataRightsNotice"
-          components={{
-            link: (
-              <Link to="/legal/data-rights" className={navLinkVariants({ variant: "underline" })} />
-            ),
-          }}
-        />
-      </TypographyMuted>
+      <DataRightsNotice />
     </main>
   );
 }
