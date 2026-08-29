@@ -4,8 +4,16 @@ import emails from "./emails";
 import errors from "./errors";
 import settings from "./settings";
 
-export const NAMESPACES = ["common", "auth", "errors", "emails", "settings"] as const;
+const catalog = { common, auth, errors, emails, settings } as const;
 
-export type Namespace = (typeof NAMESPACES)[number];
+export type Namespace = keyof typeof catalog;
 
-export default { common, auth, errors, emails, settings } as const;
+/**
+ * Derived from the catalog, never written by hand: a literal list is a second
+ * source of truth for the same fact, and the copy that drifts is always the one
+ * nothing reads at build time — a namespace added to the catalog but missing
+ * from the list is simply never checked for parity, silently.
+ */
+export const NAMESPACES = Object.keys(catalog) as Namespace[];
+
+export default catalog;

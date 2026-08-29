@@ -28,48 +28,70 @@ describe("catalog parity", () => {
     expect(Object.keys(frCatalog).sort()).toEqual(Object.keys(enCatalog).sort());
   });
 
+  const ALLOWED_IDENTICAL = [
+    "common.brand",
+    "settings.language.options.en",
+    "settings.language.options.fr",
+    // Short brand tag kept as-is in both locales, not sentence copy.
+    "common.shell.brandLabel",
+    // "Actions", "Webhooks" and "Notifications" are the correct French words too.
+    "common.commandPalette.groups.actions",
+    "common.contextualTabs.webhooks",
+    "common.contextualTabs.notifications",
+    // Non-linguistic placeholders: a masked password, a proper noun, a digit
+    // pattern and a recovery-code pattern don't get translated. The example
+    // email address IS translated (`you@` -> `vous@`, RFC 2606's
+    // `example.com` stays), so it is deliberately not listed here.
+    "auth.signIn.passwordPlaceholder",
+    "auth.signUp.namePlaceholder",
+    "auth.twoFactor.codePlaceholder",
+    "auth.twoFactor.recoveryCodePlaceholder",
+  ] as const;
+
+  const read = (root: Nested, path: string): string | undefined => {
+    let cur: string | Nested | undefined = root;
+    for (const seg of path.split(".")) {
+      if (typeof cur !== "object" || cur === null) return undefined;
+      cur = (cur as Nested)[seg];
+    }
+    return typeof cur === "string" ? cur : undefined;
+  };
+
+  const valueAt = (catalog: unknown, full: string): string | undefined => {
+    const [namespace, ...rest] = full.split(".");
+    if (namespace === undefined) return undefined;
+    const root = (catalog as Record<string, Nested>)[namespace];
+    return root === undefined ? undefined : read(root, rest.join("."));
+  };
+
   it("no French value is left identical to its English source placeholder", () => {
     // A copy-pasted English string is a translation that was never done.
-    // Genuine identical pairs (proper nouns, "Email") are listed here explicitly.
-    const ALLOWED_IDENTICAL = new Set([
-      "common.brand",
-      "settings.language.options.en",
-      "settings.language.options.fr",
-      // Short brand tag kept as-is in both locales, not sentence copy.
-      "common.shell.brandLabel",
-      // "Actions", "Webhooks" and "Notifications" are the correct French words too.
-      "common.commandPalette.groups.actions",
-      "common.contextualTabs.webhooks",
-      "common.contextualTabs.notifications",
-      // Non-linguistic placeholders: a masked password, a proper noun, a digit
-      // pattern and a recovery-code pattern don't get translated. The example
-      // email address IS translated (`you@` -> `vous@`, RFC 2606's
-      // `example.com` stays), so it is deliberately not listed here.
-      "auth.signIn.passwordPlaceholder",
-      "auth.signUp.namePlaceholder",
-      "auth.twoFactor.codePlaceholder",
-      "auth.twoFactor.recoveryCodePlaceholder",
-    ]);
+    // Genuine identical pairs (proper nouns, "Email") are listed above.
+    const allowed = new Set<string>(ALLOWED_IDENTICAL);
     const en = enCatalog as unknown as Record<string, Nested>;
-    const fr = frCatalog as unknown as Record<string, Nested>;
     const offenders: string[] = [];
     for (const namespace of NAMESPACES) {
       for (const path of flatten(en[namespace] as Nested)) {
         const full = `${namespace}.${path}`;
-        if (ALLOWED_IDENTICAL.has(full)) continue;
-        const read = (root: Nested, p: string): string | undefined => {
-          let cur: string | Nested | undefined = root;
-          for (const seg of p.split(".")) {
-            if (typeof cur !== "object" || cur === null) return undefined;
-            cur = (cur as Nested)[seg];
-          }
-          return typeof cur === "string" ? cur : undefined;
-        };
-        const e = read(en[namespace] as Nested, path);
-        const f = read(fr[namespace] as Nested, path);
+        if (allowed.has(full)) continue;
+        const e = valueAt(enCatalog, full);
+        const f = valueAt(frCatalog, full);
         if (e !== undefined && e === f) offenders.push(full);
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  // Why this test exists: an exemption list only ever grows, and an entry kept
+  // after its string was finally translated turns the parity gate into a list
+  // of things nobody will look at again. Making a stale entry fail is what
+  // forces translating a string to also remove its exemption.
+  it("every exemption is still an exact English/French match", () => {
+    const stale = ALLOWED_IDENTICAL.filter((key) => {
+      const e = valueAt(enCatalog, key);
+      const f = valueAt(frCatalog, key);
+      return e === undefined || e !== f;
+    });
+    expect(stale).toEqual([]);
   });
 });
