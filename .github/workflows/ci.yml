@@ -43,6 +43,13 @@ jobs:
       # this same value) and check:fanout (which looks the user up by SEED_EMAIL)
       # both read this one var, so they can never drift apart again.
       SEED_EMAIL: dev@example.com
+      # check:sweep-lock and check:fanout sign requests against the ephemeral CI
+      # Postgres above — this key never authenticates a real deployment, so it can
+      # live in the workflow. apps/api/.env.example deliberately ships this var
+      # empty (fail-closed on every /internal/* route, including rgpd-sweep) rather
+      # than a shared placeholder that would ship a working key into every
+      # bootstrapped .env and every environment, staging included.
+      INTERNAL_SIGNING_KEY: ci-only-signing-key-3f9a1c7e2b6d4f80912345
 
     steps:
       - uses: actions/checkout@v5
