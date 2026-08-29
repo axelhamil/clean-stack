@@ -184,7 +184,7 @@ Primitives for business domain only (never DDD for billing / auth / gating — s
 
 ## Tooling — zero-warning pipeline ✅
 
-- **pnpm 10** + **Turborepo** TUI. `globalDependencies` bust caches on `biome.json` / `pnpm-workspace.yaml` / `.env*`.
+- **pnpm 11** + **Turborepo** TUI. `globalDependencies` bust caches on `biome.json` / `pnpm-workspace.yaml` / `.env*`.
 - **Biome** (lint + format) · **knip** (unused exports) · **jscpd** (duplication) · **Husky + commitlint** (Conventional Commits) · **lint-staged** (Biome on staged files) · **pre-push**: `pnpm ci:check`.
 - **semantic-release** — `dev`→`main` merge commit: `feat`→minor, `fix`/`perf`/`refactor`/`build`→patch, `BREAKING CHANGE:`→major.
 - **Testing**: `bun test` (api) + `vitest` (packages, app). BDD style, mock at port level.

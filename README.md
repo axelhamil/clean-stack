@@ -21,7 +21,7 @@ Two ways to run it. Pick one.
 
 ### Option A — Native (fastest hot reload)
 
-**Prerequisites** — [Bun 1.3+](https://bun.com/docs/installation), [Node 24+](https://nodejs.org), [pnpm 10](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
+**Prerequisites** — [Bun 1.4+](https://bun.com/docs/installation), [Node 24.20+](https://nodejs.org), [pnpm 11](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
 git clone https://github.com/axelhamil/clean-stack my-saas
@@ -317,7 +317,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **DB** | Drizzle ORM + Postgres 18 |
 | **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
-| **Tooling** | pnpm 10 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 11 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
 ---
 

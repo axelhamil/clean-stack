@@ -30,7 +30,7 @@ Library API/config/SOTA unclear → **check docs first**. Outdated patterns are 
 - **Auth**: BetterAuth (Drizzle adapter + `twoFactor`, `passkey`, `magicLink`, `bearer`) — module-level singleton, never wrapped in DI · **Security** (`rate-limiter-flexible` fail-closed on auth routes, Origin-based CSRF, CSP nonce via Caddy+Vite — detail in `apps/api/CLAUDE.md`)
 - **Observability**: `pino` + `hono-pino` · **Contract**: Hono RPC (`hc<AppType>`)
 - **Primitives**: `@packages/ddd-kit` (`Result`, `Option`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `DomainEvent`, `BaseRepository`, `ScopedRepository`, `IUnitOfWork`)
-- **Tooling**: pnpm 10 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd · **Testing**: `bun test` (api) + `vitest` (packages, app)
+- **Tooling**: pnpm 11 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd · **Testing**: `bun test` (api) + `vitest` (packages, app)
 
 ## Cross-cutting rules (always apply)
 
