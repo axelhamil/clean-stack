@@ -10,8 +10,7 @@ import {
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
-import { formatDate } from "../../shared/utils";
+import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { adminOrgDetailQueryOptions } from "./api/admin-orgs.queries";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs/$orgId")({
@@ -19,7 +18,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs/$orgI
 });
 
 function AdminOrgDetailPage() {
-  const { i18n } = useTranslation();
+  const formatDate = useFormatDate();
   const { orgId } = Route.useParams();
 
   const query = useQuery(adminOrgDetailQueryOptions(orgId));
@@ -64,7 +63,7 @@ function AdminOrgDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span>Created</span>
-              <span>{formatDate(org.createdAt, i18n.language)}</span>
+              <span>{formatDate(org.createdAt)}</span>
             </div>
           </div>
         </CardContent>

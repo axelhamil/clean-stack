@@ -8,8 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { useTranslation } from "react-i18next";
-import { formatDate } from "../../../shared/utils";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { AdminUserDetail } from "../api/admin-users.queries";
 
 type Session = AdminUserDetail["sessions"][number];
@@ -19,7 +18,7 @@ interface SessionsCardProps {
 }
 
 export function SessionsCard({ sessions }: SessionsCardProps) {
-  const { i18n } = useTranslation();
+  const formatDate = useFormatDate();
   return (
     <Card>
       <CardHeader>
@@ -46,8 +45,8 @@ export function SessionsCard({ sessions }: SessionsCardProps) {
                   <TableCell className="max-w-xs overflow-hidden">
                     {session.userAgent ?? "—"}
                   </TableCell>
-                  <TableCell>{formatDate(session.createdAt, i18n.language)}</TableCell>
-                  <TableCell>{formatDate(session.expiresAt, i18n.language)}</TableCell>
+                  <TableCell>{formatDate(session.createdAt)}</TableCell>
+                  <TableCell>{formatDate(session.expiresAt)}</TableCell>
                   <TableCell>
                     {session.impersonatedBy ? (
                       <Badge variant="secondary">Impersonation</Badge>

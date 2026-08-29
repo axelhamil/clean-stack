@@ -2,8 +2,7 @@ import { Badge } from "@packages/ui/components/ui/badge";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { Link } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
-import { formatDate } from "../../../shared/utils";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { AdminUserListItem } from "../api/admin-users.queries";
 
 interface UserRowProps {
@@ -11,7 +10,7 @@ interface UserRowProps {
 }
 
 export function UserRow({ item }: UserRowProps) {
-  const { i18n } = useTranslation();
+  const formatDate = useFormatDate();
   return (
     <TableRow>
       <TableCell>
@@ -32,7 +31,7 @@ export function UserRow({ item }: UserRowProps) {
           <Badge variant="outline">Active</Badge>
         )}
       </TableCell>
-      <TableCell>{formatDate(item.createdAt, i18n.language)}</TableCell>
+      <TableCell>{formatDate(item.createdAt)}</TableCell>
     </TableRow>
   );
 }

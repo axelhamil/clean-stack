@@ -3,13 +3,12 @@ import { Button } from "@packages/ui/components/ui/button";
 import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { cancelInvitationMutationOptions } from "../../../shared/api/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
-import { formatDate } from "../../../shared/utils";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 
 export interface InvitationRowProps {
   invitation: {
@@ -23,7 +22,7 @@ export interface InvitationRowProps {
 }
 
 export function InvitationRow({ invitation, organizationId }: InvitationRowProps) {
-  const { i18n } = useTranslation();
+  const formatDate = useFormatDate();
   const queryClient = useQueryClient();
   const { can } = useAuthorization();
   const canCancel = can({ invitation: ["cancel"] });
@@ -44,7 +43,7 @@ export function InvitationRow({ invitation, organizationId }: InvitationRowProps
       <ListRowContent>
         <TypographyP>{invitation.email}</TypographyP>
         <TypographyMuted>
-          {invitation.role} · expires {formatDate(invitation.expiresAt, i18n.language)}
+          {invitation.role} · expires {formatDate(invitation.expiresAt)}
         </TypographyMuted>
       </ListRowContent>
       <ListRowAction>

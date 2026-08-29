@@ -6,8 +6,7 @@ import {
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
-import { useTranslation } from "react-i18next";
-import { formatDate } from "../utils";
+import { useFormatDate } from "../i18n/use-format-date";
 import type { NotificationGroup } from "./group-notifications";
 import { labelOf } from "./notification-labels";
 
@@ -17,7 +16,7 @@ interface NotificationItemProps {
 }
 
 export function NotificationItem({ group, onRead }: NotificationItemProps) {
-  const { i18n } = useTranslation();
+  const formatDate = useFormatDate();
   const { latest, count, unread } = group;
 
   return (
@@ -31,7 +30,7 @@ export function NotificationItem({ group, onRead }: NotificationItemProps) {
         >
           <TypographySmall>{labelOf(latest)}</TypographySmall>
           <ListRowMeta>
-            <TypographyMuted>{formatDate(latest.createdAt, i18n.language)}</TypographyMuted>
+            <TypographyMuted>{formatDate(latest.createdAt)}</TypographyMuted>
             {count > 1 && <TypographyMuted>and {count - 1} more</TypographyMuted>}
           </ListRowMeta>
         </button>
