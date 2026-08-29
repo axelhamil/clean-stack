@@ -19,10 +19,16 @@ if (!signingKey || signingKey.length < 32) {
 // to the default rather than yielding `Number.NaN`/`0` and aborting every sweep instantly.
 const rawTimeoutMs = process.env.INTERNAL_FETCH_TIMEOUT_MS;
 const parsedTimeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : Number.NaN;
-const timeoutMs =
-  Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= 1000
-    ? parsedTimeoutMs
-    : DEFAULT_INTERNAL_FETCH_TIMEOUT_MS;
+const timeoutMsValid = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= 1000;
+if (rawTimeoutMs !== undefined && !timeoutMsValid) {
+  // Silently falling back would let an operator believe they tightened the budget
+  // (e.g. "500") when they actually loosened it 300x back to the default — the API
+  // itself refuses to boot on the same out-of-range value (`.min(1000)`).
+  console.warn(
+    `[sweep] INTERNAL_FETCH_TIMEOUT_MS=${rawTimeoutMs} is invalid (must be a number >= 1000) — falling back to ${DEFAULT_INTERNAL_FETCH_TIMEOUT_MS}ms`,
+  );
+}
+const timeoutMs = timeoutMsValid ? parsedTimeoutMs : DEFAULT_INTERNAL_FETCH_TIMEOUT_MS;
 
 const sweeps = [
   "/internal/sweep-email-messages",
