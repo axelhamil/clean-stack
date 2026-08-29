@@ -1,6 +1,7 @@
 import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import { and, db, emailSchema, eq, inArray, isNull, lte, or, sql } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
+import { logger } from "../logger";
 import type {
   EmailMessageInsert,
   EmailMessageRecord,
@@ -34,8 +35,12 @@ export class DrizzleEmailQueue implements IEmailQueue {
           nextAttemptAt: null,
           idempotencyKey: r.idempotencyKey.isSome() ? r.idempotencyKey.unwrap() : null,
         }));
-        const query = exec.insert(emailSchema.emailMessage).values(values);
-        await this.instrumentation.startSpan(
+        const query = exec
+          .insert(emailSchema.emailMessage)
+          .values(values)
+          .onConflictDoNothing({ target: emailSchema.emailMessage.idempotencyKey })
+          .returning({ id: emailSchema.emailMessage.id });
+        const written = await this.instrumentation.startSpan(
           {
             name: "insert into email_message",
             op: "db.query",
@@ -43,6 +48,12 @@ export class DrizzleEmailQueue implements IEmailQueue {
           },
           () => query,
         );
+        if (written.length < values.length) {
+          logger.warn(
+            { requested: values.length, written: written.length },
+            "email enqueue suppressed duplicate rows — idempotency keys already present",
+          );
+        }
         return Result.ok<void, EmailQueueError>(undefined);
       } catch (err) {
         this.instrumentation.capture(err);

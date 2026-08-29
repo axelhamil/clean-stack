@@ -4,11 +4,27 @@ import { Option } from "@packages/ddd-kit";
 const inserted: unknown[] = [];
 const execCalls: string[] = [];
 
+// Set by a test to make the insert report fewer written rows than requested.
+let insertReturns: ((rows: unknown[]) => unknown[]) | null = null;
+
+const warnSpy = mock(() => {});
+mock.module("../logger", () => ({
+  logger: { warn: warnSpy, info: mock(() => {}), error: mock(() => {}), debug: mock(() => {}) },
+}));
+
 mock.module("@packages/drizzle", () => ({
   db: {
     insert: () => ({
-      values: async (rows: unknown[]) => {
+      values: (rows: unknown[]) => {
         inserted.push(...rows);
+        const written = insertReturns ? insertReturns(rows) : rows.map(() => ({ id: "id" }));
+        const chain = {
+          onConflictDoNothing: () => chain,
+          returning: async () => written,
+          // biome-ignore lint/suspicious/noThenProperty: intentional thenable so the old `await ....values(...)` call shape still works
+          then: (resolve: (v: unknown) => unknown) => resolve(written),
+        };
+        return chain;
       },
     }),
   },
@@ -106,6 +122,16 @@ mock.module("@packages/drizzle", () => ({
 const { DrizzleEmailQueue } = await import("../services/drizzle-email-queue.service");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
 
+const rowFixture = (to: string) => ({
+  kind: "template" as const,
+  template: Option.some("delete_completed"),
+  toAddress: to,
+  subject: "s",
+  locale: "en" as const,
+  payload: { name: "Ada" },
+  idempotencyKey: Option.some(`k/${to}`),
+});
+
 describe("DrizzleEmailQueue.enqueue", () => {
   it("assigns an id and pending status to every row", async () => {
     const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
@@ -130,9 +156,13 @@ describe("DrizzleEmailQueue.enqueue", () => {
     const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
     const tx = {
       insert: () => ({
-        values: async () => {
-          throw new Error("db down");
-        },
+        values: () => ({
+          onConflictDoNothing: () => ({
+            returning: async () => {
+              throw new Error("db down");
+            },
+          }),
+        }),
       }),
     };
     const result = await queue.enqueue(
@@ -151,5 +181,28 @@ describe("DrizzleEmailQueue.enqueue", () => {
     );
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("EMAIL_QUEUE_WRITE_FAILED");
+  });
+
+  it("suppresses a duplicate row instead of failing the whole batch", async () => {
+    insertReturns = (rows) => rows.slice(1).map(() => ({ id: "id" })); // one row dropped
+    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+
+    const result = await queue.enqueue([rowFixture("a@x.test"), rowFixture("b@x.test")]);
+
+    expect(result.isSuccess).toBe(true);
+    insertReturns = null;
+  });
+
+  it("warns when fewer rows are written than requested", async () => {
+    warnSpy.mockClear();
+    insertReturns = (rows) => rows.slice(1).map(() => ({ id: "id" }));
+
+    await new DrizzleEmailQueue(new NoOpInstrumentation()).enqueue([
+      rowFixture("a@x.test"),
+      rowFixture("b@x.test"),
+    ]);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    insertReturns = null;
   });
 });
