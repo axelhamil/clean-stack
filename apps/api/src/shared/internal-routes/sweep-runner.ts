@@ -144,7 +144,13 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
       stopReasons[pass.label] = run.stopReason;
     }
   } finally {
-    if (opts.lock) await opts.lock.release();
+    if (opts.lock) {
+      try {
+        await opts.lock.release();
+      } catch (err) {
+        opts.logger.error({ err, label: opts.label }, "lease release failed");
+      }
+    }
   }
 
   const truncated = Object.values(stopReasons).some((r) => r === "budget" || r === "batch-cap");

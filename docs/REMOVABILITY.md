@@ -48,6 +48,8 @@ After each axis, the worst gate that can fail is named in parens. After axis 6, 
 
 `pnpm dev` boot + `curl /livez` is the runtime gate but optional in a dry-run — the build gate covers it statically.
 
+**Targeted real-DB scripts, not covered by gate 6**: some logic lives entirely in the SQL a mocked transaction never evaluates (a `WHERE`, a `CASE`, a conditional `UPDATE`), so `pnpm test` structurally cannot prove it and a dedicated script against a real Postgres stands in instead (`apps/api/src/shared/CLAUDE.md`). `pnpm --filter api check:fanout` (notification fan-out) and `pnpm --filter api check:sweep-lock` (the `sweep_lock` single-flight lease, `apps/api/src/shared/internal-routes/sweep-lock.ts`) are the two on this rail — re-run the matching one after touching either file, and after any removal that touches the routes it exercises (`check:sweep-lock` drives all six `sweep-*.route.ts` files through their real `POST` handlers).
+
 ---
 
 ## Worked example — removing `modules/rgpd` (Phase 0.5 dry-run, May 2026)

@@ -1,5 +1,5 @@
 {
-  "id": "182a96ad-8ddb-40cf-b16f-b4becf76781f",
+  "id": "c3da6e2e-aed0-4e78-947f-396203831e8d",
   "prevId": "eea30a2e-f4ac-4185-9ec8-a6f19967c180",
   "version": "7",
   "dialect": "postgresql",
@@ -2767,16 +2767,22 @@
           "primaryKey": true,
           "notNull": true
         },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "locked_at": {
           "name": "locked_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
         "locked_until": {
           "name": "locked_until",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         }
