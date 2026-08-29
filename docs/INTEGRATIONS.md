@@ -49,6 +49,12 @@ see [`CRON.md`](./CRON.md).
   re-autolink visible URL text and break `?token=...`.
 - **`expiresAt` is an ISO string** (`new Date(...).toISOString()`); render it
   with the user's locale on the template side.
+- **Locale is per recipient, never per batch** — `EmailRecipient<K>.locale`
+  (`apps/api/src/shared/ports/email.port.ts`), resolved at enqueue and frozen
+  onto the `email_message.locale` column, so a retry days later replays the
+  same language. There is deliberately no batch-level `locale` option: the two
+  genuinely multi-recipient callers (notification digests, RGPD notices) are
+  exactly the ones that must not be forced into one language.
 - **Never call Resend directly from a request path** — always go through `IEmailService.sendTemplate` or `sendTemplateBatch`. The worker owns batching and retry.
 
 ### Bounce suppression

@@ -38,19 +38,20 @@ Remaining work for clean-stack, plus the design record of each shipped phase. **
 | **Phase A.6 — Accessibility gate** | **Aug 2026** | `apps/app/a11y/` (Playwright as an axe driver) + `.github/workflows/ci.yml` — the repo's **first PR-triggered CI**. Zero `serious`/`critical` WCAG 2.1 AA violations over 4 public + 3 authenticated pages **× light and dark**, one `<main>`/`<h1>` per page, final-URL assertion so a gate redirect can't pass as its target, keyboard tab order, palette focus trap, reduced-motion. Found and fixed 7 real defects (unlabelled password inputs app-wide, missing `<h1>` on both auth pages, 4 contrast failures across both schemes, unlabelled avatar input) and 2 clone-blocking `db:seed` bugs. Lighthouse dropped — a11y subset of axe. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase D.3 — In-app notification center** | **Aug 2026** | `modules/notifications/` (back) + `shared/notifications/` (front) — `<Bell />` inbox in the shell (unread badge, `groupKey` grouping, cross-tab read propagation), `/settings/notifications` preference matrix, org defaults card behind `organization:["update"]`; fan-out as an `OutboxSubscriber` inside the dispatch TX (one `INSERT ... SELECT`, never N inserts); preference cascade **org lock → user → org default → enabled** resolved in that same statement, `forced` bypassing all four; SSE stream carrying a signal, never data (`pg_notify` + one `LISTEN` per instance, `fetch`+`ReadableStream` not `EventSource`); dedup via partial unique index; 2 crons. **No new event type** — the catalog is consumed, not extended: **67 / 28 public / 39 internal**. Cascade verified against Postgres via `pnpm --filter api check:fanout` (8 cases) — a mocked `tx` evaluates no `WHERE`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase C.7 — SSO SAML/OIDC + SCIM** | **Aug 2026** | `@better-auth/sso` + `@better-auth/scim` — per-org OIDC/SAML providers, domain verification, enforce-SSO toggle, JIT provisioning on first sign-in, SCIM 2.0 `Users` CRUD, `/settings/sso` + a "Sign in with SSO" entry on `/sign-in` (redirects straight into the IdP flow on an `SSO_REQUIRED` rejection, using the `providerId` the server already returns). Local Keycloak under the opt-in `sso` Docker profile — round-trip documented in [`docs/SSO-LOCAL.md`](docs/SSO-LOCAL.md). 13 new events (`sso.*` ×7, `scim.*` ×6) → **80 / 34 public / 46 internal**. As-built + all deviations in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase E.1a — i18n foundation** | **Aug 2026** | `@packages/i18n` — `.ts … as const` catalogs bound through `CustomTypeOptions.resources`, so an unknown `t()` key is a `tsc` error. `i18next` + `react-i18next` chosen over Lingui and Paraglide; locale resolves from a cookie then `user.locale` and **never from the URL**, so no route was re-parented. Language switcher in `/settings/account`, `PUT /me/locale`, per-recipient email locale frozen at enqueue, localized API/BetterAuth/Zod messages, `<html lang>` asserted in the a11y gate, `en`/`fr` key parity enforced by a test. `auth`, `account` and the shell are translated; the rest is E.1b. 1 event → **81 / 35 public / 46 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
 ## 🚧 What's left
 
-The plumbing a SaaS boilerplate owes its cloner is shipped: auth + MFA, multi-tenant with a capability SSOT, RGPD Art. 17/20, cookie consent, policy versioning, billing + quota gating, security perimeter, admin + impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC + SAML) + SCIM provisioning, event rail (80 events / 34 public / 46 internal), Railway reference deploy. Per-phase detail below, as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).
+The plumbing a SaaS boilerplate owes its cloner is shipped: auth + MFA, multi-tenant with a capability SSOT, RGPD Art. 17/20, cookie consent, policy versioning, billing + quota gating, security perimeter, admin + impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC + SAML) + SCIM provisioning, a typed i18n rail (`en`/`fr`), event rail (81 events / 35 public / 46 internal), Railway reference deploy. Per-phase detail below, as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).
 
 What remains is short on purpose. **Everything not listed here was cut** — a boilerplate that carries a wishlist of twelve unbuilt phases reads as unfinished when it isn't.
 
 | | What | Why it survived the cut |
 |---|---|---|
 | **Review pass** | Full manual review of the shipped surface — owned by @axelhamil, not a code task | The only thing standing between "feature-complete" and "clone-ready" |
-| **E.1** | i18n (locale routes + Lingui) | Real ask for EU clones; the routing shape has to be decided before features multiply |
+| **E.1b** | Remaining i18n extraction (`admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, per-locale legal content) | E.1a shipped the rail and typed the surface it covers; what is left is catalog work, not a design decision |
 | **C.1** | S5b behavioural signals + S6 captcha hook | Deferred for calibration, not abandoned — needs real traffic |
 | **D.5** | Known debts (3) | Actual defects, including a duplicate deletion email on worker crash |
 
@@ -210,11 +211,11 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 
 ---
 
-## i18n — typed catalogs, locale outside the URL — **Phase E.1**
+## i18n — typed catalogs, locale outside the URL — **Phase E.1a ✅ SHIPPED (Aug 2026) · E.1b left**
 
 **Why**: most i18n stacks ship as runtime plugins that crash production with missing keys at the worst moment. Enforce keys at build time and resolve the locale from the user, not the path.
 
-**E.1a — foundation (shipped)**: `@packages/i18n` with `.ts … as const` catalogs typed through `CustomTypeOptions.resources`, so an unknown key is a `tsc` error. `i18next` + `react-i18next`, chosen over Lingui and Paraglide — see `docs/HISTORY.md`. Locale resolves from a cookie then `user.locale`; **it is not in the URL**, so the 34 route files and 62 navigation call sites were untouched. Language switcher in `/settings/account`, `PUT /me/locale` + `user.locale.changed` (catalog 80 → 81), per-recipient email locale frozen at enqueue, localized API/BetterAuth/Zod messages, `<html lang>` asserted in the a11y gate.
+**E.1a — foundation (shipped)**: `@packages/i18n` with `.ts … as const` catalogs typed through `CustomTypeOptions.resources`, so an unknown key is a `tsc` error. `i18next` + `react-i18next`, chosen over Lingui and Paraglide — see `docs/HISTORY.md`. Locale resolves from a cookie then `user.locale`; **it is not in the URL**, so the 34 route files and 62 navigation call sites were untouched. Language switcher in `/settings/account`, `PUT /me/locale` + `user.locale.changed` (catalog 80 → **81 / 35 public / 46 internal**), per-recipient email locale frozen at enqueue, localized API/BetterAuth/Zod messages, `<html lang>` asserted in the a11y gate.
 
 - [ ] **E.1b — remaining extraction**: `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, and per-locale legal content modules (English filled, French a stub the cloner replaces with its own legal text).
 

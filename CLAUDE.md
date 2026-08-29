@@ -29,6 +29,7 @@ Library API/config/SOTA unclear → **check docs first**. Outdated patterns are 
 - **DB**: Drizzle + Postgres 18 (Docker, port `5433`) · **DI**: `inwire` (type-inference container)
 - **Auth**: BetterAuth (Drizzle adapter + `twoFactor`, `passkey`, `magicLink`, `bearer`) — module-level singleton, never wrapped in DI · **Security** (`rate-limiter-flexible` fail-closed on auth routes, Origin-based CSRF, CSP nonce via Caddy+Vite — detail in `apps/api/CLAUDE.md`)
 - **Observability**: `pino` + `hono-pino` · **Contract**: Hono RPC (`hc<AppType>`)
+- **i18n**: `i18next` + `react-i18next` — typed `.ts` catalogs in `@packages/i18n` (`en`/`fr`), locale from cookie then `user.locale`, never from the URL
 - **Primitives**: `@packages/ddd-kit` (`Result`, `Option`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `DomainEvent`, `BaseRepository`, `ScopedRepository`, `IUnitOfWork`)
 - **Tooling**: pnpm 11 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd · **Testing**: `bun test` (api) + `vitest` (packages, app)
 

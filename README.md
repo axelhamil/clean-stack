@@ -142,6 +142,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - TanStack Router file-based routing (`routes.ts` virtual config → generated, versioned `routeTree.gen.ts`) with a 2-file feature pattern (`route` + lazy component), near-zero TanStack Start migration
 - Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~355 KB, route chunks 1–43 KB)
 - TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
+- Typed i18n (`@packages/i18n`) — `en`/`fr` `.ts` catalogs bound to `t()` through `CustomTypeOptions`, so an unknown key fails `tsc`; locale from cookie then `user.locale`, never from the URL; `en`/`fr` key parity enforced by a test
 - shadcn-pure UI kit (`@packages/ui`) — typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
 
 **Infra, ops & DX**
@@ -154,10 +155,10 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 
 ### Roadmap
 
-The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, the 80-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
+The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 81-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
 - **A manual review pass** over the shipped surface — the last step before this is genuinely clone-ready.
-- **E.1 i18n** — locale routes + Lingui, with build-time key checking.
+- **E.1b i18n extraction** — the typed rail shipped (E.1a); `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings` and the legal pages are still English-only, by design.
 - **C.1 S5b/S6** — impossible-travel, ASN deny-list, captcha hook. Deferred for calibration: these need real traffic to tune.
 - **D.5 known debts** — three, including a duplicate deletion email if the worker crashes mid-batch.
 
@@ -316,6 +317,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Storage** | Cloudflare R2 prod · SeaweedFS dev (S3-compatible, opt-in) |
 | **DB** | Drizzle ORM + Postgres 18 |
 | **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types |
+| **i18n** | `i18next` + `react-i18next` — typed `.ts` catalogs (`@packages/i18n`), locale outside the URL |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
 | **Tooling** | pnpm 11 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
@@ -327,7 +329,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 |---|---|
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, i18n, abuse signals, D.5 debts |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, E.1b i18n extraction, abuse signals, D.5 debts |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |

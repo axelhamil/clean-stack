@@ -167,12 +167,22 @@ The single biggest item procurement checks for at enterprise deal size — and t
 
 SAML registrations are hardened server-side regardless of what the client sends — SHA-256 signatures and signed assertions are forced, never optional. A local Keycloak profile (`docker compose --profile sso up keycloak -d`) makes the whole round-trip testable without a real Okta or Entra ID tenant.
 
+## Two languages, and the locale never touches the URL
+
+English and French ship in the box. Which one a visitor gets is decided by a cookie, then by what they saved on their account — never by the address bar. That choice is deliberate: locale-prefixed routes would have re-parented every page in the app and every link pointing at one, for a benefit (shareable per-language URLs) that a product with an account system rarely needs.
+
+The catalogs are TypeScript, not JSON, and that is the whole point: `t("auth.signIn.title")` is checked at build time, so a typo or a key you forgot to add is a compile error rather than a raw `auth.signIn.title` rendered to a customer. A test fails the build the moment the two catalogs stop having the same keys, or a French string is left byte-identical to its English source.
+
+Emails pick their language **per recipient**, not per batch, and the choice is frozen onto the queued row when the mail is enqueued — so a retry three hours later replays the same language even if the person switched theirs in between. Form validation messages, API error envelopes and the auth library's own error codes all resolve through the same catalogs, so a French user never gets a French form around an English error.
+
+Today `auth`, the account settings page and the app shell are translated. `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings` and the legal pages are still English — a stated scope decision, not an oversight, and it degrades quietly: a missing French key renders its English copy, never a key.
+
 ## What's next
 
 Short, and short on purpose — the plumbing is done, so the list is a review pass plus three items rather than a phase catalogue.
 
 - **A manual review pass** over everything shipped, before calling the stack clone-ready.
-- **Internationalization** — locale-prefixed routes with build-time key checking.
+- **The rest of the translation** — the typed rail and the `auth` / account / shell surfaces shipped; the admin, billing, webhooks, SSO and legal pages are still English-only.
 - **Abuse signals and a captcha hook** — deferred until there's real traffic to calibrate them against.
 
 The full plan, with constraints and extension points, lives in [`../ROADMAP.md`](../ROADMAP.md).
