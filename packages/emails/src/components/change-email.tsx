@@ -10,12 +10,10 @@ interface ChangeEmailProps extends ChangeEmailVars {
 
 export function ChangeEmail({ name, newEmail, confirmUrl, t }: ChangeEmailProps) {
   return (
-    <EmailLayout preview={t("subjects.changeEmail")}>
-      <Heading as="h1">Confirm your new email</Heading>
-      <Text>
-        Hi {name}, confirm that you want to change your email address to {newEmail}.
-      </Text>
-      <Button href={confirmUrl}>Confirm new email</Button>
+    <EmailLayout preview={t("subjects.changeEmail")} t={t}>
+      <Heading as="h1">{t("changeEmail.heading")}</Heading>
+      <Text>{t("changeEmail.body", { name, newEmail })}</Text>
+      <Button href={confirmUrl}>{t("changeEmail.cta")}</Button>
       <Text>{confirmUrl}</Text>
     </EmailLayout>
   );

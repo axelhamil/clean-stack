@@ -16,9 +16,9 @@ export function NotificationDigest({
 }: NotificationDigestProps) {
   const subject = t("subjects.notificationDigest", { count: Number(itemCount), category });
   return (
-    <EmailLayout preview={subject}>
+    <EmailLayout preview={subject} t={t}>
       <Heading as="h1">{subject}</Heading>
-      <Text>Here is a summary of your recent {category} activity:</Text>
+      <Text>{t("notificationDigest.intro", { category })}</Text>
       <Text>{itemsSummary}</Text>
     </EmailLayout>
   );

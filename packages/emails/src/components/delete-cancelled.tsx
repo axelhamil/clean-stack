@@ -10,11 +10,9 @@ interface DeleteCancelledProps extends DeleteCancelledVars {
 
 export function DeleteCancelled({ name, t }: DeleteCancelledProps) {
   return (
-    <EmailLayout preview={t("subjects.deleteCancelled")}>
-      <Heading as="h1">Account deletion cancelled</Heading>
-      <Text>
-        Hi {name}, your account deletion request has been cancelled. Your account remains active.
-      </Text>
+    <EmailLayout preview={t("subjects.deleteCancelled")} t={t}>
+      <Heading as="h1">{t("deleteCancelled.heading")}</Heading>
+      <Text>{t("deleteCancelled.body", { name })}</Text>
     </EmailLayout>
   );
 }

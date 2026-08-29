@@ -10,12 +10,10 @@ interface OrgInvitationProps extends OrgInvitationVars {
 
 export function OrgInvitation({ inviterName, orgName, role, inviteUrl, t }: OrgInvitationProps) {
   return (
-    <EmailLayout preview={t("subjects.orgInvitation", { orgName })}>
-      <Heading as="h1">You have been invited</Heading>
-      <Text>
-        {inviterName} has invited you to join <strong>{orgName}</strong> as a {role}.
-      </Text>
-      <Button href={inviteUrl}>Accept invitation</Button>
+    <EmailLayout preview={t("subjects.orgInvitation", { orgName })} t={t}>
+      <Heading as="h1">{t("orgInvitation.heading")}</Heading>
+      <Text>{t("orgInvitation.body", { inviterName, orgName, role })}</Text>
+      <Button href={inviteUrl}>{t("orgInvitation.cta")}</Button>
       <Text>{inviteUrl}</Text>
     </EmailLayout>
   );

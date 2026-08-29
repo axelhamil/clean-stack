@@ -10,7 +10,7 @@ interface VerifyEmailProps extends VerifyEmailVars {
 
 export function VerifyEmail({ name, verifyUrl, t }: VerifyEmailProps) {
   return (
-    <EmailLayout preview={t("subjects.verifyEmail")}>
+    <EmailLayout preview={t("subjects.verifyEmail")} t={t}>
       <Heading as="h1">{t("verifyEmail.heading")}</Heading>
       <Text>{t("verifyEmail.body", { name })}</Text>
       <Button href={verifyUrl}>{t("verifyEmail.cta")}</Button>

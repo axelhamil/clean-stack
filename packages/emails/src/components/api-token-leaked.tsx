@@ -10,17 +10,11 @@ interface ApiTokenLeakedProps extends ApiTokenLeakedVars {
 
 export function ApiTokenLeaked({ name, tokenName, revokedAt, t }: ApiTokenLeakedProps) {
   return (
-    <EmailLayout preview={t("subjects.apiTokenLeaked")}>
-      <Heading as="h1">API token revoked</Heading>
-      <Text>Hi {name},</Text>
-      <Text>
-        Your API token <strong>{tokenName}</strong> was detected in a public repository and has been
-        automatically revoked on {revokedAt} to protect your account.
-      </Text>
-      <Text>
-        If you believe this was a mistake or need to regenerate the token, you can do so in your
-        account settings.
-      </Text>
+    <EmailLayout preview={t("subjects.apiTokenLeaked")} t={t}>
+      <Heading as="h1">{t("apiTokenLeaked.heading")}</Heading>
+      <Text>{t("apiTokenLeaked.greeting", { name })}</Text>
+      <Text>{t("apiTokenLeaked.body", { tokenName, revokedAt })}</Text>
+      <Text>{t("apiTokenLeaked.help")}</Text>
     </EmailLayout>
   );
 }

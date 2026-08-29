@@ -10,13 +10,10 @@ interface DeleteRequestedProps extends DeleteRequestedVars {
 
 export function DeleteRequested({ name, cancelUrl, expiresAt, t }: DeleteRequestedProps) {
   return (
-    <EmailLayout preview={t("subjects.deleteRequested")}>
-      <Heading as="h1">Account deletion requested</Heading>
-      <Text>
-        Hi {name}, we received a request to delete your account. The deletion will be processed on{" "}
-        {expiresAt}. If this was not you, cancel now.
-      </Text>
-      <Button href={cancelUrl}>Cancel deletion</Button>
+    <EmailLayout preview={t("subjects.deleteRequested")} t={t}>
+      <Heading as="h1">{t("deleteRequested.heading")}</Heading>
+      <Text>{t("deleteRequested.body", { name, expiresAt })}</Text>
+      <Button href={cancelUrl}>{t("deleteRequested.cta")}</Button>
       <Text>{cancelUrl}</Text>
     </EmailLayout>
   );

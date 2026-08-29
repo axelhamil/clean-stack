@@ -10,10 +10,10 @@ interface MagicLinkProps extends MagicLinkVars {
 
 export function MagicLink({ magicUrl, t }: MagicLinkProps) {
   return (
-    <EmailLayout preview={t("subjects.magicLink")}>
-      <Heading as="h1">Sign in to your account</Heading>
-      <Text>Click the button below to sign in. This link is single-use and expires shortly.</Text>
-      <Button href={magicUrl}>Sign in</Button>
+    <EmailLayout preview={t("subjects.magicLink")} t={t}>
+      <Heading as="h1">{t("magicLink.heading")}</Heading>
+      <Text>{t("magicLink.body")}</Text>
+      <Button href={magicUrl}>{t("magicLink.cta")}</Button>
       <Text>{magicUrl}</Text>
     </EmailLayout>
   );

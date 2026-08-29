@@ -27,6 +27,18 @@ describe("renderTemplate locale", () => {
     expect(out.subject).toBe("Vous avez été invité à rejoindre Acme");
   });
 
+  it("translates the body, not only the subject", async () => {
+    const out = await renderTemplate(
+      "reset_password",
+      { name: "Ada", resetUrl: "https://x/r" },
+      "fr",
+    );
+    expect(out.html).toContain("Réinitialisez votre mot de passe");
+    expect(out.text).toContain("Bonjour Ada");
+    expect(out.text).not.toContain("Hi Ada");
+    expect(out.text).not.toContain("If you did not expect this email");
+  });
+
   it("does not leak one render's locale into the next", async () => {
     const fr = await renderTemplate("verify_email", { name: "A", verifyUrl: "u" }, "fr");
     const en = await renderTemplate("verify_email", { name: "A", verifyUrl: "u" }, "en");

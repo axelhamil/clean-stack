@@ -10,13 +10,10 @@ interface BackupCodeUsedProps extends BackupCodeUsedVars {
 
 export function BackupCodeUsed({ securityUrl, t }: BackupCodeUsedProps) {
   return (
-    <EmailLayout preview={t("subjects.backupCodeUsed")}>
-      <Heading as="h1">A backup code was used</Heading>
-      <Text>
-        A backup two-factor authentication code was just used to sign in to your account. If this
-        was not you, review your account security immediately.
-      </Text>
-      <Button href={securityUrl}>Review security settings</Button>
+    <EmailLayout preview={t("subjects.backupCodeUsed")} t={t}>
+      <Heading as="h1">{t("backupCodeUsed.heading")}</Heading>
+      <Text>{t("backupCodeUsed.body")}</Text>
+      <Button href={securityUrl}>{t("backupCodeUsed.cta")}</Button>
       <Text>{securityUrl}</Text>
     </EmailLayout>
   );

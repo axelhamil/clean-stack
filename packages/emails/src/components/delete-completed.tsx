@@ -10,9 +10,9 @@ interface DeleteCompletedProps extends DeleteCompletedVars {
 
 export function DeleteCompleted({ name, t }: DeleteCompletedProps) {
   return (
-    <EmailLayout preview={t("subjects.deleteCompleted")}>
-      <Heading as="h1">Your account has been deleted</Heading>
-      <Text>Hi {name}, your account and all associated data have been permanently deleted.</Text>
+    <EmailLayout preview={t("subjects.deleteCompleted")} t={t}>
+      <Heading as="h1">{t("deleteCompleted.heading")}</Heading>
+      <Text>{t("deleteCompleted.body", { name })}</Text>
     </EmailLayout>
   );
 }

@@ -10,12 +10,10 @@ interface ResetPasswordProps extends ResetPasswordVars {
 
 export function ResetPassword({ name, resetUrl, t }: ResetPasswordProps) {
   return (
-    <EmailLayout preview={t("subjects.resetPassword")}>
-      <Heading as="h1">Reset your password</Heading>
-      <Text>
-        Hi {name}, click the button below to reset your password. The link expires in 1 hour.
-      </Text>
-      <Button href={resetUrl}>Reset password</Button>
+    <EmailLayout preview={t("subjects.resetPassword")} t={t}>
+      <Heading as="h1">{t("resetPassword.heading")}</Heading>
+      <Text>{t("resetPassword.body", { name })}</Text>
+      <Button href={resetUrl}>{t("resetPassword.cta")}</Button>
       <Text>{resetUrl}</Text>
     </EmailLayout>
   );
