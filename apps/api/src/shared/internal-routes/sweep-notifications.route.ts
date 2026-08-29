@@ -54,6 +54,7 @@ export const sweepNotificationsRoutes = new Hono<HonoEnv>()
       ],
       logger: c.var.logger,
       label: "sweep-notifications",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
     return c.json(response);
   });

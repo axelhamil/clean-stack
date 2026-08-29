@@ -83,6 +83,7 @@ export const sweepEmailMessagesRoutes = new Hono<HonoEnv>()
       passes: buildEmailSweepPasses(),
       logger: c.var.logger,
       label: "sweep-email-messages",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
     return c.json(response);
   });

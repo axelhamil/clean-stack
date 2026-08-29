@@ -57,6 +57,7 @@ export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
       ],
       logger: c.var.logger,
       label: "sweep-webhook-delivery",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
     return c.json(response);
   });

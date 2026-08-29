@@ -75,6 +75,7 @@ export const sweepAuditLogRoutes = new Hono<HonoEnv>()
       })),
       logger,
       label: "sweep-audit-log",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
 
     return c.json({

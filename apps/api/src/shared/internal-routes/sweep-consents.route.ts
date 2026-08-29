@@ -68,6 +68,7 @@ export const sweepConsentsRoutes = new Hono<HonoEnv>()
       ],
       logger,
       label: "sweep-consents",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
     return c.json(response);
   });

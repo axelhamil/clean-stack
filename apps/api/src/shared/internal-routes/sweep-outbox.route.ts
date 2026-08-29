@@ -81,6 +81,7 @@ export const sweepOutboxRoutes = new Hono<HonoEnv>()
       ],
       logger,
       label: "sweep-outbox",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
     return c.json(response);
   });
