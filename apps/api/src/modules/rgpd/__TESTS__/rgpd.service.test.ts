@@ -80,6 +80,7 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
       Result.ok<ExecuteWipeOutput, RgpdError>({
         deletedOrgIds: ["org_personal", "org_solo"],
         anonymizedEmail: "deleted-uuid@anonymized.local",
+        alreadyWiped: false,
       }),
     ),
     verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(true)),
@@ -579,6 +580,43 @@ describe("RgpdService", () => {
         .map((e) => e.aggregateId)
         .sort();
       expect(orgDeleted).toEqual(["org_personal", "org_solo"]);
+    });
+
+    it("short-circuits without emitting USER_DELETED when the repository reports the row already wiped (lost race, no SKIP LOCKED on rgpd-sweep)", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+        executeWipe: mock(async () =>
+          Result.ok<ExecuteWipeOutput, RgpdError>({
+            deletedOrgIds: [],
+            anonymizedEmail: "",
+            alreadyWiped: true,
+          }),
+        ),
+      });
+      const enqueued: Array<{ eventType: string }> = [];
+      const spyOutbox: IOutboxRepository = {
+        enqueue: async (events) => {
+          for (const e of events) enqueued.push({ eventType: e.eventType });
+        },
+        findPendingBatch: async () => [],
+        markDispatched: async () => {},
+        markFailed: async () => {},
+      };
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        spyOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(enqueued).toHaveLength(0);
     });
 
     it("returns success no-op when user is already deleted", async () => {

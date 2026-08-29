@@ -13,10 +13,16 @@ if (!signingKey || signingKey.length < 32) {
 }
 
 // Kept in sync with `env.INTERNAL_FETCH_TIMEOUT_MS`'s schema default — this script is a
-// standalone process reading `process.env` directly and cannot import the API's `env`.
-const timeoutMs = Number(
-  process.env.INTERNAL_FETCH_TIMEOUT_MS ?? DEFAULT_INTERNAL_FETCH_TIMEOUT_MS,
-);
+// standalone process reading `process.env` directly and cannot import the API's `env`,
+// so it repeats its own defensive parsing rather than inheriting `shared/env.ts`'s
+// "" → undefined normalization: an empty string or a non-numeric value must fall back
+// to the default rather than yielding `Number.NaN`/`0` and aborting every sweep instantly.
+const rawTimeoutMs = process.env.INTERNAL_FETCH_TIMEOUT_MS;
+const parsedTimeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : Number.NaN;
+const timeoutMs =
+  Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= 1000
+    ? parsedTimeoutMs
+    : DEFAULT_INTERNAL_FETCH_TIMEOUT_MS;
 
 const sweeps = [
   "/internal/sweep-email-messages",
@@ -26,6 +32,8 @@ const sweeps = [
   "/internal/sweep-consents",
   "/internal/sweep-notifications",
 ] as const;
+
+let anyFailure = false;
 
 for (const path of sweeps) {
   const started = Date.now();
@@ -94,12 +102,13 @@ for (const path of sweeps) {
       break;
     case "batch-error":
       // A batch error recurs every tick until someone looks at the data. Never let it
-      // hide behind the truncation warning.
+      // hide behind the truncation warning — but it must not starve every sweep after
+      // it either, so accumulate and keep going; the process still exits non-zero.
       console.error(
         `[sweep] BATCH ERROR ${path} in ${elapsed}ms on ${classification.passes.join(", ")}: ${body}`,
       );
-      process.exit(1);
-      break;
+      anyFailure = true;
+      continue;
     case "truncated":
       // A healthy outcome for a backlog: the budget was spent and the next tick resumes.
       // Truncating on *every* tick is not — it means the backlog outpaces the cadence.
@@ -111,4 +120,4 @@ for (const path of sweeps) {
   }
 }
 
-process.exit(0);
+process.exit(anyFailure ? 1 : 0);

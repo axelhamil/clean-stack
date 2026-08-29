@@ -7,7 +7,7 @@ internal endpoints (`POST /internal/<job>`); you wire your own scheduler.
 
 | Endpoint | Body | What it does |
 |---|---|---|
-| `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun, truncated }`. `processed` is `succeeded.length + failed.length` — accounts actually attempted, not the batch size, so a truncated run reports what it really did. Time-budgeted like the retention sweeps below (checked *between* account wipes, never inside one — an account wipe is a single transaction and must never be cut in half), but deliberately holds no lease: each wipe claims its own row and is idempotent, so two overlapping runs cannot double-wipe. |
+| `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun, truncated }`. `processed` is `succeeded.length + failed.length` — accounts actually attempted, not the batch size, so a truncated run reports what it really did. Time-budgeted like the retention sweeps below (checked *between* account wipes, never inside one — an account wipe is a single transaction and must never be cut in half), but deliberately holds no lease and its selection query is not `SKIP LOCKED`, so two overlapping runs can pick the same account; the anonymizing update is guarded by `deletedAt IS NULL`, making the wipe itself idempotent so the loser of the race short-circuits without double-wiping. |
 | `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups pending notification emails into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Note: "immediate" frequency means "at the next cron tick" — true real-time delivery is handled by the SSE event stream, not email. |
 | `POST /internal/sweep-notifications` | `{ batchSize?: number; dryRun?: boolean }` | Purges read notifications older than `NOTIFICATION_RETENTION_DAYS` (default 30d). Unread notifications are never purged regardless of age. Recommended cadence: daily. |
 
@@ -64,8 +64,12 @@ a tz-naive column is silently wrong the moment the app process and the
 database don't agree on a timezone, so don't "fix" it back to match the rest
 of the schema.
 
-`rgpd-sweep` deliberately has no lease: each wipe claims its own account row and
-is idempotent, so two overlapping runs cannot double-wipe.
+`rgpd-sweep` deliberately has no lease and its selection (`findUsersReadyForWipe`)
+does not use `SKIP LOCKED`, so two overlapping runs can select the same account.
+What makes that safe is that the wipe itself is idempotent: the anonymizing
+`UPDATE` is guarded by `deletedAt IS NULL`, so a run that loses the race updates
+zero rows, short-circuits before emitting `USER_DELETED`, and reports success
+without wiping twice.
 
 **Migration note (pull this branch before it ships to `main`).** `sweep_lock`'s
 migration (`0020`) was amended in place to add the `owner` column and switch to
@@ -92,6 +96,15 @@ rather than silently misbehaving in prod.
 | Sweep budget | `SWEEP_DEADLINE_MS` | 90 000 ms | The batched loop inside `POST /internal/sweep-*`, and the per-account loop in `rgpd-sweep`. Checked *between* units of work — a started batch or wipe always finishes, so no transaction is cut short and no account is half-erased. |
 | Server idle timeout | `SERVER_IDLE_TIMEOUT_SECONDS` | 120 | `Bun.serve`. Bun's own default is **10 s** and it applies while the handler runs — measured here: a handler silent for 15 s loses its socket at 10 s, and so does a stream that writes once then waits 25 s. Maximum accepted by Bun: 255. |
 | Client abort | `INTERNAL_FETCH_TIMEOUT_MS` | 150 000 ms | `signedInternalFetch`. A trip means the API is unreachable or wedged; under normal operation the server answers first. |
+
+**The boot-time ordering check only covers the API process.** `INTERNAL_FETCH_TIMEOUT_MS`
+is validated in `apps/api/src/shared/env.ts` but read nowhere in the API — its only
+consumer is `apps/api/src/cron/sweep.ts`, a standalone script that runs as its own
+service (Railway/Fly/K8s CronJob) with its own environment and parses `process.env`
+directly, unchecked against the other two bounds. Raising `SERVER_IDLE_TIMEOUT_SECONDS`
+on the API without also raising `INTERNAL_FETCH_TIMEOUT_MS` on the cron service leaves
+the cron aborting a legitimate long sweep and reporting it `UNREACHABLE` — always raise
+both together.
 
 **`SERVER_IDLE_TIMEOUT_SECONDS` is not only about sweeps.** `GET /notifications/stream`
 heartbeats every 25 s, so any value at or below that drops every SSE connection on

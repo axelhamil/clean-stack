@@ -64,6 +64,7 @@ export interface UserExportPayload {
 export interface ExecuteWipeOutput {
   deletedOrgIds: string[];
   anonymizedEmail: string;
+  alreadyWiped: boolean;
 }
 
 export interface PendingDeletionRow {

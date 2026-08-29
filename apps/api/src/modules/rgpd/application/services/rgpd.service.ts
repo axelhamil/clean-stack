@@ -286,6 +286,7 @@ export class RgpdService {
           const inner = await this.transactions.run(async (trx) => {
             const wipe = await this.rgpd.executeWipe(input.userId, trx);
             if (wipe.isFailure) return wipe;
+            if (wipe.getValue().alreadyWiped) return wipe;
             await emitEvent(
               this.outbox,
               EventTypes.USER_DELETED,
