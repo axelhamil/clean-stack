@@ -16,6 +16,7 @@ type SweepOutput = {
   succeeded: string[];
   failed: Array<{ userId: string; errorCode: string }>;
   dryRun: boolean;
+  truncated: boolean;
 };
 type SweepResult = Result<SweepOutput, { code: string; message: string }>;
 
@@ -25,6 +26,7 @@ const mockedExecute = mock<(...args: unknown[]) => Promise<SweepResult>>(async (
     succeeded: ["u1", "u2"],
     failed: [],
     dryRun: false,
+    truncated: false,
   }),
 );
 
@@ -77,6 +79,7 @@ describe("POST /internal/rgpd-sweep", () => {
         succeeded: ["u1", "u2"],
         failed: [],
         dryRun: false,
+        truncated: false,
       }),
     );
   });
@@ -106,7 +109,11 @@ describe("POST /internal/rgpd-sweep", () => {
         headers,
         body: JSON.stringify(body),
       });
-      expect(mockedExecute).toHaveBeenCalledWith({ batchSize: 25, dryRun: true });
+      expect(mockedExecute).toHaveBeenCalledWith({
+        batchSize: 25,
+        dryRun: true,
+        deadlineMs: env.SWEEP_DEADLINE_MS,
+      });
     });
 
     it("should fall back to the env default batchSize when omitted", async () => {
@@ -120,6 +127,7 @@ describe("POST /internal/rgpd-sweep", () => {
       expect(mockedExecute).toHaveBeenCalledWith({
         batchSize: env.RGPD_SWEEP_BATCH_SIZE,
         dryRun: false,
+        deadlineMs: env.SWEEP_DEADLINE_MS,
       });
     });
   });

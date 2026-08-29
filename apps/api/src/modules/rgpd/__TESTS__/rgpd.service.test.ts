@@ -821,6 +821,63 @@ describe("RgpdService", () => {
       expect(emailMock.sendTemplateBatch).not.toHaveBeenCalled();
     });
 
+    it("stops between wipes once the budget is spent and reports truncated", async () => {
+      // A clock that jumps 60ms per read: deadlineAt = 60 + 100 = 160. The first
+      // in-loop check reads 120 (< 160, wipe runs); the second reads 180 (>= 160,
+      // stop before starting the next wipe) — one account wiped, two deferred.
+      let readCount = 0;
+      const fakeClock = () => {
+        readCount += 1;
+        return readCount * 60;
+      };
+      const repo = makeBatchRepo(pendingRows);
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        noopOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.processPendingDeletions({
+        batchSize: 3,
+        dryRun: false,
+        deadlineMs: 100,
+        now: fakeClock,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      const output = result.getValue();
+      expect(output.succeeded).toHaveLength(1);
+      expect(output.succeeded.length).toBeLessThan(3);
+      expect(output.truncated).toBe(true);
+    });
+
+    it("reports truncated: false when every account finishes inside the budget", async () => {
+      const repo = makeBatchRepo(pendingRows);
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        noopOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.processPendingDeletions({
+        batchSize: 3,
+        dryRun: false,
+        deadlineMs: 100,
+        now: () => 0,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      const output = result.getValue();
+      expect(output.succeeded).toHaveLength(3);
+      expect(output.truncated).toBe(false);
+    });
+
     it("records ACCOUNT_WIPE_PROVIDER_FAILURE when the wipe transaction throws", async () => {
       const badRows: PendingDeletionRow[] = [
         {
