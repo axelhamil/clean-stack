@@ -94,7 +94,7 @@ export class QueuedEmailService implements IEmailService {
           locale: DEFAULT_LOCALE,
           payload: m.body,
           idempotencyKey: options?.idempotencyKey
-            ? Option.some(`${options.idempotencyKey}/${index}`)
+            ? Option.some(`${options.idempotencyKey}#${index}`)
             : Option.none(),
         }));
         return this.enqueue(rows, options?.tx);

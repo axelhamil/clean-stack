@@ -128,4 +128,19 @@ describe("QueuedEmailService", () => {
     ]);
     expect(queue.rows[0]?.idempotencyKey.isNone()).toBe(true);
   });
+
+  it("namespaces the raw batch fallback with # like the template batch", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendRawBatch(
+      [
+        { to: "a@example.com", subject: "S1", body: { text: "1" } },
+        { to: "b@example.com", subject: "S2", body: { text: "2" } },
+      ],
+      { idempotencyKey: "key" },
+    );
+    const rows = queue.rows;
+    expect(rows[0]?.idempotencyKey.unwrap()).toBe("key#0");
+    expect(rows[1]?.idempotencyKey.unwrap()).toBe("key#1");
+  });
 });
