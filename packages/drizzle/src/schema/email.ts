@@ -12,6 +12,7 @@ export const emailMessage = pgTable(
     template: text("template"),
     toAddress: text("to_address").notNull(),
     subject: text("subject").notNull(),
+    locale: text("locale"),
     payload: jsonb("payload").$type<unknown>().notNull(),
     status: text("status", { enum: EMAIL_MESSAGE_STATUSES }).notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),

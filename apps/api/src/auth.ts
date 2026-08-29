@@ -386,6 +386,7 @@ const authOptions = {
       lastExportRequestedAt: { type: "date", required: false, returned: true, input: false },
       deletedAt: { type: "date", required: false, returned: false, input: false },
       pendingEmail: { type: "string", required: false, returned: true, input: false },
+      locale: { type: "string", required: false, returned: true, input: false },
     },
     changeEmail: {
       enabled: true,

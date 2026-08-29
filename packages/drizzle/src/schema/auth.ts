@@ -17,6 +17,7 @@ export const user = pgTable("user", {
   deletedAt: timestamp("deleted_at"),
   lastExportRequestedAt: timestamp("last_export_requested_at"),
   pendingEmail: text("pending_email"),
+  locale: text("locale"),
   stripeCustomerId: text("stripe_customer_id"),
   role: text("role"),
   banned: boolean("banned").default(false),
