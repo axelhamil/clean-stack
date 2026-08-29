@@ -331,7 +331,8 @@ export class RgpdService {
           wipeOutput = inner.getValue();
         } catch (e) {
           const failure = notifyFailure as EmailError | null;
-          if (failure) {
+          const isRollbackSentinel = e instanceof Error && e.message === "rollback";
+          if (isRollbackSentinel && failure) {
             logger.error(
               { userId: input.userId, code: failure.code },
               "account wipe rolled back — deletion confirmation could not be enqueued",

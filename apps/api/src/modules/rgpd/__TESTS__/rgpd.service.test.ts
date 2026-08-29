@@ -503,6 +503,48 @@ describe("RgpdService", () => {
       expect(uowThrew).toBe(true);
     });
 
+    it("reports a generic provider failure and captures the error when the ROLLBACK itself throws", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const failEmail: IEmailService = {
+        ...makeEmail(),
+        sendTemplate: mock(async () =>
+          Result.fail<void, EmailError>({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
+        ),
+      };
+      const brokenTx: IUnitOfWork<never> = {
+        startTransaction: async (cb) => cb({} as never),
+        run: async () => {
+          // Simulates Postgres failing to ROLLBACK (e.g. connection loss) after the
+          // sentinel throw — a different error surfaces from `run`, not "rollback".
+          throw new Error("connection terminated unexpectedly");
+        },
+      };
+      const captured: unknown[] = [];
+      const capturingInstrumentation = new NoOpInstrumentation();
+      capturingInstrumentation.capture = (err: unknown) => {
+        captured.push(err);
+      };
+
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        failEmail,
+        brokenTx,
+        noopOutbox,
+        capturingInstrumentation,
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("ACCOUNT_WIPE_PROVIDER_FAILURE");
+      expect(captured).toHaveLength(1);
+    });
+
     it("emits ORG_DELETED for every organization destroyed in the wipe (RGPD audit completeness)", async () => {
       const repo = makeRepo({
         getUserDeletionState: mock(async () =>
