@@ -14,6 +14,7 @@
  * the per-call fallback covers genuinely unknown errors and network failures.
  */
 
+import { enCatalog } from "@packages/i18n";
 import type { TFunction } from "i18next";
 import type { ApiError } from "./api-error";
 
@@ -31,8 +32,20 @@ const SUFFIXES = [
   "TIMEOUT",
 ] as const;
 
+/**
+ * Every `bySuffix` read passes the English source as `defaultValue`.
+ *
+ * `getErrorsT()` degrades to "return the key" before i18next has booted, so a
+ * lookup with no default renders the literal `bySuffix.INVALID` to the user.
+ * The English catalog is a static import — it is in the bundle either way —
+ * which makes the pre-boot answer a real sentence rather than a debug token.
+ */
+function suffixMessage(suffix: (typeof SUFFIXES)[number], t: TFunction<"errors">): string {
+  return t(`bySuffix.${suffix}` as never, { defaultValue: enCatalog.errors.bySuffix[suffix] });
+}
+
 export function rateLimitedMessage(t: TFunction<"errors">): string {
-  return t("bySuffix.RATE_LIMITED");
+  return suffixMessage("RATE_LIMITED", t);
 }
 
 /**
@@ -44,7 +57,7 @@ export function messageFromCode(code: string, t: TFunction<"errors">): string | 
   const exact = t(`byCode.${code}` as never, { defaultValue: "" });
   if (exact) return exact;
   for (const suffix of SUFFIXES) {
-    if (code.endsWith(`_${suffix}`)) return t(`bySuffix.${suffix}` as never);
+    if (code.endsWith(`_${suffix}`)) return suffixMessage(suffix, t);
   }
   return undefined;
 }
