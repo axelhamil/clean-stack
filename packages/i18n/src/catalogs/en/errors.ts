@@ -8,6 +8,36 @@ export default {
     ACCOUNT_PASSWORD_INVALID: "Invalid password.",
     TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
     TWO_FACTOR_INVALID: "Invalid authenticator code.",
+    // BetterAuth's own `BASE_ERROR_CODES`. They are keyed here rather than
+    // read off `error.message` because the library ships one English string
+    // per code and no translation hook — the code is the only stable,
+    // localisable identifier the client receives.
+    INVALID_EMAIL_OR_PASSWORD: "Invalid email or password.",
+    INVALID_EMAIL: "Enter a valid email address.",
+    INVALID_PASSWORD: "Invalid password.",
+    USER_NOT_FOUND: "No account matches those details.",
+    USER_EMAIL_NOT_FOUND: "No account matches that email address.",
+    USER_ALREADY_EXISTS: "An account already exists for that email address.",
+    USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL:
+      "An account already exists for that email address. Use another one.",
+    EMAIL_NOT_VERIFIED: "Verify your email address before signing in.",
+    EMAIL_ALREADY_VERIFIED: "That email address is already verified.",
+    EMAIL_CAN_NOT_BE_UPDATED: "That email address cannot be used.",
+    EMAIL_MISMATCH: "That email address does not match this request.",
+    PASSWORD_TOO_SHORT: "That password is too short.",
+    PASSWORD_TOO_LONG: "That password is too long.",
+    PASSWORD_ALREADY_SET: "This account already has a password.",
+    USER_ALREADY_HAS_PASSWORD: "Confirm with your existing password.",
+    INVALID_TOKEN: "This link is invalid.",
+    TOKEN_EXPIRED: "This link has expired. Request a new one.",
+    SESSION_EXPIRED: "Your session has expired. Sign in again to continue.",
+    SESSION_NOT_FRESH: "Sign in again to confirm this change.",
+    CREDENTIAL_ACCOUNT_NOT_FOUND:
+      "This account has no password — use the sign-in method you set up.",
+    ACCOUNT_NOT_FOUND: "Account not found.",
+    SOCIAL_ACCOUNT_ALREADY_LINKED: "That account is already linked to another user.",
+    FAILED_TO_CREATE_USER: "We could not create your account. Please try again.",
+    FAILED_TO_CREATE_SESSION: "We could not sign you in. Please try again.",
   },
   bySuffix: {
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
@@ -21,6 +51,14 @@ export default {
     PROVIDER_FAILURE: "Service is temporarily unavailable. Please try again.",
     UNAVAILABLE: "Service is temporarily unavailable. Please try again.",
     TIMEOUT: "Request timed out. Please try again.",
+  },
+  rateLimit: {
+    retryInSeconds_one: "Try again in {{count}} second.",
+    retryInSeconds_other: "Try again in {{count}} seconds.",
+    retryInMinutes_one: "Try again in {{count}} minute.",
+    retryInMinutes_other: "Try again in {{count}} minutes.",
+    retryInHours_one: "Try again in {{count}} hour.",
+    retryInHours_other: "Try again in {{count}} hours.",
   },
   validation: {
     required: "This field is required.",

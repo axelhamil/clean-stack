@@ -49,6 +49,14 @@ describe("toastError", () => {
     expect(toast.error).toHaveBeenCalledOnce();
     expect(toast.error).toHaveBeenCalledWith("Invalid input.");
   });
+
+  it("prefers the caller's localised fallback over the untranslated server message", () => {
+    const err: ApiError = Object.assign(new Error("Something exploded server-side"), {
+      status: 500,
+    });
+    toastError(err, "Impossible de mettre à jour votre langue");
+    expect(toast.error).toHaveBeenCalledWith("Impossible de mettre à jour votre langue");
+  });
 });
 
 describe("toastSuccess", () => {
