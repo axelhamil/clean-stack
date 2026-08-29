@@ -461,7 +461,7 @@ export class RgpdService {
         if (failed.length > 0) logger.warn({ failed }, "rgpd sweep had failures");
 
         return Result.ok({
-          processed: batch.length,
+          processed: succeeded.length + failed.length,
           succeeded,
           failed,
           dryRun: false,

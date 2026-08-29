@@ -852,6 +852,8 @@ describe("RgpdService", () => {
       expect(output.succeeded).toHaveLength(1);
       expect(output.succeeded.length).toBeLessThan(3);
       expect(output.truncated).toBe(true);
+      expect(output.processed).toBe(output.succeeded.length + output.failed.length);
+      expect(output.processed).toBeLessThan(3);
     });
 
     it("reports truncated: false when every account finishes inside the budget", async () => {
