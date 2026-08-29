@@ -39,6 +39,10 @@ jobs:
       APP_URL: http://localhost:4173
       # The guard resolves MX records; leaving it on would make the seed depend on DNS.
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
+      # Single source of truth for the seeded account's email: db:seed (defaults to
+      # this same value) and check:fanout (which looks the user up by SEED_EMAIL)
+      # both read this one var, so they can never drift apart again.
+      SEED_EMAIL: dev@example.com
 
     steps:
       - uses: actions/checkout@v5
@@ -80,10 +84,7 @@ jobs:
         run: pnpm --filter api db:seed
 
       - name: Check fanout preferences against a real database
-        # check-fanout-preferences.ts looks up the seeded user by SEED_EMAIL, so this
-        # must run after seeding and share the same default as the step above.
-        env:
-          SEED_EMAIL: dev@example.com
+        # Must run after seeding: it looks up the SEED_EMAIL user by that email.
         run: pnpm --filter api check:fanout
 
       - name: Cache Playwright browsers
