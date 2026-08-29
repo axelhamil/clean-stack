@@ -1,23 +1,22 @@
-import { isLocale } from "@packages/i18n";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { setLocaleMutationOptions } from "../api/mutations/set-locale";
 import { sessionQueryOptions } from "../api/queries/session";
 import { isImpersonating } from "../auth/is-impersonating";
 import { changeLocale } from "./i18n";
+import { getChosenLocale, reconcileLocale } from "./locale-reconciliation";
+import { useSetLocaleMutation } from "./use-set-locale-mutation";
 
 /**
  * Reconciles the browser-resolved locale with the one on the user record.
  *
- * Server wins when it has a value. When it has none, the resolved locale is
- * persisted once — otherwise a user who never visits their settings keeps a
- * null locale forever and receives English emails while reading a French UI.
+ * The decision itself is `reconcileLocale` — this component only supplies the
+ * inputs and runs the resulting effect.
  */
 export function LocaleSync() {
   const { i18n } = useTranslation();
   const { data: session } = useQuery(sessionQueryOptions);
-  const { mutate } = useMutation(setLocaleMutationOptions);
+  const { mutate } = useSetLocaleMutation();
   const persisted = useRef(false);
 
   const userLocale = session?.user?.locale;
@@ -28,16 +27,18 @@ export function LocaleSync() {
   useEffect(() => {
     if (!userId) return;
 
-    if (isLocale(userLocale)) {
-      if (userLocale !== active) void changeLocale(i18n, userLocale);
-      return;
-    }
+    const decision = reconcileLocale({
+      userLocale,
+      activeLocale: active,
+      chosenLocale: getChosenLocale(),
+      impersonated,
+      alreadyPersisted: persisted.current,
+    });
 
-    if (impersonated) return;
-
-    if (!persisted.current && isLocale(active)) {
+    if (decision.action === "apply") void changeLocale(i18n, decision.locale);
+    if (decision.action === "persist") {
       persisted.current = true;
-      mutate({ locale: active });
+      mutate({ locale: decision.locale });
     }
   }, [userId, userLocale, active, i18n, mutate, impersonated]);
 

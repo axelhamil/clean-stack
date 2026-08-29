@@ -15,25 +15,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
-import { setLocaleMutationOptions } from "../../../shared/api/mutations/set-locale";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { isImpersonating } from "../../../shared/auth/is-impersonating";
 import { changeLocale } from "../../../shared/i18n/i18n";
+import { useSetLocaleMutation } from "../../../shared/i18n/use-set-locale-mutation";
 
 export function LanguageCard() {
   const { t, i18n } = useTranslation(["settings", "common"]);
   const { data: session } = useQuery(sessionQueryOptions);
   const [pending, setPending] = useState<Locale | undefined>();
 
-  const mutation = useMutation({
-    ...setLocaleMutationOptions,
-    onSuccess: async (_data, variables) => {
-      await changeLocale(i18n, variables.locale);
+  const mutation = useSetLocaleMutation({
+    onSaved: async (locale) => {
+      await changeLocale(i18n, locale);
       toast.success(t("language.saved"));
     },
     onError: (err) => toastError(err, t("language.failed")),
