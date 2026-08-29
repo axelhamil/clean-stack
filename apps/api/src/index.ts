@@ -21,6 +21,7 @@ import { healthRoutes } from "./modules/health/routes";
 import { notificationsRoutes } from "./modules/notifications/routes";
 import { organizationSettingsRoutes } from "./modules/organization/routes";
 import { policyRoutes } from "./modules/policies/routes";
+import { profileRoutes } from "./modules/profile/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
@@ -255,6 +256,7 @@ app.route(
 
 const routes = app
   .route("/me", rgpdMeRoutes)
+  .route("/me", profileRoutes)
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
   .route("/admin/users", adminUserRoutes)

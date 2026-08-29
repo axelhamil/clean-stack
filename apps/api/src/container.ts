@@ -9,6 +9,7 @@ import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
 import { notificationsModule } from "./modules/notifications/module";
 import { policyModule } from "./modules/policies/module";
+import { profileModule } from "./modules/profile/module";
 import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
@@ -135,5 +136,6 @@ export const di = container()
   .addModule(quotaModule)
   .addModule(billingModule)
   .addModule(notificationsModule)
+  .addModule(profileModule)
   .add("NotificationStreamHub", () => new NotificationStreamHub(logger, env.DATABASE_URL))
   .build();

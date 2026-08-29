@@ -36,6 +36,7 @@
     "@packages/drizzle": "workspace:*",
     "@packages/emails": "workspace:*",
     "@packages/events": "workspace:*",
+    "@packages/i18n": "workspace:*",
     "@packages/policies": "workspace:*",
     "@sentry/bun": "^10.71.0",
     "@simplewebauthn/server": "^13.3.3",

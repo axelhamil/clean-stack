@@ -98,6 +98,9 @@ importers:
       '@packages/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
