@@ -1,7 +1,8 @@
 import type { Mutation, Query } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ApiError } from "../api/errors/api-error";
-import { RATE_LIMITED_MESSAGE } from "../api/errors/messages";
+import { rateLimitedMessage } from "../api/errors/messages";
+import { getErrorsT } from "../i18n/get-errors-t";
 import { isUnexpectedError, isUnexpectedMutationError } from "./error-classifier";
 import { captureError } from "./sentry";
 
@@ -21,7 +22,7 @@ function formatRetryAfter(seconds: number): string {
 function notifyIfRateLimited(error: unknown): boolean {
   if (errorContext(error).status !== 429) return false;
   const retryAfter = (error as ApiError).metadata?.retryAfter;
-  toast.error(RATE_LIMITED_MESSAGE, {
+  toast.error(rateLimitedMessage(getErrorsT()), {
     id: "rate-limit",
     description:
       typeof retryAfter === "number" ? `Try again in ${formatRetryAfter(retryAfter)}.` : undefined,

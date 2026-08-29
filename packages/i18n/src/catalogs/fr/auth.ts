@@ -14,6 +14,7 @@ export default {
     acceptSeparator: "et les",
     privacyPolicy: "politique de confidentialité",
     termsOfService: "conditions d'utilisation",
+    failed: "L'inscription a échoué",
   },
   twoFactor: {
     invalidCode: "Code invalide",
@@ -21,6 +22,12 @@ export default {
   },
   resetPassword: {
     failed: "La réinitialisation a échoué",
+  },
+  forgotPassword: {
+    failed: "La demande a échoué",
+  },
+  magicLink: {
+    failed: "L'envoi du lien a échoué",
   },
   passkey: {
     failed: "La connexion par clé d'accès a échoué",

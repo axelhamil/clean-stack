@@ -13,6 +13,7 @@ export default {
     acceptSeparator: "and",
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
+    failed: "Sign-up failed",
   },
   twoFactor: {
     invalidCode: "Invalid code",
@@ -20,6 +21,12 @@ export default {
   },
   resetPassword: {
     failed: "Reset failed",
+  },
+  forgotPassword: {
+    failed: "Request failed",
+  },
+  magicLink: {
+    failed: "Failed to send link",
   },
   passkey: {
     failed: "Passkey sign-in failed",

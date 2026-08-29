@@ -1,12 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { TwoFactorInput } from "../../../shared/auth/auth.schema";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { resolveAuthError } from "../auth-error";
 
 export function useVerifyTwoFactor(redirectTo?: string) {
+  const { t } = useTranslation("auth");
+  const { t: tErrors } = useTranslation("errors");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   return useMutation({
@@ -16,7 +20,7 @@ export function useVerifyTwoFactor(redirectTo?: string) {
         code: input.code,
         trustDevice: input.trustDevice,
       });
-      if (error) throw new Error(error.message ?? "Invalid code");
+      if (error) throw new Error(resolveAuthError(error, "twoFactor.invalidCode", t, tErrors));
 
       return data;
     },

@@ -7,7 +7,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { i18n as I18nInstance } from "i18next";
 import { ThemeProvider } from "next-themes";
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import { router } from "../router";
 import { activeOrgQueryOptions } from "./api/queries/active-org";
@@ -19,6 +19,7 @@ import { onAuthChange } from "./auth/auth-broadcast";
 import { AnalyticsScripts } from "./components/analytics-scripts";
 import { CookieBanner } from "./components/cookie-banner";
 import { LocaleSync } from "./i18n/locale-sync";
+import { applyZodErrorMap } from "./i18n/zod-error-map";
 import { ErrorBoundary } from "./observability/sentry";
 import { watchSession } from "./observability/session-watcher";
 
@@ -64,6 +65,7 @@ export function AppProviders({ i18n }: AppProvidersProps) {
               <Toaster richColors closeButton />
               <CookieBanner />
               <LocaleSync />
+              <ZodLocale />
               <AnalyticsScripts />
               {import.meta.env.DEV && (
                 <>
@@ -77,6 +79,14 @@ export function AppProviders({ i18n }: AppProvidersProps) {
       </I18nextProvider>
     </StrictMode>
   );
+}
+
+function ZodLocale() {
+  const { t } = useTranslation("errors");
+  useEffect(() => {
+    applyZodErrorMap(t);
+  }, [t]);
+  return null;
 }
 
 function AppErrorFallback() {

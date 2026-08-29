@@ -1,3 +1,4 @@
+import enCatalog from "@packages/i18n/src/catalogs/en";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner", () => ({
@@ -6,6 +7,19 @@ vi.mock("sonner", () => ({
     success: vi.fn(),
     dismiss: vi.fn(),
   }),
+}));
+
+vi.mock("../../i18n/get-errors-t", () => ({
+  getErrorsT: () =>
+    ((key: string, opts?: { defaultValue?: string }) => {
+      const path = key.replace(/^errors:/, "").split(".");
+      let node: unknown = enCatalog.errors;
+      for (const seg of path) {
+        if (typeof node !== "object" || node === null) return opts?.defaultValue ?? key;
+        node = (node as Record<string, unknown>)[seg];
+      }
+      return typeof node === "string" ? node : (opts?.defaultValue ?? key);
+    }) as never,
 }));
 
 import { toast } from "sonner";

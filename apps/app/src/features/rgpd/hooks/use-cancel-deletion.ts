@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { formatApiError } from "../../../shared/api/errors/messages";
 import { cancelAccountDeletionMutationOptions } from "../../../shared/api/mutations/cancel-account-deletion";
@@ -6,6 +7,7 @@ import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 
 export function useCancelDeletion() {
+  const { t } = useTranslation("errors");
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -16,6 +18,6 @@ export function useCancelDeletion() {
       toast.success("Account deletion cancelled.");
     },
     onError: (err) =>
-      toast.error(formatApiError(err, "Couldn't cancel deletion. Please try again.")),
+      toast.error(formatApiError(err, "Couldn't cancel deletion. Please try again.", t)),
   });
 }

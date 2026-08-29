@@ -7,6 +7,7 @@ import {
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import {
@@ -19,6 +20,7 @@ interface RequestDeletionPasswordFormProps {
 }
 
 export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPasswordFormProps) {
+  const { t } = useTranslation("errors");
   const mutation = useRequestDeletion({ onClose });
   const form = useForm<RequestDeletionWithPasswordInput>({
     resolver: zodResolver(requestDeletionWithPasswordSchema),
@@ -30,8 +32,11 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
       <form
         onSubmit={form.handleSubmit((values) =>
           mutation.mutate(values, {
-            onError: buildDeletionOnError(onClose, "ACCOUNT_PASSWORD_INVALID", (msg) =>
-              form.setError("password", { message: msg }),
+            onError: buildDeletionOnError(
+              onClose,
+              "ACCOUNT_PASSWORD_INVALID",
+              (msg) => form.setError("password", { message: msg }),
+              t,
             ),
           }),
         )}

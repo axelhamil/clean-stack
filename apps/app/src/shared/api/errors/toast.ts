@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { getErrorsT } from "../../i18n/get-errors-t";
 import type { ApiError } from "./api-error";
 import { formatApiError } from "./messages";
 
@@ -17,7 +18,7 @@ function rawMessage(err: unknown): string | undefined {
 
 export function toastError(err: unknown, fallback: string): void {
   if ((err as ApiError)?.status === 429) return;
-  toast.error(formatApiError(err, rawMessage(err) ?? fallback));
+  toast.error(formatApiError(err, rawMessage(err) ?? fallback, getErrorsT()));
 }
 
 export function toastSuccess(message: string): void {

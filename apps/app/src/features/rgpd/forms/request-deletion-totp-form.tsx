@@ -7,6 +7,7 @@ import {
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import { type RequestDeletionWithTotpInput, requestDeletionWithTotpSchema } from "../rgpd.schema";
@@ -16,6 +17,7 @@ interface RequestDeletionTotpFormProps {
 }
 
 export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProps) {
+  const { t } = useTranslation("errors");
   const mutation = useRequestDeletion({ onClose });
   const form = useForm<RequestDeletionWithTotpInput>({
     resolver: zodResolver(requestDeletionWithTotpSchema),
@@ -27,8 +29,11 @@ export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProp
       <form
         onSubmit={form.handleSubmit((values) =>
           mutation.mutate(values, {
-            onError: buildDeletionOnError(onClose, "TWO_FACTOR_INVALID", (msg) =>
-              form.setError("totpCode", { message: msg }),
+            onError: buildDeletionOnError(
+              onClose,
+              "TWO_FACTOR_INVALID",
+              (msg) => form.setError("totpCode", { message: msg }),
+              t,
             ),
           }),
         )}

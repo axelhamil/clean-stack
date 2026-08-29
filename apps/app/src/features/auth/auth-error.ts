@@ -1,4 +1,5 @@
-import { RATE_LIMITED_MESSAGE } from "../../shared/api/errors/messages";
+import type { TFunction } from "i18next";
+import { rateLimitedMessage } from "../../shared/api/errors/messages";
 import { authClient } from "../../shared/auth/auth-client";
 
 interface BetterAuthError {
@@ -10,9 +11,23 @@ interface BetterAuthError {
 
 export const SSO_REDIRECT_IN_PROGRESS = "sso-redirect-in-progress";
 
-export function resolveAuthError(error: BetterAuthError, fallback: string): string {
-  if (error.status === 429) return RATE_LIMITED_MESSAGE;
-  return error.message ?? fallback;
+/**
+ * BetterAuth errors stop surfacing the raw server string and go through the
+ * same code-keyed `errors` catalog as the API errors, so there is one
+ * translation store rather than two.
+ */
+export function resolveAuthError(
+  error: BetterAuthError,
+  fallbackKey: string,
+  t: TFunction<"auth">,
+  tErrors: TFunction<"errors">,
+): string {
+  if (error.status === 429) return rateLimitedMessage(tErrors);
+  if (error.code) {
+    const mapped = tErrors(`byCode.${error.code}` as never, { defaultValue: "" });
+    if (mapped) return mapped;
+  }
+  return t(fallbackKey as never);
 }
 
 /**

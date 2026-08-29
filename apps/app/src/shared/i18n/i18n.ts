@@ -19,12 +19,26 @@ function syncDocumentLang(locale: string): void {
   if (typeof document !== "undefined") document.documentElement.lang = locale;
 }
 
+let activeInstance: I18nInstance | undefined;
+
+/**
+ * Read-only access to the booted i18next instance for code that cannot use
+ * `useTranslation` — the global `QueryCache`/`MutationCache` error handlers
+ * (`observability/query-error-handler.ts`) and `toast.ts` run outside the
+ * React tree entirely. `undefined` before `initI18n()` resolves (tests,
+ * SSR); callers fall back to an untranslated default in that case.
+ */
+export function getI18n(): I18nInstance | undefined {
+  return activeInstance;
+}
+
 async function bootInstance(locale: Locale): Promise<I18nInstance> {
   const resources = await loadCatalog(locale);
   const instance = await createI18n({ locale, resources });
 
   syncDocumentLang(locale);
   instance.on("languageChanged", syncDocumentLang);
+  activeInstance = instance;
 
   return instance;
 }
