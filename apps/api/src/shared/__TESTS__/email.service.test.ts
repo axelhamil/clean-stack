@@ -10,7 +10,7 @@ function fakeQueue() {
     rows,
     enqueue: async (batch: EmailMessageInsert[]) => {
       rows.push(...batch);
-      return Result.ok<void, never>(undefined);
+      return Result.ok<{ written: number }, never>({ written: batch.length });
     },
     claimPending: async () => Result.ok([]),
     markSent: async () => Result.ok<void, never>(undefined),

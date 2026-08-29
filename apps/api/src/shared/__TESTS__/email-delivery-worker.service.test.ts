@@ -133,7 +133,7 @@ function harness(rows: EmailMessageRecord[]) {
 
   const sentProviderIds: Record<string, string>[] = [];
   const queue = {
-    enqueue: async () => Result.ok<void, never>(undefined),
+    enqueue: async () => Result.ok<{ written: number }, never>({ written: 0 }),
     claimPending: async () => Result.ok(rows.splice(0, rows.length)),
     markSent: async (ids: string[], _at: Date, providerIds: Record<string, string>) => {
       sent.push(ids);

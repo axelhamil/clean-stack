@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
 
 const inserted: unknown[] = [];
@@ -134,6 +134,10 @@ const rowFixture = (to: string) => ({
 });
 
 describe("DrizzleEmailQueue.enqueue", () => {
+  beforeEach(() => {
+    insertReturns = null;
+  });
+
   it("assigns an id and pending status to every row", async () => {
     const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
     const result = await queue.enqueue([
@@ -148,9 +152,17 @@ describe("DrizzleEmailQueue.enqueue", () => {
       },
     ]);
     expect(result.isSuccess).toBe(true);
+    expect(result.isSuccess && result.getValue().written).toBe(1);
     expect(inserted).toHaveLength(1);
     expect((inserted[0] as { status: string }).status).toBe("pending");
     expect((inserted[0] as { id: string }).id).toBeTruthy();
+  });
+
+  it("reports written: 0 for an empty batch", async () => {
+    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const result = await queue.enqueue([]);
+    expect(result.isSuccess).toBe(true);
+    expect(result.isSuccess && result.getValue().written).toBe(0);
   });
 
   it("returns a failure Result instead of throwing when the insert rejects", async () => {
@@ -191,7 +203,7 @@ describe("DrizzleEmailQueue.enqueue", () => {
     const result = await queue.enqueue([rowFixture("a@x.test"), rowFixture("b@x.test")]);
 
     expect(result.isSuccess).toBe(true);
-    insertReturns = null;
+    expect(result.isSuccess && result.getValue().written).toBe(1);
   });
 
   it("warns when fewer rows are written than requested", async () => {
@@ -204,7 +216,6 @@ describe("DrizzleEmailQueue.enqueue", () => {
     ]);
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    insertReturns = null;
   });
 });
 

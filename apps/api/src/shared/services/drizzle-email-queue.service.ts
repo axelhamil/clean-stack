@@ -17,10 +17,10 @@ export class DrizzleEmailQueue implements IEmailQueue {
   async enqueue(
     rows: EmailMessageInsert[],
     tx?: ITransaction,
-  ): Promise<Result<void, EmailQueueError>> {
+  ): Promise<Result<{ written: number }, EmailQueueError>> {
     const exec = tx ?? db;
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > enqueue" }, async () => {
-      if (rows.length === 0) return Result.ok<void, EmailQueueError>(undefined);
+      if (rows.length === 0) return Result.ok<{ written: number }, EmailQueueError>({ written: 0 });
       try {
         const values = rows.map((r) => ({
           id: uuidv7(),
@@ -54,7 +54,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
             "email enqueue suppressed duplicate rows — idempotency keys already present",
           );
         }
-        return Result.ok<void, EmailQueueError>(undefined);
+        return Result.ok<{ written: number }, EmailQueueError>({ written: written.length });
       } catch (err) {
         this.instrumentation.capture(err);
         return Result.fail({
