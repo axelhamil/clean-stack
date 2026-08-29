@@ -18,6 +18,7 @@ import { queryClient } from "./api/query-client";
 import { onAuthChange } from "./auth/auth-broadcast";
 import { AnalyticsScripts } from "./components/analytics-scripts";
 import { CookieBanner } from "./components/cookie-banner";
+import { LocaleSync } from "./i18n/locale-sync";
 import { ErrorBoundary } from "./observability/sentry";
 import { watchSession } from "./observability/session-watcher";
 
@@ -62,6 +63,7 @@ export function AppProviders({ i18n }: AppProvidersProps) {
               <RouterProvider router={router} />
               <Toaster richColors closeButton />
               <CookieBanner />
+              <LocaleSync />
               <AnalyticsScripts />
               {import.meta.env.DEV && (
                 <>

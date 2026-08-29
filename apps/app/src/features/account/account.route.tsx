@@ -6,6 +6,7 @@ import { PasskeysCard } from "../security/components/passkeys-card";
 import { RecoveryCodesCard } from "../security/components/recovery-codes-card";
 import { TwoFactorCard } from "../security/components/two-factor-card";
 import { ChangePasswordCard } from "./components/change-password-card";
+import { LanguageCard } from "./components/language-card";
 import { ProfileCard } from "./components/profile-card";
 
 export const Route = createFileRoute("/_protected/_shell/settings/account")({
@@ -19,6 +20,7 @@ function AccountPage() {
     <main className="flex flex-col gap-6">
       <TypographyH1 className="sr-only">Account settings</TypographyH1>
       <ProfileCard name={user.name ?? ""} email={user.email} pendingEmail={user.pendingEmail} />
+      <LanguageCard />
       <ChangePasswordCard />
       <PasskeysCard />
       <TwoFactorCard enabled={user.twoFactorEnabled === true} />
