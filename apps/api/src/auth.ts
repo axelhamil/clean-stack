@@ -8,7 +8,7 @@ import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "@packages/i18n";
+import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -418,7 +418,7 @@ const authOptions = {
           user.email,
           { name: user.name ?? "", newEmail, confirmUrl: url },
           tokenIdempotencyKey("change-email", token),
-          isLocale(userLocale) ? userLocale : DEFAULT_LOCALE,
+          toLocale(userLocale),
         );
       },
     },
@@ -442,7 +442,7 @@ const authOptions = {
         user.email,
         { name: user.name ?? "", resetUrl },
         tokenIdempotencyKey("reset-password", token),
-        isLocale(userLocale) ? userLocale : DEFAULT_LOCALE,
+        toLocale(userLocale),
       );
     },
     onPasswordReset: async ({ user }) => {
@@ -462,7 +462,7 @@ const authOptions = {
         user.email,
         { name: user.name ?? "", verifyUrl },
         tokenIdempotencyKey("verify-email", token),
-        isLocale(userLocale) ? userLocale : DEFAULT_LOCALE,
+        toLocale(userLocale),
       );
     },
   },
@@ -764,6 +764,8 @@ const authOptions = {
       },
       sendInvitationEmail: async ({ id, email, role, inviter, organization: org }) => {
         const inviteUrl = `${env.APP_URL}/accept-invitation/${id}`;
+        // Rendered in the inviter's locale, not the invitee's: an invitee with
+        // no account yet has no locale of their own to read.
         const inviterLocale = (inviter.user as { locale?: unknown }).locale;
         await dispatchEmail(
           "org_invitation",
@@ -775,7 +777,7 @@ const authOptions = {
             inviteUrl,
           },
           tokenIdempotencyKey("org-invitation", id),
-          isLocale(inviterLocale) ? inviterLocale : DEFAULT_LOCALE,
+          toLocale(inviterLocale),
         );
       },
     }),

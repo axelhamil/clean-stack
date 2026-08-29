@@ -2,8 +2,8 @@ import { Option, Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { isLocale, type Locale } from "@packages/i18n";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { IProfileStore, ProfileError } from "../../../../shared/ports/profile.port";
 import type { ITransaction } from "../../../../shared/transaction";
-import type { IProfileStore, ProfileError } from "../../application/ports/profile.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 

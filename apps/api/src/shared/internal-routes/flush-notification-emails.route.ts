@@ -12,7 +12,7 @@ import {
   notificationSchema,
   sql,
 } from "@packages/drizzle";
-import { DEFAULT_LOCALE, isLocale } from "@packages/i18n";
+import { toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
@@ -135,7 +135,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
             itemCount: String(d.items.length),
             itemsSummary: d.items.map((i) => i.eventType).join(", "),
           },
-          locale: isLocale(d.locale) ? d.locale : DEFAULT_LOCALE,
+          locale: toLocale(d.locale),
         })),
         {
           tx: tx as unknown as import("../transaction").ITransaction,

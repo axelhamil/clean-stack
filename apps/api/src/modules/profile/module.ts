@@ -1,5 +1,5 @@
 import { defineModule } from "inwire";
-import type { IProfileStore } from "./application/ports/profile.port";
+import type { IProfileStore } from "../../shared/ports/profile.port";
 import { DrizzleProfileStore } from "./infrastructure/repositories/drizzle-profile.store";
 
 declare module "inwire" {

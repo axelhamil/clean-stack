@@ -3,8 +3,8 @@ import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
 import { z } from "zod";
-import type { IProfileStore } from "../../modules/profile/application/ports/profile.port";
 import type { IEmailService } from "../ports/email.port";
+import type { IProfileStore } from "../ports/profile.port";
 
 // mock.module leaks across files: drizzle-outbox.service.test.ts stubs EVERY
 // @packages/events payload schema with `{ safeParse: () => ({ success: true, data: {} }) }`.
