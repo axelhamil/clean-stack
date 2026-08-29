@@ -68,19 +68,28 @@ for (const path of sweeps) {
   try {
     body = await res.text();
   } catch (err) {
+    // A body-read failure mid-transfer, unlike the fetch call itself throwing above,
+    // means the API answered and the socket dropped afterward — evidence of a flaky
+    // transfer for this one route, not that the API is down. Accumulate and move on
+    // so it cannot starve the routes after it either.
     console.error(
       `[sweep] TRUNCATED BODY ${path} after ${Date.now() - started}ms: ${
         err instanceof Error ? err.message : String(err)
       }`,
     );
-    process.exit(1);
+    anyFailure = true;
+    continue;
   }
 
   if (!res.ok) {
+    // A non-2xx response (most often the bare-`throw` default for a route with no
+    // onBatchError, turned into a 500 by the error middleware) must not starve every
+    // sweep after it — that is exactly the failure mode this branch exists to remove.
     console.error(
       `[sweep] FAIL ${path} → ${res.status} in ${Date.now() - started}ms: ${body.slice(0, 500)}`,
     );
-    process.exit(1);
+    anyFailure = true;
+    continue;
   }
 
   const elapsed = Date.now() - started;
@@ -93,9 +102,12 @@ for (const path of sweeps) {
     parsed = JSON.parse(body);
   } catch {
     // Substring-matching JSON would misread a reordered or reformatted body; a body
-    // that will not parse at all is itself the anomaly worth reporting.
+    // that will not parse at all is itself the anomaly worth reporting. Same reasoning
+    // as FAIL/TRUNCATED BODY: the API answered, so this is this route's problem, not
+    // proof the rest will fail identically.
     console.error(`[sweep] UNPARSEABLE ${path} in ${elapsed}ms: ${body.slice(0, 500)}`);
-    process.exit(1);
+    anyFailure = true;
+    continue;
   }
 
   const classification = classifySweepResult(parsed);
