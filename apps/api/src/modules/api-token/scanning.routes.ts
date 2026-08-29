@@ -1,6 +1,6 @@
 import type { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "@packages/i18n";
+import { type Locale, toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { hmacToken, parseToken } from "../../shared/crypto/api-token";
@@ -126,7 +126,7 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
 
           const user = await deps.findUserById(record.userId);
           if (user) {
-            const locale = isLocale(user.locale) ? user.locale : DEFAULT_LOCALE;
+            const locale = toLocale(user.locale);
             const sent = await deps.emailService.sendTemplate(
               "api_token_leaked",
               user.email,
