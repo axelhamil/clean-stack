@@ -12,6 +12,16 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 - Estimates assume the dev knows the libraries. The price is for **integrating + architecting + testing + documenting**, not for learning BetterAuth.
 - Single fourchette per module, not low/high consultancy. Lower bound = experienced solo dev shipping fast. Upper bound = same dev being thorough on tests + docs.
 
+## Primary keys for new tables
+
+Postgres 18 (`docker-compose.yaml`) ships a native `uuidv7()` — time-ordered, so insert-heavy tables avoid the B-tree hotspot/write-amplification of random `uuidv4()` while staying globally unique. For **any new application table owned by the cloner**, default the primary key to it:
+
+```ts
+uuid("id").primaryKey().default(sql`uuidv7()`)
+```
+
+**Every existing table stays `text("id").primaryKey()`** — every PK in `packages/drizzle/src/schema/` is filled by BetterAuth, which generates its own ids on its own schema. Converting those is a BetterAuth question, not a Postgres one, and is deliberately out of scope here.
+
 ---
 
 ## Shipped modules — value already in the box (v2.0+)
@@ -29,8 +39,8 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Audit log** (append-only, SOC2 §CC7.2 / ISO 27001, retention enum operational 90d / compliance 365d, env-driven sweep `/internal/sweep-audit-log`, GET /admin/audit-log gated requireOrgPermission, idempotent via outbox subscriber, prev_hash/hash columns posées pour tamper-evidence future) | **€1 500 – €2 500** | 3-4j |
 | **Outbound webhooks** (CRUD endpoints /settings/webhooks gated requireOrgPermission, plaintext secret retourné une seule fois at creation, HMAC-SHA256 Stripe-style, AEAD-encrypted secrets via @noble/ciphers XChaCha20-Poly1305 + HKDF per-org, retry decorrelated jitter, dead-letter, replay endpoint, idempotency keys) | **€2 500 – €3 500** | 5-6j |
 | **UI shadcn-pure + theme** (full registry + custom primitives `NavLink`, `ListRow`, `FormTextField`, `DestructiveActionDialog`, `BackupCodeList`, `QrCodeFrame`, `BrandLink`, `TextLink` + view-transitions theme toggle + typography exports) | **€600 – €1 200** | 2j |
-| **App shell** (Vite + React 19 + TanStack Router code-based with `lazyRouteComponent` 2-file pattern + intent prefetch + view transitions + AppProviders + 4 pathless gates + settings layout + command palette ⌘K + org switcher + auth devtool) | **€1 500 – €2 500** | 3-4j |
-| **Monorepo tooling** (pnpm 10 + Turborepo TUI with `with: ["type-check"]` + Biome 2 + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push) | **€600 – €1 000** | 2j |
+| **App shell** (Vite + React 19 + TanStack Router file-based via `virtualRouteConfig` + `autoCodeSplitting` + intent prefetch + view transitions + AppProviders + 4 pathless gates + settings layout + command palette ⌘K + org switcher + auth devtool) | **€1 500 – €2 500** | 3-4j |
+| **Monorepo tooling** (pnpm 11 + Turborepo TUI with `with: ["type-check"]` + Biome 2 + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push) | **€600 – €1 000** | 2j |
 | **AI-pair ready** (`CLAUDE.md` root + sub-CLAUDE.md per layer auto-loaded by Claude Code + `docs/HISTORY.md` + `docs/CRON.md` + `docs/INTEGRATIONS.md` + `docs/FEATURES.md` + `docs/OVERVIEW.md`) | **€300 – €600** | 1j |
 | **Health probes** (0.2) (`/livez` + `/readyz` + `/startupz` IETF format, registry pattern, graceful shutdown, asymmetric cache) | **€500 – €900** | 1-2j |
 | **Backups + DR** (0.3) (daily `pg_dump` cron, R2 lifecycle 30d/1y cold, monthly automated restore-test, RPO/RTO doc, PITR doc) | **€1 000 – €1 800** | 2-3j |

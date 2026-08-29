@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const updateEndpointBodySchema = z
   .object({
-    url: z.string().url().optional(),
+    url: z.url().optional(),
     eventTypes: z
       .array(z.string())
       .min(1)

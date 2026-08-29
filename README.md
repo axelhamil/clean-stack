@@ -21,7 +21,7 @@ Two ways to run it. Pick one.
 
 ### Option A — Native (fastest hot reload)
 
-**Prerequisites** — [Bun 1.3+](https://bun.com/docs/installation), [Node 24+](https://nodejs.org), [pnpm 10](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
+**Prerequisites** — [Bun 1.4+](https://bun.com/docs/installation), [Node 24.20+](https://nodejs.org), [pnpm 11](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
 git clone https://github.com/axelhamil/clean-stack my-saas
@@ -78,7 +78,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **67 typed events** auto-emitted on every state change (28 public + 39 internal), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter) — operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
-| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
+| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
 | **AI-pair ready** | `CLAUDE.md` at the root + per-layer sub-`CLAUDE.md`. Your agent already knows the rules — Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
 | **Zero-warning pipeline** | Husky + lint-staged + commitlint + pre-push CI (Biome, knip, jscpd, type-check). Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
 
@@ -135,12 +135,12 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - DDD-kit (`@packages/ddd-kit`) — `Result` / `Option`, `Entity` / `Aggregate` / `ValueObject` (zod-validated) / `UUID` / `DomainEvent`, `BaseRepository` / `ScopedRepository` / `IUnitOfWork`
 - Vertical-slice modular monolith — `modules/<context>/{domain,application,infrastructure}` + per-feature front slices
 - CQRS (commands via use-cases, queries direct to Drizzle) · inwire DI (type-inference container, no declared interfaces)
-- Drizzle + Postgres 17 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
+- Drizzle + Postgres 18 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
 
 **Frontend & UI**
 - App shell — sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
-- TanStack Router code-based 2-file pattern (`route` + lazy `page`) — no codegen, no `routeTree.gen.ts`, near-zero TanStack Start migration
-- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~588 KB, route chunks 1–43 KB)
+- TanStack Router file-based routing (`routes.ts` virtual config → generated, versioned `routeTree.gen.ts`) with a 2-file feature pattern (`route` + lazy component), near-zero TanStack Start migration
+- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~355 KB, route chunks 1–43 KB)
 - TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
 - shadcn-pure UI kit (`@packages/ui`) — typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
 
@@ -169,16 +169,18 @@ Cut and not returning: marketing site, status page + SLO dashboards, SOC2 checkl
 
 What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
 
-### Database — Postgres 17
+### Database — Postgres 18
 
 | | |
 |---|---|
-| **Image** | [`postgres:17-alpine`](https://hub.docker.com/_/postgres) |
+| **Image** | [`postgres:18-alpine`](https://hub.docker.com/_/postgres) |
 | **Host port** | `5433` (deliberately not the default `5432` — avoids collision with a system Postgres) |
 | **In-network** | `postgres:5432` (used by the api container) |
-| **Volume** | `postgres_data` (persistent across `compose down`) |
+| **Volume** | `postgres_data` (persistent across `compose down` — **not** across a Postgres major bump, see below) |
 | **Healthcheck** | `pg_isready` every 5 s — api waits for healthy before starting |
 | **Schema** | [Drizzle ORM](https://orm.drizzle.team) — sources in `packages/drizzle/src/schema/` |
+
+> **Action required if you already had `postgres_data` populated before this branch**: the volume mount moved from `/var/lib/postgresql/data` to `/var/lib/postgresql` (Postgres 18+ images store `PGDATA` in a major-version-specific subdirectory — [docker-library/postgres#1259](https://github.com/docker-library/postgres/pull/1259)). An existing volume won't crash on `docker compose up` — it will **silently reinitialize as an empty database**, since the image finds nothing at the new mount point and just creates a fresh one. Run `docker volume rm clean-stack_postgres_data` once before the first `up` on this branch, then rebuild dev data with `pnpm db:push && pnpm db:seed`.
 
 ```bash
 pnpm db:push            # dev — push schema directly (drizzle-kit push --force, non-TTY safe)
@@ -258,7 +260,7 @@ Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `app
 
 | Service | Image | Port (host) | Profile | Persistent volume |
 |---|---|---|---|---|
-| `postgres` | `postgres:17-alpine` | `5433` | default | `postgres_data` |
+| `postgres` | `postgres:18-alpine` | `5433` | default | `postgres_data` |
 | `api` | built (`apps/api/dev.Dockerfile`) | `3000` | default | — |
 | `app` | built (`apps/app/dev.Dockerfile`) | `5173` | default | — |
 | `seaweedfs` | `chrislusf/seaweedfs` | `8333` | `storage` | `seaweedfs_data` |
@@ -312,10 +314,10 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Auth** | BetterAuth + `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
 | **Email** | Resend (typed templates, idempotency, provider-side suppression) |
 | **Storage** | Cloudflare R2 prod · SeaweedFS dev (S3-compatible, opt-in) |
-| **DB** | Drizzle ORM + Postgres 17 |
+| **DB** | Drizzle ORM + Postgres 18 |
 | **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
-| **Tooling** | pnpm 10 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 11 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
 ---
 

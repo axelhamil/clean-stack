@@ -35,7 +35,7 @@ Caddy injects the nonce via `{http.request.uuid}` into `<meta property="csp-nonc
 
 `shared/auth/auth-client.ts`: one `createAuthClient` with same plugin set as server; sessions via TanStack Query, not auth-lib nanostore.
 
-## Route gates (in `router/layouts.tsx` + `router.tsx`)
+## Route gates (in `apps/app/src/router/*.tsx`, wired via `apps/app/routes.ts`)
 
 Auth state enforced by **layout routes with `id` (no path)** — `_guest`, `_protected`, `_shell`, `_org-scope`. Each owns its `beforeLoad`. Children inherit via `addChildren`. The `_` prefix marks "no path contribution". Naming by access *condition*, not feature — avoid `_auth` (ambiguous).
 
@@ -49,7 +49,7 @@ Auth state enforced by **layout routes with `id` (no path)** — `_guest`, `_pro
 
 **Per-route capability gates use `ensureOrgPermission(...)`, not nested pathless layouts.** One pathless `_org-scope` gates "active org required"; capabilities live per-route in `beforeLoad`. **Why**: stacking `_org-admin`/`_org-owner`/`_can-manage-billing` forces every tier into the directory tree. Customize via `ensureOrgPermission(perms, { redirectTo })`.
 
-**Don't static-import the route binding from a page file** (`import { xxxRoute } from "./xxx.route"`) — creates a cycle Biome flags. Pages access route via `getRouteApi("/path/id")`.
+**The route file's page component must stay internal, never exported** (`function <Name>Page() { ... }`, not `export function`) — route and page now share one module (`<name>.route.tsx`), and `autoCodeSplitting` only chunks a component it can see is local to that file. Exporting it re-attaches the page to the static import graph and the chunk silently merges back into the main bundle. Access route state through the `Route` binding directly (`Route.useSearch()`, `Route.useParams()`, `Route.useRouteContext()`), not `getRouteApi`.
 
 ## Authorization (capability-based, front)
 

@@ -64,6 +64,10 @@ Add the Postgres add-on (managed, includes PITR on Pro):
 railway add --database postgres-ssl
 ```
 
+> Requires Postgres 18 or newer (matching `docker-compose.yaml`). Railway's
+> `postgres-ssl` plugin provisions a current major; verify with
+> `railway run psql -c 'select version()'` after the first deploy.
+
 Set the region to `europe-west4` (Amsterdam) via the dashboard for RGPD compliance: **Settings → Region**.
 
 The add-on exposes `${{Postgres.DATABASE_URL}}` to other services — never copy the URL by value.

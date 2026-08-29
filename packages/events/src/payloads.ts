@@ -3,7 +3,7 @@ import { EventTypes } from "./event-types";
 
 const UserRef = z.object({ userId: z.string() });
 const OrgRef = z.object({ organizationId: z.string() });
-const Email = z.string().email();
+const Email = z.email();
 
 export const UserCreatedPayload = UserRef.extend({
   email: Email,
@@ -99,7 +99,7 @@ export const UserProfileUpdatedPayload = UserRef.extend({
 export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
 
 export const UserEmailChangeRequestedPayload = UserRef.extend({
-  newEmail: z.string().email(),
+  newEmail: z.email(),
 });
 export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
 
@@ -190,7 +190,7 @@ export type UploadDeletedPayload = z.infer<typeof UploadDeletedPayload>;
 export const WebhookEndpointCreatedPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
-  url: z.string().url(),
+  url: z.url(),
   eventTypes: z.array(z.string()),
   enabled: z.boolean(),
 });

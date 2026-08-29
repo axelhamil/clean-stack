@@ -1,8 +1,10 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { rootRoute } from "../../router/layouts";
+import { createFileRoute } from "@tanstack/react-router";
+import { PolicyDocView } from "./policy-doc-view";
 
-export const privacyPolicyRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "legal/privacy-policy",
-  component: lazyRouteComponent(() => import("./privacy-policy.page"), "PrivacyPolicyPage"),
+export const Route = createFileRoute("/legal/privacy-policy")({
+  component: PrivacyPolicyPage,
 });
+
+function PrivacyPolicyPage() {
+  return <PolicyDocView type="privacy" />;
+}

@@ -1,11 +1,11 @@
-FROM node:24.15.0-alpine AS pruner
+FROM node:24.20.0-alpine AS pruner
 WORKDIR /repo
 COPY . .
 RUN npx -y turbo@2.9.6 prune api --docker
 
-FROM oven/bun:1.3.6-alpine AS runner
+FROM oven/bun:1.4.0-alpine AS runner
 RUN apk add --no-cache wget nodejs npm
-RUN npm install -g pnpm@10.33.2
+RUN npm install -g pnpm@11.24.0
 
 WORKDIR /repo
 

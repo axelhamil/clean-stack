@@ -133,7 +133,7 @@ The app provides a public `/pricing` page (plan grid fed from the live Stripe ca
 
 - An **app shell** — sticky navigation, organization switcher, theme toggle, user menu, and a ⌘K command palette that navigates, switches org, changes theme, and only shows what the current user is allowed to reach
 - Complete **account, organization, and privacy screens** — profile with avatar upload, password change, passkey management, 2FA setup with recovery codes, member invitations and role management, ownership transfer, contextual danger zones (delete-account at the bottom of the Account page; org leave/delete at the bottom of the Organization page), and a `/settings/privacy` hub for active-session revoke, data export, consent management, policy acceptance status, and sub-processor disclosure
-- **Vite + React 19 + TanStack Router/Query** with a two-file route pattern and no code-generation step
+- **Vite + React 19 + TanStack Router/Query** with file-based routing (a single `routes.ts` virtual config generating a versioned `routeTree.gen.ts`) and a two-file feature pattern (`route` + lazy component)
 - **Route-level code-splitting** with hover-intent preloading, so navigation feels immediate
 - Forms on **React Hook Form + Zod**, a **shadcn/ui** component kit (base primitives plus purpose-built ones like a reveal-toggle password field and a typed-confirmation destructive dialog), system-aware theming with an animated view-transition, and toast notifications with a live countdown on rate-limit errors
 
