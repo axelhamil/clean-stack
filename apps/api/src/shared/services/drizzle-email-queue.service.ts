@@ -95,7 +95,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
             rows.map((r) => ({
               ...r,
               template: Option.fromNullable(r.template),
-              locale: isLocale(r.locale) ? r.locale : null,
+              locale: Option.fromNullable(isLocale(r.locale) ? r.locale : null),
               nextAttemptAt: Option.fromNullable(r.nextAttemptAt),
               lastError: Option.fromNullable(r.lastError),
               idempotencyKey: Option.fromNullable(r.idempotencyKey),

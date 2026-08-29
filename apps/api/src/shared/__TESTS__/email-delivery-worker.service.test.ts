@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
 
 mock.module("@packages/drizzle", () => ({
@@ -108,7 +109,7 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
   template: Option.some("delete_completed"),
   toAddress: "a@x.test",
   subject: "s",
-  locale: null,
+  locale: Option.none<Locale>(),
   payload: { name: "Ada" },
   status: "pending",
   attempts: 0,

@@ -217,7 +217,7 @@ export class EmailDeliveryWorker {
     const rendered = await renderTemplate(
       templateName as EmailTemplateKey,
       rowRecord.payload as never,
-      rowRecord.locale ?? DEFAULT_LOCALE,
+      rowRecord.locale.toUndefined() ?? DEFAULT_LOCALE,
     );
     return { ...base, html: rendered.html, text: rendered.text };
   }

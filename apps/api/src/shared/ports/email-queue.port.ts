@@ -21,7 +21,7 @@ export interface EmailMessageRecord {
   template: Option<string>;
   toAddress: string;
   subject: string;
-  locale: Locale | null;
+  locale: Option<Locale>;
   payload: unknown;
   status: EmailMessageStatus;
   attempts: number;
