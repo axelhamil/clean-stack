@@ -113,6 +113,17 @@ export class QueuedEmailService implements IEmailService {
         message: result.getError().message,
       });
     }
+    const { written } = result.getValue();
+    if (rows.length > 0 && written === 0) {
+      // Every row was suppressed (idempotency conflict on all of them). A 0-of-N write is
+      // indistinguishable from success to the caller unless we surface it — and a caller
+      // that believes an email was queued when nothing was written (e.g. the RGPD deletion
+      // confirmation) must not commit on that false premise.
+      return Result.fail({
+        code: "EMAIL_PROVIDER_FAILURE",
+        message: `email enqueue fully suppressed — 0 of ${rows.length} row(s) written`,
+      });
+    }
     return Result.ok();
   }
 }

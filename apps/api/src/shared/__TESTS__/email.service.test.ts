@@ -84,6 +84,30 @@ describe("QueuedEmailService", () => {
     expect(result.getError().code).toBe("EMAIL_PROVIDER_FAILURE");
   });
 
+  it("fails with EMAIL_PROVIDER_FAILURE when every row is suppressed (0 of N written)", async () => {
+    const fullySuppressed = {
+      enqueue: async (_batch: EmailMessageInsert[]) =>
+        Result.ok<{ written: number }, never>({ written: 0 }),
+    };
+    const service = new QueuedEmailService(fullySuppressed as never, new NoOpInstrumentation());
+    const result = await service.sendTemplate("delete_completed", "a@x.test", { name: "Ada" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("EMAIL_PROVIDER_FAILURE");
+  });
+
+  it("stays success on a partial suppression (some rows written, some duplicates)", async () => {
+    const partiallySuppressed = {
+      enqueue: async (_batch: EmailMessageInsert[]) =>
+        Result.ok<{ written: number }, never>({ written: 1 }),
+    };
+    const service = new QueuedEmailService(partiallySuppressed as never, new NoOpInstrumentation());
+    const result = await service.sendTemplateBatch("delete_completed", [
+      { to: "a@x.test", variables: { name: "Ada" } },
+      { to: "b@x.test", variables: { name: "Bob" } },
+    ]);
+    expect(result.isSuccess).toBe(true);
+  });
+
   it("uses a recipient-level key verbatim", async () => {
     const queue = fakeQueue();
     const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
