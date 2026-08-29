@@ -1,14 +1,8 @@
-import type { TFunction } from "i18next";
 import { Button, Heading, Text } from "react-email";
-import type { EmailTemplates } from "../templates";
+import type { EmailProps } from "../templates";
 import { EmailLayout } from "./layout";
 
-type ResetPasswordVars = EmailTemplates["reset_password"];
-interface ResetPasswordProps extends ResetPasswordVars {
-  t: TFunction<"emails">;
-}
-
-export function ResetPassword({ name, resetUrl, t }: ResetPasswordProps) {
+export function ResetPassword({ name, resetUrl, t }: EmailProps<"reset_password">) {
   return (
     <EmailLayout preview={t("subjects.resetPassword")} t={t}>
       <Heading as="h1">{t("resetPassword.heading")}</Heading>

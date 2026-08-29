@@ -1,14 +1,8 @@
-import type { TFunction } from "i18next";
 import { Button, Heading, Text } from "react-email";
-import type { EmailTemplates } from "../templates";
+import type { EmailProps } from "../templates";
 import { EmailLayout } from "./layout";
 
-type VerifyEmailVars = EmailTemplates["verify_email"];
-interface VerifyEmailProps extends VerifyEmailVars {
-  t: TFunction<"emails">;
-}
-
-export function VerifyEmail({ name, verifyUrl, t }: VerifyEmailProps) {
+export function VerifyEmail({ name, verifyUrl, t }: EmailProps<"verify_email">) {
   return (
     <EmailLayout preview={t("subjects.verifyEmail")} t={t}>
       <Heading as="h1">{t("verifyEmail.heading")}</Heading>

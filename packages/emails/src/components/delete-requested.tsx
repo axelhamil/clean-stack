@@ -1,14 +1,8 @@
-import type { TFunction } from "i18next";
 import { Button, Heading, Text } from "react-email";
-import type { EmailTemplates } from "../templates";
+import type { EmailProps } from "../templates";
 import { EmailLayout } from "./layout";
 
-type DeleteRequestedVars = EmailTemplates["delete_requested"];
-interface DeleteRequestedProps extends DeleteRequestedVars {
-  t: TFunction<"emails">;
-}
-
-export function DeleteRequested({ name, cancelUrl, expiresAt, t }: DeleteRequestedProps) {
+export function DeleteRequested({ name, cancelUrl, expiresAt, t }: EmailProps<"delete_requested">) {
   return (
     <EmailLayout preview={t("subjects.deleteRequested")} t={t}>
       <Heading as="h1">{t("deleteRequested.heading")}</Heading>
