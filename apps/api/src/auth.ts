@@ -398,11 +398,13 @@ const authOptions = {
           userId: user.id,
           newEmail,
         });
+        const userLocale = (user as { locale?: unknown }).locale;
         await dispatchEmail(
           "change_email",
           user.email,
           { name: user.name ?? "", newEmail, confirmUrl: url },
           tokenIdempotencyKey("change-email", token),
+          isLocale(userLocale) ? userLocale : DEFAULT_LOCALE,
         );
       },
     },
@@ -420,11 +422,13 @@ const authOptions = {
         userId: user.id,
         email: user.email,
       });
+      const userLocale = (user as { locale?: unknown }).locale;
       await dispatchEmail(
         "reset_password",
         user.email,
         { name: user.name ?? "", resetUrl },
         tokenIdempotencyKey("reset-password", token),
+        isLocale(userLocale) ? userLocale : DEFAULT_LOCALE,
       );
     },
     onPasswordReset: async ({ user }) => {
@@ -438,11 +442,13 @@ const authOptions = {
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, token }) => {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+      const userLocale = (user as { locale?: unknown }).locale;
       await dispatchEmail(
         "verify_email",
         user.email,
         { name: user.name ?? "", verifyUrl },
         tokenIdempotencyKey("verify-email", token),
+        isLocale(userLocale) ? userLocale : DEFAULT_LOCALE,
       );
     },
   },

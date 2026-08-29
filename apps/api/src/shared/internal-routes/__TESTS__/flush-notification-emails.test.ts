@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { buildDigests, digestIdempotencyKey } from "../flush-notification-emails.route";
 
-const row = (userId: string, category: string, id: string) => ({
+const row = (userId: string, category: string, id: string, locale: string | null = null) => ({
   id,
   userId,
   category,
   eventType: "billing.payment.failed",
   email: `${userId}@example.com`,
+  locale,
   payload: {},
 });
 
@@ -26,6 +27,11 @@ describe("buildDigests", () => {
 
   test("un lot vide ne produit aucun digest", () => {
     expect(buildDigests([])).toEqual([]);
+  });
+
+  test("preserve la locale du destinataire dans le digest", () => {
+    const digests = buildDigests([row("u1", "billing", "n1", "fr")]);
+    expect(digests[0]?.locale).toBe("fr");
   });
 });
 
