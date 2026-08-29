@@ -1,12 +1,13 @@
 // `/internal/sweep-audit-log` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import type { AuditRetention } from "@packages/drizzle";
-import { and, auditLogSchema, count, db, eq, inArray, lt, sql } from "@packages/drizzle";
+import { and, auditLogSchema, db, eq, inArray, lt, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
@@ -15,11 +16,10 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 const { auditLog } = auditLogSchema;
 
 async function countEligible(bucket: AuditRetention, cutoff: Date): Promise<number> {
-  const rows = await db
-    .select({ count: count() })
-    .from(auditLog)
-    .where(and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff)));
-  return rows[0]?.count ?? 0;
+  return countEligibleWithTimeout(
+    auditLog,
+    and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff)),
+  );
 }
 
 async function purgeBatch(
@@ -81,11 +81,10 @@ export const sweepAuditLogRoutes = new Hono<HonoEnv>()
     });
 
     return c.json({
+      ...result,
       deletedPerBucket: {
         operational: result.deletedPerPass.operational ?? 0,
         compliance: result.deletedPerPass.compliance ?? 0,
       },
-      durationMs: result.durationMs,
-      dryRun: result.dryRun,
     });
   });

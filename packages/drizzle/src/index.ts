@@ -1,3 +1,4 @@
+export type { SQL } from "drizzle-orm";
 export {
   and,
   arrayContains,
