@@ -19,6 +19,12 @@ export interface SendTemplateOptions {
   idempotencyKey?: string;
   from?: string;
   tx?: ITransaction;
+  /**
+   * The recipient's locale. Named rather than positional so a call site that
+   * has no locale to give simply omits it, instead of parking an `undefined`
+   * placeholder that reads like a deliberate choice.
+   */
+  locale?: Locale;
 }
 
 export interface EmailRecipient<K extends keyof EmailTemplates> {
@@ -32,7 +38,6 @@ export interface IEmailService {
     template: K,
     to: string,
     variables: EmailTemplates[K] & TemplateVariables,
-    locale?: Locale,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>>;
 

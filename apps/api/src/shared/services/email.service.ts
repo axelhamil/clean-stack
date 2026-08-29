@@ -1,6 +1,6 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
-import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
+import { DEFAULT_LOCALE } from "@packages/i18n";
 import type {
   EmailBody,
   EmailError,
@@ -23,11 +23,10 @@ export class QueuedEmailService implements IEmailService {
     template: K,
     to: string,
     variables: EmailTemplates[K] & TemplateVariables,
-    locale?: Locale,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>> {
     return this.instrumentation.startSpan({ name: "QueuedEmailService > sendTemplate" }, () =>
-      this.sendTemplateBatch(template, [{ to, variables, locale }], options),
+      this.sendTemplateBatch(template, [{ to, variables, locale: options?.locale }], options),
     );
   }
 

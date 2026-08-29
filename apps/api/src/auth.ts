@@ -354,15 +354,29 @@ function readCookieFromHeaders(headers: Headers | undefined, name: string): stri
  * `async () => void` hook signature. Transport-not-configured is downgraded
  * to a warning (dev/test without Resend configured should not crash).
  */
+/**
+ * Resolves the locale to write a message in when the hook only hands over an
+ * address. Magic-link sign-in is the one auth flow with no user object in
+ * scope; an address with no account yet legitimately falls back to the
+ * default rather than failing the send.
+ */
+async function localeForEmail(email: string): Promise<Locale> {
+  const found = await di.IProfileStore.findLocaleByEmail(email);
+  if (found.isFailure) return DEFAULT_LOCALE;
+  const locale = found.getValue();
+  return locale.isSome() ? locale.unwrap() : DEFAULT_LOCALE;
+}
+
 async function dispatchEmail<K extends keyof EmailTemplates>(
   template: K,
   to: string,
   variables: EmailTemplates[K] & TemplateVariables,
   idempotencyKey: string,
-  locale?: Locale,
+  locale: Locale,
 ): Promise<void> {
-  const result = await di.IEmailService.sendTemplate(template, to, variables, locale, {
+  const result = await di.IEmailService.sendTemplate(template, to, variables, {
     idempotencyKey,
+    locale,
   });
   if (result.isFailure) {
     const error = result.getError();
@@ -562,6 +576,7 @@ const authOptions = {
           email,
           { magicUrl },
           tokenIdempotencyKey("magic-link", token),
+          await localeForEmail(email),
         );
       },
     }),

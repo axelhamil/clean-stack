@@ -1,5 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
+import type { IProfileStore } from "../../modules/profile/application/ports/profile.port";
 import type { IEmailService } from "../ports/email.port";
 import { backupCodeUsedNotifier } from "../services/backup-code-used-notifier";
 
@@ -8,10 +10,22 @@ function makeEmailService() {
   return { service: { sendTemplate } as unknown as IEmailService, sendTemplate };
 }
 
+function makeProfileStore(locale?: Locale): IProfileStore {
+  return {
+    findLocale: async () =>
+      Result.ok(locale ? Option.some(locale) : Option.none<Locale>()) as never,
+    findLocaleByEmail: async () => Result.ok(Option.none<Locale>()) as never,
+    setLocale: async () => Result.ok() as never,
+  };
+}
+
 describe("backupCodeUsedNotifier", () => {
   it("sends the backup_code_used template to the payload email", async () => {
     const { service, sendTemplate } = makeEmailService();
-    const handler = backupCodeUsedNotifier({ IEmailService: service });
+    const handler = backupCodeUsedNotifier({
+      IEmailService: service,
+      IProfileStore: makeProfileStore("fr"),
+    });
 
     await handler.handle({
       eventType: "user.mfa.backup_code_used",
@@ -21,15 +35,47 @@ describe("backupCodeUsedNotifier", () => {
     });
 
     expect(sendTemplate).toHaveBeenCalledTimes(1);
-    const call = sendTemplate.mock.calls[0] as unknown as [string, string, { securityUrl: string }];
+    const call = sendTemplate.mock.calls[0] as unknown as [
+      string,
+      string,
+      { securityUrl: string },
+      { locale: Locale },
+    ];
     expect(call[0]).toBe("backup_code_used");
     expect(call[1]).toBe("axel@example.com");
     expect(call[2].securityUrl).toContain("/settings/account");
+    expect(call[3].locale).toBe("fr");
+  });
+
+  it("falls back to the default locale when the user record has none", async () => {
+    const { service, sendTemplate } = makeEmailService();
+    const handler = backupCodeUsedNotifier({
+      IEmailService: service,
+      IProfileStore: makeProfileStore(),
+    });
+
+    await handler.handle({
+      eventType: "user.mfa.backup_code_used",
+      aggregateId: "u1",
+      dateOccurred: new Date(),
+      payload: { userId: "u1", email: "axel@example.com" },
+    });
+
+    const call = sendTemplate.mock.calls[0] as unknown as [
+      string,
+      string,
+      unknown,
+      { locale: Locale },
+    ];
+    expect(call[3].locale).toBe("en");
   });
 
   it("skips invalid payloads without sending", async () => {
     const { service, sendTemplate } = makeEmailService();
-    const handler = backupCodeUsedNotifier({ IEmailService: service });
+    const handler = backupCodeUsedNotifier({
+      IEmailService: service,
+      IProfileStore: makeProfileStore(),
+    });
 
     await handler.handle({
       eventType: "user.mfa.backup_code_used",
@@ -50,6 +96,7 @@ describe("backupCodeUsedNotifier", () => {
     );
     const handler = backupCodeUsedNotifier({
       IEmailService: { sendTemplate } as unknown as IEmailService,
+      IProfileStore: makeProfileStore(),
     });
 
     await expect(

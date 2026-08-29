@@ -49,6 +49,37 @@ export class DrizzleProfileStore implements IProfileStore {
     );
   }
 
+  async findLocaleByEmail(
+    email: string,
+    tx?: ITransaction,
+  ): Promise<Result<Option<Locale>, ProfileError>> {
+    const invoker = tx ?? db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleProfileStore > findLocaleByEmail" },
+      async () => {
+        try {
+          const query = invoker
+            .select({ locale: authSchema.user.locale })
+            .from(authSchema.user)
+            .where(eq(authSchema.user.email, email))
+            .limit(1);
+
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          const row = rows[0];
+          if (!row) return Result.fail({ code: "PROFILE_NOT_FOUND", message: "user not found" });
+          return Result.ok(isLocale(row.locale) ? Option.some(row.locale) : Option.none());
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "findLocaleByEmail"));
+        }
+      },
+    );
+  }
+
   async setLocale(
     userId: string,
     locale: Locale,

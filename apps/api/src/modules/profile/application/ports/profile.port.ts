@@ -6,5 +6,9 @@ export type ProfileError = AppError<"PROFILE_PROVIDER_FAILURE" | "PROFILE_NOT_FO
 
 export interface IProfileStore {
   findLocale(userId: string, tx?: ITransaction): Promise<Result<Option<Locale>, ProfileError>>;
+  findLocaleByEmail(
+    email: string,
+    tx?: ITransaction,
+  ): Promise<Result<Option<Locale>, ProfileError>>;
   setLocale(userId: string, locale: Locale, tx?: ITransaction): Promise<Result<void, ProfileError>>;
 }

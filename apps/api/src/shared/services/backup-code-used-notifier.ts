@@ -1,11 +1,14 @@
 import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
 import { EventTypes, UserMfaBackupCodeUsedPayload } from "@packages/events";
+import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
+import type { IProfileStore } from "../../modules/profile/application/ports/profile.port";
 import { env } from "../env";
 import { logger } from "../logger";
 import type { IEmailService } from "../ports/email.port";
 
 interface BackupCodeUsedNotifierDeps {
   IEmailService: IEmailService;
+  IProfileStore: IProfileStore;
 }
 
 export const backupCodeUsedNotifier: (deps: BackupCodeUsedNotifierDeps) => EventHandler = onEvent(
@@ -17,9 +20,16 @@ export const backupCodeUsedNotifier: (deps: BackupCodeUsedNotifierDeps) => Event
       return;
     }
     const securityUrl = `${env.APP_URL ?? ""}/settings/account`;
-    const sent = await deps.IEmailService.sendTemplate("backup_code_used", parsed.data.email, {
-      securityUrl,
-    });
+    const stored = await deps.IProfileStore.findLocale(parsed.data.userId);
+    const locale: Locale = stored.isSuccess
+      ? (stored.getValue().toUndefined() ?? DEFAULT_LOCALE)
+      : DEFAULT_LOCALE;
+    const sent = await deps.IEmailService.sendTemplate(
+      "backup_code_used",
+      parsed.data.email,
+      { securityUrl },
+      { locale },
+    );
     if (sent.isFailure) {
       logger.warn(
         { err: sent.getError(), userId: parsed.data.userId },

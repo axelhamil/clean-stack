@@ -112,7 +112,6 @@ export const di = container()
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
   .add("NotificationFanoutSubscriber", (c) => new NotificationFanoutSubscriber(c.IInstrumentation))
-  .add("BackupCodeUsedNotifier", (c) => backupCodeUsedNotifier({ IEmailService: c.IEmailService }))
   .add(
     "OutboxDispatcher",
     (c) =>
@@ -137,5 +136,8 @@ export const di = container()
   .addModule(billingModule)
   .addModule(notificationsModule)
   .addModule(profileModule)
+  .add("BackupCodeUsedNotifier", (c) =>
+    backupCodeUsedNotifier({ IEmailService: c.IEmailService, IProfileStore: c.IProfileStore }),
+  )
   .add("NotificationStreamHub", () => new NotificationStreamHub(logger, env.DATABASE_URL))
   .build();

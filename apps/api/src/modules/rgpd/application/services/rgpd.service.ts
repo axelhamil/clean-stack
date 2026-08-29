@@ -1,5 +1,6 @@
 import { type IUnitOfWork, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { Locale } from "@packages/i18n";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import { logger } from "../../../../shared/logger";
@@ -46,7 +47,7 @@ export interface ExecuteAccountWipeInput {
 export interface ExecuteAccountWipeOutput {
   deletedOrgIds: string[];
   storageKeysDeleted: number;
-  notify: { to: string; name: string } | null;
+  notify: { to: string; name: string; locale?: Locale } | null;
 }
 
 export interface ProcessPendingDeletionsInput {
@@ -173,8 +174,10 @@ export class RgpdService {
           "delete_requested",
           state.email,
           { name: state.name, cancelUrl, expiresAt: until.toISOString() },
-          undefined,
-          { idempotencyKey: `delete-requested/${input.userId}/${until.getTime()}` },
+          {
+            idempotencyKey: `delete-requested/${input.userId}/${until.getTime()}`,
+            locale: state.locale.toUndefined(),
+          },
         );
         if (sent.isFailure)
           logger.warn(
@@ -233,9 +236,9 @@ export class RgpdService {
           "delete_cancelled",
           state.email,
           { name: state.name },
-          undefined,
           {
             idempotencyKey: `delete-cancelled/${input.userId}/${pendingUntil.getTime()}`,
+            locale: state.locale.toUndefined(),
           },
         );
         if (sent.isFailure)
@@ -273,6 +276,7 @@ export class RgpdService {
 
         const originalEmail = state.email;
         const originalName = state.name;
+        const originalLocale = state.locale;
 
         let wipeOutput: ExecuteWipeOutput;
         try {
@@ -342,7 +346,11 @@ export class RgpdService {
         return Result.ok({
           deletedOrgIds: wipeOutput.deletedOrgIds ?? [],
           storageKeysDeleted: keysDeleted,
-          notify: { to: originalEmail, name: originalName },
+          notify: {
+            to: originalEmail,
+            name: originalName,
+            locale: originalLocale.toUndefined(),
+          },
         });
       },
     );
@@ -380,7 +388,7 @@ export class RgpdService {
 
         const succeeded: string[] = [];
         const failed: Array<{ userId: string; errorCode: string }> = [];
-        const recipients: Array<{ to: string; variables: { name: string } }> = [];
+        const recipients: Array<{ to: string; variables: { name: string }; locale?: Locale }> = [];
 
         for (const row of batch) {
           try {
@@ -388,7 +396,12 @@ export class RgpdService {
             if (res.isSuccess) {
               succeeded.push(row.userId);
               const notify = res.getValue().notify;
-              if (notify) recipients.push({ to: notify.to, variables: { name: notify.name } });
+              if (notify)
+                recipients.push({
+                  to: notify.to,
+                  variables: { name: notify.name },
+                  locale: notify.locale,
+                });
             } else {
               failed.push({ userId: row.userId, errorCode: res.getError().code });
             }
@@ -509,8 +522,10 @@ export class RgpdService {
             downloadUrl: presigned.getValue().url,
             expiresAt: presigned.getValue().expiresAt,
           },
-          undefined,
-          { idempotencyKey: `data-export/${key}` },
+          {
+            idempotencyKey: `data-export/${key}`,
+            locale: state.locale.toUndefined(),
+          },
         );
         if (sent.isFailure)
           logger.warn(

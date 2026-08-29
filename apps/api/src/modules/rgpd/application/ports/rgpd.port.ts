@@ -1,4 +1,5 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
 import type { ITransaction } from "../../../../shared/transaction";
 
 export type RgpdError = AppError<
@@ -73,6 +74,7 @@ export interface PendingDeletionRow {
 export interface UserDeletionState {
   email: string;
   name: string;
+  locale: Option<Locale>;
   twoFactorEnabled: boolean;
   pendingDeletionUntil: Option<Date>;
   deletedAt: Option<Date>;
