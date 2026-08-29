@@ -14,7 +14,25 @@
  * a temporary CHECK constraint on `email_message.to_address` that rejects the probe user's
  * email, forcing a genuine Postgres-level failure at the exact insert the wipe transaction
  * performs, then drops the constraint again in cleanup.
+ *
+ * WARNING: `ALTER TABLE ... ADD CONSTRAINT` takes an ACCESS EXCLUSIVE lock on the shared
+ * `email_message` table for the duration of the statement — stop the dev API worker (and any
+ * other process reading/writing `email_message`) before running this script, or the lock wait
+ * will queue behind it. This script also refuses to run against a non-local `DATABASE_URL` and
+ * caps the lock wait with `lock_timeout` so a stuck lock fails fast instead of hanging.
  */
+
+const databaseUrl = process.env.DATABASE_URL ?? "";
+const isLocalDatabase = /^(?:postgres(?:ql)?:\/\/)[^/]*@?(localhost|127\.0\.0\.1)(?::\d+)?\//.test(
+  databaseUrl,
+);
+if (!isLocalDatabase) {
+  console.error(
+    "check-wipe-rollback refuses to run: DATABASE_URL does not point at localhost/127.0.0.1. " +
+      "This script takes an ACCESS EXCLUSIVE lock on email_message — never point it at a shared database.",
+  );
+  process.exit(1);
+}
 
 import { authSchema, db, eq, sql, TransactionService } from "@packages/drizzle";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
@@ -56,6 +74,9 @@ async function seedUser(): Promise<void> {
 }
 
 async function addFailingConstraint(): Promise<void> {
+  // Bound so a lock held by another process (e.g. a forgotten dev API worker) fails fast
+  // instead of hanging the script indefinitely while holding up the wait queue.
+  await db.execute(sql`SET lock_timeout = '5s'`);
   // DDL does not accept bind parameters, so the marker (a fixed, script-owned literal —
   // never user input) is inlined via sql.raw rather than a parameterized value.
   await db.execute(sql`
