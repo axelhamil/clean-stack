@@ -9,8 +9,8 @@ import type { ZodType } from "zod";
  * Re-typed so the return value is `MiddlewareHandler<E, P, V>` rather than the
  * union `MiddlewareHandler | Response` that `zValidator` normally produces.
  * That union leaks into Hono RPC's response type inference — `zV` casts it away
- * so validation failures throw `HTTPException(400)` and the happy-path response
- * type stays clean.
+ * so validation failures throw `AppErrorException({ code: "REQUEST_INVALID" })`
+ * and the happy-path response type stays clean.
  */
 type ZV = <
   T extends ZodType,
