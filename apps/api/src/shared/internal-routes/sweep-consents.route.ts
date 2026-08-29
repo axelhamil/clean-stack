@@ -58,9 +58,14 @@ export const sweepConsentsRoutes = new Hono<HonoEnv>()
     const logger = c.var.logger;
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      retentionDays: env.CONSENT_RETENTION_DAYS,
-      purgeBatch,
-      countEligible,
+      passes: [
+        {
+          label: "default",
+          retentionDays: env.CONSENT_RETENTION_DAYS,
+          purgeBatch,
+          countEligible,
+        },
+      ],
       logger,
       label: "sweep-consents",
     });

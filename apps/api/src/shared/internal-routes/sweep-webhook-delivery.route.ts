@@ -47,9 +47,14 @@ export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
   .post("/sweep-webhook-delivery", zV("json", sweepBodySchema), async (c) => {
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
-      purgeBatch,
-      countEligible,
+      passes: [
+        {
+          label: "default",
+          retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
+          purgeBatch,
+          countEligible,
+        },
+      ],
       logger: c.var.logger,
       label: "sweep-webhook-delivery",
     });

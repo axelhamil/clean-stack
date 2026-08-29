@@ -57,25 +57,30 @@ export const sweepOutboxRoutes = new Hono<HonoEnv>()
     const logger = c.var.logger;
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      retentionDays: env.OUTBOX_RETENTION_DAYS,
-      purgeBatch,
-      countEligible,
+      passes: [
+        {
+          label: "default",
+          retentionDays: env.OUTBOX_RETENTION_DAYS,
+          purgeBatch,
+          countEligible,
+          onBatchError: (err) => {
+            const isFK =
+              err instanceof Error &&
+              (err.message.includes("violates foreign key constraint") ||
+                ("code" in err && (err as { code: string }).code === "23503"));
+            if (isFK) {
+              logger.error(
+                { err },
+                "sweep-outbox FK violation — stopping the entire sweep (run sweep-webhook-delivery first)",
+              );
+              return "break";
+            }
+            return "throw";
+          },
+        },
+      ],
       logger,
       label: "sweep-outbox",
-      onBatchError: (err) => {
-        const isFK =
-          err instanceof Error &&
-          (err.message.includes("violates foreign key constraint") ||
-            ("code" in err && (err as { code: string }).code === "23503"));
-        if (isFK) {
-          logger.error(
-            { err },
-            "sweep-outbox FK violation — stopping the entire sweep (run sweep-webhook-delivery first)",
-          );
-          return "break";
-        }
-        return "throw";
-      },
     });
     return c.json(response);
   });

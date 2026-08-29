@@ -44,9 +44,14 @@ export const sweepEmailMessagesRoutes = new Hono<HonoEnv>()
   .post("/sweep-email-messages", zV("json", sweepBodySchema), async (c) => {
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      retentionDays: env.EMAIL_MESSAGE_RETENTION_DAYS,
-      purgeBatch,
-      countEligible,
+      passes: [
+        {
+          label: "sent",
+          retentionDays: env.EMAIL_MESSAGE_RETENTION_DAYS,
+          purgeBatch,
+          countEligible,
+        },
+      ],
       logger: c.var.logger,
       label: "sweep-email-messages",
     });
