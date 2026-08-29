@@ -73,8 +73,18 @@ jobs:
       - name: Push schema
         run: pnpm db:push
 
+      - name: Check the sweep lease against a real database
+        run: pnpm --filter api check:sweep-lock
+
       - name: Seed the audited account
         run: pnpm --filter api db:seed
+
+      - name: Check fanout preferences against a real database
+        # check-fanout-preferences.ts looks up the seeded user by SEED_EMAIL, so this
+        # must run after seeding and share the same default as the step above.
+        env:
+          SEED_EMAIL: dev@example.com
+        run: pnpm --filter api check:fanout
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

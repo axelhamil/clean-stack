@@ -1,3 +1,8 @@
+// WARNING: this script acquires leases under the real production route labels
+// (`sweep-audit-log`, `sweep-outbox`, …) for up to 60s each. Point it only at a local
+// database — running it against a shared or production database will contend with,
+// and can starve, the real sweeps for that duration.
+//
 // A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE` — the whole point of
 // `acquireSweepLease` is the conditional UPDATE the database performs, so this checks it
 // against a real Postgres instead. Wired to a script, not `bun:test`: nearly every test
@@ -107,9 +112,11 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 // wrong one — proven by holding that exact label's lease and expecting THIS route,
 // and only this route, to log the skip for it. Deleting a route's `lock:` wiring, or
 // wiring it to the wrong label, makes this fail. Asserted off the log line rather than
-// the response body: sweep-audit-log's handler reshapes the response and drops
-// `skipped`, so the log (`${label} skipped — another run holds the lease`, always
-// emitted by runRetentionSweep itself) is the one signal every route shares. ────────
+// the response body: sweep-audit-log's handler reshapes its response but still spreads
+// the full `result` (so `skipped` does survive there), and this way every route is
+// checked the same way rather than special-casing the one with an extra field. The
+// log line (`${label} skipped — another run holds the lease`, always emitted by
+// runRetentionSweep itself) is the one signal every route shares. ────────
 function makeApp(routes: Hono, lines: string[]) {
   const sink = new Writable({
     write(chunk: Buffer, _encoding, callback) {

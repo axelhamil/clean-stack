@@ -54,6 +54,7 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 | **Review pass** | Full manual review of the shipped surface — owned by @axelhamil, not a code task | The only thing standing between "feature-complete" and "clone-ready" |
 | **E.1b** | Remaining i18n extraction (`admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, per-locale legal content) | E.1a shipped the rail and typed the surface it covers; what is left is catalog work, not a design decision |
 | **C.1** | S5b behavioural signals + S6 captcha hook | Deferred for calibration, not abandoned — needs real traffic |
+| **D.5** | Instrumentation spans on the `/internal/sweep-*` rail — not the runner, not the six `purgeBatch` implementations, not `sweep_lock` | Deliberately deferred: instrumenting only the lease (repo rule #8) would produce an incoherent trace with the runner and the batches around it left dark |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058 — Gmail/Yahoo require it for bulk senders) and SPF + DKIM + DMARC `p=reject` (DNS, doc only).
 
