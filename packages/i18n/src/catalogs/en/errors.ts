@@ -1,0 +1,31 @@
+export default {
+  fallback: "Something went wrong. Please try again.",
+  byCode: {
+    ACCOUNT_EXPORT_RATE_LIMITED: "You can request another data export in 24 hours.",
+    ACCOUNT_PASSWORD_REQUIRED: "Confirm with your password.",
+    ACCOUNT_DELETION_BLOCKED: "Resolve organization ownership before deleting your account.",
+    ACCOUNT_DELETION_NOT_FOUND: "No deletion to cancel.",
+    ACCOUNT_PASSWORD_INVALID: "Invalid password.",
+    TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
+    TWO_FACTOR_INVALID: "Invalid authenticator code.",
+  },
+  bySuffix: {
+    RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
+    NOT_FOUND: "Not found.",
+    FORBIDDEN: "You don't have permission to do this.",
+    UNAUTHORIZED: "Please sign in again.",
+    REQUIRED: "Additional confirmation required.",
+    BLOCKED: "Action blocked.",
+    INVALID: "Invalid input.",
+    INTEGRITY_FAILED: "Data integrity check failed. Please try again.",
+    PROVIDER_FAILURE: "Service is temporarily unavailable. Please try again.",
+    UNAVAILABLE: "Service is temporarily unavailable. Please try again.",
+    TIMEOUT: "Request timed out. Please try again.",
+  },
+  validation: {
+    required: "This field is required.",
+    invalidEmail: "Enter a valid email address.",
+    tooSmall: "Must be at least {{minimum}} characters.",
+    tooBig: "Must be at most {{maximum}} characters.",
+  },
+} as const;
