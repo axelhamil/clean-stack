@@ -5,8 +5,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import type { i18n as I18nInstance } from "i18next";
 import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { router } from "../router";
 import { activeOrgQueryOptions } from "./api/queries/active-org";
 import { currentMembershipQueryOptions } from "./api/queries/current-membership";
@@ -40,44 +42,49 @@ onAuthChange(async () => {
   await router.invalidate();
 });
 
-export function AppProviders() {
+interface AppProvidersProps {
+  i18n: I18nInstance;
+}
+
+export function AppProviders({ i18n }: AppProvidersProps) {
   return (
     <StrictMode>
-      <ErrorBoundary fallback={<AppErrorFallback />}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          nonce={cspNonce}
-        >
-          <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
-            <Toaster richColors closeButton />
-            <CookieBanner />
-            <AnalyticsScripts />
-            {import.meta.env.DEV && (
-              <>
-                <TanStackRouterDevtools router={router} position="bottom-left" />
-                <ReactQueryDevtools buttonPosition="bottom-right" />
-              </>
-            )}
-          </QueryClientProvider>
-        </ThemeProvider>
-      </ErrorBoundary>
+      <I18nextProvider i18n={i18n}>
+        <ErrorBoundary fallback={<AppErrorFallback />}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            nonce={cspNonce}
+          >
+            <QueryClientProvider client={queryClient}>
+              <RouterProvider router={router} />
+              <Toaster richColors closeButton />
+              <CookieBanner />
+              <AnalyticsScripts />
+              {import.meta.env.DEV && (
+                <>
+                  <TanStackRouterDevtools router={router} position="bottom-left" />
+                  <ReactQueryDevtools buttonPosition="bottom-right" />
+                </>
+              )}
+            </QueryClientProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
+      </I18nextProvider>
     </StrictMode>
   );
 }
 
 function AppErrorFallback() {
+  const { t } = useTranslation();
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <TypographyH1>Something went wrong</TypographyH1>
-      <TypographyMuted>
-        We've been notified and are looking into it. Try reloading the page.
-      </TypographyMuted>
+      <TypographyH1>{t("errorBoundary.title")}</TypographyH1>
+      <TypographyMuted>{t("errorBoundary.body")}</TypographyMuted>
       <Button variant="outline" onClick={() => window.location.reload()}>
-        Reload
+        {t("actions.reload")}
       </Button>
     </main>
   );

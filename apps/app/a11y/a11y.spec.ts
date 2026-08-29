@@ -24,6 +24,11 @@ async function audit(page: Page, target: AuditedPage): Promise<void> {
   await expect(page.locator("h1")).toHaveCount(1);
   await expect(page.locator("[data-slot=skeleton]")).toHaveCount(0);
 
+  // axe cannot tell that French content is served under lang="en" — html-has-lang
+  // passes either way. The suite asserts the attribute is actually populated from
+  // the active locale, which is the only thing that catches a broken sync.
+  await expect(page.locator("html")).toHaveAttribute("lang", /^(en|fr)$/);
+
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.has(v.impact ?? ""));
 
