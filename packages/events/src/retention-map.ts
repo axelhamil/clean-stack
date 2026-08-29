@@ -25,6 +25,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: "compliance",
   [EventTypes.USER_EXPORT_REQUESTED]: "compliance",
   [EventTypes.USER_EXPORT_COMPLETED]: "compliance",
+  [EventTypes.USER_LOCALE_CHANGED]: "operational",
   [EventTypes.ORG_CREATED]: "compliance",
   [EventTypes.ORG_UPDATED]: "compliance",
   [EventTypes.ORG_DELETED]: "compliance",

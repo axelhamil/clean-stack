@@ -112,6 +112,15 @@ export const UserExportCompletedPayload = UserRef.extend({
 });
 export type UserExportCompletedPayload = z.infer<typeof UserExportCompletedPayload>;
 
+// Subject and actor are the same person: the route carries `denyImpersonated`,
+// so no admin can trigger this on someone else's behalf. `userId` alone
+// therefore satisfies §7 without a separate `actorUserId`.
+export const UserLocaleChangedPayload = UserRef.extend({
+  locale: z.string(),
+  previousLocale: z.string().nullable(),
+});
+export type UserLocaleChangedPayload = z.infer<typeof UserLocaleChangedPayload>;
+
 export const OrgCreatedPayload = OrgRef.extend({
   ownerUserId: z.string(),
   slug: z.string(),
@@ -578,6 +587,7 @@ export const PayloadByEventType = {
   [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: UserEmailChangeRequestedPayload,
   [EventTypes.USER_EXPORT_REQUESTED]: UserExportRequestedPayload,
   [EventTypes.USER_EXPORT_COMPLETED]: UserExportCompletedPayload,
+  [EventTypes.USER_LOCALE_CHANGED]: UserLocaleChangedPayload,
   [EventTypes.ORG_CREATED]: OrgCreatedPayload,
   [EventTypes.ORG_UPDATED]: OrgUpdatedPayload,
   [EventTypes.ORG_DELETED]: OrgDeletedPayload,

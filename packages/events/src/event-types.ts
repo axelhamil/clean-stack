@@ -23,6 +23,7 @@ export const EventTypes = {
   USER_EMAIL_CHANGE_REQUESTED: "user.email.change_requested",
   USER_EXPORT_REQUESTED: "user.export.requested",
   USER_EXPORT_COMPLETED: "user.export.completed",
+  USER_LOCALE_CHANGED: "user.locale.changed",
   ORG_CREATED: "org.created",
   ORG_UPDATED: "org.updated",
   ORG_DELETED: "org.deleted",
