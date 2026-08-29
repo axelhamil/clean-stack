@@ -259,6 +259,7 @@ describe("RgpdService", () => {
         "delete_requested",
         "u@example.com",
         expect.objectContaining({ name: "User", cancelUrl: expect.any(String) }),
+        undefined,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -365,6 +366,7 @@ describe("RgpdService", () => {
         "delete_cancelled",
         "u@example.com",
         expect.objectContaining({ name: "User" }),
+        undefined,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -836,6 +838,7 @@ describe("RgpdService", () => {
         "data_export_ready",
         "u@example.com",
         expect.objectContaining({ name: "User", downloadUrl: expect.any(String) }),
+        undefined,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
       expect(repo.touchExportRequestedAt).toHaveBeenCalledWith("u1", expect.anything());

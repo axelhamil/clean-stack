@@ -1,9 +1,12 @@
+import type { TFunction } from "i18next";
 import { Button, Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
 type ImpersonationStartedVars = EmailTemplates["impersonation_started"];
-interface ImpersonationStartedProps extends ImpersonationStartedVars {}
+interface ImpersonationStartedProps extends ImpersonationStartedVars {
+  t: TFunction<"emails">;
+}
 
 export function ImpersonationStarted({
   userName,
@@ -11,9 +14,10 @@ export function ImpersonationStarted({
   expiresAt,
   reason,
   supportUrl,
+  t,
 }: ImpersonationStartedProps) {
   return (
-    <EmailLayout preview="Support access to your account">
+    <EmailLayout preview={t("subjects.impersonationStarted")}>
       <Heading as="h1">Support access to your account</Heading>
       <Text>
         Hi {userName}, a member of our support team accessed your account for diagnostic purposes on{" "}

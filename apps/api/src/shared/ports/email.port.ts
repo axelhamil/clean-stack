@@ -1,5 +1,6 @@
 import type { Result } from "@packages/ddd-kit";
 import type { EmailTemplates } from "@packages/emails";
+import type { Locale } from "@packages/i18n";
 import type { ITransaction } from "../transaction";
 
 export type { EmailTemplates };
@@ -17,8 +18,13 @@ export type EmailError =
 export interface SendTemplateOptions {
   idempotencyKey?: string;
   from?: string;
-  locale?: string;
   tx?: ITransaction;
+}
+
+export interface EmailRecipient<K extends keyof EmailTemplates> {
+  to: string;
+  variables: EmailTemplates[K] & TemplateVariables;
+  locale?: Locale;
 }
 
 export interface IEmailService {
@@ -26,6 +32,7 @@ export interface IEmailService {
     template: K,
     to: string,
     variables: EmailTemplates[K] & TemplateVariables,
+    locale?: Locale,
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>>;
 
@@ -38,7 +45,7 @@ export interface IEmailService {
 
   sendTemplateBatch<K extends keyof EmailTemplates>(
     template: K,
-    recipients: Array<{ to: string; variables: EmailTemplates[K] & TemplateVariables }>,
+    recipients: EmailRecipient<K>[],
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>>;
 

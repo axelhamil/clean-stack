@@ -2,6 +2,7 @@ import { Option } from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
+import { DEFAULT_LOCALE } from "@packages/i18n";
 import { Resend } from "resend";
 import { env } from "../env";
 import { emitEvent } from "../event-emitter";
@@ -216,6 +217,7 @@ export class EmailDeliveryWorker {
     const rendered = await renderTemplate(
       templateName as EmailTemplateKey,
       rowRecord.payload as never,
+      rowRecord.locale ?? DEFAULT_LOCALE,
     );
     return { ...base, html: rendered.html, text: rendered.text };
   }

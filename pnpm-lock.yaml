@@ -397,9 +397,15 @@ importers:
 
   packages/emails:
     dependencies:
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@react-email/render':
         specifier: ^2.1.0
         version: 2.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      i18next:
+        specifier: ^26.4.0
+        version: 26.4.0(typescript@7.0.2)
       react:
         specifier: ^19.2.8
         version: 19.2.8

@@ -8,6 +8,7 @@ import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@packages/i18n";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -358,8 +359,9 @@ async function dispatchEmail<K extends keyof EmailTemplates>(
   to: string,
   variables: EmailTemplates[K] & TemplateVariables,
   idempotencyKey: string,
+  locale?: Locale,
 ): Promise<void> {
-  const result = await di.IEmailService.sendTemplate(template, to, variables, {
+  const result = await di.IEmailService.sendTemplate(template, to, variables, locale, {
     idempotencyKey,
   });
   if (result.isFailure) {
@@ -741,6 +743,7 @@ const authOptions = {
       },
       sendInvitationEmail: async ({ id, email, role, inviter, organization: org }) => {
         const inviteUrl = `${env.APP_URL}/accept-invitation/${id}`;
+        const inviterLocale = (inviter.user as { locale?: unknown }).locale;
         await dispatchEmail(
           "org_invitation",
           email,
@@ -751,6 +754,7 @@ const authOptions = {
             inviteUrl,
           },
           tokenIdempotencyKey("org-invitation", id),
+          isLocale(inviterLocale) ? inviterLocale : DEFAULT_LOCALE,
         );
       },
     }),

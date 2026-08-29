@@ -1,12 +1,16 @@
+import type { TFunction } from "i18next";
 import { Heading, Text } from "react-email";
 import type { EmailTemplates } from "../templates";
 import { EmailLayout } from "./layout";
 
 type ApiTokenLeakedVars = EmailTemplates["api_token_leaked"];
-interface ApiTokenLeakedProps extends ApiTokenLeakedVars {}
-export function ApiTokenLeaked({ name, tokenName, revokedAt }: ApiTokenLeakedProps) {
+interface ApiTokenLeakedProps extends ApiTokenLeakedVars {
+  t: TFunction<"emails">;
+}
+
+export function ApiTokenLeaked({ name, tokenName, revokedAt, t }: ApiTokenLeakedProps) {
   return (
-    <EmailLayout preview="Your API token was revoked">
+    <EmailLayout preview={t("subjects.apiTokenLeaked")}>
       <Heading as="h1">API token revoked</Heading>
       <Text>Hi {name},</Text>
       <Text>

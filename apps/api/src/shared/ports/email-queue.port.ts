@@ -1,4 +1,5 @@
 import type { Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
 import type { ITransaction } from "../transaction";
 
 export type EmailMessageKind = "template" | "raw";
@@ -9,6 +10,7 @@ export interface EmailMessageInsert {
   template: Option<string>;
   toAddress: string;
   subject: string;
+  locale: Locale;
   payload: unknown;
   idempotencyKey: Option<string>;
 }
@@ -19,6 +21,7 @@ export interface EmailMessageRecord {
   template: Option<string>;
   toAddress: string;
   subject: string;
+  locale: Locale | null;
   payload: unknown;
   status: EmailMessageStatus;
   attempts: number;

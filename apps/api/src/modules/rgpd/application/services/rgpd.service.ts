@@ -173,6 +173,7 @@ export class RgpdService {
           "delete_requested",
           state.email,
           { name: state.name, cancelUrl, expiresAt: until.toISOString() },
+          undefined,
           { idempotencyKey: `delete-requested/${input.userId}/${until.getTime()}` },
         );
         if (sent.isFailure)
@@ -232,6 +233,7 @@ export class RgpdService {
           "delete_cancelled",
           state.email,
           { name: state.name },
+          undefined,
           {
             idempotencyKey: `delete-cancelled/${input.userId}/${pendingUntil.getTime()}`,
           },
@@ -507,6 +509,7 @@ export class RgpdService {
             downloadUrl: presigned.getValue().url,
             expiresAt: presigned.getValue().expiresAt,
           },
+          undefined,
           { idempotencyKey: `data-export/${key}` },
         );
         if (sent.isFailure)
