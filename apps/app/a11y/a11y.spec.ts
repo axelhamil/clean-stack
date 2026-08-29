@@ -75,7 +75,7 @@ test.describe("locale resolution (fr)", () => {
     if (!target) throw new Error("sign-in page missing from PUBLIC_PAGES");
 
     await context.addCookies([
-      { name: LOCALE_COOKIE, value: "fr", url: BASE_URL, path: "/", sameSite: "Lax" },
+      { name: LOCALE_COOKIE, value: "fr", url: BASE_URL, sameSite: "Lax" },
     ]);
 
     await audit(page, target, "fr");
