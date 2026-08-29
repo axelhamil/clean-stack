@@ -1,5 +1,12 @@
-import { createI18n, type Locale, loadCatalog, resolveLocale } from "@packages/i18n";
+import {
+  createI18n,
+  DEFAULT_LOCALE,
+  type Locale,
+  loadCatalog,
+  resolveLocale,
+} from "@packages/i18n";
 import type { i18n as I18nInstance } from "i18next";
+import { captureError } from "../observability/sentry";
 import { readLocaleCookie, writeLocaleCookie } from "./locale-cookie";
 
 function browserCandidates(): string[] {
@@ -12,8 +19,7 @@ function syncDocumentLang(locale: string): void {
   if (typeof document !== "undefined") document.documentElement.lang = locale;
 }
 
-export async function initI18n(): Promise<I18nInstance> {
-  const locale = resolveLocale(browserCandidates());
+async function bootInstance(locale: Locale): Promise<I18nInstance> {
   const resources = await loadCatalog(locale);
   const instance = await createI18n({ locale, resources });
 
@@ -21,6 +27,30 @@ export async function initI18n(): Promise<I18nInstance> {
   instance.on("languageChanged", syncDocumentLang);
 
   return instance;
+}
+
+/**
+ * Resolves the boot locale and builds the i18next instance for it.
+ *
+ * A rejected dynamic catalog import (bad network mid-boot) must not leave the
+ * app on a blank screen: the failure is reported to telemetry and the boot
+ * retries once against `DEFAULT_LOCALE`, whose catalog is a static import and
+ * therefore not subject to the same network failure. Only a second failure —
+ * meaning the bundle itself is broken, not the network — propagates.
+ */
+export async function initI18n(): Promise<I18nInstance> {
+  try {
+    const locale = resolveLocale(browserCandidates());
+    return await bootInstance(locale);
+  } catch (error) {
+    captureError(error, { stage: "i18n-init" });
+    try {
+      return await bootInstance(DEFAULT_LOCALE);
+    } catch (fallbackError) {
+      captureError(fallbackError, { stage: "i18n-init-fallback" });
+      throw fallbackError;
+    }
+  }
 }
 
 /**
