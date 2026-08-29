@@ -85,6 +85,44 @@ export default {
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
   },
+  cookieBanner: {
+    ariaLabel: "Consentement aux cookies",
+    message:
+      "Nous utilisons des cookies pour faire fonctionner ce service. Les cookies optionnels aident à améliorer votre expérience.",
+    policyLink: "Politique cookies",
+    rejectAll: "Tout refuser",
+    customize: "Personnaliser",
+    acceptAll: "Tout accepter",
+    preferencesTitle: "Préférences cookies",
+  },
+  cookieConsent: {
+    title: "Gérez vos préférences cookies",
+    save: "Enregistrer les préférences",
+    withdraw: "Retirer tous les consentements",
+    savedToast: "Préférences enregistrées",
+    withdrawnToast: "Consentement retiré",
+    categories: {
+      necessary: {
+        label: "Strictement nécessaires",
+        description:
+          "Indispensables au fonctionnement du service. Ils ne peuvent pas être désactivés.",
+      },
+      functional: {
+        label: "Fonctionnels",
+        description:
+          "Améliorent votre expérience (préférences de langue ou de région, par exemple).",
+      },
+      analytics: {
+        label: "Mesure d'audience",
+        description:
+          "Nous aident à comprendre comment le service est utilisé (données anonymisées).",
+      },
+      marketing: {
+        label: "Marketing et publicité",
+        description: "Autorisent la publicité personnalisée et le reciblage.",
+      },
+    },
+  },
   legalFooter: {
     ariaLabel: "Légal",
   },

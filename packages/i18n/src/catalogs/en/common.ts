@@ -85,6 +85,41 @@ export default {
     expired: "session expired",
     end: "End impersonation",
   },
+  cookieBanner: {
+    ariaLabel: "Cookie consent",
+    message:
+      "We use cookies to operate this service. Optional cookies help improve your experience.",
+    policyLink: "Cookie policy",
+    rejectAll: "Reject all",
+    customize: "Customize",
+    acceptAll: "Accept all",
+    preferencesTitle: "Cookie preferences",
+  },
+  cookieConsent: {
+    title: "Manage your cookie preferences",
+    save: "Save preferences",
+    withdraw: "Withdraw all consent",
+    savedToast: "Preferences saved",
+    withdrawnToast: "Consent withdrawn",
+    categories: {
+      necessary: {
+        label: "Strictly necessary",
+        description: "Required for the service to function. Cannot be disabled.",
+      },
+      functional: {
+        label: "Functional",
+        description: "Enhance your experience (e.g. language or region preferences).",
+      },
+      analytics: {
+        label: "Analytics",
+        description: "Help us understand how visitors use the service (anonymised data).",
+      },
+      marketing: {
+        label: "Marketing",
+        description: "Allow personalised advertising and retargeting.",
+      },
+    },
+  },
   legalFooter: {
     ariaLabel: "Legal",
   },

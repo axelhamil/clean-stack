@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Locale } from "@packages/i18n";
+import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
 import { expect, type Page, test } from "@playwright/test";
 import { LOCALE_COOKIE } from "../src/shared/i18n/locale-cookie";
 import { AUTHENTICATED_PAGES, type AuditedPage, PUBLIC_PAGES } from "./pages";
@@ -10,7 +10,7 @@ type Violation = Awaited<ReturnType<AxeBuilder["analyze"]>>["violations"][number
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const BLOCKING_IMPACTS = new Set(["serious", "critical"]);
 const SCHEMES = ["light", "dark"] as const;
-const DEFAULT_LOCALE_UNDER_TEST: Locale = "en";
+const DEFAULT_LOCALE_UNDER_TEST: Locale = DEFAULT_LOCALE;
 
 function formatViolation(violation: Violation): string {
   const targets = violation.nodes.map((node) => node.target.join(" ")).join(", ");
