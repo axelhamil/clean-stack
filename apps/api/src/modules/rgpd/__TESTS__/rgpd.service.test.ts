@@ -80,6 +80,7 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
       Result.ok<ExecuteWipeOutput, RgpdError>({
         deletedOrgIds: ["org_personal", "org_solo"],
         anonymizedEmail: "deleted-uuid@anonymized.local",
+        alreadyWiped: false,
       }),
     ),
     verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(true)),
@@ -581,6 +582,43 @@ describe("RgpdService", () => {
       expect(orgDeleted).toEqual(["org_personal", "org_solo"]);
     });
 
+    it("short-circuits without emitting USER_DELETED when the repository reports the row already wiped (lost race, no SKIP LOCKED on rgpd-sweep)", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+        executeWipe: mock(async () =>
+          Result.ok<ExecuteWipeOutput, RgpdError>({
+            deletedOrgIds: [],
+            anonymizedEmail: "",
+            alreadyWiped: true,
+          }),
+        ),
+      });
+      const enqueued: Array<{ eventType: string }> = [];
+      const spyOutbox: IOutboxRepository = {
+        enqueue: async (events) => {
+          for (const e of events) enqueued.push({ eventType: e.eventType });
+        },
+        findPendingBatch: async () => [],
+        markDispatched: async () => {},
+        markFailed: async () => {},
+      };
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        spyOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(enqueued).toHaveLength(0);
+    });
+
     it("returns success no-op when user is already deleted", async () => {
       const repo = makeRepo({
         getUserDeletionState: mock(async () =>
@@ -819,6 +857,65 @@ describe("RgpdService", () => {
 
       expect(emailMock.sendTemplate).not.toHaveBeenCalled();
       expect(emailMock.sendTemplateBatch).not.toHaveBeenCalled();
+    });
+
+    it("stops between wipes once the budget is spent and reports truncated", async () => {
+      // A clock that jumps 60ms per read: deadlineAt = 60 + 100 = 160. The first
+      // in-loop check reads 120 (< 160, wipe runs); the second reads 180 (>= 160,
+      // stop before starting the next wipe) — one account wiped, two deferred.
+      let readCount = 0;
+      const fakeClock = () => {
+        readCount += 1;
+        return readCount * 60;
+      };
+      const repo = makeBatchRepo(pendingRows);
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        noopOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.processPendingDeletions({
+        batchSize: 3,
+        dryRun: false,
+        deadlineMs: 100,
+        now: fakeClock,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      const output = result.getValue();
+      expect(output.succeeded).toHaveLength(1);
+      expect(output.succeeded.length).toBeLessThan(3);
+      expect(output.truncated).toBe(true);
+      expect(output.processed).toBe(output.succeeded.length + output.failed.length);
+      expect(output.processed).toBeLessThan(3);
+    });
+
+    it("reports truncated: false when every account finishes inside the budget", async () => {
+      const repo = makeBatchRepo(pendingRows);
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        noopOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.processPendingDeletions({
+        batchSize: 3,
+        dryRun: false,
+        deadlineMs: 100,
+        now: () => 0,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      const output = result.getValue();
+      expect(output.succeeded).toHaveLength(3);
+      expect(output.truncated).toBe(false);
     });
 
     it("records ACCOUNT_WIPE_PROVIDER_FAILURE when the wipe transaction throws", async () => {

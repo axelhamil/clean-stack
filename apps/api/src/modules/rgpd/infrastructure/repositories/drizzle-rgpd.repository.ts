@@ -312,7 +312,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           const userOrgIds = userOrgRows.map((r) => r.id);
 
           const anonymizedEmail = `deleted-${crypto.randomUUID()}@${ANONYMIZED_DOMAIN}`;
-          await tx
+          const updatedRows = await tx
             .update(schema.user)
             .set({
               email: anonymizedEmail,
@@ -323,7 +323,15 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               pendingDeletionUntil: null,
               deletedAt: new Date(),
             })
-            .where(eq(schema.user.id, userId));
+            .where(and(eq(schema.user.id, userId), isNull(schema.user.deletedAt)))
+            .returning({ id: schema.user.id });
+
+          if (updatedRows.length === 0) {
+            // Another overlapping run already wiped this account between our
+            // pending-deletion read and this transaction: nothing left to do,
+            // and the caller must not emit USER_DELETED a second time.
+            return Result.ok({ deletedOrgIds: [], anonymizedEmail: "", alreadyWiped: true });
+          }
 
           await tx.delete(schema.session).where(eq(schema.session.userId, userId));
           await tx.delete(schema.account).where(eq(schema.account.userId, userId));
@@ -357,6 +365,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           return Result.ok({
             deletedOrgIds: deletedOrgs.map((o) => o.id),
             anonymizedEmail,
+            alreadyWiped: false,
           });
         } catch (err) {
           this.instrumentation.capture(err);

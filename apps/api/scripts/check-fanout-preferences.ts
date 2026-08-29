@@ -4,6 +4,13 @@ import type { OutboxRecord } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";
 
+let failed = false;
+
+function check(label: string, ok: boolean) {
+  console.log(`${ok ? "  OK" : "  FAIL"}: ${label}`);
+  if (!ok) failed = true;
+}
+
 const email = process.env.SEED_EMAIL ?? "axxl41+dev@gmail.com";
 const [user] = await db
   .select({ id: authSchema.user.id })
@@ -63,32 +70,26 @@ await reset();
 await setPreference("activity", "in_app", false);
 await fanout("user.export.completed");
 const a = await inspect("[1] activity in_app=false, event non force ->");
-console.log(a.length === 0 ? "  OK: aucune notification creee" : "  ECHEC: notification creee");
+check("aucune notification creee", a.length === 0);
 
 await reset();
 await setPreference("activity", "in_app", true);
 await setPreference("activity", "email", false);
 await fanout("user.export.completed");
 const b = await inspect("[2] in_app=true, email=false ->");
-console.log(
-  b.length === 1 && b[0]?.emailPendingAt === null ? "  OK: creee sans email en attente" : "  ECHEC",
-);
+check("creee sans email en attente", b.length === 1 && b[0]?.emailPendingAt === null);
 
 await reset();
 await setPreference("security", "in_app", false);
 await setPreference("security", "email", false);
 await fanout("user.password_changed");
 const c = await inspect("[3] security tout coupe, event force ->");
-console.log(
-  c.length === 1 && c[0]?.emailPendingAt !== null
-    ? "  OK: forced ignore les preferences"
-    : "  ECHEC",
-);
+check("forced ignore les preferences", c.length === 1 && c[0]?.emailPendingAt !== null);
 
 await reset();
 await fanout("user.export.completed");
 const d = await inspect("[4] aucune preference enregistree ->");
-console.log(d.length === 1 && d[0]?.emailPendingAt !== null ? "  OK: defaut actif" : "  ECHEC");
+check("defaut actif", d.length === 1 && d[0]?.emailPendingAt !== null);
 
 const [membership] = await db
   .select({ organizationId: multiTenantSchema.member.organizationId })
@@ -120,7 +121,7 @@ await resetOrg();
 await setPreference("org", "in_app", false);
 await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
 const e = await inspect("[5] audience org, preference user in_app=false ->");
-console.log(e.length === 0 ? "  OK: le membre est filtre" : "  ECHEC: notification creee");
+check("le membre est filtre", e.length === 0);
 
 await reset();
 await resetOrg();
@@ -128,14 +129,14 @@ await setPreference("org", "in_app", false);
 await setOrgPreference("org", "in_app", true, true);
 await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
 const f = await inspect("[6] org lock enabled=true contre user false ->");
-console.log(f.length === 1 ? "  OK: le verrou org prime" : "  ECHEC");
+check("le verrou org prime", f.length === 1);
 
 await reset();
 await resetOrg();
 await setOrgPreference("org", "in_app", false, false);
 await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
 const g = await inspect("[7] defaut org non verrouille a false, aucun choix user ->");
-console.log(g.length === 0 ? "  OK: le defaut org s'applique" : "  ECHEC");
+check("le defaut org s'applique", g.length === 0);
 
 await reset();
 await resetOrg();
@@ -143,8 +144,13 @@ await setPreference("org", "in_app", true);
 await setOrgPreference("org", "in_app", false, false);
 await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
 const h = await inspect("[8] choix user true contre defaut org non verrouille false ->");
-console.log(h.length === 1 ? "  OK: le choix user prime sur un defaut org" : "  ECHEC");
+check("le choix user prime sur un defaut org", h.length === 1);
 
 await reset();
 await resetOrg();
-process.exit(0);
+
+if (failed) {
+  console.error("check:fanout FAILED");
+  process.exit(1);
+}
+console.log("check:fanout OK");

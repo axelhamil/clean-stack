@@ -1,21 +1,13 @@
 // `/internal/sweep-email-messages` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import {
-  type AnyPgColumn,
-  and,
-  count,
-  db,
-  emailSchema,
-  eq,
-  inArray,
-  lt,
-  sql,
-} from "@packages/drizzle";
+import { type AnyPgColumn, and, db, emailSchema, eq, inArray, lt, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { countEligibleWithTimeout } from "./sweep-count";
+import { sweepLockFor } from "./sweep-lock";
 import {
   type RetentionPass,
   runRetentionSweep,
@@ -31,8 +23,7 @@ const sentPredicate = (cutoff: Date) => and(eq(em.status, "sent"), lt(em.sentAt,
 const failedPredicate = (cutoff: Date) => and(eq(em.status, "failed"), lt(em.createdAt, cutoff));
 
 async function countEligible(where: ReturnType<typeof sentPredicate>): Promise<number> {
-  const rows = await db.select({ count: count() }).from(em).where(where);
-  return rows[0]?.count ?? 0;
+  return countEligibleWithTimeout(em, where);
 }
 
 async function purgeBatch(
@@ -83,6 +74,8 @@ export const sweepEmailMessagesRoutes = new Hono<HonoEnv>()
       passes: buildEmailSweepPasses(),
       logger: c.var.logger,
       label: "sweep-email-messages",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
+      lock: sweepLockFor("sweep-email-messages"),
     });
     return c.json(response);
   });

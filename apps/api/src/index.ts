@@ -27,6 +27,7 @@ import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
+import { buildServerOptions } from "./server-options";
 import { env } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-notification-emails.route";
@@ -327,6 +328,6 @@ export type { WebhookDeliveryStatus } from "./modules/webhooks/application/ports
 
 export type AppType = typeof routes;
 export default {
-  port: env.PORT,
+  ...buildServerOptions({ port: env.PORT, idleTimeoutSeconds: env.SERVER_IDLE_TIMEOUT_SECONDS }),
   fetch: app.fetch,
 };

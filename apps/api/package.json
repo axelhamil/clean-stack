@@ -16,6 +16,7 @@
     "check:wipe-rollback": "bun scripts/check-wipe-rollback.ts",
     "check:marksent": "bun scripts/check-marksent.ts",
     "check:enqueue": "bun scripts/check-enqueue.ts",
+    "check:sweep-lock": "bun scripts/check-sweep-lock.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --pass-with-no-tests",

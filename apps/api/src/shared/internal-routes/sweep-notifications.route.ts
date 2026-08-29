@@ -1,9 +1,11 @@
-import { and, count, db, inArray, isNotNull, lt, notificationSchema, sql } from "@packages/drizzle";
+import { and, db, inArray, isNotNull, lt, notificationSchema, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { countEligibleWithTimeout } from "./sweep-count";
+import { sweepLockFor } from "./sweep-lock";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
@@ -15,8 +17,7 @@ export function buildPurgeFilter(cutoff: Date) {
 
 async function countEligible(cutoff: Date): Promise<number> {
   const n = notificationSchema.notification;
-  const rows = await db.select({ count: count() }).from(n).where(buildPurgeFilter(cutoff));
-  return rows[0]?.count ?? 0;
+  return countEligibleWithTimeout(n, buildPurgeFilter(cutoff));
 }
 
 async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
@@ -54,6 +55,8 @@ export const sweepNotificationsRoutes = new Hono<HonoEnv>()
       ],
       logger: c.var.logger,
       label: "sweep-notifications",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
+      lock: sweepLockFor("sweep-notifications"),
     });
     return c.json(response);
   });

@@ -2,6 +2,7 @@ import { type IUnitOfWork, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
+import { DEFAULT_SWEEP_DEADLINE_MS } from "../../../../shared/internal-routes/sweep-runner";
 import { logger } from "../../../../shared/logger";
 import type { EmailError, IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -51,12 +52,15 @@ export interface ExecuteAccountWipeOutput {
 export interface ProcessPendingDeletionsInput {
   batchSize?: number;
   dryRun?: boolean;
+  deadlineMs?: number;
+  now?: () => number;
 }
 export interface ProcessPendingDeletionsOutput {
   processed: number;
   succeeded: string[];
   failed: Array<{ userId: string; errorCode: string }>;
   dryRun: boolean;
+  truncated: boolean;
 }
 
 export interface RequestDataExportInput {
@@ -282,6 +286,7 @@ export class RgpdService {
           const inner = await this.transactions.run(async (trx) => {
             const wipe = await this.rgpd.executeWipe(input.userId, trx);
             if (wipe.isFailure) return wipe;
+            if (wipe.getValue().alreadyWiped) return wipe;
             await emitEvent(
               this.outbox,
               EventTypes.USER_DELETED,
@@ -393,6 +398,7 @@ export class RgpdService {
             succeeded: [],
             failed: [],
             dryRun: input.dryRun === true,
+            truncated: false,
           });
         }
         const batch = batchResult.getValue();
@@ -404,12 +410,32 @@ export class RgpdService {
             succeeded: batch.map((r) => r.userId),
             failed: [],
             dryRun: true,
+            truncated: false,
           });
+
+        const now = input.now ?? Date.now;
+        const deadlineAt = now() + (input.deadlineMs ?? DEFAULT_SWEEP_DEADLINE_MS);
 
         const succeeded: string[] = [];
         const failed: Array<{ userId: string; errorCode: string }> = [];
+        let truncated = false;
 
         for (const row of batch) {
+          // Checked between wipes, never inside one: executeAccountWipe owns a transaction
+          // with cascade deletes and storage calls, and cutting it short would leave a
+          // half-erased account — the one outcome an Art. 17 sweep must never produce.
+          if (now() >= deadlineAt) {
+            truncated = true;
+            logger.warn(
+              {
+                processed: succeeded.length + failed.length,
+                remaining: batch.length - succeeded.length - failed.length,
+              },
+              "rgpd sweep hit the time budget — remaining accounts deferred to the next tick",
+            );
+            break;
+          }
+
           try {
             const res = await this.executeAccountWipe({ userId: row.userId });
             if (res.isSuccess) {
@@ -436,10 +462,11 @@ export class RgpdService {
         if (failed.length > 0) logger.warn({ failed }, "rgpd sweep had failures");
 
         return Result.ok({
-          processed: batch.length,
+          processed: succeeded.length + failed.length,
           succeeded,
           failed,
           dryRun: false,
+          truncated,
         });
       },
     );

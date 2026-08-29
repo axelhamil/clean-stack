@@ -1,3 +1,4 @@
+export type { SQL } from "drizzle-orm";
 export {
   and,
   arrayContains,
@@ -44,6 +45,7 @@ export * as policiesSchema from "./schema/policies";
 export * as quotaUsageSchema from "./schema/quota-usage";
 export * as rateLimitSchema from "./schema/rate-limit";
 export * as ssoSchema from "./schema/sso";
+export * as sweepSchema from "./schema/sweep";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
 export * as webhooksSchema from "./schema/webhooks";
 export { type FlushHandler, TransactionService } from "./services/transaction-manager.service";

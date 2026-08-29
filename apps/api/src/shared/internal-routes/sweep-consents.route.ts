@@ -1,27 +1,26 @@
 // `/internal/sweep-consents` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 // Purges ONLY guest (userId IS NULL) expired consent records. Authed records are compliance evidence — never purged.
 
-import { and, consentSchema, count, db, inArray, isNull, lt, sql } from "@packages/drizzle";
+import { and, consentSchema, db, inArray, isNull, lt, sql } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { countEligibleWithTimeout } from "./sweep-count";
+import { sweepLockFor } from "./sweep-lock";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
 async function countEligible(cutoff: Date): Promise<number> {
-  const rows = await db
-    .select({ count: count() })
-    .from(consentSchema.consentRecord)
-    .where(
-      and(
-        isNull(consentSchema.consentRecord.userId),
-        lt(consentSchema.consentRecord.expiresAt, cutoff),
-      ),
-    );
-  return rows[0]?.count ?? 0;
+  return countEligibleWithTimeout(
+    consentSchema.consentRecord,
+    and(
+      isNull(consentSchema.consentRecord.userId),
+      lt(consentSchema.consentRecord.expiresAt, cutoff),
+    ),
+  );
 }
 
 async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
@@ -68,6 +67,8 @@ export const sweepConsentsRoutes = new Hono<HonoEnv>()
       ],
       logger,
       label: "sweep-consents",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
+      lock: sweepLockFor("sweep-consents"),
     });
     return c.json(response);
   });

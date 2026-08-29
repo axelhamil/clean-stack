@@ -1,11 +1,13 @@
 // `/internal/sweep-webhook-delivery` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, count, db, inArray, lt, sql, webhooksSchema } from "@packages/drizzle";
+import { and, db, inArray, lt, sql, webhooksSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { countEligibleWithTimeout } from "./sweep-count";
+import { sweepLockFor } from "./sweep-lock";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
@@ -14,11 +16,10 @@ const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
 
 async function countEligible(cutoff: Date): Promise<number> {
   const wd = webhooksSchema.webhookDelivery;
-  const rows = await db
-    .select({ count: count() })
-    .from(wd)
-    .where(and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)));
-  return rows[0]?.count ?? 0;
+  return countEligibleWithTimeout(
+    wd,
+    and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)),
+  );
 }
 
 async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
@@ -57,6 +58,8 @@ export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
       ],
       logger: c.var.logger,
       label: "sweep-webhook-delivery",
+      deadlineMs: env.SWEEP_DEADLINE_MS,
+      lock: sweepLockFor("sweep-webhook-delivery"),
     });
     return c.json(response);
   });

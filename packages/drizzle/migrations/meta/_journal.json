@@ -141,6 +141,13 @@
       "when": 1788012569136,
       "tag": "0019_wakeful_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788031401881,
+      "tag": "0020_futuristic_wong",
+      "breakpoints": true
     }
   ]
 }
