@@ -412,6 +412,9 @@ importers:
       react-email:
         specifier: ^6.9.3
         version: 6.9.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@7.2.0)
+      react-i18next:
+        specifier: ^17.0.12
+        version: 17.0.12(i18next@26.4.0(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
     devDependencies:
       '@packages/typescript-config':
         specifier: workspace:*
@@ -431,6 +434,9 @@ importers:
       '@packages/access-control':
         specifier: workspace:*
         version: link:../access-control
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       zod:
         specifier: ^4.4.3
         version: 4.4.3

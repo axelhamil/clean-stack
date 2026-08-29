@@ -1,3 +1,4 @@
+import { LOCALES } from "@packages/i18n";
 import { z } from "zod";
 import { EventTypes } from "./event-types";
 
@@ -116,8 +117,8 @@ export type UserExportCompletedPayload = z.infer<typeof UserExportCompletedPaylo
 // so no admin can trigger this on someone else's behalf. `userId` alone
 // therefore satisfies §7 without a separate `actorUserId`.
 export const UserLocaleChangedPayload = UserRef.extend({
-  locale: z.string(),
-  previousLocale: z.string().nullable(),
+  locale: z.enum(LOCALES),
+  previousLocale: z.enum(LOCALES).nullable(),
 });
 export type UserLocaleChangedPayload = z.infer<typeof UserLocaleChangedPayload>;
 
