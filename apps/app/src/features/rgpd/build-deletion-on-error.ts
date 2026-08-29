@@ -15,18 +15,20 @@ export function buildDeletionOnError(
   fieldErrorCode: string,
   reportFieldError: FieldErrorReporter,
   t: TFunction<"errors">,
+  tSettings: TFunction<"settings">,
 ) {
   return (err: unknown) => {
     const code = errorCode(err);
+    const fallback = tSettings("deletion.requestFailed");
     if (code === "ACCOUNT_DELETION_BLOCKED") {
-      toast.error(formatApiError(err, "Couldn't request deletion. Please try again.", t));
+      toast.error(formatApiError(err, fallback, t));
       onClose();
       return;
     }
     if (code === fieldErrorCode) {
-      reportFieldError("Invalid credential");
+      reportFieldError(tSettings("deletion.invalidCredential"));
       return;
     }
-    toast.error(formatApiError(err, "Couldn't request deletion. Please try again.", t));
+    toast.error(formatApiError(err, fallback, t));
   };
 }

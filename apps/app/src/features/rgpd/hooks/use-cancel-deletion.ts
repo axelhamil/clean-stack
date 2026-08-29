@@ -8,6 +8,7 @@ import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 
 export function useCancelDeletion() {
   const { t } = useTranslation("errors");
+  const { t: tSettings } = useTranslation("settings");
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -15,9 +16,8 @@ export function useCancelDeletion() {
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
       broadcastAuthChange();
-      toast.success("Account deletion cancelled.");
+      toast.success(tSettings("deletion.cancelledToast"));
     },
-    onError: (err) =>
-      toast.error(formatApiError(err, "Couldn't cancel deletion. Please try again.", t)),
+    onError: (err) => toast.error(formatApiError(err, tSettings("deletion.cancelFailed"), t)),
   });
 }

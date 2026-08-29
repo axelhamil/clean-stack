@@ -18,6 +18,7 @@ import {
 } from "@packages/ui/components/ui/dialog";
 import { ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { DisableTwoFactorForm } from "../forms/disable-two-factor-form";
 import { EnableTwoFactorForm } from "../forms/enable-two-factor-form";
 
@@ -26,17 +27,19 @@ interface TwoFactorCardProps {
 }
 
 export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
+  const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
+  const action = enabled ? t("twoFactor.disableAction") : t("twoFactor.enableAction");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Two-factor authentication</CardTitle>
-        <CardDescription>
-          Require a 6-digit code from your authenticator app on every sign-in.
-        </CardDescription>
+        <CardTitle>{t("twoFactor.title")}</CardTitle>
+        <CardDescription>{t("twoFactor.description")}</CardDescription>
         <CardAction>
-          <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Off"}</Badge>
+          <Badge variant={enabled ? "default" : "secondary"}>
+            {enabled ? t("twoFactor.enabled") : t("twoFactor.off")}
+          </Badge>
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -44,16 +47,16 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
           <DialogTrigger asChild>
             <Button variant={enabled ? "destructive" : "outline"}>
               {enabled ? <ShieldOffIcon /> : <ShieldCheckIcon />}
-              {enabled ? "Disable" : "Enable"} two-factor
+              {action}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{enabled ? "Disable" : "Enable"} two-factor</DialogTitle>
+              <DialogTitle>{action}</DialogTitle>
               <DialogDescription>
                 {enabled
-                  ? "You'll only need your password to sign in."
-                  : "Set up an authenticator app and save your backup codes."}
+                  ? t("twoFactor.disableDialogDescription")
+                  : t("twoFactor.enableDialogDescription")}
               </DialogDescription>
             </DialogHeader>
             {enabled ? (

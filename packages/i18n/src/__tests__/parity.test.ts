@@ -46,6 +46,12 @@ describe("catalog parity", () => {
     "auth.signUp.namePlaceholder",
     "auth.twoFactor.codePlaceholder",
     "auth.twoFactor.recoveryCodePlaceholder",
+    // Same two non-linguistic placeholders on the account settings screen: a
+    // masked password and a digit pattern.
+    "settings.twoFactor.passwordPlaceholder",
+    "settings.twoFactor.codePlaceholder",
+    "settings.deletion.passwordPlaceholder",
+    "settings.deletion.totpPlaceholder",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {

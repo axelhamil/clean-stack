@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
 import type { AddPasskeyInput } from "../security.schema";
 
 export function useAddPasskey() {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -14,11 +16,11 @@ export function useAddPasskey() {
       if (result?.error) {
         if (result.error.message?.toLowerCase().includes("not allowed"))
           throw new Error("Cancelled");
-        throw new Error(result.error.message ?? "Failed to add passkey");
+        throw new Error(result.error.message ?? t("passkeys.addFailed"));
       }
     },
     onSuccess: async () => {
-      toast.success("Passkey added");
+      toast.success(t("passkeys.addedToast"));
       await queryClient.invalidateQueries({
         queryKey: passkeysQueryOptions.queryKey,
       });

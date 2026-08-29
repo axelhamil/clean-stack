@@ -5,6 +5,7 @@ import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { BackupCodesPanel } from "../components/backup-codes-panel";
 import { useGenerateBackupCodes } from "../hooks/use-generate-backup-codes";
 import { type PasswordPromptInput, passwordPromptSchema } from "../security.schema";
@@ -14,6 +15,7 @@ interface RegenerateBackupCodesFormProps {
 }
 
 export function RegenerateBackupCodesForm({ onDone }: RegenerateBackupCodesFormProps = {}) {
+  const { t } = useTranslation("settings");
   const [codes, setCodes] = useState<string[] | null>(null);
 
   if (codes) {
@@ -21,7 +23,7 @@ export function RegenerateBackupCodesForm({ onDone }: RegenerateBackupCodesFormP
       <div className="flex flex-col gap-4">
         <BackupCodesPanel codes={codes} />
         <Button type="button" className="w-full" onClick={() => onDone?.()}>
-          Done
+          {t("recoveryCodes.done")}
         </Button>
       </div>
     );
@@ -35,6 +37,7 @@ interface PasswordStepProps {
 }
 
 function PasswordStep({ onCodes }: PasswordStepProps) {
+  const { t } = useTranslation("settings");
   const mutation = useGenerateBackupCodes();
   const form = useForm<PasswordPromptInput>({
     resolver: zodResolver(passwordPromptSchema),
@@ -48,20 +51,17 @@ function PasswordStep({ onCodes }: PasswordStepProps) {
         className="flex flex-col gap-4"
         noValidate
       >
-        <TypographyMuted>
-          Regenerating invalidates all your previous backup codes. Confirm your password to
-          continue.
-        </TypographyMuted>
+        <TypographyMuted>{t("recoveryCodes.confirmPasswordPrompt")}</TypographyMuted>
         <FormTextField
           control={form.control}
           name="password"
-          label="Password"
+          label={t("twoFactor.passwordLabel")}
           type="password"
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder={t("twoFactor.passwordPlaceholder")}
         />
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Generating…" : "Regenerate codes"}
+          {mutation.isPending ? t("recoveryCodes.generating") : t("recoveryCodes.regenerate")}
         </Button>
       </form>
     </Form>

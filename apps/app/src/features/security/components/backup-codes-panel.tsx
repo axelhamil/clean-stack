@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { CopyIcon, DownloadIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 const DOWNLOAD_FILENAME = "clean-stack-recovery-codes.txt";
@@ -18,9 +19,11 @@ interface BackupCodesPanelProps {
 }
 
 export function BackupCodesPanel({ codes }: BackupCodesPanelProps) {
+  const { t } = useTranslation("settings");
+
   const copyCodes = () => {
     void navigator.clipboard.writeText(codes.join("\n"));
-    toast.success("Backup codes copied");
+    toast.success(t("backupCodes.copiedToast"));
   };
 
   const downloadCodes = () => {
@@ -36,18 +39,16 @@ export function BackupCodesPanel({ codes }: BackupCodesPanelProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Backup codes</CardTitle>
-        <CardDescription>
-          Save these in a safe place. Each can be used once if you lose your device.
-        </CardDescription>
+        <CardTitle>{t("backupCodes.title")}</CardTitle>
+        <CardDescription>{t("backupCodes.description")}</CardDescription>
         <CardAction className="flex gap-1">
           <Button type="button" variant="ghost" size="sm" onClick={copyCodes}>
             <CopyIcon />
-            Copy
+            {t("backupCodes.copy")}
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={downloadCodes}>
             <DownloadIcon />
-            Download
+            {t("backupCodes.download")}
           </Button>
         </CardAction>
       </CardHeader>

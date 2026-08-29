@@ -21,6 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toastError } from "../../../shared/api/errors/toast";
 import { preflightDeletionQueryOptions } from "../../../shared/api/queries/account-deletion";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
@@ -49,23 +50,23 @@ interface PendingStateProps {
 }
 
 function PendingState({ until }: PendingStateProps) {
+  const { t } = useTranslation("settings");
   const formatDate = useFormatDate();
   const formatDateTime = useFormatDateTime();
   const cancel = useCancelDeletion();
   return (
     <Card>
       <CardHeader>
-        <CardTitle variant="destructive">Account deletion scheduled</CardTitle>
+        <CardTitle variant="destructive">{t("deletion.scheduledTitle")}</CardTitle>
         <CardDescription>
-          Your account is scheduled for deletion on {formatDateTime(until)}. You can cancel any time
-          before then.
+          {t("deletion.scheduledDescription", { date: formatDateTime(until) })}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <Alert variant="destructive">
           <AlertTriangleIcon />
           <AlertDescription>
-            After {formatDate(until)}, your data will be anonymized and cannot be recovered.
+            {t("deletion.anonymizedWarning", { date: formatDate(until) })}
           </AlertDescription>
         </Alert>
         <Button
@@ -75,7 +76,7 @@ function PendingState({ until }: PendingStateProps) {
           disabled={cancel.isPending}
           onClick={() => cancel.mutate()}
         >
-          {cancel.isPending ? "Cancelling…" : "Cancel deletion"}
+          {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}
         </Button>
       </CardContent>
     </Card>
@@ -87,26 +88,22 @@ interface ActiveStateProps {
 }
 
 function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
+  const { t } = useTranslation("settings");
   const preflight = useQuery(preflightDeletionQueryOptions);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle variant="destructive">Delete account</CardTitle>
-        <CardDescription>
-          Permanently anonymizes your data after a 7-day grace period. RGPD Art. 17 (right to
-          erasure).
-        </CardDescription>
+        <CardTitle variant="destructive">{t("deletion.title")}</CardTitle>
+        <CardDescription>{t("deletion.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {preflight.isPending ? (
-          <TypographyMuted>Checking account status…</TypographyMuted>
+          <TypographyMuted>{t("deletion.checking")}</TypographyMuted>
         ) : preflight.isError ? (
           <Alert variant="destructive">
             <AlertTriangleIcon />
-            <AlertDescription>
-              Could not verify account status. Refresh the page and try again.
-            </AlertDescription>
+            <AlertDescription>{t("deletion.checkFailed")}</AlertDescription>
           </Alert>
         ) : preflight.data.blockingOrgs.length > 0 ? (
           <BlockingOrgsList orgs={preflight.data.blockingOrgs} />
@@ -114,10 +111,7 @@ function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
           <>
             <Alert variant="destructive">
               <AlertTriangleIcon />
-              <AlertDescription>
-                Deleting your account will anonymize all your data after a 7-day grace period. This
-                action cannot be undone after that period.
-              </AlertDescription>
+              <AlertDescription>{t("deletion.warning")}</AlertDescription>
             </Alert>
             <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
           </>
@@ -132,6 +126,7 @@ interface BlockingOrgsListProps {
 }
 
 function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
+  const { t } = useTranslation("settings");
   const navigate = useNavigate();
   const { switchOrg } = useSetActiveOrg();
 
@@ -139,7 +134,7 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
     try {
       await switchOrg(orgId);
     } catch (err) {
-      toastError(err, "Failed to switch organization");
+      toastError(err, t("deletion.switchOrgFailed"));
       return;
     }
     void navigate({ to: "/settings/organization" });
@@ -147,17 +142,14 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <TypographyMuted>
-        You are the only owner of these organizations. Transfer ownership or delete each one before
-        you can delete your account.
-      </TypographyMuted>
+      <TypographyMuted>{t("deletion.blockingIntro")}</TypographyMuted>
       <ul className="flex flex-col gap-2">
         {orgs.map((org) => (
           <ListRow key={org.orgId}>
             <ListRowContent>
               <TypographyLarge>{org.orgName}</TypographyLarge>
               <TypographyMuted>
-                {org.otherMembersCount} other member{org.otherMembersCount === 1 ? "" : "s"}
+                {t("deletion.otherMembers", { count: org.otherMembersCount })}
               </TypographyMuted>
             </ListRowContent>
             <ListRowAction>
@@ -167,7 +159,7 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
                 size="sm"
                 onClick={() => void resolveOrg(org.orgId)}
               >
-                Resolve
+                {t("deletion.resolve")}
               </Button>
             </ListRowAction>
           </ListRow>
@@ -182,22 +174,20 @@ interface DeleteDialogProps {
 }
 
 function DeleteDialog({ twoFactorEnabled }: DeleteDialogProps) {
+  const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button type="button" variant="destructive" className="self-start">
           <TrashIcon />
-          Delete account
+          {t("deletion.title")}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete your account</AlertDialogTitle>
-          <AlertDialogDescription>
-            Your data will be anonymized after a 7-day grace period. You can cancel any time during
-            those 7 days by signing in.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t("deletion.dialogTitle")}</AlertDialogTitle>
+          <AlertDialogDescription>{t("deletion.dialogDescription")}</AlertDialogDescription>
         </AlertDialogHeader>
         {twoFactorEnabled ? (
           <RequestDeletionTotpForm onClose={() => setOpen(false)} />
