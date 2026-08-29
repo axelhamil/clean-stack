@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
+import { AppErrorException } from "@packages/ddd-kit";
 import type { Env, Input, MiddlewareHandler, ValidationTargets } from "hono";
-import { HTTPException } from "hono/http-exception";
 import type { ZodType } from "zod";
 
 /**
@@ -30,20 +30,32 @@ type ZV = <
 ) => MiddlewareHandler<E, P, V>;
 
 /**
- * Drop-in replacement for `zValidator` that throws `HTTPException(400)` on
+ * Drop-in replacement for `zValidator` that throws `REQUEST_INVALID` on
  * validation failure instead of returning a `Response` inline.
  *
- * Why: the default `zValidator` widens the route's return type with an error
- * branch, which pollutes Hono RPC's inferred response union on the client.
- * Throwing keeps the type clean and delegates error formatting to the central
- * `errorHandler`.
+ * Why an error *code* and not a bare `HTTPException`: the client resolves user
+ * copy from the code, so a rejection that carries none falls through to the
+ * caller's generic fallback and the user is told "please try again" about a
+ * field they could have fixed. A named code lands on the localised
+ * `_INVALID` copy in every language, and the offending fields travel in
+ * `metadata` where a support ticket or a log line can still name them.
+ *
+ * Why throwing at all: the default `zValidator` widens the route's return type
+ * with an error branch, which pollutes Hono RPC's inferred response union on
+ * the client. Throwing keeps the type clean and delegates error formatting to
+ * the central `errorHandler`.
  */
 export const zV = ((target: keyof ValidationTargets, schema: ZodType) =>
   zValidator(target, schema, (result) => {
     if (!result.success) {
-      const message = result.error.issues
-        .map((issue) => `${issue.path.join(".") || "_"}: ${issue.message}`)
-        .join("; ");
-      throw new HTTPException(400, { message });
+      const fields = result.error.issues.map((issue) => ({
+        path: issue.path.join(".") || "_",
+        message: issue.message,
+      }));
+      throw new AppErrorException({
+        code: "REQUEST_INVALID",
+        message: fields.map((f) => `${f.path}: ${f.message}`).join("; "),
+        metadata: { fields },
+      });
     }
   })) as ZV;
