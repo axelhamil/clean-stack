@@ -94,7 +94,7 @@ Pages: `/organization/new`, `/settings/general`, `/settings/team`, `/dashboard`,
 
 **`EmailDeliveryWorker`** (`shared/services/email-delivery-worker.service.ts`) — polls every 2 s, `FOR UPDATE SKIP LOCKED`, up to 300 rows per tick, chunked 100/request, 10 req/s (Resend team limit).
 
-**Retry** — decorrelated jitter (`shared/jitter.ts`). Ceiling → `status = 'failed'`, emits `email.delivery.exhausted`. **Idempotency** — `${idempotencyKey}/${index}` per recipient. **Retention sweep** — `POST /internal/sweep-email-messages` (HMAC-gated, `EMAIL_MESSAGE_RETENTION_DAYS=7`). `failed` rows kept as audit trace.
+**Retry** — decorrelated jitter (`shared/jitter.ts`). Ceiling → `status = 'failed'`, emits `email.delivery.exhausted`. **Idempotency** — per-recipient key: `EmailRecipient.idempotencyKey` when set, else `${options.idempotencyKey}#${index}` (namespaced with `#`, shared by both the template and the raw batch path). **Retention sweep** — `POST /internal/sweep-email-messages` (HMAC-gated, two passes: `EMAIL_MESSAGE_RETENTION_DAYS=7` for `status = 'sent'`, `EMAIL_MESSAGE_FAILED_RETENTION_DAYS=90` for `status = 'failed'`).
 
 **DNS hardening required before prod**: SPF, DKIM (3 Resend CNAMEs), DMARC. Gmail/Yahoo/Outlook reject unauthenticated bulk senders since 2024-2025.
 
