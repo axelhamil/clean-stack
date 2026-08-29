@@ -1,7 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { formatDate, formatDateTime } from "../utils";
 
 const D = "2026-03-09T14:05:00.000Z";
+
+// Intl.DateTimeFormat without an explicit `timeZone` renders in the runtime's
+// default timezone, which `new Date(D)` can then straddle a day boundary in —
+// 14:05 UTC is already tomorrow local at UTC+14 and still yesterday at
+// UTC-12. Pinning TZ makes the assertions below deterministic regardless of
+// where CI runs.
+beforeAll(() => {
+  vi.stubEnv("TZ", "UTC");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("formatDate", () => {
   it("formats day-first in French and month-first in English", () => {

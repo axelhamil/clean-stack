@@ -25,7 +25,13 @@ export default {
   validation: {
     required: "This field is required.",
     invalidEmail: "Enter a valid email address.",
+    invalidUrl: "Enter a valid URL.",
+    invalidFormat: "Invalid format.",
     tooSmall: "Must be at least {{minimum}} characters.",
     tooBig: "Must be at most {{maximum}} characters.",
+    tooFewItems: "Select at least {{minimum}}.",
+    passwordsMismatch: "Passwords do not match.",
+    acceptPolicies: "You must accept the required policies.",
+    invalidEventSelection: "Contains an unknown or non-subscribable event.",
   },
 } as const;
