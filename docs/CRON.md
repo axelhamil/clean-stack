@@ -38,6 +38,19 @@ INTERNAL_AUTH_LAYERS=signature
 
 ## Bounds
 
+**Upgrading an existing checkout.** `pnpm bootstrap` only creates `.env` from
+`.env.example` when `.env` does not already exist — it never overwrites one.
+Anyone who ran `pnpm bootstrap` before this branch landed has a `.env` missing
+the variables below; `check:sweep-lock` (and the boot-time ordering check)
+will fail until they're added by hand:
+
+```bash
+SWEEP_DEADLINE_MS=90000
+SERVER_IDLE_TIMEOUT_SECONDS=120
+INTERNAL_FETCH_TIMEOUT_MS=150000
+INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)   # required to run check:sweep-lock/check:fanout locally
+```
+
 ### Single-flight
 
 Each sweep label holds a lease in `sweep_lock` for the duration of its run. A
@@ -91,6 +104,19 @@ where `SWEEP_DEADLINE_MS < SERVER_IDLE_TIMEOUT_SECONDS * 1000 <
 INTERNAL_FETCH_TIMEOUT_MS` does not hold, so a bad `.env` fails the boot
 rather than silently misbehaving in prod.
 
+There is a fourth bound, `SHUTDOWN_GRACE_PERIOD_MS` (default 15 000 ms, see
+[HEALTH-PROBES.md](HEALTH-PROBES.md)), and it is **deliberately not nested**
+with the three above. A `SIGTERM` during a sweep — which this branch made
+routinely 90–110 s long — fires well outside that 15 s grace window: the
+in-flight sweep's transaction rolls back cleanly (no corruption), but its
+lease in `sweep_lock` is left behind and answers `skipped` to the next one or
+two ticks until it expires on its own. This is a known, accepted gap, not an
+oversight — folding a 90 s+ sweep into a 15 s shutdown grace would mean either
+stretching every deploy's drain window far past what the health-probe
+contract needs for ordinary requests, or teaching the shutdown handler to wait
+out an arbitrary sweep, which reintroduces the exact "wedge on shutdown" risk
+the grace period exists to avoid.
+
 | Bound | Env var | Default | What it protects |
 |---|---|---|---|
 | Sweep budget | `SWEEP_DEADLINE_MS` | 90 000 ms | The batched loop inside `POST /internal/sweep-*`, and the per-account loop in `rgpd-sweep`. Checked *between* units of work — a started batch or wipe always finishes, so no transaction is cut short and no account is half-erased. |
@@ -106,12 +132,18 @@ on the API without also raising `INTERNAL_FETCH_TIMEOUT_MS` on the cron service 
 the cron aborting a legitimate long sweep and reporting it `UNREACHABLE` — always raise
 both together.
 
-**`SERVER_IDLE_TIMEOUT_SECONDS` is not only about sweeps.** `GET /notifications/stream`
-heartbeats every 25 s, so any value at or below that drops every SSE connection on
-a cadence with no visible link to this table — this was measured in production
-(every stream connection was being dropped and reconnected at Bun's implicit 10 s
-default), not inferred from reading the code. Keep it well above both the
-heartbeat and the sweep budget.
+**`SERVER_IDLE_TIMEOUT_SECONDS` is not only about sweeps.** It is a single,
+process-wide `Bun.serve` setting: raising it from Bun's 10 s default to 120 s
+raises the idle budget for **every** socket the API serves, public traffic
+included, not just the internal sweep rail — there is no way to scope it to
+`/internal/*` alone. The reason it moved was `GET /notifications/stream`:
+its heartbeat is every 25 s, so any value at or below that drops every SSE
+connection on a cadence with no visible link to this table — this was
+measured in production (every stream connection was being dropped and
+reconnected at Bun's implicit 10 s default), not inferred from reading the
+code. Keep it well above both the heartbeat and the sweep budget, and be
+aware the cost of that headroom lands on the public surface too — a slow or
+stalled public handler now also gets 120 s before its socket is cut.
 
 ### Response fields
 
