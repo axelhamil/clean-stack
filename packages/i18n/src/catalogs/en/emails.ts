@@ -35,7 +35,7 @@ export default {
   },
   orgInvitation: {
     heading: "You have been invited",
-    body: "{{inviterName}} has invited you to join {{orgName}} as a {{role}}.",
+    body: "{{inviterName}} has invited you to join <org>{{orgName}}</org> as a {{role}}.",
     cta: "Accept invitation",
   },
   dataExportReady: {
@@ -79,7 +79,7 @@ export default {
   apiTokenLeaked: {
     heading: "API token revoked",
     greeting: "Hi {{name}},",
-    body: "Your API token {{tokenName}} was detected in a public repository and has been automatically revoked on {{revokedAt}} to protect your account.",
+    body: "Your API token <token>{{tokenName}}</token> was detected in a public repository and has been automatically revoked on {{revokedAt}} to protect your account.",
     help: "If you believe this was a mistake or need to regenerate the token, you can do so in your account settings.",
   },
   notificationDigest: {

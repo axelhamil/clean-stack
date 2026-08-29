@@ -1,18 +1,26 @@
-import type { TFunction } from "i18next";
 import { Button, Heading, Text } from "react-email";
-import type { EmailTemplates } from "../templates";
+import { Trans } from "react-i18next";
+import type { EmailProps } from "../templates";
 import { EmailLayout } from "./layout";
 
-type OrgInvitationVars = EmailTemplates["org_invitation"];
-interface OrgInvitationProps extends OrgInvitationVars {
-  t: TFunction<"emails">;
-}
-
-export function OrgInvitation({ inviterName, orgName, role, inviteUrl, t }: OrgInvitationProps) {
+export function OrgInvitation({
+  inviterName,
+  orgName,
+  role,
+  inviteUrl,
+  t,
+}: EmailProps<"org_invitation">) {
   return (
     <EmailLayout preview={t("subjects.orgInvitation", { orgName })} t={t}>
       <Heading as="h1">{t("orgInvitation.heading")}</Heading>
-      <Text>{t("orgInvitation.body", { inviterName, orgName, role })}</Text>
+      <Text>
+        <Trans
+          t={t}
+          i18nKey="orgInvitation.body"
+          values={{ inviterName, orgName, role }}
+          components={{ org: <strong /> }}
+        />
+      </Text>
       <Button href={inviteUrl}>{t("orgInvitation.cta")}</Button>
       <Text>{inviteUrl}</Text>
     </EmailLayout>

@@ -2,6 +2,7 @@ import { createI18n, DEFAULT_LOCALE, type Locale, loadCatalog } from "@packages/
 import { render } from "@react-email/render";
 import type { TFunction } from "i18next";
 import type { ComponentType } from "react";
+import { I18nextProvider } from "react-i18next";
 import { ApiTokenLeaked } from "./components/api-token-leaked";
 import { BackupCodeUsed } from "./components/backup-code-used";
 import { ChangeEmail } from "./components/change-email";
@@ -70,7 +71,15 @@ export async function renderTemplate<K extends EmailTemplateKey>(
 
   const entry = TEMPLATES[key];
   const Component = entry.component as unknown as ComponentType<Record<string, unknown>>;
-  const element = <Component {...variables} t={t} />;
+  // `<Trans>` resolves its interpolation through the i18next instance in
+  // context, never through the `t` prop alone; the provider is what keeps that
+  // resolution bound to *this* render's instance rather than a process-wide
+  // singleton the next recipient would mutate.
+  const element = (
+    <I18nextProvider i18n={i18n}>
+      <Component {...variables} t={t} />
+    </I18nextProvider>
+  );
   const [html, text] = await Promise.all([render(element), render(element, { plainText: true })]);
   return { subject: entry.subject(t, variables), html, text };
 }

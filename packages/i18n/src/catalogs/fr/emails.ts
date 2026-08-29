@@ -35,7 +35,7 @@ export default {
   },
   orgInvitation: {
     heading: "Vous avez été invité",
-    body: "{{inviterName}} vous invite à rejoindre {{orgName}} en tant que {{role}}.",
+    body: "{{inviterName}} vous invite à rejoindre <org>{{orgName}}</org> en tant que {{role}}.",
     cta: "Accepter l'invitation",
   },
   dataExportReady: {
@@ -79,7 +79,7 @@ export default {
   apiTokenLeaked: {
     heading: "Jeton d'API révoqué",
     greeting: "Bonjour {{name}},",
-    body: "Votre jeton d'API {{tokenName}} a été détecté dans un dépôt public et a été automatiquement révoqué le {{revokedAt}} afin de protéger votre compte.",
+    body: "Votre jeton d'API <token>{{tokenName}}</token> a été détecté dans un dépôt public et a été automatiquement révoqué le {{revokedAt}} afin de protéger votre compte.",
     help: "Si vous pensez qu'il s'agit d'une erreur ou si vous devez régénérer le jeton, vous pouvez le faire dans les paramètres de votre compte.",
   },
   notificationDigest: {
