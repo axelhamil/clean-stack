@@ -53,7 +53,7 @@ check("caller re-acquires after release", owner2 !== null);
 if (owner2) await releaseSweepLease(label, owner2);
 
 // [2] a lease left behind by a crashed run (already expired) is reclaimable.
-const expiredOwner = await acquireSweepLease(label, -1_000);
+const expiredOwner = await acquireSweepLease(label, -60_000);
 check("expired lease is written", expiredOwner !== null);
 const reclaimOwner = await acquireSweepLease(label, 60_000);
 check("next caller reclaims the expired lease", reclaimOwner !== null);
@@ -71,7 +71,7 @@ check("release deletes the row", rowsAfterRelease.length === 0);
 // [4] a stale owner's release does not steal a successor's lease — the bug this
 // ownership token exists to close: an overrunning run must not delete the row a
 // legitimate successor now holds just because it shares the same label.
-const staleOwner = await acquireSweepLease(label, -1_000);
+const staleOwner = await acquireSweepLease(label, -60_000);
 const successorOwner = await acquireSweepLease(label, 60_000);
 if (staleOwner) await releaseSweepLease(label, staleOwner);
 const rowsAfterStaleRelease = await db
