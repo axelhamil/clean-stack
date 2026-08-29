@@ -45,7 +45,7 @@ function ConsumeToken({ token }: ConsumeTokenProps) {
   if (mutation.isError) return <VerifyEmailError message={mutation.error.message} />;
 
   return (
-    <AuthShell title={t("verifyEmail.verifyingTitle")} description={t("magicLink.oneMoment")}>
+    <AuthShell title={t("verifyEmail.verifyingTitle")} description={t("verifyEmail.oneMoment")}>
       <TypographyMuted>{t("verifyEmail.hangTight")}</TypographyMuted>
     </AuthShell>
   );

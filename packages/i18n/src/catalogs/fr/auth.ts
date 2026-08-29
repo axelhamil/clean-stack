@@ -36,7 +36,7 @@ export default {
   },
   emailField: {
     label: "E-mail",
-    placeholder: "you@example.com",
+    placeholder: "vous@example.com",
   },
   passwordField: {
     hint: "Au moins 15 caractères. Évitez les mots de passe exposés dans des fuites connues.",
@@ -96,6 +96,7 @@ export default {
   },
   verifyEmail: {
     verifyingTitle: "Vérification de votre e-mail…",
+    oneMoment: "Un instant.",
     hangTight: "Un instant, s'il vous plaît.",
     failedTitle: "Échec de la vérification",
     failedFallback: "Échec de la vérification",

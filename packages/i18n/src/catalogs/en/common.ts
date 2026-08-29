@@ -49,6 +49,7 @@ export default {
       light: "Theme: Light",
       dark: "Theme: Dark",
       system: "Theme: System",
+      active: "active",
     },
     copyOrgSlug: "Copy org slug",
     orgSlugCopiedToast: "Org slug copied to clipboard",

@@ -41,11 +41,12 @@ describe("catalog parity", () => {
       "common.commandPalette.groups.actions",
       "common.contextualTabs.webhooks",
       "common.contextualTabs.notifications",
-      // Non-linguistic placeholders: a masked password, an example email, a proper
-      // noun, a digit pattern and a recovery-code pattern don't get translated.
+      // Non-linguistic placeholders: a masked password, a proper noun, a digit
+      // pattern and a recovery-code pattern don't get translated. The example
+      // email address IS translated (`you@` -> `vous@`, RFC 2606's
+      // `example.com` stays), so it is deliberately not listed here.
       "auth.signIn.passwordPlaceholder",
       "auth.signUp.namePlaceholder",
-      "auth.emailField.placeholder",
       "auth.twoFactor.codePlaceholder",
       "auth.twoFactor.recoveryCodePlaceholder",
     ]);

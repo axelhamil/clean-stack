@@ -49,6 +49,7 @@ export default {
       light: "Thème : clair",
       dark: "Thème : sombre",
       system: "Thème : système",
+      active: "actif",
     },
     copyOrgSlug: "Copier l'identifiant de l'organisation",
     orgSlugCopiedToast: "Identifiant de l'organisation copié dans le presse-papiers",

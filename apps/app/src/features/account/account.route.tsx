@@ -1,4 +1,4 @@
-import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { navLinkVariants } from "@packages/ui/components/ui/nav-link";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Trans, useTranslation } from "react-i18next";
@@ -37,9 +37,7 @@ function AccountPage() {
           i18nKey="account.dataRightsNotice"
           components={{
             link: (
-              <NavLink asChild variant="underline">
-                <Link to="/legal/data-rights" />
-              </NavLink>
+              <Link to="/legal/data-rights" className={navLinkVariants({ variant: "underline" })} />
             ),
           }}
         />

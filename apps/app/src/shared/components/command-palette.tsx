@@ -257,7 +257,7 @@ function useActionsGroup(t: TFunction<"common">): CommandGroupConfig {
     id: `theme:${option.value}`,
     label: option.label,
     icon: option.icon,
-    hint: theme === option.value ? t("commandPalette.organizationActive") : undefined,
+    hint: theme === option.value ? t("commandPalette.theme.active") : undefined,
     run: () => setTheme(option.value),
   }));
 

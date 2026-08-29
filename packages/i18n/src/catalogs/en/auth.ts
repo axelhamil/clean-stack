@@ -95,6 +95,7 @@ export default {
   },
   verifyEmail: {
     verifyingTitle: "Verifying your email…",
+    oneMoment: "One moment.",
     hangTight: "Hang tight.",
     failedTitle: "Verification failed",
     failedFallback: "Verification failed",
