@@ -17,17 +17,27 @@ export const profileRoutes = new Hono<{ Variables: AuthVariables }>().put(
     const { locale } = c.req.valid("json");
     const userId = c.get("user").id;
 
-    const previous = await di.IProfileStore.findLocale(userId);
-    if (previous.isFailure) throw new AppErrorException(previous.getError());
-    const previousLocale = previous.getValue();
+    await di.ITransactionService.run(async (tx) => {
+      const previous = await di.IProfileStore.findLocale(userId, tx);
+      if (previous.isFailure) throw new AppErrorException(previous.getError());
+      const previousLocale = previous.getValue();
 
-    const written = await di.IProfileStore.setLocale(userId, locale);
-    if (written.isFailure) throw new AppErrorException(written.getError());
+      const written = await di.IProfileStore.setLocale(userId, locale, tx);
+      if (written.isFailure) throw new AppErrorException(written.getError());
 
-    await emitEvent(di.IOutboxRepository, EventTypes.USER_LOCALE_CHANGED, "user", userId, {
-      userId,
-      locale,
-      previousLocale: previousLocale.isSome() ? previousLocale.unwrap() : null,
+      await emitEvent(
+        di.IOutboxRepository,
+        EventTypes.USER_LOCALE_CHANGED,
+        "user",
+        userId,
+        {
+          userId,
+          locale,
+          previousLocale: previousLocale.isSome() ? previousLocale.unwrap() : null,
+        },
+        {},
+        tx,
+      );
     });
 
     return c.json({ ok: true as const });
