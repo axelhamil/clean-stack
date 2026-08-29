@@ -34,4 +34,24 @@ describe("formatApiError", () => {
   it("returns the caller fallback for a non-object error", () => {
     expect(formatApiError(new Error("boom"), "fb", t)).toBe("fb");
   });
+
+  it("surfaces the server message for a 4xx the catalog does not cover", () => {
+    expect(formatApiError({ status: 400, message: "url: Enter a valid https URL" }, "fb", t)).toBe(
+      "url: Enter a valid https URL",
+    );
+    expect(formatApiError({ status: 400, code: "HTTP_400", message: "url: bad" }, "fb", t)).toBe(
+      "url: bad",
+    );
+  });
+
+  it("keeps the localised fallback for a network failure and for a 5xx", () => {
+    expect(formatApiError(Object.assign(new Error("Failed to fetch")), "fb", t)).toBe("fb");
+    expect(formatApiError({ status: 500, message: "Internal Server Error" }, "fb", t)).toBe("fb");
+  });
+
+  it("resolves the validator code through the suffix table", () => {
+    expect(formatApiError({ status: 400, code: "REQUEST_INVALID", message: "raw" }, "fb", t)).toBe(
+      enCatalog.errors.byCode.REQUEST_INVALID,
+    );
+  });
 });

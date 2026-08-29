@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { rateLimitedMessage } from "../../shared/api/errors/messages";
+import { messageFromCode, rateLimitedMessage } from "../../shared/api/errors/messages";
 import { authClient } from "../../shared/auth/auth-client";
 
 interface BetterAuthError {
@@ -24,7 +24,7 @@ export function resolveAuthError(
 ): string {
   if (error.status === 429) return rateLimitedMessage(tErrors);
   if (error.code) {
-    const mapped = tErrors(`byCode.${error.code}` as never, { defaultValue: "" });
+    const mapped = messageFromCode(error.code, tErrors);
     if (mapped) return mapped;
   }
   return t(fallbackKey as never);
