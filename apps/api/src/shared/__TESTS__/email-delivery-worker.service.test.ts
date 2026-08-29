@@ -100,7 +100,9 @@ mock.module("@packages/drizzle", () => ({
 // this file asserts on rendered content (only on which row got claimed/sent),
 // so exercising the real renderer is both safe and cheap.
 
-const { EmailDeliveryWorker } = await import("../services/email-delivery-worker.service");
+const { EmailDeliveryWorker, chunkIdempotencyKey } = await import(
+  "../services/email-delivery-worker.service"
+);
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
 
 const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
@@ -241,5 +243,34 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     for (const s of h.settled) {
       expect(s.nextAttemptAt.isSome()).toBe(true);
     }
+  });
+});
+
+describe("chunkIdempotencyKey", () => {
+  const keyed = (key: string | null) =>
+    row({ idempotencyKey: key === null ? Option.none<string>() : Option.some(key) });
+
+  it("distinguishes key sets that differ only past 256 characters", async () => {
+    // Both sets join to `<prefix>-one|<prefix>-two` — identical for the first 256
+    // characters, differing only after them. 250 + 4 = 254 characters for the first key
+    // alone, so the separator and the whole second key fall past the cut.
+    const prefix = "a".repeat(250);
+    const first = await chunkIdempotencyKey([keyed(`${prefix}-one`), keyed(`${prefix}-two`)]);
+    const second = await chunkIdempotencyKey([keyed(`${prefix}-one`), keyed(`${prefix}-three`)]);
+
+    expect(first.isSome()).toBe(true);
+    expect(second.isSome()).toBe(true);
+    expect(first.unwrap()).not.toBe(second.unwrap());
+  });
+
+  it("is order-independent", async () => {
+    const a = await chunkIdempotencyKey([keyed("k1"), keyed("k2")]);
+    const b = await chunkIdempotencyKey([keyed("k2"), keyed("k1")]);
+    expect(a.unwrap()).toBe(b.unwrap());
+  });
+
+  it("returns none when any row lacks a key", async () => {
+    const result = await chunkIdempotencyKey([keyed("k1"), keyed(null)]);
+    expect(result.isNone()).toBe(true);
   });
 });
