@@ -51,6 +51,11 @@ export type RetentionPass = {
   onBatchError?: (err: unknown) => SweepBatchErrorDecision;
 };
 
+export type SweepLock = {
+  acquire: () => Promise<boolean>;
+  release: () => Promise<void>;
+};
+
 export type RunRetentionSweepOptions = {
   body: SweepBody;
   passes: RetentionPass[];
@@ -59,6 +64,7 @@ export type RunRetentionSweepOptions = {
   deadlineMs?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  lock?: SweepLock;
 };
 
 export type SweepResponse = {
@@ -69,6 +75,7 @@ export type SweepResponse = {
   deletedPerPass: Record<string, number>;
   stopReasons: Record<string, SweepStopReason>;
   truncated: boolean;
+  skipped: boolean;
 };
 
 export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise<SweepResponse> {
@@ -86,6 +93,20 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
     `${opts.label} started`,
   );
 
+  if (opts.lock && !(await opts.lock.acquire())) {
+    opts.logger.warn({ label: opts.label }, `${opts.label} skipped — another run holds the lease`);
+    return {
+      deleted: 0,
+      durationMs: now() - startMs,
+      dryRun,
+      batchCount: 0,
+      deletedPerPass: {},
+      stopReasons: {},
+      truncated: false,
+      skipped: true,
+    };
+  }
+
   // One absolute deadline for the whole request, shared by every pass: the budget
   // exists to keep the response inside the server's idleTimeout, and that is a
   // property of the request, not of an individual pass.
@@ -96,30 +117,34 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
   const deletedPerPass: Record<string, number> = {};
   const stopReasons: Record<string, SweepStopReason> = {};
 
-  // Sequential on purpose: each pass may loop hundreds of batched transactions, and
-  // running passes in parallel halves the connection-pool headroom left for prod traffic.
-  for (const pass of opts.passes) {
-    // Cutoff is relative to the request's start, not to whenever this pass happens to
-    // run: reading `now()` again here would burn a clock tick per pass for no benefit
-    // (the deadline check below is what actually protects the budget) and would let a
-    // slow earlier pass drift every later pass's retention window.
-    const cutoff = new Date(startMs - pass.retentionDays * 24 * 60 * 60 * 1000);
-    const run = await runBatchedSweep({
-      purgeBatch: (size) => pass.purgeBatch(cutoff, size),
-      countEligible: () => pass.countEligible(cutoff),
-      batchSize,
-      dryRun,
-      logger: opts.logger,
-      label: `${opts.label}:${pass.label}`,
-      onBatchError: pass.onBatchError,
-      deadlineAt,
-      now,
-      sleep: opts.sleep,
-    });
-    deleted += run.deleted;
-    batchCount += run.batchCount;
-    deletedPerPass[pass.label] = run.deleted;
-    stopReasons[pass.label] = run.stopReason;
+  try {
+    // Sequential on purpose: each pass may loop hundreds of batched transactions, and
+    // running passes in parallel halves the connection-pool headroom left for prod traffic.
+    for (const pass of opts.passes) {
+      // Cutoff is relative to the request's start, not to whenever this pass happens to
+      // run: reading `now()` again here would burn a clock tick per pass for no benefit
+      // (the deadline check below is what actually protects the budget) and would let a
+      // slow earlier pass drift every later pass's retention window.
+      const cutoff = new Date(startMs - pass.retentionDays * 24 * 60 * 60 * 1000);
+      const run = await runBatchedSweep({
+        purgeBatch: (size) => pass.purgeBatch(cutoff, size),
+        countEligible: () => pass.countEligible(cutoff),
+        batchSize,
+        dryRun,
+        logger: opts.logger,
+        label: `${opts.label}:${pass.label}`,
+        onBatchError: pass.onBatchError,
+        deadlineAt,
+        now,
+        sleep: opts.sleep,
+      });
+      deleted += run.deleted;
+      batchCount += run.batchCount;
+      deletedPerPass[pass.label] = run.deleted;
+      stopReasons[pass.label] = run.stopReason;
+    }
+  } finally {
+    if (opts.lock) await opts.lock.release();
   }
 
   const truncated = Object.values(stopReasons).some((r) => r === "budget" || r === "batch-cap");
@@ -129,7 +154,16 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
     `${opts.label} done`,
   );
 
-  return { deleted, durationMs, dryRun, batchCount, deletedPerPass, stopReasons, truncated };
+  return {
+    deleted,
+    durationMs,
+    dryRun,
+    batchCount,
+    deletedPerPass,
+    stopReasons,
+    truncated,
+    skipped: false,
+  };
 }
 
 export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<SweepRunResult> {

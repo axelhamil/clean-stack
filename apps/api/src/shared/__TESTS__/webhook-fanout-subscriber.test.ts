@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 
 // ---------------------------------------------------------------------------
 // Query-chain factories — called fresh on each tx.select / tx.insert
@@ -142,6 +143,7 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
   uuidv7: () => "generated-uuid",
+  sweepSchema,
 }));
 
 const { WebhookFanoutSubscriber } = await import("../services/webhook-fanout-subscriber");

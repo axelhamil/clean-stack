@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -157,6 +158,7 @@ mock.module("@packages/drizzle", () => ({
   TransactionService: class {},
   trackEventsOnSuccess: () => {},
   uuidv7: () => "generated-uuid",
+  sweepSchema,
 }));
 
 const { DrizzleApiTokenRepository } = await import(

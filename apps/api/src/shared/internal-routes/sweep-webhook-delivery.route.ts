@@ -6,6 +6,7 @@ import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { acquireSweepLease, releaseSweepLease } from "./sweep-lock";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
@@ -58,6 +59,10 @@ export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
       logger: c.var.logger,
       label: "sweep-webhook-delivery",
       deadlineMs: env.SWEEP_DEADLINE_MS,
+      lock: {
+        acquire: () => acquireSweepLease("sweep-webhook-delivery", env.SWEEP_DEADLINE_MS * 2),
+        release: () => releaseSweepLease("sweep-webhook-delivery"),
+      },
     });
     return c.json(response);
   });

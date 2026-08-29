@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
+import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
 
 mock.module("@packages/drizzle", () => ({
@@ -90,6 +91,7 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
+  sweepSchema,
 }));
 
 // `@packages/emails` is intentionally NOT mocked here: `mock.module` replaces a

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 mock.module("hono/bun", () => ({
@@ -63,6 +64,7 @@ mock.module("@packages/drizzle", () => ({
   desc: () => {},
   and: () => {},
   sql: Object.assign(() => {}, { raw: () => ({}), identifier: () => ({}) }),
+  sweepSchema,
 }));
 
 const { cspReportCors, makeCspReportApp } = await import("../internal-routes/csp-report.route");

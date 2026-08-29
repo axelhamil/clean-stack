@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 
 // ---------------------------------------------------------------------------
@@ -155,6 +156,7 @@ mock.module("@packages/drizzle", () => ({
   trackEventsOnSuccess: () => {},
   TransactionService: class {},
   uuidv7: () => "generated-uuid",
+  sweepSchema,
 }));
 
 // ---------------------------------------------------------------------------

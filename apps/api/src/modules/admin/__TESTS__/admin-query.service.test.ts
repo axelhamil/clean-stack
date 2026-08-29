@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 const rows = [
   {
@@ -168,6 +169,7 @@ mock.module("@packages/drizzle", () => ({
   count: mk("count"),
   arrayContains: mk("arrayContains"),
   sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
+  sweepSchema,
 }));
 
 const { AdminQueryService } = await import("../application/services/admin-query.service");

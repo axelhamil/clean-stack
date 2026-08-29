@@ -7,6 +7,7 @@ import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { acquireSweepLease, releaseSweepLease } from "./sweep-lock";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
@@ -69,6 +70,10 @@ export const sweepConsentsRoutes = new Hono<HonoEnv>()
       logger,
       label: "sweep-consents",
       deadlineMs: env.SWEEP_DEADLINE_MS,
+      lock: {
+        acquire: () => acquireSweepLease("sweep-consents", env.SWEEP_DEADLINE_MS * 2),
+        release: () => releaseSweepLease("sweep-consents"),
+      },
     });
     return c.json(response);
   });

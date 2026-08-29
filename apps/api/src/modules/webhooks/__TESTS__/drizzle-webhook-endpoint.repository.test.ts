@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -154,6 +155,7 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
+  sweepSchema,
 }));
 
 const { DrizzleWebhookEndpointRepository } = await import(

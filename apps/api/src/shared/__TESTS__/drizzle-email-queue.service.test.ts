@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 
 const inserted: unknown[] = [];
 const execCalls: string[] = [];
@@ -118,6 +119,7 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
+  sweepSchema,
 }));
 
 const { DrizzleEmailQueue } = await import("../services/drizzle-email-queue.service");

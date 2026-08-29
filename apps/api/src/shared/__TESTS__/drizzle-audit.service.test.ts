@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
@@ -106,6 +107,7 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
+  sweepSchema,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────

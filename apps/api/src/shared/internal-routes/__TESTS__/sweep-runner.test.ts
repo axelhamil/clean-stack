@@ -192,3 +192,60 @@ describe("runRetentionSweep — time budget", () => {
     expect(result.truncated).toBe(false);
   });
 });
+
+describe("runRetentionSweep — lease", () => {
+  it("does no work and reports skipped when the lease is held", async () => {
+    let purged = 0;
+
+    const result = await runRetentionSweep({
+      body: {},
+      lock: { acquire: async () => false, release: async () => {} },
+      passes: [
+        {
+          label: "sent",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => {
+            purged++;
+            return 1;
+          },
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    expect(purged).toBe(0);
+    expect(result.skipped).toBe(true);
+    expect(result.deleted).toBe(0);
+  });
+
+  it("releases the lease even when a pass throws", async () => {
+    let released = false;
+
+    const run = runRetentionSweep({
+      body: {},
+      lock: {
+        acquire: async () => true,
+        release: async () => {
+          released = true;
+        },
+      },
+      passes: [
+        {
+          label: "sent",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => {
+            throw new Error("boom");
+          },
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    await expect(run).rejects.toThrow("boom");
+    expect(released).toBe(true);
+  });
+});

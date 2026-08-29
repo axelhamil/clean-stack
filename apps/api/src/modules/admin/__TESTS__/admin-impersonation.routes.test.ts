@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { EventTypes } from "@packages/events";
+import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 type SqlMarker = { _op: string; args: unknown[] };
 const mk =
@@ -117,6 +118,7 @@ mock.module("@packages/drizzle", () => ({
   count: mk("count"),
   arrayContains: mk("arrayContains"),
   sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
+  sweepSchema,
 }));
 
 mock.module("hono/bun", () => ({

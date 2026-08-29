@@ -22,6 +22,7 @@ import {
   RateLimiterMemory as RealRateLimiterMemory,
   RateLimiterRes as RealRateLimiterRes,
 } from "rate-limiter-flexible";
+import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { WindowConfig } from "../ports/rate-limiter.port";
 
@@ -97,6 +98,7 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
+  sweepSchema,
 }));
 
 // ── Mock rate-limiter-flexible ──────────────────────────────────────────────

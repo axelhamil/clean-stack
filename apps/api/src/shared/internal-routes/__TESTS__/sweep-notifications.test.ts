@@ -105,9 +105,11 @@ mock.module("@packages/drizzle", () => ({
       updatedAt: {},
     },
   },
+  sweepSchema,
 }));
 
 import { describe, expect, test } from "bun:test";
+import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 const { buildPurgeFilter } = await import("../sweep-notifications.route");
 
