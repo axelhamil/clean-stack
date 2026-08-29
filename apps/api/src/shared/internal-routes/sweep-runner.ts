@@ -64,7 +64,7 @@ export type RunRetentionSweepOptions = {
   deadlineMs?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
-  lock?: SweepLock;
+  lock: SweepLock;
 };
 
 export type SweepResponse = {

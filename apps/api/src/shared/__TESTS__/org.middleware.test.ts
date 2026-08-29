@@ -1,6 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Hono } from "hono";
-import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 
 let nextRoleRows: Array<{ role: string }> = [];
 
@@ -78,7 +77,6 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
-  sweepSchema,
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");

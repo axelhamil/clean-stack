@@ -71,10 +71,8 @@ mock.module("@packages/drizzle", () => ({
     },
   },
   apiTokenSchema: {},
-  sweepSchema,
 }));
 
-import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 import { ensureNotificationTrigger } from "../notification-trigger";
 
 describe("ensureNotificationTrigger", () => {

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -145,7 +144,6 @@ mock.module("@packages/drizzle", () => ({
       locked: { name: "locked" },
     },
   },
-  sweepSchema,
 }));
 
 // All imports AFTER mock.module to ensure mocks are in place before module resolution.

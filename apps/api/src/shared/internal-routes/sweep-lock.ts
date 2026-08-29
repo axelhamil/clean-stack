@@ -4,8 +4,6 @@ import { env } from "../env";
 import type { ITransaction } from "../transaction";
 import type { SweepLock } from "./sweep-runner";
 
-const lock = sweepSchema.sweepLock;
-
 /**
  * Takes the lease for `label`, or reports that someone else holds it.
  *
@@ -29,6 +27,7 @@ export async function acquireSweepLease(
   ttlMs: number,
   exec?: ITransaction,
 ): Promise<string | null> {
+  const lock = sweepSchema.sweepLock;
   const client = exec ?? db;
   const owner = uuidv7();
   const until = new Date(Date.now() + ttlMs);
@@ -49,6 +48,7 @@ export async function releaseSweepLease(
   owner: string,
   exec?: ITransaction,
 ): Promise<void> {
+  const lock = sweepSchema.sweepLock;
   const client = exec ?? db;
   await client.delete(lock).where(and(eq(lock.label, label), eq(lock.owner, owner)));
 }

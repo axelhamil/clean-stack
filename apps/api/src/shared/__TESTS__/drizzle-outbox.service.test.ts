@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
-import * as sweepSchema from "../../../../../packages/drizzle/src/schema/sweep";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
 // Expose full export surface so parallel test files don't see missing exports.
@@ -139,7 +138,6 @@ mock.module("@packages/drizzle", () => ({
       updatedAt: {},
     },
   },
-  sweepSchema,
 }));
 
 // ── Mock @packages/events ──────────────────────────────────────────────────

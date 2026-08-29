@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import * as sweepSchema from "../../../../../../packages/drizzle/src/schema/sweep";
 
 type SqlMarker = { _op: string; args: unknown[] };
 const mk =
@@ -156,7 +155,6 @@ mock.module("@packages/drizzle", () => ({
   count: mk("count"),
   arrayContains: mk("arrayContains"),
   sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
-  sweepSchema,
 }));
 
 const { DrizzleAdminUserStore } = await import(

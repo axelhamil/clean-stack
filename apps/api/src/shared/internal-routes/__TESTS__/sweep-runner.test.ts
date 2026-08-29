@@ -3,6 +3,11 @@ import { MAX_BATCHES, runRetentionSweep } from "../sweep-runner";
 
 const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 
+// `lock` is required on `RunRetentionSweepOptions` — every route holds one, so a
+// route that forgot it would no longer type-check. Tests that aren't exercising
+// lease behavior pass this always-acquires no-op instead.
+const noopLock = { acquire: async () => true, release: async () => {} };
+
 describe("runRetentionSweep", () => {
   it("runs passes sequentially and reports each one", async () => {
     const order: string[] = [];
@@ -21,6 +26,7 @@ describe("runRetentionSweep", () => {
 
     const result = await runRetentionSweep({
       body: {},
+      lock: noopLock,
       passes: [pass("sent", 3), pass("failed", 2)],
       logger,
       label: "sweep-x",
@@ -45,6 +51,7 @@ describe("runRetentionSweep", () => {
 
     await runRetentionSweep({
       body: { dryRun: true },
+      lock: noopLock,
       passes: [pass("sent", 7), pass("failed", 90)],
       logger,
       label: "sweep-x",
@@ -70,6 +77,7 @@ describe("runRetentionSweep — time budget", () => {
 
     const result = await runRetentionSweep({
       body: {},
+      lock: noopLock,
       deadlineMs: 100,
       // Each clock read jumps 60ms: the first loop check sees 0 (batch runs), the
       // second sees 120 > 100 (budget spent).
@@ -109,6 +117,7 @@ describe("runRetentionSweep — time budget", () => {
 
     const result = await runRetentionSweep({
       body: {},
+      lock: noopLock,
       deadlineMs: 100,
       now: fakeClock(60),
       passes: [pass("sent"), pass("failed")],
@@ -125,6 +134,7 @@ describe("runRetentionSweep — time budget", () => {
   it("reports exhausted and truncated: false when a pass drains inside the budget", async () => {
     const result = await runRetentionSweep({
       body: {},
+      lock: noopLock,
       deadlineMs: 60_000,
       passes: [
         {
@@ -145,6 +155,7 @@ describe("runRetentionSweep — time budget", () => {
   it("treats the batch cap as truncation, not as a clean finish", async () => {
     const result = await runRetentionSweep({
       body: {},
+      lock: noopLock,
       deadlineMs: 60_000,
       // The inter-batch sleep is stubbed out: this drives the loop through all
       // MAX_BATCHES iterations, which would otherwise take ~50s at
@@ -171,6 +182,7 @@ describe("runRetentionSweep — time budget", () => {
   it("reports a batch error distinctly from truncation", async () => {
     const result = await runRetentionSweep({
       body: {},
+      lock: noopLock,
       deadlineMs: 60_000,
       passes: [
         {
