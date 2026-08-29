@@ -1,0 +1,126 @@
+export default {
+  brand: "clean-stack",
+  actions: {
+    save: "Save",
+    cancel: "Cancel",
+    retry: "Retry",
+    reload: "Reload",
+  },
+  errorBoundary: {
+    title: "Something went wrong",
+    body: "We've been notified and are looking into it. Try reloading the page.",
+  },
+  nav: {
+    dashboard: "Dashboard",
+    settings: "Settings",
+    admin: "Admin",
+  },
+  shell: {
+    brandLabel: "App",
+    search: "Search...",
+    openCommandPalette: "Open command palette",
+  },
+  commandPalette: {
+    searchPlaceholder: "Search pages, actions, organizations...",
+    noResults: "No results found.",
+    actionFailed: "Action failed",
+    groups: {
+      navigate: "Navigate",
+      switchOrganization: "Switch organization",
+      admin: "Admin",
+      legal: "Legal & privacy",
+      actions: "Actions",
+    },
+    nav: {
+      organization: "Settings — Organization",
+      billing: "Settings — Billing",
+      webhooks: "Settings — Webhooks",
+      account: "Settings — Account",
+      privacy: "Settings — Privacy",
+      eventCatalog: "Developers — Event catalog",
+    },
+    organizationActive: "active",
+    admin: {
+      auditLog: "Admin — Audit log",
+      accounts: "Admin — Accounts",
+      organizations: "Admin — Organizations",
+    },
+    theme: {
+      light: "Theme: Light",
+      dark: "Theme: Dark",
+      system: "Theme: System",
+      active: "active",
+    },
+    copyOrgSlug: "Copy org slug",
+    orgSlugCopiedToast: "Org slug copied to clipboard",
+  },
+  contextualTabs: {
+    ariaLabel: "Settings sections",
+    organization: "Organization",
+    billing: "Billing",
+    webhooks: "Webhooks",
+    sso: "Single sign-on",
+    account: "Account",
+    notifications: "Notifications",
+    privacy: "Privacy",
+    apiTokens: "API tokens",
+  },
+  orgSwitcher: {
+    searchPlaceholder: "Search organization...",
+    noResults: "No organization found.",
+    heading: "Organizations",
+    newOrganization: "New organization",
+    selectPlaceholder: "Select organization",
+    switchFailed: "Failed to switch organization",
+  },
+  userMenu: {
+    openMenu: "Open user menu",
+    account: "Account",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+  },
+  impersonation: {
+    activeSession: "Active impersonation session — acting as <name></name>",
+    remainingMinutes: "{{minutes}} min remaining",
+    expired: "session expired",
+    end: "End impersonation",
+  },
+  cookieBanner: {
+    ariaLabel: "Cookie consent",
+    message:
+      "We use cookies to operate this service. Optional cookies help improve your experience.",
+    policyLink: "Cookie policy",
+    rejectAll: "Reject all",
+    customize: "Customize",
+    acceptAll: "Accept all",
+    preferencesTitle: "Cookie preferences",
+  },
+  cookieConsent: {
+    title: "Manage your cookie preferences",
+    save: "Save preferences",
+    withdraw: "Withdraw all consent",
+    savedToast: "Preferences saved",
+    withdrawnToast: "Consent withdrawn",
+    categories: {
+      necessary: {
+        label: "Strictly necessary",
+        description: "Required for the service to function. Cannot be disabled.",
+      },
+      functional: {
+        label: "Functional",
+        description: "Enhance your experience (e.g. language or region preferences).",
+      },
+      analytics: {
+        label: "Analytics",
+        description: "Help us understand how visitors use the service (anonymised data).",
+      },
+      marketing: {
+        label: "Marketing",
+        description: "Allow personalised advertising and retargeting.",
+      },
+    },
+  },
+  legalFooter: {
+    ariaLabel: "Legal",
+  },
+} as const;

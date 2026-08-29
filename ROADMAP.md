@@ -38,22 +38,23 @@ Remaining work for clean-stack, plus the design record of each shipped phase. **
 | **Phase A.6 — Accessibility gate** | **Aug 2026** | `apps/app/a11y/` (Playwright as an axe driver) + `.github/workflows/ci.yml` — the repo's **first PR-triggered CI**. Zero `serious`/`critical` WCAG 2.1 AA violations over 4 public + 3 authenticated pages **× light and dark**, one `<main>`/`<h1>` per page, final-URL assertion so a gate redirect can't pass as its target, keyboard tab order, palette focus trap, reduced-motion. Found and fixed 7 real defects (unlabelled password inputs app-wide, missing `<h1>` on both auth pages, 4 contrast failures across both schemes, unlabelled avatar input) and 2 clone-blocking `db:seed` bugs. Lighthouse dropped — a11y subset of axe. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase D.3 — In-app notification center** | **Aug 2026** | `modules/notifications/` (back) + `shared/notifications/` (front) — `<Bell />` inbox in the shell (unread badge, `groupKey` grouping, cross-tab read propagation), `/settings/notifications` preference matrix, org defaults card behind `organization:["update"]`; fan-out as an `OutboxSubscriber` inside the dispatch TX (one `INSERT ... SELECT`, never N inserts); preference cascade **org lock → user → org default → enabled** resolved in that same statement, `forced` bypassing all four; SSE stream carrying a signal, never data (`pg_notify` + one `LISTEN` per instance, `fetch`+`ReadableStream` not `EventSource`); dedup via partial unique index; 2 crons. **No new event type** — the catalog is consumed, not extended: **67 / 28 public / 39 internal**. Cascade verified against Postgres via `pnpm --filter api check:fanout` (8 cases) — a mocked `tx` evaluates no `WHERE`. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 | **Phase C.7 — SSO SAML/OIDC + SCIM** | **Aug 2026** | `@better-auth/sso` + `@better-auth/scim` — per-org OIDC/SAML providers, domain verification, enforce-SSO toggle, JIT provisioning on first sign-in, SCIM 2.0 `Users` CRUD, `/settings/sso` + a "Sign in with SSO" entry on `/sign-in` (redirects straight into the IdP flow on an `SSO_REQUIRED` rejection, using the `providerId` the server already returns). Local Keycloak under the opt-in `sso` Docker profile — round-trip documented in [`docs/SSO-LOCAL.md`](docs/SSO-LOCAL.md). 13 new events (`sso.*` ×7, `scim.*` ×6) → **80 / 34 public / 46 internal**. As-built + all deviations in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Phase E.1a — i18n foundation** | **Aug 2026** | `@packages/i18n` — `.ts … as const` catalogs bound through `CustomTypeOptions.resources`, so an unknown `t()` key is a `tsc` error. `i18next` + `react-i18next` chosen over Lingui and Paraglide; locale resolves from a cookie then `user.locale` and **never from the URL**, so no route was re-parented. Language switcher in `/settings/account`, `PUT /me/locale`, per-recipient email locale frozen at enqueue, localized API/BetterAuth/Zod messages, `<html lang>` asserted in the a11y gate, `en`/`fr` key parity enforced by a test. `auth`, `account` and the shell are translated; the rest is E.1b. 1 event → **81 / 35 public / 46 internal**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
+| **Email queue debt closeout** | **Aug 2026** | Fixed a live production defect (`chunkIdempotencyKey` now hashes the joined keys instead of truncating to 256 chars — truncation collisions let the provider-side dedup return a cached response for a different send, marking never-sent recipients `sent`); the RGPD deletion confirmation now enqueues **inside** the wipe transaction (`throw new Error("rollback")` on enqueue failure), closing a permanent-loss window on crash; per-recipient idempotency keys (`EmailRecipient.idempotencyKey`, `#`-namespaced positional fallback on both batch paths); `enqueue` now `onConflictDoNothing` on `idempotency_key` with a short-write warning; the retention runner promoted to N passes across all five callers; a second sweep pass purges `failed` rows past `EMAIL_MESSAGE_FAILED_RETENTION_DAYS=90`; `markSent` collapsed to one `UPDATE … CASE WHEN`. **No new events — catalog stays 81 / 35 public / 46 internal.** As-built in [`docs/HISTORY.md`](docs/HISTORY.md). |
 
 ---
 
 ## 🚧 What's left
 
-The plumbing a SaaS boilerplate owes its cloner is shipped: auth + MFA, multi-tenant with a capability SSOT, RGPD Art. 17/20, cookie consent, policy versioning, billing + quota gating, security perimeter, admin + impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC + SAML) + SCIM provisioning, event rail (80 events / 34 public / 46 internal), Railway reference deploy. Per-phase detail below, as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).
+The plumbing a SaaS boilerplate owes its cloner is shipped: auth + MFA, multi-tenant with a capability SSOT, RGPD Art. 17/20, cookie consent, policy versioning, billing + quota gating, security perimeter, admin + impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC + SAML) + SCIM provisioning, a typed i18n rail (`en`/`fr`), event rail (81 events / 35 public / 46 internal), Railway reference deploy. Per-phase detail below, as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).
 
 What remains is short on purpose. **Everything not listed here was cut** — a boilerplate that carries a wishlist of twelve unbuilt phases reads as unfinished when it isn't.
 
 | | What | Why it survived the cut |
 |---|---|---|
 | **Review pass** | Full manual review of the shipped surface — owned by @axelhamil, not a code task | The only thing standing between "feature-complete" and "clone-ready" |
-| **E.1** | i18n (locale routes + Lingui) | Real ask for EU clones; the routing shape has to be decided before features multiply |
+| **E.1b** | Remaining i18n extraction (`admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, per-locale legal content) | E.1a shipped the rail and typed the surface it covers; what is left is catalog work, not a design decision |
 | **C.1** | S5b behavioural signals + S6 captcha hook | Deferred for calibration, not abandoned — needs real traffic |
-| **D.5** | Known debts (3) | Actual defects, including a duplicate deletion email on worker crash |
-| **G.1** | Toolchain refresh — TS 7, Postgres 18, pnpm 11, file-based routing | This file opens with "All SOTA 2026". Measured on 2026-08-17, it isn't: TypeScript is a major behind, the pinned pnpm contradicts `packageManager`, and E.1 is about to freeze a routing shape that TanStack no longer recommends |
+| **D.5** | Sweep routes + cron client have no explicit timeout | Found during review, left unfixed rather than widened in silence — `internalLayers` sets none, `Bun.serve` has no `idleTimeout`, `signedInternalFetch` issues a bare `fetch` with no `AbortSignal`; doubling the sweep passes brings it closer to mattering |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058 — Gmail/Yahoo require it for bulk senders) and SPF + DKIM + DMARC `p=reject` (DNS, doc only).
 
@@ -191,11 +192,9 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 
 **Shipped (Aug 2026).** `email_message` durable queue + `EmailDeliveryWorker` (poll 2s, claim 300, chunk 100, `resend.batch.send`) + `@packages/emails` in-repo React Email templates (`TEMPLATE_IDS` as override) + port methods `sendRaw`/`sendTemplateBatch`/`sendRawBatch` + retention sweep (`EMAIL_MESSAGE_RETENTION_DAYS=7`). Provider facts: rate limit 10 req/s per team; `scheduled_at` supported in batch; `Idempotency-Key` is batch-level (`<message-id>/<chunk-index>`); bounce suppression provider-side (no `email_suppression` table needed). `email.delivery.exhausted` internal event → **55 total / 50 subscribable / 5 internal**. Note: `SendTemplateOptions.tx?` exists on the port but has no caller — every send is enqueued post-commit and best-effort (`idempotencyKey` by contrast is used widely: `auth.ts` + 3 RGPD sites). As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-**Known debts (follow-up work)**:
+**Known debts — closed.** All three follow-ups listed here at ship time are now fixed; see the "Email queue debt closeout" row above and [`docs/HISTORY.md`](docs/HISTORY.md) for the as-built record: `failed` rows now purge on their own `EMAIL_MESSAGE_FAILED_RETENTION_DAYS=90` cutoff behind a covering partial index; `markSent` collapsed to one `UPDATE … CASE WHEN`; the RGPD deletion confirmation carries a per-recipient idempotency key again (enqueued inside the wipe transaction, so a worker crash can no longer send it twice — or lose it).
 
-- **`failed` rows never purged.** Retention sweep filters `status='sent'` only; no covering index on `failed` rows. Deliberate — a failed row is the operator's only trace of a dropped email — but unbounded. Decide: a longer retention cutoff for `failed` (with a covering index) or an explicit decision that failed rows are forensic and kept indefinitely.
-- **`markSent` is one UPDATE per row.** A 100-message chunk costs 100 round-trips (each row carries its own `provider_message_id`). A single `UPDATE … WHERE id IN (…)` with a `CASE WHEN` for the provider id would collapse it to one. No correctness issue; pure throughput.
-- **`delete_completed` notification lost its idempotency key.** Pre-D.5 it was sent per-account with `` idempotencyKey: `delete-completed/${userId}` ``. The batched RGPD sweep call passes no options, so a worker crash between provider acceptance and `markSent` commit can send a duplicate deletion confirmation. Judged acceptable at review for a notification email. Fix: pass a per-recipient idempotency key through `sendTemplateBatch` (already suffixes keys per recipient).
+**New known debt found during closeout review**: the sweep routes and the cron client have no explicit timeout — `internalLayers` sets none, `Bun.serve` has no `idleTimeout`, `signedInternalFetch` issues a bare `fetch` with no `AbortSignal` — and doubling the sweep passes brings that closer to mattering. Deliberately left unfixed rather than widened in silence; tracked as **D.5** in "What's left".
 
 ---
 
@@ -211,71 +210,27 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 
 ---
 
-## i18n — TanStack Router locale routes + typed catalogs — **Phase E.1**
+## i18n — typed catalogs, locale outside the URL — **Phase E.1a ✅ SHIPPED (Aug 2026) · E.1b left**
 
-**Why**: most i18n stacks ship as runtime plugins that crash production with missing keys at the worst moment. Bake locale into routing (`/en/...`, `/fr/...`), enforce keys at build time, detect on the server. Zero "Translation missing" string ever shipped.
+**Why**: most i18n stacks ship as runtime plugins that crash production with missing keys at the worst moment. Enforce keys at build time and resolve the locale from the user, not the path.
 
-- [ ] `@lingui/{core,react,cli}` (CLDR plurals + AST extraction). Catalogs as `.po` per lang, compiled at build time, with a generated `.d.ts` so `tsc` rejects an unknown key.
-- [ ] `langLayout` (`path: "$lang"`) parented to `rootRoute` in `apps/app/src/router/layouts.tsx`, validating against `["en", "fr"]`; every layout/leaf re-parents under it. Hono middleware 302s a root request per `Accept-Language`. `/api/*` stays lang-agnostic — locale comes from the user record.
-- [ ] Lang switcher (cookie + same path under the new lang), Zod `setErrorMap` per lang at the providers boundary, `Intl.*` for dates/numbers (no extra dep).
-- [ ] **Auth errors**: BetterAuth returns stable `code`s — map them front-side to Lingui entries so there is a single translation store. Switch to `@better-auth/i18n` only if a non-web client appears; the plugin's server-side mapping would otherwise duplicate the catalog.
-- [ ] Per-lang email templates in `@packages/emails`, picked from the user's preferred lang.
-- [ ] CI gate: `lingui extract --clean` + git diff check — any drift fails the build.
+**E.1a — foundation (shipped)**: `@packages/i18n` with `.ts … as const` catalogs typed through `CustomTypeOptions.resources`, so an unknown key is a `tsc` error. `i18next` + `react-i18next`, chosen over Lingui and Paraglide — see `docs/HISTORY.md`. Locale resolves from a cookie then `user.locale`; **it is not in the URL**, so the 34 route files and 62 navigation call sites were untouched. Language switcher in `/settings/account`, `PUT /me/locale` + `user.locale.changed` (catalog 80 → **81 / 35 public / 46 internal**), per-recipient email locale frozen at enqueue, localized API/BetterAuth/Zod messages, `<html lang>` asserted in the a11y gate.
+
+- [ ] **E.1b — remaining extraction**: `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, and per-locale legal content modules (English filled, French a stub the cloner replaces with its own legal text).
 
 ---
 
-## Toolchain refresh — **Phase G.1**
+## Toolchain refresh — **Phase G.1** ✅ SHIPPED (Aug 2026)
 
-**Why**: a boilerplate's version floor is a feature. The cloner inherits whatever is pinned here, and "All SOTA 2026" at the top of this file is a claim that decays silently. Versions below were read from the npm registry, nodejs.org and Docker Hub on **2026-08-17** — not from memory. Re-measure before executing; do not trust this table blind.
+**Why**: a boilerplate's version floor is a feature. The cloner inherits whatever is pinned here, and "All SOTA 2026" at the top of this file is a claim that decays silently. Started from the repo baseline (Node 24.15.0 / Bun 1.3.6 / pnpm 11.0.9 / TypeScript 6.0.3 / Postgres 17-alpine); versions below are what was actually measured landing on **2026-08-28**. As-built in [`docs/HISTORY.md`](docs/HISTORY.md).
 
-### G.1a — Runtime and package manager
+**Shipped**: pnpm `11.24.0` (single source of truth — `mise.toml` and `package.json#packageManager` now agree), Node `24.20.0` LTS, Bun `1.4.0` (held — no fallback needed, proven by the 718-test API suite and the Bun build), TypeScript `7.0.2` across all **11** workspaces that declare it (`@packages/ddd-kit` included), Postgres `18.6-alpine`, `@hono/zod-validator` `0.9.0`, Biome `2.5.10`, plus a full `pnpm up -r --latest` lockfile refresh.
 
-| | Pinned today | Latest | Note |
-|---|---|---|---|
-| pnpm | `10.33.2` (`mise.toml`) vs `11.0.9` (`packageManager`) | `11.22.0` | **The two disagree** — `corepack` follows `packageManager`, `mise` follows itself. Whichever wins is accidental. Single source of truth, then bump. |
-| Node | `24.15.0` | `24.19.0` LTS | 26.7.0 is *Current*, not LTS — Node only runs the tooling here, no reason to take that risk. |
-| Bun | `1.3.6` | `1.3.14` | runtime of `apps/api` |
-
-- [ ] Make `mise.toml` and `package.json#packageManager` agree on `pnpm@11.22.0`, bump `engines.node` to `>=24.19.0`, regenerate `pnpm-lock.yaml`, re-run `pnpm bootstrap` from a clean clone.
-
-### G.1b — TypeScript 7
-
-The native (Go) compiler. The published package is ~2.5 MB against ~22 MB for 6.x, and `tsc` remains the binary name.
-
-- [ ] Bump `typescript` to `^7.0.2` across the 12 workspaces, run `turbo type-check`, triage what the stricter/faster checker surfaces.
-- [ ] Low blast radius by construction: nothing here *builds* with `tsc` — `apps/api` builds with Bun, `apps/app` with Vite, `@packages/ddd-kit` with tsup, tests run through esbuild. TS is the type-check gate only, so a regression fails CI rather than production.
-- [ ] Watch `tsup` (`@packages/ddd-kit` `prepublishOnly`) — it uses the TS API for `.d.ts` emit, the one place where the native port's API surface is not yet 1:1. If it breaks, pin `tsup`'s own TS or emit declarations with `tsc` explicitly.
-
-### G.1c — Postgres 18
-
-- [ ] `postgres:17-alpine` → `postgres:18-alpine` in `docker-compose.yaml`, plus the three README occurrences and the Railway reference deploy (bump the Railway plugin version *before* the compose file — the doc must not describe a version the reference deploy can't run).
-- [ ] **Primary keys stay `text`.** Postgres 18 ships a native `uuidv7()`, and time-ordered UUIDs are the right default for insert-heavy tables — but every PK in `packages/drizzle/src/schema/` is `text("id").primaryKey()` filled by BetterAuth, which generates its own ids. Converting them is a BetterAuth question, not a Postgres one. Do not open it as part of a version bump.
-- [ ] Where it does apply: **new** application tables owned by the cloner. Document `uuid("id").primaryKey().default(sql\`uuidv7()\`)` as the recommended shape for those in `docs/MODULES.md`, and say plainly that the auth-adjacent tables are `text` for a reason.
-- [ ] The real 18 payoff here is operational, not schema-side: async I/O and B-tree skip scan. Verify the outbox drain (`SELECT ... FOR UPDATE SKIP LOCKED` on `outbox_event_pending_idx`) and the notification fan-out `INSERT ... SELECT` still plan the way they do on 17 — `EXPLAIN (ANALYZE, BUFFERS)` before and after, recorded in `docs/HISTORY.md`.
-
-### G.1d — Dependency floor
-
-Two distinct problems, and conflating them wastes a day. Most deps here are declared with `^`, so a fresh `pnpm install` already resolves to the newest minor — what is stale is the **lockfile**, not the range. Only three ranges genuinely block.
-
-**Blocked by the range (edit `package.json`):**
-
-- `typescript` `^6.0.3` → `^7.0.2` (G.1b)
-- `@hono/zod-validator` `^0.8.0` → `^0.9.0` — a `^` does not cross a `0.x` minor
-- `@types/pg` `^8.20.0` → `^8.21.0`
-
-**Everything else is a lockfile refresh** — `pnpm up -r --latest`, then the full gate (`ci:check` + a11y + `check:fanout`). Where it lands as of 2026-08-17: biome 2.5.8, turbo 2.10.10, vitest 4.1.10, vite 8.2.1, `@vitejs/plugin-react` 6.0.5, hono 4.13.2 (from 4.12.27), pg 8.23.0, react/react-dom 19.2.8, tailwind + `@tailwindcss/vite` 4.3.3, `@types/node` 26.2.0, `@tanstack/react-router` 1.170.29, `@tanstack/react-query` 5.101.4. `drizzle-orm` (0.45.2), `drizzle-kit` (0.31.10) and `zod` (4.4.3) are already current.
-
-- [ ] Bump the `$schema` URL in `biome.json` alongside the binary — it still points at `2.5.1` and silently under-validates the config against newer rules.
-- [ ] `@hono/zod-validator` 0.8 → 0.9 is the only bump with a real chance of touching behaviour — it wraps every input on the API surface through `zV`. Re-read `apps/api/src/shared/validator.ts` after the bump: the point of that wrapper is that it throws `HTTPException(400)` instead of returning a Response inline, and the RPC types depend on it staying that way.
-- [ ] Zod 4 deprecates the string-method form of format checks (`z.string().uuid()` → `z.uuid()`). Sweep `@packages/events/payloads.ts` and the module DTOs; deprecated today, gone in 5.
-
-### G.1e — File-based routing (do this before E.1, or not at all)
-
-`apps/app` composes its route tree by hand: `router.tsx` + `router/layouts.tsx` + ~39 `createRoute()` calls across 32 feature files. TanStack now recommends file-based routing through `@tanstack/router-plugin/vite` (`^1.168.32`), with `routeTree.gen.ts` generated and gitignored.
-
-- [ ] The forcing function is **E.1**, which plans a `langLayout` (`path: "$lang"`) re-parenting *every* layout and leaf. Doing that by hand across 32 files, then migrating the result to file-based later, is the same work twice. Sequence: G.1e, then E.1 — or accept code-based permanently and delete this item.
-- [ ] Migration is mechanical but not small: `src/routes/__root.tsx` + one file per route, `createRoute` → `createFileRoute`, `addChildren` deleted, `routeTree.gen.ts` gitignored, `autoCodeSplitting: true`. The vertical-slice layout (`features/<x>/<x>.route.tsx`) is worth preserving via the plugin's `routesDirectory` / virtual routes rather than flattening features into `src/routes/`.
-- [ ] Gate: the a11y suite (7 pages × 2 schemes) and the legal-accept redirect (`should-redirect-to-legal-accept.ts`) must pass unchanged. Route-level redirects are exactly what a routing migration breaks silently.
+- [x] **G.1a — Runtime and package manager.** `mise.toml` and `packageManager` unified on `pnpm@11.24.0`; Node → `24.20.0` LTS (`.nvmrc` moved with it so CI doesn't stay pinned to the old value); Bun → `1.4.0`.
+- [x] **G.1b — TypeScript 7.** All 11 workspaces on `^7.0.2`. `@packages/ddd-kit` was the holdout: its `tsup`-driven `.d.ts` emit used a bundled `rollup-plugin-dts` that crashes under TS7's rewritten compiler-host API. Fixed by having `tsup` stop emitting declarations (`dts: false`) and `tsc -p tsconfig.build.json --emitDeclarationOnly` do it instead — `tsconfig.build.json` already existed, unwired, from the publishing setup. **Trap for the next person touching this config**: `incremental` must stay `false` there — `tsup`'s `clean: true` wipes `dist/` on every build, and a leftover `.tsbuildinfo` from a prior `tsc` run convinces it the declarations are already current, so it emits nothing, silently. Accepted trade-off: declarations are no longer bundled into one file — `tsc` emits one `.d.ts` per source module instead of `tsup`'s flattened `index.d.ts`. Harmless today (nothing in-monorepo consumes `dist/`; internal packages import from `src/`), matters only the day the package is actually published.
+- [x] **G.1c — Postgres 18.** `postgres:18-alpine`, all references. **Undocumented breaking change**: the 18 image refuses the old bind mount at `/var/lib/postgresql/data` — it now wants the volume at `/var/lib/postgresql` (data lands one directory deeper, at `/var/lib/postgresql/<major>/docker`). A pre-existing volume mounted the old way doesn't crash, it just silently initializes empty — documented in `README.md`'s Database section with the one-time `docker volume rm` fix. Primary keys stay `text` (BetterAuth-generated ids; `uuidv7()` documented as the shape for new cloner-owned tables in `docs/MODULES.md`). Before/after `EXPLAIN (ANALYZE, BUFFERS)` plans recorded in [`docs/HISTORY.md`](docs/HISTORY.md): the outbox drain plans the same way on both versions; the notification fan-out capture is **non-conclusive** (the two runs used different data volumes, not a genuine planner regression) and is documented as such rather than called a pass or a fail.
+- [x] **G.1d — Dependency floor.** The three range-blocked bumps landed (`typescript`, `@hono/zod-validator` 0.8→0.9, `@types/pg`), plus a full `pnpm up -r --latest`. **An open point, not swept under the rug**: `pnpm up` also pulled the `@better-auth/*` family toward `1.7.2` via caret ranges, and `@better-auth/scim@1.7.x` turns out to be a full config rewrite (`requiredRole`/`providerOwnership`/`storeSCIMToken` all removed) — a real breaking change behind a semver-minor. Rolled back and **pinned the whole `better-auth` family to exact `1.6.30`** (`better-auth`, `@better-auth/passkey`, `@better-auth/stripe` moved from caret ranges to pins; `@better-auth/scim`/`@better-auth/sso` were already pinned) rather than re-implementing the SCIM integration mid-toolchain-bump. **Migrating to 1.7.x is deferred debt**, to be done as its own task against C.7's SCIM surface, not folded into this one. Also: TS7's `lib.dom.d.ts` added `Response.textStream`, which Hono's `ClientResponse` doesn't implement, breaking `throwApiError(res: Response)` — narrowed to what the function actually reads. Stripe's bump to `22.6.0` moved the literal `apiVersion` the client sends (`"2026-06-24.dahlia"` → `"2026-08-26.dahlia"`) because the SDK only types the newest value; the consumed surface was re-read against the 22.4→22.6 changelog with no shape change found, but **no CI signal can verify a real Stripe call** — check against a live account before a production deploy. Biome's `$schema` now points at the resolved `2.5.10`; its stricter `noUnsafeOptionalChaining` caught three pre-existing unsafe casts in test files, fixed with explicit narrowing. The eight deprecated `z.string().email()`/`.url()` call sites moved to the standalone Zod 4 form.
+- [x] **G.1e — File-based routing.** `apps/app/routes.ts` now declares the whole tree via `virtualRouteConfig` (`@tanstack/router-plugin/vite`), paths relative to `routesDirectory: "./src"` — not `physical()`, not a flattened `src/routes/`, so the vertical-slice layout (`features/<x>/<x>.route.tsx`) survives untouched. All 40 route ids are unchanged (confirmed empirically: `virtualRouteConfig` paths resolve relative to `routesDirectory`, not to `vite.config.ts`, verified by generating the tree from a single route before wiring the rest). `autoCodeSplitting: true` then let the 32 `<name>.page.tsx` files merge into their `<name>.route.tsx`, deleting the `lazyRouteComponent`/`getRouteApi` 2-file pattern — main chunk 478,025 → 363,798 bytes (−23.9%), 32 route chunks. `knip.json` gained `src/features/**/*.route.tsx` as an entry point (alongside `routes.ts` and `src/router/*.tsx`) so the converted route files don't read as dead code — **and, going forward, so a route file that's created but never wired into `routes.ts` no longer gets flagged as dead code either**: it's now an entry point in its own right, an inherent cost of the string-based indirection.
 
 ---
 

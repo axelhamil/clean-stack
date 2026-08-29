@@ -14,6 +14,7 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { type DisplayUser, displayName, initialsOf } from "../../shared/utils";
 import { sessionQueryOptions } from "../api/queries/session";
 import { useSignOut } from "../auth/use-sign-out";
@@ -23,6 +24,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ user }: UserMenuProps) {
+  const { t } = useTranslation("common");
   const signOut = useSignOut();
   const display = displayName(user);
   const { data: session } = useQuery(sessionQueryOptions);
@@ -36,7 +38,7 @@ export function UserMenu({ user }: UserMenuProps) {
             {image ? <AvatarImage src={image} alt={display} /> : null}
             <AvatarFallback className="text-xs font-medium">{initialsOf(display)}</AvatarFallback>
           </Avatar>
-          <span className="sr-only">Open user menu</span>
+          <span className="sr-only">{t("userMenu.openMenu")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="min-w-56">
@@ -49,7 +51,7 @@ export function UserMenu({ user }: UserMenuProps) {
           <DropdownMenuItem asChild>
             <Link to="/settings/account">
               <User />
-              Account
+              {t("userMenu.account")}
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -60,7 +62,7 @@ export function UserMenu({ user }: UserMenuProps) {
           variant="destructive"
         >
           <LogOut />
-          {signOut.isPending ? "Signing out…" : "Sign out"}
+          {signOut.isPending ? t("userMenu.signingOut") : t("userMenu.signOut")}
           <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>

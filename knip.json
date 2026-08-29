@@ -17,6 +17,9 @@
     },
     "apps/app": {
       "entry": [
+        "routes.ts",
+        "src/router/*.tsx",
+        "src/features/**/*.route.tsx",
         "src/shared/api/api-client.ts",
         "src/shared/api/mutations/*.ts",
         "src/shared/api/queries/*.ts",
@@ -35,6 +38,10 @@
       "ignore": ["**/stubs/**"]
     },
     "packages/drizzle": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/i18n": {
+      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/access-control": {

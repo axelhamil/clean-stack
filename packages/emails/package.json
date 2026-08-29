@@ -12,13 +12,16 @@
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
-    "@types/react": "^19.2.17",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "@types/react": "^19.2.18",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@packages/i18n": "workspace:*",
     "@react-email/render": "^2.1.0",
-    "react": "^19.2.7",
-    "react-email": "^6.9.1"
+    "i18next": "^26.4.0",
+    "react": "^19.2.8",
+    "react-email": "^6.9.3",
+    "react-i18next": "^17.0.12"
   }
 }

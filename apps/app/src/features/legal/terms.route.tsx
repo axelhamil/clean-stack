@@ -1,8 +1,10 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { rootRoute } from "../../router/layouts";
+import { createFileRoute } from "@tanstack/react-router";
+import { PolicyDocView } from "./policy-doc-view";
 
-export const termsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "legal/terms",
-  component: lazyRouteComponent(() => import("./terms.page"), "TermsPage"),
+export const Route = createFileRoute("/legal/terms")({
+  component: TermsPage,
 });
+
+function TermsPage() {
+  return <PolicyDocView type="terms" />;
+}

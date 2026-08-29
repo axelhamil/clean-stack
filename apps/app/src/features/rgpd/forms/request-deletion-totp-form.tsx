@@ -7,6 +7,7 @@ import {
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import { type RequestDeletionWithTotpInput, requestDeletionWithTotpSchema } from "../rgpd.schema";
@@ -16,6 +17,9 @@ interface RequestDeletionTotpFormProps {
 }
 
 export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProps) {
+  const { t } = useTranslation("errors");
+  const { t: tSettings } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const mutation = useRequestDeletion({ onClose });
   const form = useForm<RequestDeletionWithTotpInput>({
     resolver: zodResolver(requestDeletionWithTotpSchema),
@@ -27,8 +31,12 @@ export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProp
       <form
         onSubmit={form.handleSubmit((values) =>
           mutation.mutate(values, {
-            onError: buildDeletionOnError(onClose, "TWO_FACTOR_INVALID", (msg) =>
-              form.setError("totpCode", { message: msg }),
+            onError: buildDeletionOnError(
+              onClose,
+              "TWO_FACTOR_INVALID",
+              (msg) => form.setError("totpCode", { message: msg }),
+              t,
+              tSettings,
             ),
           }),
         )}
@@ -38,15 +46,15 @@ export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProp
         <FormTextField
           control={form.control}
           name="totpCode"
-          label="Confirm with your authenticator code"
+          label={tSettings("deletion.totpLabel")}
           inputMode="numeric"
           autoComplete="one-time-code"
-          placeholder="123456"
+          placeholder={tSettings("deletion.totpPlaceholder")}
         />
         <AlertDialogFooter>
-          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <AlertDialogCancel type="button">{tCommon("actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction type="submit" variant="destructive" disabled={mutation.isPending}>
-            {mutation.isPending ? "Submitting…" : "Delete account"}
+            {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </form>

@@ -4,20 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { stopImpersonationMutationOptions } from "../api/mutations/stop-impersonation";
 import { sessionQueryOptions } from "../api/queries/session";
 import { broadcastAuthChange } from "../auth/auth-broadcast";
 import { isImpersonating } from "../auth/is-impersonating";
 import { displayName } from "../utils";
 
-function formatRemainingTime(expiresAt: Date, now: number): string {
-  const ms = new Date(expiresAt).getTime() - now;
-  if (ms <= 0) return "session expired";
-  const minutes = Math.ceil(ms / 60000);
-  return `${minutes} min remaining`;
-}
-
 export function ImpersonationBanner() {
+  const { t } = useTranslation("common");
   const { data: session } = useQuery(sessionQueryOptions);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -27,7 +22,7 @@ export function ImpersonationBanner() {
     ...stopImpersonationMutationOptions,
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
+      broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/admin/users" });
     },
   });
@@ -40,14 +35,25 @@ export function ImpersonationBanner() {
   if (!session || !isImpersonating(session)) return null;
 
   const name = displayName(session.user);
+  const ms = new Date(session.session.expiresAt).getTime() - now;
+  const remaining =
+    ms <= 0
+      ? t("impersonation.expired")
+      : t("impersonation.remainingMinutes", {
+          minutes: Math.ceil(ms / 60000),
+        });
 
   return (
     <Alert variant="banner">
       <ShieldAlert />
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>
-          Active impersonation session — acting as <strong>{name}</strong>
-          {`. ${formatRemainingTime(session.session.expiresAt, now)}`}
+          <Trans
+            ns="common"
+            i18nKey="impersonation.activeSession"
+            components={{ name: <strong>{name}</strong> }}
+          />
+          {`. ${remaining}`}
         </span>
         <Button
           variant="secondary"
@@ -55,7 +61,7 @@ export function ImpersonationBanner() {
           disabled={mutation.isPending}
           onClick={() => mutation.mutate()}
         >
-          End impersonation
+          {t("impersonation.end")}
         </Button>
       </AlertDescription>
     </Alert>

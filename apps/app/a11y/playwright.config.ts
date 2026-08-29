@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
-const BASE_URL = process.env.A11Y_BASE_URL ?? "http://localhost:4173";
+export const BASE_URL = process.env.A11Y_BASE_URL ?? "http://localhost:4173";
 const APP_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 export const STORAGE_STATE = fileURLToPath(new URL(".auth/state.json", import.meta.url));

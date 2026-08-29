@@ -8,7 +8,22 @@ interface ErrorEnvelope {
   error?: { code?: string; message?: string; metadata?: Record<string, unknown> };
 }
 
-export async function throwApiError(res: Response, fallbackMessage: string): Promise<never> {
+/**
+ * Narrowed to what this function actually reads. Hono RPC's `ClientResponse`
+ * (every real call site) and the DOM `Response` both satisfy this, but they
+ * no longer satisfy each other structurally now that `Response` carries a
+ * `textStream` member `ClientResponse` doesn't implement.
+ */
+interface ApiFailureResponse {
+  readonly status: number;
+  readonly headers: Pick<Headers, "get">;
+  json(): Promise<unknown>;
+}
+
+export async function throwApiError(
+  res: ApiFailureResponse,
+  fallbackMessage: string,
+): Promise<never> {
   let payload: ErrorEnvelope = {};
   try {
     payload = (await res.json()) as ErrorEnvelope;

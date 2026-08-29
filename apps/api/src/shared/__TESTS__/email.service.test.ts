@@ -10,7 +10,7 @@ function fakeQueue() {
     rows,
     enqueue: async (batch: EmailMessageInsert[]) => {
       rows.push(...batch);
-      return Result.ok<void, never>(undefined);
+      return Result.ok<{ written: number }, never>({ written: batch.length });
     },
     claimPending: async () => Result.ok([]),
     markSent: async () => Result.ok<void, never>(undefined),
@@ -58,6 +58,20 @@ describe("QueuedEmailService", () => {
     expect(queue.rows.map((r) => r.toAddress)).toEqual(["a@x.test", "b@x.test"]);
   });
 
+  it("freezes the caller's locale on the row and renders the subject in it", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const result = await service.sendTemplate(
+      "verify_email",
+      "a@x.test",
+      { name: "Ada", verifyUrl: "https://x.test/v" },
+      { locale: "fr" },
+    );
+    expect(result.isSuccess).toBe(true);
+    expect(queue.rows[0]?.locale).toBe("fr");
+    expect(queue.rows[0]?.subject).toBe("Confirmez votre adresse e-mail");
+  });
+
   it("surfaces a queue write failure as EMAIL_PROVIDER_FAILURE", async () => {
     const failing = {
       enqueue: async () => Result.fail({ code: "EMAIL_QUEUE_WRITE_FAILED", message: "db down" }),
@@ -68,5 +82,89 @@ describe("QueuedEmailService", () => {
     });
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("EMAIL_PROVIDER_FAILURE");
+  });
+
+  it("fails with EMAIL_PROVIDER_FAILURE when every row is suppressed (0 of N written)", async () => {
+    const fullySuppressed = {
+      enqueue: async (_batch: EmailMessageInsert[]) =>
+        Result.ok<{ written: number }, never>({ written: 0 }),
+    };
+    const service = new QueuedEmailService(fullySuppressed as never, new NoOpInstrumentation());
+    const result = await service.sendTemplate("delete_completed", "a@x.test", { name: "Ada" });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("EMAIL_PROVIDER_FAILURE");
+  });
+
+  it("stays success on a partial suppression (some rows written, some duplicates)", async () => {
+    const partiallySuppressed = {
+      enqueue: async (_batch: EmailMessageInsert[]) =>
+        Result.ok<{ written: number }, never>({ written: 1 }),
+    };
+    const service = new QueuedEmailService(partiallySuppressed as never, new NoOpInstrumentation());
+    const result = await service.sendTemplateBatch("delete_completed", [
+      { to: "a@x.test", variables: { name: "Ada" } },
+      { to: "b@x.test", variables: { name: "Bob" } },
+    ]);
+    expect(result.isSuccess).toBe(true);
+  });
+
+  it("uses a recipient-level key verbatim", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch("delete_completed", [
+      { to: "a@example.com", variables: { name: "A" }, idempotencyKey: "wipe/user-1" },
+    ]);
+    expect(queue.rows[0]?.idempotencyKey.unwrap()).toBe("wipe/user-1");
+  });
+
+  it("falls back to the batch key namespaced with #", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch(
+      "delete_completed",
+      [
+        { to: "a@example.com", variables: { name: "A" } },
+        { to: "b@example.com", variables: { name: "B" } },
+      ],
+      { idempotencyKey: "batch" },
+    );
+    const rows = queue.rows;
+    expect(rows[0]?.idempotencyKey.unwrap()).toBe("batch#0");
+    expect(rows[1]?.idempotencyKey.unwrap()).toBe("batch#1");
+  });
+
+  it("prefers the recipient key over the batch key", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch(
+      "delete_completed",
+      [{ to: "a@example.com", variables: { name: "A" }, idempotencyKey: "explicit" }],
+      { idempotencyKey: "batch" },
+    );
+    expect(queue.rows[0]?.idempotencyKey.unwrap()).toBe("explicit");
+  });
+
+  it("leaves the key absent when neither form is supplied", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendTemplateBatch("delete_completed", [
+      { to: "a@example.com", variables: { name: "A" } },
+    ]);
+    expect(queue.rows[0]?.idempotencyKey.isNone()).toBe(true);
+  });
+
+  it("namespaces the raw batch fallback with # like the template batch", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    await service.sendRawBatch(
+      [
+        { to: "a@example.com", subject: "S1", body: { text: "1" } },
+        { to: "b@example.com", subject: "S2", body: { text: "2" } },
+      ],
+      { idempotencyKey: "key" },
+    );
+    const rows = queue.rows;
+    expect(rows[0]?.idempotencyKey.unwrap()).toBe("key#0");
+    expect(rows[1]?.idempotencyKey.unwrap()).toBe("key#1");
   });
 });

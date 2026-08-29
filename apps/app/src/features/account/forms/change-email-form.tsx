@@ -3,6 +3,7 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type ChangeEmailInput, changeEmailSchema } from "../account.schema";
 import { useChangeEmail } from "../hooks/use-change-email";
 
@@ -11,6 +12,7 @@ interface ChangeEmailFormProps {
 }
 
 export function ChangeEmailForm({ onSuccess }: ChangeEmailFormProps = {}) {
+  const { t } = useTranslation("settings");
   const mutation = useChangeEmail();
   const form = useForm<ChangeEmailInput>({
     resolver: zodResolver(changeEmailSchema),
@@ -34,12 +36,12 @@ export function ChangeEmailForm({ onSuccess }: ChangeEmailFormProps = {}) {
         <FormTextField
           control={form.control}
           name="newEmail"
-          label="New email address"
+          label={t("account.newEmailLabel")}
           type="email"
           autoComplete="email"
         />
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Sending…" : "Send confirmation"}
+          {mutation.isPending ? t("account.sending") : t("account.sendConfirmation")}
         </Button>
       </form>
     </Form>

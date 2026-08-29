@@ -190,6 +190,7 @@ const mockFindUserById = mock(async () => ({
   id: "user-1",
   email: "user@example.com",
   name: "Alice",
+  locale: "fr",
 }));
 
 // mock.module leaks: admin-action.service.test.ts and admin-impersonation.routes.test.ts
@@ -272,6 +273,7 @@ describe("POST /api/token-scanning/github", () => {
       id: "user-1",
       email: "user@example.com",
       name: "Alice",
+      locale: "fr",
     }));
   });
 
@@ -329,6 +331,7 @@ describe("POST /api/token-scanning/github", () => {
       "api_token_leaked",
       "user@example.com",
       expect.objectContaining({ tokenName: "ci-token" }),
+      { locale: "fr" },
     );
   });
 

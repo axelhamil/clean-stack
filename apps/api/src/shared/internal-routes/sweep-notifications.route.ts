@@ -44,9 +44,14 @@ export const sweepNotificationsRoutes = new Hono<HonoEnv>()
   .post("/sweep-notifications", zV("json", sweepBodySchema), async (c) => {
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      retentionDays: env.NOTIFICATION_RETENTION_DAYS,
-      purgeBatch,
-      countEligible,
+      passes: [
+        {
+          label: "default",
+          retentionDays: env.NOTIFICATION_RETENTION_DAYS,
+          purgeBatch,
+          countEligible,
+        },
+      ],
       logger: c.var.logger,
       label: "sweep-notifications",
     });

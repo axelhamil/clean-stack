@@ -2,6 +2,7 @@ import { Option } from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
+import { DEFAULT_LOCALE } from "@packages/i18n";
 import { Resend } from "resend";
 import { env } from "../env";
 import { emitEvent } from "../event-emitter";
@@ -119,7 +120,7 @@ export class EmailDeliveryWorker {
 
   private async sendChunk(chunk: EmailMessageRecord[]): Promise<void> {
     const entries = await Promise.all(chunk.map((r) => this.toEntry(r)));
-    const keyOpt = chunkIdempotencyKey(chunk);
+    const keyOpt = await chunkIdempotencyKey(chunk);
     const result = await this.sender.batchSend(entries, keyOpt.isSome() ? keyOpt.unwrap() : null);
 
     if (result.error !== null) {
@@ -216,18 +217,19 @@ export class EmailDeliveryWorker {
     const rendered = await renderTemplate(
       templateName as EmailTemplateKey,
       rowRecord.payload as never,
+      rowRecord.locale.toUndefined() ?? DEFAULT_LOCALE,
     );
     return { ...base, html: rendered.html, text: rendered.text };
   }
 }
 
-export function chunkIdempotencyKey(chunk: EmailMessageRecord[]): Option<string> {
+export async function chunkIdempotencyKey(chunk: EmailMessageRecord[]): Promise<Option<string>> {
   const explicit = chunk
     .map((r) => r.idempotencyKey)
     .filter((k) => k.isSome())
     .map((k) => k.unwrap());
   if (explicit.length !== chunk.length) return Option.none();
-  return Option.some(explicit.sort().join("|").slice(0, 256));
+  return Option.some(await sha256Hex(explicit.sort().join("|")));
 }
 
 export function groupRows(rows: EmailMessageRecord[]): EmailMessageRecord[][] {

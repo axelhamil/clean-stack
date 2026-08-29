@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import type { IEmailService } from "../../../shared/ports/email.port";
+import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { IStorageService } from "../../../shared/ports/storage.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
@@ -20,6 +20,7 @@ import { RgpdService } from "../application/services/rgpd.service";
 const baseState: UserDeletionState = {
   email: "u@example.com",
   name: "User",
+  locale: Option.some("fr"),
   twoFactorEnabled: false,
   pendingDeletionUntil: Option.none(),
   deletedAt: Option.none(),
@@ -43,9 +44,20 @@ const stubExportPayload: UserExportPayload = {
   invitationsSent: [],
 };
 
+let capturedTrx: unknown = null;
+let uowThrew = false;
 const tx: IUnitOfWork<never> = {
   startTransaction: async (cb) => cb({} as never),
-  run: async (cb) => cb({} as never),
+  run: async (cb) => {
+    const trx = {} as never;
+    capturedTrx = trx;
+    try {
+      return await cb(trx);
+    } catch (e) {
+      uowThrew = true;
+      throw e;
+    }
+  },
 };
 
 const noopOutbox: IOutboxRepository = {
@@ -124,6 +136,7 @@ function makeService(opts: {
             Option.some({
               email: `${userId}@example.com`,
               name: "User",
+              locale: Option.some("fr" as const),
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
               deletedAt: Option.none(),
@@ -147,6 +160,8 @@ describe("RgpdService", () => {
 
   beforeEach(() => {
     email = makeEmail();
+    capturedTrx = null;
+    uowThrew = false;
   });
 
   describe("preflightAccountDeletion", () => {
@@ -259,7 +274,7 @@ describe("RgpdService", () => {
         "delete_requested",
         "u@example.com",
         expect.objectContaining({ name: "User", cancelUrl: expect.any(String) }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
     });
 
@@ -365,7 +380,7 @@ describe("RgpdService", () => {
         "delete_cancelled",
         "u@example.com",
         expect.objectContaining({ name: "User" }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
     });
 
@@ -417,7 +432,117 @@ describe("RgpdService", () => {
       expect(storage.listObjectKeys).toHaveBeenCalledWith("u1/");
       expect(storage.deleteObjects).toHaveBeenCalledWith(["u1/uploads/a", "u1/exports/b"]);
       expect(result.getValue().storageKeysDeleted).toBe(2);
-      expect(result.getValue().notify).toEqual({ to: "u@example.com", name: "User" });
+      expect(email.sendTemplate).toHaveBeenCalledWith(
+        "delete_completed",
+        "u@example.com",
+        { name: "User" },
+        expect.objectContaining({ idempotencyKey: "delete-completed/u1", locale: "fr" }),
+      );
+    });
+
+    it("enqueues the confirmation inside the wipe transaction", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        email,
+        tx,
+        noopOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(email.sendTemplate).toHaveBeenCalledTimes(1);
+      const call = (
+        email.sendTemplate as unknown as {
+          mock: {
+            calls: [string, string, unknown, { idempotencyKey?: string; tx?: unknown }][];
+          };
+        }
+      ).mock.calls[0];
+      if (!call) throw new Error("sendTemplate was not called");
+      const [template, to, variables, options] = call;
+      expect(template).toBe("delete_completed");
+      expect(to).toBe("u@example.com");
+      expect(variables).toEqual({ name: "User" });
+      expect(options.idempotencyKey).toBe("delete-completed/u1");
+      expect(options.tx).toBe(capturedTrx);
+    });
+
+    it("aborts the wipe transaction when the confirmation cannot be enqueued", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const failEmail: IEmailService = {
+        ...makeEmail(),
+        sendTemplate: mock(async () =>
+          Result.fail<void, EmailError>({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
+        ),
+      };
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        failEmail,
+        tx,
+        noopOutbox,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE");
+      expect(uowThrew).toBe(true);
+    });
+
+    it("reports a generic provider failure and captures the error when the ROLLBACK itself throws", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const failEmail: IEmailService = {
+        ...makeEmail(),
+        sendTemplate: mock(async () =>
+          Result.fail<void, EmailError>({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
+        ),
+      };
+      const brokenTx: IUnitOfWork<never> = {
+        startTransaction: async (cb) => cb({} as never),
+        run: async () => {
+          // Simulates Postgres failing to ROLLBACK (e.g. connection loss) after the
+          // sentinel throw — a different error surfaces from `run`, not "rollback".
+          throw new Error("connection terminated unexpectedly");
+        },
+      };
+      const captured: unknown[] = [];
+      const capturingInstrumentation = new NoOpInstrumentation();
+      capturingInstrumentation.capture = (err: unknown) => {
+        captured.push(err);
+      };
+
+      const service = new RgpdService(
+        repo,
+        makeStorage(),
+        failEmail,
+        brokenTx,
+        noopOutbox,
+        capturingInstrumentation,
+      );
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("ACCOUNT_WIPE_PROVIDER_FAILURE");
+      expect(captured).toHaveLength(1);
     });
 
     it("emits ORG_DELETED for every organization destroyed in the wipe (RGPD audit completeness)", async () => {
@@ -462,6 +587,7 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(
             Option.some({
               email: "deleted@anonymized.local",
+              locale: Option.none<"fr">(),
               name: "[deleted]",
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.none(),
@@ -559,6 +685,7 @@ describe("RgpdService", () => {
             Option.some({
               email: `${userId}@example.com`,
               name: "User",
+              locale: Option.some("fr" as const),
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
               deletedAt: Option.none(),
@@ -645,6 +772,7 @@ describe("RgpdService", () => {
             Option.some({
               email: `${userId}@example.com`,
               name: "User",
+              locale: Option.some("fr" as const),
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
               deletedAt: Option.none(),
@@ -672,41 +800,25 @@ describe("RgpdService", () => {
       expect(output.failed.some((f) => f.userId === "u2")).toBe(true);
     });
 
-    it("sends one batch for all successfully wiped accounts instead of one email each", async () => {
-      const batches: Array<{ template: string; count: number }> = [];
-      const email = {
-        sendTemplate: async () => Result.ok<void, never>(undefined),
-        sendTemplateBatch: async (template: string, recipients: unknown[]) => {
-          batches.push({ template, count: recipients.length });
-          return Result.ok<void, never>(undefined);
-        },
-        sendRaw: async () => Result.ok<void, never>(undefined),
-        sendRawBatch: async () => Result.ok<void, never>(undefined),
-      };
-      const service = makeService({ email, readyForWipe: ["u1", "u2", "u3"] });
+    it("sends one enqueue per account rather than one batch", async () => {
+      const emailMock = makeEmail();
+      const service = makeService({ email: emailMock, readyForWipe: ["u1", "u2", "u3"] });
 
       const result = await service.processPendingDeletions({ batchSize: 50 });
 
       expect(result.getValue().succeeded).toHaveLength(3);
-      expect(batches).toEqual([{ template: "delete_completed", count: 3 }]);
+      expect(emailMock.sendTemplate).toHaveBeenCalledTimes(3);
+      expect(emailMock.sendTemplateBatch).not.toHaveBeenCalled();
     });
 
     it("does not send anything when every wipe fails", async () => {
-      const batches: unknown[] = [];
-      const email = {
-        sendTemplate: async () => Result.ok<void, never>(undefined),
-        sendTemplateBatch: async () => {
-          batches.push(1);
-          return Result.ok<void, never>(undefined);
-        },
-        sendRaw: async () => Result.ok<void, never>(undefined),
-        sendRawBatch: async () => Result.ok<void, never>(undefined),
-      };
-      const service = makeService({ email, readyForWipe: ["u1"], wipeFails: true });
+      const emailMock = makeEmail();
+      const service = makeService({ email: emailMock, readyForWipe: ["u1"], wipeFails: true });
 
       await service.processPendingDeletions({ batchSize: 50 });
 
-      expect(batches).toHaveLength(0);
+      expect(emailMock.sendTemplate).not.toHaveBeenCalled();
+      expect(emailMock.sendTemplateBatch).not.toHaveBeenCalled();
     });
 
     it("records ACCOUNT_WIPE_PROVIDER_FAILURE when the wipe transaction throws", async () => {
@@ -836,7 +948,7 @@ describe("RgpdService", () => {
         "data_export_ready",
         "u@example.com",
         expect.objectContaining({ name: "User", downloadUrl: expect.any(String) }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
       expect(repo.touchExportRequestedAt).toHaveBeenCalledWith("u1", expect.anything());
     });

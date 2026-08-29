@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@packages/ui/components/ui/
 import { Button } from "@packages/ui/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { createUpload } from "../../../shared/api/mutations/create-upload";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
@@ -24,6 +25,7 @@ interface UploadAvatarProps {
 }
 
 export function UploadAvatar({ name }: UploadAvatarProps) {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const { data: session } = useQuery(sessionQueryOptions);
   const image = session?.user.image;
@@ -34,7 +36,7 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
     mutationFn: async (file: File) => {
       const { publicUrl } = await createUpload({ file, scope: "avatars" });
       const { error } = await authClient.updateUser({ image: publicUrl });
-      if (error) throw new Error(error.message ?? "Failed to update avatar");
+      if (error) throw new Error(error.message ?? t("account.avatarUpdateFailed"));
       return publicUrl;
     },
     onSuccess: (publicUrl) => {
@@ -42,7 +44,7 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
         old ? { ...old, user: { ...old.user, image: publicUrl } } : old,
       );
       broadcastAuthChange();
-      toast.success("Avatar updated");
+      toast.success(t("account.avatarUpdatedToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -52,11 +54,11 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
     e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.");
+      toast.error(t("account.avatarFileTypeError"));
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      toast.error("Image must be under 5 MB.");
+      toast.error(t("account.avatarSizeError"));
       return;
     }
     mutation.mutate(file);
@@ -72,7 +74,7 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
         ref={inputRef}
         type="file"
         accept="image/*"
-        aria-label="Upload a new avatar image"
+        aria-label={t("account.uploadAvatarLabel")}
         className="sr-only"
         tabIndex={-1}
         onChange={handleFileChange}
@@ -84,7 +86,7 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
         disabled={mutation.isPending}
         onClick={() => inputRef.current?.click()}
       >
-        {mutation.isPending ? "Uploading…" : "Change avatar"}
+        {mutation.isPending ? t("account.uploading") : t("account.changeAvatar")}
       </Button>
     </div>
   );

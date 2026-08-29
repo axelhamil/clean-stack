@@ -8,6 +8,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { DownloadIcon } from "lucide-react";
+import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { useRequestExport } from "../hooks/use-request-export";
 
 const RATE_LIMIT_HOURS = 24;
@@ -17,6 +18,7 @@ interface DataExportCardProps {
 }
 
 export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
+  const formatDateTime = useFormatDateTime();
   const mutation = useRequestExport();
 
   const last = lastExportRequestedAt ? new Date(lastExportRequestedAt) : null;
@@ -42,9 +44,7 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
           {mutation.isPending ? "Requesting…" : "Request data export"}
         </Button>
         {cooldown && nextAllowedAt && (
-          <TypographyMuted>
-            Next request available {nextAllowedAt.toLocaleString()}.
-          </TypographyMuted>
+          <TypographyMuted>Next request available {formatDateTime(nextAllowedAt)}.</TypographyMuted>
         )}
       </CardContent>
     </Card>

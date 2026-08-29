@@ -1,9 +1,10 @@
+import { LOCALES } from "@packages/i18n";
 import { z } from "zod";
 import { EventTypes } from "./event-types";
 
 const UserRef = z.object({ userId: z.string() });
 const OrgRef = z.object({ organizationId: z.string() });
-const Email = z.string().email();
+const Email = z.email();
 
 export const UserCreatedPayload = UserRef.extend({
   email: Email,
@@ -99,7 +100,7 @@ export const UserProfileUpdatedPayload = UserRef.extend({
 export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
 
 export const UserEmailChangeRequestedPayload = UserRef.extend({
-  newEmail: z.string().email(),
+  newEmail: z.email(),
 });
 export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
 
@@ -111,6 +112,15 @@ export const UserExportCompletedPayload = UserRef.extend({
   expiresAt: z.coerce.date(),
 });
 export type UserExportCompletedPayload = z.infer<typeof UserExportCompletedPayload>;
+
+// Subject and actor are the same person: the route carries `denyImpersonated`,
+// so no admin can trigger this on someone else's behalf. `userId` alone
+// therefore satisfies §7 without a separate `actorUserId`.
+export const UserLocaleChangedPayload = UserRef.extend({
+  locale: z.enum(LOCALES),
+  previousLocale: z.enum(LOCALES).nullable(),
+});
+export type UserLocaleChangedPayload = z.infer<typeof UserLocaleChangedPayload>;
 
 export const OrgCreatedPayload = OrgRef.extend({
   ownerUserId: z.string(),
@@ -190,7 +200,7 @@ export type UploadDeletedPayload = z.infer<typeof UploadDeletedPayload>;
 export const WebhookEndpointCreatedPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
-  url: z.string().url(),
+  url: z.url(),
   eventTypes: z.array(z.string()),
   enabled: z.boolean(),
 });
@@ -578,6 +588,7 @@ export const PayloadByEventType = {
   [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: UserEmailChangeRequestedPayload,
   [EventTypes.USER_EXPORT_REQUESTED]: UserExportRequestedPayload,
   [EventTypes.USER_EXPORT_COMPLETED]: UserExportCompletedPayload,
+  [EventTypes.USER_LOCALE_CHANGED]: UserLocaleChangedPayload,
   [EventTypes.ORG_CREATED]: OrgCreatedPayload,
   [EventTypes.ORG_UPDATED]: OrgUpdatedPayload,
   [EventTypes.ORG_DELETED]: OrgDeletedPayload,

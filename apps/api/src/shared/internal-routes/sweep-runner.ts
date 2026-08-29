@@ -27,49 +27,72 @@ export type RunBatchedSweepOptions = {
 
 export type SweepRunResult = { deleted: number; batchCount: number };
 
+export type RetentionPass = {
+  label: string;
+  retentionDays: number;
+  purgeBatch: (cutoff: Date, batchSize: number) => Promise<number>;
+  countEligible: (cutoff: Date) => Promise<number>;
+  onBatchError?: (err: unknown) => SweepBatchErrorDecision;
+};
+
+export type RunRetentionSweepOptions = {
+  body: SweepBody;
+  passes: RetentionPass[];
+  logger: PinoLogger;
+  label: string;
+};
+
 export type SweepResponse = {
   deleted: number;
   durationMs: number;
   dryRun: boolean;
   batchCount: number;
-};
-
-export type RunRetentionSweepOptions = {
-  body: SweepBody;
-  retentionDays: number;
-  purgeBatch: (cutoff: Date, batchSize: number) => Promise<number>;
-  countEligible: (cutoff: Date) => Promise<number>;
-  logger: PinoLogger;
-  label: string;
-  onBatchError?: (err: unknown) => SweepBatchErrorDecision;
+  deletedPerPass: Record<string, number>;
 };
 
 export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise<SweepResponse> {
   const batchSize = opts.body.batchSize ?? 5000;
   const dryRun = opts.body.dryRun ?? false;
+  const startMs = Date.now();
 
   opts.logger.info(
-    { retentionDays: opts.retentionDays, batchSize, dryRun },
+    {
+      passes: opts.passes.map((p) => ({ label: p.label, retentionDays: p.retentionDays })),
+      batchSize,
+      dryRun,
+    },
     `${opts.label} started`,
   );
 
-  const startMs = Date.now();
-  const cutoff = new Date(Date.now() - opts.retentionDays * 24 * 60 * 60 * 1000);
+  let deleted = 0;
+  let batchCount = 0;
+  const deletedPerPass: Record<string, number> = {};
 
-  const { deleted, batchCount } = await runBatchedSweep({
-    purgeBatch: (size) => opts.purgeBatch(cutoff, size),
-    countEligible: () => opts.countEligible(cutoff),
-    batchSize,
-    dryRun,
-    logger: opts.logger,
-    label: opts.label,
-    onBatchError: opts.onBatchError,
-  });
+  // Sequential on purpose: each pass may loop hundreds of batched transactions, and
+  // running passes in parallel halves the connection-pool headroom left for prod traffic.
+  for (const pass of opts.passes) {
+    const cutoff = new Date(Date.now() - pass.retentionDays * 24 * 60 * 60 * 1000);
+    const run = await runBatchedSweep({
+      purgeBatch: (size) => pass.purgeBatch(cutoff, size),
+      countEligible: () => pass.countEligible(cutoff),
+      batchSize,
+      dryRun,
+      logger: opts.logger,
+      label: `${opts.label}:${pass.label}`,
+      onBatchError: pass.onBatchError,
+    });
+    deleted += run.deleted;
+    batchCount += run.batchCount;
+    deletedPerPass[pass.label] = run.deleted;
+  }
 
   const durationMs = Date.now() - startMs;
-  opts.logger.info({ deleted, durationMs, batchCount, dryRun }, `${opts.label} done`);
+  opts.logger.info(
+    { deleted, deletedPerPass, durationMs, batchCount, dryRun },
+    `${opts.label} done`,
+  );
 
-  return { deleted, durationMs, dryRun, batchCount };
+  return { deleted, durationMs, dryRun, batchCount, deletedPerPass };
 }
 
 export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<SweepRunResult> {

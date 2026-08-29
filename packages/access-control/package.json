@@ -12,12 +12,12 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "better-auth": "^1.6.20"
+    "better-auth": "1.6.30"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

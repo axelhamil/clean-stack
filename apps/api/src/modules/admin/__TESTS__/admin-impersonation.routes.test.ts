@@ -178,10 +178,24 @@ mock.module("../../../shared/middleware/auth.middleware", () => ({
 }));
 
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
+const { Hono } = await import("hono");
+const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
+const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+
+// Mounted behind the real error handler: a validation rejection is now an
+// `AppErrorException`, which only Hono's `onError` turns into a 400 — a bare
+// sub-router would report it as an unhandled 500 and hide the contract.
+const app = new Hono<{ Variables: { requestId: string } }>()
+  .use("*", async (c, next) => {
+    c.set("requestId", "req-test");
+    await next();
+  })
+  .route("/", adminImpersonationRoutes);
+app.onError(createErrorHandler(new NoOpInstrumentation()));
 
 describe("POST /admin/impersonation/:id/start", () => {
   it("rejects a request without a reason", async () => {
-    const res = await adminImpersonationRoutes.request("/u-2/start", {
+    const res = await app.request("/u-2/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reason: "" }),
@@ -190,7 +204,7 @@ describe("POST /admin/impersonation/:id/start", () => {
   });
 
   it("rejects self-impersonation", async () => {
-    const res = await adminImpersonationRoutes.request("/admin-1/start", {
+    const res = await app.request("/admin-1/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reason: "testing self" }),
@@ -200,7 +214,7 @@ describe("POST /admin/impersonation/:id/start", () => {
 
   it("relays the impersonation cookie and emits the start event", async () => {
     emitted.length = 0;
-    const res = await adminImpersonationRoutes.request("/u-2/start", {
+    const res = await app.request("/u-2/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reason: "ticket 42 — cannot upload avatar" }),
@@ -218,7 +232,7 @@ describe("POST /admin/impersonation/:id/start", () => {
     mockImpersonateUser.mockImplementationOnce(
       async () => new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }),
     );
-    const res = await adminImpersonationRoutes.request("/u-2/start", {
+    const res = await app.request("/u-2/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reason: "test refusal" }),
@@ -230,7 +244,7 @@ describe("POST /admin/impersonation/:id/start", () => {
 describe("POST /admin/impersonation/stop", () => {
   it("returns 400 when not impersonating", async () => {
     currentSession = { impersonatedBy: null, userId: "admin-1", createdAt: new Date() };
-    const res = await adminImpersonationRoutes.request("/stop", {
+    const res = await app.request("/stop", {
       method: "POST",
     });
     expect(res.status).toBe(400);
@@ -246,7 +260,7 @@ describe("POST /admin/impersonation/stop", () => {
     mockStopImpersonating.mockImplementationOnce(
       async () => new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }),
     );
-    const res = await adminImpersonationRoutes.request("/stop", {
+    const res = await app.request("/stop", {
       method: "POST",
     });
     expect(res.status).toBe(403);
@@ -260,7 +274,7 @@ describe("POST /admin/impersonation/stop", () => {
       userId: "target-2",
       createdAt: new Date(Date.now() - 5_000),
     };
-    const res = await adminImpersonationRoutes.request("/stop", {
+    const res = await app.request("/stop", {
       method: "POST",
     });
     expect(res.status).toBe(200);

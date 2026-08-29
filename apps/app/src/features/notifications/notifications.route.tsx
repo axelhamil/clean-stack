@@ -1,8 +1,57 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { settingsLayout } from "../../router/layouts";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@packages/ui/components/ui/card";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { toast } from "sonner";
+import { updatePreferenceMutationOptions } from "../../shared/api/mutations/notifications";
+import { notificationPreferencesQueryOptions } from "../../shared/api/queries/notifications";
+import { buildPreferenceMatrix } from "../../shared/notifications/build-preference-matrix";
+import {
+  type PreferenceChange,
+  PreferenceMatrix,
+} from "../../shared/notifications/preference-matrix";
 
-export const notificationsRoute = createRoute({
-  getParentRoute: () => settingsLayout,
-  path: "notifications",
-  component: lazyRouteComponent(() => import("./notifications.page"), "NotificationsPage"),
+export const Route = createFileRoute("/_protected/_shell/settings/notifications")({
+  component: NotificationsPage,
 });
+
+function NotificationsPage() {
+  const queryClient = useQueryClient();
+  const { data, isPending } = useQuery(notificationPreferencesQueryOptions);
+  const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
+
+  const update = useMutation({
+    ...updatePreferenceMutationOptions,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: notificationPreferencesQueryOptions.queryKey }),
+    onError: () => toast.error("Could not save your notification preferences"),
+  });
+
+  const handleChange = ({ category, channel, enabled, frequency }: PreferenceChange) =>
+    update.mutate({ category, channel, enabled, frequency });
+
+  return (
+    <main className="flex flex-col gap-6">
+      <TypographyH1 className="sr-only">Notifications</TypographyH1>
+      <Card>
+        <CardHeader>
+          <CardTitle>Notification preferences</CardTitle>
+          <CardDescription>
+            Choose how each category reaches you. These settings apply to your account across every
+            organization you belong to.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PreferenceMatrix rows={rows} onChange={handleChange} disabled={isPending} />
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

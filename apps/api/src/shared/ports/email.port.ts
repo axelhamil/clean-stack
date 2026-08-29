@@ -1,5 +1,6 @@
 import type { Result } from "@packages/ddd-kit";
 import type { EmailTemplates } from "@packages/emails";
+import type { Locale } from "@packages/i18n";
 import type { ITransaction } from "../transaction";
 
 export type { EmailTemplates };
@@ -17,8 +18,25 @@ export type EmailError =
 export interface SendTemplateOptions {
   idempotencyKey?: string;
   from?: string;
-  locale?: string;
   tx?: ITransaction;
+  /**
+   * The recipient's locale. Named rather than positional so a call site that
+   * has no locale to give simply omits it, instead of parking an `undefined`
+   * placeholder that reads like a deliberate choice.
+   */
+  locale?: Locale;
+}
+
+export interface EmailRecipient<K extends keyof EmailTemplates> {
+  to: string;
+  variables: EmailTemplates[K] & TemplateVariables;
+  locale?: Locale;
+  /**
+   * Per-recipient idempotency key. Overrides the batch-level
+   * `SendTemplateOptions.idempotencyKey`, whose positional suffix is unstable when
+   * the batch is rebuilt from a partially-successful set. Must not contain `#`.
+   */
+  idempotencyKey?: string;
 }
 
 export interface IEmailService {
@@ -38,7 +56,7 @@ export interface IEmailService {
 
   sendTemplateBatch<K extends keyof EmailTemplates>(
     template: K,
-    recipients: Array<{ to: string; variables: EmailTemplates[K] & TemplateVariables }>,
+    recipients: EmailRecipient<K>[],
     options?: SendTemplateOptions,
   ): Promise<Result<void, EmailError>>;
 

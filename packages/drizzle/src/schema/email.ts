@@ -12,6 +12,7 @@ export const emailMessage = pgTable(
     template: text("template"),
     toAddress: text("to_address").notNull(),
     subject: text("subject").notNull(),
+    locale: text("locale"),
     payload: jsonb("payload").$type<unknown>().notNull(),
     status: text("status", { enum: EMAIL_MESSAGE_STATUSES }).notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
@@ -28,5 +29,8 @@ export const emailMessage = pgTable(
       .on(table.nextAttemptAt, table.createdAt)
       .where(sql`${table.status} = 'pending'`),
     index("email_message_sweep_idx").on(table.sentAt).where(sql`${table.status} = 'sent'`),
+    index("email_message_failed_sweep_idx")
+      .on(table.createdAt)
+      .where(sql`${table.status} = 'failed'`),
   ],
 );

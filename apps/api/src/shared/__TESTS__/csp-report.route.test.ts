@@ -384,10 +384,11 @@ describe("POST /csp-report", () => {
         Array<{ payload: Record<string, unknown> }>,
       ];
       const payload = events[0]?.payload;
-      expect((payload?.documentUri as string).length).toBe(2048);
-      expect((payload?.blockedUri as string).length).toBe(2048);
-      expect((payload?.violatedDirective as string).length).toBe(128);
-      expect((payload?.effectiveDirective as string).length).toBe(64);
+      if (!payload) throw new Error("payload not found");
+      expect((payload.documentUri as string).length).toBe(2048);
+      expect((payload.blockedUri as string).length).toBe(2048);
+      expect((payload.violatedDirective as string).length).toBe(128);
+      expect((payload.effectiveDirective as string).length).toBe(64);
     });
   });
 

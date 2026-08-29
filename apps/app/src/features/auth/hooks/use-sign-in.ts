@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { SignInInput } from "../../../shared/auth/auth.schema";
@@ -10,6 +11,8 @@ import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } f
 const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
 
 export function useSignIn(redirectTo?: string) {
+  const { t } = useTranslation("auth");
+  const { t: tErrors } = useTranslation("errors");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -31,13 +34,13 @@ export function useSignIn(redirectTo?: string) {
 
         if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
 
-        throw new Error(resolveAuthError(error, "Sign-in failed"));
+        throw new Error(resolveAuthError(error, "signIn.failed", t, tErrors));
       }
 
       return data;
     },
     onSuccess: async () => {
-      toast.success("Welcome back");
+      toast.success(t("signIn.success"));
 
       await queryClient.refetchQueries({
         queryKey: sessionQueryOptions.queryKey,

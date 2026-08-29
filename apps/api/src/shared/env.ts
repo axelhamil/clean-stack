@@ -58,6 +58,7 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
   OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   EMAIL_MESSAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+  EMAIL_MESSAGE_FAILED_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
   WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),

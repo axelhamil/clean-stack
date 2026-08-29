@@ -12,6 +12,16 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 - Estimates assume the dev knows the libraries. The price is for **integrating + architecting + testing + documenting**, not for learning BetterAuth.
 - Single fourchette per module, not low/high consultancy. Lower bound = experienced solo dev shipping fast. Upper bound = same dev being thorough on tests + docs.
 
+## Primary keys for new tables
+
+Postgres 18 (`docker-compose.yaml`) ships a native `uuidv7()` — time-ordered, so insert-heavy tables avoid the B-tree hotspot/write-amplification of random `uuidv4()` while staying globally unique. For **any new application table owned by the cloner**, default the primary key to it:
+
+```ts
+uuid("id").primaryKey().default(sql`uuidv7()`)
+```
+
+**Every existing table stays `text("id").primaryKey()`** — every PK in `packages/drizzle/src/schema/` is filled by BetterAuth, which generates its own ids on its own schema. Converting those is a BetterAuth question, not a Postgres one, and is deliberately out of scope here.
+
 ---
 
 ## Shipped modules — value already in the box (v2.0+)
@@ -29,8 +39,8 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | **Audit log** (append-only, SOC2 §CC7.2 / ISO 27001, retention enum operational 90d / compliance 365d, env-driven sweep `/internal/sweep-audit-log`, GET /admin/audit-log gated requireOrgPermission, idempotent via outbox subscriber, prev_hash/hash columns posées pour tamper-evidence future) | **€1 500 – €2 500** | 3-4j |
 | **Outbound webhooks** (CRUD endpoints /settings/webhooks gated requireOrgPermission, plaintext secret retourné une seule fois at creation, HMAC-SHA256 Stripe-style, AEAD-encrypted secrets via @noble/ciphers XChaCha20-Poly1305 + HKDF per-org, retry decorrelated jitter, dead-letter, replay endpoint, idempotency keys) | **€2 500 – €3 500** | 5-6j |
 | **UI shadcn-pure + theme** (full registry + custom primitives `NavLink`, `ListRow`, `FormTextField`, `DestructiveActionDialog`, `BackupCodeList`, `QrCodeFrame`, `BrandLink`, `TextLink` + view-transitions theme toggle + typography exports) | **€600 – €1 200** | 2j |
-| **App shell** (Vite + React 19 + TanStack Router code-based with `lazyRouteComponent` 2-file pattern + intent prefetch + view transitions + AppProviders + 4 pathless gates + settings layout + command palette ⌘K + org switcher + auth devtool) | **€1 500 – €2 500** | 3-4j |
-| **Monorepo tooling** (pnpm 10 + Turborepo TUI with `with: ["type-check"]` + Biome 2 + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push) | **€600 – €1 000** | 2j |
+| **App shell** (Vite + React 19 + TanStack Router file-based via `virtualRouteConfig` + `autoCodeSplitting` + intent prefetch + view transitions + AppProviders + 4 pathless gates + settings layout + command palette ⌘K + org switcher + auth devtool) | **€1 500 – €2 500** | 3-4j |
+| **Monorepo tooling** (pnpm 11 + Turborepo TUI with `with: ["type-check"]` + Biome 2 + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push) | **€600 – €1 000** | 2j |
 | **AI-pair ready** (`CLAUDE.md` root + sub-CLAUDE.md per layer auto-loaded by Claude Code + `docs/HISTORY.md` + `docs/CRON.md` + `docs/INTEGRATIONS.md` + `docs/FEATURES.md` + `docs/OVERVIEW.md`) | **€300 – €600** | 1j |
 | **Health probes** (0.2) (`/livez` + `/readyz` + `/startupz` IETF format, registry pattern, graceful shutdown, asymmetric cache) | **€500 – €900** | 1-2j |
 | **Backups + DR** (0.3) (daily `pg_dump` cron, R2 lifecycle 30d/1y cold, monthly automated restore-test, RPO/RTO doc, PITR doc) | **€1 000 – €1 800** | 2-3j |
@@ -51,8 +61,9 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 
 | **Notification center** (D.3) (`<Bell />` + dropdown inbox in the app shell, unread badge, read/read-all with cross-tab propagation, rows grouped by `groupKey`; `/settings/notifications` preference matrix (category × channel + email frequency) and org defaults card behind `organization:["update"]`; fan-out as an outbox subscriber inside the dispatch TX, one `INSERT ... SELECT` resolving the org-lock → user → org-default → enabled cascade in-statement, `forced` bypass for critical alerts; SSE signal stream (`pg_notify` + one `LISTEN` per instance, `fetch`+`ReadableStream` not `EventSource`) with polling only as fallback; dedup via partial unique index; 2 crons (digest flush + read-only sweep). No new event type — the catalog is consumed, so it stays **67 total / 28 public / 39 internal**.) | **€1 200 – €2 000** | 3j |
 | **Enterprise SSO + SCIM provisioning** (C.7) (`@better-auth/sso` OIDC + SAML 2.0 + `@better-auth/scim`; per-org provider registration + domain verification; JIT provisioning on first sign-in; domain-based SSO enforcement across all four sign-in paths — password, sign-up, magic-link, passkey — with a "Sign in with SSO" redirect on the front instead of a dead-end error; SAML forced to SHA-256 signed assertions server-side regardless of client input; SCIM `Users` CRUD, `DELETE` as an org departure (member row only, account survives); `/settings/sso`; local Keycloak dev profile. 13 events → **80 total / 34 public / 46 internal**.) | **€5 000 – €8 000** | 10-12j |
+| **i18n foundation** (E.1a) (`@packages/i18n` — `.ts … as const` catalogs (`common`, `auth`, `errors`, `emails`, `settings`) bound to `t()` through `CustomTypeOptions.resources`, so an unknown key is a `tsc` error; `i18next` + `react-i18next` retained over Lingui/Paraglide on adoption and typing evidence; locale resolved cookie → `user.locale`, **never from the URL** — zero routes re-parented; language switcher + `PUT /me/locale`; per-recipient email locale frozen on the queued row at enqueue; localized Zod / API / BetterAuth error copy through one global map; `en`/`fr` key-parity test; `<html lang>` asserted in the a11y gate. 1 event → **81 total / 35 public / 46 internal**.) | **€1 000 – €1 800** | 2-3j |
 
-**Subtotal Core (shipped)**: **€41 600 – €69 600** of senior-dev value already in the repo on day zero. ~90-116 days of focused senior work compressed into a clone.
+**Subtotal Core (shipped)**: **€42 600 – €71 400** of senior-dev value already in the repo on day zero. ~92-119 days of focused senior work compressed into a clone.
 
 ---
 
@@ -64,18 +75,18 @@ This file doubles as a **value sheet for client proposals**. Each module is pric
 | D.1 | **Status page + SLO dashboards + alerting** (Cachet/Astro, Grafana SLO consuming 0.4 `/metrics`, Sentry → Slack/PagerDuty, runbook-linked) | **€1 500 – €2 500** | 3-4j |
 | D.2 | **OpenAPI auto-docs** (`@hono/zod-openapi`, Scalar UI at `/api/docs`) | **€400 – €700** | 1j |
 | D.4 | **SOC2 Type II readiness checklist** (mapping shipped controls, Vanta/Drata-ready) | **€600 – €1 000** | 1-2j |
-| E.1 | **i18n** (TanStack locale routes + Lingui, full string refactor, fallback locale) | **€1 500 – €2 500** | 3-4j |
+| E.1b | **i18n — remaining extraction** (`admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, per-locale legal content modules — catalog work on the rail E.1a already shipped) | **€600 – €1 000** | 1-2j |
 | E.2 | **Marketing site** (Astro 5 + Payload 3 self-hosted, separate deploy, content modeling, blog) | **€2 500 – €4 000** | 5-7j |
 | F.1 | **Capacitor mobile shell** (`apps/mobile/` wrapping `apps/app` build, bearer auth, push channel) | **€2 000 – €3 500** | 4-5j |
 | F.2 | **Feature flags GrowthBook** (self-hosted, decouple deploy from release, A/B harness) | **€600 – €1 000** | 1-2j |
 
-**Subtotal Roadmap**: **€10 300 – €17 200** committed to ship.
+**Subtotal Roadmap**: **€9 400 – €15 700** committed to ship.
 
 ---
 
 ## Total value-in-box once roadmap is shipped
 
-**Core + Roadmap = €51 900 – €86 800** of realistic senior-dev value packaged.
+**Core + Roadmap = €52 000 – €87 100** of realistic senior-dev value packaged.
 
 That's ~5.5-7 months of focused senior work compressed into a clone. Honest, defensible to clients, no inflated SOW pricing.
 
@@ -89,7 +100,7 @@ When clean-stack is commercialized as a product (ShipFast / Bullet Train / Maker
 - Makerkit charges €499-999 against ~€15-25k of value (~3%).
 - Bullet Train charges €1499 against ~€25-40k of value (~4%).
 
-Applying the same ratio bands to clean-stack's €51k–€85k value:
+Applying the same ratio bands to clean-stack's €52k–€87k value:
 
 - **1.5% floor** (ShipFast aggressive entry) → **€800 – €1 300** one-time.
 - **3% market median** → **€1 500 – €2 600** one-time.
@@ -97,7 +108,7 @@ Applying the same ratio bands to clean-stack's €51k–€85k value:
 
 **Recommended initial positioning**: single tier at **€699 – €999** lifetime license, lifetime updates within current major. Reasoning:
 - Anchors near Makerkit's lower tier — signals "more architecturally serious than ShipFast, less than Bullet Train premium"
-- Clean round number, easy to anchor against the €50-85k value delivered ("you save 50-100× the price on day one")
+- Clean round number, easy to anchor against the €52-87k value delivered ("you save 50-100× the price on day one")
 - Single tier eliminates funnel friction — the whole stack is the product
 - Premium tier (~€1 999) only when a course / community / 1-on-1 onboarding is included — pure license alone doesn't justify it
 

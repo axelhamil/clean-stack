@@ -127,6 +127,20 @@
       "when": 1786917715364,
       "tag": "0017_blue_speed_demon",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787989183402,
+      "tag": "0018_overjoyed_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788012569136,
+      "tag": "0019_wakeful_blackheart",
+      "breakpoints": true
     }
   ]
 }

@@ -6,7 +6,7 @@ import {
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
-import { formatDate } from "../utils";
+import { useFormatDate } from "../i18n/use-format-date";
 import type { NotificationGroup } from "./group-notifications";
 import { labelOf } from "./notification-labels";
 
@@ -16,6 +16,7 @@ interface NotificationItemProps {
 }
 
 export function NotificationItem({ group, onRead }: NotificationItemProps) {
+  const formatDate = useFormatDate();
   const { latest, count, unread } = group;
 
   return (

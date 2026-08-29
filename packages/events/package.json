@@ -17,13 +17,14 @@
   },
   "dependencies": {
     "@packages/access-control": "workspace:*",
+    "@packages/i18n": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
-    "@types/node": "^26.0.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,4 +1,5 @@
 import type { Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
 import type { ITransaction } from "../transaction";
 
 export type EmailMessageKind = "template" | "raw";
@@ -9,6 +10,7 @@ export interface EmailMessageInsert {
   template: Option<string>;
   toAddress: string;
   subject: string;
+  locale: Locale;
   payload: unknown;
   idempotencyKey: Option<string>;
 }
@@ -19,6 +21,7 @@ export interface EmailMessageRecord {
   template: Option<string>;
   toAddress: string;
   subject: string;
+  locale: Option<Locale>;
   payload: unknown;
   status: EmailMessageStatus;
   attempts: number;
@@ -31,7 +34,10 @@ export interface EmailMessageRecord {
 export type EmailQueueError = { code: "EMAIL_QUEUE_WRITE_FAILED"; message: string };
 
 export interface IEmailQueue {
-  enqueue(rows: EmailMessageInsert[], tx?: ITransaction): Promise<Result<void, EmailQueueError>>;
+  enqueue(
+    rows: EmailMessageInsert[],
+    tx?: ITransaction,
+  ): Promise<Result<{ written: number }, EmailQueueError>>;
   claimPending(
     limit: number,
     claimUntil: Date,

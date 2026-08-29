@@ -4,7 +4,7 @@ Shipped phases — full architectural log. The roadmap stays forward-looking; ev
 
 Each section preserves the **why** and the **non-obvious decisions** baked into the codebase. New contributors read this to understand *why the code looks like it does*.
 
-> **Note on paths**: file paths in entries below reflect the layout at the time of shipping. The codebase has since migrated to vertical-slice on both sides (front: `features/<x>/<x>.route.tsx` + `shared/`, code-based routing via `apps/app/src/router.tsx`; api: `modules/<context>/{application,infrastructure,routes.ts,module.ts}` + `shared/`, inwire `defineModule()` per context). For the current canonical layout see `CLAUDE.md` `## Layout`. The decisions and rationales below stay accurate — only the directory containers moved.
+> **Note on paths**: file paths in entries below reflect the layout at the time of shipping. The codebase has since migrated to vertical-slice on both sides (front: `features/<x>/<x>.route.tsx` + `shared/`, file-based routing via `apps/app/routes.ts` + generated `src/routeTree.gen.ts`; api: `modules/<context>/{application,infrastructure,routes.ts,module.ts}` + `shared/`, inwire `defineModule()` per context). For the current canonical layout see `CLAUDE.md` `## Layout`. The decisions and rationales below stay accurate — only the directory containers moved.
 
 ---
 
@@ -198,7 +198,7 @@ Personal org is structurally identical to a team org for every operation except 
 - **Retry with exponential backoff** — 3 attempts (1s/2s/4s), retry only on `429` and `5xx` + network errors (`status === 0`). 4xx non-rate-limit fail fast (validation = retry futile). Distinct `STATUS_HINTS` log per `401` / `403` / `409` / `422` so prod debug isn't blind.
 - **`Idempotency-Key`** — `${event-type}/${sha256(token)[:32]}` (Resend pattern, 24h window). Hash via `Bun.CryptoHasher`. Safe under retries — same payload returns original response, different payload returns 409.
 - **`SendTemplateOptions.from?`** — per-tenant `from` override slot for future per-org sending domain. Defaults to `env.RESEND_FROM`. Adding it now = zero breaking change in phase 2.
-- **`SendTemplateOptions.locale?`** — slot reserved for the i18n phase. Adapter logs a warn ("not yet implemented") if passed; resolution will switch to `${template}_${locale}` env lookup when locale-prefixed templates land.
+- **`SendTemplateOptions.locale?`** — slot reserved for the i18n phase. Adapter logs a warn ("not yet implemented") if passed; resolution will switch to `${template}_${locale}` env lookup when locale-prefixed templates land. *Note: removed rather than activated by the i18n foundation (Phase E.1a) — a batch-level locale would force one language on every recipient of a batch, so locale moved onto `EmailRecipient<K>.locale` instead. See that entry.*
 - **Boot-time fail-hard in production** — constructor throws if `NODE_ENV === "production"` and `RESEND_API_KEY` or any template ID is missing. Dev mode keeps the warn-only fallback. *Note: reversed by prod-validation closeout (Phase 0.7) to warn-and-degrade for the boilerplate — see that entry.*
 - **IP reputation guarded by Resend, not by us** — Resend ships a domain-scoped suppression list since 2025: hard bounces and spam complaints auto-add the address. **No own suppression table needed** until a product feature actually consumes it. Building it earlier is the OpenUp anti-pattern. Promote on second occurrence.
 - **DNS mandatory before any production send** — Gmail (Feb 2024), Yahoo (Feb 2024), Microsoft Outlook (May 2025) all reject unauthenticated bulk senders with 550 5.7.515. SPF + DKIM CNAMEs + DMARC TXT (`p=none` → `p=quarantine` once stable, target `p=reject`).
@@ -884,3 +884,258 @@ A security-focused review of the whole branch was run after the PR was opened an
 **Merged** after this round: PR #61 into `dev` as a merge commit, all gates green (718 api tests, 147 app tests, type-check 12/12, Biome clean, knip clean, jscpd 28 clones, a11y 21/21).
 
 **Gaps this phase never closed, carried forward**: `sso.domain.verified` is still never exercised live (it needs DNS TXT control over a real domain); no real WebAuthn ceremony has been driven; the SSO-callback success path after the final enforcement change rests on construction plus a probe rather than a Keycloak round-trip; `enforcedProviderForDomain` and the `auth.ts` wiring have no automated coverage, since the repo has no real-DB test harness; the a11y suite stays coupled to an IP-keyed rate limit; SAML SLO is declared but unwired; and there is no operator runbook for recovering an org that locks itself out with enforcement.
+
+## Toolchain refresh — pnpm, Node, Bun, TypeScript 7, Postgres 18, file-based routing ✅ Phase G.1 · Aug 2026
+
+**Why**: the version floor a boilerplate ships is a feature the cloner inherits silently. Starting point (repo baseline before this phase): Node `24.15.0`, Bun `1.3.6`, pnpm `11.0.9` (disagreeing with `mise.toml`'s `10.33.2`), TypeScript `6.0.3`, Postgres `17-alpine`. Everything below is what was actually measured landing, on **2026-08-28** — not the versions the phase's own planning table guessed at ten days earlier, which had already drifted by the time the work started.
+
+### G.1a — Runtime and package manager
+
+pnpm `11.24.0` (single source of truth now — `mise.toml` and `package.json#packageManager` agreed on the same string, `corepack` and `mise` no longer race), Node `24.20.0` LTS (`.nvmrc` moved with it, since CI resolves Node from that file), Bun `1.4.0`. **Bun held — no fallback was needed**: the 718-test API suite and the Bun build both passed clean at `1.4.0`.
+
+### G.1b — TypeScript 7
+
+Landed at `7.0.2` across all **11 workspaces** that declare `typescript`, `@packages/ddd-kit` included — that inclusion was not a given going in. The native (Go) compiler surfaced two real issues:
+
+- **`@packages/ddd-kit`'s `tsup` build crashed.** Its `.d.ts` emit went through a bundled `rollup-plugin-dts` that isn't updated for TS7's rewritten compiler-host API. The fix was not to pin `ddd-kit` back to TS6 (which was the initial workaround, and which quietly took it off the TS7 type-check gate that every other workspace now runs) — it was to stop `tsup` emitting declarations at all (`dts: false`, dropping the `ignoreDeprecations: "6.0"` compatibility shim that went with it) and let `tsc -p tsconfig.build.json --emitDeclarationOnly` do it instead. `tsconfig.build.json` already existed, unwired, left over from the package's publishing setup. The build script now chains `tsup && tsc -p tsconfig.build.json`, so a single `pnpm build` still produces `dist/index.js`, `dist/index.cjs` and `dist/index.d.ts`.
+  **Trap for the next person touching this config**: `incremental` must stay `false` in `tsconfig.build.json`. `tsup`'s `clean: true` wipes `dist/` on every build; a stale `.tsbuildinfo` left behind by a prior `tsc` run convinces `tsc` the declarations are already up to date after `tsup` has just deleted them, so it emits **nothing — silently**. No error, no warning, just an absent `dist/*.d.ts`.
+  **Accepted trade-off**: declarations are no longer aggregated into one file. `tsc` emits one `.d.ts` per source module (`dist/domain/entity.d.ts`, `dist/primitives/result.d.ts`, …), re-exported from `dist/index.d.ts`, instead of `tsup`'s single flattened `index.d.ts`. Harmless today — nothing in-monorepo consumes `dist/`, internal packages import from `src/` per the source-only rule — and only matters the day this package is actually published.
+- **`lib.dom.d.ts` gained `Response.textStream`.** Hono's `ClientResponse` doesn't implement it, which broke every RPC call site that fed a response into `throwApiError(res: Response)`. Fixed by narrowing that function's parameter to the subset of `Response` it actually reads, rather than widening Hono's type.
+
+### G.1c — Postgres 18
+
+**Undocumented breaking change discovered while recreating the dev volume**: the `postgres:18-alpine` image refuses to start against a bind mount at `/var/lib/postgresql/data` — the 18+ images store data one directory up, at `/var/lib/postgresql/<major>/docker`, to align with `pg_ctlcluster`-style layouts. `docker-compose.yaml`'s `postgres` service now mounts the named volume at `/var/lib/postgresql` (was `/var/lib/postgresql/data`); without this the container loops in `Restarting` with `Error: in 18+, these Docker images are configured to store database data in a format which is compatible with "pg_ctlcluster"...`. Neither the task brief nor the ROADMAP entry that scoped this work anticipated this — it's a genuine image-level change, not something to have caught by reading `docker-compose.yaml` alone.
+
+**Action required for anyone with a pre-existing `postgres_data` volume**: the mount-path move above is silent, not loud, for a volume populated under the old layout. `docker compose up` won't crash the way a brand-new empty volume did during this task — Postgres 18 will find nothing at the new `/var/lib/postgresql` mount point (the old data sits one level down, at the now-unmounted `/var/lib/postgresql/data`) and will just initialize a fresh, empty database with no error. That's a silent dev-data loss, not a visible failure. Run `docker volume rm clean-stack_postgres_data` once before the first `up` on a checkout that already ran `docker compose up postgres` pre-bump, then rebuild with `pnpm db:push && pnpm db:seed`. Documented in `README.md`'s Database section (the `Volume` row + the callout above the `db:*` script block) as the place a reader would hit this before losing data rather than after.
+
+Primary keys stay `text`: every PK in `packages/drizzle/src/schema/` is filled by BetterAuth, which generates its own ids, so `uuidv7()` is a BetterAuth question rather than a Postgres one. It's documented in `docs/MODULES.md` as the shape for new cloner-owned tables instead.
+
+#### Before/after query plans
+
+The payoff of 18 here is operational (async I/O, B-tree skip scan), so the two hot paths that touch the outbox were `EXPLAIN (ANALYZE, BUFFERS)`'d before the bump (Postgres 17.x, `docker compose exec postgres psql`) and again after (Postgres 18.6-alpine, same commands, dev DB recreated from scratch per the brief since a major version doesn't read the previous major's data directory).
+
+**1. Outbox drain** — mirrors `apps/api/src/shared/services/drizzle-outbox.service.ts:95-108`, which reads `outbox_event_pending_idx` (`packages/drizzle/src/schema/outbox.ts:30`):
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM outbox_event
+WHERE dispatched_at IS NULL
+  AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+ORDER BY occurred_at
+LIMIT 100
+FOR UPDATE SKIP LOCKED;
+```
+
+Postgres 17 (0 pending rows at capture time — dev DB had already drained the seeded events):
+
+```
+Limit  (cost=8.15..8.17 rows=1 width=582) (actual time=0.024..0.025 rows=0 loops=1)
+  Buffers: shared hit=4
+  ->  LockRows  (cost=8.15..8.17 rows=1 width=582) (actual time=0.023..0.024 rows=0 loops=1)
+        Buffers: shared hit=4
+        ->  Sort  (cost=8.15..8.16 rows=1 width=582) (actual time=0.023..0.023 rows=0 loops=1)
+              Sort Key: occurred_at
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=4
+              ->  Index Scan using outbox_event_pending_idx on outbox_event  (cost=0.12..8.14 rows=1 width=582) (actual time=0.006..0.006 rows=0 loops=1)
+                    Filter: ((dispatched_at IS NULL) AND ((next_attempt_at IS NULL) OR (next_attempt_at <= now())))
+                    Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=197
+Planning Time: 0.662 ms
+Execution Time: 0.075 ms
+```
+
+Postgres 18.6 (5 pending rows — fresh seed, dispatcher not yet run):
+
+```
+Limit  (cost=8.17..8.19 rows=1 width=290) (actual time=0.040..0.043 rows=5.00 loops=1)
+  Buffers: shared hit=10
+  ->  LockRows  (cost=8.17..8.19 rows=1 width=290) (actual time=0.039..0.041 rows=5.00 loops=1)
+        Buffers: shared hit=10
+        ->  Sort  (cost=8.17..8.18 rows=1 width=290) (actual time=0.028..0.029 rows=5.00 loops=1)
+              Sort Key: occurred_at
+              Sort Method: quicksort  Memory: 27kB
+              Buffers: shared hit=5
+              ->  Index Scan using outbox_event_pending_idx on outbox_event  (cost=0.14..8.16 rows=1 width=290) (actual time=0.009..0.011 rows=5.00 loops=1)
+                    Filter: ((dispatched_at IS NULL) AND ((next_attempt_at IS NULL) OR (next_attempt_at <= now())))
+                    Index Searches: 1
+                    Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=161
+Planning Time: 0.553 ms
+Execution Time: 0.079 ms
+```
+
+**Access path unchanged**: both plans drive the drain through `Index Scan using outbox_event_pending_idx`, wrapped in the same `LockRows`/`Sort`/`Limit` shape — no fallback to a sequential scan. The only textual diff is Postgres 18 printing a new `Index Searches: 1` line under each index node (a genuine 18 addition to `EXPLAIN`'s index-scan output, not a plan change) and the row counts differing because the two captures ran against different data volumes (see caveat below). This is the query that matters most for this bump — confirmed stable.
+
+**2. Notification fan-out** — the `INSERT … SELECT` at `apps/api/src/shared/services/notification-fanout-subscriber.ts:103-132`, captured by instrumenting a `CapturingInstrumentation` that records the span name the code already builds for `query.getQuery().sql` (the same value the production Sentry span carries), driving it with a real `org.member.invited` event inside a rolled-back transaction against the seeded dev user/org, then re-running the captured SQL + params through `EXPLAIN (ANALYZE, BUFFERS)` in a second rolled-back transaction (`pg.Pool`, `BEGIN`/`ROLLBACK` bracketing — no data mutated in either DB).
+
+Postgres 17 (org with 12 members across the accumulated 11h-old dev dataset):
+
+```
+Insert on notification  (cost=0.59..34.02 rows=0 width=0) (actual time=0.078..0.078 rows=0 loops=1)
+  Conflict Resolution: NOTHING
+  Conflict Arbiter Indexes: notification_dedup_uidx
+  Tuples Inserted: 1
+  Conflicting Tuples: 0
+  Buffers: shared hit=20
+  ->  Subquery Scan on "*SELECT*"  (cost=0.59..34.02 rows=1 width=283) (actual time=0.031..0.033 rows=1 loops=1)
+        Buffers: shared hit=9
+        ->  Nested Loop Left Join  (cost=0.59..34.00 rows=1 width=259) (actual time=0.030..0.031 rows=1 loops=1)
+              Buffers: shared hit=9
+              ->  Nested Loop Left Join  (cost=0.44..25.81 rows=1 width=28) (actual time=0.018..0.020 rows=1 loops=1)
+                    Join Filter: (up_mail.scope_id = member.user_id)
+                    Buffers: shared hit=7
+                    ->  Nested Loop Left Join  (cost=0.29..17.62 rows=1 width=27) (actual time=0.015..0.016 rows=1 loops=1)
+                          Filter: COALESCE(CASE WHEN op_app.locked THEN op_app.enabled ELSE NULL::boolean END, up_app.enabled, op_app.enabled, true)
+                          Buffers: shared hit=5
+                          ->  Nested Loop Left Join  (cost=0.15..9.44 rows=1 width=28) (actual time=0.011..0.012 rows=1 loops=1)
+                                Join Filter: (up_app.scope_id = member.user_id)
+                                Buffers: shared hit=3
+                                ->  Seq Scan on member  (cost=0.00..1.24 rows=1 width=27) (actual time=0.006..0.007 rows=1 loops=1)
+                                      Filter: ((role = ANY ('{owner,admin}'::text[])) AND (organization_id = 'cd51d944-2022-4038-b6ce-064af9a5be4e'::text))
+                                      Rows Removed by Filter: 11
+                                      Buffers: shared hit=1
+                                ->  Index Scan using notification_preference_uidx on notification_preference up_app  (cost=0.15..8.18 rows=1 width=33) (actual time=0.004..0.004 rows=0 loops=1)
+                                      Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                      Buffers: shared hit=2
+                          ->  Index Scan using notification_preference_uidx on notification_preference op_app  (cost=0.15..8.17 rows=1 width=2) (actual time=0.003..0.003 rows=0 loops=1)
+                                Index Cond: ((scope = 'org'::text) AND (scope_id = 'cd51d944-2022-4038-b6ce-064af9a5be4e'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                Buffers: shared hit=2
+                    ->  Index Scan using notification_preference_uidx on notification_preference up_mail  (cost=0.15..8.18 rows=1 width=33) (actual time=0.003..0.003 rows=0 loops=1)
+                          Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                          Buffers: shared hit=2
+              ->  Index Scan using notification_preference_uidx on notification_preference op_mail  (cost=0.15..8.17 rows=1 width=2) (actual time=0.004..0.004 rows=0 loops=1)
+                    Index Cond: ((scope = 'org'::text) AND (scope_id = 'cd51d944-2022-4038-b6ce-064af9a5be4e'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                    Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=359
+Planning Time: 0.895 ms
+Trigger for constraint notification_user_id_user_id_fk: time=0.253 calls=1
+Trigger for constraint notification_organization_id_organization_id_fk: time=0.194 calls=1
+Trigger notification_notify_trigger: time=0.293 calls=1
+Execution Time: 0.874 ms
+```
+
+Postgres 18.6 (org with 1 member — freshly reseeded dev volume, per Step 6):
+
+```
+Insert on notification  (cost=4.75..42.29 rows=0 width=0) (actual time=0.117..0.118 rows=0.00 loops=1)
+  Conflict Resolution: NOTHING
+  Conflict Arbiter Indexes: notification_dedup_uidx
+  Tuples Inserted: 1
+  Conflicting Tuples: 0
+  Buffers: shared hit=22
+  ->  Subquery Scan on "*SELECT*"  (cost=4.75..42.29 rows=1 width=288) (actual time=0.056..0.057 rows=1.00 loops=1)
+        Buffers: shared hit=12
+        ->  Nested Loop Left Join  (cost=4.75..42.27 rows=1 width=264) (actual time=0.051..0.052 rows=1.00 loops=1)
+              Buffers: shared hit=12
+              ->  Nested Loop Left Join  (cost=4.61..34.08 rows=1 width=33) (actual time=0.041..0.042 rows=1.00 loops=1)
+                    Join Filter: (up_mail.scope_id = member.user_id)
+                    Buffers: shared hit=10
+                    ->  Nested Loop Left Join  (cost=4.46..25.89 rows=1 width=32) (actual time=0.035..0.036 rows=1.00 loops=1)
+                          Filter: COALESCE(CASE WHEN op_app.locked THEN op_app.enabled ELSE NULL::boolean END, up_app.enabled, op_app.enabled, true)
+                          Buffers: shared hit=8
+                          ->  Nested Loop Left Join  (cost=4.31..17.70 rows=1 width=33) (actual time=0.029..0.030 rows=1.00 loops=1)
+                                Join Filter: (up_app.scope_id = member.user_id)
+                                Buffers: shared hit=6
+                                ->  Bitmap Heap Scan on member  (cost=4.16..9.51 rows=1 width=32) (actual time=0.012..0.012 rows=1.00 loops=1)
+                                      Recheck Cond: (organization_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text)
+                                      Filter: (role = ANY ('{owner,admin}'::text[]))
+                                      Heap Blocks: exact=1
+                                      Buffers: shared hit=2
+                                      ->  Bitmap Index Scan on "member_organizationId_idx"  (cost=0.00..4.16 rows=2 width=0) (actual time=0.005..0.006 rows=1.00 loops=1)
+                                            Index Cond: (organization_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text)
+                                            Index Searches: 1
+                                            Buffers: shared hit=1
+                                ->  Index Scan using notification_preference_uidx on notification_preference up_app  (cost=0.15..8.18 rows=1 width=33) (actual time=0.016..0.016 rows=0.00 loops=1)
+                                      Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                      Index Searches: 1
+                                      Buffers: shared hit=4
+                          ->  Index Scan using notification_preference_uidx on notification_preference op_app  (cost=0.15..8.17 rows=1 width=2) (actual time=0.005..0.005 rows=0.00 loops=1)
+                                Index Cond: ((scope = 'org'::text) AND (scope_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text) AND (category = 'org'::text) AND (channel = 'in_app'::text))
+                                Index Searches: 1
+                                Buffers: shared hit=2
+                    ->  Index Scan using notification_preference_uidx on notification_preference up_mail  (cost=0.15..8.18 rows=1 width=33) (actual time=0.006..0.006 rows=0.00 loops=1)
+                          Index Cond: ((scope = 'user'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                          Index Searches: 1
+                          Buffers: shared hit=2
+              ->  Index Scan using notification_preference_uidx on notification_preference op_mail  (cost=0.15..8.17 rows=1 width=2) (actual time=0.004..0.004 rows=0.00 loops=1)
+                    Index Cond: ((scope = 'org'::text) AND (scope_id = 'a1c087a7-9e0d-4f94-a509-6545adfcebdb'::text) AND (category = 'org'::text) AND (channel = 'email'::text))
+                    Index Searches: 1
+                    Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=348
+Planning Time: 1.250 ms
+Trigger for constraint notification_user_id_user_id_fk: time=0.406 calls=1
+Trigger for constraint notification_organization_id_organization_id_fk: time=0.248 calls=1
+Execution Time: 0.855 ms
+```
+
+**Access path partly changed, and it's not a clean read on Postgres 18 alone**: the four `notification_preference` lookups (`up_app`/`op_app`/`up_mail`/`op_mail`) stayed `Index Scan using notification_preference_uidx` on both versions. The `member` lookup did change shape — `Seq Scan on member` (17) vs `Bitmap Heap Scan` through `member_organizationId_idx` (18) — **but the two captures ran against different data volumes**: the 17 capture reused an 11-hour-old dev DB with 12 accumulated member rows across several orgs, while the 18 capture ran against the freshly reseeded, single-org, single-member DB the brief's Step 6 requires (`docker volume rm` + `db:push && db:seed`). A `member` table with 1 row choosing an index path over a seq scan is exactly the kind of small-table plan choice that's sensitive to `ANALYZE` timing right after a fresh seed, not evidence of a genuine Postgres 18 planner regression — the estimated costs (`4.16..9.51` for the bitmap path) are still tiny in absolute terms. Re-running both captures against matched row counts, on the same major, is the only way to attribute this cleanly to the version bump rather than to dataset drift; it wasn't repeated here because the outbox-drain query is the one the brief calls the primary signal, and that one is unambiguous. Recorded here rather than silently dropped, per the instruction that an unexplained plan change is the thing this step exists to catch.
+
+### G.1d — Dependency floor
+
+The three range-blocked bumps (`typescript` `^6.0.3` → `^7.0.2`, `@hono/zod-validator` `^0.8.0` → `^0.9.0`, `@types/pg`), plus a full `pnpm up -r --latest` lockfile refresh landing Biome `2.5.10` (`$schema` moved with it — it had pointed at `2.5.1` and was silently under-validating the config), Turbo, Vitest, Vite, `@vitejs/plugin-react`, Hono, `pg`, React/React-DOM, Tailwind, `@types/node`, `@tanstack/react-router` and `@tanstack/react-query`.
+
+**One open point, surfaced rather than hidden**: `pnpm up -r --latest` also pulled the `@better-auth/*` family toward `1.7.2` via their caret ranges. `@better-auth/scim@1.7.x` turns out to be a full config-shape rewrite — `requiredRole`, `providerOwnership`, `storeSCIMToken` all removed — a real breaking change riding a semver-minor. Re-implementing the SCIM integration C.7 shipped against a different contract was out of scope for a toolchain refresh, so the whole `better-auth` family was rolled back and **pinned to exact `1.6.30`** (the newest 1.6.x patch, still ahead of the repo's starting point): `better-auth`, `@better-auth/passkey` and `@better-auth/stripe` moved from caret ranges to exact pins; `@better-auth/scim` and `@better-auth/sso` were already pinned and stayed that way. **Migrating to `@better-auth/scim@1.7.x` is deferred debt** — a dedicated task against the C.7 SCIM surface, not something to fold into a version bump.
+
+Two behavioural side-effects worth a permanent record: `@hono/zod-validator` 0.8 → 0.9 wraps every input on the API surface through `zV`, and `apps/api/src/shared/validator.ts` was re-read after the bump to confirm it still throws `HTTPException(400)` instead of returning a Response inline — the RPC types depend on that. And **the Stripe bump to `22.6.0` changed the API version the client actually calls**: `apiVersion` in `stripe-client.ts` moved from `"2026-06-24.dahlia"` to `"2026-08-26.dahlia"`, because 22.6's SDK types only the newest literal (`LatestApiVersion = typeof ApiVersion`) — there is no way to bump the package and keep the old version string typed. The full surface consumed from Stripe was re-read against the 22.4→22.6 changelog with no shape change found, but **this is a genuinely open point**: no CI signal can exercise a real Stripe call, so nothing here proves the new API version behaves identically in production. Verify against a live Stripe account before deploying this change.
+
+Eight deprecated `z.string().email()`/`.url()` call sites (`@packages/events/payloads.ts` and module DTOs) moved to the standalone Zod 4 form ahead of their removal in 5.
+
+### G.1e — File-based routing
+
+`apps/app/routes.ts` now declares the entire route tree once via `@tanstack/router-plugin/vite`'s `virtualRouteConfig`, wired in `apps/app/vite.config.ts` (`routesDirectory: "./src"`, `generatedRouteTree: "./src/routeTree.gen.ts"`, `virtualRouteConfig: "./routes.ts"`, `autoCodeSplitting: true`). Deliberately not `physical()` and not a flattened `src/routes/` directory: the 5 pathless layouts wrap routes drawn from 8 different features, which a directory mount can't express, and flattening would have destroyed the vertical slices — every `features/<x>/<x>.route.tsx` stays exactly where it was, `routes.ts` just points at it.
+
+**Path resolution — verified empirically, not assumed**: `virtualRouteConfig` entries resolve relative to `routesDirectory` (`"./src"`), not to `vite.config.ts`'s own location. This was confirmed by generating the tree from a single route before wiring the other 39, rather than trusting the docs and finding out wrong after 40 entries were written.
+
+**Route ids are unchanged** — all 40 of them — which is what kept every `getRouteApi(...)` call site (12, at the time) valid through the migration: they're string literals checked through `Register`, so `tsc` was the gate that proved nothing broke. `autoCodeSplitting` stayed off in this first commit deliberately — the 32 `lazyRouteComponent` call sites were left untouched, merging the pages was treated as a separate, later step so the tree migration alone could be verified in isolation.
+
+That separate step landed in the following commit: `autoCodeSplitting: true` only chunks a component that's *local* to its route file — a statically imported one silently stays in the main bundle — so all 32 `<name>.page.tsx` files were merged into their `<name>.route.tsx`, and the 32 `lazyRouteComponent` wrappers deleted along with the `getRouteApi` 2-file pattern (the 12 call sites collapse to `Route.useSearch()`/`Route.useParams()`/`Route.useRouteContext()` now that page and route share a module). This is also the point at which the 2-file rule in `apps/app/src/features/CLAUDE.md` was rewritten rather than amended, per the repo's cross-cutting rule #1: its justifying property (the bundler only reaching the page through a dynamic `import()`) no longer held. Main chunk **478,025 → 363,798 bytes (−23.9%)**, with 32 separate route chunks replacing the one `lazyRouteComponent`-driven bundle shape.
+
+**`knip.json` gained `src/features/**/*.route.tsx`** as an `apps/app` entry point, alongside `routes.ts` and `src/router/*.tsx`. Necessary because `routeTree.gen.ts` (gitignored) is the only file that imports each `Route` export, and the `vite.config.ts` → `routes.ts` link goes through a string (`virtualRouteConfig`) knip can't follow statically — without the entry, every route file reads as dead code. **The cost, worth stating plainly for whoever next touches routing**: this is symmetric. A future route file created but never added to `routes.ts` is now itself an entry point, so knip no longer flags it as unreferenced dead code — the string-based indirection that made the entry necessary also makes the failure mode of "wrote a route, forgot to wire it" invisible to the dead-code gate.
+
+---
+
+## i18n foundation — typed catalogs, locale outside the URL ✅ Phase E.1a · Aug 2026
+
+**Why**: the ROADMAP originally prescribed Lingui and `/en/...`/`/fr/...` locale routes. Both were re-decided on evidence before writing any code — see [`docs/superpowers/specs/2026-08-29-e1a-i18n-foundation-design.md`](superpowers/specs/2026-08-29-e1a-i18n-foundation-design.md) for the full design record this section summarizes.
+
+**`i18next` replaces Lingui.** Measured 2026-08-29: `i18next` at 21.7M and `react-i18next` at 15.7M weekly downloads against Lingui's 1.6M and Paraglide's 0.5M — a 31× adoption gap against the stated "known and recognized" requirement. Its key typing is also the strongest of the three, the opposite of the received wisdom: `ParseKeys` (`i18next/typescript/t.d.ts`) constrains `t()` across nested keys, namespaces, `keyPrefix`, `context` and the six plural categories; a plural key requires `{ count: number }`; interpolation types from the format specifier. Lingui's Typed Message IDs only work in explicit-ID mode, not with its default macros, and `react-intl` generates no types at all. `@vitejs/plugin-react` no longer runs Babel for the JSX transform (`oxc-transform-react` does it now) — Lingui's macro would have dragged Babel back into a build that just left it; i18next is pure runtime, no build-time extraction step. Costs accepted: ~23.4 kB gzip of runtime (i18next 13.4 + react-i18next 10.0) against Lingui's ~3.7 kB and Paraglide's ~0.5 kB, and catalogs are not tree-shaken (a dead key still ships). `i18next` itself has zero runtime dependencies since v26.0.7; MIT license on both packages keeps a fork available if ever needed.
+
+**Catalogs are `.ts … as const`, never `.json`.** Probed directly against the repo's `typescript@7.0.2`: with `resolveJsonModule` on (already the case, `packages/typescript-config/base.json`), TypeScript widens every JSON string value to `string` — assigning an unrelated string to `typeof catalog["greeting"]` compiles with no error. The identical catalog written as a `.ts` module with `as const` correctly rejects it (`TS2322`). Since `CustomTypeOptions.resources` is bound to `typeof enCatalog` for the `t()` key-checking guarantee, a `.json` catalog would silently defeat the entire premise of this design — an unknown or mistyped key would type-check. Keys and plural suffixes (`_one`/`_other`) survive either format since they're property names, but only the `.ts` form protects the values, which is where interpolation placeholders (`{{name}}`) live. `packages/i18n/src/load-catalog.ts`'s `Resources` type widens every string-literal leaf of the English catalog's shape (`WidenStrings<T>`) so a French catalog can share the same structure without being forced to the exact English literals — that widening is scoped to the runtime resources bag only; `CustomTypeOptions.resources` in `types.ts` stays bound to the literal English catalog, so the `t()` guarantee is untouched.
+
+**`SendTemplateOptions.locale` was removed, not activated.** An early draft assumed the port's shared `options` bag was where locale belonged. It isn't: `sendTemplateBatch(template, recipients[], options)` takes N recipients under one `options`, so a batch-level locale would force a single language onto every recipient in the batch — and the two genuinely multi-recipient callers (`flush-notification-emails.route.ts`'s one-digest-per-user job and `rgpd.service.ts`'s export/deletion notices) are exactly the ones that must not be forced. Locale instead moved onto the recipient entry itself, `EmailRecipient<K>.locale`, defaulting to `DEFAULT_LOCALE` per recipient in `QueuedEmailService.sendTemplateBatch` and rendered through `renderTemplate(template, variables, locale)` before the row is written — the resolved language is frozen onto the `email_message.locale` column at enqueue time, so a queue retry days later still renders in the language the recipient had when the email was requested, not whatever locale they've since switched to.
+
+**Partial translation is a stated, accepted state — not an oversight.** E.1a extracted `auth`, `account` and the app shell into catalogs; `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, and the legal pages remain hardcoded English, tracked as E.1b in the ROADMAP. This is safe only because `createI18n` always registers the English catalog under `DEFAULT_LOCALE` **in addition to** the requested locale's resources — `fallbackLng: DEFAULT_LOCALE` is otherwise inert, since i18next can only fall back to a language whose resources are actually loaded into the instance. The result: a French user gets French navigation, sign-in/sign-up, account settings, error messages and email subjects, around English content on the unextracted deeper pages — a mixed-language UI, never a raw `"settings.billing.title"` key rendered to the screen. `packages/i18n/src/__tests__/parity.test.ts` enforces exact key parity between `en` and `fr` for every namespace that does exist, so the partial coverage is a scope decision, not a silently-drifting one.
+
+**Two decisions recorded but deliberately out of scope**: `EVENT_DESCRIPTIONS` (`packages/events/src/event-descriptions.ts`) and the `/developers/events` page stay English permanently, consistent with the rest of the API documentation surface. And the pre-existing `apps/app/src/shared/CLAUDE.md` claim that `ThemeProvider`'s CSP nonce comes from a Caddy-injected `meta[property="csp-nonce"]` tag was found, while auditing `app-providers.tsx`, to reference a tag `index.html` doesn't actually contain — the nonce is always `undefined` in practice. Left unfixed here: out of this phase's scope, noted so it's a known debt rather than a silent discovery.
+
+---
+
+## Email delivery queue — debt closeout ✅ Aug 2026
+
+**Why**: Phase D.5 shipped with three known debts (`failed` rows never purged, `markSent` one UPDATE per row, RGPD deletion confirmation missing its idempotency key). Closing them surfaced two review findings that widened the phase beyond those three: a live production defect in the provider-side dedup key, and a second, more serious loss mode in the RGPD path that the original debt list hadn't named.
+
+**The design draft's central claim was wrong, and it matters**: the draft justified skipping a dedicated fix by arguing the `email_message.idempotency_key` UNIQUE constraint already closed the duplicate-email window. It doesn't. The constraint protects an **INSERT** — two enqueue calls racing to create the same row. The actual failure mode is a **re-send of an already-inserted row**: the worker crashes after the provider accepts the send but before `markSent` commits, the row is re-claimed on the next poll, and `sendChunk` calls Resend again for a row that was never marked `sent`. No INSERT occurs on that second call, so the UNIQUE constraint never sees it. What actually closes that window is the provider-side `Idempotency-Key` header on the batch request — Resend recognizes the key and returns the cached response instead of sending twice. That header was itself broken (next paragraph), so for a period the window this design believed was closed, wasn't, by any mechanism.
+
+**Finding 1 — silent mail loss via key truncation.** `chunkIdempotencyKey` built the provider's `Idempotency-Key` by joining every recipient key in the chunk and truncating to 256 characters. Two structurally different chunks (different recipients, different content) can share the same first 256 characters of their joined keys, producing the same truncated header. Resend then returns the **cached response of the first send** for the second, structurally different chunk — and `sendChunk` reads that cached response as success and marks its own (different) recipients `sent`, even though nothing was ever sent to them. This was a live production defect, not a theoretical one: any two chunks colliding on the truncated prefix silently dropped mail while the queue reported success. Fixed by hashing the joined keys instead of truncating them, so no two distinct key-sets can collide onto the same header.
+
+**Finding 2 — permanent loss of the RGPD deletion confirmation on a crash.** The confirmation email was enqueued *after* the wipe transaction committed. A crash (or any failure) between the commit and the enqueue call permanently lost the confirmation — the wipe is one-shot and never replayed, so there was no second chance to send it. Fixed by moving the enqueue inside the wipe transaction itself, with `throw new Error("rollback")` on enqueue failure — a failed enqueue now rolls back the wipe rather than completing it silently without notifying the account holder.
+
+**The three originally-scoped debts, also closed**:
+
+- **`enqueue` idempotency at the queue layer**: gained `onConflictDoNothing` targeted at the `idempotency_key` unique index, plus `returning()` — a warning is logged when fewer rows come back than were requested, surfacing silent conflict-driven drops instead of hiding them.
+- **Per-recipient idempotency keys**: `EmailRecipient.idempotencyKey` lets a caller set a key per recipient; the positional fallback (`${options.idempotencyKey}#${index}`) is namespaced with `#` and shared by both the template batch path and the raw batch path. **This is a one-time cross-deploy dedup window, not a cosmetic rename**: the separator moved from `/` to `#`, so every existing single-recipient caller's stored key changes shape (`<key>/0` → `<key>#0`). A row enqueued before the deploy and retriggered after it will not match its old key and will not dedupe — one duplicate email per affected key, bounded by `EMAIL_MESSAGE_RETENTION_DAYS=7` (old rows age out of the dedup window within a week). The digest flush route already keyed its send on a digest of the full row-id list (`digestIdempotencyKey(rows.map(r => r.id))`), unchanged by this pass — no per-call timestamp was ever involved there.
+- **`failed` rows never purged**: `EMAIL_MESSAGE_FAILED_RETENTION_DAYS` (default 90) plus a new partial index (`email_message_failed_sweep_idx`) backs a second sweep pass. `sent` rows still purge on the original `EMAIL_MESSAGE_RETENTION_DAYS=7`. The cutoff is measured from `created_at` (enqueue time), not from when the row transitioned to `failed` — since the retry ceiling is minutes, the two are close in practice, but a row enqueued 89 days ago that fails today is purged on the very next sweep.
+- **`markSent` fan-out cost**: collapsed from one `UPDATE` per row to a single `UPDATE … WHERE id IN (...)` (Drizzle `inArray`) with a `CASE WHEN` selecting each row's `provider_message_id` — a 100-message chunk now costs one round-trip instead of 100.
+
+**Supporting changes**: `runRetentionSweep` was promoted from a single pass to N passes, and six route files were migrated onto the promoted signature: the five direct `runRetentionSweep` callers, plus `sweep-audit-log`, which had been bypassing the shared runner via `runBatchedSweep` on its own. All six now share the same runner as the two new email sweep passes (`sent`, `failed`), rather than growing a bespoke second code path.
+
+**Rule #6 amended, not exempted**: closing the `failed`-row debt meant no new domain event fires when the sweep deletes a `failed` row — but rule #6's "infra retention sweeps" exception only named `outbox_event`, `audit_log`, `webhook_delivery`. `email_message` wasn't on that list, and invoking the exception as written anyway would have stretched a rule's scope silently, which rule #1 forbids. The exception list was rewritten to add `email_message`, with the justification spelled out: a row reaches `status = 'failed'` only when `nextAttempt.isNone()` — the exact point `email.delivery.exhausted` is already emitted — so every purged `failed` row corresponds 1:1 to an event already emitted and audited before the sweep ever runs.
+
+**No new event types.** The catalog is consumed here, not extended — verified by importing `packages/events/src/visibility-map.ts` and counting `Object.values(VISIBILITY)`: **81 total / 35 public / 46 internal**, unchanged from Phase E.1a.
+
+**New debt found and deliberately left open**: the sweep routes and the cron client (`internalLayers`, `Bun.serve`, `signedInternalFetch`) have no explicit request timeout anywhere in the chain — no `AbortSignal` on the outbound `fetch`, no `idleTimeout` on the server. Doubling the number of sweep passes (one more for `email_message` `failed` rows, on top of the existing runners) brings a hang closer to actually mattering, but wiring timeouts through the whole internal-call path was out of scope for a queue-correctness closeout. Tracked as **D.5** in the ROADMAP's "What's left" table rather than folded in silently.

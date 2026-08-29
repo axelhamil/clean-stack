@@ -8,6 +8,7 @@ import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
+import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -353,14 +354,29 @@ function readCookieFromHeaders(headers: Headers | undefined, name: string): stri
  * `async () => void` hook signature. Transport-not-configured is downgraded
  * to a warning (dev/test without Resend configured should not crash).
  */
+/**
+ * Resolves the locale to write a message in when the hook only hands over an
+ * address. Magic-link sign-in is the one auth flow with no user object in
+ * scope; an address with no account yet legitimately falls back to the
+ * default rather than failing the send.
+ */
+async function localeForEmail(email: string): Promise<Locale> {
+  const found = await di.IProfileStore.findLocaleByEmail(email);
+  if (found.isFailure) return DEFAULT_LOCALE;
+  const locale = found.getValue();
+  return locale.isSome() ? locale.unwrap() : DEFAULT_LOCALE;
+}
+
 async function dispatchEmail<K extends keyof EmailTemplates>(
   template: K,
   to: string,
   variables: EmailTemplates[K] & TemplateVariables,
   idempotencyKey: string,
+  locale: Locale,
 ): Promise<void> {
   const result = await di.IEmailService.sendTemplate(template, to, variables, {
     idempotencyKey,
+    locale,
   });
   if (result.isFailure) {
     const error = result.getError();
@@ -386,6 +402,7 @@ const authOptions = {
       lastExportRequestedAt: { type: "date", required: false, returned: true, input: false },
       deletedAt: { type: "date", required: false, returned: false, input: false },
       pendingEmail: { type: "string", required: false, returned: true, input: false },
+      locale: { type: "string", required: false, returned: true, input: false },
     },
     changeEmail: {
       enabled: true,
@@ -395,11 +412,13 @@ const authOptions = {
           userId: user.id,
           newEmail,
         });
+        const userLocale = (user as { locale?: unknown }).locale;
         await dispatchEmail(
           "change_email",
           user.email,
           { name: user.name ?? "", newEmail, confirmUrl: url },
           tokenIdempotencyKey("change-email", token),
+          toLocale(userLocale),
         );
       },
     },
@@ -417,11 +436,13 @@ const authOptions = {
         userId: user.id,
         email: user.email,
       });
+      const userLocale = (user as { locale?: unknown }).locale;
       await dispatchEmail(
         "reset_password",
         user.email,
         { name: user.name ?? "", resetUrl },
         tokenIdempotencyKey("reset-password", token),
+        toLocale(userLocale),
       );
     },
     onPasswordReset: async ({ user }) => {
@@ -435,11 +456,13 @@ const authOptions = {
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, token }) => {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+      const userLocale = (user as { locale?: unknown }).locale;
       await dispatchEmail(
         "verify_email",
         user.email,
         { name: user.name ?? "", verifyUrl },
         tokenIdempotencyKey("verify-email", token),
+        toLocale(userLocale),
       );
     },
   },
@@ -553,6 +576,7 @@ const authOptions = {
           email,
           { magicUrl },
           tokenIdempotencyKey("magic-link", token),
+          await localeForEmail(email),
         );
       },
     }),
@@ -740,6 +764,9 @@ const authOptions = {
       },
       sendInvitationEmail: async ({ id, email, role, inviter, organization: org }) => {
         const inviteUrl = `${env.APP_URL}/accept-invitation/${id}`;
+        // Rendered in the inviter's locale, not the invitee's: an invitee with
+        // no account yet has no locale of their own to read.
+        const inviterLocale = (inviter.user as { locale?: unknown }).locale;
         await dispatchEmail(
           "org_invitation",
           email,
@@ -750,6 +777,7 @@ const authOptions = {
             inviteUrl,
           },
           tokenIdempotencyKey("org-invitation", id),
+          toLocale(inviterLocale),
         );
       },
     }),

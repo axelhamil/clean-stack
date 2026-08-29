@@ -1,9 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { authClient } from "../../../shared/auth/auth-client";
 import type { EmailRequestInput } from "../auth.schema";
 
 export function useSignInSso() {
+  const { t } = useTranslation("auth");
   return useMutation({
     mutationKey: ["session", "sign-in-sso"],
     mutationFn: async (input: EmailRequestInput) => {
@@ -14,7 +16,7 @@ export function useSignInSso() {
         email: input.email,
         callbackURL: `${window.location.origin}/dashboard`,
       });
-      if (error) throw new Error(error.message ?? "Failed to start SSO sign-in");
+      if (error) throw new Error(error.message ?? t("signIn.ssoFailed"));
     },
     onError: (err) => toast.error(err.message),
   });

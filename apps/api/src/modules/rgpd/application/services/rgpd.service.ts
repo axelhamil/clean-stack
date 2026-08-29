@@ -3,7 +3,7 @@ import { EventTypes } from "@packages/events";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import { logger } from "../../../../shared/logger";
-import type { IEmailService } from "../../../../shared/ports/email.port";
+import type { EmailError, IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
@@ -46,7 +46,6 @@ export interface ExecuteAccountWipeInput {
 export interface ExecuteAccountWipeOutput {
   deletedOrgIds: string[];
   storageKeysDeleted: number;
-  notify: { to: string; name: string } | null;
 }
 
 export interface ProcessPendingDeletionsInput {
@@ -173,7 +172,10 @@ export class RgpdService {
           "delete_requested",
           state.email,
           { name: state.name, cancelUrl, expiresAt: until.toISOString() },
-          { idempotencyKey: `delete-requested/${input.userId}/${until.getTime()}` },
+          {
+            idempotencyKey: `delete-requested/${input.userId}/${until.getTime()}`,
+            locale: state.locale.toUndefined(),
+          },
         );
         if (sent.isFailure)
           logger.warn(
@@ -234,6 +236,7 @@ export class RgpdService {
           { name: state.name },
           {
             idempotencyKey: `delete-cancelled/${input.userId}/${pendingUntil.getTime()}`,
+            locale: state.locale.toUndefined(),
           },
         );
         if (sent.isFailure)
@@ -261,7 +264,7 @@ export class RgpdService {
 
         const state = stateOpt.unwrap();
         if (state.deletedAt.isSome())
-          return Result.ok({ deletedOrgIds: [], storageKeysDeleted: 0, notify: null });
+          return Result.ok({ deletedOrgIds: [], storageKeysDeleted: 0 });
 
         if (state.pendingDeletionUntil.isNone() || state.pendingDeletionUntil.unwrap() > new Date())
           return Result.fail({
@@ -271,8 +274,10 @@ export class RgpdService {
 
         const originalEmail = state.email;
         const originalName = state.name;
+        const originalLocale = state.locale;
 
         let wipeOutput: ExecuteWipeOutput;
+        let notifyFailure: EmailError | null = null;
         try {
           const inner = await this.transactions.run(async (trx) => {
             const wipe = await this.rgpd.executeWipe(input.userId, trx);
@@ -297,6 +302,20 @@ export class RgpdService {
                 trx,
               );
             }
+            const notified = await this.email.sendTemplate(
+              "delete_completed",
+              originalEmail,
+              { name: originalName },
+              {
+                tx: trx,
+                locale: originalLocale.toUndefined(),
+                idempotencyKey: `delete-completed/${input.userId}`,
+              },
+            );
+            if (notified.isFailure) {
+              notifyFailure = notified.getError();
+              throw new Error("rollback");
+            }
             return wipe;
           });
           if (inner.isFailure) {
@@ -311,6 +330,18 @@ export class RgpdService {
           }
           wipeOutput = inner.getValue();
         } catch (e) {
+          const failure = notifyFailure as EmailError | null;
+          const isRollbackSentinel = e instanceof Error && e.message === "rollback";
+          if (isRollbackSentinel && failure) {
+            logger.error(
+              { userId: input.userId, code: failure.code },
+              "account wipe rolled back — deletion confirmation could not be enqueued",
+            );
+            return Result.fail({
+              code: "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
+              message: "deletion confirmation enqueue failed — wipe rolled back",
+            });
+          }
           this.instrumentation.capture(e);
           logger.error({ err: e, userId: input.userId }, "account wipe transaction failed");
           return Result.fail({
@@ -340,7 +371,6 @@ export class RgpdService {
         return Result.ok({
           deletedOrgIds: wipeOutput.deletedOrgIds ?? [],
           storageKeysDeleted: keysDeleted,
-          notify: { to: originalEmail, name: originalName },
         });
       },
     );
@@ -378,15 +408,12 @@ export class RgpdService {
 
         const succeeded: string[] = [];
         const failed: Array<{ userId: string; errorCode: string }> = [];
-        const recipients: Array<{ to: string; variables: { name: string } }> = [];
 
         for (const row of batch) {
           try {
             const res = await this.executeAccountWipe({ userId: row.userId });
             if (res.isSuccess) {
               succeeded.push(row.userId);
-              const notify = res.getValue().notify;
-              if (notify) recipients.push({ to: notify.to, variables: { name: notify.name } });
             } else {
               failed.push({ userId: row.userId, errorCode: res.getError().code });
             }
@@ -398,15 +425,6 @@ export class RgpdService {
               "wipe threw uncaught error — Result contract violated",
             );
           }
-        }
-
-        if (recipients.length > 0) {
-          const sent = await this.email.sendTemplateBatch("delete_completed", recipients);
-          if (sent.isFailure)
-            logger.warn(
-              { code: sent.getError().code, count: recipients.length },
-              "wipe sweep completed but final notification batch failed",
-            );
         }
 
         if (succeeded.length > 0)
@@ -507,7 +525,10 @@ export class RgpdService {
             downloadUrl: presigned.getValue().url,
             expiresAt: presigned.getValue().expiresAt,
           },
-          { idempotencyKey: `data-export/${key}` },
+          {
+            idempotencyKey: `data-export/${key}`,
+            locale: state.locale.toUndefined(),
+          },
         );
         if (sent.isFailure)
           logger.warn(

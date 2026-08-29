@@ -167,7 +167,12 @@ Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery
 
 ### `POST /internal/sweep-email-messages` — email queue retention sweep (Phase D.5)
 
-Purges `email_message` rows with `status = 'sent'` older than `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d). `failed` rows are kept deliberately — they are the operator's only trace of a dropped email and must be reviewed manually. All take `{ batchSize?: 1–50000, dryRun?: boolean }`. Chained at the end of `apps/api/src/cron/sweep.ts` (runs after the event-pipeline sweeps).
+Two purge passes, run in sequence on every invocation:
+
+1. Purges `email_message` rows with `status = 'sent'` older than `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d), cutoff measured from `sent_at`.
+2. Purges `email_message` rows with `status = 'failed'` older than `EMAIL_MESSAGE_FAILED_RETENTION_DAYS` (default 90d), cutoff measured from `created_at` (enqueue time), **not** from when the row failed.
+
+A `failed` row is the operator's only trace of a dropped email and should be reviewed manually before it ages out — but it is not kept forever: past the 90-day default it is purged like any other retention sweep. All take `{ batchSize?: 1–50000, dryRun?: boolean }`. Chained at the end of `apps/api/src/cron/sweep.ts` (runs after the event-pipeline sweeps).
 
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken — fix that, not the window.

@@ -1,0 +1,129 @@
+export default {
+  brand: "clean-stack",
+  actions: {
+    save: "Enregistrer",
+    cancel: "Annuler",
+    retry: "Réessayer",
+    reload: "Recharger",
+  },
+  errorBoundary: {
+    title: "Une erreur est survenue",
+    body: "Nous avons été alertés et nous examinons le problème. Essayez de recharger la page.",
+  },
+  nav: {
+    dashboard: "Tableau de bord",
+    settings: "Paramètres",
+    admin: "Administration",
+  },
+  shell: {
+    brandLabel: "App",
+    search: "Rechercher...",
+    openCommandPalette: "Ouvrir la palette de commandes",
+  },
+  commandPalette: {
+    searchPlaceholder: "Rechercher des pages, actions, organisations...",
+    noResults: "Aucun résultat.",
+    actionFailed: "L'action a échoué",
+    groups: {
+      navigate: "Naviguer",
+      switchOrganization: "Changer d'organisation",
+      admin: "Administration",
+      legal: "Légal & confidentialité",
+      actions: "Actions",
+    },
+    nav: {
+      organization: "Paramètres — Organisation",
+      billing: "Paramètres — Facturation",
+      webhooks: "Paramètres — Webhooks",
+      account: "Paramètres — Compte",
+      privacy: "Paramètres — Confidentialité",
+      eventCatalog: "Développeurs — Catalogue d'événements",
+    },
+    organizationActive: "actif",
+    admin: {
+      auditLog: "Administration — Journal d'audit",
+      accounts: "Administration — Comptes",
+      organizations: "Administration — Organisations",
+    },
+    theme: {
+      light: "Thème : clair",
+      dark: "Thème : sombre",
+      system: "Thème : système",
+      active: "actif",
+    },
+    copyOrgSlug: "Copier l'identifiant de l'organisation",
+    orgSlugCopiedToast: "Identifiant de l'organisation copié dans le presse-papiers",
+  },
+  contextualTabs: {
+    ariaLabel: "Sections des paramètres",
+    organization: "Organisation",
+    billing: "Facturation",
+    webhooks: "Webhooks",
+    sso: "Authentification unique",
+    account: "Compte",
+    notifications: "Notifications",
+    privacy: "Confidentialité",
+    apiTokens: "Jetons API",
+  },
+  orgSwitcher: {
+    searchPlaceholder: "Rechercher une organisation...",
+    noResults: "Aucune organisation trouvée.",
+    heading: "Organisations",
+    newOrganization: "Nouvelle organisation",
+    selectPlaceholder: "Sélectionner une organisation",
+    switchFailed: "Échec du changement d'organisation",
+  },
+  userMenu: {
+    openMenu: "Ouvrir le menu utilisateur",
+    account: "Compte",
+    signOut: "Se déconnecter",
+    signingOut: "Déconnexion…",
+  },
+  impersonation: {
+    activeSession: "Session d'emprunt d'identité active — agit en tant que <name></name>",
+    remainingMinutes: "{{minutes}} min restantes",
+    expired: "session expirée",
+    end: "Arrêter l'emprunt d'identité",
+  },
+  cookieBanner: {
+    ariaLabel: "Consentement aux cookies",
+    message:
+      "Nous utilisons des cookies pour faire fonctionner ce service. Les cookies optionnels aident à améliorer votre expérience.",
+    policyLink: "Politique cookies",
+    rejectAll: "Tout refuser",
+    customize: "Personnaliser",
+    acceptAll: "Tout accepter",
+    preferencesTitle: "Préférences cookies",
+  },
+  cookieConsent: {
+    title: "Gérez vos préférences cookies",
+    save: "Enregistrer les préférences",
+    withdraw: "Retirer tous les consentements",
+    savedToast: "Préférences enregistrées",
+    withdrawnToast: "Consentement retiré",
+    categories: {
+      necessary: {
+        label: "Strictement nécessaires",
+        description:
+          "Indispensables au fonctionnement du service. Ils ne peuvent pas être désactivés.",
+      },
+      functional: {
+        label: "Fonctionnels",
+        description:
+          "Améliorent votre expérience (préférences de langue ou de région, par exemple).",
+      },
+      analytics: {
+        label: "Mesure d'audience",
+        description:
+          "Nous aident à comprendre comment le service est utilisé (données anonymisées).",
+      },
+      marketing: {
+        label: "Marketing et publicité",
+        description: "Autorisent la publicité personnalisée et le reciblage.",
+      },
+    },
+  },
+  legalFooter: {
+    ariaLabel: "Légal",
+  },
+} as const;

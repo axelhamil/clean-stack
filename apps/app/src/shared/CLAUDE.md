@@ -8,6 +8,7 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 - `auth/` — auth-client, auth-broadcast, can, use-authorization, use-set-active-org, use-sign-out, schemas/
 - `components/` — cross-feature UI (app-shell, org-switcher, command-palette, …)
 - `notifications/` — bell + inbox item, preference matrix, grouping, labels, read-broadcast, SSE stream hook (D.3)
+- `i18n/` — i18next boot (`i18n.ts`), locale cookie, session reconciliation, `LocaleSync`, the global Zod error map, `useFormatDate`/`useFormatDateTime`
 - `observability/` — sentry.ts (init + captureError/addBreadcrumb/setUser/ErrorBoundary/reactErrorHandler) + noop.ts mirror, error-classifier, query-error-handler (QueryCache/MutationCache onError), session-watcher (setUser sync)
 - `app-providers.tsx` — provider tree
 - `env.ts` — validated env
@@ -31,11 +32,18 @@ Caddy injects the nonce via `{http.request.uuid}` into `<meta property="csp-nonc
 - **No direct `@sentry/react` import outside `observability/sentry.ts`.** Removability = swap the `./sentry` imports to `./noop` (see `docs/OBSERVABILITY.md`); call sites never change.
 - **The `["session"]` key is intentionally hardcoded in `session-watcher.ts`** — importing `sessionQueryOptions` would pull `auth-client` (and `window`) into non-React code and break node tests. **Why** `state.data === undefined` is skipped there: `undefined` = query not resolved yet, `null` = resolved with no session; only the latter must clear the Sentry user.
 
+## i18n (front)
+
+- **Translation is read through the React tree; `getErrorsT()` is the exception, not the shortcut.** Components and hooks call `useTranslation` — that is what re-renders them when the language changes. `getErrorsT()` exists only for code that has no tree to read from: the global `QueryCache`/`MutationCache` handlers and `toast.ts` run outside React entirely. **Why it matters which one you reach for**: `getErrorsT()` resolves against whatever the instance holds *at call time* and returns the raw key before boot, so using it inside a component produces copy that silently stops following the language switch. **Test**: if the call site is inside a component or a hook, it must be `useTranslation`.
+- **`changeLocale` owns the cookie write.** No call site writes the locale cookie itself. **Why**: the cookie is the pre-render signal the next page load resolves from, so a path that changes the language without leaving that trace boots the next visit in the old one — and there is more than one such path (the settings switcher and the session reconciliation both change it).
+- **`LocaleSync` is mounted exactly once, in `app-providers`.** It is an effect over the session query with a `useRef` latch, not a pure view. **Why once**: two mounts race on the same reconciliation and each holds its own `alreadyPersisted` ref, so the "seed the empty user record" branch fires twice and issues two writes for one decision. The decision itself lives in `reconcileLocale`, a pure function, so "does a save bounce back?" is answerable in a unit test with no DOM.
+- **Schemas carry no inline `message:`.** Localised validation copy comes from the global Zod map (`i18n/zod-error-map.ts`), re-applied on every language change. A per-issue `message:` wins over the global map — that is Zod's own precedence — so an inline literal is a string that can never be translated. Custom checks pass `{ params: { i18nKey } }` instead, which is what routes them back through the catalog.
+
 ## Auth (BetterAuth client)
 
 `shared/auth/auth-client.ts`: one `createAuthClient` with same plugin set as server; sessions via TanStack Query, not auth-lib nanostore.
 
-## Route gates (in `router/layouts.tsx` + `router.tsx`)
+## Route gates (in `apps/app/src/router/*.tsx`, wired via `apps/app/routes.ts`)
 
 Auth state enforced by **layout routes with `id` (no path)** — `_guest`, `_protected`, `_shell`, `_org-scope`. Each owns its `beforeLoad`. Children inherit via `addChildren`. The `_` prefix marks "no path contribution". Naming by access *condition*, not feature — avoid `_auth` (ambiguous).
 
@@ -49,7 +57,7 @@ Auth state enforced by **layout routes with `id` (no path)** — `_guest`, `_pro
 
 **Per-route capability gates use `ensureOrgPermission(...)`, not nested pathless layouts.** One pathless `_org-scope` gates "active org required"; capabilities live per-route in `beforeLoad`. **Why**: stacking `_org-admin`/`_org-owner`/`_can-manage-billing` forces every tier into the directory tree. Customize via `ensureOrgPermission(perms, { redirectTo })`.
 
-**Don't static-import the route binding from a page file** (`import { xxxRoute } from "./xxx.route"`) — creates a cycle Biome flags. Pages access route via `getRouteApi("/path/id")`.
+**The route file's page component must stay internal, never exported** (`function <Name>Page() { ... }`, not `export function`) — route and page now share one module (`<name>.route.tsx`), and `autoCodeSplitting` only chunks a component it can see is local to that file. Exporting it re-attaches the page to the static import graph and the chunk silently merges back into the main bundle. Access route state through the `Route` binding directly (`Route.useSearch()`, `Route.useParams()`, `Route.useRouteContext()`), not `getRouteApi`.
 
 ## Authorization (capability-based, front)
 

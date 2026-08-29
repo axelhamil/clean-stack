@@ -2,6 +2,7 @@ import { createOTP } from "@better-auth/utils/otp";
 import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { and, db, eq, gt, inArray, isNull, like, lte, not, or, schema } from "@packages/drizzle";
+import { isLocale } from "@packages/i18n";
 import { symmetricDecrypt, verifyPassword as verifyHash } from "better-auth/crypto";
 import { env } from "../../../../shared/env";
 import type { Logger } from "../../../../shared/logger";
@@ -478,6 +479,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             .select({
               email: schema.user.email,
               name: schema.user.name,
+              locale: schema.user.locale,
               twoFactorEnabled: schema.user.twoFactorEnabled,
               pendingDeletionUntil: schema.user.pendingDeletionUntil,
               deletedAt: schema.user.deletedAt,
@@ -495,6 +497,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             Option.some({
               email: u.email,
               name: u.name,
+              locale: isLocale(u.locale) ? Option.some(u.locale) : Option.none(),
               twoFactorEnabled: u.twoFactorEnabled ?? false,
               pendingDeletionUntil: Option.fromNullable(u.pendingDeletionUntil),
               deletedAt: Option.fromNullable(u.deletedAt),
