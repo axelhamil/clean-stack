@@ -25,8 +25,8 @@ export function useVerifyBackupCode(redirectTo?: string) {
       return data;
     },
     onSuccess: async () => {
-      toast.success("Verified");
-      toast.info("That code is now used. Consider regenerating your recovery codes in settings.");
+      toast.success(t("twoFactor.verifiedToast"));
+      toast.info(t("twoFactor.backupCodeUsedNotice"));
       await queryClient.refetchQueries({
         queryKey: sessionQueryOptions.queryKey,
       });

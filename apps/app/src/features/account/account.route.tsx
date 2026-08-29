@@ -1,6 +1,7 @@
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Trans, useTranslation } from "react-i18next";
 import { RgpdDeletionCard } from "../rgpd/components/rgpd-deletion-card";
 import { PasskeysCard } from "../security/components/passkeys-card";
 import { RecoveryCodesCard } from "../security/components/recovery-codes-card";
@@ -14,11 +15,12 @@ export const Route = createFileRoute("/_protected/_shell/settings/account")({
 });
 
 function AccountPage() {
+  const { t } = useTranslation("settings");
   const { user } = Route.useRouteContext();
 
   return (
     <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">Account settings</TypographyH1>
+      <TypographyH1 className="sr-only">{t("account.title")}</TypographyH1>
       <ProfileCard name={user.name ?? ""} email={user.email} pendingEmail={user.pendingEmail} />
       <LanguageCard />
       <ChangePasswordCard />
@@ -30,11 +32,17 @@ function AccountPage() {
         twoFactorEnabled={user.twoFactorEnabled === true}
       />
       <TypographyMuted>
-        Read our{" "}
-        <NavLink asChild variant="underline">
-          <Link to="/legal/data-rights">data rights policy</Link>
-        </NavLink>{" "}
-        for the full breakdown of what&apos;s deleted, anonymized, and retained.
+        <Trans
+          ns="settings"
+          i18nKey="account.dataRightsNotice"
+          components={{
+            link: (
+              <NavLink asChild variant="underline">
+                <Link to="/legal/data-rights" />
+              </NavLink>
+            ),
+          }}
+        />
       </TypographyMuted>
     </main>
   );

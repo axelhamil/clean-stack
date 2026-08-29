@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { initialsOf } from "../../shared/utils";
 import { toastError } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
@@ -22,6 +23,7 @@ import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 
 export function OrgSwitcher() {
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { data: orgs = [] } = useQuery(orgsListQueryOptions);
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
@@ -34,7 +36,7 @@ export function OrgSwitcher() {
     try {
       await switchOrg(organizationId);
     } catch (err) {
-      toastError(err, "Failed to switch organization");
+      toastError(err, t("orgSwitcher.switchFailed"));
       return;
     }
     void navigate({ to: "/dashboard" });
@@ -50,17 +52,17 @@ export function OrgSwitcher() {
             </AvatarFallback>
           </Avatar>
           <TypographySmall className="max-w-32 truncate">
-            {activeOrg?.name ?? "Select organization"}
+            {activeOrg?.name ?? t("orgSwitcher.selectPlaceholder")}
           </TypographySmall>
           <ChevronsUpDown className="size-3.5 opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
         <Command>
-          <CommandInput placeholder="Search organization..." />
+          <CommandInput placeholder={t("orgSwitcher.searchPlaceholder")} />
           <CommandList>
-            <CommandEmpty>No organization found.</CommandEmpty>
-            <CommandGroup heading="Organizations">
+            <CommandEmpty>{t("orgSwitcher.noResults")}</CommandEmpty>
+            <CommandGroup heading={t("orgSwitcher.heading")}>
               {orgs.map((org) => (
                 <CommandItem
                   key={org.id}
@@ -83,7 +85,7 @@ export function OrgSwitcher() {
               <CommandItem asChild>
                 <Link to="/org/new" onClick={() => setOpen(false)}>
                   <Plus />
-                  New organization
+                  {t("orgSwitcher.newOrganization")}
                 </Link>
               </CommandItem>
             </CommandGroup>

@@ -18,7 +18,7 @@ export function useForgotPassword() {
 
       return data;
     },
-    onSuccess: () => toast.success("Check your inbox for the reset link"),
+    onSuccess: () => toast.success(t("forgotPassword.successToast")),
     onError: (err) => toast.error(err.message),
   });
 }

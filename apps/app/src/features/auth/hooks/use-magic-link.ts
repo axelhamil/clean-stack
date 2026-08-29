@@ -21,7 +21,7 @@ export function useMagicLink() {
 
       return data;
     },
-    onSuccess: () => toast.success("Magic link sent — check your inbox"),
+    onSuccess: () => toast.success(t("magicLink.successToast")),
     onError: (err) => {
       if (err.message === SSO_REDIRECT_IN_PROGRESS) return;
       toast.error(err.message);

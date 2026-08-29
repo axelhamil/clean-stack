@@ -35,6 +35,19 @@ describe("catalog parity", () => {
       "common.brand",
       "settings.language.options.en",
       "settings.language.options.fr",
+      // Short brand tag kept as-is in both locales, not sentence copy.
+      "common.shell.brandLabel",
+      // "Actions", "Webhooks" and "Notifications" are the correct French words too.
+      "common.commandPalette.groups.actions",
+      "common.contextualTabs.webhooks",
+      "common.contextualTabs.notifications",
+      // Non-linguistic placeholders: a masked password, an example email, a proper
+      // noun, a digit pattern and a recovery-code pattern don't get translated.
+      "auth.signIn.passwordPlaceholder",
+      "auth.signUp.namePlaceholder",
+      "auth.emailField.placeholder",
+      "auth.twoFactor.codePlaceholder",
+      "auth.twoFactor.recoveryCodePlaceholder",
     ]);
     const en = enCatalog as unknown as Record<string, Nested>;
     const fr = frCatalog as unknown as Record<string, Nested>;

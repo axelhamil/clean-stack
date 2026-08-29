@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type EmailRequestInput, emailRequestSchema } from "../auth.schema";
 
 interface EmailRequestFormProps {
@@ -19,6 +20,7 @@ export function EmailRequestForm({
   pendingLabel,
   buttonVariant = "default",
 }: EmailRequestFormProps) {
+  const { t } = useTranslation("auth");
   const form = useForm<EmailRequestInput>({
     resolver: zodResolver(emailRequestSchema),
     defaultValues: { email: "" },
@@ -34,10 +36,10 @@ export function EmailRequestForm({
         <FormTextField
           control={form.control}
           name="email"
-          label="Email"
+          label={t("emailField.label")}
           type="email"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder={t("emailField.placeholder")}
         />
         <Button
           type="submit"

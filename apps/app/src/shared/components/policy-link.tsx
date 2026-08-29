@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 
 interface PolicyLinkProps {
   type: PolicyType;
-  children: ReactNode;
+  // Optional because `<Trans>` clones this element and injects the translated
+  // text as children at render time — the JSX call site passes none.
+  children?: ReactNode;
 }
 
 export function PolicyLink({ type, children }: PolicyLinkProps) {

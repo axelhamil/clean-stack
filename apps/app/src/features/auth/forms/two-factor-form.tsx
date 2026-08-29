@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormCheckboxField } from "@packages/ui/components/ui/form-checkbox-field";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type TwoFactorInput, twoFactorSchema } from "../../../shared/auth/auth.schema";
 import { useVerifyTwoFactor } from "../hooks/use-verify-two-factor";
 
@@ -12,6 +13,7 @@ interface TwoFactorFormProps {
 }
 
 export function TwoFactorForm({ redirectTo }: TwoFactorFormProps = {}) {
+  const { t } = useTranslation("auth");
   const mutation = useVerifyTwoFactor(redirectTo);
   const form = useForm<TwoFactorInput>({
     resolver: zodResolver(twoFactorSchema),
@@ -28,16 +30,20 @@ export function TwoFactorForm({ redirectTo }: TwoFactorFormProps = {}) {
         <FormTextField
           control={form.control}
           name="code"
-          label="Authentication code"
+          label={t("twoFactor.codeLabel")}
           inputMode="numeric"
           autoComplete="one-time-code"
-          placeholder="123456"
+          placeholder={t("twoFactor.codePlaceholder")}
         />
 
-        <FormCheckboxField control={form.control} name="trustDevice" label="Trust this device" />
+        <FormCheckboxField
+          control={form.control}
+          name="trustDevice"
+          label={t("twoFactor.trustDevice")}
+        />
 
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Verifying…" : "Verify"}
+          {mutation.isPending ? t("twoFactor.verifyPending") : t("twoFactor.verify")}
         </Button>
       </form>
     </Form>

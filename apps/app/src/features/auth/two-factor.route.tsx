@@ -1,6 +1,7 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthShell } from "./components/auth-shell";
 import { BackupCodeForm } from "./forms/backup-code-form";
@@ -16,16 +17,15 @@ export const Route = createFileRoute("/two-factor")({
 });
 
 function TwoFactorPage() {
+  const { t } = useTranslation("auth");
   const { redirect } = Route.useSearch();
   const [method, setMethod] = useState<"totp" | "backup">("totp");
 
   return (
     <AuthShell
-      title="Two-factor authentication"
+      title={t("twoFactor.title")}
       description={
-        method === "totp"
-          ? "Enter the 6-digit code from your authenticator app."
-          : "Enter one of your one-time recovery codes."
+        method === "totp" ? t("twoFactor.descriptionTotp") : t("twoFactor.descriptionBackup")
       }
     >
       {method === "totp" ? (
@@ -39,7 +39,7 @@ function TwoFactorPage() {
         className="w-full"
         onClick={() => setMethod(method === "totp" ? "backup" : "totp")}
       >
-        {method === "totp" ? "Use a recovery code instead" : "Use authenticator app"}
+        {method === "totp" ? t("twoFactor.useRecoveryCode") : t("twoFactor.useAuthenticatorApp")}
       </Button>
     </AuthShell>
   );

@@ -26,7 +26,7 @@ export function useSignUp() {
       return data;
     },
     onSuccess: () => {
-      toast.success("Account created — check your email to verify");
+      toast.success(t("signUp.successToast"));
       void navigate({ to: "/verify-email" });
     },
     onError: (err) => {

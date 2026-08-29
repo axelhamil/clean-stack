@@ -25,7 +25,7 @@ export function useVerifyTwoFactor(redirectTo?: string) {
       return data;
     },
     onSuccess: async () => {
-      toast.success("Verified");
+      toast.success(t("twoFactor.verifiedToast"));
       await queryClient.refetchQueries({
         queryKey: sessionQueryOptions.queryKey,
       });

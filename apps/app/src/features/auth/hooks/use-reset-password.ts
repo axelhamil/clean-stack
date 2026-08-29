@@ -23,7 +23,7 @@ export function useResetPassword(token: string) {
       return data;
     },
     onSuccess: () => {
-      toast.success("Password updated — sign in to continue");
+      toast.success(t("resetPassword.successToast"));
       void navigate({ to: "/sign-in" });
     },
     onError: (err) => toast.error(err.message),

@@ -3,6 +3,7 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type UpdateProfileInput, updateProfileSchema } from "../account.schema";
 import { UploadAvatar } from "../components/upload-avatar";
 import { useUpdateProfile } from "../hooks/use-update-profile";
@@ -12,6 +13,7 @@ interface UpdateProfileFormProps {
 }
 
 export function UpdateProfileForm({ name }: UpdateProfileFormProps) {
+  const { t } = useTranslation("settings");
   const mutation = useUpdateProfile();
   const form = useForm<UpdateProfileInput>({
     resolver: zodResolver(updateProfileSchema),
@@ -26,9 +28,14 @@ export function UpdateProfileForm({ name }: UpdateProfileFormProps) {
         noValidate
       >
         <UploadAvatar name={name} />
-        <FormTextField control={form.control} name="name" label="Name" autoComplete="name" />
+        <FormTextField
+          control={form.control}
+          name="name"
+          label={t("account.nameLabel")}
+          autoComplete="name"
+        />
         <Button type="submit" className="w-fit" disabled={mutation.isPending}>
-          {mutation.isPending ? "Saving…" : "Save changes"}
+          {mutation.isPending ? t("account.saving") : t("account.saveChanges")}
         </Button>
       </form>
     </Form>

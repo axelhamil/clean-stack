@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { ResetPasswordForm } from "./forms/reset-password-form";
@@ -16,17 +17,18 @@ export const Route = createFileRoute("/reset-password")({
 });
 
 function ResetPasswordPage() {
+  const { t } = useTranslation("auth");
   const { token } = Route.useSearch();
   if (!token) return null;
 
   return (
     <AuthShell
-      title="Set a new password"
-      description="Choose a new password for your account."
+      title={t("resetPassword.title")}
+      description={t("resetPassword.description")}
       footer={
         <AuthShellFooter
-          lead="Changed your mind?"
-          link={<Link to="/sign-in">Back to sign in</Link>}
+          lead={t("resetPassword.changedYourMind")}
+          link={<Link to="/sign-in">{t("backToSignIn")}</Link>}
         />
       }
     >

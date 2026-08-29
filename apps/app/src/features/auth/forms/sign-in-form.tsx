@@ -5,6 +5,7 @@ import { FormCheckboxField } from "@packages/ui/components/ui/form-checkbox-fiel
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { KeyRoundIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type SignInInput, signInSchema } from "../../../shared/auth/auth.schema";
 import { usePasskeyAutofill } from "../hooks/use-passkey-autofill";
 import { usePasskeySupported } from "../hooks/use-passkey-supported";
@@ -16,6 +17,7 @@ interface SignInFormProps {
 }
 
 export function SignInForm({ redirectTo }: SignInFormProps = {}) {
+  const { t } = useTranslation("auth");
   const mutation = useSignIn(redirectTo);
   const passkey = useSignInPasskey(redirectTo);
   const support = usePasskeySupported();
@@ -36,24 +38,28 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
         <FormTextField
           control={form.control}
           name="email"
-          label="Email"
+          label={t("emailField.label")}
           type="email"
           autoComplete={support.conditional ? "username webauthn" : "username"}
-          placeholder="you@example.com"
+          placeholder={t("emailField.placeholder")}
         />
 
         <FormTextField
           control={form.control}
           name="password"
-          label="Password"
+          label={t("signIn.passwordLabel")}
           type="password"
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder={t("signIn.passwordPlaceholder")}
         />
 
-        <FormCheckboxField control={form.control} name="rememberMe" label="Remember me" />
+        <FormCheckboxField
+          control={form.control}
+          name="rememberMe"
+          label={t("signIn.rememberMe")}
+        />
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Signing in…" : "Sign in"}
+          {mutation.isPending ? t("signIn.pending") : t("signIn.submit")}
         </Button>
 
         {support.available && (
@@ -68,7 +74,7 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
             disabled={passkey.isPending}
           >
             <KeyRoundIcon />
-            {passkey.isPending ? "Waiting for device…" : "Sign in with passkey"}
+            {passkey.isPending ? t("signIn.passkeyWaiting") : t("signIn.passkeyButton")}
           </Button>
         )}
       </form>

@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { SignUpForm } from "./forms/sign-up-form";
 
@@ -7,14 +8,15 @@ export const Route = createFileRoute("/_guest/sign-up")({
 });
 
 function SignUpPage() {
+  const { t } = useTranslation("auth");
   return (
     <AuthShell
-      title="Create your account"
-      description="Start building in under a minute."
+      title={t("signUp.title")}
+      description={t("signUp.description")}
       footer={
         <AuthShellFooter
-          lead="Already have an account?"
-          link={<Link to="/sign-in">Sign in</Link>}
+          lead={t("signUp.alreadyHaveAccount")}
+          link={<Link to="/sign-in">{t("signIn.submit")}</Link>}
         />
       }
     >

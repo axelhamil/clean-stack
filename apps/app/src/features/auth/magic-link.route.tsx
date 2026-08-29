@@ -1,6 +1,7 @@
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { useVerifyMagicLink } from "./hooks/use-verify-magic-link";
@@ -29,6 +30,7 @@ interface ConsumeTokenProps {
 }
 
 function ConsumeToken({ token }: ConsumeTokenProps) {
+  const { t } = useTranslation("auth");
   const mutation = useVerifyMagicLink();
   const fired = useRef(false);
 
@@ -42,8 +44,8 @@ function ConsumeToken({ token }: ConsumeTokenProps) {
   if (mutation.isError) return <MagicLinkError message={mutation.error.message} />;
 
   return (
-    <AuthShell title="Signing you in…" description="One moment.">
-      <TypographyMuted>Verifying your link.</TypographyMuted>
+    <AuthShell title={t("magicLink.signingInTitle")} description={t("magicLink.oneMoment")}>
+      <TypographyMuted>{t("magicLink.verifyingLink")}</TypographyMuted>
     </AuthShell>
   );
 }
@@ -53,13 +55,14 @@ interface MagicLinkErrorProps {
 }
 
 function MagicLinkError({ message }: MagicLinkErrorProps) {
+  const { t } = useTranslation("auth");
   return (
     <AuthShell
-      title="Link invalid or expired"
+      title={t("magicLink.invalidTitle")}
       description={message}
-      footer={<AuthShellFooter link={<Link to="/sign-in">Request a new link</Link>} />}
+      footer={<AuthShellFooter link={<Link to="/sign-in">{t("magicLink.requestNewLink")}</Link>} />}
     >
-      <TypographyMuted>Magic links are single-use and expire after a few minutes.</TypographyMuted>
+      <TypographyMuted>{t("magicLink.expiryNotice")}</TypographyMuted>
     </AuthShell>
   );
 }
