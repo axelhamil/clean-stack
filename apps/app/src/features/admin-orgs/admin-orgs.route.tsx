@@ -14,7 +14,9 @@ import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typogr
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { formatDate } from "../../shared/utils";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
 
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs")({
 });
 
 function AdminOrgsPage() {
+  const { i18n } = useTranslation();
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
@@ -80,7 +83,7 @@ function AdminOrgsPage() {
                     </TableCell>
                     <TableCell>{org.slug}</TableCell>
                     <TableCell>{org.memberCount}</TableCell>
-                    <TableCell>{new Date(org.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(org.createdAt, i18n.language)}</TableCell>
                     <TableCell>
                       <Switch
                         aria-label={`SSO enforced for ${org.name}`}

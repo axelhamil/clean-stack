@@ -19,9 +19,11 @@ import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
+import { formatDate } from "../../shared/utils";
 import {
   banUserMutationOptions,
   resetPasswordMutationOptions,
@@ -39,6 +41,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/users/$id"
 });
 
 function AdminUserDetailPage() {
+  const { i18n } = useTranslation();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -139,7 +142,7 @@ function AdminUserDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span>Member since</span>
-              <span>{new Date(user.createdAt).toLocaleDateString()}</span>
+              <span>{formatDate(user.createdAt, i18n.language)}</span>
             </div>
           </div>
         </CardContent>
@@ -217,7 +220,7 @@ function AdminUserDetailPage() {
             {user.banExpires !== null && (
               <div className="flex items-center justify-between">
                 <span>Expires</span>
-                <span>{new Date(user.banExpires).toLocaleDateString()}</span>
+                <span>{formatDate(user.banExpires, i18n.language)}</span>
               </div>
             )}
             {user.banned && user.banExpires === null && (

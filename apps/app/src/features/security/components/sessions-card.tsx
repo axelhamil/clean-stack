@@ -18,6 +18,7 @@ import {
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { LogOutIcon, MonitorIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
 import { formatDate } from "../../../shared/utils";
 import { useRevokeOtherSessions } from "../hooks/use-revoke-other-sessions";
@@ -85,8 +86,9 @@ interface SessionRowProps {
 }
 
 function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt }: SessionRowProps) {
+  const { i18n } = useTranslation();
   const mutation = useRevokeSession();
-  const expires = formatDate(expiresAt);
+  const expires = formatDate(expiresAt, i18n.language);
   const ua = userAgent ? summarizeUserAgent(userAgent) : "Unknown device";
 
   return (

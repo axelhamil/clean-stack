@@ -24,11 +24,13 @@ import {
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
+import { formatDate } from "../../shared/utils";
 import {
   createEndpointMutationOptions,
   deleteEndpointMutationOptions,
@@ -54,6 +56,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/web
 });
 
 function WebhooksPage() {
+  const { i18n } = useTranslation();
   const qc = useQueryClient();
   const { can } = useAuthorization();
   const canWrite = can({ webhooks: ["write"] });
@@ -245,7 +248,7 @@ function WebhooksPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{d.attempts}</TableCell>
-                        <TableCell>{new Date(d.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDate(d.createdAt, i18n.language)}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setSelectedDelivery(d)}>
                             Details

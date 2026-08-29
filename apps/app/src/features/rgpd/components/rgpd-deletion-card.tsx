@@ -21,9 +21,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toastError } from "../../../shared/api/errors/toast";
 import { preflightDeletionQueryOptions } from "../../../shared/api/queries/account-deletion";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
+import { formatDate, formatDateTime } from "../../../shared/utils";
 import { RequestDeletionPasswordForm } from "../forms/request-deletion-password-form";
 import { RequestDeletionTotpForm } from "../forms/request-deletion-totp-form";
 import { useCancelDeletion } from "../hooks/use-cancel-deletion";
@@ -48,21 +50,22 @@ interface PendingStateProps {
 }
 
 function PendingState({ until }: PendingStateProps) {
+  const { i18n } = useTranslation();
   const cancel = useCancelDeletion();
   return (
     <Card>
       <CardHeader>
         <CardTitle variant="destructive">Account deletion scheduled</CardTitle>
         <CardDescription>
-          Your account is scheduled for deletion on {until.toLocaleString()}. You can cancel any
-          time before then.
+          Your account is scheduled for deletion on {formatDateTime(until, i18n.language)}. You can
+          cancel any time before then.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <Alert variant="destructive">
           <AlertTriangleIcon />
           <AlertDescription>
-            After {until.toLocaleDateString()}, your data will be anonymized and cannot be
+            After {formatDate(until, i18n.language)}, your data will be anonymized and cannot be
             recovered.
           </AlertDescription>
         </Alert>

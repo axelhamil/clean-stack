@@ -26,6 +26,7 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { formatDate } from "../../../shared/utils";
 import { AddPasskeyForm } from "../forms/add-passkey-form";
@@ -93,8 +94,9 @@ interface PasskeyRowProps {
 }
 
 function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowProps) {
+  const { i18n } = useTranslation();
   const mutation = useDeletePasskey();
-  const created = formatDate(createdAt);
+  const created = formatDate(createdAt, i18n.language);
 
   return (
     <ListRow>

@@ -15,6 +15,8 @@ import {
   TooltipTrigger,
 } from "@packages/ui/components/ui/tooltip";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { formatDate } from "../../../shared/utils";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
 
 export type EndpointStatus = "active" | "paused" | "auto-disabled";
@@ -43,6 +45,7 @@ export function EndpointRow({
   onDelete,
   onSelect,
 }: EndpointRowProps) {
+  const { i18n } = useTranslation();
   const status = endpointStatus(endpoint);
 
   return (
@@ -68,7 +71,7 @@ export function EndpointRow({
         )}
       </TableCell>
       <TableCell>{endpoint.eventTypes.length}</TableCell>
-      <TableCell>{new Date(endpoint.createdAt).toLocaleDateString()}</TableCell>
+      <TableCell>{formatDate(endpoint.createdAt, i18n.language)}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
