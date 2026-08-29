@@ -52,6 +52,6 @@ describe("account settings — data rights notice", () => {
 
     const html = render();
     expect(html).toContain('href="/legal/data-rights"');
-    expect(html).toContain("data rights policy");
+    expect(html).toMatch(/<a[^>]*href="\/legal\/data-rights"[^>]*>data rights policy<\/a>/);
   });
 });

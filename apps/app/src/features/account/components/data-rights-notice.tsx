@@ -10,7 +10,7 @@ export function DataRightsNotice() {
         ns="settings"
         i18nKey="account.dataRightsNotice"
         components={{
-          link: (
+          dataRightsLink: (
             <Link to="/legal/data-rights" className={navLinkVariants({ variant: "underline" })} />
           ),
         }}

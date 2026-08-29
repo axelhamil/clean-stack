@@ -38,7 +38,7 @@ export default {
     profileUpdatedToast: "Profil mis à jour",
     profileUpdateFailed: "Échec de la mise à jour du profil",
     dataRightsNotice:
-      "Consultez notre <link>politique de droits sur les données</link> pour le détail complet de ce qui est supprimé, anonymisé et conservé.",
+      "Consultez notre <dataRightsLink>politique de droits sur les données</dataRightsLink> pour le détail complet de ce qui est supprimé, anonymisé et conservé.",
   },
   language: {
     title: "Langue",

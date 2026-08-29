@@ -38,7 +38,7 @@ export default {
     profileUpdatedToast: "Profile updated",
     profileUpdateFailed: "Failed to update profile",
     dataRightsNotice:
-      "Read our <link>data rights policy</link> for the full breakdown of what's deleted, anonymized, and retained.",
+      "Read our <dataRightsLink>data rights policy</dataRightsLink> for the full breakdown of what's deleted, anonymized, and retained.",
   },
   language: {
     title: "Language",
