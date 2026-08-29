@@ -9,6 +9,7 @@ import { consentModule } from "./modules/consents/module";
 import { healthModule } from "./modules/health/module";
 import { notificationsModule } from "./modules/notifications/module";
 import { policyModule } from "./modules/policies/module";
+import { profileModule } from "./modules/profile/module";
 import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
@@ -111,7 +112,6 @@ export const di = container()
   .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
   .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
   .add("NotificationFanoutSubscriber", (c) => new NotificationFanoutSubscriber(c.IInstrumentation))
-  .add("BackupCodeUsedNotifier", (c) => backupCodeUsedNotifier({ IEmailService: c.IEmailService }))
   .add(
     "OutboxDispatcher",
     (c) =>
@@ -135,5 +135,9 @@ export const di = container()
   .addModule(quotaModule)
   .addModule(billingModule)
   .addModule(notificationsModule)
+  .addModule(profileModule)
+  .add("BackupCodeUsedNotifier", (c) =>
+    backupCodeUsedNotifier({ IEmailService: c.IEmailService, IProfileStore: c.IProfileStore }),
+  )
   .add("NotificationStreamHub", () => new NotificationStreamHub(logger, env.DATABASE_URL))
   .build();

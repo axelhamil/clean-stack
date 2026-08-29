@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+
 export type EmailTemplates = {
   verify_email: { name: string; verifyUrl: string };
   reset_password: { name: string; resetUrl: string };
@@ -29,3 +31,16 @@ export type EmailTemplates = {
 };
 
 export type EmailTemplateKey = keyof EmailTemplates;
+
+/**
+ * Props of the React component rendering template `K`: its declared variables
+ * plus the bound `emails` translator.
+ *
+ * Every template needs exactly this shape, so deriving it keeps the variable
+ * contract in one place — adding a variable to `EmailTemplates` immediately
+ * type-checks against its component, instead of drifting behind a hand-written
+ * copy of the same members.
+ */
+export type EmailProps<K extends EmailTemplateKey> = EmailTemplates[K] & {
+  t: TFunction<"emails">;
+};

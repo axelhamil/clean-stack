@@ -2,6 +2,7 @@ import { Badge } from "@packages/ui/components/ui/badge";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { Link } from "@tanstack/react-router";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { AdminUserListItem } from "../api/admin-users.queries";
 
 interface UserRowProps {
@@ -9,6 +10,7 @@ interface UserRowProps {
 }
 
 export function UserRow({ item }: UserRowProps) {
+  const formatDate = useFormatDate();
   return (
     <TableRow>
       <TableCell>
@@ -29,7 +31,7 @@ export function UserRow({ item }: UserRowProps) {
           <Badge variant="outline">Active</Badge>
         )}
       </TableCell>
-      <TableCell>{new Date(item.createdAt).toLocaleDateString()}</TableCell>
+      <TableCell>{formatDate(item.createdAt)}</TableCell>
     </TableRow>
   );
 }

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@packages/access-control": "workspace:*",
+    "@packages/i18n": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

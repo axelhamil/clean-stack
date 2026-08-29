@@ -29,6 +29,7 @@ import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
+import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   createEndpointMutationOptions,
   deleteEndpointMutationOptions,
@@ -54,6 +55,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/web
 });
 
 function WebhooksPage() {
+  const formatDate = useFormatDate();
   const qc = useQueryClient();
   const { can } = useAuthorization();
   const canWrite = can({ webhooks: ["write"] });
@@ -245,7 +247,7 @@ function WebhooksPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{d.attempts}</TableCell>
-                        <TableCell>{new Date(d.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDate(d.createdAt)}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setSelectedDelivery(d)}>
                             Details

@@ -7,6 +7,7 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { BackupCodesPanel } from "../components/backup-codes-panel";
 import { type EnableTwoFactorResult, useEnableTwoFactor } from "../hooks/use-enable-two-factor";
 import { useVerifyTwoFactorSetup } from "../hooks/use-verify-two-factor-setup";
@@ -34,6 +35,7 @@ interface PasswordStepProps {
 }
 
 function PasswordStep({ onSetup }: PasswordStepProps) {
+  const { t } = useTranslation("settings");
   const mutation = useEnableTwoFactor();
   const form = useForm<PasswordPromptInput>({
     resolver: zodResolver(passwordPromptSchema),
@@ -47,19 +49,17 @@ function PasswordStep({ onSetup }: PasswordStepProps) {
         className="flex flex-col gap-4"
         noValidate
       >
-        <TypographyMuted>
-          Confirm your password to set up two-factor authentication.
-        </TypographyMuted>
+        <TypographyMuted>{t("twoFactor.confirmPasswordPrompt")}</TypographyMuted>
         <FormTextField
           control={form.control}
           name="password"
-          label="Password"
+          label={t("twoFactor.passwordLabel")}
           type="password"
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder={t("twoFactor.passwordPlaceholder")}
         />
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Generating…" : "Continue"}
+          {mutation.isPending ? t("twoFactor.generating") : t("twoFactor.continue")}
         </Button>
       </form>
     </Form>
@@ -72,6 +72,7 @@ interface ConfirmStepProps {
 }
 
 function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
+  const { t } = useTranslation("settings");
   const mutation = useVerifyTwoFactorSetup();
   const form = useForm<VerifyTotpSetupInput>({
     resolver: zodResolver(verifyTotpSetupSchema),
@@ -86,9 +87,7 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
               fixed white background to keep modules legible across light/dark themes. */}
           <QRCodeSVG value={setup.totpURI} size={176} marginSize={4} />
         </QrCodeFrame>
-        <TypographyMuted className="text-center">
-          Scan with your authenticator app, then enter the 6-digit code below.
-        </TypographyMuted>
+        <TypographyMuted className="text-center">{t("twoFactor.scanPrompt")}</TypographyMuted>
       </div>
 
       <BackupCodesPanel codes={setup.backupCodes} />
@@ -104,13 +103,13 @@ function ConfirmStep({ setup, onSuccess }: ConfirmStepProps) {
           <FormTextField
             control={form.control}
             name="code"
-            label="Verification code"
+            label={t("twoFactor.codeLabel")}
             inputMode="numeric"
             autoComplete="one-time-code"
-            placeholder="123456"
+            placeholder={t("twoFactor.codePlaceholder")}
           />
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? "Verifying…" : "Enable two-factor"}
+            {mutation.isPending ? t("twoFactor.verifying") : t("twoFactor.enableAction")}
           </Button>
         </form>
       </Form>

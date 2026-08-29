@@ -1,0 +1,150 @@
+export default {
+  fallback: "Une erreur est survenue. Veuillez réessayer.",
+  byCode: {
+    ACCOUNT_EXPORT_RATE_LIMITED: "Vous pourrez demander un nouvel export dans 24 heures.",
+    ACCOUNT_PASSWORD_REQUIRED: "Confirmez avec votre mot de passe.",
+    ACCOUNT_DELETION_BLOCKED:
+      "Réglez la propriété de vos organisations avant de supprimer votre compte.",
+    ACCOUNT_DELETION_NOT_FOUND: "Aucune suppression à annuler.",
+    ACCOUNT_PASSWORD_INVALID: "Mot de passe invalide.",
+    TWO_FACTOR_REQUIRED: "Confirmez avec votre mot de passe ou votre code d'authentification.",
+    TWO_FACTOR_INVALID: "Code d'authentification invalide.",
+    INVALID_EMAIL_OR_PASSWORD: "Adresse e-mail ou mot de passe invalide.",
+    INVALID_EMAIL: "Saisissez une adresse e-mail valide.",
+    INVALID_PASSWORD: "Mot de passe invalide.",
+    USER_NOT_FOUND: "Aucun compte ne correspond à ces informations.",
+    USER_EMAIL_NOT_FOUND: "Aucun compte ne correspond à cette adresse e-mail.",
+    USER_ALREADY_EXISTS: "Un compte existe déjà pour cette adresse e-mail.",
+    USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL:
+      "Un compte existe déjà pour cette adresse e-mail. Utilisez-en une autre.",
+    EMAIL_NOT_VERIFIED: "Vérifiez votre adresse e-mail avant de vous connecter.",
+    EMAIL_ALREADY_VERIFIED: "Cette adresse e-mail est déjà vérifiée.",
+    EMAIL_CAN_NOT_BE_UPDATED: "Cette adresse e-mail ne peut pas être utilisée.",
+    EMAIL_MISMATCH: "Cette adresse e-mail ne correspond pas à cette demande.",
+    PASSWORD_TOO_SHORT: "Ce mot de passe est trop court.",
+    PASSWORD_TOO_LONG: "Ce mot de passe est trop long.",
+    PASSWORD_ALREADY_SET: "Ce compte possède déjà un mot de passe.",
+    USER_ALREADY_HAS_PASSWORD: "Confirmez avec votre mot de passe actuel.",
+    INVALID_TOKEN: "Ce lien est invalide.",
+    TOKEN_EXPIRED: "Ce lien a expiré. Demandez-en un nouveau.",
+    SESSION_EXPIRED: "Votre session a expiré. Reconnectez-vous pour continuer.",
+    SESSION_NOT_FRESH: "Reconnectez-vous pour confirmer cette modification.",
+    CREDENTIAL_ACCOUNT_NOT_FOUND:
+      "Ce compte n'a pas de mot de passe — utilisez la méthode de connexion que vous avez configurée.",
+    ACCOUNT_NOT_FOUND: "Compte introuvable.",
+    SOCIAL_ACCOUNT_ALREADY_LINKED: "Ce compte est déjà lié à un autre utilisateur.",
+    FAILED_TO_CREATE_USER: "Nous n'avons pas pu créer votre compte. Veuillez réessayer.",
+    FAILED_TO_CREATE_SESSION: "Nous n'avons pas pu vous connecter. Veuillez réessayer.",
+    REQUEST_INVALID:
+      "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
+    OTP_NOT_ENABLED: "Les codes à usage unique ne sont pas activés sur ce compte.",
+    OTP_HAS_EXPIRED: "Ce code a expiré. Demandez-en un nouveau.",
+    TOTP_NOT_ENABLED: "Aucune application d'authentification n'est configurée sur ce compte.",
+    TWO_FACTOR_NOT_ENABLED: "La double authentification n'est pas activée sur ce compte.",
+    BACKUP_CODES_NOT_ENABLED: "Aucun code de secours n'est configuré sur ce compte.",
+    INVALID_BACKUP_CODE: "Ce code de secours est invalide ou a déjà été utilisé.",
+    INVALID_CODE:
+      "Ce code est incorrect. Vérifiez votre application d'authentification et réessayez.",
+    TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Trop de tentatives. Demandez un nouveau code.",
+    ACCOUNT_TEMPORARILY_LOCKED:
+      "Trop de tentatives échouées. Votre compte est temporairement verrouillé — réessayez plus tard.",
+    INVALID_TWO_FACTOR_COOKIE: "Cette étape de vérification a expiré. Reconnectez-vous.",
+    CHALLENGE_NOT_FOUND: "Cette tentative de clé d'accès a expiré. Réessayez.",
+    YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY:
+      "Cette clé d'accès ne peut pas être enregistrée ici.",
+    FAILED_TO_VERIFY_REGISTRATION: "Nous n'avons pas pu enregistrer cette clé d'accès. Réessayez.",
+    PASSKEY_NOT_FOUND: "Cette clé d'accès n'existe plus.",
+    AUTHENTICATION_FAILED: "Votre appareil n'a pas pu confirmer votre identité. Réessayez.",
+    UNABLE_TO_CREATE_SESSION: "Nous n'avons pas pu vous connecter. Veuillez réessayer.",
+    FAILED_TO_UPDATE_PASSKEY: "Nous n'avons pas pu mettre à jour cette clé d'accès. Réessayez.",
+    PREVIOUSLY_REGISTERED: "Cette clé d'accès est déjà enregistrée sur ce compte.",
+    REGISTRATION_CANCELLED: "La configuration de la clé d'accès a été annulée.",
+    AUTH_CANCELLED: "La connexion par clé d'accès a été annulée.",
+    SESSION_REQUIRED: "Connectez-vous avant d'ajouter une clé d'accès.",
+    YOU_ARE_NOT_ALLOWED_TO_CREATE_A_NEW_ORGANIZATION:
+      "Vous n'avez pas la permission de créer une organisation.",
+    YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS:
+      "Vous avez atteint le nombre maximum d'organisations.",
+    ORGANIZATION_ALREADY_EXISTS: "Une organisation portant ce nom existe déjà.",
+    ORGANIZATION_SLUG_ALREADY_TAKEN: "Cette adresse d'organisation est déjà prise.",
+    ORGANIZATION_NOT_FOUND: "Organisation introuvable.",
+    USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION:
+      "Cet utilisateur n'est pas membre de cette organisation.",
+    YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission de modifier cette organisation.",
+    YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission de supprimer cette organisation.",
+    NO_ACTIVE_ORGANIZATION: "Sélectionnez d'abord une organisation.",
+    USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION:
+      "Cet utilisateur est déjà membre de cette organisation.",
+    MEMBER_NOT_FOUND: "Membre introuvable.",
+    ROLE_NOT_FOUND: "Rôle introuvable.",
+    YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER:
+      "Transférez la propriété avant de partir : vous êtes le seul propriétaire.",
+    YOU_CANNOT_LEAVE_THE_ORGANIZATION_WITHOUT_AN_OWNER:
+      "Une organisation doit conserver au moins un propriétaire.",
+    YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER:
+      "Vous n'avez pas la permission de retirer ce membre.",
+    YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_MEMBER:
+      "Vous n'avez pas la permission de modifier ce membre.",
+    YOU_ARE_NOT_ALLOWED_TO_INVITE_USERS_TO_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission d'inviter des personnes dans cette organisation.",
+    USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION: "Cette personne a déjà été invitée.",
+    INVITATION_NOT_FOUND: "Cette invitation n'existe plus.",
+    YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION:
+      "Cette invitation a été envoyée à une autre adresse.",
+    EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION:
+      "Vérifiez votre adresse e-mail avant de répondre à cette invitation.",
+    EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION:
+      "Vérifiez votre adresse e-mail pour consulter vos invitations.",
+    YOU_ARE_NOT_ALLOWED_TO_CANCEL_THIS_INVITATION:
+      "Vous n'avez pas la permission d'annuler cette invitation.",
+    INVITER_IS_NO_LONGER_A_MEMBER_OF_THE_ORGANIZATION:
+      "La personne qui vous a invité n'est plus membre de cette organisation.",
+    YOU_ARE_NOT_ALLOWED_TO_INVITE_USER_WITH_THIS_ROLE:
+      "Vous n'avez pas la permission d'inviter quelqu'un avec ce rôle.",
+    FAILED_TO_RETRIEVE_INVITATION:
+      "Nous n'avons pas pu charger cette invitation. Veuillez réessayer.",
+    INVITATION_LIMIT_REACHED: "Vous avez atteint la limite d'invitations pour cette organisation.",
+    ORGANIZATION_MEMBERSHIP_LIMIT_REACHED: "Cette organisation a atteint sa limite de membres.",
+    YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission d'accéder à cette organisation.",
+    YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
+  },
+  bySuffix: {
+    RATE_LIMITED: "Trop de requêtes. Patientez un instant avant de réessayer.",
+    NOT_FOUND: "Introuvable.",
+    FORBIDDEN: "Vous n'avez pas la permission de faire cela.",
+    UNAUTHORIZED: "Veuillez vous reconnecter.",
+    REQUIRED: "Une confirmation supplémentaire est requise.",
+    BLOCKED: "Action bloquée.",
+    INVALID: "Saisie invalide.",
+    INTEGRITY_FAILED: "Le contrôle d'intégrité a échoué. Veuillez réessayer.",
+    PROVIDER_FAILURE: "Le service est temporairement indisponible. Veuillez réessayer.",
+    UNAVAILABLE: "Le service est temporairement indisponible. Veuillez réessayer.",
+    TIMEOUT: "La requête a expiré. Veuillez réessayer.",
+  },
+  rateLimit: {
+    retryInSeconds_one: "Réessayez dans {{count}} seconde.",
+    retryInSeconds_other: "Réessayez dans {{count}} secondes.",
+    retryInMinutes_one: "Réessayez dans {{count}} minute.",
+    retryInMinutes_other: "Réessayez dans {{count}} minutes.",
+    retryInHours_one: "Réessayez dans {{count}} heure.",
+    retryInHours_other: "Réessayez dans {{count}} heures.",
+  },
+  validation: {
+    required: "Ce champ est obligatoire.",
+    invalidEmail: "Saisissez une adresse e-mail valide.",
+    invalidUrl: "Saisissez une URL valide.",
+    invalidFormat: "Format invalide.",
+    totpCode: "Saisissez le code à 6 chiffres de votre application d'authentification.",
+    backupCode: "Saisissez un code de secours valide.",
+    httpsUrl: "Saisissez une URL https valide.",
+    tooSmall: "Doit contenir au moins {{minimum}} caractères.",
+    tooBig: "Doit contenir au plus {{maximum}} caractères.",
+    tooFewItems: "Sélectionnez au moins {{minimum}}.",
+    passwordsMismatch: "Les mots de passe ne correspondent pas.",
+    acceptPolicies: "Vous devez accepter les politiques requises.",
+    invalidEventSelection: "Contient un événement inconnu ou non abonnable.",
+  },
+} as const;

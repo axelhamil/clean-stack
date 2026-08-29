@@ -58,6 +58,20 @@ describe("QueuedEmailService", () => {
     expect(queue.rows.map((r) => r.toAddress)).toEqual(["a@x.test", "b@x.test"]);
   });
 
+  it("freezes the caller's locale on the row and renders the subject in it", async () => {
+    const queue = fakeQueue();
+    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const result = await service.sendTemplate(
+      "verify_email",
+      "a@x.test",
+      { name: "Ada", verifyUrl: "https://x.test/v" },
+      { locale: "fr" },
+    );
+    expect(result.isSuccess).toBe(true);
+    expect(queue.rows[0]?.locale).toBe("fr");
+    expect(queue.rows[0]?.subject).toBe("Confirmez votre adresse e-mail");
+  });
+
   it("surfaces a queue write failure as EMAIL_PROVIDER_FAILURE", async () => {
     const failing = {
       enqueue: async () => Result.fail({ code: "EMAIL_QUEUE_WRITE_FAILED", message: "db down" }),

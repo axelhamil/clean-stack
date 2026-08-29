@@ -26,27 +26,26 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
-import { formatDate } from "../../../shared/utils";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { AddPasskeyForm } from "../forms/add-passkey-form";
 import { useDeletePasskey } from "../hooks/use-delete-passkey";
 
 export function PasskeysCard() {
+  const { t } = useTranslation("settings");
   const { data, isLoading } = useQuery(passkeysQueryOptions);
   const [open, setOpen] = useState(false);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Passkeys</CardTitle>
-        <CardDescription>
-          Sign in with biometrics or a hardware key. Passkeys are phishing-resistant and replace
-          passwords.
-        </CardDescription>
+        <CardTitle>{t("passkeys.title")}</CardTitle>
+        <CardDescription>{t("passkeys.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {isLoading ? (
-          <TypographyMuted>Loading…</TypographyMuted>
+          <TypographyMuted>{t("passkeys.loading")}</TypographyMuted>
         ) : data && data.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {data.map((passkey) => (
@@ -61,20 +60,20 @@ export function PasskeysCard() {
             ))}
           </ul>
         ) : (
-          <TypographyMuted>No passkeys yet.</TypographyMuted>
+          <TypographyMuted>{t("passkeys.empty")}</TypographyMuted>
         )}
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" className="w-fit">
               <PlusIcon />
-              Add a passkey
+              {t("passkeys.add")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add a passkey</DialogTitle>
-              <DialogDescription>Give it a name so you can identify it later.</DialogDescription>
+              <DialogTitle>{t("passkeys.add")}</DialogTitle>
+              <DialogDescription>{t("passkeys.addDialogDescription")}</DialogDescription>
             </DialogHeader>
             <AddPasskeyForm onSuccess={() => setOpen(false)} />
           </DialogContent>
@@ -93,21 +92,24 @@ interface PasskeyRowProps {
 }
 
 function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowProps) {
+  const { t } = useTranslation("settings");
+  const formatDate = useFormatDate();
   const mutation = useDeletePasskey();
-  const created = formatDate(createdAt);
 
   return (
     <ListRow>
       <ListRowMedia>
         <KeyRoundIcon />
         <ListRowContent>
-          <TypographySmall>{name ?? "Unnamed passkey"}</TypographySmall>
+          <TypographySmall>{name ?? t("passkeys.unnamed")}</TypographySmall>
           <ListRowMeta>
             <Badge variant="secondary">
-              {deviceType === "singleDevice" ? "Device-bound" : "Synced"}
+              {deviceType === "singleDevice" ? t("passkeys.deviceBound") : t("passkeys.synced")}
             </Badge>
-            {backedUp && <Badge variant="outline">Backed up</Badge>}
-            <TypographyMuted>Added {created}</TypographyMuted>
+            {backedUp && <Badge variant="outline">{t("passkeys.backedUp")}</Badge>}
+            <TypographyMuted>
+              {t("passkeys.added", { date: formatDate(createdAt) })}
+            </TypographyMuted>
           </ListRowMeta>
         </ListRowContent>
       </ListRowMedia>
@@ -118,7 +120,7 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowPro
           size="sm"
           onClick={() => mutation.mutate(id)}
           disabled={mutation.isPending}
-          aria-label="Remove passkey"
+          aria-label={t("passkeys.remove")}
         >
           <Trash2Icon />
         </Button>

@@ -8,7 +8,7 @@ import { toastError } from "../../../shared/api/errors/toast";
 import { cancelInvitationMutationOptions } from "../../../shared/api/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
-import { formatDate } from "../../../shared/utils";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 
 export interface InvitationRowProps {
   invitation: {
@@ -22,6 +22,7 @@ export interface InvitationRowProps {
 }
 
 export function InvitationRow({ invitation, organizationId }: InvitationRowProps) {
+  const formatDate = useFormatDate();
   const queryClient = useQueryClient();
   const { can } = useAuthorization();
   const canCancel = can({ invitation: ["cancel"] });

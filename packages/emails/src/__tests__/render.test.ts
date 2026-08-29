@@ -56,4 +56,14 @@ describe("renderTemplate", () => {
       expect(out.subject.length).toBeGreaterThan(0);
     }
   });
+
+  it("emphasises the token and organization names rather than inlining the tag", async () => {
+    const token = await renderTemplate("api_token_leaked", STUB_VARS.api_token_leaked);
+    expect(token.html).toContain("<strong>CI token</strong>");
+    expect(token.html).not.toContain("<token>");
+
+    const invite = await renderTemplate("org_invitation", STUB_VARS.org_invitation, "fr");
+    expect(invite.html).toContain("<strong>Acme</strong>");
+    expect(invite.html).not.toContain("<org>");
+  });
 });

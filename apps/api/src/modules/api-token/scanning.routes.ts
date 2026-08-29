@@ -1,5 +1,6 @@
 import type { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { type Locale, toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { hmacToken, parseToken } from "../../shared/crypto/api-token";
@@ -19,10 +20,13 @@ export interface ScanningDeps {
       template: string,
       email: string,
       data: Record<string, unknown>,
+      options?: { locale?: Locale },
     ): Promise<Result<void, unknown>>;
   };
   instrumentation: IInstrumentation;
-  findUserById: (id: string) => Promise<{ email: string; name?: string | null } | undefined>;
+  findUserById: (
+    id: string,
+  ) => Promise<{ email: string; name?: string | null; locale?: string | null } | undefined>;
   prefix: string;
   pepper: string;
   pepperPrevious?: string;
@@ -122,11 +126,17 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
 
           const user = await deps.findUserById(record.userId);
           if (user) {
-            const sent = await deps.emailService.sendTemplate("api_token_leaked", user.email, {
-              name: user.name ?? "User",
-              tokenName: record.name,
-              revokedAt: new Date().toLocaleString("en-US"),
-            });
+            const locale = toLocale(user.locale);
+            const sent = await deps.emailService.sendTemplate(
+              "api_token_leaked",
+              user.email,
+              {
+                name: user.name ?? "User",
+                tokenName: record.name,
+                revokedAt: new Date().toLocaleString(locale),
+              },
+              { locale },
+            );
             if (sent.isFailure) deps.instrumentation.capture(sent.getError());
           }
         }

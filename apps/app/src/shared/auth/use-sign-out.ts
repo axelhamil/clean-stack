@@ -19,7 +19,7 @@ export function useSignOut() {
       toast.success("Signed out");
       queryClient.setQueryData(sessionQueryOptions.queryKey, null);
 
-      broadcastAuthChange();
+      broadcastAuthChange({ identityChanged: true });
 
       void navigate({ to: "/sign-in" });
     },

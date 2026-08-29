@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@packages/ui/components/ui/tooltip";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
 
 export type EndpointStatus = "active" | "paused" | "auto-disabled";
@@ -43,6 +44,7 @@ export function EndpointRow({
   onDelete,
   onSelect,
 }: EndpointRowProps) {
+  const formatDate = useFormatDate();
   const status = endpointStatus(endpoint);
 
   return (
@@ -68,7 +70,7 @@ export function EndpointRow({
         )}
       </TableCell>
       <TableCell>{endpoint.eventTypes.length}</TableCell>
-      <TableCell>{new Date(endpoint.createdAt).toLocaleDateString()}</TableCell>
+      <TableCell>{formatDate(endpoint.createdAt)}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

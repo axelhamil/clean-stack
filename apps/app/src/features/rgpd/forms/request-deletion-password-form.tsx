@@ -7,6 +7,7 @@ import {
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import {
@@ -19,6 +20,9 @@ interface RequestDeletionPasswordFormProps {
 }
 
 export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPasswordFormProps) {
+  const { t } = useTranslation("errors");
+  const { t: tSettings } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const mutation = useRequestDeletion({ onClose });
   const form = useForm<RequestDeletionWithPasswordInput>({
     resolver: zodResolver(requestDeletionWithPasswordSchema),
@@ -30,8 +34,12 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
       <form
         onSubmit={form.handleSubmit((values) =>
           mutation.mutate(values, {
-            onError: buildDeletionOnError(onClose, "ACCOUNT_PASSWORD_INVALID", (msg) =>
-              form.setError("password", { message: msg }),
+            onError: buildDeletionOnError(
+              onClose,
+              "ACCOUNT_PASSWORD_INVALID",
+              (msg) => form.setError("password", { message: msg }),
+              t,
+              tSettings,
             ),
           }),
         )}
@@ -41,15 +49,15 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
         <FormTextField
           control={form.control}
           name="password"
-          label="Confirm with your password"
+          label={tSettings("deletion.passwordLabel")}
           type="password"
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder={tSettings("deletion.passwordPlaceholder")}
         />
         <AlertDialogFooter>
-          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <AlertDialogCancel type="button">{tCommon("actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction type="submit" variant="destructive" disabled={mutation.isPending}>
-            {mutation.isPending ? "Submitting…" : "Delete account"}
+            {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </form>

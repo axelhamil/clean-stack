@@ -425,6 +425,22 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 
 ---
 
+## i18n foundation — typed catalogs, locale outside the URL ✅ Phase E.1a
+
+Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in the URL** — it resolves from the `locale` cookie, then `user.locale`, then falls back to English — so the 34 route files and every navigation call site were untouched by this phase. Rationale for `i18next` over Lingui/Paraglide, and for `.ts` catalogs over `.json`, in [`docs/HISTORY.md`](HISTORY.md).
+
+**SSOT** `@packages/i18n`: `packages/i18n/src/catalogs/{en,fr}/*.ts` — `common`, `auth`, `errors`, `emails`, `settings` namespaces, each a plain object literal typed `as const` (never `.json` — TypeScript widens a JSON string value to `string`, silently defeating the interpolation-key guarantee). `CustomTypeOptions.resources` binds to `typeof enCatalog`, so `t()` rejects an unknown key at `tsc` time; English is the source of truth, French a translation. `createI18n({ locale, resources })` builds a fresh `i18next` instance per call (never a shared singleton — the email worker renders for many recipients in sequence) and always registers the English catalog under `DEFAULT_LOCALE` alongside the target locale, so `fallbackLng` actually has something to fall back to: a key missing from French renders its English copy, never a raw key. `resolveLocale` (`packages/i18n/src/resolve.ts`) picks the first supported locale from an ordered candidate list, dropping a region subtag (`fr-BE` → `fr`) to match i18next's `load: "languageOnly"`. `packages/i18n/src/__tests__/parity.test.ts` fails the build the moment `en` and `fr` keys diverge, or a French value is left byte-identical to its English source (short allowlist for genuine identical pairs: brand name, proper nouns, masked-value placeholders).
+
+**Backend** `apps/api/src/modules/profile/` — `PUT /me/locale` (`requireAuth`, `denyImpersonated`, `zV("json", localeSchema)`) persists to `user.locale` and emits `user.locale.changed` (catalog **80 → 81**). BetterAuth error codes and API error envelopes are mapped through the same `errors` namespace (`apps/app/src/shared/api/errors/messages.ts`'s `formatApiError(err, fallback, t)` — exact code match first, longest-suffix match second). Server-side Zod validation is localized through one global map — `apps/app/src/shared/i18n/zod-error-map.ts` calls `z.config({ customError })` once per language change, translating `too_small`/`too_big`/`invalid_format`/etc., and routing any `.refine()` custom check through `{ params: { i18nKey } }` (a per-issue `message:` literal always wins over the global map — that's Zod's own precedence, so schemas stay message-free on their built-in checks).
+
+**Email** — locale is **per recipient, not per batch**: `EmailRecipient<K>.locale` (`apps/api/src/shared/ports/email.port.ts`), rendered via `renderTemplate(template, variables, locale)` and frozen onto the `email_message.locale` column at enqueue time, so a later worker retry replays the same language regardless of the recipient's locale changing in between. `SendTemplateOptions.locale` was deliberately never added — a batch-level option would force one language on every recipient of `flush-notification-emails.route.ts`'s digest and `rgpd.service.ts`'s exports, exactly the two genuinely multi-recipient callers.
+
+**Frontend** — `<I18nextProvider>` mounts in `app-providers.tsx` outside `ThemeProvider`, so even the top-level error fallback can translate. `apps/app/src/shared/i18n/locale-cookie.ts`: `LOCALE_COOKIE = "locale"`, non-`httpOnly` (read pre-render, no secret), `path=/`, `max-age=31536000` (1 year), `SameSite=Lax`. Language switcher at `/settings/account` (`features/account/components/language-card.tsx`) writes the cookie, calls `PUT /me/locale` when signed in, and reinitializes the running i18next instance. `formatDate`/`formatDateTime` (`apps/app/src/shared/utils.ts`) take an explicit `locale` argument and go through `Intl.DateTimeFormat` — no date library. `<html lang>` is kept in sync and asserted by the a11y gate below.
+
+**Accepted partial-translation state.** Only `auth`, `account` and the app shell are extracted; `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, and the legal pages (`/legal/*`, including the cookie inventory) stay hardcoded English — E.1b's scope, tracked in [`../ROADMAP.md`](../ROADMAP.md). `fallbackLng: "en"` means this degrades quietly: a French user sees French navigation and account settings around English deep pages, never a raw translation key.
+
+---
+
 ## Accessibility gate (A.6)
 
 `apps/app/a11y/` — Playwright as an axe driver, not an E2E suite. Run by `.github/workflows/ci.yml` on every PR into `dev`/`main`, and locally with `pnpm --filter app check:a11y`. Details and local setup in [`apps/app/a11y/README.md`](../apps/app/a11y/README.md).
@@ -442,6 +458,6 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 See [`../ROADMAP.md`](../ROADMAP.md) — the list is short by design; anything not on it was cut rather than deferred.
 
 - Manual review pass over the shipped surface.
-- E.1 — i18n (TanStack Router locale routes + typed message catalogs).
+- E.1b — remaining i18n extraction (`admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, per-locale legal content).
 - C.1 S5b/S6 — abuse signals + captcha hook, pending real traffic to calibrate.
 - D.5 known debts — `failed` rows never purged, per-row `markSent`, lost idempotency key on `delete_completed`.

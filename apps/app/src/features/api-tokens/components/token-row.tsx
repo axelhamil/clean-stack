@@ -1,6 +1,7 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { ApiToken } from "../api/api-tokens.queries";
 
 interface TokenRowProps {
@@ -10,6 +11,7 @@ interface TokenRowProps {
 }
 
 export function TokenRow({ token, onRevoke, isRevoking }: TokenRowProps) {
+  const formatDate = useFormatDate();
   const isRevoked = token.revokedAt !== null;
   const isExpired =
     !isRevoked && token.expiresAt !== null && new Date(token.expiresAt) < new Date();
@@ -27,12 +29,8 @@ export function TokenRow({ token, onRevoke, isRevoking }: TokenRowProps) {
           ))}
         </div>
       </TableCell>
-      <TableCell>
-        {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : "—"}
-      </TableCell>
-      <TableCell>
-        {token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : "Never"}
-      </TableCell>
+      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : "—"}</TableCell>
+      <TableCell>{token.expiresAt ? formatDate(token.expiresAt) : "Never"}</TableCell>
       <TableCell>
         {isRevoked && <Badge variant="destructive">Revoked</Badge>}
         {isExpired && <Badge variant="outline">Expired</Badge>}

@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormCheckboxField } from "@packages/ui/components/ui/form-checkbox-field";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import {
   type BackupCodeVerifyInput,
   backupCodeVerifySchema,
@@ -15,6 +16,7 @@ interface BackupCodeFormProps {
 }
 
 export function BackupCodeForm({ redirectTo }: BackupCodeFormProps = {}) {
+  const { t } = useTranslation("auth");
   const mutation = useVerifyBackupCode(redirectTo);
   const form = useForm<BackupCodeVerifyInput>({
     resolver: zodResolver(backupCodeVerifySchema),
@@ -31,15 +33,19 @@ export function BackupCodeForm({ redirectTo }: BackupCodeFormProps = {}) {
         <FormTextField
           control={form.control}
           name="code"
-          label="Recovery code"
+          label={t("twoFactor.recoveryCodeLabel")}
           autoComplete="off"
-          placeholder="xxxxx-xxxxx"
+          placeholder={t("twoFactor.recoveryCodePlaceholder")}
         />
 
-        <FormCheckboxField control={form.control} name="trustDevice" label="Trust this device" />
+        <FormCheckboxField
+          control={form.control}
+          name="trustDevice"
+          label={t("twoFactor.trustDevice")}
+        />
 
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Verifying…" : "Verify"}
+          {mutation.isPending ? t("twoFactor.verifyPending") : t("twoFactor.verify")}
         </Button>
       </form>
     </Form>

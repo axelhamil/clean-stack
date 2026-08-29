@@ -12,6 +12,7 @@ import {
   notificationSchema,
   sql,
 } from "@packages/drizzle";
+import { toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
@@ -34,6 +35,7 @@ export type PendingRow = {
   category: string;
   eventType: string;
   email: string;
+  locale: string | null;
   payload: unknown;
 };
 
@@ -41,6 +43,7 @@ export type DigestGroup = {
   userId: string;
   email: string;
   category: string;
+  locale: string | null;
   notificationIds: string[];
   items: { eventType: string; payload: unknown }[];
 };
@@ -58,6 +61,7 @@ export function buildDigests(rows: PendingRow[]): DigestGroup[] {
         userId: row.userId,
         email: row.email,
         category: row.category,
+        locale: row.locale,
         notificationIds: [row.id],
         items: [{ eventType: row.eventType, payload: row.payload }],
       });
@@ -107,6 +111,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
           category: n.category,
           eventType: n.eventType,
           email: u.email,
+          locale: u.locale,
           payload: n.payload,
         })
         .from(n)
@@ -130,6 +135,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
             itemCount: String(d.items.length),
             itemsSummary: d.items.map((i) => i.eventType).join(", "),
           },
+          locale: toLocale(d.locale),
         })),
         {
           tx: tx as unknown as import("../transaction").ITransaction,

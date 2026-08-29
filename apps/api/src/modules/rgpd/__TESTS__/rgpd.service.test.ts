@@ -20,6 +20,7 @@ import { RgpdService } from "../application/services/rgpd.service";
 const baseState: UserDeletionState = {
   email: "u@example.com",
   name: "User",
+  locale: Option.some("fr"),
   twoFactorEnabled: false,
   pendingDeletionUntil: Option.none(),
   deletedAt: Option.none(),
@@ -124,6 +125,7 @@ function makeService(opts: {
             Option.some({
               email: `${userId}@example.com`,
               name: "User",
+              locale: Option.some("fr" as const),
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
               deletedAt: Option.none(),
@@ -259,7 +261,7 @@ describe("RgpdService", () => {
         "delete_requested",
         "u@example.com",
         expect.objectContaining({ name: "User", cancelUrl: expect.any(String) }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
     });
 
@@ -365,7 +367,7 @@ describe("RgpdService", () => {
         "delete_cancelled",
         "u@example.com",
         expect.objectContaining({ name: "User" }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
     });
 
@@ -417,7 +419,7 @@ describe("RgpdService", () => {
       expect(storage.listObjectKeys).toHaveBeenCalledWith("u1/");
       expect(storage.deleteObjects).toHaveBeenCalledWith(["u1/uploads/a", "u1/exports/b"]);
       expect(result.getValue().storageKeysDeleted).toBe(2);
-      expect(result.getValue().notify).toEqual({ to: "u@example.com", name: "User" });
+      expect(result.getValue().notify).toEqual({ to: "u@example.com", name: "User", locale: "fr" });
     });
 
     it("emits ORG_DELETED for every organization destroyed in the wipe (RGPD audit completeness)", async () => {
@@ -462,6 +464,7 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(
             Option.some({
               email: "deleted@anonymized.local",
+              locale: Option.none<"fr">(),
               name: "[deleted]",
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.none(),
@@ -559,6 +562,7 @@ describe("RgpdService", () => {
             Option.some({
               email: `${userId}@example.com`,
               name: "User",
+              locale: Option.some("fr" as const),
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
               deletedAt: Option.none(),
@@ -645,6 +649,7 @@ describe("RgpdService", () => {
             Option.some({
               email: `${userId}@example.com`,
               name: "User",
+              locale: Option.some("fr" as const),
               twoFactorEnabled: false,
               pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
               deletedAt: Option.none(),
@@ -673,11 +678,19 @@ describe("RgpdService", () => {
     });
 
     it("sends one batch for all successfully wiped accounts instead of one email each", async () => {
-      const batches: Array<{ template: string; count: number }> = [];
+      const batches: Array<{
+        template: string;
+        count: number;
+        locales: Array<string | undefined>;
+      }> = [];
       const email = {
         sendTemplate: async () => Result.ok<void, never>(undefined),
         sendTemplateBatch: async (template: string, recipients: unknown[]) => {
-          batches.push({ template, count: recipients.length });
+          batches.push({
+            template,
+            count: recipients.length,
+            locales: recipients.map((r) => (r as { locale?: string }).locale),
+          });
           return Result.ok<void, never>(undefined);
         },
         sendRaw: async () => Result.ok<void, never>(undefined),
@@ -688,7 +701,9 @@ describe("RgpdService", () => {
       const result = await service.processPendingDeletions({ batchSize: 50 });
 
       expect(result.getValue().succeeded).toHaveLength(3);
-      expect(batches).toEqual([{ template: "delete_completed", count: 3 }]);
+      expect(batches).toEqual([
+        { template: "delete_completed", count: 3, locales: ["fr", "fr", "fr"] },
+      ]);
     });
 
     it("does not send anything when every wipe fails", async () => {
@@ -836,7 +851,7 @@ describe("RgpdService", () => {
         "data_export_ready",
         "u@example.com",
         expect.objectContaining({ name: "User", downloadUrl: expect.any(String) }),
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
       expect(repo.touchExportRequestedAt).toHaveBeenCalledWith("u1", expect.anything());
     });

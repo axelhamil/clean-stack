@@ -1,12 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { BackupCodeVerifyInput } from "../../../shared/auth/auth.schema";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { resolveAuthError } from "../auth-error";
 
 export function useVerifyBackupCode(redirectTo?: string) {
+  const { t } = useTranslation("auth");
+  const { t: tErrors } = useTranslation("errors");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   return useMutation({
@@ -16,12 +20,13 @@ export function useVerifyBackupCode(redirectTo?: string) {
         code: input.code,
         trustDevice: input.trustDevice,
       });
-      if (error) throw new Error(error.message ?? "Invalid backup code");
+      if (error)
+        throw new Error(resolveAuthError(error, "twoFactor.invalidBackupCode", t, tErrors));
       return data;
     },
     onSuccess: async () => {
-      toast.success("Verified");
-      toast.info("That code is now used. Consider regenerating your recovery codes in settings.");
+      toast.success(t("twoFactor.verifiedToast"));
+      toast.info(t("twoFactor.backupCodeUsedNotice"));
       await queryClient.refetchQueries({
         queryKey: sessionQueryOptions.queryKey,
       });

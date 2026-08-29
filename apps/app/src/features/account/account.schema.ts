@@ -18,7 +18,7 @@ export const changePasswordSchema = z
     confirmPassword: strongPasswordSchema,
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
-    message: "Passwords do not match",
+    params: { i18nKey: "validation.passwordsMismatch" },
     path: ["confirmPassword"],
   });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

@@ -22,6 +22,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
+import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   banUserMutationOptions,
   resetPasswordMutationOptions,
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/users/$id"
 });
 
 function AdminUserDetailPage() {
+  const formatDate = useFormatDate();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -74,7 +76,7 @@ function AdminUserDetailPage() {
       toast.success("Impersonation started.");
       setImpersonateOpen(false);
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
+      broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/dashboard" });
     },
     onError: (err) => toast.error(err.message),
@@ -139,7 +141,7 @@ function AdminUserDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span>Member since</span>
-              <span>{new Date(user.createdAt).toLocaleDateString()}</span>
+              <span>{formatDate(user.createdAt)}</span>
             </div>
           </div>
         </CardContent>
@@ -217,7 +219,7 @@ function AdminUserDetailPage() {
             {user.banExpires !== null && (
               <div className="flex items-center justify-between">
                 <span>Expires</span>
-                <span>{new Date(user.banExpires).toLocaleDateString()}</span>
+                <span>{formatDate(user.banExpires)}</span>
               </div>
             )}
             {user.banned && user.banExpires === null && (

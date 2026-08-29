@@ -25,6 +25,7 @@ export const VISIBILITY = {
   "user.email.change_requested": "internal",
   "user.export.requested": "internal",
   "user.export.completed": "internal",
+  "user.locale.changed": "public",
   "org.created": "public",
   "org.updated": "public",
   "org.deleted": "public",

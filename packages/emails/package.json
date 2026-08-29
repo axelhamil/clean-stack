@@ -17,8 +17,11 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@packages/i18n": "workspace:*",
     "@react-email/render": "^2.1.0",
+    "i18next": "^26.4.0",
     "react": "^19.2.8",
-    "react-email": "^6.9.3"
+    "react-email": "^6.9.3",
+    "react-i18next": "^17.0.12"
   }
 }

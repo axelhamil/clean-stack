@@ -7,10 +7,7 @@ export const passwordPromptSchema = z.object({
 export type PasswordPromptInput = z.infer<typeof passwordPromptSchema>;
 
 export const addPasskeySchema = z.object({
-  name: z
-    .string()
-    .min(2, { message: "Name must be at least 2 characters" })
-    .max(50, { message: "Name must be at most 50 characters" }),
+  name: z.string().min(2).max(50),
 });
 export type AddPasskeyInput = z.infer<typeof addPasskeySchema>;
 

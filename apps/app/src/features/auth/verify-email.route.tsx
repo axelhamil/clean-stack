@@ -1,6 +1,7 @@
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
@@ -30,6 +31,7 @@ interface ConsumeTokenProps {
 }
 
 function ConsumeToken({ token }: ConsumeTokenProps) {
+  const { t } = useTranslation("auth");
   const mutation = useVerifyEmail();
   const fired = useRef(false);
 
@@ -43,8 +45,8 @@ function ConsumeToken({ token }: ConsumeTokenProps) {
   if (mutation.isError) return <VerifyEmailError message={mutation.error.message} />;
 
   return (
-    <AuthShell title="Verifying your email…" description="One moment.">
-      <TypographyMuted>Hang tight.</TypographyMuted>
+    <AuthShell title={t("verifyEmail.verifyingTitle")} description={t("verifyEmail.oneMoment")}>
+      <TypographyMuted>{t("verifyEmail.hangTight")}</TypographyMuted>
     </AuthShell>
   );
 }
@@ -54,30 +56,32 @@ interface VerifyEmailErrorProps {
 }
 
 function VerifyEmailError({ message }: VerifyEmailErrorProps) {
+  const { t } = useTranslation("auth");
   return (
     <AuthShell
-      title="Verification failed"
+      title={t("verifyEmail.failedTitle")}
       description={message}
-      footer={<AuthShellFooter link={<Link to="/sign-in">Back to sign in</Link>} />}
+      footer={<AuthShellFooter link={<Link to="/sign-in">{t("backToSignIn")}</Link>} />}
     >
-      <TypographyMuted>The link may have expired or already been used.</TypographyMuted>
+      <TypographyMuted>{t("verifyEmail.expiredOrUsed")}</TypographyMuted>
     </AuthShell>
   );
 }
 
 function CheckInbox() {
+  const { t } = useTranslation("auth");
   return (
     <AuthShell
-      title="Check your inbox"
-      description="We sent you a verification link. Click it to activate your account."
+      title={t("verifyEmail.checkInboxTitle")}
+      description={t("verifyEmail.checkInboxDescription")}
       footer={
-        <AuthShellFooter lead="Wrong email?" link={<Link to="/sign-up">Sign up again</Link>} />
+        <AuthShellFooter
+          lead={t("verifyEmail.wrongEmail")}
+          link={<Link to="/sign-up">{t("verifyEmail.signUpAgain")}</Link>}
+        />
       }
     >
-      <TypographyMuted>
-        The link expires after a short while. If it's missing, check spam or request a new one from
-        the sign-in page.
-      </TypographyMuted>
+      <TypographyMuted>{t("verifyEmail.expiryHelp")}</TypographyMuted>
     </AuthShell>
   );
 }

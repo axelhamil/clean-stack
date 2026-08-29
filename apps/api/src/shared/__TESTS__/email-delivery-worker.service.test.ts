@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
 
 mock.module("@packages/drizzle", () => ({
@@ -91,10 +92,13 @@ mock.module("@packages/drizzle", () => ({
   },
 }));
 
-mock.module("@packages/emails", () => ({
-  renderTemplate: async () => ({ html: "<p>hi</p>", text: "hi", subject: "s" }),
-  EMAIL_TEMPLATE_KEYS: [],
-}));
+// `@packages/emails` is intentionally NOT mocked here: `mock.module` replaces a
+// specifier for the lifetime of the `bun test` process (it leaks into every
+// other file, loaded or not — see apps/api/src/shared/CLAUDE.md). A stub here
+// would collide with `email-locale.test.ts`, which needs the real
+// `renderTemplate` to assert on actual per-locale subjects/bodies. Nothing in
+// this file asserts on rendered content (only on which row got claimed/sent),
+// so exercising the real renderer is both safe and cheap.
 
 const { EmailDeliveryWorker } = await import("../services/email-delivery-worker.service");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
@@ -105,6 +109,7 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
   template: Option.some("delete_completed"),
   toAddress: "a@x.test",
   subject: "s",
+  locale: Option.none<Locale>(),
   payload: { name: "Ada" },
   status: "pending",
   attempts: 0,

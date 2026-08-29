@@ -9,6 +9,7 @@ import { Separator } from "@packages/ui/components/ui/separator";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { KeyRoundIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { EmailRequestForm } from "./forms/email-request-form";
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/_guest/sign-in")({
 });
 
 function SignInPage() {
+  const { t } = useTranslation("auth");
   const { redirect } = Route.useSearch();
   const magicLinkMutation = useMagicLink();
   const ssoMutation = useSignInSso();
@@ -33,24 +35,27 @@ function SignInPage() {
 
   return (
     <AuthShell
-      title="Sign in"
-      description="Welcome back. Enter your details to continue."
+      title={t("signIn.title")}
+      description={t("signIn.description")}
       footer={
-        <AuthShellFooter lead="No account yet?" link={<Link to="/sign-up">Create one</Link>} />
+        <AuthShellFooter
+          lead={t("signIn.noAccountYet")}
+          link={<Link to="/sign-up">{t("signIn.createOne")}</Link>}
+        />
       }
       className="flex flex-col gap-6"
     >
       <SignInForm redirectTo={redirect} />
 
       <NavLink asChild className="ml-auto w-fit">
-        <Link to="/forgot-password">Forgot password?</Link>
+        <Link to="/forgot-password">{t("signIn.forgotPassword")}</Link>
       </NavLink>
 
       <Separator />
       <EmailRequestForm
         mutation={magicLinkMutation}
-        submitLabel="Email me a magic link"
-        pendingLabel="Sending…"
+        submitLabel={t("signIn.magicLinkSubmit")}
+        pendingLabel={t("signIn.magicLinkPending")}
         buttonVariant="outline"
       />
 
@@ -58,14 +63,14 @@ function SignInPage() {
         <CollapsibleTrigger asChild>
           <Button type="button" variant="outline" className="w-full">
             <KeyRoundIcon />
-            Sign in with SSO
+            {t("signIn.ssoTrigger")}
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="flex flex-col gap-4">
           <EmailRequestForm
             mutation={ssoMutation}
-            submitLabel="Continue"
-            pendingLabel="Redirecting…"
+            submitLabel={t("signIn.ssoSubmit")}
+            pendingLabel={t("signIn.ssoPending")}
             buttonVariant="outline"
           />
         </CollapsibleContent>

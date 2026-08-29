@@ -24,6 +24,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: "A user requested to change their email address.",
   [EventTypes.USER_EXPORT_REQUESTED]: "A user requested an export of their personal data.",
   [EventTypes.USER_EXPORT_COMPLETED]: "A user's personal data export is ready to download.",
+  [EventTypes.USER_LOCALE_CHANGED]: "A user changed their display language.",
   [EventTypes.ORG_CREATED]: "A new organization was created.",
   [EventTypes.ORG_UPDATED]: "An organization's settings were updated.",
   [EventTypes.ORG_DELETED]: "An organization was deleted.",

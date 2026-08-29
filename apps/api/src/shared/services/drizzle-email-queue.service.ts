@@ -1,5 +1,6 @@
 import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import { and, db, emailSchema, eq, inArray, isNull, lte, or, sql } from "@packages/drizzle";
+import { isLocale } from "@packages/i18n";
 import type {
   EmailMessageInsert,
   EmailMessageRecord,
@@ -26,6 +27,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
           template: r.template.isSome() ? r.template.unwrap() : null,
           toAddress: r.toAddress,
           subject: r.subject,
+          locale: r.locale,
           payload: r.payload,
           status: "pending" as const,
           attempts: 0,
@@ -93,6 +95,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
             rows.map((r) => ({
               ...r,
               template: Option.fromNullable(r.template),
+              locale: Option.fromNullable(isLocale(r.locale) ? r.locale : null),
               nextAttemptAt: Option.fromNullable(r.nextAttemptAt),
               lastError: Option.fromNullable(r.lastError),
               idempotencyKey: Option.fromNullable(r.idempotencyKey),

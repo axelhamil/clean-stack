@@ -7,8 +7,15 @@ export function displayName(user: DisplayUser): string {
   return user.name?.trim() || user.email;
 }
 
-export function formatDate(value: Date | string): string {
-  return new Date(value).toLocaleDateString();
+export function formatDate(value: Date | string, locale: string): string {
+  return new Intl.DateTimeFormat(locale).format(new Date(value));
+}
+
+export function formatDateTime(value: Date | string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 export function initialsOf(value: string): string {
