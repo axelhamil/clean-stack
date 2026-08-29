@@ -40,6 +40,11 @@
     "packages/drizzle": {
       "project": ["src/**/*.ts"]
     },
+    "packages/i18n": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["i18next"]
+    },
     "packages/access-control": {
       "project": ["src/**/*.ts"]
     },
