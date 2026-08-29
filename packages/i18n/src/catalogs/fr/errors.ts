@@ -35,6 +35,81 @@ export default {
     SOCIAL_ACCOUNT_ALREADY_LINKED: "Ce compte est déjà lié à un autre utilisateur.",
     FAILED_TO_CREATE_USER: "Nous n'avons pas pu créer votre compte. Veuillez réessayer.",
     FAILED_TO_CREATE_SESSION: "Nous n'avons pas pu vous connecter. Veuillez réessayer.",
+    REQUEST_INVALID:
+      "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
+    OTP_NOT_ENABLED: "Les codes à usage unique ne sont pas activés sur ce compte.",
+    OTP_HAS_EXPIRED: "Ce code a expiré. Demandez-en un nouveau.",
+    TOTP_NOT_ENABLED: "Aucune application d'authentification n'est configurée sur ce compte.",
+    TWO_FACTOR_NOT_ENABLED: "La double authentification n'est pas activée sur ce compte.",
+    BACKUP_CODES_NOT_ENABLED: "Aucun code de secours n'est configuré sur ce compte.",
+    INVALID_BACKUP_CODE: "Ce code de secours est invalide ou a déjà été utilisé.",
+    INVALID_CODE:
+      "Ce code est incorrect. Vérifiez votre application d'authentification et réessayez.",
+    TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Trop de tentatives. Demandez un nouveau code.",
+    ACCOUNT_TEMPORARILY_LOCKED:
+      "Trop de tentatives échouées. Votre compte est temporairement verrouillé — réessayez plus tard.",
+    INVALID_TWO_FACTOR_COOKIE: "Cette étape de vérification a expiré. Reconnectez-vous.",
+    CHALLENGE_NOT_FOUND: "Cette tentative de clé d'accès a expiré. Réessayez.",
+    YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY:
+      "Cette clé d'accès ne peut pas être enregistrée ici.",
+    FAILED_TO_VERIFY_REGISTRATION: "Nous n'avons pas pu enregistrer cette clé d'accès. Réessayez.",
+    PASSKEY_NOT_FOUND: "Cette clé d'accès n'existe plus.",
+    AUTHENTICATION_FAILED: "Votre appareil n'a pas pu confirmer votre identité. Réessayez.",
+    UNABLE_TO_CREATE_SESSION: "Nous n'avons pas pu vous connecter. Veuillez réessayer.",
+    FAILED_TO_UPDATE_PASSKEY: "Nous n'avons pas pu mettre à jour cette clé d'accès. Réessayez.",
+    PREVIOUSLY_REGISTERED: "Cette clé d'accès est déjà enregistrée sur ce compte.",
+    REGISTRATION_CANCELLED: "La configuration de la clé d'accès a été annulée.",
+    AUTH_CANCELLED: "La connexion par clé d'accès a été annulée.",
+    SESSION_REQUIRED: "Connectez-vous avant d'ajouter une clé d'accès.",
+    YOU_ARE_NOT_ALLOWED_TO_CREATE_A_NEW_ORGANIZATION:
+      "Vous n'avez pas la permission de créer une organisation.",
+    YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS:
+      "Vous avez atteint le nombre maximum d'organisations.",
+    ORGANIZATION_ALREADY_EXISTS: "Une organisation portant ce nom existe déjà.",
+    ORGANIZATION_SLUG_ALREADY_TAKEN: "Cette adresse d'organisation est déjà prise.",
+    ORGANIZATION_NOT_FOUND: "Organisation introuvable.",
+    USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION:
+      "Cet utilisateur n'est pas membre de cette organisation.",
+    YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission de modifier cette organisation.",
+    YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission de supprimer cette organisation.",
+    NO_ACTIVE_ORGANIZATION: "Sélectionnez d'abord une organisation.",
+    USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION:
+      "Cet utilisateur est déjà membre de cette organisation.",
+    MEMBER_NOT_FOUND: "Membre introuvable.",
+    ROLE_NOT_FOUND: "Rôle introuvable.",
+    YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER:
+      "Transférez la propriété avant de partir : vous êtes le seul propriétaire.",
+    YOU_CANNOT_LEAVE_THE_ORGANIZATION_WITHOUT_AN_OWNER:
+      "Une organisation doit conserver au moins un propriétaire.",
+    YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER:
+      "Vous n'avez pas la permission de retirer ce membre.",
+    YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_MEMBER:
+      "Vous n'avez pas la permission de modifier ce membre.",
+    YOU_ARE_NOT_ALLOWED_TO_INVITE_USERS_TO_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission d'inviter des personnes dans cette organisation.",
+    USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION: "Cette personne a déjà été invitée.",
+    INVITATION_NOT_FOUND: "Cette invitation n'existe plus.",
+    YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION:
+      "Cette invitation a été envoyée à une autre adresse.",
+    EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION:
+      "Vérifiez votre adresse e-mail avant de répondre à cette invitation.",
+    EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION:
+      "Vérifiez votre adresse e-mail pour consulter vos invitations.",
+    YOU_ARE_NOT_ALLOWED_TO_CANCEL_THIS_INVITATION:
+      "Vous n'avez pas la permission d'annuler cette invitation.",
+    INVITER_IS_NO_LONGER_A_MEMBER_OF_THE_ORGANIZATION:
+      "La personne qui vous a invité n'est plus membre de cette organisation.",
+    YOU_ARE_NOT_ALLOWED_TO_INVITE_USER_WITH_THIS_ROLE:
+      "Vous n'avez pas la permission d'inviter quelqu'un avec ce rôle.",
+    FAILED_TO_RETRIEVE_INVITATION:
+      "Nous n'avons pas pu charger cette invitation. Veuillez réessayer.",
+    INVITATION_LIMIT_REACHED: "Vous avez atteint la limite d'invitations pour cette organisation.",
+    ORGANIZATION_MEMBERSHIP_LIMIT_REACHED: "Cette organisation a atteint sa limite de membres.",
+    YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
+      "Vous n'avez pas la permission d'accéder à cette organisation.",
+    YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
   },
   bySuffix: {
     RATE_LIMITED: "Trop de requêtes. Patientez un instant avant de réessayer.",
@@ -62,6 +137,9 @@ export default {
     invalidEmail: "Saisissez une adresse e-mail valide.",
     invalidUrl: "Saisissez une URL valide.",
     invalidFormat: "Format invalide.",
+    totpCode: "Saisissez le code à 6 chiffres de votre application d'authentification.",
+    backupCode: "Saisissez un code de secours valide.",
+    httpsUrl: "Saisissez une URL https valide.",
     tooSmall: "Doit contenir au moins {{minimum}} caractères.",
     tooBig: "Doit contenir au plus {{maximum}} caractères.",
     tooFewItems: "Sélectionnez au moins {{minimum}}.",
