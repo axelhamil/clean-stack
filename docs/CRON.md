@@ -168,6 +168,26 @@ since an unbounded `COUNT(*)` on a large table would otherwise hold a pooled
 connection for the whole idle timeout) — which is what makes checking the
 budget between batches sufficient.
 
+### What a sweep looks like in tracing
+
+Every `/internal/sweep-*` request opens one `sweep` span named `sweep > <label>`,
+with a `db.query` child for the lease acquire, one `sweep.pass` child per retention
+pass (carrying `sweep.retention_days`, `sweep.batch_size`, `sweep.dry_run`, and on
+close `sweep.deleted`, `sweep.batch_count`, `sweep.stop_reason`), and a `db.query`
+child per batched delete. `sweep.stop_reason` is the field to read first: `budget`
+and `batch-cap` mean "more work left, next tick will resume", `batch-error` means a
+batch will keep failing identically.
+
+Batch spans are capped at `MAX_INSTRUMENTED_BATCHES` (50) per run — past that the
+deletes run untraced. The cap exists because Sentry truncates a transaction at ~1000
+spans from the end, and losing the last passes and the lease release to make room for
+the 900th identical delete is a bad trade.
+
+Errors: a batch failure under `onBatchError: "break"` and a failed lease release are
+both swallowed by design (a sweep that did its work must not fail on them) and both
+now reported to telemetry. A batch failure with no `onBatchError` rethrows, and
+`app.onError` reports it — it is deliberately not captured twice.
+
 ## Triggering — use the signed-fetch helper
 
 The boilerplate ships `apps/api/src/shared/internal-routes/internal-fetch.ts`. Same module the
