@@ -1,3 +1,4 @@
+import { toLocale } from "@packages/i18n";
 import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import {
   Table,
@@ -21,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { SUB_PROCESSOR_KEYS } from "../../shared/sub-processor-labels";
 import type { SubProcessor } from "../../shared/sub-processors.config";
 import { SUB_PROCESSORS } from "../../shared/sub-processors.config";
+import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 
 export const Route = createFileRoute("/legal/sub-processors")({
   component: SubProcessorsPage,
@@ -76,8 +78,9 @@ function SubProcessorTable({ processors, caption, t }: SubProcessorTableProps) {
   );
 }
 
-function SubProcessorsPage() {
-  const { t } = useTranslation("common");
+export function SubProcessorsPage() {
+  const { t, i18n } = useTranslation("common");
+  const locale = toLocale(i18n.language);
   const active = SUB_PROCESSORS.filter((sp) => sp.status === "active");
   const planned = SUB_PROCESSORS.filter((sp) => sp.status === "planned");
 
@@ -87,6 +90,8 @@ function SubProcessorsPage() {
         <TypographyH1>{t("legal.subProcessors.title")}</TypographyH1>
         <TypographyMuted>{t("legal.subProcessors.subtitle")}</TypographyMuted>
       </header>
+
+      <UntranslatedBodyBanner show={locale !== "en"} />
 
       <Card>
         <CardHeader>

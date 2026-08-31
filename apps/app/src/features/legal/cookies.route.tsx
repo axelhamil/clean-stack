@@ -1,4 +1,5 @@
 import { CONSENT_CATEGORIES, type ConsentCategory } from "@packages/cookie-consent";
+import { toLocale } from "@packages/i18n";
 import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import {
   Table,
@@ -18,6 +19,8 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ConsentSettings } from "../../shared/components/consent-settings";
+import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
+import { CATEGORY_LABEL_KEYS } from "./cookie-category-labels";
 import type { CookieInfo } from "./cookies.config";
 import { COOKIE_INVENTORY } from "./cookies.config";
 
@@ -25,17 +28,18 @@ export const Route = createFileRoute("/legal/cookies")({
   component: CookiesPage,
 });
 
-// Kept English on purpose, along with the table it labels: the cookie
-// register itself (`cookies.config.ts` — names, providers, purposes,
-// retention) is out of this task's catalog scope (see the legal-namespace
-// carve-out note in `apps/app/src/features/CLAUDE.md`), and a translated
-// category heading over an English table would read as a mixed-language bug
-// rather than a boundary. Revisit together with the register.
-const CATEGORY_LABELS: Record<ConsentCategory, string> = {
-  necessary: "Strictly necessary",
-  functional: "Functional",
-  analytics: "Analytics",
-  marketing: "Marketing",
+// Captions stay English — same as the underlying table/register (R3,
+// extended). They used to interpolate a local `CATEGORY_LABELS` record; now
+// that the heading above the table is translated (shared with the consent
+// panel via `CATEGORY_LABEL_KEYS`), building the caption from the same
+// source would mix locales. A fixed English string keeps the caption and the
+// table it describes in the same language — the untranslated-body banner
+// above already discloses that this table isn't available in French.
+const CATEGORY_TABLE_CAPTIONS: Record<ConsentCategory, string> = {
+  necessary: "Strictly necessary cookies used by this application",
+  functional: "Functional cookies used by this application",
+  analytics: "Analytics cookies used by this application",
+  marketing: "Marketing cookies used by this application",
 };
 
 interface CookieTableProps {
@@ -69,14 +73,17 @@ function CookieTable({ cookies, caption }: CookieTableProps) {
   );
 }
 
-function CookiesPage() {
-  const { t } = useTranslation("common");
+export function CookiesPage() {
+  const { t, i18n } = useTranslation("common");
+  const locale = toLocale(i18n.language);
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-2">
         <TypographyH1>{t("legal.cookies.title")}</TypographyH1>
         <TypographyMuted>{t("legal.cookies.subtitle")}</TypographyMuted>
       </header>
+
+      <UntranslatedBodyBanner show={locale !== "en"} />
 
       <Card>
         <CardHeader>
@@ -98,14 +105,11 @@ function CookiesPage() {
         return (
           <Card key={cat}>
             <CardHeader>
-              <TypographyH2>{CATEGORY_LABELS[cat]}</TypographyH2>
+              <TypographyH2>{t(CATEGORY_LABEL_KEYS[cat])}</TypographyH2>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <CookieTable
-                  cookies={cookies}
-                  caption={`${CATEGORY_LABELS[cat]} cookies used by this application`}
-                />
+                <CookieTable cookies={cookies} caption={CATEGORY_TABLE_CAPTIONS[cat]} />
               </div>
             </CardContent>
           </Card>

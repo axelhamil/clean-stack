@@ -1,10 +1,9 @@
 import { toLocale } from "@packages/i18n";
 import type { PolicyType } from "@packages/policies";
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Card, CardContent } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 import { isEnglishFallback, policyBodyFor } from "./policies";
 import { POLICY_DOCS } from "./policies.config";
 import { POLICY_TITLE_KEYS } from "./policy-labels";
@@ -28,12 +27,7 @@ export function PolicyDocView({ type }: PolicyDocViewProps) {
         </TypographyMuted>
       </header>
 
-      {isEnglishFallback(locale, type) ? (
-        <Alert>
-          <Languages />
-          <AlertDescription>{t("legal.policies.unavailableBanner")}</AlertDescription>
-        </Alert>
-      ) : null}
+      <UntranslatedBodyBanner show={isEnglishFallback(locale, type)} />
 
       <Card>
         <CardContent>

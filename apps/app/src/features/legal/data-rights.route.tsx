@@ -1,3 +1,4 @@
+import { toLocale } from "@packages/i18n";
 import {
   Card,
   CardContent,
@@ -15,19 +16,23 @@ import {
 } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 
 export const Route = createFileRoute("/legal/data-rights")({
   component: DataRightsPage,
 });
 
-function DataRightsPage() {
-  const { t } = useTranslation("common");
+export function DataRightsPage() {
+  const { t, i18n } = useTranslation("common");
+  const locale = toLocale(i18n.language);
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-2">
         <TypographyH1>{t("legal.dataRights.title")}</TypographyH1>
         <TypographyMuted>{t("legal.dataRights.subtitle")}</TypographyMuted>
       </header>
+
+      <UntranslatedBodyBanner show={locale !== "en"} />
 
       <Card>
         <CardHeader>

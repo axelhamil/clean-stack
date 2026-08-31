@@ -1,9 +1,25 @@
 import { createI18n, enCatalog, loadCatalog } from "@packages/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { isEnglishFallback, policyBodyFor } from "../policies";
 import { PolicyDocView } from "../policy-doc-view";
+
+// `POLICY_VERSIONS`/`POLICY_CHANGELOG` currently give privacy/terms the same
+// `version` and `effectiveDate` ("2026-01-15" for both), which makes the
+// version-line assertions below blind to an interpolation-order bug: passing
+// `{ version: effectiveDate, date: version }` instead of `{ version, date:
+// effectiveDate }` at the call site would render a byte-identical string.
+// Mocking distinct fixture values (rather than editing production data) is
+// what actually pins the order — see the "kills the version/date swap"
+// assertions further down, and the round-1 review report for the swap-and-
+// revert proof.
+vi.mock("../policies.config", () => ({
+  POLICY_DOCS: {
+    privacy: { type: "privacy", version: "9.9.9", effectiveDate: "1111-11-11", summary: "" },
+    terms: { type: "terms", version: "8.8.8", effectiveDate: "2222-02-02", summary: "" },
+  },
+}));
 
 async function renderPrivacyPage(locale: "en" | "fr") {
   const resources = locale === "en" ? enCatalog : await loadCatalog("fr");
@@ -54,10 +70,13 @@ describe("PolicyDocView — French locale", () => {
     expect(html).not.toContain("legal.policies.unavailableBanner");
   });
 
-  it("renders the translated chrome — title and the version/effective line", async () => {
+  it("renders the translated chrome — title and the version/effective line, in the right order", async () => {
     const html = await renderPrivacyPage("fr");
     expect(html).toContain("Politique de confidentialité");
-    expect(html).toContain("Version 2026-01-15 — en vigueur depuis le 2026-01-15");
+    // Fixture: version "9.9.9", effectiveDate "1111-11-11" — distinct on
+    // purpose, so a `{ version, date }` argument swap renders a different,
+    // wrong string instead of an indistinguishable one.
+    expect(html).toContain("Version 9.9.9 — en vigueur depuis le 1111-11-11");
   });
 });
 
@@ -70,9 +89,9 @@ describe("PolicyDocView — English locale", () => {
     expect(html).not.toContain("Ce document n'est pas encore disponible");
   });
 
-  it("renders the English chrome", async () => {
+  it("renders the English chrome, in the right order", async () => {
     const html = await renderPrivacyPage("en");
     expect(html).toContain("Privacy Policy");
-    expect(html).toContain("Version 2026-01-15 — effective 2026-01-15");
+    expect(html).toContain("Version 9.9.9 — effective 1111-11-11");
   });
 });
