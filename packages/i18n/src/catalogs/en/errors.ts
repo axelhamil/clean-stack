@@ -224,5 +224,14 @@ export default {
     startImpersonation: "Failed to start impersonation",
     loadAdminUsers: "Failed to load accounts",
     loadAdminUser: "Failed to load account",
+    loadAdminOrgs: "Failed to load organizations",
+    loadAdminOrg: "Failed to load organization",
+    // Distinct from `updateSsoEnforcement` above (the org owner's own
+    // self-service toggle) — this is the platform admin overriding
+    // enforcement on an arbitrary organization, a different action from a
+    // different source that happens to share the same English wording.
+    updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
+    loadAuditLog: "Failed to load audit log",
+    verifyAuditChain: "Failed to verify chain",
   },
 } as const;

@@ -10,6 +10,8 @@ import {
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { isOrgRole, ROLE_LABEL_KEYS } from "../../shared/auth/role-labels";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { adminOrgDetailQueryOptions } from "./api/admin-orgs.queries";
 
@@ -18,6 +20,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs/$orgI
 });
 
 function AdminOrgDetailPage() {
+  const { t } = useTranslation(["admin", "common"]);
   const formatDate = useFormatDate();
   const { orgId } = Route.useParams();
 
@@ -26,7 +29,7 @@ function AdminOrgDetailPage() {
   if (query.isLoading) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Loading…</p>
+        <p>{t("orgs.detail.loading")}</p>
       </main>
     );
   }
@@ -34,7 +37,7 @@ function AdminOrgDetailPage() {
   if (query.isError || !query.data) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Failed to load organization.</p>
+        <p>{t("orgs.detail.loadFailed")}</p>
       </main>
     );
   }
@@ -49,20 +52,20 @@ function AdminOrgDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{t("orgs.detail.detailsTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span>Slug</span>
+              <span>{t("orgs.detail.slugLabel")}</span>
               <span>{org.slug}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Plan</span>
+              <span>{t("orgs.detail.planLabel")}</span>
               <span>{org.plan ?? "—"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Created</span>
+              <span>{t("orgs.detail.createdLabel")}</span>
               <span>{formatDate(org.createdAt)}</span>
             </div>
           </div>
@@ -71,21 +74,23 @@ function AdminOrgDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Members</CardTitle>
+          <CardTitle>{t("orgs.detail.membersTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>{t("orgs.detail.table.email")}</TableHead>
+                <TableHead>{t("orgs.detail.table.role")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {org.members.map((member) => (
                 <TableRow key={member.userId}>
                   <TableCell>{member.email}</TableCell>
-                  <TableCell>{member.role}</TableCell>
+                  <TableCell>
+                    {isOrgRole(member.role) ? t(ROLE_LABEL_KEYS[member.role]) : member.role}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

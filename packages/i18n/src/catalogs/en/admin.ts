@@ -79,4 +79,74 @@ export default {
       submit: "Start impersonation",
     },
   },
+  orgs: {
+    pageTitle: "Organizations",
+    searchPlaceholder: "Search…",
+    loading: "Loading…",
+    loadFailed: "Failed to load organizations.",
+    loadMore: "Load more",
+    ssoEnforcementUpdatedToast: "SSO enforcement updated.",
+    ssoEnforcedAriaLabel: "SSO enforced for {{name}}",
+    ssoEnforcementOffHint:
+      "Turning SSO enforcement off lets members of that organization sign in with a password again.",
+    table: {
+      name: "Name",
+      // "Slug" has no established French translation in SaaS products — kept
+      // identical in both locales and listed in ALLOWED_IDENTICAL.
+      slug: "Slug",
+      members: "Members",
+      created: "Created",
+      ssoEnforced: "SSO enforced",
+    },
+    detail: {
+      loading: "Loading…",
+      loadFailed: "Failed to load organization.",
+      detailsTitle: "Details",
+      // Same cognate as `table.slug` above, own key — this section has its
+      // own copy so a translator can word it differently later if needed.
+      slugLabel: "Slug",
+      // "Plan" is spelled identically in French — a genuine cognate.
+      planLabel: "Plan",
+      createdLabel: "Created",
+      membersTitle: "Members",
+      table: {
+        email: "Email",
+        role: "Role",
+      },
+    },
+  },
+  auditLog: {
+    pageTitle: "Audit log",
+    allActionsPlaceholder: "All actions",
+    allOption: "All",
+    actorIdPlaceholder: "Actor ID",
+    organizationIdPlaceholder: "Organization ID",
+    loading: "Loading…",
+    loadFailed: "Failed to load audit log.",
+    loadMore: "Load more",
+    detailsAction: "Details",
+    table: {
+      occurredAt: "Occurred at",
+      actorType: "Actor type",
+      action: "Action",
+      target: "Target",
+      organization: "Organization",
+    },
+    actorType: {
+      user: "User",
+      system: "System",
+      admin: "Admin",
+    },
+    chain: {
+      checking: "Checking chain…",
+      verified: "Chain verified ✓",
+      broken: "Broken at #{{sequence}}",
+    },
+    metadata: {
+      actorLabel: "Actor",
+      occurredAtLabel: "Occurred at",
+      beforeLabel: "Before",
+      afterLabel: "After",
+    },
+  },
 } as const;

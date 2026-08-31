@@ -116,6 +116,17 @@ describe("catalog parity", () => {
     "admin.users.sessions.typeHeader",
     // "Normal" is spelled identically in French too — a genuine cognate.
     "admin.users.sessions.typeNormal",
+    // "Slug" has no established French translation in SaaS products — a
+    // genuine cognate, not an untranslated placeholder. Two separate keys
+    // (list table header, detail page label) so a translator can still word
+    // them differently later.
+    "admin.orgs.table.slug",
+    "admin.orgs.detail.slugLabel",
+    // "Plan" is spelled identically in French — a genuine cognate.
+    "admin.orgs.detail.planLabel",
+    // Same word in French too, matching the existing "Actions" / "Webhooks"
+    // cognate exemptions above.
+    "admin.auditLog.table.action",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {

@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { cancelInvitationMutationOptions } from "../../../shared/api/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
+import { isOrgRole, ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { INVITATION_STATUS_LABEL_KEYS, isInvitationStatus } from "../invitation-status-labels";
-import { isOrgRole, ROLE_LABEL_KEYS } from "../role-labels";
 
 export interface InvitationRowProps {
   invitation: {

@@ -20,7 +20,7 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import type { ReactElement } from "react";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { isOrgRole, ROLE_LABEL_KEYS } from "../role-labels";
+import { isOrgRole, ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 
 interface TransferLeaveDialogProps {
   org: { id: string; name: string };

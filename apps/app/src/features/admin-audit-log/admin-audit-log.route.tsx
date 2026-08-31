@@ -17,6 +17,7 @@ import {
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { type AuditRow, auditLogInfiniteQueryOptions } from "./api/audit-log.queries";
 import type { AuditLogFilters } from "./audit-log-filters";
 import { AuditTableRow } from "./components/audit-row";
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/audit-log"
 });
 
 function AdminAuditLogPage() {
+  const { t } = useTranslation("admin");
   const [filters, setFilters] = useState<AuditLogFilters>({});
   const [selected, setSelected] = useState<AuditRow | null>(null);
 
@@ -36,7 +38,7 @@ function AdminAuditLogPage() {
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-semibold">Audit log</h1>
+        <h1 className="text-2xl font-semibold">{t("auditLog.pageTitle")}</h1>
         <ChainBadge />
       </div>
 
@@ -46,10 +48,14 @@ function AdminAuditLogPage() {
           onValueChange={(v) => setFilters((f) => ({ ...f, actionPrefix: v || undefined }))}
         >
           <SelectTrigger className="w-40">
-            <SelectValue placeholder="All actions" />
+            <SelectValue placeholder={t("auditLog.allActionsPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All</SelectItem>
+            {/* The prefix values below ("user.", "org.", …) are audit action
+                type names, not copy — the brief calls these out explicitly as
+                data, matching the "audit event type names … are data, not
+                copy" rule for this screen. */}
+            <SelectItem value="">{t("auditLog.allOption")}</SelectItem>
             <SelectItem value="user.">user.</SelectItem>
             <SelectItem value="org.">org.</SelectItem>
             <SelectItem value="billing.">billing.</SelectItem>
@@ -73,14 +79,14 @@ function AdminAuditLogPage() {
         />
 
         <Input
-          placeholder="Actor ID"
+          placeholder={t("auditLog.actorIdPlaceholder")}
           className="w-52"
           value={filters.actorId ?? ""}
           onChange={(e) => setFilters((f) => ({ ...f, actorId: e.target.value || undefined }))}
         />
 
         <Input
-          placeholder="Organization ID"
+          placeholder={t("auditLog.organizationIdPlaceholder")}
           className="w-52"
           value={filters.organizationId ?? ""}
           onChange={(e) =>
@@ -90,19 +96,19 @@ function AdminAuditLogPage() {
       </div>
 
       {query.isLoading ? (
-        <p>Loading…</p>
+        <p>{t("auditLog.loading")}</p>
       ) : query.isError ? (
-        <p>Failed to load audit log.</p>
+        <p>{t("auditLog.loadFailed")}</p>
       ) : (
         <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Occurred at</TableHead>
-                <TableHead>Actor type</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Organization</TableHead>
+                <TableHead>{t("auditLog.table.occurredAt")}</TableHead>
+                <TableHead>{t("auditLog.table.actorType")}</TableHead>
+                <TableHead>{t("auditLog.table.action")}</TableHead>
+                <TableHead>{t("auditLog.table.target")}</TableHead>
+                <TableHead>{t("auditLog.table.organization")}</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -121,7 +127,7 @@ function AdminAuditLogPage() {
               disabled={query.isFetchingNextPage}
               onClick={() => query.fetchNextPage()}
             >
-              Load more
+              {t("auditLog.loadMore")}
             </Button>
           )}
         </>

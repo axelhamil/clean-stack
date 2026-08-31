@@ -210,5 +210,10 @@ export default {
     startImpersonation: "Échec du démarrage de l'emprunt d'identité",
     loadAdminUsers: "Échec du chargement des comptes",
     loadAdminUser: "Échec du chargement du compte",
+    loadAdminOrgs: "Échec du chargement des organisations",
+    loadAdminOrg: "Échec du chargement de l'organisation",
+    updateAdminOrgSsoEnforcement: "Échec de la mise à jour de l'application du SSO",
+    loadAuditLog: "Échec du chargement du journal d'audit",
+    verifyAuditChain: "Échec de la vérification de la chaîne",
   },
 } as const;

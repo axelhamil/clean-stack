@@ -27,7 +27,7 @@ import {
   type InviteMemberInput,
   inviteMemberSchema,
 } from "../../../shared/auth/organization.schema";
-import { ROLE_LABEL_KEYS } from "../role-labels";
+import { ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 
 export interface InviteMemberFormProps {
   organizationId: string;

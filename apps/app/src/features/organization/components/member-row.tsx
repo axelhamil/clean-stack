@@ -19,8 +19,8 @@ import { updateMemberRoleMutationOptions } from "../../../shared/api/mutations/u
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../../shared/api/queries/org-members";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
+import { ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
-import { ROLE_LABEL_KEYS } from "../role-labels";
 
 export interface MemberRowProps {
   member: {

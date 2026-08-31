@@ -79,4 +79,72 @@ export default {
       submit: "Démarrer l'emprunt d'identité",
     },
   },
+  orgs: {
+    pageTitle: "Organisations",
+    searchPlaceholder: "Rechercher…",
+    loading: "Chargement…",
+    loadFailed: "Échec du chargement des organisations.",
+    loadMore: "Charger plus",
+    ssoEnforcementUpdatedToast: "Application du SSO mise à jour.",
+    ssoEnforcedAriaLabel: "SSO appliqué pour {{name}}",
+    ssoEnforcementOffHint:
+      "Désactiver l'application du SSO permet aux membres de cette organisation de se reconnecter avec un mot de passe.",
+    table: {
+      name: "Nom",
+      // Genuine cognate — see the English catalog's comment.
+      slug: "Slug",
+      members: "Membres",
+      created: "Créé",
+      ssoEnforced: "SSO appliqué",
+    },
+    detail: {
+      loading: "Chargement…",
+      loadFailed: "Échec du chargement de l'organisation.",
+      detailsTitle: "Détails",
+      slugLabel: "Slug",
+      planLabel: "Plan",
+      createdLabel: "Créé",
+      membersTitle: "Membres",
+      table: {
+        email: "E-mail",
+        role: "Rôle",
+      },
+    },
+  },
+  auditLog: {
+    pageTitle: "Journal d'audit",
+    allActionsPlaceholder: "Toutes les actions",
+    allOption: "Toutes",
+    actorIdPlaceholder: "ID de l'acteur",
+    organizationIdPlaceholder: "ID de l'organisation",
+    loading: "Chargement…",
+    loadFailed: "Échec du chargement du journal d'audit.",
+    loadMore: "Charger plus",
+    detailsAction: "Détails",
+    table: {
+      occurredAt: "Survenu le",
+      actorType: "Type d'acteur",
+      // Same word in French too, matching the existing "Actions" / "Webhooks"
+      // cognate exemptions already in the parity gate.
+      action: "Action",
+      target: "Cible",
+      organization: "Organisation",
+    },
+    actorType: {
+      user: "Utilisateur",
+      system: "Système",
+      admin: "Administrateur",
+    },
+    chain: {
+      checking: "Vérification de la chaîne…",
+      verified: "Chaîne vérifiée ✓",
+      broken: "Chaîne rompue au n° {{sequence}}",
+    },
+    metadata: {
+      actorLabel: "Acteur",
+      occurredAtLabel: "Survenu le",
+      beforeLabel: "Avant",
+      afterLabel: "Après",
+    },
+  },
 } as const;
