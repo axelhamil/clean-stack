@@ -8,6 +8,7 @@ import {
 import { Switch } from "@packages/ui/components/ui/switch";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
@@ -23,6 +24,7 @@ interface OrgWithSsoEnforcement {
 
 export function SsoEnforcementCard() {
   const qc = useQueryClient();
+  const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
@@ -33,7 +35,7 @@ export function SsoEnforcementCard() {
     ...setSsoEnforcementMutationOptions,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: activeOrgQueryOptions.queryKey });
-      toast.success("SSO enforcement updated");
+      toast.success(t("sso.enforcementCard.updatedToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -42,27 +44,25 @@ export function SsoEnforcementCard() {
     <Can requires={{ organization: ["update"] }}>
       <Card>
         <CardHeader>
-          <CardTitle>Enforce SSO</CardTitle>
-          <CardDescription>
-            When enabled, members on your verified domain can no longer sign in with a password, a
-            magic link, or a passkey — SSO through your identity provider becomes the only way in.
-          </CardDescription>
+          <CardTitle>{t("sso.enforcementCard.title")}</CardTitle>
+          <CardDescription>{t("sso.enforcementCard.description")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <Switch
-              aria-label="Enforce SSO for your domain"
+              aria-label={t("sso.enforcementCard.switchAriaLabel")}
               checked={enforced}
               disabled={setEnforcement.isPending || (!enforced && !hasVerifiedProvider)}
               onCheckedChange={(next) => setEnforcement.mutate(next)}
             />
-            <span className="text-sm">{enforced ? "Enforced" : "Not enforced"}</span>
+            <span className="text-sm">
+              {enforced
+                ? t("sso.enforcementCard.enforcedLabel")
+                : t("sso.enforcementCard.notEnforcedLabel")}
+            </span>
           </div>
           {!enforced && !hasVerifiedProvider && (
-            <TypographyMuted>
-              Verify your domain before enforcing SSO — otherwise nobody on it will be able to sign
-              in at all.
-            </TypographyMuted>
+            <TypographyMuted>{t("sso.enforcementCard.verifyDomainFirst")}</TypographyMuted>
           )}
         </CardContent>
       </Card>

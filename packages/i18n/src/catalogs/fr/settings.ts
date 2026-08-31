@@ -442,4 +442,85 @@ export default {
     expiryYears_other: "{{count}} ans",
     expiryNever: "Aucune expiration",
   },
+  sso: {
+    pageTitle: "Authentification unique",
+    upsell: {
+      description:
+        "Permettez aux membres de se connecter via votre fournisseur d'identité (OIDC ou SAML), provisionnez les comptes via SCIM et imposez le SSO sur un domaine vérifié.",
+      upgradeAction: "Passez à l'offre Entreprise",
+    },
+    registerProviderFirst: "Enregistrez d'abord un fournisseur d'identité.",
+    providerCard: {
+      title: "Fournisseur d'identité",
+      description:
+        "Connectez l'application OIDC ou SAML fournie par votre fournisseur d'identité pour que les membres de votre domaine puissent s'y connecter.",
+      registeredToast: "Fournisseur SSO enregistré",
+      type: {
+        oidc: "OIDC",
+        saml: "SAML",
+      },
+      typeAndDomain: "Fournisseur {{type}} pour {{domain}}",
+      metadataUrlLabel: "URL des métadonnées SP",
+      singleProviderNotice:
+        "Cette page gère un seul fournisseur d'identité par organisation. Pour changer de fournisseur, mettez à jour ou supprimez celui-ci via l'API SSO.",
+    },
+    domainCard: {
+      title: "Vérification du domaine",
+      description:
+        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif — les membres de ce domaine ne peuvent pas s'y connecter — jusqu'à ce que l'enregistrement soit résolu.",
+      verifiedToast: "Domaine vérifié",
+      verifiedBadge: "Vérifié",
+      unverifiedBadge: "Non vérifié",
+      txtNameLabel: "Nom de l'enregistrement TXT",
+      txtValueLabel: "Valeur de l'enregistrement TXT",
+      checkNowAction: "Vérifier maintenant",
+      alreadyVerified: "Ce domaine est déjà vérifié.",
+      verifyFailed:
+        "Échec de la vérification — l'enregistrement DNS est introuvable. La propagation des changements DNS peut prendre du temps.",
+    },
+    enforcementCard: {
+      title: "Imposer le SSO",
+      description:
+        "Une fois activé, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès — le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
+      updatedToast: "Application du SSO mise à jour",
+      switchAriaLabel: "Imposer le SSO pour votre domaine",
+      enforcedLabel: "Imposé",
+      notEnforcedLabel: "Non imposé",
+      verifyDomainFirst:
+        "Vérifiez votre domaine avant d'imposer le SSO — sinon, plus personne sur ce domaine ne pourra se connecter.",
+    },
+    scimCard: {
+      title: "Provisionnement SCIM",
+      description:
+        "Laissez votre fournisseur d'identité créer, mettre à jour et désactiver les membres automatiquement.",
+      onlyOwnerCanGenerate: "Seul le propriétaire de l'organisation peut générer un jeton SCIM.",
+      baseUrlLabel: "URL de base SCIM",
+      generateAction: "Générer le jeton",
+      secretDialogTitle: "Jeton SCIM",
+      secretDialogDescription:
+        "Copiez ce jeton maintenant — il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité.",
+    },
+    forms: {
+      oidc: {
+        domainLabel: "Domaine",
+        domainPlaceholder: "acme.com",
+        issuerLabel: "Émetteur",
+        issuerPlaceholder: "https://idp.acme.com",
+        clientIdLabel: "ID client",
+        clientSecretLabel: "Secret client",
+        submitAction: "Enregistrer le fournisseur OIDC",
+      },
+      saml: {
+        domainLabel: "Domaine",
+        domainPlaceholder: "acme.com",
+        issuerLabel: "Émetteur / ID d'entité",
+        issuerPlaceholder: "acme-saml",
+        entryPointLabel: "Point d'entrée",
+        entryPointPlaceholder: "https://idp.acme.com/sso/saml",
+        certLabel: "Certificat de signature",
+        certDescription: "Le certificat X.509 encodé en PEM du fournisseur d'identité.",
+        submitAction: "Enregistrer le fournisseur SAML",
+      },
+    },
+  },
 } as const;

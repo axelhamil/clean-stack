@@ -7,6 +7,12 @@ export default {
     ACCOUNT_PASSWORD_INVALID: "Invalid password.",
     TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
     TWO_FACTOR_INVALID: "Invalid authenticator code.",
+    // `assertSsoEntitlementFor` (apps/api/src/auth.ts) puts the code directly in
+    // the APIError's `message` rather than a separate `code` field, so the
+    // front reads it back off `error.message` (see provider-card.tsx) — the
+    // catalog lookup itself is keyed the same as every other code either way.
+    SSO_PLAN_REQUIRED: "Your plan does not include SSO.",
+    SSO_ORGANIZATION_REQUIRED: "No active organization.",
     // BetterAuth's own `BASE_ERROR_CODES`. They are keyed here rather than
     // read off `error.message` because the library ships one English string
     // per code and no translation hook — the code is the only stable,
@@ -203,5 +209,13 @@ export default {
     loadWebhookEndpoints: "Failed to load webhook endpoints.",
     loadWebhookDeliveries: "Failed to load deliveries.",
     loadWebhookDeliveryDetail: "Failed to load delivery detail",
+    registerOidcProvider: "Failed to register the OIDC provider",
+    registerSamlProvider: "Failed to register the SAML provider",
+    verifySsoDomain: "Domain verification failed",
+    generateScimToken: "Failed to generate the SCIM token",
+    invalidServerResponse: "Invalid response from server",
+    updateSsoEnforcement: "Failed to update SSO enforcement",
+    loadSsoProviders: "Failed to load SSO providers",
+    loadSsoVerificationToken: "Failed to load the verification token",
   },
 } as const;

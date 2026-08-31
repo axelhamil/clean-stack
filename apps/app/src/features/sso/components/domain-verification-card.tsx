@@ -9,6 +9,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { verifyDomainMutationOptions } from "../api/sso.mutations";
@@ -21,6 +22,7 @@ import { CopyRow } from "./copy-row";
 
 export function DomainVerificationCard() {
   const qc = useQueryClient();
+  const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
@@ -34,40 +36,37 @@ export function DomainVerificationCard() {
     ...verifyDomainMutationOptions,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ssoProvidersQueryOptions.queryKey });
-      toast.success("Domain verified");
+      toast.success(t("sso.domainCard.verifiedToast"));
     },
     onError: (err) =>
       toast.error(
         err.message === "DOMAIN_VERIFIED"
-          ? "This domain is already verified."
-          : "Verification failed — the DNS record was not found. DNS changes can take a while to propagate.",
+          ? t("sso.domainCard.alreadyVerified")
+          : t("sso.domainCard.verifyFailed"),
       ),
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Domain verification</CardTitle>
-        <CardDescription>
-          Prove you control the domain by publishing a TXT record. The provider stays inactive —
-          members on that domain cannot sign in through it — until the record resolves.
-        </CardDescription>
+        <CardTitle>{t("sso.domainCard.title")}</CardTitle>
+        <CardDescription>{t("sso.domainCard.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {!provider ? (
-          <TypographyMuted>Register an identity provider first.</TypographyMuted>
+          <TypographyMuted>{t("sso.registerProviderFirst")}</TypographyMuted>
         ) : provider.domainVerified ? (
-          <Badge>Verified</Badge>
+          <Badge>{t("sso.domainCard.verifiedBadge")}</Badge>
         ) : (
           <>
-            <Badge variant="secondary">Unverified</Badge>
+            <Badge variant="secondary">{t("sso.domainCard.unverifiedBadge")}</Badge>
             {token.data && (
               <div className="flex flex-col gap-3">
                 <CopyRow
-                  label="TXT record name"
+                  label={t("sso.domainCard.txtNameLabel")}
                   value={`_better-auth-token-${provider.providerId}.${provider.domain}`}
                 />
-                <CopyRow label="TXT record value" value={token.data} />
+                <CopyRow label={t("sso.domainCard.txtValueLabel")} value={token.data} />
               </div>
             )}
             <Button
@@ -76,7 +75,7 @@ export function DomainVerificationCard() {
               disabled={verify.isPending}
               onClick={() => verify.mutate(provider.providerId)}
             >
-              Check now
+              {t("sso.domainCard.checkNowAction")}
             </Button>
           </>
         )}

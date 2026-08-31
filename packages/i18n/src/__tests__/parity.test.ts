@@ -86,6 +86,24 @@ describe("catalog parity", () => {
     // Example webhook URL — a non-linguistic placeholder, not sentence copy
     // (mirrors the auth/account placeholder exemptions above).
     "settings.webhooks.form.urlPlaceholder",
+    // Protocol acronyms, not sentence copy — a French SSO screen names OIDC
+    // and SAML exactly as an English one does. Shared between the
+    // registration Tabs triggers and the interpolated "{{type}} provider for
+    // {{domain}}" line (see sso-labels.ts).
+    "settings.sso.providerCard.type.oidc",
+    "settings.sso.providerCard.type.saml",
+    // Example domain, one placeholder per registration form (OIDC and SAML
+    // are two distinct forms/keys, not a shared one) — a non-linguistic
+    // placeholder, not sentence copy (mirrors the webhook URL exemption
+    // above).
+    "settings.sso.forms.oidc.domainPlaceholder",
+    "settings.sso.forms.saml.domainPlaceholder",
+    // Example issuer URL for the OIDC form — a non-linguistic placeholder.
+    "settings.sso.forms.oidc.issuerPlaceholder",
+    // Example SAML entity ID — a fictional identifier, not sentence copy.
+    "settings.sso.forms.saml.issuerPlaceholder",
+    // Example SAML entry-point URL — a non-linguistic placeholder.
+    "settings.sso.forms.saml.entryPointPlaceholder",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {

@@ -12,6 +12,7 @@ import {
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { Textarea } from "@packages/ui/components/ui/textarea";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type SamlProviderInput, samlProviderSchema } from "../sso.schema";
 
 const DEFAULT_VALUES: SamlProviderInput = {
@@ -27,6 +28,7 @@ interface SamlProviderFormProps {
 }
 
 export function SamlProviderForm({ isPending, onSubmit }: SamlProviderFormProps) {
+  const { t } = useTranslation("settings");
   const form = useForm<SamlProviderInput>({
     resolver: zodResolver(samlProviderSchema),
     defaultValues: DEFAULT_VALUES,
@@ -35,35 +37,40 @@ export function SamlProviderForm({ isPending, onSubmit }: SamlProviderFormProps)
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <FormTextField control={form.control} name="domain" label="Domain" placeholder="acme.com" />
+        <FormTextField
+          control={form.control}
+          name="domain"
+          label={t("sso.forms.saml.domainLabel")}
+          placeholder={t("sso.forms.saml.domainPlaceholder")}
+        />
         <FormTextField
           control={form.control}
           name="issuer"
-          label="Issuer / entity ID"
-          placeholder="acme-saml"
+          label={t("sso.forms.saml.issuerLabel")}
+          placeholder={t("sso.forms.saml.issuerPlaceholder")}
         />
         <FormTextField
           control={form.control}
           name="entryPoint"
-          label="Entry point"
-          placeholder="https://idp.acme.com/sso/saml"
+          label={t("sso.forms.saml.entryPointLabel")}
+          placeholder={t("sso.forms.saml.entryPointPlaceholder")}
         />
         <FormField
           control={form.control}
           name="cert"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Signing certificate</FormLabel>
+              <FormLabel>{t("sso.forms.saml.certLabel")}</FormLabel>
               <FormControl>
                 <Textarea rows={6} className="font-mono text-xs" {...field} />
               </FormControl>
-              <FormDescription>The IdP's PEM-encoded X.509 certificate.</FormDescription>
+              <FormDescription>{t("sso.forms.saml.certDescription")}</FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" disabled={isPending} className="w-fit">
-          Register SAML provider
+          {t("sso.forms.saml.submitAction")}
         </Button>
       </form>
     </Form>

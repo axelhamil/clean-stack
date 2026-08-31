@@ -432,4 +432,89 @@ export default {
     expiryYears_other: "{{count}} years",
     expiryNever: "No expiry",
   },
+  sso: {
+    pageTitle: "Single sign-on",
+    upsell: {
+      description:
+        "Let members sign in through your identity provider (OIDC or SAML), provision accounts via SCIM, and enforce SSO across a verified domain.",
+      upgradeAction: "Upgrade to the Business plan",
+    },
+    // Shared between `domainCard` and `scimCard` — both gate on the same
+    // "no provider registered yet" condition for the same org.
+    registerProviderFirst: "Register an identity provider first.",
+    providerCard: {
+      title: "Identity provider",
+      description:
+        "Connect the OIDC or SAML application your identity provider issues so members on your domain can sign in through it.",
+      registeredToast: "SSO provider registered",
+      // Also read by the registration Tabs triggers — same protocol names,
+      // same source, one key each (see `sso-labels.ts`).
+      type: {
+        oidc: "OIDC",
+        saml: "SAML",
+      },
+      typeAndDomain: "{{type}} provider for {{domain}}",
+      metadataUrlLabel: "SP metadata URL",
+      singleProviderNotice:
+        "This page manages one identity provider per organization. To switch identity providers, update or remove this one through the SSO API first.",
+    },
+    domainCard: {
+      title: "Domain verification",
+      description:
+        "Prove you control the domain by publishing a TXT record. The provider stays inactive — members on that domain cannot sign in through it — until the record resolves.",
+      verifiedToast: "Domain verified",
+      verifiedBadge: "Verified",
+      unverifiedBadge: "Unverified",
+      txtNameLabel: "TXT record name",
+      txtValueLabel: "TXT record value",
+      checkNowAction: "Check now",
+      alreadyVerified: "This domain is already verified.",
+      verifyFailed:
+        "Verification failed — the DNS record was not found. DNS changes can take a while to propagate.",
+    },
+    enforcementCard: {
+      title: "Enforce SSO",
+      description:
+        "When enabled, members on your verified domain can no longer sign in with a password, a magic link, or a passkey — SSO through your identity provider becomes the only way in.",
+      updatedToast: "SSO enforcement updated",
+      switchAriaLabel: "Enforce SSO for your domain",
+      enforcedLabel: "Enforced",
+      notEnforcedLabel: "Not enforced",
+      verifyDomainFirst:
+        "Verify your domain before enforcing SSO — otherwise nobody on it will be able to sign in at all.",
+    },
+    scimCard: {
+      title: "SCIM provisioning",
+      description:
+        "Let your identity provider create, update, and deactivate members automatically.",
+      onlyOwnerCanGenerate: "Only the organization owner can generate a SCIM token.",
+      baseUrlLabel: "SCIM base URL",
+      generateAction: "Generate token",
+      secretDialogTitle: "SCIM token",
+      secretDialogDescription:
+        "Copy this token now — it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector.",
+    },
+    forms: {
+      oidc: {
+        domainLabel: "Domain",
+        domainPlaceholder: "acme.com",
+        issuerLabel: "Issuer",
+        issuerPlaceholder: "https://idp.acme.com",
+        clientIdLabel: "Client ID",
+        clientSecretLabel: "Client secret",
+        submitAction: "Register OIDC provider",
+      },
+      saml: {
+        domainLabel: "Domain",
+        domainPlaceholder: "acme.com",
+        issuerLabel: "Issuer / entity ID",
+        issuerPlaceholder: "acme-saml",
+        entryPointLabel: "Entry point",
+        entryPointPlaceholder: "https://idp.acme.com/sso/saml",
+        certLabel: "Signing certificate",
+        certDescription: "The IdP's PEM-encoded X.509 certificate.",
+        submitAction: "Register SAML provider",
+      },
+    },
+  },
 } as const;
