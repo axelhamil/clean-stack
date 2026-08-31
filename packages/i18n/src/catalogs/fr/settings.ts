@@ -187,5 +187,46 @@ export default {
     invitationCancelledToast: "Invitation annulée",
     cancelInvitationFailed: "Échec de l'annulation de l'invitation",
     invitationExpiry: "{{role}} · expire le {{date}}",
+    invitationSentToast: "Invitation envoyée à {{email}}",
+    sendInvitationFailed: "Échec de l'envoi de l'invitation",
+    emailLabel: "E-mail",
+    emailPlaceholder: "collegue@example.com",
+    roleLabel: "Rôle",
+    sendInvitationAction: "Envoyer l'invitation",
+    orgUpdatedToast: "Organisation mise à jour",
+    updateOrgFailed: "Échec de la mise à jour de l'organisation",
+    nameLabel: "Nom",
+    saveChanges: "Enregistrer les modifications",
+    transferDialogTitle: "Transférer la propriété et quitter",
+    transferDialogDescription:
+      "Vous êtes le seul propriétaire de <orgName></orgName>. Transférez la propriété à un autre membre avant de partir.",
+    newOwnerLabel: "Nouveau propriétaire",
+    selectMemberPlaceholder: "Sélectionnez un membre…",
+    currentRoleSuffix: "(rôle actuel : {{role}})",
+    transferAndLeaveAction: "Transférer et quitter",
+    leftOrgToast: "Organisation quittée",
+    leaveFailed: "Échec de la sortie",
+    transferAndLeaveFailed: "Échec du transfert et de la sortie",
+    orgDeletedToast: "Organisation supprimée",
+    deleteFailed: "Échec de la suppression",
+    leaveOrgLabel: "Quitter l'organisation",
+    leaveOrgCardDescription: "Vous perdrez l'accès à ses ressources.",
+    leaveOrgAlertDescription:
+      "Vous perdrez l'accès à <orgName></orgName> et à toutes ses ressources. Vous aurez besoin d'une nouvelle invitation pour la rejoindre.",
+    leaveOrgDialogDescription: "Vous perdrez l'accès à <orgName></orgName> et à ses ressources.",
+    deleteOrgLabel: "Supprimer l'organisation",
+    deleteOrgDescriptionPersonal: "Les organisations personnelles ne peuvent pas être supprimées.",
+    deleteOrgDescriptionRegular:
+      "Tous les membres, invitations et données seront supprimés définitivement.",
+    deleteAccountToRemoveOrg:
+      "Supprimez votre compte dans les <accountLink>paramètres du compte</accountLink> pour supprimer cette organisation.",
+    deleteOrgAlertDescription:
+      "Supprimer <orgName></orgName> supprimera définitivement tous les membres, invitations et données. Cette action est irréversible.",
+    deleteOrgDialogDescription:
+      "Cette action est irréversible. Tous les membres, invitations et données rattachés à cette organisation seront supprimés définitivement.",
+    saveDefaultsFailed: "Impossible d'enregistrer les valeurs par défaut de l'organisation",
+    notificationDefaultsTitle: "Valeurs par défaut des notifications",
+    notificationDefaultsDescription:
+      "Les membres qui n'ont pas fait leur propre choix héritent de ces paramètres. Forcez une catégorie pour l'imposer à tous, en écrasant leur choix.",
   },
 } as const;

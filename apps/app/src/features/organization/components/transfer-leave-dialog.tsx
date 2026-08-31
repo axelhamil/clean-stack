@@ -19,6 +19,8 @@ import {
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import type { ReactElement } from "react";
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { isOrgRole, ROLE_LABEL_KEYS } from "../role-labels";
 
 interface TransferLeaveDialogProps {
   org: { id: string; name: string };
@@ -41,6 +43,7 @@ export function TransferLeaveDialog({
   onConfirm,
   trigger,
 }: TransferLeaveDialogProps) {
+  const { t } = useTranslation(["settings", "common"]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | undefined>(undefined);
   const [open, setOpen] = useState(false);
 
@@ -56,29 +59,35 @@ export function TransferLeaveDialog({
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Transfer ownership and leave</AlertDialogTitle>
+          <AlertDialogTitle>{t("organization.transferDialogTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            You are the sole owner of <strong>{org.name}</strong>. Transfer ownership to another
-            member before leaving.
+            <Trans
+              ns="settings"
+              i18nKey="organization.transferDialogDescription"
+              components={{ orgName: <strong>{org.name}</strong> }}
+            />
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col gap-2">
-          <TypographyMuted>New owner</TypographyMuted>
+          <TypographyMuted>{t("organization.newOwnerLabel")}</TypographyMuted>
           <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a member..." />
+              <SelectValue placeholder={t("organization.selectMemberPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               {candidates.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
-                  {m.user.name ?? m.user.email} (current role: {m.role})
+                  {m.user.name ?? m.user.email}{" "}
+                  {t("organization.currentRoleSuffix", {
+                    role: isOrgRole(m.role) ? t(`common:${ROLE_LABEL_KEYS[m.role]}`) : m.role,
+                  })}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={!selectedMemberId || isPending}
@@ -86,7 +95,7 @@ export function TransferLeaveDialog({
               if (selectedMemberId) onConfirm(selectedMemberId);
             }}
           >
-            Transfer and leave
+            {t("organization.transferAndLeaveAction")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

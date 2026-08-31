@@ -7,6 +7,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
@@ -18,6 +19,7 @@ import {
 } from "../../../shared/notifications/preference-matrix";
 
 export function OrgNotificationDefaultsCard() {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
@@ -26,7 +28,7 @@ export function OrgNotificationDefaultsCard() {
     ...updateOrgPreferenceMutationOptions,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: orgNotificationPreferencesQueryOptions.queryKey }),
-    onError: () => toast.error("Could not save the organization defaults"),
+    onError: () => toast.error(t("organization.saveDefaultsFailed")),
   });
 
   const handleChange = (change: PreferenceChange) => update.mutate(change);
@@ -35,11 +37,8 @@ export function OrgNotificationDefaultsCard() {
     <Can requires={{ organization: ["update"] }}>
       <Card>
         <CardHeader>
-          <CardTitle>Notification defaults</CardTitle>
-          <CardDescription>
-            Members who have not chosen for themselves inherit these settings. Enforce a category to
-            impose it on everyone, overriding their own choice.
-          </CardDescription>
+          <CardTitle>{t("organization.notificationDefaultsTitle")}</CardTitle>
+          <CardDescription>{t("organization.notificationDefaultsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <PreferenceMatrix rows={rows} onChange={handleChange} showLock disabled={isPending} />
