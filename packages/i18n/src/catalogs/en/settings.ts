@@ -40,6 +40,31 @@ export default {
     dataRightsNotice:
       "Read our <dataRightsLink>data rights policy</dataRightsLink> for the full breakdown of what's deleted, anonymized, and retained.",
   },
+  billing: {
+    pageTitle: "Billing settings",
+    currentPlanTitle: "Current plan: {{tier}}",
+    statusLabel: "Status: {{status}}",
+    unlimitedMembers: "Unlimited members",
+    membersUsage: "{{count}} / {{max}} members",
+    membersUsageAriaLabel: "Members usage",
+    manageBilling: "Manage billing",
+    tier: {
+      free: "Free",
+      pro: "Pro",
+      business: "Business",
+    },
+    status: {
+      free: "Free",
+      active: "Active",
+      trialing: "Trial",
+      pastDue: "Past due",
+      canceled: "Canceled",
+      unpaid: "Unpaid",
+      incomplete: "Incomplete",
+      incompleteExpired: "Incomplete — expired",
+      paused: "Paused",
+    },
+  },
   passkeys: {
     title: "Passkeys",
     description:

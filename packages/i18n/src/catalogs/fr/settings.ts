@@ -40,6 +40,31 @@ export default {
     dataRightsNotice:
       "Consultez notre <dataRightsLink>politique de droits sur les données</dataRightsLink> pour le détail complet de ce qui est supprimé, anonymisé et conservé.",
   },
+  billing: {
+    pageTitle: "Paramètres de facturation",
+    currentPlanTitle: "Forfait actuel : {{tier}}",
+    statusLabel: "Statut : {{status}}",
+    unlimitedMembers: "Membres illimités",
+    membersUsage: "{{count}} / {{max}} membres",
+    membersUsageAriaLabel: "Utilisation des membres",
+    manageBilling: "Gérer la facturation",
+    tier: {
+      free: "Gratuit",
+      pro: "Pro",
+      business: "Entreprise",
+    },
+    status: {
+      free: "Gratuit",
+      active: "Actif",
+      trialing: "Essai",
+      pastDue: "Paiement en retard",
+      canceled: "Annulé",
+      unpaid: "Impayé",
+      incomplete: "Incomplet",
+      incompleteExpired: "Incomplet — expiré",
+      paused: "En pause",
+    },
+  },
   passkeys: {
     title: "Clés d'accès",
     description:

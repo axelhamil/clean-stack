@@ -68,6 +68,15 @@ describe("catalog parity", () => {
     "settings.deletion.totpPlaceholder",
     // Example organization name — a fictional proper noun, not sentence copy.
     "common.orgNew.namePlaceholder",
+    // "Pro" is used as-is in French SaaS pricing too — a short brand-like
+    // cognate, not a sentence that was left untranslated (mirrors the
+    // "Actions"/"Webhooks"/"Notifications" exemptions above).
+    "settings.billing.tier.pro",
+    // A bare `{{amount}}/{{interval}}` slash-separated template, not sentence
+    // copy — it carries no words of its own, French included ("12 €/mois"
+    // uses the same slash). The translation happens in the interpolated
+    // `interval` value (`common.pricing.interval.*`), not in this template.
+    "common.pricing.perInterval",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {

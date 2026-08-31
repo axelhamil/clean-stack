@@ -218,4 +218,19 @@ export default {
     acceptedToast: "Invitation accepted",
     acceptFailed: "Failed to accept invitation",
   },
+  pricing: {
+    title: "Pricing",
+    subtitle: "Pick the plan that fits your team.",
+    free: "Free",
+    perInterval: "{{amount}}/{{interval}}",
+    interval: {
+      day: "day",
+      week: "week",
+      month: "month",
+      year: "year",
+    },
+    currentPlanCta: "Current plan",
+    getStarted: "Get started",
+    upgrade: "Upgrade",
+  },
 } as const;

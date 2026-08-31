@@ -222,4 +222,19 @@ export default {
     acceptedToast: "Invitation acceptée",
     acceptFailed: "Échec de l'acceptation de l'invitation",
   },
+  pricing: {
+    title: "Tarifs",
+    subtitle: "Choisissez le forfait adapté à votre équipe.",
+    free: "Gratuit",
+    perInterval: "{{amount}}/{{interval}}",
+    interval: {
+      day: "jour",
+      week: "semaine",
+      month: "mois",
+      year: "an",
+    },
+    currentPlanCta: "Forfait actuel",
+    getStarted: "Commencer",
+    upgrade: "Mettre à niveau",
+  },
 } as const;
