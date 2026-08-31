@@ -9,24 +9,24 @@ describe("SUB_PROCESSOR_KEYS", () => {
   it("points each processor at its own purpose and region keys", () => {
     expect(SUB_PROCESSOR_KEYS).toStrictEqual({
       resend: {
-        purpose: "privacy.dataSources.processors.resend.purpose",
-        region: "privacy.dataSources.processors.resend.region",
+        purpose: "legal.subProcessors.resend.purpose",
+        region: "legal.subProcessors.resend.region",
       },
       r2: {
-        purpose: "privacy.dataSources.processors.r2.purpose",
-        region: "privacy.dataSources.processors.r2.region",
+        purpose: "legal.subProcessors.r2.purpose",
+        region: "legal.subProcessors.r2.region",
       },
       betterAuth: {
-        purpose: "privacy.dataSources.processors.betterAuth.purpose",
-        region: "privacy.dataSources.processors.betterAuth.region",
+        purpose: "legal.subProcessors.betterAuth.purpose",
+        region: "legal.subProcessors.betterAuth.region",
       },
       stripe: {
-        purpose: "privacy.dataSources.processors.stripe.purpose",
-        region: "privacy.dataSources.processors.stripe.region",
+        purpose: "legal.subProcessors.stripe.purpose",
+        region: "legal.subProcessors.stripe.region",
       },
       umami: {
-        purpose: "privacy.dataSources.processors.umami.purpose",
-        region: "privacy.dataSources.processors.umami.region",
+        purpose: "legal.subProcessors.umami.purpose",
+        region: "legal.subProcessors.umami.region",
       },
     });
   });

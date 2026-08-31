@@ -17,6 +17,7 @@ const activeProcessors = SUB_PROCESSORS.filter((sp) => sp.status === "active");
 
 export function DataSourcesCard() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
 
   return (
     <Card>
@@ -30,7 +31,8 @@ export function DataSourcesCard() {
             <li key={sp.id} className="flex flex-col gap-0.5 py-3">
               <span className="text-sm font-medium">{sp.name}</span>
               <TypographyMuted className="text-xs">
-                {t(SUB_PROCESSOR_KEYS[sp.id].purpose)} · {t(SUB_PROCESSOR_KEYS[sp.id].region)}
+                {tCommon(SUB_PROCESSOR_KEYS[sp.id].purpose)} ·{" "}
+                {tCommon(SUB_PROCESSOR_KEYS[sp.id].region)}
               </TypographyMuted>
             </li>
           ))}

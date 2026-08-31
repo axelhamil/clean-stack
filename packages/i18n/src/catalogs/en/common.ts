@@ -126,6 +126,30 @@ export default {
       },
     },
   },
+  legal: {
+    subProcessors: {
+      resend: {
+        purpose: "Transactional email delivery",
+        region: "US (EU DPF-certified)",
+      },
+      r2: {
+        purpose: "Object storage (file uploads)",
+        region: "EU or US (zone configurable)",
+      },
+      betterAuth: {
+        purpose: "OAuth social authentication",
+        region: "US / EU (per provider)",
+      },
+      stripe: {
+        purpose: "Payment processing and billing",
+        region: "US (EU DPF-certified)",
+      },
+      umami: {
+        purpose: "Privacy-friendly web analytics",
+        region: "Configurable (self-hostable)",
+      },
+    },
+  },
   legalFooter: {
     ariaLabel: "Legal",
   },
