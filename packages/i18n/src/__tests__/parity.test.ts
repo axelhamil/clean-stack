@@ -40,6 +40,9 @@ describe("catalog parity", () => {
     "common.contextualTabs.notifications",
     // Same word, same capitalization, in the notification bell's own group.
     "common.notifications.title",
+    // Same word again, this time as the sr-only page heading on
+    // /settings/notifications.
+    "settings.notifications.title",
     // "Secret" is spelled identically in French — a genuine cognate, not an
     // untranslated placeholder.
     "common.secretReveal.secretLabel",
