@@ -28,20 +28,6 @@ export const Route = createFileRoute("/legal/cookies")({
   component: CookiesPage,
 });
 
-// Captions stay English — same as the underlying table/register (R3,
-// extended). They used to interpolate a local `CATEGORY_LABELS` record; now
-// that the heading above the table is translated (shared with the consent
-// panel via `CATEGORY_LABEL_KEYS`), building the caption from the same
-// source would mix locales. A fixed English string keeps the caption and the
-// table it describes in the same language — the untranslated-body banner
-// above already discloses that this table isn't available in French.
-const CATEGORY_TABLE_CAPTIONS: Record<ConsentCategory, string> = {
-  necessary: "Strictly necessary cookies used by this application",
-  functional: "Functional cookies used by this application",
-  analytics: "Analytics cookies used by this application",
-  marketing: "Marketing cookies used by this application",
-};
-
 interface CookieTableProps {
   cookies: readonly CookieInfo[];
   caption: string;
@@ -73,7 +59,7 @@ function CookieTable({ cookies, caption }: CookieTableProps) {
   );
 }
 
-export function CookiesPage() {
+function CookiesPage() {
   const { t, i18n } = useTranslation("common");
   const locale = toLocale(i18n.language);
   return (
@@ -109,7 +95,12 @@ export function CookiesPage() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <CookieTable cookies={cookies} caption={CATEGORY_TABLE_CAPTIONS[cat]} />
+                <CookieTable
+                  cookies={cookies}
+                  caption={t("legal.cookies.tableCaption", {
+                    category: t(CATEGORY_LABEL_KEYS[cat]),
+                  })}
+                />
               </div>
             </CardContent>
           </Card>

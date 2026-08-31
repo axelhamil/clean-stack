@@ -16,7 +16,7 @@ export const Route = createFileRoute("/legal/accessibility")({
   component: AccessibilityPage,
 });
 
-export function AccessibilityPage() {
+function AccessibilityPage() {
   const { t, i18n } = useTranslation("common");
   const locale = toLocale(i18n.language);
   return (

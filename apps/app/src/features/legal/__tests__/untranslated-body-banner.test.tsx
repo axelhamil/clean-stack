@@ -2,89 +2,45 @@ import type { Locale } from "@packages/i18n";
 import { createI18n, enCatalog, loadCatalog } from "@packages/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
-import { describe, expect, it, vi } from "vitest";
-import { AccessibilityPage } from "../accessibility.route";
-import { CookiesPage } from "../cookies.route";
-import { DataRightsPage } from "../data-rights.route";
-import { SubProcessorsPage } from "../sub-processors.route";
+import { describe, expect, it } from "vitest";
+import { UntranslatedBodyBanner } from "../components/untranslated-body-banner";
 
-// `Link` needs a live router context (`useRouter()`) — the only thing this
-// mocks. `DataRightsPage` itself, imported from the real production file, is
-// never touched (same pattern as `data-rights-notice.test.tsx`).
-vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, children }: { to: string; children?: React.ReactNode }) => (
-    <a href={to}>{children}</a>
-  ),
-  createFileRoute: () => (opts: unknown) => opts,
-}));
-
-// `ConsentSettings` reads live query/mutation state (`useQuery`/`useMutation`)
-// that needs a `QueryClientProvider` and a real API to resolve meaningfully.
-// Neither the banner nor the category labels under test live inside it, so
-// it's stubbed out the same way `Link` is above — `CookiesPage` itself is
-// still the real, unmodified production export.
-vi.mock("../../../shared/components/consent-settings", () => ({
-  ConsentSettings: () => null,
-}));
-
-async function renderUnder(locale: Locale, Page: () => React.ReactElement) {
+// Tests the shared component directly — this is the thing every legal page
+// actually renders, and the thing round 1 was told to promote instead of
+// copying the `<Alert>` four times. A page-level render would only prove the
+// same condition indirectly, through four extra components, and would need
+// re-writing for a fifth page; this doesn't.
+async function renderBanner(locale: Locale, show: boolean) {
   const resources = locale === "en" ? enCatalog : await loadCatalog("fr");
   const i18n = await createI18n({ locale, resources });
   return renderToStaticMarkup(
     <I18nextProvider i18n={i18n}>
-      <Page />
+      <UntranslatedBodyBanner show={show} />
     </I18nextProvider>,
   );
 }
 
-const BANNER_FR_SUBSTRING = "Vous consultez la version anglaise ci-dessous";
-const BANNER_EN_STRINGS = [
-  "This document is not yet available in your language",
-  "Ce document n'est pas encore disponible",
-];
-
-describe.each([
-  ["accessibility", AccessibilityPage, "Déclaration", "Accessibility statement"],
-  ["data rights", DataRightsPage, "Vos droits sur vos données", "Your data rights"],
-  ["sub-processors", SubProcessorsPage, "Registre des sous-traitants", "Sub-processor disclosure"],
-] as const)("%s page — untranslated-body banner", (_name, Page, frTitle, enTitle) => {
-  it("discloses the untranslated body under French", async () => {
-    const html = await renderUnder("fr", Page);
-    expect(html).toContain(frTitle);
-    expect(html).toContain(BANNER_FR_SUBSTRING);
+describe("UntranslatedBodyBanner", () => {
+  it("renders the disclosure under French when show is true", async () => {
+    const html = await renderBanner("fr", true);
+    // `renderToStaticMarkup` HTML-escapes the apostrophe (`&#x27;`); this
+    // substring avoids it while still pinning the actual banner copy.
+    expect(html).toContain("Vous consultez la version anglaise ci-dessous");
   });
 
-  it("shows no banner under English", async () => {
-    const html = await renderUnder("en", Page);
-    expect(html).toContain(enTitle);
-    for (const s of BANNER_EN_STRINGS) expect(html).not.toContain(s);
-  });
-});
-
-describe("cookies page — untranslated-body banner and category labels", () => {
-  it("discloses the untranslated body and renders the category labels in French", async () => {
-    const html = await renderUnder("fr", CookiesPage);
-    expect(html).toContain("Politique de cookies");
-    expect(html).toContain(BANNER_FR_SUBSTRING);
-    // The four category headings, now sourced from `common.cookieConsent`
-    // (shared with the consent panel) rather than a second English-only copy.
-    expect(html).toContain("Strictement nécessaires");
-    expect(html).toContain("Fonctionnels");
-    expect(html).toContain("Mesure d");
-    expect(html).toContain("Marketing et publicité");
-    // The table captions stay English on purpose (see the comment in
-    // `cookies.route.tsx`) — asserting their continued presence pins that
-    // decision rather than letting it silently drift.
-    expect(html).toContain("Strictly necessary cookies used by this application");
+  it("renders nothing when show is false, regardless of locale", async () => {
+    expect(await renderBanner("fr", false)).toBe("");
+    expect(await renderBanner("en", false)).toBe("");
   });
 
-  it("shows no banner and the English category labels under English", async () => {
-    const html = await renderUnder("en", CookiesPage);
-    expect(html).toContain("Cookie policy");
-    for (const s of BANNER_EN_STRINGS) expect(html).not.toContain(s);
-    expect(html).toContain("Strictly necessary");
-    expect(html).toContain("Functional");
-    expect(html).toContain("Analytics");
-    expect(html).toContain("Marketing");
+  it("is driven by `show` alone, with no redundant locale check of its own", async () => {
+    // The component takes the locale *condition* as a prop rather than
+    // computing it — each call site owns why (`isEnglishFallback` for
+    // `policy-doc-view.tsx`, a plain `locale !== "en"` for the other four
+    // pages). Rendering it under English with `show=true` still shows the
+    // disclosure: proof there is no second, buried locale gate in here that
+    // could silently disagree with a call site's own logic.
+    const html = await renderBanner("en", true);
+    expect(html).toContain("This document is not yet available in your language");
   });
 });

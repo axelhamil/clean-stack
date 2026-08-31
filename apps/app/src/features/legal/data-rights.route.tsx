@@ -22,7 +22,7 @@ export const Route = createFileRoute("/legal/data-rights")({
   component: DataRightsPage,
 });
 
-export function DataRightsPage() {
+function DataRightsPage() {
   const { t, i18n } = useTranslation("common");
   const locale = toLocale(i18n.language);
   return (

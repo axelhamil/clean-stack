@@ -141,6 +141,7 @@ export default {
     cookies: {
       title: "Cookie policy",
       subtitle: "CNIL compliant — Last updated: 2026-07-09",
+      tableCaption: "Cookies in the {{category}} category used by this application",
     },
     dataRights: {
       title: "Your data rights",

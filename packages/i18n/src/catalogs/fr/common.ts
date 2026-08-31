@@ -144,6 +144,7 @@ export default {
     cookies: {
       title: "Politique de cookies",
       subtitle: "Conforme CNIL — Dernière mise à jour : 2026-07-09",
+      tableCaption: "Cookies de la catégorie {{category}} utilisés par cette application",
     },
     dataRights: {
       title: "Vos droits sur vos données",
