@@ -141,6 +141,7 @@ export default {
     totpCode: "Enter the 6-digit code from your authenticator app.",
     backupCode: "Enter a valid backup code.",
     httpsUrl: "Enter a valid https URL.",
+    bareDomain: "Enter a bare domain, without https:// or a path.",
     tooSmall: "Must be at least {{minimum}} characters.",
     tooBig: "Must be at most {{maximum}} characters.",
     tooFewItems: "Select at least {{minimum}}.",

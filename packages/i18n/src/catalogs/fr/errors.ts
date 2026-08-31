@@ -140,6 +140,7 @@ export default {
     totpCode: "Saisissez le code à 6 chiffres de votre application d'authentification.",
     backupCode: "Saisissez un code de secours valide.",
     httpsUrl: "Saisissez une URL https valide.",
+    bareDomain: "Saisissez un domaine nu, sans https:// ni chemin.",
     tooSmall: "Doit contenir au moins {{minimum}} caractères.",
     tooBig: "Doit contenir au plus {{maximum}} caractères.",
     tooFewItems: "Sélectionnez au moins {{minimum}}.",

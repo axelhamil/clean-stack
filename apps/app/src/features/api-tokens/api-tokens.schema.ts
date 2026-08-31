@@ -11,8 +11,8 @@ export const EXPIRY_OPTIONS = [
 ] as const;
 
 export const tokenFormSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  scopes: z.array(z.enum(API_SCOPES)).min(1, "Select at least one scope"),
+  name: z.string().min(1).max(100),
+  scopes: z.array(z.enum(API_SCOPES)).min(1),
   organizationId: z.string().nullable(),
   expiresInDays: z.number().int().positive().nullable(),
 });
