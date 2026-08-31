@@ -30,6 +30,18 @@ export const CATEGORY_KEYS = {
 
 const UNKNOWN_CATEGORY_KEY = "notifications.categories.unknown";
 
+/**
+ * Resolves a wire-typed category to its catalog key, falling back when the value
+ * is not one this build knows.
+ *
+ * Extracted from the JSX so the fallback branch is reachable from a test: an
+ * untested fallback is a guard whose whole purpose — rendering something sensible
+ * when the assumption breaks — has never been shown to work.
+ */
+export function categoryKeyFor(category: string): string {
+  return isNotificationCategory(category) ? CATEGORY_KEYS[category] : UNKNOWN_CATEGORY_KEY;
+}
+
 // `latest.category`'s wire type is widened to `string` by Hono's response
 // inference. The only real guarantee is a TS-level one: `NotificationConfig`
 // (packages/events/src/notification-map.ts) types `category` as
@@ -68,13 +80,7 @@ export function NotificationItem({ group, onRead }: NotificationItemProps) {
       </ListRowContent>
       <ListRowAction>
         <Badge variant={unread ? "default" : "secondary"}>
-          {unread
-            ? t("notifications.newBadge")
-            : t(
-                isNotificationCategory(latest.category)
-                  ? CATEGORY_KEYS[latest.category]
-                  : UNKNOWN_CATEGORY_KEY,
-              )}
+          {unread ? t("notifications.newBadge") : t(categoryKeyFor(latest.category) as never)}
         </Badge>
       </ListRowAction>
     </ListRow>

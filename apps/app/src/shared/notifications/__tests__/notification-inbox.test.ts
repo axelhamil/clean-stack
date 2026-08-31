@@ -7,7 +7,7 @@ import { describe, expect, test } from "vitest";
 import type { Notification } from "../../api/queries/notifications";
 import { groupNotifications } from "../group-notifications";
 import { applyRead } from "../notification-broadcast";
-import { CATEGORY_KEYS } from "../notification-item";
+import { CATEGORY_KEYS, categoryKeyFor } from "../notification-item";
 import { badgeLabel, labelOf, unreadLabel } from "../notification-labels";
 
 function pluralKey(locale: "en" | "fr", count: number): "unreadLabel_one" | "unreadLabel_other" {
@@ -214,5 +214,25 @@ describe("applyRead", () => {
     applyRead(client, { ids: ["a", "b"] }, "2026-08-16T12:00:00.000Z");
 
     expect(client.getQueryData(["notifications", "unread-count"])).toEqual({ count: 2 });
+  });
+});
+
+describe("categoryKeyFor", () => {
+  test("resolves every known category to its own key", () => {
+    for (const category of NOTIFICATION_CATEGORIES) {
+      expect(categoryKeyFor(category)).toBe(CATEGORY_KEYS[category]);
+    }
+  });
+
+  // The read path has no runtime validation, so this branch is what the user sees
+  // if a category ever reaches the client that this build does not know about.
+  test("falls back to the unknown key for a category outside the union", () => {
+    expect(categoryKeyFor("wat")).toBe("notifications.categories.unknown");
+    expect(categoryKeyFor("")).toBe("notifications.categories.unknown");
+  });
+
+  test("the fallback key resolves to real copy in both locales", () => {
+    expect(enCatalog.common.notifications.categories.unknown).toBeTruthy();
+    expect(frCatalog.common.notifications.categories.unknown).toBeTruthy();
   });
 });
