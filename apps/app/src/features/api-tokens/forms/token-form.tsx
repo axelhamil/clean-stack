@@ -19,13 +19,14 @@ import {
 } from "@packages/ui/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import {
   API_SCOPES,
-  EXPIRY_OPTIONS,
   type TokenFormInput,
   tokenFormSchema,
+  useExpiryOptions,
 } from "../api-tokens.schema";
 
 interface TokenFormProps {
@@ -36,9 +37,11 @@ interface TokenFormProps {
 }
 
 export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: TokenFormProps) {
+  const { t } = useTranslation("settings");
   const { hasMembership, can } = useAuthorization();
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
   const canCreateOrgToken = hasMembership && can({ apiToken: ["create"] });
+  const expiryOptions = useExpiryOptions();
 
   const form = useForm<TokenFormInput>({
     resolver: zodResolver(tokenFormSchema),
@@ -48,14 +51,19 @@ export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: T
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormTextField control={form.control} name="name" label="Token name" placeholder="My app" />
+        <FormTextField
+          control={form.control}
+          name="name"
+          label={t("apiTokens.form.nameLabel")}
+          placeholder={t("apiTokens.form.namePlaceholder")}
+        />
 
         <FormField
           control={form.control}
           name="scopes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Scopes</FormLabel>
+              <FormLabel>{t("apiTokens.form.scopesLabel")}</FormLabel>
               <div className="flex flex-col gap-2">
                 {API_SCOPES.map((scope) => (
                   <div key={scope} className="flex items-center gap-2">
@@ -86,7 +94,7 @@ export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: T
             name="organizationId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Token scope</FormLabel>
+                <FormLabel>{t("apiTokens.form.tokenScopeLabel")}</FormLabel>
                 <Select
                   value={field.value ?? "personal"}
                   onValueChange={(v) => field.onChange(v === "personal" ? null : v)}
@@ -97,7 +105,7 @@ export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: T
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="personal">Personal</SelectItem>
+                    <SelectItem value="personal">{t("apiTokens.form.personalOption")}</SelectItem>
                     <SelectItem value={activeOrg.id}>{activeOrg.name}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -112,7 +120,7 @@ export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: T
           name="expiresInDays"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Expiry</FormLabel>
+              <FormLabel>{t("apiTokens.form.expiryLabel")}</FormLabel>
               <Select
                 value={field.value !== null ? String(field.value) : "never"}
                 onValueChange={(v) => field.onChange(v === "never" ? null : Number(v))}
@@ -123,14 +131,14 @@ export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: T
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {EXPIRY_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.label}
-                      value={opt.value !== null ? String(opt.value) : "never"}
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
+                  {expiryOptions.map((opt) => {
+                    const value = opt.value !== null ? String(opt.value) : "never";
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {opt.label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <FormMessage />

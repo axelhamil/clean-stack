@@ -15,6 +15,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
 import { createTokenMutationOptions, deleteTokenMutationOptions } from "./api/api-tokens.mutations";
@@ -35,6 +36,7 @@ const DEFAULT_VALUES: TokenFormInput = {
 };
 
 function ApiTokensPage() {
+  const { t } = useTranslation("settings");
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [revealToken, setRevealToken] = useState<string | null>(null);
@@ -47,7 +49,7 @@ function ApiTokensPage() {
       setRevealToken(res.token);
       setCreating(false);
       void qc.invalidateQueries({ queryKey: ["settings", "api-tokens"] });
-      toast.success("Token created");
+      toast.success(t("apiTokens.createdToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -56,7 +58,7 @@ function ApiTokensPage() {
     ...deleteTokenMutationOptions,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["settings", "api-tokens"] });
-      toast.success("Token revoked");
+      toast.success(t("apiTokens.revokedToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -64,26 +66,26 @@ function ApiTokensPage() {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">API tokens</h1>
-        <Button onClick={() => setCreating(true)}>New token</Button>
+        <h1 className="text-2xl font-semibold">{t("apiTokens.pageTitle")}</h1>
+        <Button onClick={() => setCreating(true)}>{t("apiTokens.newTokenAction")}</Button>
       </div>
 
       {tokens.isLoading ? (
-        <p>Loading…</p>
+        <p>{t("apiTokens.loading")}</p>
       ) : tokens.isError ? (
-        <p>Failed to load API tokens.</p>
+        <p>{t("apiTokens.loadFailed")}</p>
       ) : tokens.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">No tokens yet. Create one to get started.</p>
+        <p className="text-muted-foreground">{t("apiTokens.empty")}</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Token</TableHead>
-              <TableHead>Scopes</TableHead>
-              <TableHead>Last used</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{t("apiTokens.table.nameHeader")}</TableHead>
+              <TableHead>{t("apiTokens.table.tokenHeader")}</TableHead>
+              <TableHead>{t("apiTokens.table.scopesHeader")}</TableHead>
+              <TableHead>{t("apiTokens.table.lastUsedHeader")}</TableHead>
+              <TableHead>{t("apiTokens.table.expiresHeader")}</TableHead>
+              <TableHead>{t("apiTokens.table.statusHeader")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -103,11 +105,11 @@ function ApiTokensPage() {
       <Dialog open={creating} onOpenChange={(open) => !open && setCreating(false)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create API token</DialogTitle>
+            <DialogTitle>{t("apiTokens.createDialogTitle")}</DialogTitle>
           </DialogHeader>
           <TokenForm
             defaultValues={DEFAULT_VALUES}
-            submitLabel="Create"
+            submitLabel={t("apiTokens.createAction")}
             isPending={create.isPending}
             onSubmit={(v) => create.mutate(v)}
           />
@@ -117,8 +119,7 @@ function ApiTokensPage() {
       <SecretRevealDialog
         secret={revealToken}
         onClose={() => setRevealToken(null)}
-        title="API token"
-        description="Copy this token now — it is shown only once and cannot be retrieved later."
+        title={t("apiTokens.secretDialogTitle")}
       />
     </section>
   );
