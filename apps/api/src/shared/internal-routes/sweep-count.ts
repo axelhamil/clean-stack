@@ -1,5 +1,6 @@
 import type { AnyPgTable, SQL } from "@packages/drizzle";
 import { count, db, sql } from "@packages/drizzle";
+import type { SweepSpans } from "./sweep-span";
 
 /**
  * Shared `countEligible` body for every sweep route. Mirrors the guard `purgeBatch`
@@ -10,10 +11,12 @@ import { count, db, sql } from "@packages/drizzle";
 export async function countEligibleWithTimeout(
   table: AnyPgTable,
   where: SQL | undefined,
+  spans: SweepSpans,
 ): Promise<number> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL statement_timeout = '10s'`);
-    const rows = await tx.select({ count: count() }).from(table).where(where);
+    const query = tx.select({ count: count() }).from(table).where(where);
+    const rows = await spans.db(query.toSQL().sql, () => query.execute());
     return rows[0]?.count ?? 0;
   });
 }
