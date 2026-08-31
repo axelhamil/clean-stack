@@ -42,7 +42,10 @@ export async function acquireSweepLease(
       setWhere: sql`${lock.lockedUntil} < now()`,
     })
     .returning({ label: lock.label });
-  const rows = await spans.db(query.toSQL().sql, () => query.execute());
+  const rows = await spans.lease(
+    () => query.toSQL().sql,
+    () => query.execute(),
+  );
   return rows.length > 0 ? owner : null;
 }
 
@@ -55,7 +58,10 @@ export async function releaseSweepLease(
   const lock = sweepSchema.sweepLock;
   const client = exec ?? db;
   const query = client.delete(lock).where(and(eq(lock.label, label), eq(lock.owner, owner)));
-  await spans.db(query.toSQL().sql, () => query.execute());
+  await spans.lease(
+    () => query.toSQL().sql,
+    () => query.execute(),
+  );
 }
 
 /**

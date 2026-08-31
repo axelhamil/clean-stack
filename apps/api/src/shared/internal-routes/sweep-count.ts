@@ -16,7 +16,10 @@ export async function countEligibleWithTimeout(
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL statement_timeout = '10s'`);
     const query = tx.select({ count: count() }).from(table).where(where);
-    const rows = await spans.db(query.toSQL().sql, () => query.execute());
+    const rows = await spans.db(
+      () => query.toSQL().sql,
+      () => query.execute(),
+    );
     return rows[0]?.count ?? 0;
   });
 }

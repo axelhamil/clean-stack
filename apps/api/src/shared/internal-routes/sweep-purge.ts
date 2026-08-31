@@ -44,7 +44,10 @@ export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<nu
       .where(inArray(opts.idColumn, subq))
       .returning({ id: opts.idColumn });
 
-    const deleted = await opts.spans.db(query.toSQL().sql, () => query.execute());
+    const deleted = await opts.spans.db(
+      () => query.toSQL().sql,
+      () => query.execute(),
+    );
     return deleted.length;
   });
 }

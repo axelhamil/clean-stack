@@ -24,7 +24,13 @@ export const MAX_INSTRUMENTED_BATCHES = 50;
  */
 export type SweepSpans = {
   span<T>(options: SpanOptions, run: () => Promise<T>): Promise<T>;
-  db<T>(sql: string, run: () => Promise<T>): Promise<T>;
+  db<T>(sqlOf: () => string, run: () => Promise<T>): Promise<T>;
+  /**
+   * The lease's two statements, which bracket every other span in the run. Never
+   * subject to the batch budget — the budget exists to keep spans like these from
+   * being pushed out of the trace, so spending it on them defeats its own purpose.
+   */
+  lease<T>(sqlOf: () => string, run: () => Promise<T>): Promise<T>;
   attributes(attrs: Record<string, string | number | boolean>): void;
   capture(error: unknown, metadata: Record<string, unknown>): void;
 };
@@ -34,14 +40,22 @@ export function sweepSpans(
   maxDbSpans: number = MAX_INSTRUMENTED_BATCHES,
 ): SweepSpans {
   let remaining = maxDbSpans;
+
+  // `sqlOf` is a thunk, not a string, so a skipped `db` span never pays for the
+  // `query.toSQL()` serialisation it will not use — only `lease` and a `db` call
+  // inside budget actually invoke it.
+  const dbSpan = <T>(sqlOf: () => string, run: () => Promise<T>): Promise<T> =>
+    instrumentation.startSpan({ name: sqlOf(), op: "db.query", attributes: DB_ATTRS }, run);
+
   return {
     span: (options, run) => instrumentation.startSpan(options, run),
-    db: (sql, run) => {
+    db: (sqlOf, run) => {
       // Past the budget the query still runs — the trace loses resolution, never work.
       if (remaining <= 0) return run();
       remaining--;
-      return instrumentation.startSpan({ name: sql, op: "db.query", attributes: DB_ATTRS }, run);
+      return dbSpan(sqlOf, run);
     },
+    lease: (sqlOf, run) => dbSpan(sqlOf, run),
     attributes: (attrs) => instrumentation.setSpanAttributes(attrs),
     capture: (error, metadata) => instrumentation.capture(error, { metadata }),
   };
