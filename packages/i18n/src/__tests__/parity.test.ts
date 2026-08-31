@@ -134,4 +134,64 @@ describe("catalog parity", () => {
     });
     expect(stale).toEqual([]);
   });
+
+  // Why this test exists: the en/fr gate above compares the two locales against
+  // each other and is structurally blind to a catalog that is wrong *within* one
+  // locale. A French `_one` collapsed onto its `_other` renders "1 jours" — a
+  // grammar error no assertion in this repo caught until a human read the
+  // output. English is deliberately not checked: its `_one` and `_other` are
+  // legitimately identical wherever the noun does not inflect around `{{count}}`
+  // (`common.notifications.unreadLabel_*` is exactly that). French always
+  // inflects, so an identical pair there is a defect unless the noun itself is
+  // invariable — those go on the list below, with their reason, like every other
+  // exemption in this file.
+  const ALLOWED_SAME_PLURAL_FORM: readonly string[] = [];
+
+  it("no French plural collapses its singular onto its plural", () => {
+    const allowed = new Set(ALLOWED_SAME_PLURAL_FORM);
+    const offenders: string[] = [];
+    for (const namespace of NAMESPACES) {
+      for (const path of flatten(frCatalog[namespace] as unknown as Nested)) {
+        if (!path.endsWith("_one")) continue;
+        const stem = `${namespace}.${path.slice(0, -"_one".length)}`;
+        if (allowed.has(stem)) continue;
+        const one = valueAt(frCatalog, `${namespace}.${path}`);
+        const other = valueAt(frCatalog, `${stem}_other`);
+        if (one !== undefined && one === other) offenders.push(stem);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  // Same reason the identical-value exemptions are swept: a list nobody prunes
+  // stops being a list of decisions and becomes a list of things unexamined.
+  it("every plural exemption still names a genuinely identical French pair", () => {
+    const stale = ALLOWED_SAME_PLURAL_FORM.filter((stem) => {
+      const one = valueAt(frCatalog, `${stem}_one`);
+      const other = valueAt(frCatalog, `${stem}_other`);
+      return one === undefined || other === undefined || one !== other;
+    });
+    expect(stale).toEqual([]);
+  });
+
+  // A `_one` with no `_other` (or the reverse) is a key i18next will fall back
+  // out of at runtime, silently, for exactly one count bucket.
+  it("every plural key has both forms in both locales", () => {
+    const incomplete: string[] = [];
+    for (const [locale, catalog] of [
+      ["en", enCatalog],
+      ["fr", frCatalog],
+    ] as const) {
+      for (const namespace of NAMESPACES) {
+        for (const path of flatten(catalog[namespace] as unknown as Nested)) {
+          const suffix = path.endsWith("_one") ? "_one" : path.endsWith("_other") ? "_other" : null;
+          if (suffix === null) continue;
+          const stem = `${namespace}.${path.slice(0, -suffix.length)}`;
+          const twin = suffix === "_one" ? `${stem}_other` : `${stem}_one`;
+          if (valueAt(catalog, twin) === undefined) incomplete.push(`${locale}:${twin}`);
+        }
+      }
+    }
+    expect(incomplete).toEqual([]);
+  });
 });
