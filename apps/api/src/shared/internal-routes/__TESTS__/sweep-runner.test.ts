@@ -1,5 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
+import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { MAX_BATCHES, runRetentionSweep } from "../sweep-runner";
+import { sweepSpans } from "../sweep-span";
 
 const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 
@@ -7,6 +9,8 @@ const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 // route that forgot it would no longer type-check. Tests that aren't exercising
 // lease behavior pass this always-acquires no-op instead.
 const noopLock = { acquire: async () => true, release: async () => {} };
+
+const noopSpans = () => sweepSpans(new NoOpInstrumentation());
 
 describe("runRetentionSweep", () => {
   it("runs passes sequentially and reports each one", async () => {
@@ -27,6 +31,7 @@ describe("runRetentionSweep", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: noopLock,
+      spans: noopSpans(),
       passes: [pass("sent", 3), pass("failed", 2)],
       logger,
       label: "sweep-x",
@@ -52,6 +57,7 @@ describe("runRetentionSweep", () => {
     await runRetentionSweep({
       body: { dryRun: true },
       lock: noopLock,
+      spans: noopSpans(),
       passes: [pass("sent", 7), pass("failed", 90)],
       logger,
       label: "sweep-x",
@@ -78,6 +84,7 @@ describe("runRetentionSweep — time budget", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: noopLock,
+      spans: noopSpans(),
       deadlineMs: 100,
       // Each clock read jumps 60ms: the first loop check sees 0 (batch runs), the
       // second sees 120 > 100 (budget spent).
@@ -118,6 +125,7 @@ describe("runRetentionSweep — time budget", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: noopLock,
+      spans: noopSpans(),
       deadlineMs: 100,
       now: fakeClock(60),
       passes: [pass("sent"), pass("failed")],
@@ -135,6 +143,7 @@ describe("runRetentionSweep — time budget", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: noopLock,
+      spans: noopSpans(),
       deadlineMs: 60_000,
       passes: [
         {
@@ -156,6 +165,7 @@ describe("runRetentionSweep — time budget", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: noopLock,
+      spans: noopSpans(),
       deadlineMs: 60_000,
       // The inter-batch sleep is stubbed out: this drives the loop through all
       // MAX_BATCHES iterations, which would otherwise take ~50s at
@@ -183,6 +193,7 @@ describe("runRetentionSweep — time budget", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: noopLock,
+      spans: noopSpans(),
       deadlineMs: 60_000,
       passes: [
         {
@@ -212,6 +223,7 @@ describe("runRetentionSweep — lease", () => {
     const result = await runRetentionSweep({
       body: {},
       lock: { acquire: async () => false, release: async () => {} },
+      spans: noopSpans(),
       passes: [
         {
           label: "sent",
@@ -243,6 +255,7 @@ describe("runRetentionSweep — lease", () => {
           released = true;
         },
       },
+      spans: noopSpans(),
       passes: [
         {
           label: "sent",
@@ -259,5 +272,140 @@ describe("runRetentionSweep — lease", () => {
 
     await expect(run).rejects.toThrow("boom");
     expect(released).toBe(true);
+  });
+});
+
+describe("runRetentionSweep instrumentation", () => {
+  it("wraps the run and each pass in a named span", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "startSpan");
+
+    await runRetentionSweep({
+      body: { dryRun: true },
+      lock: noopLock,
+      spans: sweepSpans(instrumentation),
+      passes: [
+        {
+          label: "operational",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => 0,
+        },
+        {
+          label: "compliance",
+          retentionDays: 365,
+          countEligible: async () => 0,
+          purgeBatch: async () => 0,
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    const names = spy.mock.calls.map(([options]) => (options as { name: string }).name);
+    expect(names).toContain("sweep > sweep-x");
+    expect(names).toContain("sweep > sweep-x:operational");
+    expect(names).toContain("sweep > sweep-x:compliance");
+  });
+
+  it("records the pass outcome as span attributes", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "setSpanAttributes");
+
+    await runRetentionSweep({
+      body: {},
+      lock: noopLock,
+      spans: sweepSpans(instrumentation),
+      passes: [
+        {
+          label: "operational",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => 0,
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ "sweep.stop_reason": "exhausted", "sweep.deleted": 0 }),
+    );
+  });
+
+  it("captures a swallowed batch error", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "capture");
+    const boom = new Error("batch exploded");
+
+    await runRetentionSweep({
+      body: {},
+      lock: noopLock,
+      spans: sweepSpans(instrumentation),
+      passes: [
+        {
+          label: "operational",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => {
+            throw boom;
+          },
+          onBatchError: () => "break" as const,
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    expect(spy).toHaveBeenCalledWith(boom, expect.anything());
+  });
+
+  it("does not capture a rethrown batch error — onError already reports it", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "capture");
+
+    await expect(
+      runRetentionSweep({
+        body: {},
+        lock: noopLock,
+        spans: sweepSpans(instrumentation),
+        passes: [
+          {
+            label: "operational",
+            retentionDays: 7,
+            countEligible: async () => 0,
+            purgeBatch: async () => {
+              throw new Error("batch exploded");
+            },
+          },
+        ],
+        logger,
+        label: "sweep-x",
+      }),
+    ).rejects.toThrow("batch exploded");
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("captures a failed lease release", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "capture");
+    const releaseFailure = new Error("release failed");
+
+    await runRetentionSweep({
+      body: { dryRun: true },
+      lock: {
+        acquire: async () => true,
+        release: async () => {
+          throw releaseFailure;
+        },
+      },
+      spans: sweepSpans(instrumentation),
+      passes: [],
+      logger,
+      label: "sweep-x",
+    });
+
+    expect(spy).toHaveBeenCalledWith(releaseFailure, expect.anything());
   });
 });
