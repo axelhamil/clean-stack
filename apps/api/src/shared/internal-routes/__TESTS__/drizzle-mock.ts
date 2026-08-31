@@ -20,9 +20,12 @@ export const drizzleMock = () => ({
   asc: () => ({}),
   desc: () => ({}),
   like: () => ({}),
+  ilike: () => ({}),
   inArray: () => ({}),
   count: () => ({}),
   arrayContains: () => ({}),
+  migrate: async () => {},
+  getRateLimitDbClient: () => ({}),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) => ({
       // Reconstructs the literal SQL text so a test can assert on `String(sql\`...\`)` —
@@ -67,6 +70,7 @@ export const drizzleMock = () => ({
   },
   multiTenantSchema: { organization: { id: {} } },
   authSchema: {},
+  ssoSchema: {},
   schema: {},
   trackEventsOnSuccess: () => {},
   TransactionService: class {},

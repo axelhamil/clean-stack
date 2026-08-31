@@ -1,74 +1,56 @@
 // `/internal/sweep-consents` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 // Purges ONLY guest (userId IS NULL) expired consent records. Authed records are compliance evidence — never purged.
 
-import { and, consentSchema, db, inArray, isNull, lt, sql } from "@packages/drizzle";
+import { and, consentSchema, isNull, lt } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
+import { di } from "../../container";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
+import { purgeBatchWithTimeout } from "./sweep-purge";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
+import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-async function countEligible(cutoff: Date): Promise<number> {
-  return countEligibleWithTimeout(
-    consentSchema.consentRecord,
-    and(
-      isNull(consentSchema.consentRecord.userId),
-      lt(consentSchema.consentRecord.expiresAt, cutoff),
-    ),
+const filterFor = (cutoff: Date) =>
+  and(
+    isNull(consentSchema.consentRecord.userId),
+    lt(consentSchema.consentRecord.expiresAt, cutoff),
   );
-}
-
-async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-    await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
-
-    const subq = tx
-      .select({ id: consentSchema.consentRecord.id })
-      .from(consentSchema.consentRecord)
-      .where(
-        and(
-          isNull(consentSchema.consentRecord.userId),
-          lt(consentSchema.consentRecord.expiresAt, cutoff),
-        ),
-      )
-      .orderBy(consentSchema.consentRecord.expiresAt)
-      .limit(batchSize)
-      .for("update", { skipLocked: true });
-
-    const deleted = await tx
-      .delete(consentSchema.consentRecord)
-      .where(inArray(consentSchema.consentRecord.id, subq))
-      .returning({ id: consentSchema.consentRecord.id });
-
-    return deleted.length;
-  });
-}
 
 export const sweepConsentsRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/sweep-consents", zV("json", sweepBodySchema), async (c) => {
     const logger = c.var.logger;
+    const spans = sweepSpans(di.IInstrumentation);
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
+      spans,
       passes: [
         {
           label: "default",
           retentionDays: env.CONSENT_RETENTION_DAYS,
-          purgeBatch,
-          countEligible,
+          purgeBatch: (cutoff, size) =>
+            purgeBatchWithTimeout({
+              table: consentSchema.consentRecord,
+              idColumn: consentSchema.consentRecord.id,
+              where: filterFor(cutoff),
+              orderBy: consentSchema.consentRecord.expiresAt,
+              batchSize: size,
+              spans,
+            }),
+          countEligible: (cutoff) =>
+            countEligibleWithTimeout(consentSchema.consentRecord, filterFor(cutoff), spans),
         },
       ],
       logger,
       label: "sweep-consents",
       deadlineMs: env.SWEEP_DEADLINE_MS,
-      lock: sweepLockFor("sweep-consents"),
+      lock: sweepLockFor("sweep-consents", spans),
     });
     return c.json(response);
   });

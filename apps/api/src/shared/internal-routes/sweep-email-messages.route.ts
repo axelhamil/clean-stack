@@ -1,19 +1,23 @@
 // `/internal/sweep-email-messages` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { type AnyPgColumn, and, db, emailSchema, eq, inArray, lt, sql } from "@packages/drizzle";
+import { and, emailSchema, eq, lt } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
+import { di } from "../../container";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
+import { purgeBatchWithTimeout } from "./sweep-purge";
 import {
   type RetentionPass,
   runRetentionSweep,
   type SweepBody,
   sweepBodySchema,
 } from "./sweep-runner";
+import type { SweepSpans } from "./sweep-span";
+import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
@@ -22,46 +26,35 @@ const em = emailSchema.emailMessage;
 const sentPredicate = (cutoff: Date) => and(eq(em.status, "sent"), lt(em.sentAt, cutoff));
 const failedPredicate = (cutoff: Date) => and(eq(em.status, "failed"), lt(em.createdAt, cutoff));
 
-async function countEligible(where: ReturnType<typeof sentPredicate>): Promise<number> {
-  return countEligibleWithTimeout(em, where);
-}
-
-async function purgeBatch(
-  where: ReturnType<typeof sentPredicate>,
-  orderBy: AnyPgColumn,
-  batchSize: number,
-): Promise<number> {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-    await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
-
-    const subq = tx
-      .select({ id: em.id })
-      .from(em)
-      .where(where)
-      .orderBy(orderBy)
-      .limit(batchSize)
-      .for("update", { skipLocked: true });
-
-    const deleted = await tx.delete(em).where(inArray(em.id, subq)).returning({ id: em.id });
-    return deleted.length;
-  });
-}
-
-export function buildEmailSweepPasses(): RetentionPass[] {
+export function buildEmailSweepPasses(spans: SweepSpans): RetentionPass[] {
   return [
     {
       label: "sent",
       retentionDays: env.EMAIL_MESSAGE_RETENTION_DAYS,
-      countEligible: (cutoff) => countEligible(sentPredicate(cutoff)),
-      purgeBatch: (cutoff, size) => purgeBatch(sentPredicate(cutoff), em.sentAt, size),
+      countEligible: (cutoff) => countEligibleWithTimeout(em, sentPredicate(cutoff), spans),
+      purgeBatch: (cutoff, size) =>
+        purgeBatchWithTimeout({
+          table: em,
+          idColumn: em.id,
+          where: sentPredicate(cutoff),
+          orderBy: em.sentAt,
+          batchSize: size,
+          spans,
+        }),
     },
     {
       label: "failed",
       retentionDays: env.EMAIL_MESSAGE_FAILED_RETENTION_DAYS,
-      countEligible: (cutoff) => countEligible(failedPredicate(cutoff)),
-      purgeBatch: (cutoff, size) => purgeBatch(failedPredicate(cutoff), em.createdAt, size),
+      countEligible: (cutoff) => countEligibleWithTimeout(em, failedPredicate(cutoff), spans),
+      purgeBatch: (cutoff, size) =>
+        purgeBatchWithTimeout({
+          table: em,
+          idColumn: em.id,
+          where: failedPredicate(cutoff),
+          orderBy: em.createdAt,
+          batchSize: size,
+          spans,
+        }),
     },
   ];
 }
@@ -69,13 +62,15 @@ export function buildEmailSweepPasses(): RetentionPass[] {
 export const sweepEmailMessagesRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/sweep-email-messages", zV("json", sweepBodySchema), async (c) => {
+    const spans = sweepSpans(di.IInstrumentation);
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
-      passes: buildEmailSweepPasses(),
+      spans,
+      passes: buildEmailSweepPasses(spans),
       logger: c.var.logger,
       label: "sweep-email-messages",
       deadlineMs: env.SWEEP_DEADLINE_MS,
-      lock: sweepLockFor("sweep-email-messages"),
+      lock: sweepLockFor("sweep-email-messages", spans),
     });
     return c.json(response);
   });

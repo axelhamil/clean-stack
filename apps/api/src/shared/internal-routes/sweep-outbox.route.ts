@@ -1,67 +1,49 @@
 // `/internal/sweep-outbox` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, db, inArray, isNotNull, lt, outboxSchema, sql } from "@packages/drizzle";
+import { and, isNotNull, lt, outboxSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
+import { di } from "../../container";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
+import { purgeBatchWithTimeout } from "./sweep-purge";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
+import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-async function countEligible(cutoff: Date): Promise<number> {
-  return countEligibleWithTimeout(
-    outboxSchema.outboxEvent,
-    and(
-      isNotNull(outboxSchema.outboxEvent.dispatchedAt),
-      lt(outboxSchema.outboxEvent.dispatchedAt, cutoff),
-    ),
+const filterFor = (cutoff: Date) =>
+  and(
+    isNotNull(outboxSchema.outboxEvent.dispatchedAt),
+    lt(outboxSchema.outboxEvent.dispatchedAt, cutoff),
   );
-}
-
-async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-    await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
-
-    const subq = tx
-      .select({ id: outboxSchema.outboxEvent.id })
-      .from(outboxSchema.outboxEvent)
-      .where(
-        and(
-          isNotNull(outboxSchema.outboxEvent.dispatchedAt),
-          lt(outboxSchema.outboxEvent.dispatchedAt, cutoff),
-        ),
-      )
-      .orderBy(outboxSchema.outboxEvent.dispatchedAt)
-      .limit(batchSize)
-      .for("update", { skipLocked: true });
-
-    const deleted = await tx
-      .delete(outboxSchema.outboxEvent)
-      .where(inArray(outboxSchema.outboxEvent.id, subq))
-      .returning({ id: outboxSchema.outboxEvent.id });
-
-    return deleted.length;
-  });
-}
 
 export const sweepOutboxRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/sweep-outbox", zV("json", sweepBodySchema), async (c) => {
     const logger = c.var.logger;
+    const spans = sweepSpans(di.IInstrumentation);
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
+      spans,
       passes: [
         {
           label: "default",
           retentionDays: env.OUTBOX_RETENTION_DAYS,
-          purgeBatch,
-          countEligible,
+          purgeBatch: (cutoff, size) =>
+            purgeBatchWithTimeout({
+              table: outboxSchema.outboxEvent,
+              idColumn: outboxSchema.outboxEvent.id,
+              where: filterFor(cutoff),
+              orderBy: outboxSchema.outboxEvent.dispatchedAt,
+              batchSize: size,
+              spans,
+            }),
+          countEligible: (cutoff) =>
+            countEligibleWithTimeout(outboxSchema.outboxEvent, filterFor(cutoff), spans),
           onBatchError: (err) => {
             const isFK =
               err instanceof Error &&
@@ -81,7 +63,7 @@ export const sweepOutboxRoutes = new Hono<HonoEnv>()
       logger,
       label: "sweep-outbox",
       deadlineMs: env.SWEEP_DEADLINE_MS,
-      lock: sweepLockFor("sweep-outbox"),
+      lock: sweepLockFor("sweep-outbox", spans),
     });
     return c.json(response);
   });
