@@ -1,5 +1,6 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
+import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
   group: string;
@@ -28,6 +29,7 @@ interface EventTypePickerProps {
 }
 
 export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
+  const { t } = useTranslation("settings");
   const groups = groupedSubscribableEvents();
   const selected = new Set(value);
   const allSelected = selected.has("*");
@@ -44,7 +46,7 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
       {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
       <label className="flex items-center gap-2">
         <Checkbox checked={allSelected} onCheckedChange={(c) => toggle("*", c === true)} />
-        <span className="font-medium">All events (*)</span>
+        <span className="font-medium">{t("webhooks.eventTypePicker.allEvents")}</span>
       </label>
       {groups.map((g) => {
         const groupSelected = selected.has(g.wildcard);
@@ -58,7 +60,7 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                 onCheckedChange={(c) => toggle(g.wildcard, c === true)}
               />
               <span className="font-medium capitalize">
-                {g.group}.* (all {g.group} events)
+                {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
               </span>
             </label>
             <div className="ml-6 space-y-1">

@@ -15,8 +15,10 @@ import {
   TooltipTrigger,
 } from "@packages/ui/components/ui/tooltip";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
+import { ENDPOINT_STATUS_KEYS } from "../webhook-labels";
 
 export type EndpointStatus = "active" | "paused" | "auto-disabled";
 
@@ -44,6 +46,7 @@ export function EndpointRow({
   onDelete,
   onSelect,
 }: EndpointRowProps) {
+  const { t } = useTranslation(["settings", "common"]);
   const formatDate = useFormatDate();
   const status = endpointStatus(endpoint);
 
@@ -57,16 +60,18 @@ export function EndpointRow({
               <TooltipTrigger asChild>
                 <Badge variant="destructive" className="flex items-center gap-1">
                   <TriangleAlertIcon className="size-3" />
-                  auto-disabled
+                  {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
                 </Badge>
               </TooltipTrigger>
               <TooltipContent>
-                Disabled after repeated delivery failures — re-enable to reset
+                {t("settings:webhooks.endpointRow.autoDisabledTooltip")}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <Badge variant={status === "active" ? "default" : "secondary"}>{status}</Badge>
+          <Badge variant={status === "active" ? "default" : "secondary"}>
+            {t(ENDPOINT_STATUS_KEYS[status])}
+          </Badge>
         )}
       </TableCell>
       <TableCell>{endpoint.eventTypes.length}</TableCell>
@@ -76,25 +81,31 @@ export function EndpointRow({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
               <MoreHorizontalIcon className="size-4" />
-              <span className="sr-only">Open actions</span>
+              <span className="sr-only">{t("settings:webhooks.endpointRow.openActions")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onSelect(endpoint)}>View deliveries</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSelect(endpoint)}>
+              {t("settings:webhooks.endpointRow.viewDeliveries")}
+            </DropdownMenuItem>
             {canWrite && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onEdit(endpoint)}>Edit</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSendTest(endpoint)}>Send test</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(endpoint)}>
+                  {t("settings:webhooks.endpointRow.edit")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSendTest(endpoint)}>
+                  {t("settings:webhooks.endpointRow.sendTest")}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onRotate(endpoint)}>
-                  Rotate secret
+                  {t("settings:webhooks.endpointRow.rotateSecret")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onDelete(endpoint)}
                   className="text-destructive focus:text-destructive"
                 >
-                  Delete
+                  {t("settings:webhooks.endpointRow.delete")}
                 </DropdownMenuItem>
               </>
             )}
