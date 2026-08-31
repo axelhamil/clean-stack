@@ -203,5 +203,12 @@ export default {
     updateSsoEnforcement: "Échec de la mise à jour de l'application du SSO",
     loadSsoProviders: "Échec du chargement des fournisseurs SSO",
     loadSsoVerificationToken: "Échec du chargement du jeton de vérification",
+    banUser: "Échec de la suspension du compte",
+    unbanUser: "Échec de la réactivation du compte",
+    revokeUserSessions: "Échec de la révocation des sessions",
+    resetUserPassword: "Échec de l'envoi de la réinitialisation du mot de passe",
+    startImpersonation: "Échec du démarrage de l'emprunt d'identité",
+    loadAdminUsers: "Échec du chargement des comptes",
+    loadAdminUser: "Échec du chargement du compte",
   },
 } as const;

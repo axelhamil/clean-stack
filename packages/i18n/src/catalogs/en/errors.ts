@@ -217,5 +217,12 @@ export default {
     updateSsoEnforcement: "Failed to update SSO enforcement",
     loadSsoProviders: "Failed to load SSO providers",
     loadSsoVerificationToken: "Failed to load the verification token",
+    banUser: "Failed to suspend account",
+    unbanUser: "Failed to reactivate account",
+    revokeUserSessions: "Failed to revoke sessions",
+    resetUserPassword: "Failed to send password reset",
+    startImpersonation: "Failed to start impersonation",
+    loadAdminUsers: "Failed to load accounts",
+    loadAdminUser: "Failed to load account",
   },
 } as const;

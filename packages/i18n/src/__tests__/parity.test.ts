@@ -104,6 +104,18 @@ describe("catalog parity", () => {
     "settings.sso.forms.saml.issuerPlaceholder",
     // Example SAML entry-point URL — a non-linguistic placeholder.
     "settings.sso.forms.saml.entryPointPlaceholder",
+    // Format example ticket reference for the admin impersonation form, not
+    // copy — kept identical in both locales per the task brief.
+    "admin.users.impersonateForm.ticketRefPlaceholder",
+    // Genuine cognate — "permanent" is spelled identically in French.
+    "admin.users.durationPermanent",
+    // Acronym, identical in both languages.
+    "admin.users.sessions.ipHeader",
+    // "Type" is the same word in French too, matching the existing
+    // "Actions" / "Webhooks" cognate exemptions above.
+    "admin.users.sessions.typeHeader",
+    // "Normal" is spelled identically in French too — a genuine cognate.
+    "admin.users.sessions.typeNormal",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {
