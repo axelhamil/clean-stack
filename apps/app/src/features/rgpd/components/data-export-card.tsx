@@ -8,6 +8,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { DownloadIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { useRequestExport } from "../hooks/use-request-export";
 
@@ -19,6 +20,7 @@ interface DataExportCardProps {
 
 export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
   const formatDateTime = useFormatDateTime();
+  const { t } = useTranslation("settings");
   const mutation = useRequestExport();
 
   const last = lastExportRequestedAt ? new Date(lastExportRequestedAt) : null;
@@ -28,10 +30,8 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Download your data</CardTitle>
-        <CardDescription>
-          Receive a JSON archive of your account data by email. RGPD Art. 20 (right to portability).
-        </CardDescription>
+        <CardTitle>{t("dataExport.title")}</CardTitle>
+        <CardDescription>{t("dataExport.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <Button
@@ -41,10 +41,12 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
           onClick={() => mutation.mutate()}
         >
           <DownloadIcon />
-          {mutation.isPending ? "Requesting…" : "Request data export"}
+          {mutation.isPending ? t("dataExport.requesting") : t("dataExport.request")}
         </Button>
         {cooldown && nextAllowedAt && (
-          <TypographyMuted>Next request available {formatDateTime(nextAllowedAt)}.</TypographyMuted>
+          <TypographyMuted>
+            {t("dataExport.nextAvailable", { date: formatDateTime(nextAllowedAt) })}
+          </TypographyMuted>
         )}
       </CardContent>
     </Card>

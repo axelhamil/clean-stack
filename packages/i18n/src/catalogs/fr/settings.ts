@@ -256,4 +256,83 @@ export default {
     notificationDefaultsDescription:
       "Les membres qui n'ont pas fait leur propre choix héritent de ces paramètres. Forcez une catégorie pour l'imposer à tous, en écrasant leur choix.",
   },
+  privacy: {
+    pageTitle: "Confidentialité et données",
+    policyAcceptance: {
+      title: "Acceptation des politiques",
+      description: "Votre statut d'acceptation des versions actuelles de nos politiques.",
+      loading: "Chargement…",
+      neverAccepted: "Aucune version acceptée",
+      upToDate: "À jour",
+      updateRequired: "Mise à jour requise",
+      loadError: "Impossible de charger le statut des politiques.",
+      policies: {
+        privacy: "Politique de confidentialité",
+        terms: "Conditions d'utilisation",
+      },
+    },
+    dataSources: {
+      title: "Sous-traitants de données",
+      description:
+        "Tiers que nous utilisons pour faire fonctionner le service (actifs uniquement).",
+      viewAll: "Voir tous les sous-traitants",
+      processors: {
+        resend: {
+          purpose: "Envoi d'e-mails transactionnels",
+          region: "États-Unis (certifié EU DPF)",
+        },
+        r2: {
+          purpose: "Stockage d'objets (fichiers téléversés)",
+          region: "UE ou États-Unis (zone configurable)",
+        },
+        betterAuth: {
+          purpose: "Authentification sociale OAuth",
+          region: "États-Unis / UE (selon le fournisseur)",
+        },
+        stripe: {
+          purpose: "Traitement des paiements et facturation",
+          region: "États-Unis (certifié EU DPF)",
+        },
+        umami: {
+          purpose: "Mesure d'audience respectueuse de la vie privée",
+          region: "Configurable (auto-hébergeable)",
+        },
+      },
+    },
+  },
+  dataExport: {
+    title: "Télécharger vos données",
+    description:
+      "Recevez une archive JSON des données de votre compte par e-mail. RGPD art. 20 (droit à la portabilité).",
+    requesting: "Envoi de la demande…",
+    request: "Demander l'export des données",
+    nextAvailable: "Prochaine demande disponible le {{date}}.",
+    requestedToast:
+      "Export demandé. Consultez votre boîte de réception pour le lien de téléchargement.",
+    requestFailed: "Impossible de demander l'export des données. Veuillez réessayer.",
+  },
+  sessions: {
+    title: "Sessions actives",
+    description: "Appareils actuellement connectés à votre compte.",
+    signOutOthers: "Déconnecter les autres",
+    loading: "Chargement…",
+    empty: "Aucune session active.",
+    current: "Actuelle",
+    unknownIp: "IP inconnue",
+    expiresAt: "{{ip}} · expire le {{date}}",
+    unknownDevice: "Appareil inconnu",
+    revoke: "Révoquer",
+    device: {
+      ios: "Appareil iOS",
+      android: "Appareil Android",
+      mac: "Mac",
+      windows: "Windows",
+      linux: "Linux",
+      browser: "Navigateur",
+    },
+    revokedToast: "Session révoquée",
+    revokeFailed: "Échec de la révocation de la session",
+    othersRevokedToast: "Autres sessions révoquées",
+    revokeOthersFailed: "Échec de la révocation des sessions",
+  },
 } as const;

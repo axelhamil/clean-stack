@@ -46,6 +46,12 @@ describe("catalog parity", () => {
     // "Secret" is spelled identically in French — a genuine cognate, not an
     // untranslated placeholder.
     "common.secretReveal.secretLabel",
+    // Platform names, not words: "Mac", "Windows" and "Linux" are proper nouns
+    // that a French UI spells exactly as an English one does. The two device
+    // labels that ARE phrases ("iOS device", "Browser") are translated.
+    "settings.sessions.device.mac",
+    "settings.sessions.device.windows",
+    "settings.sessions.device.linux",
     // Non-linguistic placeholders: a masked password, a proper noun, a digit
     // pattern and a recovery-code pattern don't get translated. The example
     // email address IS translated (`you@` -> `vous@`, RFC 2606's

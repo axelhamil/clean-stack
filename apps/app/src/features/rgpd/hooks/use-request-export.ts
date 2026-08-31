@@ -7,15 +7,15 @@ import { sessionQueryOptions } from "../../../shared/api/queries/session";
 
 export function useRequestExport() {
   const { t } = useTranslation("errors");
+  const { t: tSettings } = useTranslation("settings");
   const queryClient = useQueryClient();
 
   return useMutation({
     ...requestDataExportMutationOptions,
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      toast.success("Export requested. Check your inbox for the download link.");
+      toast.success(tSettings("dataExport.requestedToast"));
     },
-    onError: (err) =>
-      toast.error(formatApiError(err, "Couldn't request data export. Please try again.", t)),
+    onError: (err) => toast.error(formatApiError(err, tSettings("dataExport.requestFailed"), t)),
   });
 }

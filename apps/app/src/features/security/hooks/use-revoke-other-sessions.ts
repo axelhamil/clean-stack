@@ -1,20 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
 
 export function useRevokeOtherSessions() {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: ["sessions", "revoke-others"],
     mutationFn: async () => {
       const { error } = await authClient.revokeOtherSessions();
-      if (error) throw new Error(error.message ?? "Failed to revoke sessions");
+      if (error) throw new Error(error.message ?? t("sessions.revokeOthersFailed"));
     },
     onSuccess: async () => {
-      toast.success("Other sessions revoked");
+      toast.success(t("sessions.othersRevokedToast"));
       await queryClient.invalidateQueries({
         queryKey: sessionsQueryOptions.queryKey,
       });

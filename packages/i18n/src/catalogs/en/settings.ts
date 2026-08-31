@@ -246,4 +246,81 @@ export default {
     notificationDefaultsDescription:
       "Members who have not chosen for themselves inherit these settings. Enforce a category to impose it on everyone, overriding their own choice.",
   },
+  privacy: {
+    pageTitle: "Privacy & data",
+    policyAcceptance: {
+      title: "Policy acceptance",
+      description: "Your acceptance status for the current versions of our policies.",
+      loading: "Loading…",
+      neverAccepted: "Never accepted",
+      upToDate: "Up to date",
+      updateRequired: "Update required",
+      loadError: "Could not load policy status.",
+      policies: {
+        privacy: "Privacy Policy",
+        terms: "Terms of Service",
+      },
+    },
+    dataSources: {
+      title: "Data sub-processors",
+      description: "Third parties we use to operate the service (active only).",
+      viewAll: "View all sub-processors",
+      processors: {
+        resend: {
+          purpose: "Transactional email delivery",
+          region: "US (EU DPF-certified)",
+        },
+        r2: {
+          purpose: "Object storage (file uploads)",
+          region: "EU or US (zone configurable)",
+        },
+        betterAuth: {
+          purpose: "OAuth social authentication",
+          region: "US / EU (per provider)",
+        },
+        stripe: {
+          purpose: "Payment processing and billing",
+          region: "US (EU DPF-certified)",
+        },
+        umami: {
+          purpose: "Privacy-friendly web analytics",
+          region: "Configurable (self-hostable)",
+        },
+      },
+    },
+  },
+  dataExport: {
+    title: "Download your data",
+    description:
+      "Receive a JSON archive of your account data by email. RGPD Art. 20 (right to portability).",
+    requesting: "Requesting…",
+    request: "Request data export",
+    nextAvailable: "Next request available {{date}}.",
+    requestedToast: "Export requested. Check your inbox for the download link.",
+    requestFailed: "Couldn't request data export. Please try again.",
+  },
+  sessions: {
+    title: "Active sessions",
+    description: "Devices currently signed in to your account.",
+    signOutOthers: "Sign out others",
+    loading: "Loading…",
+    empty: "No active sessions.",
+    current: "Current",
+    unknownIp: "Unknown IP",
+    expiresAt: "{{ip}} · expires {{date}}",
+    unknownDevice: "Unknown device",
+    revoke: "Revoke",
+    device: {
+      ios: "iOS device",
+      android: "Android device",
+      mac: "Mac",
+      windows: "Windows",
+      linux: "Linux",
+      browser: "Browser",
+    },
+    revokedToast: "Session revoked",
+    revokeFailed: "Failed to revoke session",
+    othersRevokedToast: "Other sessions revoked",
+    revokeOthersFailed: "Failed to revoke sessions",
+  },
 } as const;
