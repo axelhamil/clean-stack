@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { core, z } from "zod";
+import type { z } from "zod";
 import { oidcProviderSchema, samlProviderSchema } from "../sso.schema";
 
 describe("oidcProviderSchema", () => {
@@ -58,7 +58,11 @@ describe("sso schemas route their copy through the catalog", () => {
     });
     const domainIssue = issues.find((i) => i.path[0] === "domain");
     expect(domainIssue?.code).toBe("custom");
-    expect((domainIssue as core.$ZodIssueCustom | undefined)?.params).toEqual({
+    // Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed
+    // on `code`, so the conditional gives real access to `params`. A cast would
+    // assert the shape instead of proving it, and would still compile if the
+    // check above ever stopped holding.
+    expect(domainIssue?.code === "custom" ? domainIssue.params : undefined).toEqual({
       i18nKey: "validation.bareDomain",
     });
   });
@@ -72,7 +76,11 @@ describe("sso schemas route their copy through the catalog", () => {
     });
     const issuerIssue = issues.find((i) => i.path[0] === "issuer");
     expect(issuerIssue?.code).toBe("custom");
-    expect((issuerIssue as core.$ZodIssueCustom | undefined)?.params).toEqual({
+    // Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed
+    // on `code`, so the conditional gives real access to `params`. A cast would
+    // assert the shape instead of proving it, and would still compile if the
+    // check above ever stopped holding.
+    expect(issuerIssue?.code === "custom" ? issuerIssue.params : undefined).toEqual({
       i18nKey: "validation.httpsUrl",
     });
   });
@@ -86,7 +94,11 @@ describe("sso schemas route their copy through the catalog", () => {
     });
     const entryIssue = issues.find((i) => i.path[0] === "entryPoint");
     expect(entryIssue?.code).toBe("custom");
-    expect((entryIssue as core.$ZodIssueCustom | undefined)?.params).toEqual({
+    // Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed
+    // on `code`, so the conditional gives real access to `params`. A cast would
+    // assert the shape instead of proving it, and would still compile if the
+    // check above ever stopped holding.
+    expect(entryIssue?.code === "custom" ? entryIssue.params : undefined).toEqual({
       i18nKey: "validation.httpsUrl",
     });
   });
