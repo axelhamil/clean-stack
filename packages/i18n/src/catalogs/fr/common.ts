@@ -212,7 +212,7 @@ export default {
     },
   },
   policyAcceptance: {
-    acceptedToast: "Documents acceptés — bienvenue !",
+    acceptedToast: "Documents acceptés — bienvenue !",
     acceptFailed: "Impossible d'enregistrer votre acceptation. Veuillez réessayer.",
   },
   legalFooter: {
