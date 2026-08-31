@@ -176,6 +176,7 @@ const instrumentation = {
   startSpan: <T>(_o: unknown, fn: () => T) => fn(),
   capture: mock(() => {}),
   addBreadcrumb: mock(() => {}),
+  setSpanAttributes: mock(() => {}),
 };
 
 function serviceReturning(result: unknown[]) {
