@@ -218,6 +218,19 @@ export default {
     acceptedToast: "Invitation accepted",
     acceptFailed: "Failed to accept invitation",
   },
+  states: {
+    endpoint: {
+      active: "Active",
+      paused: "Paused",
+      autoDisabled: "Auto-disabled",
+    },
+    delivery: {
+      pending: "Pending",
+      success: "Success",
+      failed: "Failed",
+      deadLetter: "Dead letter",
+    },
+  },
   pricing: {
     title: "Pricing",
     subtitle: "Pick the plan that fits your team.",

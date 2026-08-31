@@ -187,5 +187,18 @@ export default {
     loadSubscription: "Failed to load subscription",
     loadPasskeys: "Failed to load passkeys",
     loadSessions: "Failed to load sessions",
+    createWebhookEndpoint: "Failed to create webhook endpoint",
+    updateWebhookEndpoint: "Failed to update webhook endpoint",
+    deleteWebhookEndpoint: "Failed to delete webhook endpoint",
+    replayWebhookDelivery: "Failed to replay delivery",
+    rotateWebhookSecret: "Failed to rotate secret",
+    sendWebhookTestEvent: "Failed to send test event",
+    // The JSX loading state (`webhooks.route.tsx`) and this fallback message
+    // (`webhooks.queries.ts`, shown only when the API sends no JSON error
+    // body) render the exact same failure — one key, so they can never drift
+    // a trailing period apart the way the two literals did before extraction.
+    loadWebhookEndpoints: "Failed to load webhook endpoints.",
+    loadWebhookDeliveries: "Failed to load deliveries.",
+    loadWebhookDeliveryDetail: "Failed to load delivery detail",
   },
 } as const;

@@ -222,6 +222,19 @@ export default {
     acceptedToast: "Invitation acceptée",
     acceptFailed: "Échec de l'acceptation de l'invitation",
   },
+  states: {
+    endpoint: {
+      active: "Actif",
+      paused: "En pause",
+      autoDisabled: "Désactivé automatiquement",
+    },
+    delivery: {
+      pending: "En attente",
+      success: "Réussi",
+      failed: "Échoué",
+      deadLetter: "Lettre morte",
+    },
+  },
   pricing: {
     title: "Tarifs",
     subtitle: "Choisissez le forfait adapté à votre équipe.",

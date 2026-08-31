@@ -77,6 +77,15 @@ describe("catalog parity", () => {
     // uses the same slash). The translation happens in the interpolated
     // `interval` value (`common.pricing.interval.*`), not in this template.
     "common.pricing.perInterval",
+    // "Webhooks" is a correct French word too (already exempted once on the
+    // nav tab, `common.contextualTabs.webhooks`); this is the same word on
+    // the page's own `<h1>`, a distinct key path.
+    "settings.webhooks.pageTitle",
+    // "URL" is the same acronym in both languages, not an untranslated word.
+    "settings.webhooks.endpointsTable.urlHeader",
+    // Example webhook URL — a non-linguistic placeholder, not sentence copy
+    // (mirrors the auth/account placeholder exemptions above).
+    "settings.webhooks.form.urlPlaceholder",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {
