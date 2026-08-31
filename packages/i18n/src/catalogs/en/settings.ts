@@ -281,10 +281,6 @@ export default {
       upToDate: "Up to date",
       updateRequired: "Update required",
       loadError: "Could not load policy status.",
-      policies: {
-        privacy: "Privacy Policy",
-        terms: "Terms of Service",
-      },
     },
     dataSources: {
       title: "Data sub-processors",

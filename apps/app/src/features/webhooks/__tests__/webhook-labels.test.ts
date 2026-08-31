@@ -1,11 +1,6 @@
 import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
-import {
-  DELIVERY_STATUS_KEYS,
-  ENDPOINT_STATUS_KEYS,
-  isDeliveryStatus,
-  isEndpointStatus,
-} from "../webhook-labels";
+import { DELIVERY_STATUS_KEYS, ENDPOINT_STATUS_KEYS, isDeliveryStatus } from "../webhook-labels";
 
 function resolve(prefixedKey: string): string | undefined {
   const [namespace, path] = prefixedKey.split(":");
@@ -35,19 +30,6 @@ describe("ENDPOINT_STATUS_KEYS", () => {
     expect(resolve(ENDPOINT_STATUS_KEYS.active)).toBe("Active");
     expect(resolve(ENDPOINT_STATUS_KEYS.paused)).toBe("Paused");
     expect(resolve(ENDPOINT_STATUS_KEYS["auto-disabled"])).toBe("Auto-disabled");
-  });
-});
-
-describe("isEndpointStatus", () => {
-  it("accepts the three known statuses", () => {
-    expect(isEndpointStatus("active")).toBe(true);
-    expect(isEndpointStatus("paused")).toBe(true);
-    expect(isEndpointStatus("auto-disabled")).toBe(true);
-  });
-
-  it("rejects anything else", () => {
-    expect(isEndpointStatus("disabled")).toBe(false);
-    expect(isEndpointStatus("")).toBe(false);
   });
 });
 

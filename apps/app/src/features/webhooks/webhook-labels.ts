@@ -1,21 +1,16 @@
 import type { WebhookDeliveryStatus } from "./api/webhooks.queries";
 import type { EndpointStatus } from "./components/endpoint-row";
 
-const ENDPOINT_STATUSES: readonly EndpointStatus[] = ["active", "paused", "auto-disabled"];
-
-export function isEndpointStatus(value: string): value is EndpointStatus {
-  return (ENDPOINT_STATUSES as readonly string[]).includes(value);
-}
-
 // `endpoint-row.tsx` renders the `EndpointStatus` union both as the plain
 // badge text (active/paused) and, hard-coded today, inside the
 // "auto-disabled" tooltip badge. `satisfies Record<EndpointStatus, string>`
 // only proves every status has AN entry — it cannot prove each one points at
 // the RIGHT key, so `__tests__/webhook-labels.test.ts` asserts the mapping
-// directly. Guarded rather than cast: `status` is locally computed today, but
-// the guard is what keeps a future wire-sourced status from reaching the
-// lookup unchecked, with the raw code as the fallback for anything the map
-// doesn't recognize.
+// directly. No guard here, deliberately: `status` is computed locally from a
+// closed union, so the compiler already proves the lookup exhaustive. The day
+// it becomes wire-sourced its type widens to `string` and `tsc` demands a
+// guard then — which protects more than a guard nothing calls, and a comment
+// claiming a fallback the call site does not have.
 export const ENDPOINT_STATUS_KEYS = {
   active: "common:states.endpoint.active",
   paused: "common:states.endpoint.paused",

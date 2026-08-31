@@ -3,10 +3,10 @@ import type { PolicyType } from "@packages/policies";
 import { Card, CardContent } from "@packages/ui/components/ui/card";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
+import { POLICY_TITLE_KEYS } from "../../shared/legal/policy-labels";
 import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 import { isEnglishFallback, policyBodyFor } from "./policies";
 import { POLICY_DOCS } from "./policies.config";
-import { POLICY_TITLE_KEYS } from "./policy-labels";
 
 interface PolicyDocViewProps {
   type: PolicyType;

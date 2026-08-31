@@ -291,10 +291,6 @@ export default {
       upToDate: "À jour",
       updateRequired: "Mise à jour requise",
       loadError: "Impossible de charger le statut des politiques.",
-      policies: {
-        privacy: "Politique de confidentialité",
-        terms: "Conditions d'utilisation",
-      },
     },
     dataSources: {
       title: "Sous-traitants de données",

@@ -18,3 +18,13 @@ export const POLICY_TITLE_KEYS = {
 export function isPolicyType(value: string): value is PolicyType {
   return value in POLICY_TITLE_KEYS;
 }
+
+// The API returns the policy type as a bare string, so an unknown type has to
+// render as itself rather than as a missing key: the register can gain a policy
+// before the catalog does, and a raw slug is a better row than a blank one.
+export function policyLabelFor(
+  type: string,
+  translate: (key: (typeof POLICY_TITLE_KEYS)[PolicyType]) => string,
+): string {
+  return isPolicyType(type) ? translate(POLICY_TITLE_KEYS[type]) : type;
+}

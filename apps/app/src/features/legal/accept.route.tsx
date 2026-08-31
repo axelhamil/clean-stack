@@ -20,9 +20,9 @@ import { z } from "zod";
 import { policiesQueryOptions } from "../../shared/api/queries/policies";
 import { PolicyLink } from "../../shared/components/policy-link";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
+import { isPolicyType, POLICY_TITLE_KEYS } from "../../shared/legal/policy-labels";
 import { useAcceptPolicies } from "./hooks/use-accept-policies";
 import { getChangesSince, POLICY_DOCS } from "./policies.config";
-import { isPolicyType, POLICY_TITLE_KEYS } from "./policy-labels";
 
 const searchSchema = z.object({
   redirect: z.string().optional(),

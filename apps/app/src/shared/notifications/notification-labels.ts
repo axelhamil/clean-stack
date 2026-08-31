@@ -18,7 +18,7 @@ export function labelOf(notification: Notification): string {
 // subscription (shared/CLAUDE.md:37) — the re-render on locale change comes
 // from the component's own `useTranslation` call instead.
 //
-// Zero unread gets its own key (`unreadNone`) rather than folling through to
+// Zero unread gets its own key (`unreadNone`) rather than falling through to
 // the `_one`/`_other` plural pair: i18next has no `_zero` category selectable
 // from either locale's `Intl.PluralRules`, but that only forbids the
 // mechanism — it says nothing about the wording. Branching explicitly keeps
