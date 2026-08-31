@@ -179,7 +179,7 @@ export default {
     inAppAriaLabel: "Notifications dans l'application pour {{category}}",
     emailAriaLabel: "Notifications par e-mail pour {{category}}",
     emailFrequencyAriaLabel: "Fréquence des e-mails pour {{category}}",
-    enforceAriaLabel: "Imposer {{category}} à tous les membres",
+    enforceAriaLabel: "Imposer la catégorie {{category}} à tous les membres",
     frequency: {
       immediate: "Immédiatement",
       hourly: "Résumé horaire",
