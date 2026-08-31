@@ -10,6 +10,8 @@ import {
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { formatApiError } from "../../shared/api/errors/messages";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { useAcceptInvitation } from "./hooks/use-accept-invitation";
 
@@ -18,6 +20,9 @@ export const Route = createFileRoute("/accept-invitation/$invitationId")({
 });
 
 function AcceptInvitationPage() {
+  const { t } = useTranslation("common");
+  const { t: tAuth } = useTranslation("auth");
+  const { t: tErrors } = useTranslation("errors");
   const { invitationId } = Route.useParams();
   const { data: session } = useQuery(sessionQueryOptions);
   const mutation = useAcceptInvitation();
@@ -25,11 +30,11 @@ function AcceptInvitationPage() {
   if (!session) {
     return (
       <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
-        <TypographyH1>Sign in to accept</TypographyH1>
-        <TypographyMuted>You need to be signed in to accept this invitation.</TypographyMuted>
+        <TypographyH1>{t("invitation.signInTitle")}</TypographyH1>
+        <TypographyMuted>{t("invitation.signInBody")}</TypographyMuted>
         <Button asChild>
           <Link to="/sign-in" search={{ redirect: `/accept-invitation/${invitationId}` }}>
-            Sign in
+            {tAuth("signIn.submit")}
           </Link>
         </Button>
       </main>
@@ -38,22 +43,23 @@ function AcceptInvitationPage() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <TypographyH1>Accept invitation</TypographyH1>
+      <TypographyH1>{t("invitation.acceptInvitation")}</TypographyH1>
       <Card>
         <CardHeader>
-          <CardTitle>Join the organization</CardTitle>
+          <CardTitle>{t("invitation.joinTitle")}</CardTitle>
           <CardDescription>
-            Signed in as {session.user.email}. If this is the wrong account, sign out and sign back
-            in with the invited email.
+            {t("invitation.signedInAs", { email: session.user.email })}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <Button onClick={() => mutation.mutate({ invitationId })} disabled={mutation.isPending}>
-            Accept invitation
+            {t("invitation.acceptInvitation")}
           </Button>
           {mutation.isError && (
             <Alert variant="destructive">
-              <AlertDescription>{mutation.error.message}</AlertDescription>
+              <AlertDescription>
+                {formatApiError(mutation.error, t("invitation.acceptFailed"), tErrors)}
+              </AlertDescription>
             </Alert>
           )}
         </CardContent>

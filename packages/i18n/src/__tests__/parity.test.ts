@@ -57,6 +57,8 @@ describe("catalog parity", () => {
     "settings.twoFactor.codePlaceholder",
     "settings.deletion.passwordPlaceholder",
     "settings.deletion.totpPlaceholder",
+    // Example organization name — a fictional proper noun, not sentence copy.
+    "common.orgNew.namePlaceholder",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {

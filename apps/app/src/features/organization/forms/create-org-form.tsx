@@ -12,6 +12,7 @@ import { Input } from "@packages/ui/components/ui/input";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { createOrgMutationOptions } from "../../../shared/api/mutations/create-org";
@@ -23,17 +24,18 @@ export interface CreateOrgFormProps {
 }
 
 export function CreateOrgForm({ onSuccess }: CreateOrgFormProps) {
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { switchOrg, isPending: isSwitching } = useSetActiveOrg();
   const create = useMutation({
     ...createOrgMutationOptions,
     onSuccess: async (org) => {
       await switchOrg(org.id);
-      toast.success("Organization created");
+      toast.success(t("orgNew.createdToast"));
       onSuccess?.();
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => toastError(err, "Failed to create organization"),
+    onError: (err) => toastError(err, t("orgNew.createFailed")),
   });
 
   const form = useForm<CreateOrgInput>({
@@ -51,16 +53,16 @@ export function CreateOrgForm({ onSuccess }: CreateOrgFormProps) {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Name</FormLabel>
+              <FormLabel>{t("orgNew.nameLabel")}</FormLabel>
               <FormControl>
-                <Input placeholder="Acme" autoFocus {...field} />
+                <Input placeholder={t("orgNew.namePlaceholder")} autoFocus {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" disabled={create.isPending || isSwitching}>
-          Create organization
+          {t("orgNew.title")}
         </Button>
       </form>
     </Form>

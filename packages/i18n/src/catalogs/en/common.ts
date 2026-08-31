@@ -155,4 +155,38 @@ export default {
       unknown: "Other",
     },
   },
+  dashboard: {
+    welcome: "Welcome back, {{name}}",
+    subtitle: "Here's what's happening today.",
+    gettingStartedTitle: "Getting started",
+    gettingStartedDescription: "Configure your workspace.",
+    gettingStartedBody:
+      "Invite teammates, configure billing, and start shipping. Everything lives under Settings.",
+    activityTitle: "Activity",
+    activityDescription: "Recent events in your workspace.",
+    activityEmpty: "Nothing yet — your activity will surface here.",
+    usageTitle: "Usage",
+    usageDescription: "Quota and limits for the current period.",
+    usageEmpty: "Hook up metering once a billable resource exists.",
+  },
+  orgNew: {
+    title: "Create organization",
+    subtitle: "Spin up a new workspace for your team.",
+    detailsTitle: "Organization details",
+    detailsDescription: "Give your organization a name and a unique slug.",
+    nameLabel: "Name",
+    namePlaceholder: "Acme",
+    createdToast: "Organization created",
+    createFailed: "Failed to create organization",
+  },
+  invitation: {
+    signInTitle: "Sign in to accept",
+    signInBody: "You need to be signed in to accept this invitation.",
+    joinTitle: "Join the organization",
+    signedInAs:
+      "Signed in as {{email}}. If this is the wrong account, sign out and sign back in with the invited email.",
+    acceptInvitation: "Accept invitation",
+    acceptedToast: "Invitation accepted",
+    acceptFailed: "Failed to accept invitation",
+  },
 } as const;

@@ -159,4 +159,38 @@ export default {
       unknown: "Autre",
     },
   },
+  dashboard: {
+    welcome: "Bon retour, {{name}}",
+    subtitle: "Voici ce qui se passe aujourd'hui.",
+    gettingStartedTitle: "Prise en main",
+    gettingStartedDescription: "Configurez votre espace de travail.",
+    gettingStartedBody:
+      "Invitez vos collègues, configurez la facturation et commencez à livrer. Tout se trouve dans les Paramètres.",
+    activityTitle: "Activité",
+    activityDescription: "Événements récents dans votre espace de travail.",
+    activityEmpty: "Rien pour l'instant — votre activité apparaîtra ici.",
+    usageTitle: "Utilisation",
+    usageDescription: "Quota et limites pour la période en cours.",
+    usageEmpty: "Branchez la mesure d'usage dès qu'une ressource facturable existe.",
+  },
+  orgNew: {
+    title: "Créer une organisation",
+    subtitle: "Démarrez un nouvel espace de travail pour votre équipe.",
+    detailsTitle: "Détails de l'organisation",
+    detailsDescription: "Donnez un nom et un identifiant unique à votre organisation.",
+    nameLabel: "Nom",
+    namePlaceholder: "Acme",
+    createdToast: "Organisation créée",
+    createFailed: "Échec de la création de l'organisation",
+  },
+  invitation: {
+    signInTitle: "Connectez-vous pour accepter",
+    signInBody: "Vous devez être connecté pour accepter cette invitation.",
+    joinTitle: "Rejoindre l'organisation",
+    signedInAs:
+      "Connecté avec {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
+    acceptInvitation: "Accepter l'invitation",
+    acceptedToast: "Invitation acceptée",
+    acceptFailed: "Échec de l'acceptation de l'invitation",
+  },
 } as const;

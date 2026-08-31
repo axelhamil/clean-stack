@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { acceptInvitationMutationOptions } from "../../../shared/api/mutations/accept-invitation";
@@ -9,6 +10,7 @@ import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 
 export function useAcceptInvitation() {
+  const { t } = useTranslation("common");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -21,9 +23,9 @@ export function useAcceptInvitation() {
         queryClient.refetchQueries({ queryKey: activeOrgQueryOptions.queryKey }),
       ]);
       broadcastAuthChange();
-      toast.success("Invitation accepted");
+      toast.success(t("invitation.acceptedToast"));
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => toastError(err, "Failed to accept invitation"),
+    onError: (err) => toastError(err, t("invitation.acceptFailed")),
   });
 }
