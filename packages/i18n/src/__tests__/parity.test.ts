@@ -127,6 +127,11 @@ describe("catalog parity", () => {
     // Same word in French too, matching the existing "Actions" / "Webhooks"
     // cognate exemptions above.
     "admin.auditLog.table.action",
+    // "DPA" (Data Processing Agreement) is the acronym used as-is in French
+    // RGPD practice too — a genuine cognate, not an untranslated column
+    // header. The DPA link text next to it (`sub-processors.route.tsx`) is
+    // the same acronym for the same reason and isn't a catalog key.
+    "common.legal.subProcessors.table.dpa",
   ] as const;
 
   const read = (root: Nested, path: string): string | undefined => {

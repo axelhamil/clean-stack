@@ -232,7 +232,7 @@ function useLegalGroup(t: TFunction<"common">): CommandGroupConfig {
     heading: t("commandPalette.groups.legal"),
     items: LEGAL_ROUTES.map((route) => ({
       id: `legal:${route.to}`,
-      label: route.label,
+      label: t(route.labelKey),
       icon: route.icon,
       run: () => navigate({ to: route.to }),
     })),

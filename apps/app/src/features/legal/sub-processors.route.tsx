@@ -16,6 +16,9 @@ import {
   TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { createFileRoute } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { SUB_PROCESSOR_KEYS } from "../../shared/sub-processor-labels";
 import type { SubProcessor } from "../../shared/sub-processors.config";
 import { SUB_PROCESSORS } from "../../shared/sub-processors.config";
 
@@ -26,18 +29,19 @@ export const Route = createFileRoute("/legal/sub-processors")({
 interface SubProcessorTableProps {
   processors: SubProcessor[];
   caption: string;
+  t: TFunction<"common">;
 }
 
-function SubProcessorTable({ processors, caption }: SubProcessorTableProps) {
+function SubProcessorTable({ processors, caption, t }: SubProcessorTableProps) {
   return (
     <Table>
       <TableCaption>{caption}</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Purpose</TableHead>
-          <TableHead>Region / Transfer basis</TableHead>
-          <TableHead>DPA</TableHead>
+          <TableHead>{t("legal.subProcessors.table.name")}</TableHead>
+          <TableHead>{t("legal.subProcessors.table.purpose")}</TableHead>
+          <TableHead>{t("legal.subProcessors.table.region")}</TableHead>
+          <TableHead>{t("legal.subProcessors.table.dpa")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -52,8 +56,10 @@ function SubProcessorTable({ processors, caption }: SubProcessorTableProps) {
                 sp.name
               )}
             </TableCell>
-            <TableCell className="whitespace-normal">{sp.purpose}</TableCell>
-            <TableCell>{sp.region}</TableCell>
+            <TableCell className="whitespace-normal">
+              {t(SUB_PROCESSOR_KEYS[sp.id].purpose)}
+            </TableCell>
+            <TableCell>{t(SUB_PROCESSOR_KEYS[sp.id].region)}</TableCell>
             <TableCell>
               {sp.dpaUrl ? (
                 <TextLink href={sp.dpaUrl} target="_blank" rel="noopener noreferrer">
@@ -71,14 +77,15 @@ function SubProcessorTable({ processors, caption }: SubProcessorTableProps) {
 }
 
 function SubProcessorsPage() {
+  const { t } = useTranslation("common");
   const active = SUB_PROCESSORS.filter((sp) => sp.status === "active");
   const planned = SUB_PROCESSORS.filter((sp) => sp.status === "planned");
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-2">
-        <TypographyH1>Sub-processor disclosure</TypographyH1>
-        <TypographyMuted>RGPD Art. 28 — Last updated: 2026-07-09</TypographyMuted>
+        <TypographyH1>{t("legal.subProcessors.title")}</TypographyH1>
+        <TypographyMuted>{t("legal.subProcessors.subtitle")}</TypographyMuted>
       </header>
 
       <Card>
@@ -104,6 +111,7 @@ function SubProcessorsPage() {
           <SubProcessorTable
             processors={active}
             caption="Third-party processors currently used to operate the service"
+            t={t}
           />
         </CardContent>
       </Card>
@@ -116,6 +124,7 @@ function SubProcessorsPage() {
           <SubProcessorTable
             processors={planned}
             caption="Third-party processors intended for future use — not yet active"
+            t={t}
           />
         </CardContent>
       </Card>

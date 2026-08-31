@@ -16,6 +16,7 @@ import {
   TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { ConsentSettings } from "../../shared/components/consent-settings";
 import type { CookieInfo } from "./cookies.config";
 import { COOKIE_INVENTORY } from "./cookies.config";
@@ -24,6 +25,12 @@ export const Route = createFileRoute("/legal/cookies")({
   component: CookiesPage,
 });
 
+// Kept English on purpose, along with the table it labels: the cookie
+// register itself (`cookies.config.ts` — names, providers, purposes,
+// retention) is out of this task's catalog scope (see the legal-namespace
+// carve-out note in `apps/app/src/features/CLAUDE.md`), and a translated
+// category heading over an English table would read as a mixed-language bug
+// rather than a boundary. Revisit together with the register.
 const CATEGORY_LABELS: Record<ConsentCategory, string> = {
   necessary: "Strictly necessary",
   functional: "Functional",
@@ -63,11 +70,12 @@ function CookieTable({ cookies, caption }: CookieTableProps) {
 }
 
 function CookiesPage() {
+  const { t } = useTranslation("common");
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-2">
-        <TypographyH1>Cookie policy</TypographyH1>
-        <TypographyMuted>CNIL compliant — Last updated: 2026-07-09</TypographyMuted>
+        <TypographyH1>{t("legal.cookies.title")}</TypographyH1>
+        <TypographyMuted>{t("legal.cookies.subtitle")}</TypographyMuted>
       </header>
 
       <Card>

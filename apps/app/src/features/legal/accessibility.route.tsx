@@ -8,19 +8,19 @@ import {
   TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/legal/accessibility")({
   component: AccessibilityPage,
 });
 
 function AccessibilityPage() {
+  const { t } = useTranslation("common");
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-2">
-        <TypographyH1>Accessibility statement</TypographyH1>
-        <TypographyMuted>
-          EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Last reviewed: 2026-07-09
-        </TypographyMuted>
+        <TypographyH1>{t("legal.accessibility.title")}</TypographyH1>
+        <TypographyMuted>{t("legal.accessibility.subtitle")}</TypographyMuted>
       </header>
 
       <Card>

@@ -13,7 +13,7 @@ export function LegalFooter() {
       >
         {LEGAL_ROUTES.map((route) => (
           <NavLink key={route.to} variant="underline" asChild>
-            <Link to={route.to}>{route.label}</Link>
+            <Link to={route.to}>{t(route.labelKey)}</Link>
           </NavLink>
         ))}
       </nav>

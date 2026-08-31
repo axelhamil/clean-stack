@@ -130,7 +130,35 @@ export default {
     },
   },
   legal: {
+    policies: {
+      privacyTitle: "Politique de confidentialité",
+      termsTitle: "Conditions d'utilisation",
+      versionLine: "Version {{version}} — en vigueur depuis le {{date}}",
+      unavailableBanner:
+        "Ce document n'est pas encore disponible dans votre langue. Vous consultez la version anglaise ci-dessous.",
+    },
+    accessibility: {
+      title: "Déclaration d'accessibilité",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Dernière relecture : 2026-07-09",
+    },
+    cookies: {
+      title: "Politique de cookies",
+      subtitle: "Conforme CNIL — Dernière mise à jour : 2026-07-09",
+    },
+    dataRights: {
+      title: "Vos droits sur vos données",
+      subtitle:
+        "Information de transparence RGPD Art. 13/14. Dernière mise à jour à la date de déploiement de cette page.",
+    },
     subProcessors: {
+      title: "Registre des sous-traitants",
+      subtitle: "RGPD Art. 28 — Dernière mise à jour : 2026-07-09",
+      table: {
+        name: "Nom",
+        purpose: "Finalité",
+        region: "Région / base de transfert",
+        dpa: "DPA",
+      },
       resend: {
         purpose: "Envoi d'e-mails transactionnels",
         region: "États-Unis (certifié EU DPF)",
@@ -151,6 +179,26 @@ export default {
         purpose: "Mesure d'audience respectueuse de la vie privée",
         region: "Configurable (auto-hébergeable)",
       },
+    },
+    accept: {
+      title: "Avant de commencer",
+      titleReacceptance: "Politiques mises à jour",
+      subtitle:
+        "Merci de consulter et d'accepter notre politique de confidentialité et nos conditions d'utilisation pour continuer.",
+      subtitleReacceptance:
+        "Nous avons mis à jour nos politiques. Merci de consulter les changements et de les accepter pour continuer.",
+      updatedBadge: "Mise à jour",
+      readFull: "Lire {{title}} en intégralité",
+      acceptButton: "Accepter et continuer",
+      acceptingButton: "Acceptation…",
+    },
+    routes: {
+      dataRights: "Droits sur les données (RGPD)",
+      privacyPolicy: "Politique de confidentialité",
+      terms: "Conditions d'utilisation",
+      subProcessors: "Sous-traitants (RGPD Art. 28)",
+      accessibility: "Déclaration d'accessibilité (EAA Art. 14)",
+      cookies: "Politique de cookies (CNIL)",
     },
   },
   legalFooter: {

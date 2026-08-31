@@ -127,7 +127,35 @@ export default {
     },
   },
   legal: {
+    policies: {
+      privacyTitle: "Privacy Policy",
+      termsTitle: "Terms of Service",
+      versionLine: "Version {{version}} — effective {{date}}",
+      unavailableBanner:
+        "This document is not yet available in your language. You are reading the English version below.",
+    },
+    accessibility: {
+      title: "Accessibility statement",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Last reviewed: 2026-07-09",
+    },
+    cookies: {
+      title: "Cookie policy",
+      subtitle: "CNIL compliant — Last updated: 2026-07-09",
+    },
+    dataRights: {
+      title: "Your data rights",
+      subtitle:
+        "RGPD Art. 13/14 transparency disclosure. Last updated on the date this page was deployed.",
+    },
     subProcessors: {
+      title: "Sub-processor disclosure",
+      subtitle: "RGPD Art. 28 — Last updated: 2026-07-09",
+      table: {
+        name: "Name",
+        purpose: "Purpose",
+        region: "Region / Transfer basis",
+        dpa: "DPA",
+      },
       resend: {
         purpose: "Transactional email delivery",
         region: "US (EU DPF-certified)",
@@ -148,6 +176,25 @@ export default {
         purpose: "Privacy-friendly web analytics",
         region: "Configurable (self-hostable)",
       },
+    },
+    accept: {
+      title: "Before you get started",
+      titleReacceptance: "Updated policies",
+      subtitle: "Please review and accept our Privacy Policy and Terms to continue.",
+      subtitleReacceptance:
+        "We've updated our policies. Please review the changes and accept to continue.",
+      updatedBadge: "Updated",
+      readFull: "Read the full {{title}}",
+      acceptButton: "Accept and continue",
+      acceptingButton: "Accepting…",
+    },
+    routes: {
+      dataRights: "Data rights (RGPD)",
+      privacyPolicy: "Privacy policy",
+      terms: "Terms of service",
+      subProcessors: "Sub-processors (RGPD Art. 28)",
+      accessibility: "Accessibility statement (EAA Art. 14)",
+      cookies: "Cookie policy (CNIL)",
     },
   },
   legalFooter: {
