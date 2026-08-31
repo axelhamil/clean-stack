@@ -17,7 +17,15 @@ export function labelOf(notification: Notification): string {
 // is a plain helper, not a component or a hook, so it cannot own a translation
 // subscription (shared/CLAUDE.md:37) — the re-render on locale change comes
 // from the component's own `useTranslation` call instead.
+//
+// Zero unread gets its own key (`unreadNone`) rather than folling through to
+// the `_one`/`_other` plural pair: i18next has no `_zero` category selectable
+// from either locale's `Intl.PluralRules`, but that only forbids the
+// mechanism — it says nothing about the wording. Branching explicitly keeps
+// "Notifications, none unread" / "Notifications, aucune non lue" instead of
+// degrading to "Notifications, 0 unread".
 export function unreadLabel(t: TFunction<"common">, count: number): string {
+  if (count === 0) return t("notifications.unreadNone");
   return t("notifications.unreadLabel", { count });
 }
 

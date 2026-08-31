@@ -146,6 +146,7 @@ export default {
     title: "Notifications",
     markAllRead: "Tout marquer comme lu",
     empty: "Vous êtes à jour.",
+    unreadNone: "Notifications, aucune non lue",
     unreadLabel_one: "Notifications, {{count}} non lue",
     unreadLabel_other: "Notifications, {{count}} non lues",
     andMore: "et {{count}} de plus",
@@ -155,6 +156,7 @@ export default {
       org: "Organisation",
       billing: "Facturation",
       activity: "Activité",
+      unknown: "Autre",
     },
   },
 } as const;

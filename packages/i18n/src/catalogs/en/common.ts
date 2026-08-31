@@ -142,6 +142,7 @@ export default {
     title: "Notifications",
     markAllRead: "Mark all as read",
     empty: "You are all caught up.",
+    unreadNone: "Notifications, none unread",
     unreadLabel_one: "Notifications, {{count}} unread",
     unreadLabel_other: "Notifications, {{count}} unread",
     andMore: "and {{count}} more",
@@ -151,6 +152,7 @@ export default {
       org: "Organization",
       billing: "Billing",
       activity: "Activity",
+      unknown: "Other",
     },
   },
 } as const;

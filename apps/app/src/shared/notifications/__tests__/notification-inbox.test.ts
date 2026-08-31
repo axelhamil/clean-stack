@@ -1,3 +1,4 @@
+import { NOTIFICATION_CATEGORIES } from "@packages/events";
 import { createI18n, type Resources } from "@packages/i18n";
 import enCatalog from "@packages/i18n/src/catalogs/en";
 import frCatalog from "@packages/i18n/src/catalogs/fr";
@@ -6,6 +7,7 @@ import { describe, expect, test } from "vitest";
 import type { Notification } from "../../api/queries/notifications";
 import { groupNotifications } from "../group-notifications";
 import { applyRead } from "../notification-broadcast";
+import { CATEGORY_KEYS } from "../notification-item";
 import { badgeLabel, labelOf, unreadLabel } from "../notification-labels";
 
 function pluralKey(locale: "en" | "fr", count: number): "unreadLabel_one" | "unreadLabel_other" {
@@ -15,6 +17,7 @@ function pluralKey(locale: "en" | "fr", count: number): "unreadLabel_one" | "unr
 }
 
 function expectedUnreadLabel(catalog: Resources, locale: "en" | "fr", count: number): string {
+  if (count === 0) return catalog.common.notifications.unreadNone;
   const key = pluralKey(locale, count);
   return catalog.common.notifications[key].replace("{{count}}", String(count));
 }
@@ -113,17 +116,48 @@ describe("unreadLabel", () => {
     expect(unreadLabel(t, 12)).toBe(expectedUnreadLabel(frCatalog, "fr", 12));
   });
 
-  test("le francais range zero dans la categorie singuliere, contrairement a l'anglais", () => {
-    // This is exactly why `unreadLabel(t, 0)` must never be pinned to a
-    // literal: the same count selects a different plural category per
-    // locale, and only the catalog (not a hardcoded string) can tell which.
-    expect(new Intl.PluralRules("fr").select(0)).toBe("one");
-    expect(new Intl.PluralRules("en").select(0)).toBe("other");
+  test("zero non-lu garde sa propre formulation, pas un compte a zero", () => {
+    // `unreadLabel` special-cases count === 0 onto `unreadNone` rather than
+    // letting it fall through to the `_one`/`_other` plural pair — i18next
+    // has no `_zero` category either locale's `Intl.PluralRules` selects,
+    // but that only forbids the plural mechanism, not the wording. This
+    // asserts the actual catalog copy survives: "none unread" in English,
+    // "aucune non lue" in French — never "0 unread".
+    expect(enCatalog.common.notifications.unreadNone).toBe("Notifications, none unread");
+    expect(frCatalog.common.notifications.unreadNone).toBe("Notifications, aucune non lue");
+  });
+
+  test("le francais accorde le pluriel differemment de l'anglais des le premier compte", () => {
+    // This is why `unreadLabel(t, count)` must never be pinned to a literal
+    // for count >= 1 either: French agrees "non lue" (singular) at 1 and
+    // "non lues" (plural) from 2 on, while English's "unread" never changes
+    // — only the catalog (not a hardcoded string) can tell which applies.
+    expect(new Intl.PluralRules("fr").select(1)).toBe("one");
+    expect(new Intl.PluralRules("fr").select(2)).toBe("other");
+    expect(frCatalog.common.notifications.unreadLabel_one).not.toBe(
+      frCatalog.common.notifications.unreadLabel_other,
+    );
   });
 
   test("le badge visuel plafonne l'affichage", () => {
     expect(badgeLabel(9)).toBe("9");
     expect(badgeLabel(10)).toBe("9+");
+  });
+});
+
+describe("CATEGORY_KEYS", () => {
+  test("chaque categorie pointe sur sa propre cle de traduction, jamais sur une autre", () => {
+    // `satisfies Record<NotificationCategory, string>` only proves every
+    // category is present — it happily accepts `org` mapped to the
+    // "security" key. This is the assertion that actually catches a swap.
+    expect(CATEGORY_KEYS.security).toBe("notifications.categories.security");
+    expect(CATEGORY_KEYS.org).toBe("notifications.categories.org");
+    expect(CATEGORY_KEYS.billing).toBe("notifications.categories.billing");
+    expect(CATEGORY_KEYS.activity).toBe("notifications.categories.activity");
+  });
+
+  test("le mapping couvre exactement les categories connues", () => {
+    expect(Object.keys(CATEGORY_KEYS).sort()).toEqual([...NOTIFICATION_CATEGORIES].sort());
   });
 });
 
