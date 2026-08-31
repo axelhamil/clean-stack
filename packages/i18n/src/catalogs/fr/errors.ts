@@ -1,5 +1,4 @@
 export default {
-  fallback: "Une erreur est survenue. Veuillez réessayer.",
   byCode: {
     ACCOUNT_EXPORT_RATE_LIMITED: "Vous pourrez demander un nouvel export dans 24 heures.",
     ACCOUNT_PASSWORD_REQUIRED: "Confirmez avec votre mot de passe.",
@@ -111,6 +110,15 @@ export default {
       "Vous n'avez pas la permission d'accéder à cette organisation.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
   },
+  byStatus: {
+    "400": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
+    "401": "Veuillez vous reconnecter.",
+    "403": "Vous n'avez pas la permission de faire cela.",
+    "404": "Introuvable.",
+    "409": "Cette action entre en conflit avec l'état actuel. Actualisez et réessayez.",
+    "422": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
+    "429": "Trop de requêtes. Patientez un instant avant de réessayer.",
+  },
   bySuffix: {
     RATE_LIMITED: "Trop de requêtes. Patientez un instant avant de réessayer.",
     NOT_FOUND: "Introuvable.",
@@ -147,5 +155,31 @@ export default {
     passwordsMismatch: "Les mots de passe ne correspondent pas.",
     acceptPolicies: "Vous devez accepter les politiques requises.",
     invalidEventSelection: "Contient un événement inconnu ou non abonnable.",
+  },
+  fallback: {
+    acceptPolicies: "Échec de l'acceptation des politiques",
+    cancelAccountDeletion: "Échec de l'annulation",
+    markNotificationsRead: "Échec du marquage des notifications comme lues",
+    markAllNotificationsRead: "Échec du marquage de toutes les notifications comme lues",
+    updateNotificationPreference: "Échec de la mise à jour de la préférence de notification",
+    updateOrgNotificationPreference:
+      "Échec de la mise à jour de la préférence de notification de l'organisation",
+    openBillingPortal: "Échec de l'ouverture du portail de facturation",
+    recordConsent: "Échec de l'enregistrement du consentement",
+    requestAccountDeletion: "Échec de la demande de suppression du compte",
+    requestDataExport: "Échec de la demande d'export",
+    stopImpersonation: "Échec de l'arrêt de l'emprunt d'identité",
+    withdrawConsent: "Échec du retrait du consentement",
+    loadPlans: "Échec du chargement des offres",
+    loadConsent: "Échec du chargement du consentement",
+    loadNotifications: "Échec du chargement des notifications",
+    loadUnreadCount: "Échec du chargement du nombre de notifications non lues",
+    loadNotificationPreferences: "Échec du chargement des préférences de notification",
+    loadOrgNotificationPreferences:
+      "Échec du chargement des préférences de notification de l'organisation",
+    loadPolicies: "Échec du chargement des politiques",
+    loadSubscription: "Échec du chargement de l'abonnement",
+    loadPasskeys: "Échec du chargement des clés d'accès",
+    loadSessions: "Échec du chargement des sessions",
   },
 } as const;

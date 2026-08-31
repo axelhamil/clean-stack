@@ -32,6 +32,8 @@ const SUFFIXES = [
   "TIMEOUT",
 ] as const;
 
+const STATUS_CODE = /^HTTP_(\d{3})$/;
+
 /**
  * Every `bySuffix` read passes the English source as `defaultValue`.
  *
@@ -56,6 +58,11 @@ export function rateLimitedMessage(t: TFunction<"errors">): string {
 export function messageFromCode(code: string, t: TFunction<"errors">): string | undefined {
   const exact = t(`byCode.${code}` as never, { defaultValue: "" });
   if (exact) return exact;
+  const status = STATUS_CODE.exec(code)?.[1];
+  if (status !== undefined) {
+    const copy = t(`byStatus.${status}` as never, { defaultValue: "" });
+    if (copy) return copy;
+  }
   for (const suffix of SUFFIXES) {
     if (code.endsWith(`_${suffix}`)) return suffixMessage(suffix, t);
   }

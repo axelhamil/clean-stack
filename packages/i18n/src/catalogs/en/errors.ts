@@ -1,5 +1,4 @@
 export default {
-  fallback: "Something went wrong. Please try again.",
   byCode: {
     ACCOUNT_EXPORT_RATE_LIMITED: "You can request another data export in 24 hours.",
     ACCOUNT_PASSWORD_REQUIRED: "Confirm with your password.",
@@ -112,6 +111,19 @@ export default {
       "You don't have permission to access this organization.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
   },
+  // Covers `HTTP_<status>` codes — raised by `HTTPException` sites with no
+  // business code (`error.middleware.ts`) — for statuses the API actually
+  // sends. A status with no entry here falls through to `bySuffix`/the
+  // server's own message, so this only ever adds coverage.
+  byStatus: {
+    "400": "Some of the information you entered isn't valid. Check the form and try again.",
+    "401": "Please sign in again.",
+    "403": "You don't have permission to do this.",
+    "404": "Not found.",
+    "409": "This action conflicts with the current state. Refresh and try again.",
+    "422": "Some of the information you entered isn't valid. Check the form and try again.",
+    "429": "Too many requests. Please wait a moment and try again.",
+  },
   bySuffix: {
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
     NOT_FOUND: "Not found.",
@@ -148,5 +160,32 @@ export default {
     passwordsMismatch: "Passwords do not match.",
     acceptPolicies: "You must accept the required policies.",
     invalidEventSelection: "Contains an unknown or non-subscribable event.",
+  },
+  fallback: {
+    // Shown only when a request fails with no JSON error body — `formatApiError`
+    // prefers the catalog's `byCode`/`bySuffix` answer and then the server's own
+    // 4xx message. These are the last resort, not the normal path.
+    acceptPolicies: "Failed to accept policies",
+    cancelAccountDeletion: "Cancel failed",
+    markNotificationsRead: "Failed to mark notifications as read",
+    markAllNotificationsRead: "Failed to mark all notifications as read",
+    updateNotificationPreference: "Failed to update notification preference",
+    updateOrgNotificationPreference: "Failed to update org notification preference",
+    openBillingPortal: "Failed to open billing portal",
+    recordConsent: "Failed to record consent",
+    requestAccountDeletion: "Account deletion failed",
+    requestDataExport: "Export request failed",
+    stopImpersonation: "Failed to stop impersonation",
+    withdrawConsent: "Failed to withdraw consent",
+    loadPlans: "Failed to load plans",
+    loadConsent: "Failed to load consent",
+    loadNotifications: "Failed to load notifications",
+    loadUnreadCount: "Failed to load unread count",
+    loadNotificationPreferences: "Failed to load notification preferences",
+    loadOrgNotificationPreferences: "Failed to load org notification preferences",
+    loadPolicies: "Failed to load policies",
+    loadSubscription: "Failed to load subscription",
+    loadPasskeys: "Failed to load passkeys",
+    loadSessions: "Failed to load sessions",
   },
 } as const;
