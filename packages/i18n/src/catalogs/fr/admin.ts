@@ -21,7 +21,7 @@ export default {
       name: "Nom",
       role: "Rôle",
       status: "Statut",
-      created: "Créé",
+      created: "Date de création",
     },
     detail: {
       loading: "Chargement…",
@@ -54,7 +54,7 @@ export default {
       // Acronym, identical in both languages.
       ipHeader: "IP",
       browserHeader: "Navigateur",
-      createdHeader: "Créé",
+      createdHeader: "Date de création",
       expiresHeader: "Expire",
       // "Type" is the same word in French too, matching the "Actions" /
       // "Webhooks" cognate exemptions already in the parity gate.
@@ -94,7 +94,7 @@ export default {
       // Genuine cognate — see the English catalog's comment.
       slug: "Slug",
       members: "Membres",
-      created: "Créé",
+      created: "Date de création",
       ssoEnforced: "SSO appliqué",
     },
     detail: {
@@ -103,7 +103,7 @@ export default {
       detailsTitle: "Détails",
       slugLabel: "Slug",
       planLabel: "Plan",
-      createdLabel: "Créé",
+      createdLabel: "Date de création",
       membersTitle: "Membres",
       table: {
         email: "E-mail",
