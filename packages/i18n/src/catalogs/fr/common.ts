@@ -19,6 +19,7 @@ export default {
     brandLabel: "App",
     search: "Rechercher...",
     openCommandPalette: "Ouvrir la palette de commandes",
+    logoAlt: "Logo de l'application",
   },
   commandPalette: {
     searchPlaceholder: "Rechercher des pages, actions, organisations...",
@@ -125,5 +126,35 @@ export default {
   },
   legalFooter: {
     ariaLabel: "Légal",
+  },
+  clipboard: {
+    copied: "{{label}} copié dans le presse-papiers",
+    copyLabel: "Copier {{label}}",
+  },
+  secretReveal: {
+    title: "Secret de signature",
+    description:
+      "Copiez-le maintenant — il ne s'affiche qu'une seule fois et ne pourra plus être récupéré.",
+    secretLabel: "Secret",
+    confirm: "Je l'ai enregistré",
+  },
+  theme: {
+    switchToLight: "Passer au thème clair",
+    switchToDark: "Passer au thème sombre",
+  },
+  notifications: {
+    title: "Notifications",
+    markAllRead: "Tout marquer comme lu",
+    empty: "Vous êtes à jour.",
+    unreadLabel_one: "Notifications, {{count}} non lue",
+    unreadLabel_other: "Notifications, {{count}} non lues",
+    andMore: "et {{count}} de plus",
+    newBadge: "Nouveau",
+    categories: {
+      security: "Sécurité",
+      org: "Organisation",
+      billing: "Facturation",
+      activity: "Activité",
+    },
   },
 } as const;

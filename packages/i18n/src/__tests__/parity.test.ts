@@ -38,6 +38,11 @@ describe("catalog parity", () => {
     "common.commandPalette.groups.actions",
     "common.contextualTabs.webhooks",
     "common.contextualTabs.notifications",
+    // Same word, same capitalization, in the notification bell's own group.
+    "common.notifications.title",
+    // "Secret" is spelled identically in French — a genuine cognate, not an
+    // untranslated placeholder.
+    "common.secretReveal.secretLabel",
     // Non-linguistic placeholders: a masked password, a proper noun, a digit
     // pattern and a recovery-code pattern don't get translated. The example
     // email address IS translated (`you@` -> `vous@`, RFC 2606's

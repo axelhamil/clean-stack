@@ -1,9 +1,23 @@
+import { createI18n, type Resources } from "@packages/i18n";
+import enCatalog from "@packages/i18n/src/catalogs/en";
+import frCatalog from "@packages/i18n/src/catalogs/fr";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, test } from "vitest";
 import type { Notification } from "../../api/queries/notifications";
 import { groupNotifications } from "../group-notifications";
 import { applyRead } from "../notification-broadcast";
 import { badgeLabel, labelOf, unreadLabel } from "../notification-labels";
+
+function pluralKey(locale: "en" | "fr", count: number): "unreadLabel_one" | "unreadLabel_other" {
+  return new Intl.PluralRules(locale).select(count) === "one"
+    ? "unreadLabel_one"
+    : "unreadLabel_other";
+}
+
+function expectedUnreadLabel(catalog: Resources, locale: "en" | "fr", count: number): string {
+  const key = pluralKey(locale, count);
+  return catalog.common.notifications[key].replace("{{count}}", String(count));
+}
 
 const makeNotification = (overrides: Partial<Notification> & { id: string }): Notification =>
   ({
@@ -81,10 +95,30 @@ describe("labelOf", () => {
 });
 
 describe("unreadLabel", () => {
-  test("annonce le nombre de non-lus aux technologies d'assistance", () => {
-    expect(unreadLabel(0)).toBe("Notifications, none unread");
-    expect(unreadLabel(1)).toBe("Notifications, 1 unread");
-    expect(unreadLabel(12)).toBe("Notifications, 12 unread");
+  test("annonce le nombre de non-lus aux technologies d'assistance, en anglais", async () => {
+    const i18n = await createI18n({ locale: "en", resources: enCatalog });
+    const t = i18n.getFixedT("en", "common");
+
+    expect(unreadLabel(t, 0)).toBe(expectedUnreadLabel(enCatalog, "en", 0));
+    expect(unreadLabel(t, 1)).toBe(expectedUnreadLabel(enCatalog, "en", 1));
+    expect(unreadLabel(t, 12)).toBe(expectedUnreadLabel(enCatalog, "en", 12));
+  });
+
+  test("annonce le nombre de non-lus aux technologies d'assistance, en francais", async () => {
+    const i18n = await createI18n({ locale: "fr", resources: frCatalog });
+    const t = i18n.getFixedT("fr", "common");
+
+    expect(unreadLabel(t, 0)).toBe(expectedUnreadLabel(frCatalog, "fr", 0));
+    expect(unreadLabel(t, 1)).toBe(expectedUnreadLabel(frCatalog, "fr", 1));
+    expect(unreadLabel(t, 12)).toBe(expectedUnreadLabel(frCatalog, "fr", 12));
+  });
+
+  test("le francais range zero dans la categorie singuliere, contrairement a l'anglais", () => {
+    // This is exactly why `unreadLabel(t, 0)` must never be pinned to a
+    // literal: the same count selects a different plural category per
+    // locale, and only the catalog (not a hardcoded string) can tell which.
+    expect(new Intl.PluralRules("fr").select(0)).toBe("one");
+    expect(new Intl.PluralRules("en").select(0)).toBe("other");
   });
 
   test("le badge visuel plafonne l'affichage", () => {

@@ -19,6 +19,7 @@ export default {
     brandLabel: "App",
     search: "Search...",
     openCommandPalette: "Open command palette",
+    logoAlt: "App logo",
   },
   commandPalette: {
     searchPlaceholder: "Search pages, actions, organizations...",
@@ -122,5 +123,34 @@ export default {
   },
   legalFooter: {
     ariaLabel: "Legal",
+  },
+  clipboard: {
+    copied: "{{label}} copied to clipboard",
+    copyLabel: "Copy {{label}}",
+  },
+  secretReveal: {
+    title: "Signing secret",
+    description: "Copy this now — it is shown only once and cannot be retrieved later.",
+    secretLabel: "Secret",
+    confirm: "I saved it",
+  },
+  theme: {
+    switchToLight: "Switch to light theme",
+    switchToDark: "Switch to dark theme",
+  },
+  notifications: {
+    title: "Notifications",
+    markAllRead: "Mark all as read",
+    empty: "You are all caught up.",
+    unreadLabel_one: "Notifications, {{count}} unread",
+    unreadLabel_other: "Notifications, {{count}} unread",
+    andMore: "and {{count}} more",
+    newBadge: "New",
+    categories: {
+      security: "Security",
+      org: "Organization",
+      billing: "Billing",
+      activity: "Activity",
+    },
   },
 } as const;
