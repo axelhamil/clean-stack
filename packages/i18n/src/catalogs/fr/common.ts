@@ -188,7 +188,7 @@ export default {
     signInBody: "Vous devez être connecté pour accepter cette invitation.",
     joinTitle: "Rejoindre l'organisation",
     signedInAs:
-      "Connecté avec {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
+      "Connecté en tant que {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
     acceptInvitation: "Accepter l'invitation",
     acceptedToast: "Invitation acceptée",
     acceptFailed: "Échec de l'acceptation de l'invitation",
