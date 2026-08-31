@@ -76,7 +76,7 @@ describe("PolicyDocView — French locale", () => {
     // Fixture: version "9.9.9", effectiveDate "1111-11-11" — distinct on
     // purpose, so a `{ version, date }` argument swap renders a different,
     // wrong string instead of an indistinguishable one.
-    expect(html).toContain("Version 9.9.9 — en vigueur depuis le 1111-11-11");
+    expect(html).toContain("Version 9.9.9 — en vigueur le 1111-11-11");
   });
 });
 

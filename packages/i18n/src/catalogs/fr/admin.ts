@@ -37,7 +37,7 @@ export default {
       impersonate: "Emprunter l'identité",
       impersonateDialogTitle: "Emprunter l'identité du compte",
       reasonLabel: "Motif",
-      expiresLabel: "Expire",
+      expiresLabel: "Expiration",
       revokeSessions: "Révoquer les sessions",
       resetPassword: "Réinitialiser le mot de passe",
       // "Compte" agrees masculine — these describe the account, never the
@@ -55,7 +55,7 @@ export default {
       ipHeader: "IP",
       browserHeader: "Navigateur",
       createdHeader: "Date de création",
-      expiresHeader: "Expire",
+      expiresHeader: "Expiration",
       // "Type" is the same word in French too, matching the "Actions" /
       // "Webhooks" cognate exemptions already in the parity gate.
       typeHeader: "Type",
@@ -85,24 +85,24 @@ export default {
     loading: "Chargement…",
     loadFailed: "Échec du chargement des organisations.",
     loadMore: "Charger plus",
-    ssoEnforcementUpdatedToast: "Application du SSO mise à jour.",
-    ssoEnforcedAriaLabel: "SSO appliqué pour {{name}}",
+    ssoEnforcementUpdatedToast: "Imposition du SSO mise à jour.",
+    ssoEnforcedAriaLabel: "SSO imposé pour {{name}}",
     ssoEnforcementOffHint:
-      "Désactiver l'application du SSO permet aux membres de cette organisation de se reconnecter avec un mot de passe.",
+      "Désactiver l'imposition du SSO permet aux membres de cette organisation de se reconnecter avec un mot de passe.",
     table: {
       name: "Nom",
       // Genuine cognate — see the English catalog's comment.
       slug: "Slug",
       members: "Membres",
       created: "Date de création",
-      ssoEnforced: "SSO appliqué",
+      ssoEnforced: "SSO imposé",
     },
     detail: {
       loading: "Chargement…",
       loadFailed: "Échec du chargement de l'organisation.",
       detailsTitle: "Détails",
       slugLabel: "Slug",
-      planLabel: "Plan",
+      planLabel: "Forfait",
       createdLabel: "Date de création",
       membersTitle: "Membres",
       table: {

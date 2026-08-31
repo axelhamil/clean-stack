@@ -52,9 +52,9 @@ export default {
       organizations: "Administration — Organisations",
     },
     theme: {
-      light: "Thème : clair",
-      dark: "Thème : sombre",
-      system: "Thème : système",
+      light: "Thème : clair",
+      dark: "Thème : sombre",
+      system: "Thème : système",
       active: "actif",
     },
     copyOrgSlug: "Copier l'identifiant de l'organisation",
@@ -133,17 +133,17 @@ export default {
     policies: {
       privacyTitle: "Politique de confidentialité",
       termsTitle: "Conditions d'utilisation",
-      versionLine: "Version {{version}} — en vigueur depuis le {{date}}",
+      versionLine: "Version {{version}} — en vigueur le {{date}}",
       unavailableBanner:
         "Ce document n'est pas encore disponible dans votre langue. Vous consultez la version anglaise ci-dessous.",
     },
     accessibility: {
       title: "Déclaration d'accessibilité",
-      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Dernière relecture : 2026-07-09",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Dernière relecture : 2026-07-09",
     },
     cookies: {
       title: "Politique de cookies",
-      subtitle: "Conforme CNIL — Dernière mise à jour : 2026-07-09",
+      subtitle: "Conforme CNIL — Dernière mise à jour : 2026-07-09",
       tableCaption: "Cookies de la catégorie {{category}} utilisés par cette application",
     },
     dataRights: {
@@ -153,7 +153,7 @@ export default {
     },
     subProcessors: {
       title: "Registre des sous-traitants",
-      subtitle: "RGPD Art. 28 — Dernière mise à jour : 2026-07-09",
+      subtitle: "RGPD Art. 28 — Dernière mise à jour : 2026-07-09",
       table: {
         name: "Nom",
         purpose: "Finalité",
@@ -189,7 +189,7 @@ export default {
       subtitleReacceptance:
         "Nous avons mis à jour nos politiques. Merci de consulter les changements et de les accepter pour continuer.",
       updatedBadge: "Mise à jour",
-      readFull: "Lire {{title}} en intégralité",
+      readFull: "Lire « {{title}} » en intégralité",
       acceptButton: "Accepter et continuer",
       acceptingButton: "Acceptation…",
     },
@@ -206,8 +206,8 @@ export default {
     ariaLabel: "Légal",
   },
   clipboard: {
-    copied: "{{label}} copié dans le presse-papiers",
-    copyLabel: "Copier {{label}}",
+    copied: "Copié dans le presse-papiers : {{label}}",
+    copyLabel: "Copier : {{label}}",
   },
   secretReveal: {
     title: "Secret de signature",
@@ -238,12 +238,12 @@ export default {
     },
   },
   dashboard: {
-    welcome: "Bon retour, {{name}}",
+    welcome: "Ravi de vous revoir, {{name}}",
     subtitle: "Voici ce qui se passe aujourd'hui.",
     gettingStartedTitle: "Prise en main",
     gettingStartedDescription: "Configurez votre espace de travail.",
     gettingStartedBody:
-      "Invitez vos collègues, configurez la facturation et commencez à livrer. Tout se trouve dans les Paramètres.",
+      "Invitez vos collègues, configurez la facturation et lancez-vous. Tout se trouve dans les Paramètres.",
     activityTitle: "Activité",
     activityDescription: "Événements récents dans votre espace de travail.",
     activityEmpty: "Rien pour l'instant — votre activité apparaîtra ici.",
@@ -263,10 +263,10 @@ export default {
   },
   invitation: {
     signInTitle: "Connectez-vous pour accepter",
-    signInBody: "Vous devez être connecté pour accepter cette invitation.",
+    signInBody: "Connectez-vous pour accepter cette invitation.",
     joinTitle: "Rejoindre l'organisation",
     signedInAs:
-      "Connecté en tant que {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
+      "Session en cours avec {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
     acceptInvitation: "Accepter l'invitation",
     acceptedToast: "Invitation acceptée",
     acceptFailed: "Échec de l'acceptation de l'invitation",
@@ -280,8 +280,8 @@ export default {
     delivery: {
       pending: "En attente",
       success: "Réussi",
-      failed: "Échoué",
-      deadLetter: "Lettre morte",
+      failed: "Échec",
+      deadLetter: "Dead letter",
     },
   },
   pricing: {

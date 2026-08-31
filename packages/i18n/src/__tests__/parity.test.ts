@@ -81,6 +81,11 @@ describe("catalog parity", () => {
     // nav tab, `common.contextualTabs.webhooks`); this is the same word on
     // the page's own `<h1>`, a distinct key path.
     "settings.webhooks.pageTitle",
+    // The webhook delivery queue's terminal state. Kept in English on purpose:
+    // "lettre morte" is a French idiom meaning "ignored", which reads as a
+    // judgement rather than a queue state, and this badge is developer-facing
+    // copy sitting beside the term the webhook documentation uses.
+    "common.states.delivery.deadLetter",
     // "URL" is the same acronym in both languages, not an untranslated word.
     "settings.webhooks.endpointsTable.urlHeader",
     // Example webhook URL — a non-linguistic placeholder, not sentence copy
@@ -122,8 +127,6 @@ describe("catalog parity", () => {
     // them differently later.
     "admin.orgs.table.slug",
     "admin.orgs.detail.slugLabel",
-    // "Plan" is spelled identically in French — a genuine cognate.
-    "admin.orgs.detail.planLabel",
     // Same word in French too, matching the existing "Actions" / "Webhooks"
     // cognate exemptions above.
     "admin.auditLog.table.action",

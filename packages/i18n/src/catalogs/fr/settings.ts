@@ -42,8 +42,8 @@ export default {
   },
   billing: {
     pageTitle: "Paramètres de facturation",
-    currentPlanTitle: "Forfait actuel : {{tier}}",
-    statusLabel: "Statut : {{status}}",
+    currentPlanTitle: "Forfait actuel : {{tier}}",
+    statusLabel: "Statut : {{status}}",
     unlimitedMembers: "Membres illimités",
     membersUsage: "{{count}} / {{max}} membres",
     membersUsageAriaLabel: "Utilisation des membres",
@@ -151,13 +151,13 @@ export default {
     cancelFailed: "Impossible d'annuler la suppression. Veuillez réessayer.",
     title: "Supprimer le compte",
     description:
-      "Anonymise définitivement vos données après un délai de grâce de 7 jours. RGPD art. 17 (droit à l'effacement).",
+      "Anonymise définitivement vos données après un délai de grâce de 7 jours. RGPD Art. 17 (droit à l'effacement).",
     checking: "Vérification de l'état du compte…",
     checkFailed: "Impossible de vérifier l'état du compte. Actualisez la page et réessayez.",
     warning:
       "Supprimer votre compte anonymisera toutes vos données après un délai de grâce de 7 jours. Cette action est irréversible passé ce délai.",
     blockingIntro:
-      "Vous êtes le seul propriétaire de ces organisations. Transférez la propriété ou supprimez-les avant de pouvoir supprimer votre compte.",
+      "Vous êtes l'unique propriétaire de ces organisations. Transférez la propriété ou supprimez-les avant de pouvoir supprimer votre compte.",
     otherMembers_one: "{{count}} autre membre",
     otherMembers_other: "{{count}} autres membres",
     resolve: "Régler",
@@ -192,18 +192,19 @@ export default {
     title: "Notifications",
     preferencesTitle: "Préférences de notification",
     preferencesDescription:
-      "Choisissez comment chaque catégorie vous joint. Ces paramètres s'appliquent à votre compte pour toutes les organisations dont vous faites partie.",
+      "Choisissez par quel canal chaque catégorie vous est notifiée. Ces paramètres s'appliquent à votre compte pour toutes les organisations dont vous faites partie.",
     saveFailedToast: "Impossible d'enregistrer vos préférences de notification",
     categoryHeader: "Catégorie",
     inAppHeader: "Dans l'application",
     emailHeader: "E-mail",
     emailFrequencyHeader: "Fréquence des e-mails",
     enforceHeader: "Imposer aux membres",
-    forcedAll: "Toujours envoyé. Les alertes critiques du compte ne peuvent pas être désactivées.",
+    forcedAll:
+      "Toujours envoyées. Les alertes critiques du compte ne peuvent pas être désactivées.",
     forcedSome: "Certaines alertes critiques de cette catégorie sont toujours envoyées.",
-    inAppAriaLabel: "Notifications dans l'application pour {{category}}",
-    emailAriaLabel: "Notifications par e-mail pour {{category}}",
-    emailFrequencyAriaLabel: "Fréquence des e-mails pour {{category}}",
+    inAppAriaLabel: "Notifications dans l'application pour la catégorie {{category}}",
+    emailAriaLabel: "Notifications par e-mail pour la catégorie {{category}}",
+    emailFrequencyAriaLabel: "Fréquence des e-mails pour la catégorie {{category}}",
     enforceAriaLabel: "Imposer la catégorie {{category}} à tous les membres",
     frequency: {
       immediate: "Immédiatement",
@@ -251,14 +252,14 @@ export default {
     saveChanges: "Enregistrer les modifications",
     transferDialogTitle: "Transférer la propriété et quitter",
     transferDialogDescription:
-      "Vous êtes le seul propriétaire de <orgName></orgName>. Transférez la propriété à un autre membre avant de partir.",
+      "Vous êtes l'unique propriétaire de <orgName></orgName>. Transférez la propriété à un autre membre avant de partir.",
     newOwnerLabel: "Nouveau propriétaire",
     selectMemberPlaceholder: "Sélectionnez un membre…",
-    currentRoleSuffix: "(rôle actuel : {{role}})",
+    currentRoleSuffix: "(rôle actuel : {{role}})",
     transferAndLeaveAction: "Transférer et quitter",
     leftOrgToast: "Organisation quittée",
-    leaveFailed: "Échec de la sortie",
-    transferAndLeaveFailed: "Échec du transfert et de la sortie",
+    leaveFailed: "Impossible de quitter l'organisation",
+    transferAndLeaveFailed: "Impossible de transférer la propriété et de quitter l'organisation",
     orgDeletedToast: "Organisation supprimée",
     deleteFailed: "Échec de la suppression",
     leaveOrgLabel: "Quitter l'organisation",
@@ -279,7 +280,7 @@ export default {
     saveDefaultsFailed: "Impossible d'enregistrer les valeurs par défaut de l'organisation",
     notificationDefaultsTitle: "Valeurs par défaut des notifications",
     notificationDefaultsDescription:
-      "Les membres qui n'ont pas fait leur propre choix héritent de ces paramètres. Forcez une catégorie pour l'imposer à tous, en écrasant leur choix.",
+      "Les membres qui n'ont pas fait leur propre choix héritent de ces paramètres. Forcez une catégorie pour l'imposer à tous, en écrasant leurs choix individuels.",
   },
   privacy: {
     pageTitle: "Confidentialité et données",
@@ -302,7 +303,7 @@ export default {
   dataExport: {
     title: "Télécharger vos données",
     description:
-      "Recevez une archive JSON des données de votre compte par e-mail. RGPD art. 20 (droit à la portabilité).",
+      "Recevez une archive JSON des données de votre compte par e-mail. RGPD Art. 20 (droit à la portabilité).",
     requesting: "Envoi de la demande…",
     request: "Demander l'export des données",
     nextAvailable: "Prochaine demande disponible le {{date}}.",
@@ -313,7 +314,7 @@ export default {
   sessions: {
     title: "Sessions actives",
     description: "Appareils actuellement connectés à votre compte.",
-    signOutOthers: "Déconnecter les autres",
+    signOutOthers: "Déconnecter les autres sessions",
     loading: "Chargement…",
     empty: "Aucune session active.",
     current: "Actuelle",
@@ -352,7 +353,7 @@ export default {
       urlHeader: "URL",
       statusHeader: "Statut",
       eventsHeader: "Événements",
-      createdHeader: "Créé",
+      createdHeader: "Date de création",
     },
     endpointRow: {
       autoDisabledTooltip:
@@ -361,7 +362,7 @@ export default {
       viewDeliveries: "Voir les livraisons",
       edit: "Modifier",
       sendTest: "Envoyer un test",
-      rotateSecret: "Régénérer le secret",
+      rotateSecret: "Faire tourner le secret",
       delete: "Supprimer",
     },
     deliveries: {
@@ -372,7 +373,7 @@ export default {
       eventTypeHeader: "Type d'événement",
       statusHeader: "Statut",
       attemptsHeader: "Tentatives",
-      createdHeader: "Créé",
+      createdHeader: "Date de création",
       detailsAction: "Détails",
       loadMore: "Charger plus",
     },
@@ -381,18 +382,18 @@ export default {
       requestBody: "Corps de la requête",
       responseHeaders: "En-têtes de la réponse",
       responseBody: "Corps de la réponse",
-      statusLine_one: "Statut : {{status}} · {{count}} tentative",
-      statusLine_other: "Statut : {{status}} · {{count}} tentatives",
+      statusLine_one: "Statut : {{status}} · {{count}} tentative",
+      statusLine_other: "Statut : {{status}} · {{count}} tentatives",
       replay: "Rejouer la livraison",
       loadingAttempts: "Chargement des tentatives…",
-      attemptNumber: "Tentative n° {{number}}",
+      attemptNumber: "Tentative n° {{number}}",
       noResponse: "aucune réponse",
       payload: "Charge utile",
     },
     verifySnippetHeading: "Vérifier les signatures (Node.js)",
     eventTypePicker: {
       allEvents: "Tous les événements (*)",
-      groupWildcard: "{{group}}.* (tous les événements {{group}})",
+      groupWildcard: "{{group}}.* (tous les événements du groupe {{group}})",
     },
     form: {
       urlLabel: "URL du point de terminaison",
@@ -417,7 +418,7 @@ export default {
       tokenHeader: "Jeton",
       scopesHeader: "Portées",
       lastUsedHeader: "Dernière utilisation",
-      expiresHeader: "Expire",
+      expiresHeader: "Expiration",
       statusHeader: "Statut",
     },
     neverExpires: "Jamais",
@@ -443,13 +444,13 @@ export default {
     upsell: {
       description:
         "Permettez aux membres de se connecter via votre fournisseur d'identité (OIDC ou SAML), provisionnez les comptes via SCIM et imposez le SSO sur un domaine vérifié.",
-      upgradeAction: "Passez à l'offre Entreprise",
+      upgradeAction: "Passez au forfait Entreprise",
     },
     registerProviderFirst: "Enregistrez d'abord un fournisseur d'identité.",
     providerCard: {
       title: "Fournisseur d'identité",
       description:
-        "Connectez l'application OIDC ou SAML fournie par votre fournisseur d'identité pour que les membres de votre domaine puissent s'y connecter.",
+        "Connectez l'application OIDC ou SAML fournie par votre fournisseur d'identité pour que les membres de votre domaine puissent se connecter avec.",
       registeredToast: "Fournisseur SSO enregistré",
       type: {
         oidc: "OIDC",
@@ -463,7 +464,7 @@ export default {
     domainCard: {
       title: "Vérification du domaine",
       description:
-        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif — les membres de ce domaine ne peuvent pas s'y connecter — jusqu'à ce que l'enregistrement soit résolu.",
+        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif — les membres de ce domaine ne peuvent pas se connecter via ce fournisseur — jusqu'à ce que l'enregistrement soit résolu.",
       verifiedToast: "Domaine vérifié",
       verifiedBadge: "Vérifié",
       unverifiedBadge: "Non vérifié",
@@ -477,8 +478,8 @@ export default {
     enforcementCard: {
       title: "Imposer le SSO",
       description:
-        "Une fois activé, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès — le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
-      updatedToast: "Application du SSO mise à jour",
+        "Une fois cette option activée, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès — le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
+      updatedToast: "Imposition du SSO mise à jour",
       switchAriaLabel: "Imposer le SSO pour votre domaine",
       enforcedLabel: "Imposé",
       notEnforcedLabel: "Non imposé",

@@ -21,7 +21,7 @@ describe("provider-card SSO registration error routing (real French t)", () => {
     const err = new Error("SSO_PLAN_REQUIRED");
     const message = formatApiError({ code: err.message }, err.message, tErrors);
 
-    expect(message).toBe("Votre offre n'inclut pas le SSO.");
+    expect(message).toBe("Votre forfait n'inclut pas le SSO.");
     expect(message).not.toBe("SSO_PLAN_REQUIRED");
   });
 

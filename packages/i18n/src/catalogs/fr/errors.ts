@@ -8,7 +8,7 @@ export default {
     ACCOUNT_PASSWORD_INVALID: "Mot de passe invalide.",
     TWO_FACTOR_REQUIRED: "Confirmez avec votre mot de passe ou votre code d'authentification.",
     TWO_FACTOR_INVALID: "Code d'authentification invalide.",
-    SSO_PLAN_REQUIRED: "Votre offre n'inclut pas le SSO.",
+    SSO_PLAN_REQUIRED: "Votre forfait n'inclut pas le SSO.",
     SSO_ORGANIZATION_REQUIRED: "Aucune organisation active.",
     INVALID_EMAIL_OR_PASSWORD: "Adresse e-mail ou mot de passe invalide.",
     INVALID_EMAIL: "Saisissez une adresse e-mail valide.",
@@ -81,7 +81,7 @@ export default {
     MEMBER_NOT_FOUND: "Membre introuvable.",
     ROLE_NOT_FOUND: "Rôle introuvable.",
     YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER:
-      "Transférez la propriété avant de partir : vous êtes le seul propriétaire.",
+      "Transférez la propriété avant de partir : vous en êtes l'unique propriétaire.",
     YOU_CANNOT_LEAVE_THE_ORGANIZATION_WITHOUT_AN_OWNER:
       "Une organisation doit conserver au moins un propriétaire.",
     YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER:
@@ -101,7 +101,7 @@ export default {
     YOU_ARE_NOT_ALLOWED_TO_CANCEL_THIS_INVITATION:
       "Vous n'avez pas la permission d'annuler cette invitation.",
     INVITER_IS_NO_LONGER_A_MEMBER_OF_THE_ORGANIZATION:
-      "La personne qui vous a invité n'est plus membre de cette organisation.",
+      "La personne à l'origine de votre invitation n'est plus membre de cette organisation.",
     YOU_ARE_NOT_ALLOWED_TO_INVITE_USER_WITH_THIS_ROLE:
       "Vous n'avez pas la permission d'inviter quelqu'un avec ce rôle.",
     FAILED_TO_RETRIEVE_INVITATION:
@@ -115,7 +115,7 @@ export default {
   byStatus: {
     "400": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
     "401": "Veuillez vous reconnecter.",
-    "403": "Vous n'avez pas la permission de faire cela.",
+    "403": "Vous n'avez pas la permission d'effectuer cette action.",
     "404": "Introuvable.",
     "409": "Cette action entre en conflit avec l'état actuel. Actualisez et réessayez.",
     "422": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
@@ -124,7 +124,7 @@ export default {
   bySuffix: {
     RATE_LIMITED: "Trop de requêtes. Patientez un instant avant de réessayer.",
     NOT_FOUND: "Introuvable.",
-    FORBIDDEN: "Vous n'avez pas la permission de faire cela.",
+    FORBIDDEN: "Vous n'avez pas la permission d'effectuer cette action.",
     UNAUTHORIZED: "Veuillez vous reconnecter.",
     REQUIRED: "Une confirmation supplémentaire est requise.",
     BLOCKED: "Action bloquée.",
@@ -150,7 +150,7 @@ export default {
     totpCode: "Saisissez le code à 6 chiffres de votre application d'authentification.",
     backupCode: "Saisissez un code de secours valide.",
     httpsUrl: "Saisissez une URL https valide.",
-    bareDomain: "Saisissez un domaine nu, sans https:// ni chemin.",
+    bareDomain: "Saisissez uniquement le nom de domaine, sans https:// ni chemin.",
     tooSmall: "Doit contenir au moins {{minimum}} caractères.",
     tooBig: "Doit contenir au plus {{maximum}} caractères.",
     tooFewItems: "Sélectionnez au moins {{minimum}}.",
@@ -172,7 +172,7 @@ export default {
     requestDataExport: "Échec de la demande d'export",
     stopImpersonation: "Échec de l'arrêt de l'emprunt d'identité",
     withdrawConsent: "Échec du retrait du consentement",
-    loadPlans: "Échec du chargement des offres",
+    loadPlans: "Échec du chargement des forfaits",
     loadConsent: "Échec du chargement du consentement",
     loadNotifications: "Échec du chargement des notifications",
     loadUnreadCount: "Échec du chargement du nombre de notifications non lues",
@@ -200,7 +200,7 @@ export default {
     verifySsoDomain: "Échec de la vérification du domaine",
     generateScimToken: "Échec de la génération du jeton SCIM",
     invalidServerResponse: "Réponse invalide du serveur",
-    updateSsoEnforcement: "Échec de la mise à jour de l'application du SSO",
+    updateSsoEnforcement: "Échec de la mise à jour de l'imposition du SSO",
     loadSsoProviders: "Échec du chargement des fournisseurs SSO",
     loadSsoVerificationToken: "Échec du chargement du jeton de vérification",
     banUser: "Échec de la suspension du compte",
@@ -212,7 +212,7 @@ export default {
     loadAdminUser: "Échec du chargement du compte",
     loadAdminOrgs: "Échec du chargement des organisations",
     loadAdminOrg: "Échec du chargement de l'organisation",
-    updateAdminOrgSsoEnforcement: "Échec de la mise à jour de l'application du SSO",
+    updateAdminOrgSsoEnforcement: "Échec de la mise à jour de l'imposition du SSO",
     loadAuditLog: "Échec du chargement du journal d'audit",
     verifyAuditChain: "Échec de la vérification de la chaîne",
   },
