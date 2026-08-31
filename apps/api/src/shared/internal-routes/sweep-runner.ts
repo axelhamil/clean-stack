@@ -82,7 +82,7 @@ export type SweepResponse = {
 };
 
 export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise<SweepResponse> {
-  return opts.spans.span({ name: `sweep > ${opts.label}`, op: "sweep" }, async () => {
+  return opts.spans.span({ name: `sweep > ${opts.label}`, op: "function" }, async () => {
     const batchSize = opts.body.batchSize ?? 5000;
     const dryRun = opts.body.dryRun ?? false;
     const now = opts.now ?? Date.now;
@@ -139,7 +139,7 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
         const run = await opts.spans.span(
           {
             name: `sweep > ${opts.label}:${pass.label}`,
-            op: "sweep.pass",
+            op: "function",
             attributes: {
               "sweep.retention_days": pass.retentionDays,
               "sweep.batch_size": batchSize,
@@ -197,6 +197,7 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
     // Same reasoning as the skipped-run attributes above, for the completed path: the
     // run span otherwise carries no attributes of its own, only its `sweep.pass` children.
     opts.spans.attributes({
+      "sweep.skipped": false,
       "sweep.deleted": deleted,
       "sweep.batch_count": batchCount,
       "sweep.truncated": truncated,

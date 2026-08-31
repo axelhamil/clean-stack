@@ -170,20 +170,23 @@ budget between batches sufficient.
 
 ### What a sweep looks like in tracing
 
-Every `/internal/sweep-*` request opens one `sweep` span named `sweep > <label>`,
-bracketed by a `db.query` child for the lease acquire and one for the lease release,
-one `sweep.pass` child per retention pass (carrying `sweep.retention_days`,
-`sweep.batch_size`, `sweep.dry_run`, and on close `sweep.deleted`, `sweep.batch_count`,
+Every `/internal/sweep-*` request opens one run span (`op: "function"`) named
+`sweep > <label>`, bracketed by a `db.query` child for the lease acquire and one for
+the lease release, one pass span (`op: "function"`) per retention pass named
+`sweep > <label>:<pass>` (carrying `sweep.retention_days`, `sweep.batch_size`,
+`sweep.dry_run`, and on close `sweep.deleted`, `sweep.batch_count`,
 `sweep.stop_reason`), a `db.query` child per batched delete, and — on a dry run — a
 `db.query` child per pass for the count. `sweep.stop_reason` is the field to read
 first: `budget` and `batch-cap` mean "more work left, next tick will resume",
-`batch-error` means a batch will keep failing identically.
+`batch-error` means a batch will keep failing identically. The run and pass spans
+share `op: "function"` with every other whole-operation span in the codebase — their
+`name` is what distinguishes them, not a dedicated op.
 
 The run span itself also carries attributes, written just before it closes: a run
 skipped because another run holds the lease sets `sweep.skipped: true` and nothing
 else — otherwise it would be indistinguishable in Sentry from a run that executed and
-found no work. A run that completes sets `sweep.deleted`, `sweep.batch_count`, and
-`sweep.truncated` instead.
+found no work. A run that completes sets `sweep.skipped: false` alongside
+`sweep.deleted`, `sweep.batch_count`, and `sweep.truncated` instead.
 
 Batch and dry-run-count spans are capped at `MAX_INSTRUMENTED_BATCHES` (50) per run —
 past that the queries still run, just untraced. The cap exists because Sentry

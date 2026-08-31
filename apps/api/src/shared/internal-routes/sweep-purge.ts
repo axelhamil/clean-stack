@@ -1,4 +1,4 @@
-import type { AnyPgColumn, AnyPgTable, SQL } from "@packages/drizzle";
+import type { AnyPgColumn, AnyPgTable, SQL, Transaction } from "@packages/drizzle";
 import { db, inArray, sql } from "@packages/drizzle";
 import type { SweepSpans } from "./sweep-span";
 
@@ -6,11 +6,19 @@ export type PurgeBatchOptions = {
   table: AnyPgTable;
   /** The primary key, selected by the locking subquery and matched by the delete. */
   idColumn: AnyPgColumn;
-  where: SQL | undefined;
+  where: SQL;
   /** Oldest-first column, so a truncated run resumes where it stopped. */
   orderBy: AnyPgColumn;
   batchSize: number;
   spans: SweepSpans;
+  /**
+   * Test-only escape hatch, run right after the three `SET LOCAL` guards and before
+   * the delete. No production call site sets it, so it never changes the delete SQL
+   * any route emits. Exists so `apps/api/scripts/check-sweep-lock.ts` can assert
+   * `current_setting(...)` against a real Postgres transaction instead of mocking
+   * `tx.execute` and asserting on SQL text (banned — see `shared/CLAUDE.md`).
+   */
+  assertGuards?: (tx: Transaction) => Promise<void>;
 };
 
 /**
@@ -26,10 +34,21 @@ export type PurgeBatchOptions = {
  * carries its SQL; the lock-timeout guards and the FOR UPDATE subquery ride inside it.
  */
 export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<number> {
+  // `and()` returns `undefined` when given no arguments or all-undefined conditions,
+  // and Drizzle's `where(undefined)` is a no-op — a caller that lets its predicate
+  // collapse to `undefined` would otherwise delete the oldest N rows of the whole
+  // table. Fail closed rather than let that type-check.
+  if (!opts.where) {
+    throw new Error("purgeBatchWithTimeout: refusing an unfiltered delete");
+  }
   return db.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
     await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
     await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+
+    if (opts.assertGuards) {
+      await opts.assertGuards(tx);
+    }
 
     const subq = tx
       .select({ id: opts.idColumn })

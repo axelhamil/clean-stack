@@ -1,5 +1,6 @@
 // `/internal/sweep-webhook-delivery` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import type { SQL } from "@packages/drizzle";
 import { and, inArray, lt, webhooksSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -18,8 +19,11 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
 
 const wd = webhooksSchema.webhookDelivery;
-const filterFor = (cutoff: Date) =>
-  and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff));
+// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
+// result is always `SQL` — asserted rather than left `undefined`-typed so
+// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
+const filterFor = (cutoff: Date): SQL =>
+  and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)) as SQL;
 
 export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)

@@ -19,16 +19,12 @@ function fakeQuery(sql: string, rows: Array<{ id: string }>) {
   };
 }
 
-const statements: string[] = [];
-
 mock.module("@packages/drizzle", () => ({
   ...drizzleMock(),
   db: {
     transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
-        execute: async (s: unknown) => {
-          statements.push(String(s));
-        },
+        execute: async () => {},
         select: () => fakeQuery("select id", []),
         delete: () => fakeQuery('delete from "t"', [{ id: "a" }, { id: "b" }]),
       }),
@@ -39,6 +35,11 @@ const { describe, expect, it, spyOn } = await import("bun:test");
 const { NoOpInstrumentation } = await import("../../services/noop-instrumentation");
 const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout } = await import("../sweep-purge");
+const { isNotNull } = await import("@packages/drizzle");
+
+// A real predicate, mirroring what every route actually passes — `where: undefined`
+// would now be refused by the guard `purgeBatchWithTimeout` fails closed on.
+const realWhere = () => isNotNull({} as never) as never;
 
 describe("purgeBatchWithTimeout", () => {
   it("returns the number of deleted rows", async () => {
@@ -46,7 +47,7 @@ describe("purgeBatchWithTimeout", () => {
     const deleted = await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
-      where: undefined,
+      where: realWhere(),
       orderBy: {} as never,
       batchSize: 100,
       spans,
@@ -55,21 +56,19 @@ describe("purgeBatchWithTimeout", () => {
     expect(deleted).toBe(2);
   });
 
-  it("keeps the three SET LOCAL guards", async () => {
-    statements.length = 0;
+  it("refuses an unfiltered delete", async () => {
     const spans = sweepSpans(new NoOpInstrumentation());
-    await purgeBatchWithTimeout({
-      table: {} as never,
-      idColumn: {} as never,
-      where: undefined,
-      orderBy: {} as never,
-      batchSize: 100,
-      spans,
-    });
 
-    expect(statements.join(" ")).toContain("statement_timeout");
-    expect(statements.join(" ")).toContain("lock_timeout");
-    expect(statements.join(" ")).toContain("idle_in_transaction_session_timeout");
+    await expect(
+      purgeBatchWithTimeout({
+        table: {} as never,
+        idColumn: {} as never,
+        where: undefined as never,
+        orderBy: {} as never,
+        batchSize: 100,
+        spans,
+      }),
+    ).rejects.toThrow("refusing an unfiltered delete");
   });
 
   it("opens exactly one db span, carrying the delete sql", async () => {
@@ -80,7 +79,7 @@ describe("purgeBatchWithTimeout", () => {
     await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
-      where: undefined,
+      where: realWhere(),
       orderBy: {} as never,
       batchSize: 100,
       spans,

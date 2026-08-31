@@ -1,6 +1,7 @@
 // `/internal/sweep-consents` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 // Purges ONLY guest (userId IS NULL) expired consent records. Authed records are compliance evidence — never purged.
 
+import type { SQL } from "@packages/drizzle";
 import { and, consentSchema, isNull, lt } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -16,11 +17,14 @@ import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-const filterFor = (cutoff: Date) =>
+// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
+// result is always `SQL` — asserted rather than left `undefined`-typed so
+// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
+const filterFor = (cutoff: Date): SQL =>
   and(
     isNull(consentSchema.consentRecord.userId),
     lt(consentSchema.consentRecord.expiresAt, cutoff),
-  );
+  ) as SQL;
 
 export const sweepConsentsRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)

@@ -15,7 +15,7 @@
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
 import { Writable } from "node:stream";
-import { db, eq, sweepSchema } from "@packages/drizzle";
+import { db, eq, sql, sweepSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import { pinoLogger } from "hono-pino";
 import { pino } from "pino";
@@ -31,6 +31,7 @@ import {
 } from "../src/shared/internal-routes/sweep-lock";
 import { sweepNotificationsRoutes } from "../src/shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "../src/shared/internal-routes/sweep-outbox.route";
+import { purgeBatchWithTimeout } from "../src/shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
@@ -113,6 +114,53 @@ const wiringRowsAfterRelease = await db
   .from(sweepSchema.sweepLock)
   .where(eq(sweepSchema.sweepLock.label, wiringLabel));
 check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length === 0);
+
+// ── purgeBatchWithTimeout: the three SET LOCAL guards, checked against a real
+// transaction. A mocked `tx.execute` can only assert on the SQL text a builder
+// produced (banned — see apps/api/src/shared/CLAUDE.md), and that check is weak on
+// its own terms: it only proves the setting *names* were sent, not their values, so
+// '5s' silently becoming '5m' would still pass. `assertGuards` runs inside the same
+// transaction `purgeBatchWithTimeout` opens, right after the three `SET LOCAL`
+// statements, and reads `current_setting(...)` back from Postgres itself. ──────────
+{
+  let guardsOk = false;
+  let observed: { statementTimeout?: string; lockTimeout?: string; idleTimeout?: string } = {};
+  await purgeBatchWithTimeout({
+    table: sweepSchema.sweepLock,
+    idColumn: sweepSchema.sweepLock.label,
+    // Matches no row — a real lease label never collides with this sentinel — so the
+    // guard check runs (and the delete executes as a harmless no-op) without touching
+    // any lease another check or a real sweep might be holding.
+    where: eq(sweepSchema.sweepLock.label, `check-sweep-guard-${crypto.randomUUID()}`),
+    orderBy: sweepSchema.sweepLock.lockedAt,
+    batchSize: 1,
+    spans: freshSpans(),
+    assertGuards: async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT
+          current_setting('statement_timeout') AS statement_timeout,
+          current_setting('lock_timeout') AS lock_timeout,
+          current_setting('idle_in_transaction_session_timeout') AS idle_timeout
+      `);
+      const row = result.rows[0] as
+        | { statement_timeout: string; lock_timeout: string; idle_timeout: string }
+        | undefined;
+      observed = {
+        statementTimeout: row?.statement_timeout,
+        lockTimeout: row?.lock_timeout,
+        idleTimeout: row?.idle_timeout,
+      };
+      guardsOk =
+        row?.statement_timeout === "5s" &&
+        row?.lock_timeout === "500ms" &&
+        row?.idle_timeout === "10s";
+    },
+  });
+  check(
+    `purgeBatchWithTimeout's SET LOCAL guards are exactly 5s/500ms/10s (got ${JSON.stringify(observed)})`,
+    guardsOk,
+  );
+}
 
 // ── the six routes: each must pass its own label to sweepLockFor, not a shared or
 // wrong one — proven by holding that exact label's lease and expecting THIS route,

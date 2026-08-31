@@ -8,11 +8,11 @@ describe("sweepSpans", () => {
     const spy = spyOn(instrumentation, "startSpan");
     const spans = sweepSpans(instrumentation);
 
-    const result = await spans.span({ name: "sweep > sweep-x", op: "sweep" }, async () => 42);
+    const result = await spans.span({ name: "sweep > sweep-x", op: "function" }, async () => 42);
 
     expect(result).toBe(42);
     expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "sweep > sweep-x", op: "sweep" }),
+      expect.objectContaining({ name: "sweep > sweep-x", op: "function" }),
       expect.any(Function),
     );
   });

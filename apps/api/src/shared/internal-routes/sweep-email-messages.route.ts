@@ -1,5 +1,6 @@
 // `/internal/sweep-email-messages` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import type { SQL } from "@packages/drizzle";
 import { and, emailSchema, eq, lt } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -23,8 +24,13 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 
 const em = emailSchema.emailMessage;
 
-const sentPredicate = (cutoff: Date) => and(eq(em.status, "sent"), lt(em.sentAt, cutoff));
-const failedPredicate = (cutoff: Date) => and(eq(em.status, "failed"), lt(em.createdAt, cutoff));
+// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
+// result is always `SQL` — asserted rather than left `undefined`-typed so
+// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
+const sentPredicate = (cutoff: Date): SQL =>
+  and(eq(em.status, "sent"), lt(em.sentAt, cutoff)) as SQL;
+const failedPredicate = (cutoff: Date): SQL =>
+  and(eq(em.status, "failed"), lt(em.createdAt, cutoff)) as SQL;
 
 export function buildEmailSweepPasses(spans: SweepSpans): RetentionPass[] {
   return [

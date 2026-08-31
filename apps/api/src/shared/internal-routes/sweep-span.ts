@@ -56,7 +56,25 @@ export function sweepSpans(
       return dbSpan(sqlOf, run);
     },
     lease: (sqlOf, run) => dbSpan(sqlOf, run),
-    attributes: (attrs) => instrumentation.setSpanAttributes(attrs),
-    capture: (error, metadata) => instrumentation.capture(error, { metadata }),
+    // Telemetry must never change the outcome of the work it observes: `attributes`
+    // and `capture` are called from a swallow branch, a `finally`, and after the
+    // deletes have committed — a throw from any of them would turn an already-decided
+    // outcome (swallowed error, successful sweep) into an unrelated 500. `span`/`db`/
+    // `lease` are deliberately left unwrapped — they carry the actual work and must
+    // propagate.
+    attributes: (attrs) => {
+      try {
+        instrumentation.setSpanAttributes(attrs);
+      } catch {
+        // Intentional no-op — see comment above.
+      }
+    },
+    capture: (error, metadata) => {
+      try {
+        instrumentation.capture(error, { metadata });
+      } catch {
+        // Intentional no-op — see comment above.
+      }
+    },
   };
 }

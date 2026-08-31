@@ -380,6 +380,7 @@ describe("runRetentionSweep instrumentation", () => {
     // `sweep.truncated` — the field that makes a skipped and a completed run
     // distinguishable in the trace.
     expect(spy).toHaveBeenCalledWith({
+      "sweep.skipped": false,
       "sweep.deleted": 0,
       "sweep.batch_count": 1,
       "sweep.truncated": false,

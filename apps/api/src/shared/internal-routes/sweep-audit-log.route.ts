@@ -1,6 +1,6 @@
 // `/internal/sweep-audit-log` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import type { AuditRetention } from "@packages/drizzle";
+import type { AuditRetention, SQL } from "@packages/drizzle";
 import { and, auditLogSchema, eq, lt } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -26,8 +26,12 @@ export const sweepAuditLogRoutes = new Hono<HonoEnv>()
     // concurrently without sharing it.
     const spans = sweepSpans(di.IInstrumentation);
 
-    const filterFor = (bucket: AuditRetention, cutoff: Date) =>
-      and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff));
+    // `and()` types as `SQL | undefined` (its signature allows zero/all-undefined
+    // args); both arguments here are always defined, so the result is always `SQL` —
+    // asserted rather than left `undefined`-typed so `purgeBatchWithTimeout`'s
+    // fail-closed `where: SQL` catches a real regression instead of a false one.
+    const filterFor = (bucket: AuditRetention, cutoff: Date): SQL =>
+      and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff)) as SQL;
 
     // AuditEventSubscriber skips retention="none" rows (returns early) — "none" is never inserted in DB.
     // We only iterate operational + compliance (the two values in AUDIT_RETENTIONS enum).

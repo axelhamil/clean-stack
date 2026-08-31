@@ -1,5 +1,6 @@
 // `/internal/sweep-outbox` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import type { SQL } from "@packages/drizzle";
 import { and, isNotNull, lt, outboxSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -15,11 +16,14 @@ import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-const filterFor = (cutoff: Date) =>
+// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
+// result is always `SQL` — asserted rather than left `undefined`-typed so
+// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
+const filterFor = (cutoff: Date): SQL =>
   and(
     isNotNull(outboxSchema.outboxEvent.dispatchedAt),
     lt(outboxSchema.outboxEvent.dispatchedAt, cutoff),
-  );
+  ) as SQL;
 
 export const sweepOutboxRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)

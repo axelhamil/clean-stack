@@ -1,3 +1,4 @@
+import type { SQL } from "@packages/drizzle";
 import { and, isNotNull, lt, notificationSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -13,9 +14,12 @@ import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-export function buildPurgeFilter(cutoff: Date) {
+// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
+// result is always `SQL` — asserted rather than left `undefined`-typed so
+// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
+export function buildPurgeFilter(cutoff: Date): SQL {
   const n = notificationSchema.notification;
-  return and(isNotNull(n.readAt), lt(n.createdAt, cutoff));
+  return and(isNotNull(n.readAt), lt(n.createdAt, cutoff)) as SQL;
 }
 
 export const sweepNotificationsRoutes = new Hono<HonoEnv>()
