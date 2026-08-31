@@ -171,17 +171,29 @@ budget between batches sufficient.
 ### What a sweep looks like in tracing
 
 Every `/internal/sweep-*` request opens one `sweep` span named `sweep > <label>`,
-with a `db.query` child for the lease acquire, one `sweep.pass` child per retention
-pass (carrying `sweep.retention_days`, `sweep.batch_size`, `sweep.dry_run`, and on
-close `sweep.deleted`, `sweep.batch_count`, `sweep.stop_reason`), and a `db.query`
-child per batched delete. `sweep.stop_reason` is the field to read first: `budget`
-and `batch-cap` mean "more work left, next tick will resume", `batch-error` means a
-batch will keep failing identically.
+bracketed by a `db.query` child for the lease acquire and one for the lease release,
+one `sweep.pass` child per retention pass (carrying `sweep.retention_days`,
+`sweep.batch_size`, `sweep.dry_run`, and on close `sweep.deleted`, `sweep.batch_count`,
+`sweep.stop_reason`), a `db.query` child per batched delete, and — on a dry run — a
+`db.query` child per pass for the count. `sweep.stop_reason` is the field to read
+first: `budget` and `batch-cap` mean "more work left, next tick will resume",
+`batch-error` means a batch will keep failing identically.
 
-Batch spans are capped at `MAX_INSTRUMENTED_BATCHES` (50) per run — past that the
-deletes run untraced. The cap exists because Sentry truncates a transaction at ~1000
-spans from the end, and losing the last passes and the lease release to make room for
-the 900th identical delete is a bad trade.
+The run span itself also carries attributes, written just before it closes: a run
+skipped because another run holds the lease sets `sweep.skipped: true` and nothing
+else — otherwise it would be indistinguishable in Sentry from a run that executed and
+found no work. A run that completes sets `sweep.deleted`, `sweep.batch_count`, and
+`sweep.truncated` instead.
+
+Batch and dry-run-count spans are capped at `MAX_INSTRUMENTED_BATCHES` (50) per run —
+past that the queries still run, just untraced. The cap exists because Sentry
+truncates a transaction at ~1000 spans from the end (measured: emitting 1200 spans in
+one transaction retained exactly 1000, tail dropped — see `docs/HISTORY.md`), and
+losing the last passes to make room for the 900th identical delete is a bad trade.
+The lease's two spans are the one exception: they are never subject to this budget,
+because the budget exists to keep spans like these from being pushed out of the
+trace, so spending it on them would defeat its own purpose — `spans.lease(...)` opens
+unconditionally, even on a run whose batch budget is already exhausted.
 
 Errors: a batch failure under `onBatchError: "break"` and a failed lease release are
 both swallowed by design (a sweep that did its work must not fail on them) and both
