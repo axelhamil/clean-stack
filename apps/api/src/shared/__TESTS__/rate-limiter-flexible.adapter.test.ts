@@ -151,6 +151,7 @@ function makeNoopInstrumentation(): IInstrumentation {
     startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
     capture: () => {},
     addBreadcrumb: () => {},
+    setSpanAttributes: () => {},
   };
 }
 
@@ -265,6 +266,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
         startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
         capture: captureSpy,
         addBreadcrumb: () => {},
+        setSpanAttributes: () => {},
       };
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);
@@ -378,6 +380,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
         startSpan: startSpanSpy as unknown as IInstrumentation["startSpan"],
         capture: () => {},
         addBreadcrumb: () => {},
+        setSpanAttributes: () => {},
       };
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);

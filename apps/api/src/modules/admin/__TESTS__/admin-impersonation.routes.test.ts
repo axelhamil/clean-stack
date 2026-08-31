@@ -124,7 +124,7 @@ mock.module("hono/bun", () => ({
 }));
 
 mock.module("../../../container", () => ({
-  di: { IOutboxRepository: {}, IInstrumentation: {} },
+  di: { IOutboxRepository: {}, IInstrumentation: { setSpanAttributes: () => {} } },
 }));
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];

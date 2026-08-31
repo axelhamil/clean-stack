@@ -11,6 +11,7 @@ function makeSpy() {
     capture: captureSpy,
     startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
     addBreadcrumb: () => {},
+    setSpanAttributes: () => {},
   };
   return { captureSpy, instrumentation };
 }
