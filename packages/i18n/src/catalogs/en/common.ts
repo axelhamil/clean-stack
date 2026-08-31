@@ -79,11 +79,20 @@ export default {
     selectPlaceholder: "Select organization",
     switchFailed: "Failed to switch organization",
   },
+  developers: {
+    eventsTitle: "Event catalog",
+    eventsIntro:
+      "All subscribable events emitted by this platform. Subscribe to any of these via a webhook endpoint in your organization settings.",
+    eventsEnglishNote:
+      "Event names and their descriptions are part of the API reference and stay in English.",
+  },
   userMenu: {
     openMenu: "Open user menu",
     account: "Account",
     signOut: "Sign out",
     signingOut: "Signing out…",
+    signedOutToast: "Signed out",
+    signOutFailed: "Sign-out failed",
   },
   impersonation: {
     activeSession: "Active impersonation session — acting as <name></name>",
@@ -197,6 +206,10 @@ export default {
       accessibility: "Accessibility statement (EAA Art. 14)",
       cookies: "Cookie policy (CNIL)",
     },
+  },
+  policyAcceptance: {
+    acceptedToast: "Policies accepted — welcome!",
+    acceptFailed: "Could not record your acceptance. Please try again.",
   },
   legalFooter: {
     ariaLabel: "Legal",

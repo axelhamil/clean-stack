@@ -79,11 +79,20 @@ export default {
     selectPlaceholder: "Sélectionner une organisation",
     switchFailed: "Échec du changement d'organisation",
   },
+  developers: {
+    eventsTitle: "Catalogue des événements",
+    eventsIntro:
+      "Tous les événements auxquels il est possible de s'abonner sur cette plateforme. Abonnez-vous à l'un d'eux depuis un point de terminaison webhook dans les paramètres de votre organisation.",
+    eventsEnglishNote:
+      "Les noms d'événements et leurs descriptions font partie de la référence de l'API et restent en anglais.",
+  },
   userMenu: {
     openMenu: "Ouvrir le menu utilisateur",
     account: "Compte",
     signOut: "Se déconnecter",
     signingOut: "Déconnexion…",
+    signedOutToast: "Déconnexion effectuée",
+    signOutFailed: "Échec de la déconnexion",
   },
   impersonation: {
     activeSession: "Session d'emprunt d'identité active — agit en tant que <name></name>",
@@ -201,6 +210,10 @@ export default {
       accessibility: "Déclaration d'accessibilité (EAA Art. 14)",
       cookies: "Politique de cookies (CNIL)",
     },
+  },
+  policyAcceptance: {
+    acceptedToast: "Documents acceptés — bienvenue !",
+    acceptFailed: "Impossible d'enregistrer votre acceptation. Veuillez réessayer.",
   },
   legalFooter: {
     ariaLabel: "Légal",
