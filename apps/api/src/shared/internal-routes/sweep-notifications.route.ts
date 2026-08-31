@@ -8,18 +8,15 @@ import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
-import { purgeBatchWithTimeout } from "./sweep-purge";
+import { purgeBatchWithTimeout, requireFilter } from "./sweep-purge";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
-// result is always `SQL` — asserted rather than left `undefined`-typed so
-// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
 export function buildPurgeFilter(cutoff: Date): SQL {
   const n = notificationSchema.notification;
-  return and(isNotNull(n.readAt), lt(n.createdAt, cutoff)) as SQL;
+  return requireFilter(and(isNotNull(n.readAt), lt(n.createdAt, cutoff)), "sweep-notifications");
 }
 
 export const sweepNotificationsRoutes = new Hono<HonoEnv>()

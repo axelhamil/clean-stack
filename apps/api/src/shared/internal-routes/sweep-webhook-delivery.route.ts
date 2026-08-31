@@ -10,7 +10,7 @@ import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
-import { purgeBatchWithTimeout } from "./sweep-purge";
+import { purgeBatchWithTimeout, requireFilter } from "./sweep-purge";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 import { sweepSpans } from "./sweep-span";
 
@@ -19,11 +19,11 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
 
 const wd = webhooksSchema.webhookDelivery;
-// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
-// result is always `SQL` — asserted rather than left `undefined`-typed so
-// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
 const filterFor = (cutoff: Date): SQL =>
-  and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)) as SQL;
+  requireFilter(
+    and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)),
+    "sweep-webhook-delivery",
+  );
 
 export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)

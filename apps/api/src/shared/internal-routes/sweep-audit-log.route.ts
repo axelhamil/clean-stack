@@ -10,7 +10,7 @@ import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
-import { purgeBatchWithTimeout } from "./sweep-purge";
+import { purgeBatchWithTimeout, requireFilter } from "./sweep-purge";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
 import { sweepSpans } from "./sweep-span";
 
@@ -26,12 +26,11 @@ export const sweepAuditLogRoutes = new Hono<HonoEnv>()
     // concurrently without sharing it.
     const spans = sweepSpans(di.IInstrumentation);
 
-    // `and()` types as `SQL | undefined` (its signature allows zero/all-undefined
-    // args); both arguments here are always defined, so the result is always `SQL` —
-    // asserted rather than left `undefined`-typed so `purgeBatchWithTimeout`'s
-    // fail-closed `where: SQL` catches a real regression instead of a false one.
     const filterFor = (bucket: AuditRetention, cutoff: Date): SQL =>
-      and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff)) as SQL;
+      requireFilter(
+        and(eq(auditLog.retention, bucket), lt(auditLog.occurredAt, cutoff)),
+        "sweep-audit-log",
+      );
 
     // AuditEventSubscriber skips retention="none" rows (returns early) — "none" is never inserted in DB.
     // We only iterate operational + compliance (the two values in AUDIT_RETENTIONS enum).

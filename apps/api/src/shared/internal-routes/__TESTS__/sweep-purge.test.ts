@@ -34,7 +34,7 @@ mock.module("@packages/drizzle", () => ({
 const { describe, expect, it, spyOn } = await import("bun:test");
 const { NoOpInstrumentation } = await import("../../services/noop-instrumentation");
 const { sweepSpans } = await import("../sweep-span");
-const { purgeBatchWithTimeout } = await import("../sweep-purge");
+const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
 const { isNotNull } = await import("@packages/drizzle");
 
 // A real predicate, mirroring what every route actually passes — `where: undefined`
@@ -89,6 +89,19 @@ describe("purgeBatchWithTimeout", () => {
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'delete from "t"', op: "db.query" }),
       expect.any(Function),
+    );
+  });
+});
+
+describe("requireFilter", () => {
+  it("returns the filter unchanged when given one", () => {
+    const filter = realWhere();
+    expect(requireFilter(filter, "some-label")).toBe(filter);
+  });
+
+  it("throws with the label in the message when given undefined", () => {
+    expect(() => requireFilter(undefined, "sweep-consents")).toThrow(
+      "sweep-consents: refusing a sweep filter that resolved to no predicate",
     );
   });
 });

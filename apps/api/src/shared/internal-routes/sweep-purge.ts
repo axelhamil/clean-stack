@@ -22,6 +22,20 @@ export type PurgeBatchOptions = {
 };
 
 /**
+ * Asserts a sweep filter was actually built.
+ *
+ * `and()` returns `undefined` when every argument is — a predicate that would make
+ * `purgeBatchWithTimeout` delete the oldest N rows of the whole table, retention window
+ * ignored. Each call site knows its own arguments are unconditional, but that is a fact
+ * about today's code, not a guarantee: this turns seven unchecked `as SQL` assertions
+ * into one named check that fails loudly the day a predicate goes conditional.
+ */
+export function requireFilter(filter: SQL | undefined, label: string): SQL {
+  if (!filter) throw new Error(`${label}: refusing a sweep filter that resolved to no predicate`);
+  return filter;
+}
+
+/**
  * The one batched delete every retention sweep runs.
  *
  * Six routes carried byte-identical copies of this body; promoting it is what makes

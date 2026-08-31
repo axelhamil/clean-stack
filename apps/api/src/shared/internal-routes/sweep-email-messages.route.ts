@@ -10,7 +10,7 @@ import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
-import { purgeBatchWithTimeout } from "./sweep-purge";
+import { purgeBatchWithTimeout, requireFilter } from "./sweep-purge";
 import {
   type RetentionPass,
   runRetentionSweep,
@@ -24,13 +24,13 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 
 const em = emailSchema.emailMessage;
 
-// `and()` types as `SQL | undefined`; both arguments here are always defined, so the
-// result is always `SQL` — asserted rather than left `undefined`-typed so
-// `purgeBatchWithTimeout`'s fail-closed `where: SQL` catches a real regression.
 const sentPredicate = (cutoff: Date): SQL =>
-  and(eq(em.status, "sent"), lt(em.sentAt, cutoff)) as SQL;
+  requireFilter(and(eq(em.status, "sent"), lt(em.sentAt, cutoff)), "sweep-email-messages:sent");
 const failedPredicate = (cutoff: Date): SQL =>
-  and(eq(em.status, "failed"), lt(em.createdAt, cutoff)) as SQL;
+  requireFilter(
+    and(eq(em.status, "failed"), lt(em.createdAt, cutoff)),
+    "sweep-email-messages:failed",
+  );
 
 export function buildEmailSweepPasses(spans: SweepSpans): RetentionPass[] {
   return [
