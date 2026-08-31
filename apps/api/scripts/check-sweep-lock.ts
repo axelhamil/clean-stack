@@ -31,9 +31,12 @@ import {
 } from "../src/shared/internal-routes/sweep-lock";
 import { sweepNotificationsRoutes } from "../src/shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "../src/shared/internal-routes/sweep-outbox.route";
+import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
+import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 let failed = false;
+const spans = sweepSpans(new NoOpInstrumentation());
 
 function check(label: string, ok: boolean) {
   console.log(`${ok ? "  OK" : "  FAIL"}: ${label}`);
@@ -44,24 +47,24 @@ function check(label: string, ok: boolean) {
 const label = `check-sweep-${crypto.randomUUID()}`;
 
 // [1] first caller wins, second is refused while the lease is live.
-const owner1 = await acquireSweepLease(label, 60_000);
+const owner1 = await acquireSweepLease(label, 60_000, spans);
 check("first caller acquires the lease", owner1 !== null);
-check("second caller is refused", (await acquireSweepLease(label, 60_000)) === null);
-if (owner1) await releaseSweepLease(label, owner1);
-const owner2 = await acquireSweepLease(label, 60_000);
+check("second caller is refused", (await acquireSweepLease(label, 60_000, spans)) === null);
+if (owner1) await releaseSweepLease(label, owner1, spans);
+const owner2 = await acquireSweepLease(label, 60_000, spans);
 check("caller re-acquires after release", owner2 !== null);
-if (owner2) await releaseSweepLease(label, owner2);
+if (owner2) await releaseSweepLease(label, owner2, spans);
 
 // [2] a lease left behind by a crashed run (already expired) is reclaimable.
-const expiredOwner = await acquireSweepLease(label, -60_000);
+const expiredOwner = await acquireSweepLease(label, -60_000, spans);
 check("expired lease is written", expiredOwner !== null);
-const reclaimOwner = await acquireSweepLease(label, 60_000);
+const reclaimOwner = await acquireSweepLease(label, 60_000, spans);
 check("next caller reclaims the expired lease", reclaimOwner !== null);
-if (reclaimOwner) await releaseSweepLease(label, reclaimOwner);
+if (reclaimOwner) await releaseSweepLease(label, reclaimOwner, spans);
 
 // [3] release deletes the row rather than leaving a freed-but-present lease.
-const owner3 = await acquireSweepLease(label, 60_000);
-if (owner3) await releaseSweepLease(label, owner3);
+const owner3 = await acquireSweepLease(label, 60_000, spans);
+if (owner3) await releaseSweepLease(label, owner3, spans);
 const rowsAfterRelease = await db
   .select()
   .from(sweepSchema.sweepLock)
@@ -71,9 +74,9 @@ check("release deletes the row", rowsAfterRelease.length === 0);
 // [4] a stale owner's release does not steal a successor's lease — the bug this
 // ownership token exists to close: an overrunning run must not delete the row a
 // legitimate successor now holds just because it shares the same label.
-const staleOwner = await acquireSweepLease(label, -60_000);
-const successorOwner = await acquireSweepLease(label, 60_000);
-if (staleOwner) await releaseSweepLease(label, staleOwner);
+const staleOwner = await acquireSweepLease(label, -60_000, spans);
+const successorOwner = await acquireSweepLease(label, 60_000, spans);
+if (staleOwner) await releaseSweepLease(label, staleOwner, spans);
 const rowsAfterStaleRelease = await db
   .select()
   .from(sweepSchema.sweepLock)
@@ -82,11 +85,11 @@ check(
   "a stale owner's release does not delete the successor's row",
   rowsAfterStaleRelease.length === 1 && rowsAfterStaleRelease[0]?.owner === successorOwner,
 );
-if (successorOwner) await releaseSweepLease(label, successorOwner);
+if (successorOwner) await releaseSweepLease(label, successorOwner, spans);
 
 // ── sweepLockFor: label + TTL it produces ────────────────────────────────────────
 const wiringLabel = `check-sweep-wiring-${crypto.randomUUID()}`;
-const wiringLock = sweepLockFor(wiringLabel);
+const wiringLock = sweepLockFor(wiringLabel, spans);
 check("sweepLockFor's acquire succeeds", await wiringLock.acquire());
 const wiringRows = await db
   .select()
@@ -190,14 +193,14 @@ const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
 ];
 
 for (const { name, path, routes } of routeCases) {
-  const routeOwner = await acquireSweepLease(name, 60_000);
+  const routeOwner = await acquireSweepLease(name, 60_000, spans);
   const lines: string[] = [];
   const res = await signedRequest(makeApp(routes, lines), path, { dryRun: true });
   check(`${name} responds 200 while its lease is held`, res.status === 200);
   const captured = lines.join("");
   const skipLine = captured.includes(`${name} skipped — another run holds the lease`);
   check(`${name} logs the skip for its own label ("${name}")`, skipLine);
-  if (routeOwner) await releaseSweepLease(name, routeOwner);
+  if (routeOwner) await releaseSweepLease(name, routeOwner, spans);
 }
 
 if (failed) {

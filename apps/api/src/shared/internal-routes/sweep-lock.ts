@@ -3,6 +3,7 @@ import { and, db, eq, sql, sweepSchema } from "@packages/drizzle";
 import { env } from "../env";
 import type { ITransaction } from "../transaction";
 import type { SweepLock } from "./sweep-runner";
+import type { SweepSpans } from "./sweep-span";
 
 /**
  * Takes the lease for `label`, or reports that someone else holds it.
@@ -25,13 +26,14 @@ import type { SweepLock } from "./sweep-runner";
 export async function acquireSweepLease(
   label: string,
   ttlMs: number,
+  spans: SweepSpans,
   exec?: ITransaction,
 ): Promise<string | null> {
   const lock = sweepSchema.sweepLock;
   const client = exec ?? db;
   const owner = uuidv7();
   const until = new Date(Date.now() + ttlMs);
-  const rows = await client
+  const query = client
     .insert(lock)
     .values({ label, owner, lockedAt: new Date(), lockedUntil: until })
     .onConflictDoUpdate({
@@ -40,17 +42,20 @@ export async function acquireSweepLease(
       setWhere: sql`${lock.lockedUntil} < now()`,
     })
     .returning({ label: lock.label });
+  const rows = await spans.db(query.toSQL().sql, () => query.execute());
   return rows.length > 0 ? owner : null;
 }
 
 export async function releaseSweepLease(
   label: string,
   owner: string,
+  spans: SweepSpans,
   exec?: ITransaction,
 ): Promise<void> {
   const lock = sweepSchema.sweepLock;
   const client = exec ?? db;
-  await client.delete(lock).where(and(eq(lock.label, label), eq(lock.owner, owner)));
+  const query = client.delete(lock).where(and(eq(lock.label, label), eq(lock.owner, owner)));
+  await spans.db(query.toSQL().sql, () => query.execute());
 }
 
 /**
@@ -61,16 +66,16 @@ export async function releaseSweepLease(
  * so a crashed run frees the label shortly after it would have finished anyway — every
  * route shares this one place instead of repeating the literal.
  */
-export function sweepLockFor(label: string): SweepLock {
+export function sweepLockFor(label: string, spans: SweepSpans): SweepLock {
   let owner: string | null = null;
   return {
     acquire: async () => {
-      owner = await acquireSweepLease(label, env.SWEEP_DEADLINE_MS * 2);
+      owner = await acquireSweepLease(label, env.SWEEP_DEADLINE_MS * 2, spans);
       return owner !== null;
     },
     release: async () => {
       if (owner === null) return;
-      await releaseSweepLease(label, owner);
+      await releaseSweepLease(label, owner, spans);
       owner = null;
     },
   };
