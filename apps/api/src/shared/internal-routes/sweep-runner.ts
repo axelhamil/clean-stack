@@ -1,5 +1,6 @@
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
+import type { SweepSpans } from "./sweep-span";
 
 export const MAX_BATCHES = 1000;
 export const INTER_BATCH_SLEEP_MS = 50;
@@ -35,6 +36,7 @@ export type RunBatchedSweepOptions = {
   deadlineAt?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  spans: SweepSpans;
 };
 
 export type SweepRunResult = {
@@ -65,6 +67,7 @@ export type RunRetentionSweepOptions = {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   lock: SweepLock;
+  spans: SweepSpans;
 };
 
 export type SweepResponse = {
@@ -79,95 +82,138 @@ export type SweepResponse = {
 };
 
 export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise<SweepResponse> {
-  const batchSize = opts.body.batchSize ?? 5000;
-  const dryRun = opts.body.dryRun ?? false;
-  const now = opts.now ?? Date.now;
-  const startMs = now();
+  return opts.spans.span({ name: `sweep > ${opts.label}`, op: "function" }, async () => {
+    const batchSize = opts.body.batchSize ?? 5000;
+    const dryRun = opts.body.dryRun ?? false;
+    const now = opts.now ?? Date.now;
+    const startMs = now();
 
-  opts.logger.info(
-    {
-      passes: opts.passes.map((p) => ({ label: p.label, retentionDays: p.retentionDays })),
-      batchSize,
-      dryRun,
-    },
-    `${opts.label} started`,
-  );
-
-  if (!(await opts.lock.acquire())) {
-    opts.logger.warn({ label: opts.label }, `${opts.label} skipped — another run holds the lease`);
-    return {
-      deleted: 0,
-      durationMs: now() - startMs,
-      dryRun,
-      batchCount: 0,
-      deletedPerPass: {},
-      stopReasons: {},
-      truncated: false,
-      skipped: true,
-    };
-  }
-
-  // One absolute deadline for the whole request, shared by every pass: the budget
-  // exists to keep the response inside the server's idleTimeout, and that is a
-  // property of the request, not of an individual pass.
-  const deadlineAt = startMs + (opts.deadlineMs ?? DEFAULT_SWEEP_DEADLINE_MS);
-
-  let deleted = 0;
-  let batchCount = 0;
-  const deletedPerPass: Record<string, number> = {};
-  const stopReasons: Record<string, SweepStopReason> = {};
-
-  try {
-    // Sequential on purpose: each pass may loop hundreds of batched transactions, and
-    // running passes in parallel halves the connection-pool headroom left for prod traffic.
-    for (const pass of opts.passes) {
-      // Cutoff is relative to the request's start, not to whenever this pass happens to
-      // run: reading `now()` again here would burn a clock tick per pass for no benefit
-      // (the deadline check below is what actually protects the budget) and would let a
-      // slow earlier pass drift every later pass's retention window.
-      const cutoff = new Date(startMs - pass.retentionDays * 24 * 60 * 60 * 1000);
-      const run = await runBatchedSweep({
-        purgeBatch: (size) => pass.purgeBatch(cutoff, size),
-        countEligible: () => pass.countEligible(cutoff),
+    opts.logger.info(
+      {
+        passes: opts.passes.map((p) => ({ label: p.label, retentionDays: p.retentionDays })),
         batchSize,
         dryRun,
-        logger: opts.logger,
-        label: `${opts.label}:${pass.label}`,
-        onBatchError: pass.onBatchError,
-        deadlineAt,
-        now,
-        sleep: opts.sleep,
-      });
-      deleted += run.deleted;
-      batchCount += run.batchCount;
-      deletedPerPass[pass.label] = run.deleted;
-      stopReasons[pass.label] = run.stopReason;
+      },
+      `${opts.label} started`,
+    );
+
+    if (!(await opts.lock.acquire())) {
+      opts.logger.warn(
+        { label: opts.label },
+        `${opts.label} skipped — another run holds the lease`,
+      );
+      // Written before returning: without it, a run refused the lease is
+      // indistinguishable in the trace from a run that executed and found nothing.
+      opts.spans.attributes({ "sweep.skipped": true });
+      return {
+        deleted: 0,
+        durationMs: now() - startMs,
+        dryRun,
+        batchCount: 0,
+        deletedPerPass: {},
+        stopReasons: {},
+        truncated: false,
+        skipped: true,
+      };
     }
-  } finally {
+
+    // One absolute deadline for the whole request, shared by every pass: the budget
+    // exists to keep the response inside the server's idleTimeout, and that is a
+    // property of the request, not of an individual pass.
+    const deadlineAt = startMs + (opts.deadlineMs ?? DEFAULT_SWEEP_DEADLINE_MS);
+
+    let deleted = 0;
+    let batchCount = 0;
+    const deletedPerPass: Record<string, number> = {};
+    const stopReasons: Record<string, SweepStopReason> = {};
+
     try {
-      await opts.lock.release();
-    } catch (err) {
-      opts.logger.error({ err, label: opts.label }, "lease release failed");
+      // Sequential on purpose: each pass may loop hundreds of batched transactions, and
+      // running passes in parallel halves the connection-pool headroom left for prod traffic.
+      for (const pass of opts.passes) {
+        // Cutoff is relative to the request's start, not to whenever this pass happens to
+        // run: reading `now()` again here would burn a clock tick per pass for no benefit
+        // (the deadline check below is what actually protects the budget) and would let a
+        // slow earlier pass drift every later pass's retention window.
+        const cutoff = new Date(startMs - pass.retentionDays * 24 * 60 * 60 * 1000);
+        const run = await opts.spans.span(
+          {
+            name: `sweep > ${opts.label}:${pass.label}`,
+            op: "function",
+            attributes: {
+              "sweep.retention_days": pass.retentionDays,
+              "sweep.batch_size": batchSize,
+              "sweep.dry_run": dryRun,
+            },
+          },
+          async () => {
+            const result = await runBatchedSweep({
+              purgeBatch: (size) => pass.purgeBatch(cutoff, size),
+              countEligible: () => pass.countEligible(cutoff),
+              batchSize,
+              dryRun,
+              logger: opts.logger,
+              label: `${opts.label}:${pass.label}`,
+              onBatchError: pass.onBatchError,
+              deadlineAt,
+              now,
+              sleep: opts.sleep,
+              spans: opts.spans,
+            });
+            // Written as the span closes: a pass that ran 40s tells you nothing on its
+            // own — whether it finished or was cut by the budget is the whole signal.
+            opts.spans.attributes({
+              "sweep.deleted": result.deleted,
+              "sweep.batch_count": result.batchCount,
+              "sweep.stop_reason": result.stopReason,
+            });
+            return result;
+          },
+        );
+        deleted += run.deleted;
+        batchCount += run.batchCount;
+        deletedPerPass[pass.label] = run.deleted;
+        stopReasons[pass.label] = run.stopReason;
+      }
+    } finally {
+      try {
+        await opts.lock.release();
+      } catch (err) {
+        opts.logger.error({ err, label: opts.label }, "lease release failed");
+        // Swallowed on purpose — a failed release must not fail a sweep that did its
+        // work, and the lease expires on its own. Swallowed *silently* is the bug:
+        // a label that keeps failing to release is invisible until it wedges.
+        opts.spans.capture(err, { label: opts.label, phase: "lease-release" });
+      }
     }
-  }
 
-  const truncated = Object.values(stopReasons).some((r) => r === "budget" || r === "batch-cap");
-  const durationMs = now() - startMs;
-  opts.logger.info(
-    { deleted, deletedPerPass, stopReasons, durationMs, batchCount, dryRun, truncated },
-    `${opts.label} done`,
-  );
+    const truncated = Object.values(stopReasons).some((r) => r === "budget" || r === "batch-cap");
+    const durationMs = now() - startMs;
+    opts.logger.info(
+      { deleted, deletedPerPass, stopReasons, durationMs, batchCount, dryRun, truncated },
+      `${opts.label} done`,
+    );
 
-  return {
-    deleted,
-    durationMs,
-    dryRun,
-    batchCount,
-    deletedPerPass,
-    stopReasons,
-    truncated,
-    skipped: false,
-  };
+    // Same reasoning as the skipped-run attributes above, for the completed path: the
+    // run span otherwise carries no attributes of its own, only its `sweep.pass` children.
+    opts.spans.attributes({
+      "sweep.skipped": false,
+      "sweep.deleted": deleted,
+      "sweep.batch_count": batchCount,
+      "sweep.truncated": truncated,
+    });
+
+    return {
+      deleted,
+      durationMs,
+      dryRun,
+      batchCount,
+      deletedPerPass,
+      stopReasons,
+      truncated,
+      skipped: false,
+    };
+  });
 }
 
 export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<SweepRunResult> {
@@ -211,7 +257,15 @@ export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<Swe
       deletedInBatch = await opts.purgeBatch(opts.batchSize);
     } catch (err) {
       const decision = opts.onBatchError?.(err) ?? "throw";
+      // Only the swallowing branch reports: a rethrown error reaches `app.onError`,
+      // which already captures it — capturing here too would double-report it.
       if (decision === "throw") throw err;
+      opts.spans.capture(err, {
+        label: opts.label,
+        batchCount,
+        deleted: totalDeleted,
+        phase: "purge-batch",
+      });
       stopReason = "batch-error";
       opts.logger.warn(
         { err, label: opts.label, deleted: totalDeleted, batchCount },

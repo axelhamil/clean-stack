@@ -18,7 +18,7 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 
 ```
 apps/api/src/shared/
-  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb }
+  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes }
   services/
     noop-instrumentation.ts            Always-bound default — silent passthrough
     sentry-instrumentation.ts          Wraps Sentry.startSpan + captureException + addBreadcrumb
@@ -107,6 +107,7 @@ export class DrizzleFooRepository implements IFooRepository {
 - **catch + capture + return-or-rethrow**: for methods returning `Promise<Result<T, E>>`, call `this.instrumentation.capture(err)` inside the existing `catch` block, then `return fail(...)`. For methods returning `Promise<T>` (throwing on infra failure), capture + rethrow. Never swallow.
 - **Multi-query methods** (e.g., `executeWipe` running 7+ DELETEs): keep only the outer span — 7 inner spans = noise. Single-statement methods always get an inner span.
 - **Span composition**: don't call sibling repo methods that themselves open spans from within a span — the inner spans become orphaned siblings rather than children. Inline the query instead.
+- **`setSpanAttributes(attrs)`** writes attributes onto the span currently open around the caller — for facts only known as the span closes (rows deleted, why it stopped), which `SpanOptions.attributes` can't express since that's open-time only. **The write is silently dropped when no span is active**: always for `NoOpInstrumentation`, and for `SentryInstrumentation` whenever the caller runs outside a `startSpan` callback. Call it from inside the span it's meant to annotate.
 - **Why no-op without `SENTRY_DSN`**: `IInstrumentation` resolves to `NoOpInstrumentation` (callback passthrough, no allocation). Zero cost beyond the function call.
 - **Tracing dormant**: `SENTRY_TRACES_SAMPLE_RATE=0` (default) means even when `SENTRY_DSN` is set, spans aren't exported — they're recorded in memory by the SDK and dropped. Set > 0 only when a tracing backend consumes them.
 

@@ -15,7 +15,7 @@
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
 import { Writable } from "node:stream";
-import { db, eq, sweepSchema } from "@packages/drizzle";
+import { db, eq, sql, sweepSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import { pinoLogger } from "hono-pino";
 import { pino } from "pino";
@@ -31,9 +31,16 @@ import {
 } from "../src/shared/internal-routes/sweep-lock";
 import { sweepNotificationsRoutes } from "../src/shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "../src/shared/internal-routes/sweep-outbox.route";
+import { purgeBatchWithTimeout } from "../src/shared/internal-routes/sweep-purge";
+import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
+import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 let failed = false;
+
+// A fresh façade per check, not one shared across the whole script — mirrors how
+// production builds one `SweepSpans` per request instead of a module-level singleton.
+const freshSpans = () => sweepSpans(new NoOpInstrumentation());
 
 function check(label: string, ok: boolean) {
   console.log(`${ok ? "  OK" : "  FAIL"}: ${label}`);
@@ -44,24 +51,24 @@ function check(label: string, ok: boolean) {
 const label = `check-sweep-${crypto.randomUUID()}`;
 
 // [1] first caller wins, second is refused while the lease is live.
-const owner1 = await acquireSweepLease(label, 60_000);
+const owner1 = await acquireSweepLease(label, 60_000, freshSpans());
 check("first caller acquires the lease", owner1 !== null);
-check("second caller is refused", (await acquireSweepLease(label, 60_000)) === null);
-if (owner1) await releaseSweepLease(label, owner1);
-const owner2 = await acquireSweepLease(label, 60_000);
+check("second caller is refused", (await acquireSweepLease(label, 60_000, freshSpans())) === null);
+if (owner1) await releaseSweepLease(label, owner1, freshSpans());
+const owner2 = await acquireSweepLease(label, 60_000, freshSpans());
 check("caller re-acquires after release", owner2 !== null);
-if (owner2) await releaseSweepLease(label, owner2);
+if (owner2) await releaseSweepLease(label, owner2, freshSpans());
 
 // [2] a lease left behind by a crashed run (already expired) is reclaimable.
-const expiredOwner = await acquireSweepLease(label, -60_000);
+const expiredOwner = await acquireSweepLease(label, -60_000, freshSpans());
 check("expired lease is written", expiredOwner !== null);
-const reclaimOwner = await acquireSweepLease(label, 60_000);
+const reclaimOwner = await acquireSweepLease(label, 60_000, freshSpans());
 check("next caller reclaims the expired lease", reclaimOwner !== null);
-if (reclaimOwner) await releaseSweepLease(label, reclaimOwner);
+if (reclaimOwner) await releaseSweepLease(label, reclaimOwner, freshSpans());
 
 // [3] release deletes the row rather than leaving a freed-but-present lease.
-const owner3 = await acquireSweepLease(label, 60_000);
-if (owner3) await releaseSweepLease(label, owner3);
+const owner3 = await acquireSweepLease(label, 60_000, freshSpans());
+if (owner3) await releaseSweepLease(label, owner3, freshSpans());
 const rowsAfterRelease = await db
   .select()
   .from(sweepSchema.sweepLock)
@@ -71,9 +78,9 @@ check("release deletes the row", rowsAfterRelease.length === 0);
 // [4] a stale owner's release does not steal a successor's lease — the bug this
 // ownership token exists to close: an overrunning run must not delete the row a
 // legitimate successor now holds just because it shares the same label.
-const staleOwner = await acquireSweepLease(label, -60_000);
-const successorOwner = await acquireSweepLease(label, 60_000);
-if (staleOwner) await releaseSweepLease(label, staleOwner);
+const staleOwner = await acquireSweepLease(label, -60_000, freshSpans());
+const successorOwner = await acquireSweepLease(label, 60_000, freshSpans());
+if (staleOwner) await releaseSweepLease(label, staleOwner, freshSpans());
 const rowsAfterStaleRelease = await db
   .select()
   .from(sweepSchema.sweepLock)
@@ -82,11 +89,11 @@ check(
   "a stale owner's release does not delete the successor's row",
   rowsAfterStaleRelease.length === 1 && rowsAfterStaleRelease[0]?.owner === successorOwner,
 );
-if (successorOwner) await releaseSweepLease(label, successorOwner);
+if (successorOwner) await releaseSweepLease(label, successorOwner, freshSpans());
 
 // ── sweepLockFor: label + TTL it produces ────────────────────────────────────────
 const wiringLabel = `check-sweep-wiring-${crypto.randomUUID()}`;
-const wiringLock = sweepLockFor(wiringLabel);
+const wiringLock = sweepLockFor(wiringLabel, freshSpans());
 check("sweepLockFor's acquire succeeds", await wiringLock.acquire());
 const wiringRows = await db
   .select()
@@ -107,6 +114,53 @@ const wiringRowsAfterRelease = await db
   .from(sweepSchema.sweepLock)
   .where(eq(sweepSchema.sweepLock.label, wiringLabel));
 check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length === 0);
+
+// ── purgeBatchWithTimeout: the three SET LOCAL guards, checked against a real
+// transaction. A mocked `tx.execute` can only assert on the SQL text a builder
+// produced (banned — see apps/api/src/shared/CLAUDE.md), and that check is weak on
+// its own terms: it only proves the setting *names* were sent, not their values, so
+// '5s' silently becoming '5m' would still pass. `assertGuards` runs inside the same
+// transaction `purgeBatchWithTimeout` opens, right after the three `SET LOCAL`
+// statements, and reads `current_setting(...)` back from Postgres itself. ──────────
+{
+  let guardsOk = false;
+  let observed: { statementTimeout?: string; lockTimeout?: string; idleTimeout?: string } = {};
+  await purgeBatchWithTimeout({
+    table: sweepSchema.sweepLock,
+    idColumn: sweepSchema.sweepLock.label,
+    // Matches no row — a real lease label never collides with this sentinel — so the
+    // guard check runs (and the delete executes as a harmless no-op) without touching
+    // any lease another check or a real sweep might be holding.
+    where: eq(sweepSchema.sweepLock.label, `check-sweep-guard-${crypto.randomUUID()}`),
+    orderBy: sweepSchema.sweepLock.lockedAt,
+    batchSize: 1,
+    spans: freshSpans(),
+    assertGuards: async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT
+          current_setting('statement_timeout') AS statement_timeout,
+          current_setting('lock_timeout') AS lock_timeout,
+          current_setting('idle_in_transaction_session_timeout') AS idle_timeout
+      `);
+      const row = result.rows[0] as
+        | { statement_timeout: string; lock_timeout: string; idle_timeout: string }
+        | undefined;
+      observed = {
+        statementTimeout: row?.statement_timeout,
+        lockTimeout: row?.lock_timeout,
+        idleTimeout: row?.idle_timeout,
+      };
+      guardsOk =
+        row?.statement_timeout === "5s" &&
+        row?.lock_timeout === "500ms" &&
+        row?.idle_timeout === "10s";
+    },
+  });
+  check(
+    `purgeBatchWithTimeout's SET LOCAL guards are exactly 5s/500ms/10s (got ${JSON.stringify(observed)})`,
+    guardsOk,
+  );
+}
 
 // ── the six routes: each must pass its own label to sweepLockFor, not a shared or
 // wrong one — proven by holding that exact label's lease and expecting THIS route,
@@ -190,14 +244,14 @@ const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
 ];
 
 for (const { name, path, routes } of routeCases) {
-  const routeOwner = await acquireSweepLease(name, 60_000);
+  const routeOwner = await acquireSweepLease(name, 60_000, freshSpans());
   const lines: string[] = [];
   const res = await signedRequest(makeApp(routes, lines), path, { dryRun: true });
   check(`${name} responds 200 while its lease is held`, res.status === 200);
   const captured = lines.join("");
   const skipLine = captured.includes(`${name} skipped — another run holds the lease`);
   check(`${name} logs the skip for its own label ("${name}")`, skipLine);
-  if (routeOwner) await releaseSweepLease(name, routeOwner);
+  if (routeOwner) await releaseSweepLease(name, routeOwner, freshSpans());
 }
 
 if (failed) {

@@ -88,7 +88,7 @@ Domain & application use `Result<T, E>` (no throw); controller translates → `H
 
 ## Observability (`IInstrumentation`)
 
-**Single port, DI everywhere.** `IInstrumentation` (`shared/ports/instrumentation.port.ts`) combines `startSpan` + `capture` + `addBreadcrumb`. Default: `NoOpInstrumentation`; `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set. **No module-level singleton, no service-locator** — every I/O class receives it via constructor. Sentry SDK init exception: `import "./shared/services/sentry-init"` as the first import of `index.ts` (must hook async-hooks before pino/Hono/Drizzle).
+**Single port, DI everywhere.** `IInstrumentation` (`shared/ports/instrumentation.port.ts`) combines `startSpan` + `capture` + `addBreadcrumb` + `setSpanAttributes`. Default: `NoOpInstrumentation`; `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set. **No module-level singleton, no service-locator** — every I/O class receives it via constructor. Sentry SDK init exception: `import "./shared/services/sentry-init"` as the first import of `index.ts` (must hook async-hooks before pino/Hono/Drizzle).
 
 **Instrumentation pattern** (see [`docs/OBSERVABILITY.md`](../../docs/OBSERVABILITY.md)):
 - **Outer span** wraps the method body: `{ name: "ClassName > methodName" }`. No `op`, no attributes.

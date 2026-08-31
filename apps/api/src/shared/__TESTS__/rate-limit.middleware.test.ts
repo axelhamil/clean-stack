@@ -34,6 +34,7 @@ function makeNoop(): IInstrumentation {
     startSpan: (_o, cb) => cb() as ReturnType<typeof cb>,
     capture: () => {},
     addBreadcrumb: () => {},
+    setSpanAttributes: () => {},
   };
 }
 

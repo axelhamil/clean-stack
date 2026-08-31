@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { buildEmailSweepPasses } from "../sweep-email-messages.route";
+import { sweepSpans } from "../sweep-span";
 
 describe("buildEmailSweepPasses", () => {
   it("declares a sent pass and a failed pass on separate retention knobs", () => {
-    const passes = buildEmailSweepPasses();
+    const passes = buildEmailSweepPasses(sweepSpans(new NoOpInstrumentation()));
 
     expect(passes.map((p) => p.label)).toEqual(["sent", "failed"]);
     const sent = passes.find((p) => p.label === "sent");

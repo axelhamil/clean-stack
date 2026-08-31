@@ -99,7 +99,12 @@ const { notifyImpersonatedUser } = await import(
   "../application/event-handlers/notify-impersonated-user"
 );
 
-const instrumentation = { capture, startSpan: mock(() => {}), addBreadcrumb: mock(() => {}) };
+const instrumentation = {
+  capture,
+  startSpan: mock(() => {}),
+  addBreadcrumb: mock(() => {}),
+  setSpanAttributes: mock(() => {}),
+};
 
 const profileStore = (locale?: string) => ({
   findLocale: mock(async () => ({

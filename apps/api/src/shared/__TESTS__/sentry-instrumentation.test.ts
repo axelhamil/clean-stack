@@ -9,6 +9,7 @@ const addBreadcrumbMock = mock((_crumb: unknown) => {});
 const setTagMock = mock((_key: string, _value: string) => {});
 const setUserMock = mock((_user: unknown) => {});
 const setContextMock = mock((_key: string, _ctx: unknown) => {});
+const getActiveSpanMock = mock(() => undefined as unknown);
 
 const scopeMock = {
   setTag: setTagMock,
@@ -26,6 +27,7 @@ mock.module("@sentry/bun", () => ({
   setTag: setTagMock,
   setUser: setUserMock,
   setContext: setContextMock,
+  getActiveSpan: getActiveSpanMock,
 }));
 
 const { SentryInstrumentation } = await import("../services/sentry-instrumentation");
@@ -120,6 +122,23 @@ describe("SentryInstrumentation", () => {
         level: "info",
         data: { status: 200 },
       });
+    });
+  });
+
+  describe("setSpanAttributes", () => {
+    it("writes attributes onto the active span", () => {
+      const setAttributes = mock(() => {});
+      getActiveSpanMock.mockReturnValue({ setAttributes });
+
+      new SentryInstrumentation().setSpanAttributes({ stop_reason: "budget", deleted: 7 });
+
+      expect(setAttributes).toHaveBeenCalledWith({ stop_reason: "budget", deleted: 7 });
+    });
+
+    it("is a no-op when no span is active", () => {
+      getActiveSpanMock.mockReturnValue(undefined);
+
+      expect(() => new SentryInstrumentation().setSpanAttributes({ deleted: 0 })).not.toThrow();
     });
   });
 });

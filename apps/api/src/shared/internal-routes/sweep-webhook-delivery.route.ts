@@ -1,65 +1,57 @@
 // `/internal/sweep-webhook-delivery` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, db, inArray, lt, sql, webhooksSchema } from "@packages/drizzle";
+import type { SQL } from "@packages/drizzle";
+import { and, inArray, lt, webhooksSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
+import { di } from "../../container";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { countEligibleWithTimeout } from "./sweep-count";
 import { sweepLockFor } from "./sweep-lock";
+import { purgeBatchWithTimeout, requireFilter } from "./sweep-purge";
 import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
+import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
 const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
 
-async function countEligible(cutoff: Date): Promise<number> {
-  const wd = webhooksSchema.webhookDelivery;
-  return countEligibleWithTimeout(
-    wd,
+const wd = webhooksSchema.webhookDelivery;
+const filterFor = (cutoff: Date): SQL =>
+  requireFilter(
     and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)),
+    "sweep-webhook-delivery",
   );
-}
-
-async function purgeBatch(cutoff: Date, batchSize: number): Promise<number> {
-  const wd = webhooksSchema.webhookDelivery;
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-    await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
-
-    const subq = tx
-      .select({ id: wd.id })
-      .from(wd)
-      .where(and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)))
-      .orderBy(wd.createdAt)
-      .limit(batchSize)
-      .for("update", { skipLocked: true });
-
-    const deleted = await tx.delete(wd).where(inArray(wd.id, subq)).returning({ id: wd.id });
-
-    return deleted.length;
-  });
-}
 
 export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/sweep-webhook-delivery", zV("json", sweepBodySchema), async (c) => {
+    const spans = sweepSpans(di.IInstrumentation);
     const response = await runRetentionSweep({
       body: c.req.valid("json") as SweepBody,
+      spans,
       passes: [
         {
           label: "default",
           retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
-          purgeBatch,
-          countEligible,
+          purgeBatch: (cutoff, size) =>
+            purgeBatchWithTimeout({
+              table: wd,
+              idColumn: wd.id,
+              where: filterFor(cutoff),
+              orderBy: wd.createdAt,
+              batchSize: size,
+              spans,
+            }),
+          countEligible: (cutoff) => countEligibleWithTimeout(wd, filterFor(cutoff), spans),
         },
       ],
       logger: c.var.logger,
       label: "sweep-webhook-delivery",
       deadlineMs: env.SWEEP_DEADLINE_MS,
-      lock: sweepLockFor("sweep-webhook-delivery"),
+      lock: sweepLockFor("sweep-webhook-delivery", spans),
     });
     return c.json(response);
   });

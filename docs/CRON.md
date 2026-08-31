@@ -168,6 +168,41 @@ since an unbounded `COUNT(*)` on a large table would otherwise hold a pooled
 connection for the whole idle timeout) — which is what makes checking the
 budget between batches sufficient.
 
+### What a sweep looks like in tracing
+
+Every `/internal/sweep-*` request opens one run span (`op: "function"`) named
+`sweep > <label>`, bracketed by a `db.query` child for the lease acquire and one for
+the lease release, one pass span (`op: "function"`) per retention pass named
+`sweep > <label>:<pass>` (carrying `sweep.retention_days`, `sweep.batch_size`,
+`sweep.dry_run`, and on close `sweep.deleted`, `sweep.batch_count`,
+`sweep.stop_reason`), a `db.query` child per batched delete, and — on a dry run — a
+`db.query` child per pass for the count. `sweep.stop_reason` is the field to read
+first: `budget` and `batch-cap` mean "more work left, next tick will resume",
+`batch-error` means a batch will keep failing identically. The run and pass spans
+share `op: "function"` with every other whole-operation span in the codebase — their
+`name` is what distinguishes them, not a dedicated op.
+
+The run span itself also carries attributes, written just before it closes: a run
+skipped because another run holds the lease sets `sweep.skipped: true` and nothing
+else — otherwise it would be indistinguishable in Sentry from a run that executed and
+found no work. A run that completes sets `sweep.skipped: false` alongside
+`sweep.deleted`, `sweep.batch_count`, and `sweep.truncated` instead.
+
+Batch and dry-run-count spans are capped at `MAX_INSTRUMENTED_BATCHES` (50) per run —
+past that the queries still run, just untraced. The cap exists because Sentry
+truncates a transaction at ~1000 spans from the end (measured: emitting 1200 spans in
+one transaction retained exactly 1000, tail dropped — see `docs/HISTORY.md`), and
+losing the last passes to make room for the 900th identical delete is a bad trade.
+The lease's two spans are the one exception: they are never subject to this budget,
+because the budget exists to keep spans like these from being pushed out of the
+trace, so spending it on them would defeat its own purpose — `spans.lease(...)` opens
+unconditionally, even on a run whose batch budget is already exhausted.
+
+Errors: a batch failure under `onBatchError: "break"` and a failed lease release are
+both swallowed by design (a sweep that did its work must not fail on them) and both
+now reported to telemetry. A batch failure with no `onBatchError` rethrows, and
+`app.onError` reports it — it is deliberately not captured twice.
+
 ## Triggering — use the signed-fetch helper
 
 The boilerplate ships `apps/api/src/shared/internal-routes/internal-fetch.ts`. Same module the
