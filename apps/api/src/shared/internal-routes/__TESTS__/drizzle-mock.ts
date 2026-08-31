@@ -1,9 +1,12 @@
 /**
- * The full `@packages/drizzle` export surface, as a mock factory.
+ * A mock factory aiming at the full `@packages/drizzle` export surface.
  *
- * Exhaustive on purpose: `mock.module` replaces the entire module and bun leaks
- * module mocks across files within one `bun test` run, so an export missing here
- * breaks whichever test file runs next — not the one that declared the mock.
+ * `mock.module` replaces the entire module and bun leaks module mocks across files
+ * within one `bun test` run, so an export missing here breaks whichever test file
+ * runs next — not the one that declared the mock. Nothing enforces completeness
+ * against the real module, though: an export gets added the moment a test needs
+ * it (four were added this way in the sweep instrumentation branch alone), so
+ * treat this as aiming at exhaustive, not as a guarantee of it.
  */
 export const drizzleMock = () => ({
   db: {},
