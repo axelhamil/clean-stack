@@ -11,6 +11,7 @@ import {
 } from "@packages/ui/components/ui/select";
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { removeMemberMutationOptions } from "../../../shared/api/mutations/remove-member";
@@ -19,6 +20,7 @@ import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../../shared/api/queries/org-members";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
+import { ROLE_LABEL_KEYS } from "../role-labels";
 
 export interface MemberRowProps {
   member: {
@@ -31,6 +33,7 @@ export interface MemberRowProps {
 }
 
 export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowProps) {
+  const { t } = useTranslation(["settings", "common"]);
   const queryClient = useQueryClient();
   const { can } = useAuthorization();
   const canManage = can({ member: ["update", "delete"] }) && !isCurrentUser;
@@ -46,9 +49,9 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
     onSuccess: async () => {
       await refetchAll();
       broadcastAuthChange();
-      toast.success("Role updated");
+      toast.success(t("organization.roleUpdatedToast"));
     },
-    onError: (err) => toastError(err, "Failed to update role"),
+    onError: (err) => toastError(err, t("organization.updateRoleFailed")),
   });
 
   const remove = useMutation({
@@ -56,9 +59,9 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
     onSuccess: async () => {
       await refetchAll();
       broadcastAuthChange();
-      toast.success("Member removed");
+      toast.success(t("organization.memberRemovedToast"));
     },
-    onError: (err) => toastError(err, "Failed to remove member"),
+    onError: (err) => toastError(err, t("organization.removeMemberFailed")),
   });
 
   return (
@@ -83,29 +86,32 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="owner">Owner</SelectItem>
+              <SelectItem value="member">{t(`common:${ROLE_LABEL_KEYS.member}`)}</SelectItem>
+              <SelectItem value="admin">{t(`common:${ROLE_LABEL_KEYS.admin}`)}</SelectItem>
+              <SelectItem value="owner">{t(`common:${ROLE_LABEL_KEYS.owner}`)}</SelectItem>
             </SelectContent>
           </Select>
         ) : (
-          <Badge variant="secondary">{member.role}</Badge>
+          <Badge variant="secondary">{t(`common:${ROLE_LABEL_KEYS[member.role]}`)}</Badge>
         )}
         {canManage && (
           <DestructiveActionDialog
             trigger={
               <Button variant="destructive" size="sm" disabled={remove.isPending}>
-                Remove
+                {t("organization.removeAction")}
               </Button>
             }
-            title="Remove member"
+            title={t("organization.removeMemberDialogTitle")}
             description={
-              <>
-                <strong>{member.user.name ?? member.user.email}</strong> will lose access to this
-                organization. This cannot be undone.
-              </>
+              <Trans
+                ns="settings"
+                i18nKey="organization.removeMemberDescription"
+                components={{
+                  userName: <strong>{member.user.name ?? member.user.email}</strong>,
+                }}
+              />
             }
-            actionLabel="Remove member"
+            actionLabel={t("organization.removeMemberDialogTitle")}
             isPending={remove.isPending}
             onConfirm={() => remove.mutate({ memberIdOrEmail: member.id, organizationId })}
           />

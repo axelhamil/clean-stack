@@ -6,6 +6,11 @@ export default {
     retry: "Réessayer",
     reload: "Recharger",
   },
+  roles: {
+    owner: "Propriétaire",
+    admin: "Administrateur",
+    member: "Membre",
+  },
   errorBoundary: {
     title: "Une erreur est survenue",
     body: "Nous avons été alertés et nous examinons le problème. Essayez de recharger la page.",

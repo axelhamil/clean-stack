@@ -6,6 +6,11 @@ export default {
     retry: "Retry",
     reload: "Reload",
   },
+  roles: {
+    owner: "Owner",
+    admin: "Admin",
+    member: "Member",
+  },
   errorBoundary: {
     title: "Something went wrong",
     body: "We've been notified and are looking into it. Try reloading the page.",
