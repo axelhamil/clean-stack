@@ -1,4 +1,5 @@
 import { CONSENT_CATEGORIES, type ConsentCategory } from "@packages/cookie-consent";
+import { toLocale } from "@packages/i18n";
 import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import {
   Table,
@@ -16,20 +17,16 @@ import {
   TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { ConsentSettings } from "../../shared/components/consent-settings";
+import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
+import { CATEGORY_LABEL_KEYS } from "./cookie-category-labels";
 import type { CookieInfo } from "./cookies.config";
 import { COOKIE_INVENTORY } from "./cookies.config";
 
 export const Route = createFileRoute("/legal/cookies")({
   component: CookiesPage,
 });
-
-const CATEGORY_LABELS: Record<ConsentCategory, string> = {
-  necessary: "Strictly necessary",
-  functional: "Functional",
-  analytics: "Analytics",
-  marketing: "Marketing",
-};
 
 interface CookieTableProps {
   cookies: readonly CookieInfo[];
@@ -63,12 +60,16 @@ function CookieTable({ cookies, caption }: CookieTableProps) {
 }
 
 function CookiesPage() {
+  const { t, i18n } = useTranslation("common");
+  const locale = toLocale(i18n.language);
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-2">
-        <TypographyH1>Cookie policy</TypographyH1>
-        <TypographyMuted>CNIL compliant — Last updated: 2026-07-09</TypographyMuted>
+        <TypographyH1>{t("legal.cookies.title")}</TypographyH1>
+        <TypographyMuted>{t("legal.cookies.subtitle")}</TypographyMuted>
       </header>
+
+      <UntranslatedBodyBanner show={locale !== "en"} />
 
       <Card>
         <CardHeader>
@@ -90,13 +91,15 @@ function CookiesPage() {
         return (
           <Card key={cat}>
             <CardHeader>
-              <TypographyH2>{CATEGORY_LABELS[cat]}</TypographyH2>
+              <TypographyH2>{t(CATEGORY_LABEL_KEYS[cat])}</TypographyH2>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <CookieTable
                   cookies={cookies}
-                  caption={`${CATEGORY_LABELS[cat]} cookies used by this application`}
+                  caption={t("legal.cookies.tableCaption", {
+                    category: t(CATEGORY_LABEL_KEYS[cat]),
+                  })}
                 />
               </div>
             </CardContent>

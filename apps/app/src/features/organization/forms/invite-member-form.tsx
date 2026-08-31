@@ -18,6 +18,7 @@ import {
 } from "@packages/ui/components/ui/select";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { inviteMemberMutationOptions } from "../../../shared/api/mutations/invite-member";
@@ -26,12 +27,14 @@ import {
   type InviteMemberInput,
   inviteMemberSchema,
 } from "../../../shared/auth/organization.schema";
+import { ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 
 export interface InviteMemberFormProps {
   organizationId: string;
 }
 
 export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
+  const { t } = useTranslation(["settings", "common"]);
   const queryClient = useQueryClient();
 
   const form = useForm<InviteMemberInput>({
@@ -45,10 +48,10 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
       await queryClient.refetchQueries({
         queryKey: orgInvitationsQueryOptions(organizationId).queryKey,
       });
-      toast.success(`Invitation sent to ${variables.email}`);
+      toast.success(t("organization.invitationSentToast", { email: variables.email }));
       form.reset();
     },
-    onError: (err) => toastError(err, "Failed to send invitation"),
+    onError: (err) => toastError(err, t("organization.sendInvitationFailed")),
   });
 
   const onSubmit = form.handleSubmit((values) => invite.mutate({ ...values, organizationId }));
@@ -61,9 +64,9 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>{t("organization.emailLabel")}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="teammate@example.com" {...field} />
+                <Input type="email" placeholder={t("organization.emailPlaceholder")} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -74,7 +77,7 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
           name="role"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Role</FormLabel>
+              <FormLabel>{t("organization.roleLabel")}</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -82,9 +85,9 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="member">{t(ROLE_LABEL_KEYS.member)}</SelectItem>
+                  <SelectItem value="admin">{t(ROLE_LABEL_KEYS.admin)}</SelectItem>
+                  <SelectItem value="owner">{t(ROLE_LABEL_KEYS.owner)}</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -92,7 +95,7 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
           )}
         />
         <Button type="submit" disabled={invite.isPending}>
-          Send invitation
+          {t("organization.sendInvitationAction")}
         </Button>
       </form>
     </Form>

@@ -3,7 +3,7 @@ export default {
     verifyEmail: "Confirmez votre adresse e-mail",
     resetPassword: "Réinitialisez votre mot de passe",
     magicLink: "Votre lien de connexion",
-    orgInvitation: "Vous avez été invité à rejoindre {{orgName}}",
+    orgInvitation: "Invitation à rejoindre {{orgName}}",
     dataExportReady: "Votre export de données est prêt",
     deleteRequested: "Suppression de compte demandée",
     deleteCancelled: "Suppression de compte annulée",
@@ -34,7 +34,7 @@ export default {
     cta: "Se connecter",
   },
   orgInvitation: {
-    heading: "Vous avez été invité",
+    heading: "Vous avez reçu une invitation",
     body: "{{inviterName}} vous invite à rejoindre <org>{{orgName}}</org> en tant que {{role}}.",
     cta: "Accepter l'invitation",
   },
@@ -69,7 +69,7 @@ export default {
   impersonationStarted: {
     heading: "Accès support à votre compte",
     body: "Bonjour {{userName}}, un membre de notre équipe support a accédé à votre compte à des fins de diagnostic le {{startedAt}}. Cet accès expirera automatiquement le {{expiresAt}}.",
-    reason: "Motif indiqué : {{reason}}",
+    reason: "Motif indiqué : {{reason}}",
     scope:
       "Cet accès est limité dans le temps et ne permet pas de modifier votre mot de passe, vos informations de paiement ni vos identifiants de connexion.",
     concerns:
@@ -83,6 +83,6 @@ export default {
     help: "Si vous pensez qu'il s'agit d'une erreur ou si vous devez régénérer le jeton, vous pouvez le faire dans les paramètres de votre compte.",
   },
   notificationDigest: {
-    intro: "Voici un résumé de votre activité {{category}} récente :",
+    intro: "Voici un résumé de votre activité récente dans la catégorie {{category}} :",
   },
 } as const;

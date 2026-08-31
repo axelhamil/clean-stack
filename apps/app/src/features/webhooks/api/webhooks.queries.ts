@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
 import { throwApiError } from "../../../shared/api/errors/api-error";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { type DeliveryFilters, serializeDeliveryFilters } from "../webhook-delivery-filters";
 
 const $listEndpoints = api.settings.webhooks.$get;
@@ -23,7 +24,13 @@ export const webhookEndpointsQueryOptions = () =>
     queryKey: ["settings", "webhooks", "endpoints"] as const,
     queryFn: async ({ signal }) => {
       const res = await $listEndpoints({}, { init: { signal } });
-      if (!res.ok) await throwApiError(res, "Failed to load webhook endpoints");
+      if (!res.ok)
+        await throwApiError(
+          res,
+          getErrorsT()("fallback.loadWebhookEndpoints", {
+            defaultValue: "Failed to load webhook endpoints.",
+          }),
+        );
       return (await res.json()) as WebhookEndpointsResponse;
     },
   });
@@ -46,7 +53,13 @@ export const webhookDeliveriesInfiniteQueryOptions = (
         },
         { init: { signal } },
       );
-      if (!res.ok) await throwApiError(res, "Failed to load deliveries");
+      if (!res.ok)
+        await throwApiError(
+          res,
+          getErrorsT()("fallback.loadWebhookDeliveries", {
+            defaultValue: "Failed to load deliveries.",
+          }),
+        );
       return (await res.json()) as DeliveriesPage;
     },
     initialPageParam: undefined as string | undefined,
@@ -61,7 +74,13 @@ export const webhookDeliveryDetailQueryOptions = (endpointId: string, deliveryId
         { param: { id: endpointId, deliveryId } },
         { init: { signal } },
       );
-      if (!res.ok) await throwApiError(res, "Failed to load delivery detail");
+      if (!res.ok)
+        await throwApiError(
+          res,
+          getErrorsT()("fallback.loadWebhookDeliveryDetail", {
+            defaultValue: "Failed to load delivery detail",
+          }),
+        );
       return (await res.json()) as DeliveryDetail;
     },
   });

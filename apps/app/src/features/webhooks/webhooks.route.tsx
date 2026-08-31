@@ -24,6 +24,7 @@ import {
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
@@ -48,6 +49,7 @@ import { EndpointRow } from "./components/endpoint-row";
 import { VerifySnippet } from "./components/verify-snippet";
 import { WebhookForm } from "./forms/webhook-form";
 import type { DeliveryFilters } from "./webhook-delivery-filters";
+import { DELIVERY_STATUS_KEYS, isDeliveryStatus } from "./webhook-labels";
 
 export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/webhooks")({
   beforeLoad: ensureOrgPermission({ webhooks: ["read"] }),
@@ -55,6 +57,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/web
 });
 
 function WebhooksPage() {
+  const { t } = useTranslation(["settings", "common", "errors"]);
   const formatDate = useFormatDate();
   const qc = useQueryClient();
   const { can } = useAuthorization();
@@ -80,7 +83,7 @@ function WebhooksPage() {
       setRevealSecret(res.secret);
       setCreating(false);
       void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
-      toast.success("Endpoint created");
+      toast.success(t("settings:webhooks.createdToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -90,7 +93,7 @@ function WebhooksPage() {
     onSuccess: () => {
       setEditing(null);
       void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
-      toast.success("Endpoint updated");
+      toast.success(t("settings:webhooks.updatedToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -99,7 +102,7 @@ function WebhooksPage() {
     ...deleteEndpointMutationOptions,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
-      toast.success("Endpoint deleted");
+      toast.success(t("settings:webhooks.deletedToast"));
     },
     onError: (err) => toast.error(err.message),
   });
@@ -108,20 +111,20 @@ function WebhooksPage() {
     ...rotateSecretMutationOptions,
     onSuccess: (res) => {
       setRevealSecret(res.secret);
-      toast.success("Secret rotated");
+      toast.success(t("settings:webhooks.secretRotatedToast"));
     },
     onError: (err) => toast.error(err.message),
   });
 
   const sendTest = useMutation({
     ...sendTestMutationOptions,
-    onSuccess: () => toast.success("Test event sent"),
+    onSuccess: () => toast.success(t("settings:webhooks.testSentToast")),
     onError: (err) => toast.error(err.message),
   });
 
   const replay = useMutation({
     ...replayDeliveryMutationOptions,
-    onSuccess: () => toast.success("Delivery replayed"),
+    onSuccess: () => toast.success(t("settings:webhooks.deliveryReplayedToast")),
     onError: (err) => toast.error(err.message),
   });
 
@@ -136,33 +139,33 @@ function WebhooksPage() {
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">Webhooks</h1>
+          <h1 className="text-2xl font-semibold">{t("settings:webhooks.pageTitle")}</h1>
           <Link
             to="/developers/events"
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
-            View event catalog
+            {t("settings:webhooks.viewEventCatalog")}
           </Link>
         </div>
         <Can requires={{ webhooks: ["write"] }}>
-          <Button onClick={() => setCreating(true)}>Add endpoint</Button>
+          <Button onClick={() => setCreating(true)}>{t("settings:webhooks.addEndpoint")}</Button>
         </Can>
       </div>
 
       {endpoints.isLoading ? (
-        <p>Loading…</p>
+        <p>{t("settings:webhooks.loading")}</p>
       ) : endpoints.isError ? (
-        <p>Failed to load webhook endpoints.</p>
+        <p>{t("errors:fallback.loadWebhookEndpoints")}</p>
       ) : endpoints.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">No endpoints configured yet.</p>
+        <p className="text-muted-foreground">{t("settings:webhooks.noEndpoints")}</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>URL</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Events</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>{t("settings:webhooks.endpointsTable.urlHeader")}</TableHead>
+              <TableHead>{t("settings:webhooks.endpointsTable.statusHeader")}</TableHead>
+              <TableHead>{t("settings:webhooks.endpointsTable.eventsHeader")}</TableHead>
+              <TableHead>{t("settings:webhooks.endpointsTable.createdHeader")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -188,7 +191,7 @@ function WebhooksPage() {
       {selectedEndpointId !== null && (
         <>
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-medium">Deliveries</h2>
+            <h2 className="text-lg font-medium">{t("settings:webhooks.deliveries.title")}</h2>
             <Select
               value={deliveryFilters.status ?? ""}
               onValueChange={(v) =>
@@ -199,31 +202,35 @@ function WebhooksPage() {
               }
             >
               <SelectTrigger className="w-40">
-                <SelectValue placeholder="All statuses" />
+                <SelectValue
+                  placeholder={t("settings:webhooks.deliveries.allStatusesPlaceholder")}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-                <SelectItem value="dead_letter">Dead letter</SelectItem>
+                <SelectItem value="">
+                  {t("settings:webhooks.deliveries.allStatusFilter")}
+                </SelectItem>
+                <SelectItem value="pending">{t(DELIVERY_STATUS_KEYS.pending)}</SelectItem>
+                <SelectItem value="success">{t(DELIVERY_STATUS_KEYS.success)}</SelectItem>
+                <SelectItem value="failed">{t(DELIVERY_STATUS_KEYS.failed)}</SelectItem>
+                <SelectItem value="dead_letter">{t(DELIVERY_STATUS_KEYS.dead_letter)}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {deliveries.isLoading ? (
-            <p>Loading deliveries…</p>
+            <p>{t("settings:webhooks.deliveries.loading")}</p>
           ) : deliveries.isError ? (
-            <p>Failed to load deliveries.</p>
+            <p>{t("errors:fallback.loadWebhookDeliveries")}</p>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Event type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Attempts</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>{t("settings:webhooks.deliveries.eventTypeHeader")}</TableHead>
+                    <TableHead>{t("settings:webhooks.deliveries.statusHeader")}</TableHead>
+                    <TableHead>{t("settings:webhooks.deliveries.attemptsHeader")}</TableHead>
+                    <TableHead>{t("settings:webhooks.deliveries.createdHeader")}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -243,14 +250,16 @@ function WebhooksPage() {
                                   : "secondary"
                             }
                           >
-                            {d.status}
+                            {isDeliveryStatus(d.status)
+                              ? t(DELIVERY_STATUS_KEYS[d.status])
+                              : d.status}
                           </Badge>
                         </TableCell>
                         <TableCell>{d.attempts}</TableCell>
                         <TableCell>{formatDate(d.createdAt)}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setSelectedDelivery(d)}>
-                            Details
+                            {t("settings:webhooks.deliveries.detailsAction")}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -264,7 +273,7 @@ function WebhooksPage() {
                   disabled={deliveries.isFetchingNextPage}
                   onClick={() => void deliveries.fetchNextPage()}
                 >
-                  Load more
+                  {t("settings:webhooks.deliveries.loadMore")}
                 </Button>
               )}
             </>
@@ -283,7 +292,11 @@ function WebhooksPage() {
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit endpoint" : "Add endpoint"}</DialogTitle>
+            <DialogTitle>
+              {editing
+                ? t("settings:webhooks.editEndpointTitle")
+                : t("settings:webhooks.addEndpoint")}
+            </DialogTitle>
           </DialogHeader>
           <WebhookForm
             defaultValues={
@@ -291,7 +304,7 @@ function WebhooksPage() {
                 ? { url: editing.url, eventTypes: editing.eventTypes, enabled: editing.enabled }
                 : { url: "", eventTypes: [], enabled: true }
             }
-            submitLabel={editing ? "Save" : "Create"}
+            submitLabel={editing ? t("common:actions.save") : t("settings:webhooks.createAction")}
             isPending={create.isPending || update.isPending}
             onSubmit={(v) => (editing ? update.mutate({ id: editing.id, ...v }) : create.mutate(v))}
           />

@@ -10,11 +10,13 @@ import { Progress } from "@packages/ui/components/ui/progress";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../shared/api/queries/org-members";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useEntitlements } from "../../shared/auth/use-entitlements";
 import { PricingTable } from "../../shared/components/pricing-table";
+import { isSubscriptionStatus, STATUS_KEYS, TIER_KEYS } from "./billing-labels";
 import { useOpenPortal } from "./hooks/use-open-portal";
 
 export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/billing")({
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/bil
 });
 
 function BillingPage() {
+  const { t } = useTranslation("settings");
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
   const { data: members = [] } = useQuery({
     ...orgMembersQueryOptions(activeOrg?.id ?? ""),
@@ -32,29 +35,31 @@ function BillingPage() {
   const portal = useOpenPortal();
   const isPaid = ent.tier !== "free";
   const memberCount = members.length;
+  const statusLabel = isSubscriptionStatus(ent.status) ? t(STATUS_KEYS[ent.status]) : ent.status;
 
   return (
     <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">Billing settings</TypographyH1>
+      <TypographyH1 className="sr-only">{t("billing.pageTitle")}</TypographyH1>
       <Card>
         <CardHeader>
-          <CardTitle>Current plan: {ent.tier}</CardTitle>
-          <CardDescription>Status: {ent.status}</CardDescription>
+          <CardTitle>{t("billing.currentPlanTitle", { tier: t(TIER_KEYS[ent.tier]) })}</CardTitle>
+          <CardDescription>{t("billing.statusLabel", { status: statusLabel })}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {ent.maxMembers === null ? (
-            <span>Unlimited members</span>
+            <span>{t("billing.unlimitedMembers")}</span>
           ) : (
             <>
-              <span>
-                {memberCount} / {ent.maxMembers} members
-              </span>
-              <Progress value={(memberCount / ent.maxMembers) * 100} aria-label="Members usage" />
+              <span>{t("billing.membersUsage", { count: memberCount, max: ent.maxMembers })}</span>
+              <Progress
+                value={(memberCount / ent.maxMembers) * 100}
+                aria-label={t("billing.membersUsageAriaLabel")}
+              />
             </>
           )}
           {isPaid && (
             <Button onClick={() => portal.mutate()} disabled={portal.isPending}>
-              Manage billing
+              {t("billing.manageBilling")}
             </Button>
           )}
         </CardContent>

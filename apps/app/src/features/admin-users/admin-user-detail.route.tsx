@@ -19,10 +19,16 @@ import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
+import {
+  isPlatformRole,
+  PLATFORM_ROLE_LABEL_KEYS,
+  USER_STATUS_LABEL_KEYS,
+} from "./admin-user-labels";
 import {
   banUserMutationOptions,
   resetPasswordMutationOptions,
@@ -40,6 +46,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/users/$id"
 });
 
 function AdminUserDetailPage() {
+  const { t } = useTranslation(["admin", "common"]);
   const formatDate = useFormatDate();
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -54,7 +61,7 @@ function AdminUserDetailPage() {
   const banMutation = useMutation({
     ...banUserMutationOptions,
     onSuccess: () => {
-      toast.success("Account suspended.");
+      toast.success(t("users.detail.banSuccessToast"));
       setBanOpen(false);
       void invalidateUser();
     },
@@ -64,7 +71,7 @@ function AdminUserDetailPage() {
   const unbanMutation = useMutation({
     ...unbanUserMutationOptions,
     onSuccess: () => {
-      toast.success("Account reactivated.");
+      toast.success(t("users.detail.unbanSuccessToast"));
       void invalidateUser();
     },
     onError: (err) => toast.error(err.message),
@@ -73,7 +80,7 @@ function AdminUserDetailPage() {
   const impersonateMutation = useMutation({
     ...startImpersonationMutationOptions,
     onSuccess: async () => {
-      toast.success("Impersonation started.");
+      toast.success(t("users.detail.impersonateSuccessToast"));
       setImpersonateOpen(false);
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
       broadcastAuthChange({ identityChanged: true });
@@ -85,7 +92,7 @@ function AdminUserDetailPage() {
   const revokeSessionsMutation = useMutation({
     ...revokeSessionsMutationOptions,
     onSuccess: () => {
-      toast.success("Sessions revoked.");
+      toast.success(t("users.detail.revokeSessionsSuccessToast"));
       void invalidateUser();
     },
     onError: (err) => toast.error(err.message),
@@ -93,14 +100,14 @@ function AdminUserDetailPage() {
 
   const resetPasswordMutation = useMutation({
     ...resetPasswordMutationOptions,
-    onSuccess: () => toast.success("Password reset email sent."),
+    onSuccess: () => toast.success(t("users.detail.resetPasswordSuccessToast")),
     onError: (err) => toast.error(err.message),
   });
 
   if (query.isLoading) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Loading…</p>
+        <p>{t("users.detail.loading")}</p>
       </main>
     );
   }
@@ -108,7 +115,7 @@ function AdminUserDetailPage() {
   if (query.isError || !query.data) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-        <p>Failed to load account.</p>
+        <p>{t("users.detail.loadFailed")}</p>
       </main>
     );
   }
@@ -123,24 +130,36 @@ function AdminUserDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Identity</CardTitle>
+          <CardTitle>{t("users.detail.identityTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span>Email</span>
+              <span>{t("users.table.email")}</span>
               <span>{user.email}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Role</span>
-              <span>{user.role ? <Badge variant="secondary">{user.role}</Badge> : "—"}</span>
+              <span>{t("users.table.role")}</span>
+              <span>
+                {user.role ? (
+                  <Badge variant="secondary">
+                    {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
+                  </Badge>
+                ) : (
+                  "—"
+                )}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Two-factor auth</span>
-              <span>{user.twoFactorEnabled ? "Enabled" : "Disabled"}</span>
+              <span>{t("users.detail.twoFactorLabel")}</span>
+              <span>
+                {user.twoFactorEnabled
+                  ? t("users.detail.twoFactorEnabled")
+                  : t("users.detail.twoFactorDisabled")}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Member since</span>
+              <span>{t("users.detail.memberSinceLabel")}</span>
               <span>{formatDate(user.createdAt)}</span>
             </div>
           </div>
@@ -149,7 +168,9 @@ function AdminUserDetailPage() {
 
       <Card variant={user.banned ? "destructive" : "default"}>
         <CardHeader>
-          <CardTitle variant={user.banned ? "destructive" : "default"}>Account status</CardTitle>
+          <CardTitle variant={user.banned ? "destructive" : "default"}>
+            {t("users.detail.accountStatusTitle")}
+          </CardTitle>
           <CardAction>
             <div className="flex flex-wrap gap-2">
               {user.banned ? (
@@ -159,18 +180,18 @@ function AdminUserDetailPage() {
                   disabled={unbanMutation.isPending}
                   onClick={() => unbanMutation.mutate(id)}
                 >
-                  Reactivate
+                  {t("users.detail.reactivate")}
                 </Button>
               ) : (
                 <Dialog open={banOpen} onOpenChange={setBanOpen}>
                   <DialogTrigger asChild>
                     <Button variant="destructive" size="sm">
-                      Suspend
+                      {t("users.detail.suspend")}
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Suspend account</DialogTitle>
+                      <DialogTitle>{t("users.suspendAccountTitle")}</DialogTitle>
                     </DialogHeader>
                     <BanForm
                       isPending={banMutation.isPending}
@@ -182,12 +203,12 @@ function AdminUserDetailPage() {
               <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
-                    Impersonate
+                    {t("users.detail.impersonate")}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Impersonate account</DialogTitle>
+                    <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
                   </DialogHeader>
                   <ImpersonateForm
                     isPending={impersonateMutation.isPending}
@@ -201,31 +222,31 @@ function AdminUserDetailPage() {
         <CardContent>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span>Status</span>
+              <span>{t("users.table.status")}</span>
               <span>
                 {user.banned ? (
-                  <Badge variant="destructive">Suspended</Badge>
+                  <Badge variant="destructive">{t(USER_STATUS_LABEL_KEYS.suspended)}</Badge>
                 ) : (
-                  <Badge variant="outline">Active</Badge>
+                  <Badge variant="outline">{t(USER_STATUS_LABEL_KEYS.active)}</Badge>
                 )}
               </span>
             </div>
             {user.banReason && (
               <div className="flex items-center justify-between">
-                <span>Reason</span>
+                <span>{t("users.detail.reasonLabel")}</span>
                 <span>{user.banReason}</span>
               </div>
             )}
             {user.banExpires !== null && (
               <div className="flex items-center justify-between">
-                <span>Expires</span>
+                <span>{t("users.detail.expiresLabel")}</span>
                 <span>{formatDate(user.banExpires)}</span>
               </div>
             )}
             {user.banned && user.banExpires === null && (
               <div className="flex items-center justify-between">
-                <span>Expires</span>
-                <span>Permanent</span>
+                <span>{t("users.detail.expiresLabel")}</span>
+                <span>{t("users.durationPermanent")}</span>
               </div>
             )}
           </div>
@@ -237,7 +258,7 @@ function AdminUserDetailPage() {
             disabled={revokeSessionsMutation.isPending}
             onClick={() => revokeSessionsMutation.mutate(id)}
           >
-            Revoke sessions
+            {t("users.detail.revokeSessions")}
           </Button>
           <Button
             variant="outline"
@@ -245,7 +266,7 @@ function AdminUserDetailPage() {
             disabled={resetPasswordMutation.isPending}
             onClick={() => resetPasswordMutation.mutate(id)}
           >
-            Reset password
+            {t("users.detail.resetPassword")}
           </Button>
         </CardFooter>
       </Card>

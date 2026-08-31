@@ -158,7 +158,6 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 81-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
 - **A manual review pass** over the shipped surface — the last step before this is genuinely clone-ready.
-- **E.1b i18n extraction** — the typed rail shipped (E.1a); `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings` and the legal pages are still English-only, by design.
 - **C.1 S5b/S6** — impossible-travel, ASN deny-list, captcha hook. Deferred for calibration: these need real traffic to tune.
 - **D.5 known debts** — three, including a duplicate deletion email if the worker crashes mid-batch.
 
@@ -329,7 +328,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 |---|---|
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, E.1b i18n extraction, abuse signals, D.5 debts |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, abuse signals, D.5 debts |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |

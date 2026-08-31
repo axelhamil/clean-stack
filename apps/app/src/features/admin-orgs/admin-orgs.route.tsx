@@ -14,6 +14,7 @@ import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typogr
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs")({
 });
 
 function AdminOrgsPage() {
+  const { t } = useTranslation("admin");
   const formatDate = useFormatDate();
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
@@ -33,7 +35,7 @@ function AdminOrgsPage() {
   const ssoEnforcementMutation = useMutation({
     ...setOrgSsoEnforcementMutationOptions,
     onSuccess: () => {
-      toast.success("SSO enforcement updated.");
+      toast.success(t("orgs.ssoEnforcementUpdatedToast"));
       void queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
     },
     onError: (err) => toast.error(err.message),
@@ -42,30 +44,30 @@ function AdminOrgsPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <header>
-        <TypographyH1 variant="page">Organizations</TypographyH1>
+        <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
       </header>
 
       <Input
-        placeholder="Search…"
+        placeholder={t("orgs.searchPlaceholder")}
         className="w-64"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
 
       {query.isLoading ? (
-        <p>Loading…</p>
+        <p>{t("orgs.loading")}</p>
       ) : query.isError ? (
-        <p>Failed to load organizations.</p>
+        <p>{t("orgs.loadFailed")}</p>
       ) : (
         <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Members</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>SSO enforced</TableHead>
+                <TableHead>{t("orgs.table.name")}</TableHead>
+                <TableHead>{t("orgs.table.slug")}</TableHead>
+                <TableHead>{t("orgs.table.members")}</TableHead>
+                <TableHead>{t("orgs.table.created")}</TableHead>
+                <TableHead>{t("orgs.table.ssoEnforced")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -85,7 +87,7 @@ function AdminOrgsPage() {
                     <TableCell>{formatDate(org.createdAt)}</TableCell>
                     <TableCell>
                       <Switch
-                        aria-label={`SSO enforced for ${org.name}`}
+                        aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
                         checked={org.ssoEnforced}
                         disabled={
                           ssoEnforcementMutation.isPending &&
@@ -101,10 +103,7 @@ function AdminOrgsPage() {
             </TableBody>
           </Table>
 
-          <TypographyMuted>
-            Turning SSO enforcement off lets members of that organization sign in with a password
-            again.
-          </TypographyMuted>
+          <TypographyMuted>{t("orgs.ssoEnforcementOffHint")}</TypographyMuted>
 
           {query.hasNextPage && (
             <Button
@@ -112,7 +111,7 @@ function AdminOrgsPage() {
               disabled={query.isFetchingNextPage}
               onClick={() => void query.fetchNextPage()}
             >
-              Load more
+              {t("orgs.loadMore")}
             </Button>
           )}
         </>

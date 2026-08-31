@@ -3,6 +3,7 @@ import { cn } from "@packages/ui/libs/utils.js";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type DocWithVT = Document & {
   startViewTransition?: (cb: () => void | Promise<void>) => {
@@ -16,6 +17,7 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
+  const { t } = useTranslation("common");
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -81,7 +83,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       variant="outline"
       size="icon"
       onClick={handleClick}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      aria-label={isDark ? t("theme.switchToLight") : t("theme.switchToDark")}
       className={cn("tap-scale", className)}
     >
       <Sun className="size-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />

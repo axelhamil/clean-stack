@@ -1,5 +1,4 @@
 export default {
-  fallback: "Something went wrong. Please try again.",
   byCode: {
     ACCOUNT_EXPORT_RATE_LIMITED: "You can request another data export in 24 hours.",
     ACCOUNT_PASSWORD_REQUIRED: "Confirm with your password.",
@@ -8,6 +7,12 @@ export default {
     ACCOUNT_PASSWORD_INVALID: "Invalid password.",
     TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
     TWO_FACTOR_INVALID: "Invalid authenticator code.",
+    // `assertSsoEntitlementFor` (apps/api/src/auth.ts) puts the code directly in
+    // the APIError's `message` rather than a separate `code` field, so the
+    // front reads it back off `error.message` (see provider-card.tsx) — the
+    // catalog lookup itself is keyed the same as every other code either way.
+    SSO_PLAN_REQUIRED: "Your plan does not include SSO.",
+    SSO_ORGANIZATION_REQUIRED: "No active organization.",
     // BetterAuth's own `BASE_ERROR_CODES`. They are keyed here rather than
     // read off `error.message` because the library ships one English string
     // per code and no translation hook — the code is the only stable,
@@ -112,6 +117,19 @@ export default {
       "You don't have permission to access this organization.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
   },
+  // Covers `HTTP_<status>` codes — raised by `HTTPException` sites with no
+  // business code (`error.middleware.ts`) — for statuses the API actually
+  // sends. A status with no entry here falls through to `bySuffix`/the
+  // server's own message, so this only ever adds coverage.
+  byStatus: {
+    "400": "Some of the information you entered isn't valid. Check the form and try again.",
+    "401": "Please sign in again.",
+    "403": "You don't have permission to do this.",
+    "404": "Not found.",
+    "409": "This action conflicts with the current state. Refresh and try again.",
+    "422": "Some of the information you entered isn't valid. Check the form and try again.",
+    "429": "Too many requests. Please wait a moment and try again.",
+  },
   bySuffix: {
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
     NOT_FOUND: "Not found.",
@@ -141,11 +159,79 @@ export default {
     totpCode: "Enter the 6-digit code from your authenticator app.",
     backupCode: "Enter a valid backup code.",
     httpsUrl: "Enter a valid https URL.",
+    bareDomain: "Enter a bare domain, without https:// or a path.",
     tooSmall: "Must be at least {{minimum}} characters.",
     tooBig: "Must be at most {{maximum}} characters.",
     tooFewItems: "Select at least {{minimum}}.",
     passwordsMismatch: "Passwords do not match.",
     acceptPolicies: "You must accept the required policies.",
     invalidEventSelection: "Contains an unknown or non-subscribable event.",
+  },
+  fallback: {
+    // Shown only when a request fails with no JSON error body — `formatApiError`
+    // prefers the catalog's `byCode`/`bySuffix` answer and then the server's own
+    // 4xx message. These are the last resort, not the normal path.
+    acceptPolicies: "Failed to accept policies",
+    cancelAccountDeletion: "Cancel failed",
+    markNotificationsRead: "Failed to mark notifications as read",
+    markAllNotificationsRead: "Failed to mark all notifications as read",
+    updateNotificationPreference: "Failed to update notification preference",
+    updateOrgNotificationPreference: "Failed to update org notification preference",
+    openBillingPortal: "Failed to open billing portal",
+    recordConsent: "Failed to record consent",
+    requestAccountDeletion: "Account deletion failed",
+    requestDataExport: "Export request failed",
+    stopImpersonation: "Failed to stop impersonation",
+    withdrawConsent: "Failed to withdraw consent",
+    loadPlans: "Failed to load plans",
+    loadConsent: "Failed to load consent",
+    loadNotifications: "Failed to load notifications",
+    loadUnreadCount: "Failed to load unread count",
+    loadNotificationPreferences: "Failed to load notification preferences",
+    loadOrgNotificationPreferences: "Failed to load org notification preferences",
+    loadPolicies: "Failed to load policies",
+    loadSubscription: "Failed to load subscription",
+    loadPasskeys: "Failed to load passkeys",
+    loadSessions: "Failed to load sessions",
+    createApiToken: "Failed to create API token",
+    revokeApiToken: "Failed to revoke API token",
+    loadApiTokens: "Failed to load API tokens",
+    createWebhookEndpoint: "Failed to create webhook endpoint",
+    updateWebhookEndpoint: "Failed to update webhook endpoint",
+    deleteWebhookEndpoint: "Failed to delete webhook endpoint",
+    replayWebhookDelivery: "Failed to replay delivery",
+    rotateWebhookSecret: "Failed to rotate secret",
+    sendWebhookTestEvent: "Failed to send test event",
+    // The JSX loading state (`webhooks.route.tsx`) and this fallback message
+    // (`webhooks.queries.ts`, shown only when the API sends no JSON error
+    // body) render the exact same failure — one key, so they can never drift
+    // a trailing period apart the way the two literals did before extraction.
+    loadWebhookEndpoints: "Failed to load webhook endpoints.",
+    loadWebhookDeliveries: "Failed to load deliveries.",
+    loadWebhookDeliveryDetail: "Failed to load delivery detail",
+    registerOidcProvider: "Failed to register the OIDC provider",
+    registerSamlProvider: "Failed to register the SAML provider",
+    verifySsoDomain: "Domain verification failed",
+    generateScimToken: "Failed to generate the SCIM token",
+    invalidServerResponse: "Invalid response from server",
+    updateSsoEnforcement: "Failed to update SSO enforcement",
+    loadSsoProviders: "Failed to load SSO providers",
+    loadSsoVerificationToken: "Failed to load the verification token",
+    banUser: "Failed to suspend account",
+    unbanUser: "Failed to reactivate account",
+    revokeUserSessions: "Failed to revoke sessions",
+    resetUserPassword: "Failed to send password reset",
+    startImpersonation: "Failed to start impersonation",
+    loadAdminUsers: "Failed to load accounts",
+    loadAdminUser: "Failed to load account",
+    loadAdminOrgs: "Failed to load organizations",
+    loadAdminOrg: "Failed to load organization",
+    // Distinct from `updateSsoEnforcement` above (the org owner's own
+    // self-service toggle) — this is the platform admin overriding
+    // enforcement on an arbitrary organization, a different action from a
+    // different source that happens to share the same English wording.
+    updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
+    loadAuditLog: "Failed to load audit log",
+    verifyAuditChain: "Failed to verify chain",
   },
 } as const;

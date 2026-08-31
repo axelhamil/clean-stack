@@ -4,6 +4,7 @@ import { api } from "../../../shared/api/api-client";
 import { throwApiError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import { env } from "../../../shared/env";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { OidcProviderInput, SamlProviderInput } from "../sso.schema";
 
 // Providers aren't given an id by the operator — the server just wants a stable
@@ -37,7 +38,13 @@ export const registerOidcProviderMutationOptions = mutationOptions({
       organizationId,
       oidcConfig: { clientId: values.clientId, clientSecret: values.clientSecret },
     });
-    if (error) throw new Error(error.message ?? "Failed to register the OIDC provider");
+    if (error)
+      throw new Error(
+        error.message ??
+          getErrorsT()("fallback.registerOidcProvider", {
+            defaultValue: "Failed to register the OIDC provider",
+          }),
+      );
     return data;
   },
 });
@@ -67,7 +74,13 @@ export const registerSamlProviderMutationOptions = mutationOptions({
         spMetadata: {},
       },
     });
-    if (error) throw new Error(error.message ?? "Failed to register the SAML provider");
+    if (error)
+      throw new Error(
+        error.message ??
+          getErrorsT()("fallback.registerSamlProvider", {
+            defaultValue: "Failed to register the SAML provider",
+          }),
+      );
     return data;
   },
 });
@@ -76,7 +89,11 @@ export const verifyDomainMutationOptions = mutationOptions({
   mutationKey: ["settings", "sso", "verify-domain"] as const,
   mutationFn: async (providerId: string) => {
     const { error } = await authClient.sso.verifyDomain({ providerId });
-    if (error) throw new Error(error.message ?? "Domain verification failed");
+    if (error)
+      throw new Error(
+        error.message ??
+          getErrorsT()("fallback.verifySsoDomain", { defaultValue: "Domain verification failed" }),
+      );
   },
 });
 
@@ -90,8 +107,19 @@ export const generateScimTokenMutationOptions = mutationOptions({
     organizationId: string;
   }) => {
     const { data, error } = await authClient.scim.generateToken({ providerId, organizationId });
-    if (error) throw new Error(error.message ?? "Failed to generate the SCIM token");
-    if (!data?.scimToken) throw new Error("Invalid response from server");
+    if (error)
+      throw new Error(
+        error.message ??
+          getErrorsT()("fallback.generateScimToken", {
+            defaultValue: "Failed to generate the SCIM token",
+          }),
+      );
+    if (!data?.scimToken)
+      throw new Error(
+        getErrorsT()("fallback.invalidServerResponse", {
+          defaultValue: "Invalid response from server",
+        }),
+      );
     return data.scimToken;
   },
 });
@@ -102,7 +130,13 @@ export const setSsoEnforcementMutationOptions = mutationOptions({
   mutationKey: ["settings", "sso", "enforcement"] as const,
   mutationFn: async (enforced: boolean) => {
     const res = await $setSsoEnforcement({ json: { enforced } });
-    if (!res.ok) await throwApiError(res, "Failed to update SSO enforcement");
+    if (!res.ok)
+      await throwApiError(
+        res,
+        getErrorsT()("fallback.updateSsoEnforcement", {
+          defaultValue: "Failed to update SSO enforcement",
+        }),
+      );
     return (await res.json()) as InferResponseType<typeof $setSsoEnforcement, 200>;
   },
 });

@@ -1,13 +1,6 @@
 import { isSubscribableSelector } from "@packages/events";
 import { z } from "zod";
-
-function isHttpsUrl(value: string): boolean {
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+import { isHttpsUrl } from "../../shared/api/is-https-url";
 
 export const webhookFormSchema = z.object({
   // `z.url()` accepts any scheme, so the https requirement the copy states has

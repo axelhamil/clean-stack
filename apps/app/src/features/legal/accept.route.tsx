@@ -15,10 +15,12 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { policiesQueryOptions } from "../../shared/api/queries/policies";
 import { PolicyLink } from "../../shared/components/policy-link";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
+import { isPolicyType, POLICY_TITLE_KEYS } from "../../shared/legal/policy-labels";
 import { useAcceptPolicies } from "./hooks/use-accept-policies";
 import { getChangesSince, POLICY_DOCS } from "./policies.config";
 
@@ -32,6 +34,7 @@ export const Route = createFileRoute("/_protected/legal/accept")({
 });
 
 function AcceptPoliciesPage() {
+  const { t } = useTranslation("common");
   const { redirect } = Route.useSearch();
   const navigate = useNavigate();
   const { data: policies } = useQuery(policiesQueryOptions);
@@ -39,7 +42,8 @@ function AcceptPoliciesPage() {
   const staleTypes = policies
     ? (Object.entries(policies) as [string, { current: boolean; acceptedVersion: string | null }][])
         .filter(([, status]) => !status.current)
-        .map(([type]) => type as keyof typeof POLICY_DOCS)
+        .map(([type]) => type)
+        .filter(isPolicyType)
     : [];
 
   const isReacceptance = staleTypes.some((type) => policies?.[type]?.acceptedVersion != null);
@@ -61,17 +65,16 @@ function AcceptPoliciesPage() {
       <div className="flex w-full max-w-lg flex-col gap-6">
         <header className="flex flex-col gap-2">
           <TypographyH1>
-            {isReacceptance ? "Updated policies" : "Before you get started"}
+            {isReacceptance ? t("legal.accept.titleReacceptance") : t("legal.accept.title")}
           </TypographyH1>
           <TypographyMuted>
-            {isReacceptance
-              ? "We've updated our policies. Please review the changes and accept to continue."
-              : "Please review and accept our Privacy Policy and Terms to continue."}
+            {isReacceptance ? t("legal.accept.subtitleReacceptance") : t("legal.accept.subtitle")}
           </TypographyMuted>
         </header>
 
         {staleTypes.map((type) => {
           const doc = POLICY_DOCS[type];
+          const title = t(POLICY_TITLE_KEYS[type]);
           const acceptedVersion = policies[type]?.acceptedVersion ?? null;
           const changes = acceptedVersion ? getChangesSince(type, acceptedVersion) : [];
 
@@ -79,11 +82,16 @@ function AcceptPoliciesPage() {
             <Card key={type}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {doc.title}
-                  {acceptedVersion ? <Badge variant="secondary">Updated</Badge> : null}
+                  {title}
+                  {acceptedVersion ? (
+                    <Badge variant="secondary">{t("legal.accept.updatedBadge")}</Badge>
+                  ) : null}
                 </CardTitle>
                 <CardDescription>
-                  Version {doc.version} — effective {doc.effectiveDate}
+                  {t("legal.policies.versionLine", {
+                    version: doc.version,
+                    date: doc.effectiveDate,
+                  })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
@@ -94,7 +102,7 @@ function AcceptPoliciesPage() {
                   </div>
                 ))}
                 <TypographyMuted>
-                  <PolicyLink type={type}>Read the full {doc.title}</PolicyLink>
+                  <PolicyLink type={type}>{t("legal.accept.readFull", { title })}</PolicyLink>
                 </TypographyMuted>
               </CardContent>
             </Card>
@@ -106,7 +114,7 @@ function AcceptPoliciesPage() {
           onClick={() => mutation.mutate({})}
           disabled={mutation.isPending}
         >
-          {mutation.isPending ? "Accepting…" : "Accept and continue"}
+          {mutation.isPending ? t("legal.accept.acceptingButton") : t("legal.accept.acceptButton")}
         </Button>
       </div>
     </main>

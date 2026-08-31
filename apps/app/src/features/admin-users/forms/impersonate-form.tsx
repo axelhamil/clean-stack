@@ -11,6 +11,7 @@ import {
 import { Input } from "@packages/ui/components/ui/input";
 import { Textarea } from "@packages/ui/components/ui/textarea";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { type ImpersonateFormInput, impersonateFormSchema } from "../admin-users.schema";
 
 interface ImpersonateFormProps {
@@ -19,6 +20,7 @@ interface ImpersonateFormProps {
 }
 
 export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
+  const { t } = useTranslation("admin");
   const form = useForm<ImpersonateFormInput>({
     resolver: zodResolver(impersonateFormSchema),
     mode: "onChange",
@@ -35,9 +37,9 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
           name="reason"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Reason</FormLabel>
+              <FormLabel>{t("users.impersonateForm.reasonLabel")}</FormLabel>
               <FormControl>
-                <Textarea placeholder="Describe the reason for impersonation…" {...field} />
+                <Textarea placeholder={t("users.impersonateForm.reasonPlaceholder")} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -48,16 +50,16 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
           name="ticketRef"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Ticket reference (optional)</FormLabel>
+              <FormLabel>{t("users.impersonateForm.ticketRefLabel")}</FormLabel>
               <FormControl>
-                <Input placeholder="SUP-42" {...field} />
+                <Input placeholder={t("users.impersonateForm.ticketRefPlaceholder")} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" disabled={!reason.trim() || isPending}>
-          Start impersonation
+          {t("users.impersonateForm.submit")}
         </Button>
       </form>
     </Form>

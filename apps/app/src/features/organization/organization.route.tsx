@@ -8,6 +8,7 @@ import {
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { currentMembershipQueryOptions } from "../../shared/api/queries/current-membership";
 import { orgInvitationsQueryOptions } from "../../shared/api/queries/org-invitations";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/org
 });
 
 function OrganizationPage() {
+  const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: membership } = useQuery(currentMembershipQueryOptions);
   const { data: members = [] } = useQuery(
@@ -36,19 +38,19 @@ function OrganizationPage() {
       : { ...orgInvitationsQueryOptions(""), enabled: false },
   );
 
-  if (!org) return <TypographyMuted>No active organization.</TypographyMuted>;
+  if (!org) return <TypographyMuted>{t("organization.noActiveOrg")}</TypographyMuted>;
 
   const pendingInvitations = invitations.filter((inv) => inv.status === "pending");
 
   return (
     <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">Organization settings</TypographyH1>
+      <TypographyH1 className="sr-only">{t("organization.title")}</TypographyH1>
 
       <Can requires={{ organization: ["update"] }}>
         <Card>
           <CardHeader>
-            <CardTitle>Details</CardTitle>
-            <CardDescription>Rename your organization.</CardDescription>
+            <CardTitle>{t("organization.detailsTitle")}</CardTitle>
+            <CardDescription>{t("organization.detailsDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <UpdateOrgForm organizationId={org.id} defaultValues={{ name: org.name }} />
@@ -59,8 +61,8 @@ function OrganizationPage() {
       <Can requires={{ invitation: ["create"] }}>
         <Card>
           <CardHeader>
-            <CardTitle>Invite a new member</CardTitle>
-            <CardDescription>They will receive an email with a link to accept.</CardDescription>
+            <CardTitle>{t("organization.inviteTitle")}</CardTitle>
+            <CardDescription>{t("organization.inviteDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <InviteMemberForm organizationId={org.id} />
@@ -70,10 +72,9 @@ function OrganizationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Members</CardTitle>
+          <CardTitle>{t("organization.membersTitle")}</CardTitle>
           <CardDescription>
-            {members.length} member{members.length === 1 ? "" : "s"} · manage roles and remove
-            members.
+            {t("organization.membersCount", { count: members.length })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,10 +98,9 @@ function OrganizationPage() {
       {pendingInvitations.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Pending invitations</CardTitle>
+            <CardTitle>{t("organization.pendingInvitationsTitle")}</CardTitle>
             <CardDescription>
-              {pendingInvitations.length} invitation
-              {pendingInvitations.length === 1 ? "" : "s"} awaiting response.
+              {t("organization.pendingInvitationsCount", { count: pendingInvitations.length })}
             </CardDescription>
           </CardHeader>
           <CardContent>

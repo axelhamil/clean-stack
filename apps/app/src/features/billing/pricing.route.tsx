@@ -1,6 +1,7 @@
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { subscriptionQueryOptions } from "../../shared/api/queries/subscription";
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/pricing")({
 });
 
 function PricingPage() {
+  const { t } = useTranslation("common");
   const { data: session } = useQuery(sessionQueryOptions);
   const { data: activeOrg } = useQuery({ ...activeOrgQueryOptions, enabled: Boolean(session) });
   const { data: sub } = useQuery({ ...subscriptionQueryOptions, enabled: Boolean(session) });
@@ -19,8 +21,8 @@ function PricingPage() {
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-8 p-8">
       <header className="flex flex-col gap-2">
-        <TypographyH1>Pricing</TypographyH1>
-        <TypographyMuted>Pick the plan that fits your team.</TypographyMuted>
+        <TypographyH1>{t("pricing.title")}</TypographyH1>
+        <TypographyMuted>{t("pricing.subtitle")}</TypographyMuted>
       </header>
       <PricingTable
         isAuthenticated={Boolean(session)}

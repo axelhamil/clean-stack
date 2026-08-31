@@ -9,6 +9,7 @@ import {
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
@@ -21,6 +22,7 @@ import { CopyRow } from "./copy-row";
 const SCIM_BASE_URL = `${env.VITE_API_URL}/api/auth/scim/v2`;
 
 export function ScimConnectionCard() {
+  const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const { role } = useAuthorization();
@@ -40,19 +42,17 @@ export function ScimConnectionCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>SCIM provisioning</CardTitle>
-        <CardDescription>
-          Let your identity provider create, update, and deactivate members automatically.
-        </CardDescription>
+        <CardTitle>{t("sso.scimCard.title")}</CardTitle>
+        <CardDescription>{t("sso.scimCard.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {!provider ? (
-          <TypographyMuted>Register an identity provider first.</TypographyMuted>
+          <TypographyMuted>{t("sso.registerProviderFirst")}</TypographyMuted>
         ) : !canGenerate ? (
-          <TypographyMuted>Only the organization owner can generate a SCIM token.</TypographyMuted>
+          <TypographyMuted>{t("sso.scimCard.onlyOwnerCanGenerate")}</TypographyMuted>
         ) : (
           <>
-            <CopyRow label="SCIM base URL" value={SCIM_BASE_URL} />
+            <CopyRow label={t("sso.scimCard.baseUrlLabel")} value={SCIM_BASE_URL} />
             <Button
               className="w-fit"
               disabled={generate.isPending}
@@ -60,7 +60,7 @@ export function ScimConnectionCard() {
                 org && generate.mutate({ providerId: provider.providerId, organizationId: org.id })
               }
             >
-              Generate token
+              {t("sso.scimCard.generateAction")}
             </Button>
           </>
         )}
@@ -69,8 +69,8 @@ export function ScimConnectionCard() {
       <SecretRevealDialog
         secret={revealToken}
         onClose={() => setRevealToken(null)}
-        title="SCIM token"
-        description="Copy this token now — it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector."
+        title={t("sso.scimCard.secretDialogTitle")}
+        description={t("sso.scimCard.secretDialogDescription")}
       />
     </Card>
   );

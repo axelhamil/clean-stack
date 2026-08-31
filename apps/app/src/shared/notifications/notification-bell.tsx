@@ -7,6 +7,7 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   markAllReadMutationOptions,
   markReadMutationOptions,
@@ -25,6 +26,7 @@ import { useNotificationStream } from "./use-notification-stream";
 const POLL_INTERVAL_MS = 30_000;
 
 export function NotificationBell() {
+  const { t } = useTranslation("common");
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const { connected } = useNotificationStream();
@@ -66,7 +68,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label={unreadLabel(count)}>
+        <Button variant="ghost" size="icon" className="relative" aria-label={unreadLabel(t, count)}>
           <Bell />
           {count > 0 && (
             <Badge aria-hidden className="-top-1 -right-1 absolute">
@@ -78,21 +80,21 @@ export function NotificationBell() {
 
       <PopoverContent align="end" className="w-96 p-0">
         <div className="flex items-center justify-between gap-2 p-3">
-          <TypographySmall>Notifications</TypographySmall>
+          <TypographySmall>{t("notifications.title")}</TypographySmall>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => markAllRead.mutate()}
             disabled={count === 0 || markAllRead.isPending}
           >
-            Mark all as read
+            {t("notifications.markAllRead")}
           </Button>
         </div>
 
         <Separator />
 
         {groups.length === 0 ? (
-          <TypographyMuted className="p-6 text-center">You are all caught up.</TypographyMuted>
+          <TypographyMuted className="p-6 text-center">{t("notifications.empty")}</TypographyMuted>
         ) : (
           <ScrollArea className="h-96">
             <ul className="flex flex-col gap-2 p-3">

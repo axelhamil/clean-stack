@@ -8,47 +8,48 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { policiesQueryOptions } from "../../../shared/api/queries/policies";
-
-const POLICY_LABELS: Record<string, string> = {
-  privacy: "Privacy Policy",
-  terms: "Terms of Service",
-};
+import { policyLabelFor } from "../../../shared/legal/policy-labels";
 
 export function PolicyAcceptanceCard() {
   const { data, isLoading } = useQuery(policiesQueryOptions);
+  const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Policy acceptance</CardTitle>
-        <CardDescription>
-          Your acceptance status for the current versions of our policies.
-        </CardDescription>
+        <CardTitle>{t("privacy.policyAcceptance.title")}</CardTitle>
+        <CardDescription>{t("privacy.policyAcceptance.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <TypographyMuted>Loading…</TypographyMuted>
+          <TypographyMuted>{t("privacy.policyAcceptance.loading")}</TypographyMuted>
         ) : data ? (
           <ul className="flex flex-col divide-y">
             {Object.entries(data).map(([type, status]) => (
               <li key={type} className="flex items-center justify-between gap-4 py-3">
-                <span className="text-sm font-medium">{POLICY_LABELS[type] ?? type}</span>
+                <span className="text-sm font-medium">{policyLabelFor(type, tCommon)}</span>
                 <div className="flex items-center gap-3">
                   <TypographyMuted className="text-xs">
-                    {status.acceptedVersion ? `v${status.acceptedVersion}` : "Never accepted"}
+                    {status.acceptedVersion
+                      ? `v${status.acceptedVersion}`
+                      : t("privacy.policyAcceptance.neverAccepted")}
                   </TypographyMuted>
                   {status.current ? (
-                    <Badge variant="secondary">Up to date</Badge>
+                    <Badge variant="secondary">{t("privacy.policyAcceptance.upToDate")}</Badge>
                   ) : (
-                    <Badge variant="destructive">Update required</Badge>
+                    <Badge variant="destructive">
+                      {t("privacy.policyAcceptance.updateRequired")}
+                    </Badge>
                   )}
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <TypographyMuted>Could not load policy status.</TypographyMuted>
+          <TypographyMuted>{t("privacy.policyAcceptance.loadError")}</TypographyMuted>
         )}
       </CardContent>
     </Card>

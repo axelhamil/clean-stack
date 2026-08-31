@@ -8,6 +8,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useEntitlements } from "../../shared/auth/use-entitlements";
 import { DomainVerificationCard } from "./components/domain-verification-card";
@@ -24,11 +25,12 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/sso
 });
 
 function SsoPage() {
+  const { t } = useTranslation("settings");
   const { hasFeature } = useEntitlements();
 
   return (
     <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">Single sign-on</TypographyH1>
+      <TypographyH1 className="sr-only">{t("sso.pageTitle")}</TypographyH1>
       {hasFeature("sso") ? (
         <>
           <ProviderCard />
@@ -44,19 +46,18 @@ function SsoPage() {
 }
 
 function SsoUpsell() {
+  const { t } = useTranslation("settings");
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Single sign-on</CardTitle>
-        <CardDescription>
-          Let members sign in through your identity provider (OIDC or SAML), provision accounts via
-          SCIM, and enforce SSO across a verified domain.
-        </CardDescription>
+        <CardTitle>{t("sso.pageTitle")}</CardTitle>
+        <CardDescription>{t("sso.upsell.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Button asChild>
           <Link to="/pricing" search={{ plan: "business" }}>
-            Upgrade to the Business plan
+            {t("sso.upsell.upgradeAction")}
           </Link>
         </Button>
       </CardContent>

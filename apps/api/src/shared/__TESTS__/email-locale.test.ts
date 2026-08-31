@@ -24,7 +24,7 @@ describe("renderTemplate locale", () => {
       { inviterName: "Ada", orgName: "Acme", role: "member", inviteUrl: "https://x" },
       "fr",
     );
-    expect(out.subject).toBe("Vous avez été invité à rejoindre Acme");
+    expect(out.subject).toBe("Invitation à rejoindre Acme");
   });
 
   it("translates the body, not only the subject", async () => {

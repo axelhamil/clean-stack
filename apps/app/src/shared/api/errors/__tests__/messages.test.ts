@@ -39,9 +39,21 @@ describe("formatApiError", () => {
     expect(formatApiError({ status: 400, message: "url: Enter a valid https URL" }, "fb", t)).toBe(
       "url: Enter a valid https URL",
     );
+  });
+
+  it("resolves an HTTP_<status> code (no business code) through the byStatus table", () => {
     expect(formatApiError({ status: 400, code: "HTTP_400", message: "url: bad" }, "fb", t)).toBe(
-      "url: bad",
+      enCatalog.errors.byStatus["400"],
     );
+    expect(formatApiError({ status: 403, code: "HTTP_403", message: "raw" }, "fb", t)).toBe(
+      enCatalog.errors.byStatus["403"],
+    );
+  });
+
+  it("falls through to the server message for a status HTTP_<status> does not cover", () => {
+    expect(
+      formatApiError({ status: 418, code: "HTTP_418", message: "I'm a teapot" }, "fb", t),
+    ).toBe("I'm a teapot");
   });
 
   it("keeps the localised fallback for a network failure and for a 5xx", () => {

@@ -22,7 +22,9 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { useTranslation } from "react-i18next";
 import type { PreferenceRow } from "./build-preference-matrix";
+import { CATEGORY_KEYS } from "./notification-item";
 
 export interface PreferenceChange {
   category: NotificationCategory;
@@ -39,22 +41,30 @@ interface PreferenceMatrixProps {
   disabled?: boolean;
 }
 
-const CATEGORY_LABELS: Record<NotificationCategory, string> = {
-  security: "Security",
-  org: "Organization",
-  billing: "Billing",
-  activity: "Activity",
-};
+// Reuses Task 3's `CATEGORY_KEYS` (shared/notifications/notification-item.tsx)
+// rather than declaring a second category->key map: this matrix's `row.category`
+// is the same `NotificationCategory` union, so a second copy would be two
+// records naming the same categories (recipe rule #2's second occurrence).
+// Resolved through `common`'s own `t`, not this component's `settings` one —
+// the keys aren't namespace-prefixed because Task 3 wrote them for a plain
+// `useTranslation("common")` call site.
 
-const FREQUENCY_LABELS: Record<NotificationFrequency, string> = {
-  immediate: "Immediately",
-  hourly: "Hourly digest",
-  daily: "Daily digest",
-};
+// `satisfies Record<NotificationFrequency, string>` proves every frequency has
+// AN entry; `__tests__/preference-matrix.test.ts` asserts the mapping itself
+// so a swapped pair (e.g. `hourly` pointing at `frequency.daily`) can't ship
+// silently.
+export const FREQUENCY_KEYS = {
+  immediate: "notifications.frequency.immediate",
+  hourly: "notifications.frequency.hourly",
+  daily: "notifications.frequency.daily",
+} as const satisfies Record<NotificationFrequency, string>;
 
-const FORCED_NOTE = {
-  all: "Always sent. Critical account alerts cannot be turned off.",
-  some: "Some critical alerts in this category are always sent.",
+// Same rationale as `FREQUENCY_KEYS` above: `satisfies` only proves the three
+// forced levels are present, not that each points at the right note (or at
+// `null` for "none"). Exported so the mapping is assertable directly.
+export const FORCED_NOTE_KEYS = {
+  all: "notifications.forcedAll",
+  some: "notifications.forcedSome",
   none: null,
 } as const;
 
@@ -64,23 +74,27 @@ export function PreferenceMatrix({
   showLock = false,
   disabled = false,
 }: PreferenceMatrixProps) {
+  const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Category</TableHead>
-          <TableHead>In app</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Email frequency</TableHead>
-          {showLock && <TableHead>Enforce for members</TableHead>}
+          <TableHead>{t("notifications.categoryHeader")}</TableHead>
+          <TableHead>{t("notifications.inAppHeader")}</TableHead>
+          <TableHead>{t("notifications.emailHeader")}</TableHead>
+          <TableHead>{t("notifications.emailFrequencyHeader")}</TableHead>
+          {showLock && <TableHead>{t("notifications.enforceHeader")}</TableHead>}
         </TableRow>
       </TableHeader>
 
       <TableBody>
         {rows.map((row) => {
           const forced = forcedLevelOf(row.category);
-          const note = FORCED_NOTE[forced];
+          const noteKey = FORCED_NOTE_KEYS[forced];
           const frozen = disabled || forced === "all";
+          const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
 
           const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>
             onChange({
@@ -95,8 +109,8 @@ export function PreferenceMatrix({
           return (
             <TableRow key={row.category}>
               <TableCell>
-                <TypographySmall>{CATEGORY_LABELS[row.category]}</TypographySmall>
-                {note && <TypographyMuted>{note}</TypographyMuted>}
+                <TypographySmall>{categoryLabel}</TypographySmall>
+                {noteKey && <TypographyMuted>{t(noteKey)}</TypographyMuted>}
               </TableCell>
 
               <TableCell>
@@ -104,7 +118,7 @@ export function PreferenceMatrix({
                   checked={row.in_app.enabled}
                   disabled={frozen}
                   onCheckedChange={(enabled) => emit("in_app", { enabled })}
-                  aria-label={`In-app notifications for ${CATEGORY_LABELS[row.category]}`}
+                  aria-label={t("notifications.inAppAriaLabel", { category: categoryLabel })}
                 />
               </TableCell>
 
@@ -113,7 +127,7 @@ export function PreferenceMatrix({
                   checked={row.email.enabled}
                   disabled={frozen}
                   onCheckedChange={(enabled) => emit("email", { enabled })}
-                  aria-label={`Email notifications for ${CATEGORY_LABELS[row.category]}`}
+                  aria-label={t("notifications.emailAriaLabel", { category: categoryLabel })}
                 />
               </TableCell>
 
@@ -126,14 +140,16 @@ export function PreferenceMatrix({
                   }
                 >
                   <SelectTrigger
-                    aria-label={`Email frequency for ${CATEGORY_LABELS[row.category]}`}
+                    aria-label={t("notifications.emailFrequencyAriaLabel", {
+                      category: categoryLabel,
+                    })}
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {NOTIFICATION_FREQUENCIES.map((frequency) => (
                       <SelectItem key={frequency} value={frequency}>
-                        {FREQUENCY_LABELS[frequency]}
+                        {t(FREQUENCY_KEYS[frequency])}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -149,7 +165,7 @@ export function PreferenceMatrix({
                       emit("in_app", { locked });
                       emit("email", { locked });
                     }}
-                    aria-label={`Enforce ${CATEGORY_LABELS[row.category]} for all members`}
+                    aria-label={t("notifications.enforceAriaLabel", { category: categoryLabel })}
                   />
                 </TableCell>
               )}

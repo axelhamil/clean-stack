@@ -9,6 +9,7 @@ import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { updatePreferenceMutationOptions } from "../../shared/api/mutations/notifications";
 import { notificationPreferencesQueryOptions } from "../../shared/api/queries/notifications";
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/notifications"
 });
 
 function NotificationsPage() {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const { data, isPending } = useQuery(notificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
@@ -31,7 +33,7 @@ function NotificationsPage() {
     ...updatePreferenceMutationOptions,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: notificationPreferencesQueryOptions.queryKey }),
-    onError: () => toast.error("Could not save your notification preferences"),
+    onError: () => toast.error(t("notifications.saveFailedToast")),
   });
 
   const handleChange = ({ category, channel, enabled, frequency }: PreferenceChange) =>
@@ -39,14 +41,11 @@ function NotificationsPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">Notifications</TypographyH1>
+      <TypographyH1 className="sr-only">{t("notifications.title")}</TypographyH1>
       <Card>
         <CardHeader>
-          <CardTitle>Notification preferences</CardTitle>
-          <CardDescription>
-            Choose how each category reaches you. These settings apply to your account across every
-            organization you belong to.
-          </CardDescription>
+          <CardTitle>{t("notifications.preferencesTitle")}</CardTitle>
+          <CardDescription>{t("notifications.preferencesDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <PreferenceMatrix rows={rows} onChange={handleChange} disabled={isPending} />

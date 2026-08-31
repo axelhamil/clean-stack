@@ -11,6 +11,7 @@ import {
 import { Input } from "@packages/ui/components/ui/input";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { updateOrgMutationOptions } from "../../../shared/api/mutations/update-org";
@@ -25,6 +26,7 @@ export interface UpdateOrgFormProps {
 }
 
 export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormProps) {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
 
   const form = useForm<UpdateOrgInput>({
@@ -40,9 +42,9 @@ export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormPr
         queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
       ]);
       broadcastAuthChange();
-      toast.success("Organization updated");
+      toast.success(t("organization.orgUpdatedToast"));
     },
-    onError: (err) => toastError(err, "Failed to update organization"),
+    onError: (err) => toastError(err, t("organization.updateOrgFailed")),
   });
 
   const onSubmit = form.handleSubmit((values) => update.mutate({ organizationId, ...values }));
@@ -55,7 +57,7 @@ export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormPr
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Name</FormLabel>
+              <FormLabel>{t("organization.nameLabel")}</FormLabel>
               <FormControl>
                 <Input {...field} value={field.value ?? ""} />
               </FormControl>
@@ -64,7 +66,7 @@ export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormPr
           )}
         />
         <Button type="submit" disabled={update.isPending}>
-          Save changes
+          {t("organization.saveChanges")}
         </Button>
       </form>
     </Form>

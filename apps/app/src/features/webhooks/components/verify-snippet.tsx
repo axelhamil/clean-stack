@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 const SNIPPET = `import crypto from "node:crypto";
 
 // Header: x-webhook-signature: t=<ts>,v1=<sig>[,v1=<sig>]
@@ -17,9 +19,13 @@ export function verify(rawBody: string, header: string, secret: string): boolean
 }`;
 
 export function VerifySnippet() {
+  const { t } = useTranslation("settings");
+
   return (
     <details className="rounded-md border p-3">
-      <summary className="cursor-pointer text-sm font-medium">Verify signatures (Node.js)</summary>
+      <summary className="cursor-pointer text-sm font-medium">
+        {t("webhooks.verifySnippetHeading")}
+      </summary>
       <pre className="mt-3 overflow-x-auto rounded bg-muted p-3 text-xs">
         <code>{SNIPPET}</code>
       </pre>
