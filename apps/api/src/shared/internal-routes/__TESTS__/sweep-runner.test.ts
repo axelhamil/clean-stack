@@ -244,6 +244,29 @@ describe("runRetentionSweep — lease", () => {
     expect(result.deleted).toBe(0);
   });
 
+  it("marks the run span skipped when the lease is held", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "setSpanAttributes");
+
+    await runRetentionSweep({
+      body: {},
+      lock: { acquire: async () => false, release: async () => {} },
+      spans: sweepSpans(instrumentation),
+      passes: [
+        {
+          label: "sent",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => 1,
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    expect(spy).toHaveBeenCalledWith({ "sweep.skipped": true });
+  });
+
   it("releases the lease even when a pass throws", async () => {
     let released = false;
 
@@ -331,6 +354,36 @@ describe("runRetentionSweep instrumentation", () => {
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({ "sweep.stop_reason": "exhausted", "sweep.deleted": 0 }),
     );
+  });
+
+  it("records the run outcome as span attributes when it completes", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const spy = spyOn(instrumentation, "setSpanAttributes");
+
+    await runRetentionSweep({
+      body: {},
+      lock: noopLock,
+      spans: sweepSpans(instrumentation),
+      passes: [
+        {
+          label: "operational",
+          retentionDays: 7,
+          countEligible: async () => 0,
+          purgeBatch: async () => 0,
+        },
+      ],
+      logger,
+      label: "sweep-x",
+    });
+
+    // Unlike the pass-level attributes above, only the run span carries
+    // `sweep.truncated` — the field that makes a skipped and a completed run
+    // distinguishable in the trace.
+    expect(spy).toHaveBeenCalledWith({
+      "sweep.deleted": 0,
+      "sweep.batch_count": 1,
+      "sweep.truncated": false,
+    });
   });
 
   it("captures a swallowed batch error", async () => {

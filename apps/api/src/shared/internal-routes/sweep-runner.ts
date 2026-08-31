@@ -102,6 +102,9 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
         { label: opts.label },
         `${opts.label} skipped — another run holds the lease`,
       );
+      // Written before returning: without it, a run refused the lease is
+      // indistinguishable in the trace from a run that executed and found nothing.
+      opts.spans.attributes({ "sweep.skipped": true });
       return {
         deleted: 0,
         durationMs: now() - startMs,
@@ -190,6 +193,14 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
       { deleted, deletedPerPass, stopReasons, durationMs, batchCount, dryRun, truncated },
       `${opts.label} done`,
     );
+
+    // Same reasoning as the skipped-run attributes above, for the completed path: the
+    // run span otherwise carries no attributes of its own, only its `sweep.pass` children.
+    opts.spans.attributes({
+      "sweep.deleted": deleted,
+      "sweep.batch_count": batchCount,
+      "sweep.truncated": truncated,
+    });
 
     return {
       deleted,
