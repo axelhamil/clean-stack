@@ -79,7 +79,7 @@ export function TransferLeaveDialog({
                 <SelectItem key={m.id} value={m.id}>
                   {m.user.name ?? m.user.email}{" "}
                   {t("organization.currentRoleSuffix", {
-                    role: isOrgRole(m.role) ? t(`common:${ROLE_LABEL_KEYS[m.role]}`) : m.role,
+                    role: isOrgRole(m.role) ? t(ROLE_LABEL_KEYS[m.role]) : m.role,
                   })}
                 </SelectItem>
               ))}

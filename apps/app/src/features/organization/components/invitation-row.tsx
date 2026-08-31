@@ -10,6 +10,8 @@ import { cancelInvitationMutationOptions } from "../../../shared/api/mutations/c
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import { INVITATION_STATUS_LABEL_KEYS, isInvitationStatus } from "../invitation-status-labels";
+import { isOrgRole, ROLE_LABEL_KEYS } from "../role-labels";
 
 export interface InvitationRowProps {
   invitation: {
@@ -46,13 +48,19 @@ export function InvitationRow({ invitation, organizationId }: InvitationRowProps
         <TypographyP>{invitation.email}</TypographyP>
         <TypographyMuted>
           {t("organization.invitationExpiry", {
-            role: invitation.role,
+            role: isOrgRole(invitation.role)
+              ? t(ROLE_LABEL_KEYS[invitation.role])
+              : invitation.role,
             date: formatDate(invitation.expiresAt),
           })}
         </TypographyMuted>
       </ListRowContent>
       <ListRowAction>
-        <Badge variant="outline">{invitation.status}</Badge>
+        <Badge variant="outline">
+          {isInvitationStatus(invitation.status)
+            ? t(INVITATION_STATUS_LABEL_KEYS[invitation.status])
+            : invitation.status}
+        </Badge>
         {canCancel && invitation.status === "pending" && (
           <Button
             variant="ghost"

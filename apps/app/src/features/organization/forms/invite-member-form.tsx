@@ -85,9 +85,9 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="member">{t(`common:${ROLE_LABEL_KEYS.member}`)}</SelectItem>
-                  <SelectItem value="admin">{t(`common:${ROLE_LABEL_KEYS.admin}`)}</SelectItem>
-                  <SelectItem value="owner">{t(`common:${ROLE_LABEL_KEYS.owner}`)}</SelectItem>
+                  <SelectItem value="member">{t(ROLE_LABEL_KEYS.member)}</SelectItem>
+                  <SelectItem value="admin">{t(ROLE_LABEL_KEYS.admin)}</SelectItem>
+                  <SelectItem value="owner">{t(ROLE_LABEL_KEYS.owner)}</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
