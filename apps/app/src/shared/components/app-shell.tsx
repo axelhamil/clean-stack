@@ -2,13 +2,17 @@ import { BrandLink } from "@packages/ui/components/ui/brand-link";
 import { Button } from "@packages/ui/components/ui/button";
 import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { Separator } from "@packages/ui/components/ui/separator";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { LogoMark } from "../../shared/components/logo-mark";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
+import { NotificationBell } from "../../shared/notifications/notification-bell";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
 import { canAccessPlatformAdmin } from "../auth/can-access-platform-admin";
 import { CommandPalette } from "./command-palette";
@@ -24,8 +28,8 @@ interface AppShellProps {
 }
 
 const PRIMARY_NAV = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/settings", label: "Settings" },
+  { to: "/dashboard", labelKey: "nav.dashboard" },
+  { to: "/settings", labelKey: "nav.settings" },
 ] as const;
 
 function isApplePlatform(): boolean {
@@ -37,6 +41,7 @@ function isApplePlatform(): boolean {
 const SHORTCUT_LABEL = isApplePlatform() ? "⌘ K" : "Ctrl K";
 
 export function AppShell({ user, children }: AppShellProps) {
+  const { t } = useTranslation("common");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: session } = useQuery(sessionQueryOptions);
   const platformAdmin = canAccessPlatformAdmin(session);
@@ -50,11 +55,11 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="glass-header sticky top-0 z-30 border-b">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
+        <div className={cn(pageContainerVariants(), "flex h-14 items-center gap-4")}>
           <BrandLink asChild>
             <Link to="/dashboard">
               <LogoMark />
-              <span className="hidden sm:inline">App</span>
+              <span className="hidden sm:inline">{t("shell.brandLabel")}</span>
             </Link>
           </BrandLink>
 
@@ -71,13 +76,13 @@ export function AppShell({ user, children }: AppShellProps) {
 
               return (
                 <NavLink key={item.to} variant="pill" active={active} asChild>
-                  <Link to={item.to}>{item.label}</Link>
+                  <Link to={item.to}>{t(item.labelKey)}</Link>
                 </NavLink>
               );
             })}
             {platformAdmin && (
               <NavLink variant="pill" active={pathname.startsWith("/admin")} asChild>
-                <Link to="/admin/users">Admin</Link>
+                <Link to="/admin/users">{t("nav.admin")}</Link>
               </NavLink>
             )}
           </nav>
@@ -90,7 +95,7 @@ export function AppShell({ user, children }: AppShellProps) {
               className="hidden h-9 gap-2 text-muted-foreground sm:inline-flex"
             >
               <Search className="size-4" />
-              <span>Search...</span>
+              <span>{t("shell.search")}</span>
               <KeyboardShortcut className="ml-2">{SHORTCUT_LABEL}</KeyboardShortcut>
             </Button>
 
@@ -99,10 +104,12 @@ export function AppShell({ user, children }: AppShellProps) {
               size="icon"
               onClick={fireCommandPalette}
               className="sm:hidden"
-              aria-label="Open command palette"
+              aria-label={t("shell.openCommandPalette")}
             >
               <Search />
             </Button>
+
+            <NotificationBell />
 
             <ThemeToggle />
 
@@ -111,7 +118,9 @@ export function AppShell({ user, children }: AppShellProps) {
         </div>
 
         {pathname.startsWith("/settings") && (
-          <ContextualTabs className="border-t mx-auto max-w-7xl px-4 sm:px-6" />
+          <div className="border-t">
+            <ContextualTabs className={pageContainerVariants()} />
+          </div>
         )}
       </header>
 

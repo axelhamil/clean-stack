@@ -42,8 +42,7 @@ const fakeTx = {
 };
 
 // ---------------------------------------------------------------------------
-// Drizzle mock — full superset so parallel test files don't see missing exports
-// (see shared/CLAUDE.md anti-pattern note)
+// Drizzle mock — scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
 mock.module("@packages/drizzle", () => ({
   db: fakeTx,
@@ -77,10 +76,11 @@ mock.module("@packages/drizzle", () => ({
   alias: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   schema: {},
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
@@ -90,6 +90,32 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: {
+    notification: {
+      id: { name: "id" },
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      category: { name: "category" },
+      eventType: { name: "event_type" },
+      groupKey: { name: "group_key" },
+      dedupKey: { name: "dedup_key" },
+      payload: { name: "payload" },
+      readAt: { name: "read_at" },
+      emailPendingAt: { name: "email_pending_at" },
+      emailSentAt: { name: "email_sent_at" },
+      createdAt: { name: "created_at" },
+    },
+    notificationPreference: {
+      id: { name: "id" },
+      scope: { name: "scope" },
+      scopeId: { name: "scope_id" },
+      category: { name: "category" },
+      channel: { name: "channel" },
+      enabled: { name: "enabled" },
+      frequency: { name: "frequency" },
+      locked: { name: "locked" },
+    },
+  },
   webhooksSchema: {
     webhookEndpoint: {
       id: "id",

@@ -1,4 +1,4 @@
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { logger } from "../../../../shared/logger";
 import type {
   IStorageService,
@@ -9,6 +9,7 @@ import type {
   StorageError,
   UploadObjectInput,
 } from "../../../../shared/ports/storage.port";
+import { keySchema } from "../../application/dto/_key";
 
 const unconfigured = <T>(): Promise<Result<T, StorageError>> =>
   Promise.resolve(
@@ -60,5 +61,9 @@ export class NoOpStorageService implements IStorageService {
 
   publicUrlFor(key: string): string {
     return key;
+  }
+
+  keyFromPublicUrl(url: string): Option<string> {
+    return keySchema.safeParse(url).success ? Option.some(url) : Option.none();
   }
 }

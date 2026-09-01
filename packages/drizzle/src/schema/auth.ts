@@ -17,6 +17,7 @@ export const user = pgTable("user", {
   deletedAt: timestamp("deleted_at"),
   lastExportRequestedAt: timestamp("last_export_requested_at"),
   pendingEmail: text("pending_email"),
+  locale: text("locale"),
   stripeCustomerId: text("stripe_customer_id"),
   role: text("role"),
   banned: boolean("banned").default(false),
@@ -95,6 +96,8 @@ export const twoFactor = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     verified: boolean("verified").default(true),
+    failedVerificationCount: integer("failed_verification_count").default(0),
+    lockedUntil: timestamp("locked_until"),
   },
   (table) => [
     index("twoFactor_secret_idx").on(table.secret),

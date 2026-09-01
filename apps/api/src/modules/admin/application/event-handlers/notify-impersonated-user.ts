@@ -1,12 +1,15 @@
 import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
 import { AdminImpersonationStartedPayload, EventTypes } from "@packages/events";
+import { localeForUser } from "../../../../shared/locale-for-user";
 import type { IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { IProfileStore } from "../../../../shared/ports/profile.port";
 import type { AdminQueryService } from "../services/admin-query.service";
 
 interface NotifyImpersonatedUserDeps {
   IEmailService: IEmailService;
   AdminQueryService: AdminQueryService;
+  IProfileStore: IProfileStore;
   IInstrumentation: IInstrumentation;
   supportUrl: string;
 }
@@ -32,13 +35,20 @@ export const notifyImpersonatedUser: (deps: NotifyImpersonatedUserDeps) => Event
     const user = target.unwrap();
 
     try {
-      const sent = await c.IEmailService.sendTemplate("impersonation_started", user.email, {
-        userName: user.name,
-        startedAt: event.dateOccurred.toLocaleString("fr-FR", FORMAT),
-        expiresAt: new Date(parsed.data.expiresAt).toLocaleString("fr-FR", FORMAT),
-        reason: parsed.data.reason,
-        supportUrl: c.supportUrl,
-      });
+      const locale = await localeForUser(c.IProfileStore, parsed.data.userId);
+
+      const sent = await c.IEmailService.sendTemplate(
+        "impersonation_started",
+        user.email,
+        {
+          userName: user.name,
+          startedAt: event.dateOccurred.toLocaleString(locale, FORMAT),
+          expiresAt: new Date(parsed.data.expiresAt).toLocaleString(locale, FORMAT),
+          reason: parsed.data.reason,
+          supportUrl: c.supportUrl,
+        },
+        { locale },
+      );
       if (sent.isFailure) {
         c.IInstrumentation.capture(sent.getError());
       }

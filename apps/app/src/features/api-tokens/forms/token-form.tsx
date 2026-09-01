@@ -1,0 +1,167 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@packages/ui/components/ui/button";
+import { Checkbox } from "@packages/ui/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@packages/ui/components/ui/form";
+import { FormTextField } from "@packages/ui/components/ui/form-text-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@packages/ui/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
+import { useAuthorization } from "../../../shared/auth/use-authorization";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import {
+  API_SCOPES,
+  type TokenFormInput,
+  tokenFormSchema,
+  useExpiryOptions,
+} from "../api-tokens.schema";
+
+interface TokenFormProps {
+  defaultValues: TokenFormInput;
+  submitLabel: string;
+  isPending: boolean;
+  guard: ImpersonationGuard;
+  onSubmit: (values: TokenFormInput) => void;
+}
+
+export function TokenForm({
+  defaultValues,
+  submitLabel,
+  isPending,
+  guard,
+  onSubmit,
+}: TokenFormProps) {
+  const { t } = useTranslation("settings");
+  const { hasMembership, can } = useAuthorization();
+  const { data: activeOrg } = useQuery(activeOrgQueryOptions);
+  const canCreateOrgToken = hasMembership && can({ apiToken: ["create"] });
+  const expiryOptions = useExpiryOptions();
+
+  const form = useForm<TokenFormInput>({
+    resolver: zodResolver(tokenFormSchema),
+    defaultValues,
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormTextField
+          control={form.control}
+          name="name"
+          label={t("apiTokens.form.nameLabel")}
+          placeholder={t("apiTokens.form.namePlaceholder")}
+        />
+
+        <FormField
+          control={form.control}
+          name="scopes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("apiTokens.form.scopesLabel")}</FormLabel>
+              <div className="flex flex-col gap-2">
+                {API_SCOPES.map((scope) => (
+                  <div key={scope} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`scope-${scope}`}
+                      checked={field.value.includes(scope)}
+                      onCheckedChange={(checked) => {
+                        const next = checked
+                          ? [...field.value, scope]
+                          : field.value.filter((s) => s !== scope);
+                        field.onChange(next);
+                      }}
+                    />
+                    <label htmlFor={`scope-${scope}`} className="cursor-pointer font-mono text-sm">
+                      {scope}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {canCreateOrgToken && activeOrg && (
+          <FormField
+            control={form.control}
+            name="organizationId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("apiTokens.form.tokenScopeLabel")}</FormLabel>
+                <Select
+                  value={field.value ?? "personal"}
+                  onValueChange={(v) => field.onChange(v === "personal" ? null : v)}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="personal">{t("apiTokens.form.personalOption")}</SelectItem>
+                    <SelectItem value={activeOrg.id}>{activeOrg.name}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        <FormField
+          control={form.control}
+          name="expiresInDays"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("apiTokens.form.expiryLabel")}</FormLabel>
+              <Select
+                value={field.value !== null ? String(field.value) : "never"}
+                onValueChange={(v) => field.onChange(v === "never" ? null : Number(v))}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {expiryOptions.map((opt) => {
+                    const value = opt.value !== null ? String(opt.value) : "never";
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {opt.label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button
+          type="submit"
+          disabled={isPending || guard.blocked}
+          {...guard.describeProps(isPending)}
+        >
+          {submitLabel}
+        </Button>
+      </form>
+    </Form>
+  );
+}

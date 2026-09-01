@@ -34,4 +34,10 @@ export class SentryInstrumentation implements IInstrumentation {
       data: crumb.data,
     });
   }
+
+  setSpanAttributes(attributes: Record<string, string | number | boolean>): void {
+    // No active span means the caller runs outside any `startSpan` callback — a
+    // legitimate state (a sweep triggered with Sentry disabled), never an error.
+    Sentry.getActiveSpan()?.setAttributes(attributes);
+  }
 }

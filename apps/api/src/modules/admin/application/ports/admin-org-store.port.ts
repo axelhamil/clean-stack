@@ -7,6 +7,7 @@ export interface AdminOrgRow {
   slug: string;
   memberCount: number;
   createdAt: Date;
+  ssoEnforced: boolean;
 }
 
 export interface AdminOrgMemberRow {

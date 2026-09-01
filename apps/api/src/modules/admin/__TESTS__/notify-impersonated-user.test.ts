@@ -1,15 +1,25 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { notifyImpersonatedUser } from "../application/event-handlers/notify-impersonated-user";
 
 const capture = mock(() => {});
 const sendTemplate = mock(async () => Result.ok());
 
-const { notifyImpersonatedUser } = await import(
-  "../application/event-handlers/notify-impersonated-user"
-);
+const instrumentation = {
+  capture,
+  startSpan: mock(() => {}),
+  addBreadcrumb: mock(() => {}),
+  setSpanAttributes: mock(() => {}),
+};
 
-const instrumentation = { capture, startSpan: mock(() => {}), addBreadcrumb: mock(() => {}) };
+const profileStore = (locale?: string) => ({
+  findLocale: mock(async () => ({
+    isSuccess: true,
+    isFailure: false,
+    getValue: () => ({ toUndefined: () => locale }),
+  })),
+});
 
 const BASE_EVENT = {
   eventType: EventTypes.ADMIN_IMPERSONATION_STARTED,
@@ -38,6 +48,7 @@ describe("notifyImpersonatedUser", () => {
           }),
         })),
       },
+      IProfileStore: profileStore("fr"),
       IInstrumentation: instrumentation,
       supportUrl: "https://example.com/support",
     } as never);
@@ -51,7 +62,11 @@ describe("notifyImpersonatedUser", () => {
         userName: "Ada",
         reason: "ticket #42",
         supportUrl: "https://example.com/support",
+        // The dates must be formatted in the recipient's locale, not in a
+        // hardcoded one: "5 août 2026" is the French rendering.
+        startedAt: expect.stringContaining("août"),
       }),
+      { locale: "fr" },
     );
     expect(capture).not.toHaveBeenCalled();
   });
@@ -73,6 +88,7 @@ describe("notifyImpersonatedUser", () => {
           }),
         })),
       },
+      IProfileStore: profileStore("fr"),
       IInstrumentation: instrumentation,
       supportUrl: "https://example.com/support",
     } as never);
@@ -98,6 +114,7 @@ describe("notifyImpersonatedUser", () => {
           getError: () => ({ code: "ADMIN_QUERY_PROVIDER_FAILURE", message: "db error" }),
         })),
       },
+      IProfileStore: profileStore("fr"),
       IInstrumentation: instrumentation,
       supportUrl: "https://example.com/support",
     } as never);

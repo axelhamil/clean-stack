@@ -1,7 +1,10 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
+import { useTranslation } from "react-i18next";
+import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import type { AuditRow } from "../api/audit-log.queries";
+import { AUDIT_ACTOR_TYPE_LABEL_KEYS } from "../audit-actor-type-labels";
 
 interface AuditRowProps {
   row: AuditRow;
@@ -9,11 +12,17 @@ interface AuditRowProps {
 }
 
 export function AuditTableRow({ row, onSelect }: AuditRowProps) {
+  const { t } = useTranslation("admin");
+  // Occurred-at is the audit trail's ordering key — same-day events must stay
+  // distinguishable, so this uses date+time precision rather than the
+  // date-only `useFormatDate`.
+  const formatDateTime = useFormatDateTime();
+
   return (
     <TableRow>
-      <TableCell>{row.occurredAt as unknown as string}</TableCell>
+      <TableCell>{formatDateTime(row.occurredAt)}</TableCell>
       <TableCell>
-        <Badge variant="secondary">{row.actorType}</Badge>
+        <Badge variant="secondary">{t(AUDIT_ACTOR_TYPE_LABEL_KEYS[row.actorType])}</Badge>
       </TableCell>
       <TableCell>
         <Badge variant="outline">{row.action}</Badge>
@@ -24,7 +33,7 @@ export function AuditTableRow({ row, onSelect }: AuditRowProps) {
       <TableCell>{row.organizationId ?? "—"}</TableCell>
       <TableCell>
         <Button variant="ghost" size="sm" onClick={() => onSelect(row)}>
-          Details
+          {t("auditLog.detailsAction")}
         </Button>
       </TableCell>
     </TableRow>

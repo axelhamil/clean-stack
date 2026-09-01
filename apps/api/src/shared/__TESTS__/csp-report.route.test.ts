@@ -20,7 +20,7 @@ mock.module("@packages/drizzle", () => ({
   auditLogSchema: {},
   webhooksSchema: {},
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   schema: {},
   rateLimitSchema: {},
   billingSchema: {},
@@ -29,6 +29,32 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: {
+    notification: {
+      id: { name: "id" },
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      category: { name: "category" },
+      eventType: { name: "event_type" },
+      groupKey: { name: "group_key" },
+      dedupKey: { name: "dedup_key" },
+      payload: { name: "payload" },
+      readAt: { name: "read_at" },
+      emailPendingAt: { name: "email_pending_at" },
+      emailSentAt: { name: "email_sent_at" },
+      createdAt: { name: "created_at" },
+    },
+    notificationPreference: {
+      id: { name: "id" },
+      scope: { name: "scope" },
+      scopeId: { name: "scope_id" },
+      category: { name: "category" },
+      channel: { name: "channel" },
+      enabled: { name: "enabled" },
+      frequency: { name: "frequency" },
+      locked: { name: "locked" },
+    },
+  },
   inArray: () => {},
   eq: () => {},
   lt: () => {},
@@ -36,7 +62,7 @@ mock.module("@packages/drizzle", () => ({
   asc: () => {},
   desc: () => {},
   and: () => {},
-  sql: () => {},
+  sql: Object.assign(() => {}, { raw: () => ({}), identifier: () => ({}) }),
 }));
 
 const { cspReportCors, makeCspReportApp } = await import("../internal-routes/csp-report.route");
@@ -358,10 +384,11 @@ describe("POST /csp-report", () => {
         Array<{ payload: Record<string, unknown> }>,
       ];
       const payload = events[0]?.payload;
-      expect((payload?.documentUri as string).length).toBe(2048);
-      expect((payload?.blockedUri as string).length).toBe(2048);
-      expect((payload?.violatedDirective as string).length).toBe(128);
-      expect((payload?.effectiveDirective as string).length).toBe(64);
+      if (!payload) throw new Error("payload not found");
+      expect((payload.documentUri as string).length).toBe(2048);
+      expect((payload.blockedUri as string).length).toBe(2048);
+      expect((payload.violatedDirective as string).length).toBe(128);
+      expect((payload.effectiveDirective as string).length).toBe(64);
     });
   });
 

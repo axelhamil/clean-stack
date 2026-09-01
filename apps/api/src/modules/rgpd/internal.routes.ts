@@ -15,6 +15,7 @@ export const rgpdInternalRoutes = new Hono()
     const result = await di.RgpdService.processPendingDeletions({
       batchSize: body.batchSize ?? env.RGPD_SWEEP_BATCH_SIZE ?? 50,
       dryRun: body.dryRun,
+      deadlineMs: env.SWEEP_DEADLINE_MS,
     });
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json(result.getValue());

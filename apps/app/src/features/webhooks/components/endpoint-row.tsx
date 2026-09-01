@@ -15,7 +15,11 @@ import {
   TooltipTrigger,
 } from "@packages/ui/components/ui/tooltip";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
+import { ENDPOINT_STATUS_KEYS } from "../webhook-labels";
 
 export type EndpointStatus = "active" | "paused" | "auto-disabled";
 
@@ -32,6 +36,7 @@ interface EndpointRowProps {
   onRotate: (endpoint: WebhookEndpoint) => void;
   onDelete: (endpoint: WebhookEndpoint) => void;
   onSelect: (endpoint: WebhookEndpoint) => void;
+  guard: ImpersonationGuard;
 }
 
 export function EndpointRow({
@@ -42,7 +47,10 @@ export function EndpointRow({
   onRotate,
   onDelete,
   onSelect,
+  guard,
 }: EndpointRowProps) {
+  const { t } = useTranslation(["settings", "common"]);
+  const formatDate = useFormatDate();
   const status = endpointStatus(endpoint);
 
   return (
@@ -55,44 +63,66 @@ export function EndpointRow({
               <TooltipTrigger asChild>
                 <Badge variant="destructive" className="flex items-center gap-1">
                   <TriangleAlertIcon className="size-3" />
-                  auto-disabled
+                  {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
                 </Badge>
               </TooltipTrigger>
               <TooltipContent>
-                Disabled after repeated delivery failures — re-enable to reset
+                {t("settings:webhooks.endpointRow.autoDisabledTooltip")}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <Badge variant={status === "active" ? "default" : "secondary"}>{status}</Badge>
+          <Badge variant={status === "active" ? "default" : "secondary"}>
+            {t(ENDPOINT_STATUS_KEYS[status])}
+          </Badge>
         )}
       </TableCell>
       <TableCell>{endpoint.eventTypes.length}</TableCell>
-      <TableCell>{new Date(endpoint.createdAt).toLocaleDateString()}</TableCell>
+      <TableCell>{formatDate(endpoint.createdAt)}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
               <MoreHorizontalIcon className="size-4" />
-              <span className="sr-only">Open actions</span>
+              <span className="sr-only">{t("settings:webhooks.endpointRow.openActions")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onSelect(endpoint)}>View deliveries</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSelect(endpoint)}>
+              {t("settings:webhooks.endpointRow.viewDeliveries")}
+            </DropdownMenuItem>
             {canWrite && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onEdit(endpoint)}>Edit</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSendTest(endpoint)}>Send test</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRotate(endpoint)}>
-                  Rotate secret
+                <DropdownMenuItem
+                  onClick={() => onEdit(endpoint)}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
+                >
+                  {t("settings:webhooks.endpointRow.edit")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onSendTest(endpoint)}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
+                >
+                  {t("settings:webhooks.endpointRow.sendTest")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onRotate(endpoint)}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
+                >
+                  {t("settings:webhooks.endpointRow.rotateSecret")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onDelete(endpoint)}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
                   className="text-destructive focus:text-destructive"
                 >
-                  Delete
+                  {t("settings:webhooks.endpointRow.delete")}
                 </DropdownMenuItem>
               </>
             )}

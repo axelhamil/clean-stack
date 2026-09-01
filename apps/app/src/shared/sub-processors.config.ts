@@ -1,4 +1,13 @@
+export type SubProcessorId = "resend" | "r2" | "betterAuth" | "stripe" | "umami";
+
 export interface SubProcessor {
+  /**
+   * Stable catalog key for the vendor's purpose and region. The register itself
+   * stays English — it restates what the signed DPA says, and the DPA is not
+   * translated — but the two fields a user reads on screen are copy, so they
+   * live in the catalog like every other rendered string.
+   */
+  id: SubProcessorId;
   name: string;
   purpose: string;
   region: string;
@@ -10,6 +19,7 @@ export interface SubProcessor {
 
 export const SUB_PROCESSORS: readonly SubProcessor[] = [
   {
+    id: "resend",
     name: "Resend",
     purpose: "Transactional email delivery",
     region: "US (EU DPF-certified)",
@@ -19,6 +29,7 @@ export const SUB_PROCESSORS: readonly SubProcessor[] = [
     status: "active",
   },
   {
+    id: "r2",
     name: "Cloudflare R2",
     purpose: "Object storage (file uploads)",
     region: "EU or US (zone configurable)",
@@ -28,6 +39,7 @@ export const SUB_PROCESSORS: readonly SubProcessor[] = [
     status: "active",
   },
   {
+    id: "betterAuth",
     name: "BetterAuth (GitHub/Google OAuth)",
     purpose: "OAuth social authentication",
     region: "US / EU (per provider)",
@@ -36,6 +48,7 @@ export const SUB_PROCESSORS: readonly SubProcessor[] = [
     status: "active",
   },
   {
+    id: "stripe",
     name: "Stripe",
     purpose: "Payment processing and billing",
     region: "US (EU DPF-certified)",
@@ -45,14 +58,7 @@ export const SUB_PROCESSORS: readonly SubProcessor[] = [
     status: "planned",
   },
   {
-    name: "GrowthBook",
-    purpose: "Feature flags and A/B testing",
-    region: "US (self-hostable option)",
-    category: "analytics",
-    url: "https://www.growthbook.io",
-    status: "planned",
-  },
-  {
+    id: "umami",
     name: "Umami",
     purpose: "Privacy-friendly web analytics",
     region: "Configurable (self-hostable)",

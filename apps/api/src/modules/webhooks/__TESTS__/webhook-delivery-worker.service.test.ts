@@ -3,7 +3,7 @@ import { Option, Result } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 
 // ---------------------------------------------------------------------------
-// Drizzle mock — full superset so parallel test files don't see missing exports
+// Drizzle mock — scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
 let dbTransactionResult: unknown = [];
 
@@ -85,10 +85,11 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   schema: {},
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
@@ -98,6 +99,32 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: {
+    notification: {
+      id: { name: "id" },
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      category: { name: "category" },
+      eventType: { name: "event_type" },
+      groupKey: { name: "group_key" },
+      dedupKey: { name: "dedup_key" },
+      payload: { name: "payload" },
+      readAt: { name: "read_at" },
+      emailPendingAt: { name: "email_pending_at" },
+      emailSentAt: { name: "email_sent_at" },
+      createdAt: { name: "created_at" },
+    },
+    notificationPreference: {
+      id: { name: "id" },
+      scope: { name: "scope" },
+      scopeId: { name: "scope_id" },
+      category: { name: "category" },
+      channel: { name: "channel" },
+      enabled: { name: "enabled" },
+      frequency: { name: "frequency" },
+      locked: { name: "locked" },
+    },
+  },
   webhooksSchema: {
     webhookEndpoint: {
       id: "id",
@@ -338,8 +365,8 @@ describe("WebhookDeliveryWorker", () => {
     const successUpdate = fakeDeliveries.updates.find(
       (u) => (u.update as { status: string }).status === "success",
     );
-    expect(successUpdate).toBeDefined();
-    expect((successUpdate?.update as { attempts: number }).attempts).toBe(1);
+    if (!successUpdate) throw new Error("successUpdate not found");
+    expect((successUpdate.update as { attempts: number }).attempts).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -500,7 +527,7 @@ describe("WebhookDeliveryWorker", () => {
     ];
     let sig: string | undefined;
     const mockFetch = async (_u: unknown, init?: RequestInit) => {
-      sig = (init?.headers as Record<string, string>)["x-webhook-signature"];
+      sig = (init?.headers as Record<string, string> | undefined)?.["x-webhook-signature"];
       return new Response(null, { status: 200 });
     };
 

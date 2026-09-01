@@ -1,6 +1,6 @@
 import { uuidv7 } from "@packages/ddd-kit";
 import { and, eq, type Transaction, webhooksSchema } from "@packages/drizzle";
-import { type EventType, INTERNAL_EVENT_TYPES, matchesSubscription } from "@packages/events";
+import { type EventType, isPublicEvent, matchesSubscription } from "@packages/events";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { OutboxRecord } from "../ports/outbox.port";
 import type { OutboxSubscriber } from "./outbox-subscriber";
@@ -16,7 +16,7 @@ export class WebhookFanoutSubscriber implements OutboxSubscriber {
       async () => {
         try {
           if (event.organizationId.isNone()) return;
-          if (INTERNAL_EVENT_TYPES.includes(event.eventType as EventType)) return;
+          if (!isPublicEvent(event.eventType as EventType)) return;
           const ep = webhooksSchema.webhookEndpoint;
           const endpointsQuery = tx
             .select({ id: ep.id, eventTypes: ep.eventTypes })

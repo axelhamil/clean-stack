@@ -1,9 +1,10 @@
+import { LOCALES } from "@packages/i18n";
 import { z } from "zod";
 import { EventTypes } from "./event-types";
 
 const UserRef = z.object({ userId: z.string() });
 const OrgRef = z.object({ organizationId: z.string() });
-const Email = z.string().email();
+const Email = z.email();
 
 export const UserCreatedPayload = UserRef.extend({
   email: Email,
@@ -99,7 +100,7 @@ export const UserProfileUpdatedPayload = UserRef.extend({
 export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
 
 export const UserEmailChangeRequestedPayload = UserRef.extend({
-  newEmail: z.string().email(),
+  newEmail: z.email(),
 });
 export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
 
@@ -111,6 +112,15 @@ export const UserExportCompletedPayload = UserRef.extend({
   expiresAt: z.coerce.date(),
 });
 export type UserExportCompletedPayload = z.infer<typeof UserExportCompletedPayload>;
+
+// Subject and actor are the same person: the route carries `denyImpersonated`,
+// so no admin can trigger this on someone else's behalf. `userId` alone
+// therefore satisfies §7 without a separate `actorUserId`.
+export const UserLocaleChangedPayload = UserRef.extend({
+  locale: z.enum(LOCALES),
+  previousLocale: z.enum(LOCALES).nullable(),
+});
+export type UserLocaleChangedPayload = z.infer<typeof UserLocaleChangedPayload>;
 
 export const OrgCreatedPayload = OrgRef.extend({
   ownerUserId: z.string(),
@@ -190,7 +200,7 @@ export type UploadDeletedPayload = z.infer<typeof UploadDeletedPayload>;
 export const WebhookEndpointCreatedPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
-  url: z.string().url(),
+  url: z.url(),
   eventTypes: z.array(z.string()),
   enabled: z.boolean(),
 });
@@ -421,6 +431,157 @@ export const AdminUserSessionsRevokedPayload = ActorRef.merge(UserRef).extend({
 });
 export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
 
+export const ApiTokenCreatedPayload = z.object({
+  userId: z.string(),
+  actorUserId: z.string(),
+  organizationId: z.string().nullable(),
+  tokenId: z.string(),
+  name: z.string(),
+  scopes: z.array(z.string()),
+  expiresAt: z.date().nullable(),
+});
+export type ApiTokenCreatedPayload = z.infer<typeof ApiTokenCreatedPayload>;
+
+export const ApiTokenRevokedPayload = z.object({
+  userId: z.string(),
+  actorUserId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  tokenId: z.string(),
+  reason: z.enum(["user", "membership_lost", "leaked"]),
+});
+export type ApiTokenRevokedPayload = z.infer<typeof ApiTokenRevokedPayload>;
+
+export const ApiTokenUsedPayload = z.object({
+  userId: z.string(),
+  actorUserId: z.string(),
+  organizationId: z.string().nullable(),
+  tokenId: z.string(),
+  scopes: z.array(z.string()),
+});
+export type ApiTokenUsedPayload = z.infer<typeof ApiTokenUsedPayload>;
+
+export const NotificationPreferenceUpdatedPayload = UserRef.extend({
+  category: z.string(),
+  channel: z.string(),
+  enabled: z.boolean(),
+  frequency: z.string(),
+});
+export type NotificationPreferenceUpdatedPayload = z.infer<
+  typeof NotificationPreferenceUpdatedPayload
+>;
+
+export const NotificationOrgPreferenceUpdatedPayload = OrgRef.extend({
+  actorUserId: z.string(),
+  category: z.string(),
+  channel: z.string(),
+  enabled: z.boolean(),
+  frequency: z.string(),
+  locked: z.boolean(),
+});
+export type NotificationOrgPreferenceUpdatedPayload = z.infer<
+  typeof NotificationOrgPreferenceUpdatedPayload
+>;
+
+// Subject and actor are the same person: both routes carry `denyImpersonated`
+// and the update is scoped to rows the caller owns, so no admin or system can
+// reach it on someone else's behalf. `userId` alone therefore satisfies §7 —
+// there is no second party to name, and `actorUserId` would only restate it.
+//
+// `notificationIds` carries what actually changed for an explicit selection
+// (bounded by the request body at 100). "Mark all as read" reports `count`
+// only: the unread set has no bound, and copying it into the outbox and the
+// audit row would buy a detail nobody reads at the price of rows of arbitrary
+// size.
+export const NotificationReadPayload = UserRef.extend({
+  scope: z.enum(["selection", "all"]),
+  count: z.number().int().positive(),
+  notificationIds: z.array(z.string()),
+});
+export type NotificationReadPayload = z.infer<typeof NotificationReadPayload>;
+
+const SsoProviderRef = z.object({
+  actorUserId: z.string(),
+  organizationId: z.string(),
+  providerId: z.string(),
+});
+
+export const SsoProviderRegisteredPayload = SsoProviderRef.extend({
+  protocol: z.enum(["saml", "oidc"]),
+  domain: z.string(),
+  issuer: z.string(),
+});
+export type SsoProviderRegisteredPayload = z.infer<typeof SsoProviderRegisteredPayload>;
+
+export const SsoProviderUpdatedPayload = SsoProviderRef.extend({
+  changedFields: z.array(z.string()),
+});
+export type SsoProviderUpdatedPayload = z.infer<typeof SsoProviderUpdatedPayload>;
+
+export const SsoProviderDeletedPayload = SsoProviderRef;
+export type SsoProviderDeletedPayload = z.infer<typeof SsoProviderDeletedPayload>;
+
+export const SsoDomainVerifiedPayload = SsoProviderRef.extend({ domain: z.string() });
+export type SsoDomainVerifiedPayload = z.infer<typeof SsoDomainVerifiedPayload>;
+
+export const SsoEnforcementChangedPayload = z.object({
+  actorUserId: z.string(),
+  organizationId: z.string(),
+  enforced: z.boolean(),
+  viaPlatformAdmin: z.boolean(),
+});
+export type SsoEnforcementChangedPayload = z.infer<typeof SsoEnforcementChangedPayload>;
+
+export const SsoLoginSuccessPayload = UserRef.extend({
+  providerId: z.string(),
+  organizationId: z.string().nullable(),
+  protocol: z.enum(["saml", "oidc"]),
+  jitProvisioned: z.boolean(),
+});
+export type SsoLoginSuccessPayload = z.infer<typeof SsoLoginSuccessPayload>;
+
+export const SsoLoginFailurePayload = z.object({
+  actorUserId: z.string().nullable(),
+  providerId: z.string().nullable(),
+  domain: z.string(),
+  reason: z.string(),
+  ip: z.string(),
+});
+export type SsoLoginFailurePayload = z.infer<typeof SsoLoginFailurePayload>;
+
+const ScimConnectionRef = z.object({
+  actorUserId: z.string(),
+  organizationId: z.string(),
+  providerId: z.string(),
+});
+
+export const ScimConnectionCreatedPayload = ScimConnectionRef;
+export type ScimConnectionCreatedPayload = z.infer<typeof ScimConnectionCreatedPayload>;
+
+export const ScimConnectionDeletedPayload = ScimConnectionRef;
+export type ScimConnectionDeletedPayload = z.infer<typeof ScimConnectionDeletedPayload>;
+
+const ScimUserRef = z.object({
+  userId: z.string(),
+  actorUserId: z.string().nullable(),
+  organizationId: z.string(),
+  scimProviderId: z.string(),
+  externalId: z.string().nullable(),
+});
+
+export const ScimUserCreatedPayload = ScimUserRef;
+export type ScimUserCreatedPayload = z.infer<typeof ScimUserCreatedPayload>;
+
+export const ScimUserUpdatedPayload = ScimUserRef.extend({
+  changedFields: z.array(z.string()),
+});
+export type ScimUserUpdatedPayload = z.infer<typeof ScimUserUpdatedPayload>;
+
+export const ScimUserDeactivatedPayload = ScimUserRef;
+export type ScimUserDeactivatedPayload = z.infer<typeof ScimUserDeactivatedPayload>;
+
+export const ScimUserDeprovisionedPayload = ScimUserRef;
+export type ScimUserDeprovisionedPayload = z.infer<typeof ScimUserDeprovisionedPayload>;
+
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,
   [EventTypes.USER_SIGNED_IN]: UserSignedInPayload,
@@ -444,6 +605,7 @@ export const PayloadByEventType = {
   [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: UserEmailChangeRequestedPayload,
   [EventTypes.USER_EXPORT_REQUESTED]: UserExportRequestedPayload,
   [EventTypes.USER_EXPORT_COMPLETED]: UserExportCompletedPayload,
+  [EventTypes.USER_LOCALE_CHANGED]: UserLocaleChangedPayload,
   [EventTypes.ORG_CREATED]: OrgCreatedPayload,
   [EventTypes.ORG_UPDATED]: OrgUpdatedPayload,
   [EventTypes.ORG_DELETED]: OrgDeletedPayload,
@@ -484,4 +646,23 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
+  [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
+  [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
+  [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
+  [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: NotificationPreferenceUpdatedPayload,
+  [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: NotificationOrgPreferenceUpdatedPayload,
+  [EventTypes.NOTIFICATION_READ]: NotificationReadPayload,
+  [EventTypes.SSO_PROVIDER_REGISTERED]: SsoProviderRegisteredPayload,
+  [EventTypes.SSO_PROVIDER_UPDATED]: SsoProviderUpdatedPayload,
+  [EventTypes.SSO_PROVIDER_DELETED]: SsoProviderDeletedPayload,
+  [EventTypes.SSO_DOMAIN_VERIFIED]: SsoDomainVerifiedPayload,
+  [EventTypes.SSO_ENFORCEMENT_CHANGED]: SsoEnforcementChangedPayload,
+  [EventTypes.SSO_LOGIN_SUCCESS]: SsoLoginSuccessPayload,
+  [EventTypes.SSO_LOGIN_FAILURE]: SsoLoginFailurePayload,
+  [EventTypes.SCIM_CONNECTION_CREATED]: ScimConnectionCreatedPayload,
+  [EventTypes.SCIM_CONNECTION_DELETED]: ScimConnectionDeletedPayload,
+  [EventTypes.SCIM_USER_CREATED]: ScimUserCreatedPayload,
+  [EventTypes.SCIM_USER_UPDATED]: ScimUserUpdatedPayload,
+  [EventTypes.SCIM_USER_DEACTIVATED]: ScimUserDeactivatedPayload,
+  [EventTypes.SCIM_USER_DEPROVISIONED]: ScimUserDeprovisionedPayload,
 } as const;

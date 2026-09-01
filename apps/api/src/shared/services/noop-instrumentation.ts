@@ -11,4 +11,5 @@ export class NoOpInstrumentation implements IInstrumentation {
   }
   capture(_error: unknown, _context?: ErrorContext): void {}
   addBreadcrumb(_crumb: Breadcrumb): void {}
+  setSpanAttributes(_attributes: Record<string, string | number | boolean>): void {}
 }

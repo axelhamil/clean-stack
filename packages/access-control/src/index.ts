@@ -13,6 +13,7 @@ const statement = {
   billing: ["read", "manage"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
+  apiToken: ["create", "read", "revoke"],
 } as const;
 
 const _ac = createAccessControl(statement);
@@ -23,6 +24,7 @@ const _owner = _ac.newRole({
   billing: ["read", "manage"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
+  apiToken: ["create", "read", "revoke"],
 });
 
 const _admin = _ac.newRole({
@@ -31,6 +33,7 @@ const _admin = _ac.newRole({
   billing: ["read"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
+  apiToken: ["create", "read", "revoke"],
 });
 
 const _member = _ac.newRole({
@@ -64,6 +67,10 @@ export function authorizeRole(
     authorize: (p: OrgPermissions, c?: "OR" | "AND") => { success: boolean };
   };
   return policy.authorize(permissions, connector).success;
+}
+
+export function rolesWith(permissions: OrgPermissions): OrgRole[] {
+  return ORG_ROLES.filter((role) => authorizeRole(role, permissions));
 }
 
 export const ac = _ac as unknown as AccessControl;

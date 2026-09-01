@@ -44,6 +44,10 @@ your code           ─►  uow.run(async tx => repo.save(aggregate, tx))
   → audit_log row               → webhook_delivery rows              (auto-discovered via
   (idempotent via               (HMAC POST → consumers via            EVENT_HANDLER_SYMBOL)
   audit-${eventId})             WebhookDeliveryWorker)
+
+  NotificationFanoutSubscriber
+  → notification rows (preference cascade resolved
+    in the INSERT; forced events bypass it)
 ```
 
 **Key invariant**: built-in subscribers run inside the same DB transaction as `markDispatched` — atomic. User handlers run **post-commit**, best-effort, isolated from each other (one handler throwing doesn't fail the outbox dispatch).
@@ -234,14 +238,16 @@ Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. During a secret rotatio
 Reject if timestamp drift > 5 min (replay protection). Use the `x-webhook-idempotency` header (`<eventId>:<endpointId>`) to dedupe on your side.
 
 ```ts
-// Receiver verification
+// Receiver verification — the shipped copy-paste version lives in
+// apps/app/src/features/webhooks/components/verify-snippet.tsx
 const sigHeader = req.headers["x-webhook-signature"];
-const [tsPart, sigPart] = sigHeader.split(",");
-const ts = Number(tsPart.split("=")[1]);
-const sig = sigPart.split("=")[1];
+const ts = Number(sigHeader.match(/t=([^,]+)/)?.[1]);
+// Number("abc") is NaN and NaN > 300 is false, so the finite check is load-bearing.
+if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 const expected = hmacSha256(`${ts}.${rawBody}`, secret);
-if (!timingSafeEqual(sig, expected)) return reject(401);
-if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
+// Every v1= value, not the first — during rotation both secrets sign.
+const provided = sigHeader.match(/v1=([0-9a-f]+)/g)?.map((m) => m.slice(3)) ?? [];
+if (!provided.some((sig) => timingSafeEqual(sig, expected))) return reject(401);
 ```
 
 ## Architecture choices (SOTA 2026)
@@ -253,11 +259,73 @@ if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 - **AEAD secret encryption** (`@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key) for webhook secrets at rest.
 - **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`) — `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Dead-letter after 5 attempts.
 - **Claim window pattern** in delivery worker — claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
-- **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id` — captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context — Phase D.1 OTel.)
+- **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id` — captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context, unused until OTel is wired.)
+
+## Visibility — public vs internal events
+
+`packages/events/src/visibility-map.ts` is the **single-source allowlist** that determines whether an event is a public contract or an internal signal. Every `EventType` is classified as `"public"` or `"internal"`.
+
+```ts
+// visibility-map.ts
+export const VISIBILITY = {
+  "api_token.created": "public",
+  "api_token.revoked": "public",
+  "api_token.used":    "internal", // sampled high-volume signal, not a customer contract
+  "webhook.endpoint.created": "internal", // operational plumbing, not customer-observable state
+  // ...
+} satisfies Record<EventType, Visibility>;
+```
+
+**Why the allowlist matters.** An event that is "public" is a **contract**: once a customer writes an integration against it, renaming the event type or dropping a payload field is a breaking change. Internal events can be renamed, reshaped, or removed at any time without notice. The classification forces a deliberate review in every PR that promotes an event to public — that's the point.
+
+Three surfaces consume the visibility map simultaneously:
+
+| Consumer | Where | Effect |
+|---|---|---|
+| `WebhookFanoutSubscriber` | `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Only public events are fanned out to customer webhook endpoints. Internal events skip fanout entirely. |
+| `EventTypePicker` + `webhookFormSchema` | `apps/app/src/features/webhooks/forms/event-type-picker.tsx` + `webhooks.schema.ts` | The subscription picker shows only `SUBSCRIBABLE_EVENT_TYPES` (public events). The Zod schema rejects any internal event type as a selector. |
+| `/developers/events` catalog | `apps/app/src/features/developers/components/event-types-table.tsx` | Only public events are listed in the public-facing event catalog page. |
+
+Changing a public event type string or removing a payload field requires a changelog entry and a deprecation window. Promoting a new event to public is permanent — plan for it in the PR review.
+
+## Notifications — catalogue de notifiabilité
+
+`packages/events/src/notification-map.ts` est la **troisième projection** du catalogue d'événements, après `visibility-map.ts` (webhooks) et `retention-map.ts` (purge).
+
+```ts
+// notification-map.ts
+export const NOTIFICATION_MAP = {
+  "billing.payment.failed": { audience: { can: { billing: ["read"] } }, category: "billing", forced: true },
+  "org.member.joined":      { audience: { can: { organization: ["update"] } }, category: "org", groupBy: "resource" },
+  // ...
+} satisfies Partial<Record<EventType, NotificationConfig>>;
+```
+
+**Ce que cette projection projette.** Pour chaque type d'événement listé, elle déclare :
+- `audience` — qui doit recevoir la notification : `"self"` (l'utilisateur concerné), `"actor"`, `"org:all"`, ou `{ can: OrgPermissions }` (les membres dont le rôle porte la capability). La résolution capability→roles est faite par `rolesWith(audience.can)` (`@packages/access-control`) et reste cohérente avec le reste des gates de l'app.
+- `category` — regroupement UI (`security`, `org`, `billing`, `activity`).
+- `forced?: true` — contourne les préférences utilisateur et le batching email (bypass critique du SOTA).
+- `groupBy` et `dedupWindow` — fenêtre de déduplication et clé de regroupement lecteur (style Linear "X et 3 autres").
+
+**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement — une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) et le passage à l'état lu (`notification.read`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **82 événements / 35 publics / 47 internes**.
+
+**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 82 événements sont audit-only).
+
+**La cascade de préférences est résolue dans la requête d'insertion**, jamais en amont ni destinataire par destinataire : un `LEFT JOIN notification_preference` par portée et par canal, sur le même `INSERT ... SELECT`.
+
+```
+ligne org verrouillée  >  ligne utilisateur  >  ligne org (défaut non verrouillé)  >  activé
+```
+
+Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du tout), le canal email décide d'un `CASE` qui remplit ou non `emailPendingAt` : couper l'email sans couper l'in-app produit donc une notification sans envoi en attente. Un événement `forced` court-circuite les quatre niveaux et n'émet même pas les jointures.
+
+**Pourquoi dans le SQL et pas dans un service.** L'audience d'organisation est un `INSERT ... SELECT` sur `member` : résoudre les préférences en TypeScript imposerait soit une boucle par destinataire, soit un pré-chargement de toutes les lignes de préférence de l'organisation. Un service `resolve()` a existé en parallèle du fan-out sans jamais être appelé, et sa cascade avait déjà divergé (il ignorait les défauts d'organisation non verrouillés) — il a été supprimé. **Une seule implémentation, à l'endroit où elle s'applique.**
+
+**Vérification.** `pnpm --filter api check:fanout` (`apps/api/scripts/check-fanout-preferences.ts`) exécute 8 cas contre Postgres : in-app coupé, email coupé seul, `forced`, aucune préférence, filtrage d'un membre dans une audience d'organisation, verrou d'organisation contre choix utilisateur, défaut d'organisation appliqué, choix utilisateur prioritaire sur un défaut. `pnpm --filter api check:digest` (`apps/api/scripts/check-digest-window.ts`) en exécute 19 de plus sur la fenêtre de regroupement : les trois cadences (`immediate` / `hourly` / `daily`) et l'échéance qu'elles écrivent dans `email_pending_at`, l'immunité des événements `forced`, la fenêtre vide qui n'envoie rien, le regroupement en un seul e-mail, et le bail de `flush-notification-emails` face à deux exécutions concurrentes. **À relancer après toute modification du fan-out** : aucun test unitaire ne peut couvrir ces cas, une transaction mockée n'évalue aucun `WHERE` et le dépôt n'a pas de harnais d'intégration base. C'est ce script, et lui seul, qui a révélé qu'un `CASE WHEN ... THEN $date` casse l'inférence de type de Postgres (cast `::timestamp` obligatoire).
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **62 events** (57 subscribable + 5 internal) automatically. Sources: 23 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 new internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle). Source of truth: `packages/events/src/event-types.ts`. **Internal events** (`webhook.test`, `webhook.endpoint.secret_rotated`, `webhook.endpoint.disabled`, `webhook.delivery.exhausted`, `email.delivery.exhausted`) are non-subscribable and never fan out to user endpoints — they use the delivery worker directly for test deliveries and skip `WebhookFanoutSubscriber` for lifecycle signals.
+The boilerplate emits **82 events** (35 public + 47 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used), **3 from `modules/notifications/`** (Phase D.3 — preference.updated, org_preference.updated, read), **13 from `sso`/`scim`** (Phase C.7 — 7 `sso.*` provider/domain/enforcement/login events + 6 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a — `user.locale.changed`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -356,6 +424,24 @@ Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quo
 
 - `BILLING_QUOTA_EXCEEDED` (`billing.quota.exceeded`) — emitted on quota ceiling hit. Payload: `{ organizationId, resource: string, limit: number, attempted: number, tier: string, actorUserId: string }`, retention `operational`.
 
+### Via `auth.ts` `hooks.after` (Phase C.7 — `@better-auth/sso` / `@better-auth/scim`)
+
+All 13 events emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth.ts`'s `hooks.after`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). SCIM endpoints authenticate with a bearer token, not a session — the actor is resolved from the connection row (`scimConnectionOwner`), not `ctx.context.session`.
+
+- `SSO_PROVIDER_REGISTERED` (`sso.provider.registered`) — `path === SSO_PATHS.register`. Payload: `{ actorUserId, organizationId, providerId, protocol: "oidc" | "saml", domain }`, retention `internal`.
+- `SSO_PROVIDER_UPDATED` (`sso.provider.updated`) — `path === SSO_PATHS.updateProvider`. Payload includes `changedFields: string[]`.
+- `SSO_PROVIDER_DELETED` (`sso.provider.deleted`) — `path === SSO_PATHS.deleteProvider`. The provider row is gone by the time `hooks.after` runs, so a pre-delete snapshot (`ssoProviderDeleteSnapshots`, keyed on `providerId`) supplies `organizationId` for the payload.
+- `SSO_DOMAIN_VERIFIED` (`sso.domain.verified`) — `path === SSO_PATHS.verifyDomain`, only after the endpoint's own DNS TXT check succeeds.
+- `SSO_ENFORCEMENT_CHANGED` (`sso.enforcement.changed`) — emitted by `AdminActionService.setSsoEnforcement` (`POST /settings/organization/sso-enforcement`, `organization:["update"]`), not a `hooks.after` path — the only one of the 13 not routed through the SSO/SCIM plugin's own endpoints.
+- `SSO_LOGIN_SUCCESS` (`sso.login.success`) — public. Payload: `{ userId, providerId, organizationId, protocol, jitProvisioned: boolean }`. `jitProvisioned` is a heuristic (`user.createdAt` within the last 10s of the login), not a plugin-native flag.
+- `SSO_LOGIN_FAILURE` (`sso.login.failure`) — public. Emitted from the plugin's own error redirect path; `providerId` may be `"unknown"` when the failure happens before a provider is resolved.
+- `SCIM_CONNECTION_CREATED` (`scim.connection.created`) — `path === SCIM_PATHS.generateToken`.
+- `SCIM_CONNECTION_DELETED` (`scim.connection.deleted`) — `path === SCIM_PATHS.deleteConnection`. Same pre-delete-snapshot pattern as `SSO_PROVIDER_DELETED` (`scimConnectionDeleteSnapshots`).
+- `SCIM_USER_CREATED` (`scim.user.created`) — public. `path.startsWith(SCIM_PATHS.users) && method === "POST"`.
+- `SCIM_USER_UPDATED` (`scim.user.updated`) — public. `PUT`/`PATCH` that is not a deactivation (`isDeactivation(body)` false). Payload carries `changedFields` (`changedFieldsFrom(body)` — PATCH `Operations[].path`, or top-level PUT keys minus `schemas`).
+- `SCIM_USER_DEACTIVATED` (`scim.user.deactivated`) — public. `PUT`/`PATCH` where `isDeactivation(body)` is true (`active: false`, either as a top-level PUT field or a PATCH `replace` operation on `path: "active"` — both shapes IdPs actually send, per `sso-paths.ts`).
+- `SCIM_USER_DEPROVISIONED` (`scim.user.deprovisioned`) — public. `DELETE`. **This removes only the `member` row for the owning org** — the global `user` row (and any other org membership) is untouched. A SCIM deprovision is an org departure, not an account deletion; it does not route through the RGPD grace-period wipe.
+
 ## Payload validation guarantee
 
 Every `outbox.enqueue(...)` call validates each event against `PayloadByEventType[eventType]` via Zod `safeParse` **before** the INSERT. A failure throws, which rolls back the surrounding TX (UoW or BetterAuth hook). **Why**: the audit trail is only as good as the payloads it stores — a missing `actorUserId`, an extra field, a wrong type silently corrupts compliance. Failing the mutation forces the bug to surface at the call site, atomically (the business write and the bad event are rejected together, never half-applied).
@@ -387,7 +473,8 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (62 events: 57 subscribable + 5 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (82 events: 35 public + 47 internal) |
+| `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |

@@ -58,6 +58,9 @@ mock.module("../../../container", () => ({
       findDelivery: mockFindDelivery,
       replayDelivery: mockReplayDelivery,
     },
+    PolicyAcceptanceService: {
+      hasAcceptedCurrent: mock(async () => Result.ok(true)),
+    },
   },
 }));
 

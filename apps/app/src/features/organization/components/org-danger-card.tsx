@@ -9,11 +9,12 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-action-dialog";
-import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { navLinkVariants } from "@packages/ui/components/ui/nav-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { deleteOrgMutationOptions } from "../../../shared/api/mutations/delete-org";
@@ -30,12 +31,13 @@ import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
 import { TransferLeaveDialog } from "./transfer-leave-dialog";
 
 export function OrgDangerCard() {
+  const { t } = useTranslation("settings");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { role } = useAuthorization();
   const { switchOrg } = useSetActiveOrg();
-  const { data: membership } = useQuery(currentMembershipQueryOptions);
+  const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
   const { data: members = [] } = useQuery(
     org ? orgMembersQueryOptions(org.id) : { ...orgMembersQueryOptions(""), enabled: false },
   );
@@ -47,20 +49,20 @@ export function OrgDangerCard() {
     } else {
       broadcastAuthChange();
     }
-    toast.success("Left organization");
+    toast.success(t("organization.leftOrgToast"));
     void navigate({ to: "/dashboard" });
   };
 
   const leave = useMutation({
     ...leaveOrgMutationOptions,
     onSuccess: onLeaveSuccess,
-    onError: (err) => toastError(err, "Failed to leave"),
+    onError: (err) => toastError(err, t("organization.leaveFailed")),
   });
 
   const transferAndLeave = useMutation({
     ...transferAndLeaveMutationOptions,
     onSuccess: onLeaveSuccess,
-    onError: (err) => toastError(err, "Failed to transfer and leave"),
+    onError: (err) => toastError(err, t("organization.transferAndLeaveFailed")),
   });
 
   const remove = useMutation({
@@ -71,10 +73,10 @@ export function OrgDangerCard() {
         queryClient.refetchQueries({ queryKey: orgsListQueryOptions.queryKey }),
       ]);
       broadcastAuthChange();
-      toast.success("Organization deleted");
+      toast.success(t("organization.orgDeletedToast"));
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => toastError(err, "Failed to delete"),
+    onError: (err) => toastError(err, t("organization.deleteFailed")),
   });
 
   if (!org) return null;
@@ -89,15 +91,18 @@ export function OrgDangerCard() {
         <Can requires={{ organization: ["leave"] }}>
           <Card>
             <CardHeader>
-              <CardTitle variant="destructive">Leave organization</CardTitle>
-              <CardDescription>You will lose access to its resources.</CardDescription>
+              <CardTitle variant="destructive">{t("organization.leaveOrgLabel")}</CardTitle>
+              <CardDescription>{t("organization.leaveOrgCardDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <Alert variant="destructive">
                 <AlertTriangleIcon />
                 <AlertDescription>
-                  You will lose access to <strong>{org.name}</strong> and all its resources. You
-                  will need a new invitation to rejoin.
+                  <Trans
+                    ns="settings"
+                    i18nKey="organization.leaveOrgAlertDescription"
+                    components={{ orgName: <strong>{org.name}</strong> }}
+                  />
                 </AlertDescription>
               </Alert>
               {needsTransfer ? (
@@ -115,7 +120,7 @@ export function OrgDangerCard() {
                       className="self-start"
                       disabled={transferAndLeave.isPending}
                     >
-                      Leave organization
+                      {t("organization.leaveOrgLabel")}
                     </Button>
                   }
                 />
@@ -123,16 +128,18 @@ export function OrgDangerCard() {
                 <DestructiveActionDialog
                   trigger={
                     <Button variant="destructive" className="self-start" disabled={leave.isPending}>
-                      Leave organization
+                      {t("organization.leaveOrgLabel")}
                     </Button>
                   }
-                  title="Leave organization"
+                  title={t("organization.leaveOrgLabel")}
                   description={
-                    <>
-                      You will lose access to <strong>{org.name}</strong> and its resources.
-                    </>
+                    <Trans
+                      ns="settings"
+                      i18nKey="organization.leaveOrgDialogDescription"
+                      components={{ orgName: <strong>{org.name}</strong> }}
+                    />
                   }
-                  actionLabel="Leave organization"
+                  actionLabel={t("organization.leaveOrgLabel")}
                   isPending={leave.isPending}
                   onConfirm={() => leave.mutate({ organizationId: org.id })}
                 />
@@ -144,28 +151,39 @@ export function OrgDangerCard() {
       <Can requires={{ organization: ["delete"] }}>
         <Card>
           <CardHeader>
-            <CardTitle variant="destructive">Delete organization</CardTitle>
+            <CardTitle variant="destructive">{t("organization.deleteOrgLabel")}</CardTitle>
             <CardDescription>
               {personal
-                ? "Personal organizations cannot be deleted."
-                : "All members, invitations, and data will be permanently removed."}
+                ? t("organization.deleteOrgDescriptionPersonal")
+                : t("organization.deleteOrgDescriptionRegular")}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {personal ? (
               <TypographyMuted>
-                <NavLink asChild variant="underline">
-                  <Link to="/settings/account">Delete your account in Account settings</Link>
-                </NavLink>{" "}
-                to remove this organization.
+                <Trans
+                  ns="settings"
+                  i18nKey="organization.deleteAccountToRemoveOrg"
+                  components={{
+                    accountLink: (
+                      <Link
+                        to="/settings/account"
+                        className={navLinkVariants({ variant: "underline" })}
+                      />
+                    ),
+                  }}
+                />
               </TypographyMuted>
             ) : (
               <>
                 <Alert variant="destructive">
                   <AlertTriangleIcon />
                   <AlertDescription>
-                    Deleting <strong>{org.name}</strong> will permanently delete all members,
-                    invitations, and data. This action cannot be undone.
+                    <Trans
+                      ns="settings"
+                      i18nKey="organization.deleteOrgAlertDescription"
+                      components={{ orgName: <strong>{org.name}</strong> }}
+                    />
                   </AlertDescription>
                 </Alert>
                 <DestructiveActionDialog
@@ -175,13 +193,13 @@ export function OrgDangerCard() {
                       className="self-start"
                       disabled={remove.isPending}
                     >
-                      Delete organization
+                      {t("organization.deleteOrgLabel")}
                     </Button>
                   }
-                  title="Delete organization"
-                  description="This action cannot be undone. All members, invitations, and data attached to this organization will be permanently removed."
+                  title={t("organization.deleteOrgLabel")}
+                  description={t("organization.deleteOrgDialogDescription")}
                   confirmText={org.name}
-                  actionLabel="Delete organization"
+                  actionLabel={t("organization.deleteOrgLabel")}
                   isPending={remove.isPending}
                   onConfirm={() => remove.mutate({ organizationId: org.id })}
                 />

@@ -29,6 +29,7 @@ function makeNoop(): IInstrumentation {
     startSpan: (_opts: unknown, cb: () => unknown) => cb(),
     capture: () => {},
     addBreadcrumb: () => {},
+    setSpanAttributes: () => {},
   } as unknown as IInstrumentation;
 }
 

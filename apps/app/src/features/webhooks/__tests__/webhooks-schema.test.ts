@@ -34,10 +34,9 @@ describe("webhookFormSchema", () => {
 });
 
 describe("groupedSubscribableEvents", () => {
-  it("groups by prefix and excludes internal webhook events", () => {
+  it("has no 'webhook' group because all webhook.* events are internal (C.5 curation decision)", () => {
     const groups = groupedSubscribableEvents();
     const webhook = groups.find((g) => g.group === "webhook");
-    expect(webhook?.events).not.toContain("webhook.test");
-    expect(webhook?.events).toContain("webhook.endpoint.created");
+    expect(webhook).toBeUndefined();
   });
 });

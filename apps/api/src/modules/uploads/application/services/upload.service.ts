@@ -1,4 +1,4 @@
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
@@ -57,10 +57,7 @@ export interface CreateDownloadUrlOutput {
   expiresAt: string;
 }
 
-export interface DeleteUploadInput {
-  ownerId: string;
-  key: string;
-}
+export type DeleteUploadInput = { ownerId: string } & ({ key: string } | { url: string });
 
 export class UploadService {
   constructor(
@@ -155,27 +152,34 @@ export class UploadService {
     );
   }
 
-  async deleteUpload(input: DeleteUploadInput): Promise<Result<void, StorageError>> {
+  async deleteUpload(
+    input: DeleteUploadInput,
+  ): Promise<Result<{ deleted: boolean }, StorageError>> {
     return this.instrumentation.startSpan(
       { name: "UploadService > deleteUpload", op: "function" },
       async () => {
-        if (!input.key.startsWith(`${input.ownerId}/`)) {
+        const resolved =
+          "key" in input ? Option.some(input.key) : this.storage.keyFromPublicUrl(input.url);
+        if (resolved.isNone()) return Result.ok({ deleted: false });
+        const key = resolved.unwrap();
+
+        if (!key.startsWith(`${input.ownerId}/`)) {
           return Result.fail({
             code: "STORAGE_FORBIDDEN",
             message: "key does not belong to the requesting owner",
           });
         }
 
-        const deleted = await this.storage.deleteObject(input.key);
+        const deleted = await this.storage.deleteObject(key);
         if (deleted.isFailure) return Result.fail(deleted.getError());
 
-        const hashedKey = await hashKey(input.key);
+        const hashedKey = await hashKey(key);
         await emitEvent(this.outbox, EventTypes.UPLOAD_DELETED, "upload", hashedKey, {
           userId: input.ownerId,
           key: hashedKey,
         });
 
-        return Result.ok(undefined);
+        return Result.ok({ deleted: true });
       },
     );
   }

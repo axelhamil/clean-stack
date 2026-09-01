@@ -34,13 +34,26 @@ export function FormTextField<
     <FormField
       control={control}
       name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
+      render={({ field }) => {
+        // FormControl forwards the generated id onto its single child — it has to wrap
+        // the input itself, never the reveal-button wrapper, or the label labels a div.
+        const input = (
           <FormControl>
+            <Input
+              type={inputType}
+              className={isPassword ? "pr-10" : undefined}
+              {...inputProps}
+              {...field}
+            />
+          </FormControl>
+        );
+
+        return (
+          <FormItem>
+            <FormLabel>{label}</FormLabel>
             {isPassword ? (
               <div className="relative">
-                <Input type={inputType} className="pr-10" {...inputProps} {...field} />
+                {input}
                 <Button
                   type="button"
                   variant="ghost"
@@ -54,13 +67,13 @@ export function FormTextField<
                 </Button>
               </div>
             ) : (
-              <Input type={type} {...inputProps} {...field} />
+              input
             )}
-          </FormControl>
-          {description ? <FormDescription>{description}</FormDescription> : null}
-          <FormMessage />
-        </FormItem>
-      )}
+            {description ? <FormDescription>{description}</FormDescription> : null}
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }

@@ -1,12 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
 
 export function useSignInPasskey(redirectTo?: string) {
+  const { t } = useTranslation("auth");
+  const { t: tErrors } = useTranslation("errors");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
@@ -24,11 +28,14 @@ export function useSignInPasskey(redirectTo?: string) {
       if (result?.error) {
         const msg = result.error.message?.toLowerCase() ?? "";
         if (msg.includes("not allowed") || msg.includes("cancel")) throw new Error("Cancelled");
-        throw new Error(result.error.message ?? "Passkey sign-in failed");
+        // The passkey leg is server-enforced like the three email-bearing ones, so it
+        // gets the same redirect rather than a bare `SSO_REQUIRED` toast.
+        if (await redirectToSsoIfRequired(result.error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+        throw new Error(resolveAuthError(result.error, "passkey.failed", t, tErrors));
       }
     },
     onSuccess: async () => {
-      toast.success("Welcome back");
+      toast.success(t("signIn.success"));
       await queryClient.refetchQueries({
         queryKey: sessionQueryOptions.queryKey,
       });
@@ -36,7 +43,12 @@ export function useSignInPasskey(redirectTo?: string) {
       void navigate({ to: redirectTo ?? "/" });
     },
     onError: (err) => {
-      if (err.name === "AbortError" || err.message === "Cancelled") return;
+      if (
+        err.name === "AbortError" ||
+        err.message === "Cancelled" ||
+        err.message === SSO_REDIRECT_IN_PROGRESS
+      )
+        return;
       toast.error(err.message);
     },
   });

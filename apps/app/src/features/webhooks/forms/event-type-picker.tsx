@@ -1,5 +1,6 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
+import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
   group: string;
@@ -28,6 +29,7 @@ interface EventTypePickerProps {
 }
 
 export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
+  const { t } = useTranslation("settings");
   const groups = groupedSubscribableEvents();
   const selected = new Set(value);
   const allSelected = selected.has("*");
@@ -40,11 +42,15 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="max-h-[45vh] space-y-4 overflow-y-auto pr-1">
       {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
       <label className="flex items-center gap-2">
-        <Checkbox checked={allSelected} onCheckedChange={(c) => toggle("*", c === true)} />
-        <span className="font-medium">All events (*)</span>
+        <Checkbox
+          className="shrink-0"
+          checked={allSelected}
+          onCheckedChange={(c) => toggle("*", c === true)}
+        />
+        <span className="font-medium">{t("webhooks.eventTypePicker.allEvents")}</span>
       </label>
       {groups.map((g) => {
         const groupSelected = selected.has(g.wildcard);
@@ -58,21 +64,24 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                 onCheckedChange={(c) => toggle(g.wildcard, c === true)}
               />
               <span className="font-medium capitalize">
-                {g.group}.* (all {g.group} events)
+                {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
               </span>
             </label>
             <div className="ml-6 space-y-1">
               {g.events.map((type) => {
                 return (
                   // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally
-                  <label key={type} className="flex items-center gap-2 text-sm">
+                  <label key={type} className="flex items-start gap-2 text-sm">
                     <Checkbox
+                      className="mt-0.5 shrink-0"
                       checked={groupSelected || allSelected || selected.has(type)}
                       disabled={groupSelected}
                       onCheckedChange={(c) => toggle(type, c === true)}
                     />
-                    <span className="font-mono">{type}</span>
-                    <span className="text-muted-foreground">{descriptionFor(type)}</span>
+                    <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                      <span className="break-all font-mono">{type}</span>
+                      <span className="text-muted-foreground">{descriptionFor(type)}</span>
+                    </span>
                   </label>
                 );
               })}

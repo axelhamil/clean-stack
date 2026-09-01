@@ -3,6 +3,7 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { useAddPasskey } from "../hooks/use-add-passkey";
 import { type AddPasskeyInput, addPasskeySchema } from "../security.schema";
 
@@ -11,6 +12,7 @@ interface AddPasskeyFormProps {
 }
 
 export function AddPasskeyForm({ onSuccess }: AddPasskeyFormProps = {}) {
+  const { t } = useTranslation("settings");
   const mutation = useAddPasskey();
 
   const form = useForm<AddPasskeyInput>({
@@ -30,12 +32,12 @@ export function AddPasskeyForm({ onSuccess }: AddPasskeyFormProps = {}) {
         <FormTextField
           control={form.control}
           name="name"
-          label="Name"
-          placeholder="MacBook Touch ID"
+          label={t("passkeys.nameLabel")}
+          placeholder={t("passkeys.namePlaceholder")}
           autoComplete="off"
         />
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Waiting for device…" : "Add passkey"}
+          {mutation.isPending ? t("passkeys.waitingForDevice") : t("passkeys.add")}
         </Button>
       </form>
     </Form>

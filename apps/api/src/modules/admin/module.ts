@@ -29,6 +29,7 @@ export const adminModule = defineModule()((b) =>
       notifyImpersonatedUser({
         IEmailService: c.IEmailService,
         AdminQueryService: c.AdminQueryService,
+        IProfileStore: c.IProfileStore,
         IInstrumentation: c.IInstrumentation,
         supportUrl: `${env.APP_URL}/support`,
       }),

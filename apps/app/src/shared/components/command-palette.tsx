@@ -30,6 +30,7 @@ import {
 } from "@packages/ui/components/ui/command";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import {
   BookOpen,
   Building2,
@@ -50,6 +51,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toastError, toastSuccess } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
@@ -87,40 +89,47 @@ const SIGN_OUT_SHORTCUT: CommandShortcutBinding = {
 
 interface NavigationRoute {
   to: string;
-  label: string;
+  labelKey:
+    | "nav.dashboard"
+    | "commandPalette.nav.organization"
+    | "commandPalette.nav.billing"
+    | "commandPalette.nav.webhooks"
+    | "commandPalette.nav.account"
+    | "commandPalette.nav.privacy"
+    | "commandPalette.nav.eventCatalog";
   icon: LucideIcon;
   requires?: OrgPermissions;
   requiresOrg?: boolean;
 }
 
 const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   {
     to: "/settings/organization",
-    label: "Settings — Organization",
+    labelKey: "commandPalette.nav.organization",
     icon: Users,
     requiresOrg: true,
   },
   {
     to: "/settings/billing",
-    label: "Settings — Billing",
+    labelKey: "commandPalette.nav.billing",
     icon: CreditCard,
     requires: { billing: ["manage"] },
     requiresOrg: true,
   },
   {
     to: "/settings/webhooks",
-    label: "Settings — Webhooks",
+    labelKey: "commandPalette.nav.webhooks",
     icon: Webhook,
     requires: { webhooks: ["read"] },
     requiresOrg: true,
   },
-  { to: "/settings/account", label: "Settings — Account", icon: User },
-  { to: "/settings/privacy", label: "Settings — Privacy", icon: ShieldCheck },
-  { to: "/developers/events", label: "Developers — Event catalog", icon: BookOpen },
+  { to: "/settings/account", labelKey: "commandPalette.nav.account", icon: User },
+  { to: "/settings/privacy", labelKey: "commandPalette.nav.privacy", icon: ShieldCheck },
+  { to: "/developers/events", labelKey: "commandPalette.nav.eventCatalog", icon: BookOpen },
 ];
 
-function useNavigationGroup(): CommandGroupConfig {
+function useNavigationGroup(t: TFunction<"common">): CommandGroupConfig {
   const navigate = useNavigate();
   const { can, hasMembership } = useAuthorization();
   const visible = NAVIGATION_ROUTES.filter((route) => {
@@ -129,17 +138,17 @@ function useNavigationGroup(): CommandGroupConfig {
     return true;
   });
   return {
-    heading: "Navigate",
+    heading: t("commandPalette.groups.navigate"),
     items: visible.map((route) => ({
       id: `nav:${route.to}`,
-      label: route.label,
+      label: t(route.labelKey),
       icon: route.icon,
       run: () => navigate({ to: route.to }),
     })),
   };
 }
 
-function useOrganizationGroup(): CommandGroupConfig | null {
+function useOrganizationGroup(t: TFunction<"common">): CommandGroupConfig | null {
   const navigate = useNavigate();
   const { data: orgs = [] } = useQuery(orgsListQueryOptions);
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
@@ -148,14 +157,14 @@ function useOrganizationGroup(): CommandGroupConfig | null {
   if (orgs.length === 0) return null;
 
   return {
-    heading: "Switch organization",
+    heading: t("commandPalette.groups.switchOrganization"),
     items: [
       ...orgs.map<CommandEntry>((org) => ({
         id: `org:${org.id}`,
         label: org.name,
         icon: Building2,
         searchValue: org.slug,
-        hint: org.id === activeOrg?.id ? "active" : undefined,
+        hint: org.id === activeOrg?.id ? t("commandPalette.organizationActive") : undefined,
         run: async () => {
           if (org.id !== activeOrg?.id) await switchOrg(org.id);
           void navigate({ to: "/dashboard" });
@@ -163,7 +172,7 @@ function useOrganizationGroup(): CommandGroupConfig | null {
       })),
       {
         id: "org:new",
-        label: "New organization",
+        label: t("orgSwitcher.newOrganization"),
         icon: Plus,
         run: () => navigate({ to: "/org/new" }),
       },
@@ -174,7 +183,10 @@ function useOrganizationGroup(): CommandGroupConfig | null {
 interface OperatorRoute {
   id: string;
   to: string;
-  label: string;
+  labelKey:
+    | "commandPalette.admin.auditLog"
+    | "commandPalette.admin.accounts"
+    | "commandPalette.admin.organizations";
   icon: LucideIcon;
 }
 
@@ -182,90 +194,103 @@ const OPERATOR_ROUTES: readonly OperatorRoute[] = [
   {
     id: "operator:audit-log",
     to: "/admin/audit-log",
-    label: "Admin — Audit log",
+    labelKey: "commandPalette.admin.auditLog",
     icon: ScrollText,
   },
-  { id: "operator:users", to: "/admin/users", label: "Admin — Accounts", icon: Users },
-  { id: "operator:orgs", to: "/admin/orgs", label: "Admin — Organizations", icon: Building2 },
+  {
+    id: "operator:users",
+    to: "/admin/users",
+    labelKey: "commandPalette.admin.accounts",
+    icon: Users,
+  },
+  {
+    id: "operator:orgs",
+    to: "/admin/orgs",
+    labelKey: "commandPalette.admin.organizations",
+    icon: Building2,
+  },
 ];
 
-function useOperatorGroup(): CommandGroupConfig | null {
+function useOperatorGroup(t: TFunction<"common">): CommandGroupConfig | null {
   const navigate = useNavigate();
   const { data: session } = useQuery(sessionQueryOptions);
   if (!isPlatformAdmin(session)) return null;
   return {
-    heading: "Admin",
+    heading: t("commandPalette.groups.admin"),
     items: OPERATOR_ROUTES.map((route) => ({
       id: route.id,
-      label: route.label,
+      label: t(route.labelKey),
       icon: route.icon,
       run: () => navigate({ to: route.to }),
     })),
   };
 }
 
-function useLegalGroup(): CommandGroupConfig {
+function useLegalGroup(t: TFunction<"common">): CommandGroupConfig {
   const navigate = useNavigate();
   return {
-    heading: "Legal & privacy",
+    heading: t("commandPalette.groups.legal"),
     items: LEGAL_ROUTES.map((route) => ({
       id: `legal:${route.to}`,
-      label: route.label,
+      label: t(route.labelKey),
       icon: route.icon,
       run: () => navigate({ to: route.to }),
     })),
   };
 }
 
-const THEME_OPTIONS = [
-  { value: "light", label: "Theme: Light", icon: Sun },
-  { value: "dark", label: "Theme: Dark", icon: Moon },
-  { value: "system", label: "Theme: System", icon: Monitor },
-] as const;
+function useThemeOptions(t: TFunction<"common">) {
+  return [
+    { value: "light", label: t("commandPalette.theme.light"), icon: Sun },
+    { value: "dark", label: t("commandPalette.theme.dark"), icon: Moon },
+    { value: "system", label: t("commandPalette.theme.system"), icon: Monitor },
+  ] as const;
+}
 
-function useActionsGroup(): CommandGroupConfig {
+function useActionsGroup(t: TFunction<"common">): CommandGroupConfig {
   const { setTheme, theme } = useTheme();
   const signOut = useSignOut();
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
+  const themeOptions = useThemeOptions(t);
 
-  const items: CommandEntry[] = THEME_OPTIONS.map((option) => ({
+  const items: CommandEntry[] = themeOptions.map((option) => ({
     id: `theme:${option.value}`,
     label: option.label,
     icon: option.icon,
-    hint: theme === option.value ? "active" : undefined,
+    hint: theme === option.value ? t("commandPalette.theme.active") : undefined,
     run: () => setTheme(option.value),
   }));
 
   if (activeOrg) {
     items.push({
       id: "action:copy-org-slug",
-      label: "Copy org slug",
+      label: t("commandPalette.copyOrgSlug"),
       icon: Copy,
       searchValue: activeOrg.slug,
       run: async () => {
         await navigator.clipboard.writeText(activeOrg.slug);
-        toastSuccess("Org slug copied to clipboard");
+        toastSuccess(t("commandPalette.orgSlugCopiedToast"));
       },
     });
   }
 
   items.push({
     id: "action:sign-out",
-    label: "Sign out",
+    label: t("userMenu.signOut"),
     icon: LogOut,
     shortcut: SIGN_OUT_SHORTCUT,
     run: () => signOut.mutate(),
   });
 
-  return { heading: "Actions", items };
+  return { heading: t("commandPalette.groups.actions"), items };
 }
 
-function useCommandGroups(): CommandGroupConfig[] {
-  const navigation = useNavigationGroup();
-  const organization = useOrganizationGroup();
-  const operator = useOperatorGroup();
-  const legal = useLegalGroup();
-  const actions = useActionsGroup();
+function useCommandGroups(t: TFunction<"common">): CommandGroupConfig[] {
+  const navigation = useNavigationGroup(t);
+  const organization = useOrganizationGroup(t);
+  const operator = useOperatorGroup(t);
+  const legal = useLegalGroup(t);
+  const actions = useActionsGroup(t);
 
   return [navigation, organization, operator, legal, actions].filter(
     (group): group is CommandGroupConfig => group !== null,
@@ -292,7 +317,7 @@ function useTogglePaletteShortcut(setOpen: Dispatch<SetStateAction<boolean>>) {
   }, [setOpen]);
 }
 
-function useEntryShortcuts(groups: CommandGroupConfig[]) {
+function useEntryShortcuts(groups: CommandGroupConfig[], t: TFunction<"common">) {
   const groupsRef = useRef(groups);
   groupsRef.current = groups;
 
@@ -303,7 +328,9 @@ function useEntryShortcuts(groups: CommandGroupConfig[]) {
         for (const entry of group.items) {
           if (entry.shortcut?.match(e)) {
             e.preventDefault();
-            Promise.resolve(entry.run()).catch((err) => toastError(err, "Action failed"));
+            Promise.resolve(entry.run()).catch((err) =>
+              toastError(err, t("commandPalette.actionFailed")),
+            );
             return;
           }
         }
@@ -311,7 +338,7 @@ function useEntryShortcuts(groups: CommandGroupConfig[]) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [t]);
 }
 
 function buildSearchValue(entry: CommandEntry): string {
@@ -319,21 +346,22 @@ function buildSearchValue(entry: CommandEntry): string {
 }
 
 export function CommandPalette() {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
-  const groups = useCommandGroups();
+  const groups = useCommandGroups(t);
   useTogglePaletteShortcut(setOpen);
-  useEntryShortcuts(groups);
+  useEntryShortcuts(groups, t);
 
   const selectEntry = (entry: CommandEntry) => () => {
     setOpen(false);
-    Promise.resolve(entry.run()).catch((err) => toastError(err, "Action failed"));
+    Promise.resolve(entry.run()).catch((err) => toastError(err, t("commandPalette.actionFailed")));
   };
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search pages, actions, organizations..." />
+      <CommandInput placeholder={t("commandPalette.searchPlaceholder")} />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>{t("commandPalette.noResults")}</CommandEmpty>
         {groups.map((group, index) => (
           <Fragment key={group.heading}>
             {index > 0 && <CommandSeparator />}

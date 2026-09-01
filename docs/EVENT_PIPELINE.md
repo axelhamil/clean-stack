@@ -65,6 +65,7 @@ zero divergence.
 │     │   for each event:                                             │
 │     │     ├─ AuditEventSubscriber.handle(event, tx)                 │
 │     │     ├─ WebhookFanoutSubscriber.handle(event, tx)              │
+│     │     ├─ NotificationFanoutSubscriber.handle(event, tx)         │
 │     │     └─ markDispatched(event.id, tx)                           │
 │     │                                                                │
 │     │   on failure: markFailed + exponential backoff w/ jitter      │
@@ -125,7 +126,7 @@ purpose:
 
 | Tier | Runs | Guarantees | Use for |
 |---|---|---|---|
-| **Built-in subscribers** | Inside the drain TX | Atomic with `markDispatched`. A failure retries the whole event. | Audit log, webhook fan-out, anything where dropping a row is a compliance bug. |
+| **Built-in subscribers** | Inside the drain TX | Atomic with `markDispatched`. A failure retries the whole event. | Audit log, webhook fan-out, notification fan-out, anything where dropping a row is a compliance bug. |
 | **User handlers** | After the drain commits | Isolated; a throw is logged but the event stays marked dispatched. | Emails, push notifications, search-index updates — side effects that have their own retry logic. |
 
 If a future handler *cannot* tolerate at-most-once semantics, promote it to a
@@ -191,6 +192,41 @@ Names are stable in the repo; the pattern is what matters.
 4. **Ordering**: events are dispatched in `occurred_at` order *within a
    single drain batch*. Across batches and across parallel dispatchers,
    ordering is not guaranteed. Design handlers accordingly.
+
+## Event visibility — public vs internal
+
+Not every event in `@packages/events` is a public contract. An event used only
+for internal coordination (audit trail, delivery telemetry, rate-limit
+tracking) must never reach a customer webhook endpoint or appear in the
+developer-facing catalog — changing its payload would then be a breaking
+change.
+
+`packages/events/src/visibility-map.ts` is the single SSOT that declares every
+event type as either `"public"` or `"internal"`. The decision lives in code,
+not in an admin toggle, because it is a product contract that should go through
+code review, not a configuration change an operator can make by clicking.
+
+Three consumers enforce it:
+
+1. **`WebhookFanoutSubscriber`** (`apps/api/src/shared/services/webhook-fanout-subscriber.ts`)
+   — calls `isPublicEvent(event.type)` before fan-out; internal events flow to
+   `audit_log` and in-process handlers but are never delivered to customer
+   endpoints.
+
+2. **`/developers/events` catalog** (`apps/app/src/features/developers/`) —
+   the public event reference page filters the catalog to `public` events only.
+   Internal events remain invisible to API consumers and cannot accumulate
+   subscribers who depend on a payload that may change.
+
+3. **Webhook subscription picker** (`EventTypePicker` in the webhooks feature)
+   — the same filter gates what event types an endpoint can subscribe to. A
+   customer cannot subscribe to `api_token.used` or `security.csrf.rejected`
+   regardless of what they type in the form.
+
+**Adding an event as `"public"` is a breaking-change boundary.** Once
+published, renaming the event type or removing a field from its payload
+requires a deprecation notice. Mark `"internal"` by default; graduate to
+`"public"` only when a customer needs to build against it.
 
 ## Going further
 

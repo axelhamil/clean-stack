@@ -2,7 +2,7 @@ import { isSubscribableSelector } from "@packages/events";
 import { z } from "zod";
 
 export const createEndpointBodySchema = z.object({
-  url: z.string().url(),
+  url: z.url(),
   eventTypes: z
     .array(z.string())
     .min(1)

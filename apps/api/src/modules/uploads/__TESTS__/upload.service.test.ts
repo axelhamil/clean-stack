@@ -1,5 +1,5 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
   IStorageService,
@@ -28,6 +28,12 @@ const stubMeta: ObjectMetadata = {
   contentType: CONTENT_TYPE,
 };
 
+const CDN_PREFIX = "https://cdn.example.com/";
+
+function publicUrlOf(key: string): string {
+  return `${CDN_PREFIX}${key}`;
+}
+
 const noopOutbox: IOutboxRepository = {
   enqueue: mock(async () => {}),
   findPendingBatch: mock(async () => []),
@@ -45,7 +51,10 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
     uploadObject: mock(async () => Result.ok<StorageError>()),
     listObjectKeys: mock(async () => Result.ok<string[], StorageError>([])),
     deleteObjects: mock(async () => Result.ok<StorageError>()),
-    publicUrlFor: mock(() => "https://cdn.example.com/key"),
+    publicUrlFor: mock((key: string) => publicUrlOf(key)),
+    keyFromPublicUrl: mock((url: string) =>
+      url.startsWith(CDN_PREFIX) ? Option.some(url.slice(CDN_PREFIX.length)) : Option.none(),
+    ),
     ...overrides,
   } as unknown as IStorageService;
 }
@@ -275,6 +284,43 @@ describe("UploadService", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
+    });
+
+    it("accepts a public URL and deletes the derived key", async () => {
+      const storage = makeStorage();
+      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+
+      const result = await service.deleteUpload({
+        ownerId: OWNER_ID,
+        url: publicUrlOf(`${OWNER_ID}/${SCOPE}/a.png`),
+      });
+
+      expect(result.getValue()).toEqual({ deleted: true });
+      expect(storage.deleteObject).toHaveBeenCalledWith(`${OWNER_ID}/${SCOPE}/a.png`);
+    });
+
+    it("is a no-op for a URL this storage did not produce", async () => {
+      const storage = makeStorage();
+      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+
+      const result = await service.deleteUpload({
+        ownerId: OWNER_ID,
+        url: "https://example.com/x.png",
+      });
+
+      expect(result.getValue()).toEqual({ deleted: false });
+      expect(storage.deleteObject).not.toHaveBeenCalled();
+    });
+
+    it("still refuses a URL resolving to another owner's key", async () => {
+      const service = makeService();
+
+      const result = await service.deleteUpload({
+        ownerId: OWNER_ID,
+        url: publicUrlOf(`user-2/${SCOPE}/a.png`),
+      });
+
+      expect(result.getError().code).toBe("STORAGE_FORBIDDEN");
     });
 
     it("calls instrumentation span with op=function", async () => {

@@ -1,23 +1,34 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toAuthClientError } from "../../../shared/api/errors/api-error";
+import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 
 export function useDeletePasskey() {
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: ["passkeys", "delete"],
     mutationFn: async (id: string) => {
       const { error } = await authClient.passkey.deletePasskey({ id });
-      if (error) throw new Error(error.message ?? "Failed to delete passkey");
+      if (error) throw toAuthClientError(error, t("passkeys.removeFailed"));
     },
     onSuccess: async () => {
-      toast.success("Passkey removed");
+      toast.success(t("passkeys.removedToast"));
       await queryClient.invalidateQueries({
         queryKey: passkeysQueryOptions.queryKey,
       });
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.deletePasskey", {
+          defaultValue: "Couldn't remove that passkey. Please try again.",
+        }),
+      ),
   });
 }

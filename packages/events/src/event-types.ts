@@ -1,3 +1,5 @@
+import { isPublicEvent } from "./visibility-map";
+
 export const EventTypes = {
   USER_CREATED: "user.created",
   USER_SIGNED_IN: "user.signed_in",
@@ -21,6 +23,7 @@ export const EventTypes = {
   USER_EMAIL_CHANGE_REQUESTED: "user.email.change_requested",
   USER_EXPORT_REQUESTED: "user.export.requested",
   USER_EXPORT_COMPLETED: "user.export.completed",
+  USER_LOCALE_CHANGED: "user.locale.changed",
   ORG_CREATED: "org.created",
   ORG_UPDATED: "org.updated",
   ORG_DELETED: "org.deleted",
@@ -39,6 +42,9 @@ export const EventTypes = {
   WEBHOOK_ENDPOINT_SECRET_ROTATED: "webhook.endpoint.secret_rotated",
   WEBHOOK_ENDPOINT_DISABLED: "webhook.endpoint.disabled",
   WEBHOOK_DELIVERY_EXHAUSTED: "webhook.delivery.exhausted",
+  API_TOKEN_CREATED: "api_token.created",
+  API_TOKEN_REVOKED: "api_token.revoked",
+  API_TOKEN_USED: "api_token.used",
   USER_POLICY_ACCEPTED: "user.policy.accepted",
   USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
   USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
@@ -61,6 +67,22 @@ export const EventTypes = {
   ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
   ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
   EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
+  NOTIFICATION_PREFERENCE_UPDATED: "notification.preference.updated",
+  NOTIFICATION_ORG_PREFERENCE_UPDATED: "notification.org_preference.updated",
+  NOTIFICATION_READ: "notification.read",
+  SSO_PROVIDER_REGISTERED: "sso.provider.registered",
+  SSO_PROVIDER_UPDATED: "sso.provider.updated",
+  SSO_PROVIDER_DELETED: "sso.provider.deleted",
+  SSO_DOMAIN_VERIFIED: "sso.domain.verified",
+  SSO_ENFORCEMENT_CHANGED: "sso.enforcement.changed",
+  SSO_LOGIN_SUCCESS: "sso.login.success",
+  SSO_LOGIN_FAILURE: "sso.login.failure",
+  SCIM_CONNECTION_CREATED: "scim.connection.created",
+  SCIM_CONNECTION_DELETED: "scim.connection.deleted",
+  SCIM_USER_CREATED: "scim.user.created",
+  SCIM_USER_UPDATED: "scim.user.updated",
+  SCIM_USER_DEACTIVATED: "scim.user.deactivated",
+  SCIM_USER_DEPROVISIONED: "scim.user.deprovisioned",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -71,17 +93,7 @@ export function isKnownEventType(value: string): value is EventType {
   return ALL_EVENT_TYPES.includes(value as EventType);
 }
 
-export const INTERNAL_EVENT_TYPES: readonly EventType[] = [
-  EventTypes.WEBHOOK_TEST,
-  EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED,
-  EventTypes.WEBHOOK_ENDPOINT_DISABLED,
-  EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
-  EventTypes.EMAIL_DELIVERY_EXHAUSTED,
-];
-
-export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(
-  (t) => !INTERNAL_EVENT_TYPES.includes(t),
-);
+export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(isPublicEvent);
 
 export function eventGroupOf(eventType: string): string {
   const dot = eventType.indexOf(".");
@@ -92,7 +104,7 @@ export function matchesSubscription(
   eventType: EventType,
   subscriptions: readonly string[],
 ): boolean {
-  if (INTERNAL_EVENT_TYPES.includes(eventType)) return false;
+  if (!isPublicEvent(eventType)) return false;
   if (subscriptions.includes("*")) return true;
   if (subscriptions.includes(eventType)) return true;
   return subscriptions.includes(`${eventGroupOf(eventType)}.*`);

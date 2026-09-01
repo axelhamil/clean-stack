@@ -21,7 +21,7 @@ Two ways to run it. Pick one.
 
 ### Option A — Native (fastest hot reload)
 
-**Prerequisites** — [Bun 1.3+](https://bun.com/docs/installation), [Node 24+](https://nodejs.org), [pnpm 10](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
+**Prerequisites** — [Bun 1.4+](https://bun.com/docs/installation), [Node 24.20+](https://nodejs.org), [pnpm 11](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
 git clone https://github.com/axelhamil/clean-stack my-saas
@@ -75,10 +75,10 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Legal / compliance** | Day-one EU-legal across the GDPR surface: **Art. 7** privacy/terms versioning (re-acceptance gate when a version bumps, `user.policy.accepted` evidence), **Art. 16** rectification (profile + email-change + password), **Art. 17** erasure (`POST /me/delete` — 2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in, cron wipe + ref anonymization), **Art. 20** portability (`POST /me/export` — signed 7-day R2 URL, 1/24h throttle). Passwords follow **NIST SP 800-63B** (min 15, HIBP k-anonymity breach check, contextual ban-list, no forced complexity). Without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris — provider swap = one env var. |
 | **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
-| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **52 typed events** auto-emitted on every state change (48 subscribable + 4 internal webhook events), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter) — operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
+| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **82 typed events** auto-emitted on every state change (35 public + 47 internal), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter) — operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context — one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
-| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~588 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
+| **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1–43 KB) + `defaultPreload: "intent"` — perceived latency near zero. |
 | **AI-pair ready** | `CLAUDE.md` at the root + per-layer sub-`CLAUDE.md`. Your agent already knows the rules — Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
 | **Zero-warning pipeline** | Husky + lint-staged + commitlint + pre-push CI (Biome, knip, jscpd, type-check). Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
 
@@ -86,7 +86,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 
 ## Features
 
-Everything wired today, and the build order for what's next. Prefer prose? [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the guided tour. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
+Everything wired today, and the short list of what's left. Prefer prose? [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the guided tour. Full inventory in [`docs/FEATURES.md`](docs/FEATURES.md); detailed plan with constraints in [`ROADMAP.md`](ROADMAP.md).
 
 ### Shipped
 
@@ -98,6 +98,7 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 **Multi-tenant & authorization**
 - `organization` plugin — Personal org auto-heal, team orgs, email invitations, role-based members, ownership transfer
 - Capability-based authorization SSOT (`@packages/access-control`) — same predicate at server middleware, route `beforeLoad` gate, and `<Can>` UI
+- Enterprise SSO + SCIM (`business` tier) — per-org OIDC/SAML providers with DNS domain verification, JIT provisioning, a domain-wide enforce-SSO toggle closing all four sign-in paths, SCIM 2.0 `Users` CRUD (RFC 7644) for directory-driven provisioning and deprovisioning, local Keycloak profile for development
 
 **Security & hardening** — *the deploy-safe perimeter (Phase C.1)*
 - Unified rate-limit — one Hono middleware (`rate-limiter-flexible`, BetterAuth built-in disabled) → global + 8 auth-burst policies, multi-window, IETF `RateLimit`/`RateLimit-Policy`/`Retry-After` headers, **fail-closed on auth** (a store outage can't silently disable brute-force protection — OWASP A10:2025), trusted-proxy IP resolution (`private`/CIDR/exact, OWASP rightmost-non-trusted), memory → Postgres (dedicated pool) stores
@@ -118,8 +119,8 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 
 **Event-driven core & transactions** — *the hard distributed-systems part, already solved*
 - Transactional outbox — domain events persisted in the **same DB transaction** as the state change (`IUnitOfWork.run()` + `EventCollector` AsyncLocalStorage) → no event ever lost, none emitted for a rolled-back write (the dual-write problem, solved)
-- Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout), user `onEvent(...)` handlers isolated post-commit
-- **52 typed events** (48 subscribable + 4 internal), append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay, SSRF guard, dual-secret rotation), `X-Request-Id` correlation
+- Post-commit dispatch — Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout + notification fanout), user `onEvent(...)` handlers isolated post-commit
+- **82 typed events** (35 public + 47 internal), append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay, SSRF guard, dual-secret rotation), `X-Request-Id` correlation
 - **Zero plumbing post-clone** — declare the event in `@packages/events` → `addEvent()` in the aggregate → run via `uow.run()`; the audit row, webhook fanout, and in-process handlers (auto-discovered via inwire) come for free
 - Internal `/internal/*` endpoints — HMAC-signed, optional private-network layer
 
@@ -134,13 +135,14 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 - DDD-kit (`@packages/ddd-kit`) — `Result` / `Option`, `Entity` / `Aggregate` / `ValueObject` (zod-validated) / `UUID` / `DomainEvent`, `BaseRepository` / `ScopedRepository` / `IUnitOfWork`
 - Vertical-slice modular monolith — `modules/<context>/{domain,application,infrastructure}` + per-feature front slices
 - CQRS (commands via use-cases, queries direct to Drizzle) · inwire DI (type-inference container, no declared interfaces)
-- Drizzle + Postgres 17 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
+- Drizzle + Postgres 18 — `TransactionService`, org-scoped `withOrg(table, orgId)` helper, dedicated port `5433`
 
 **Frontend & UI**
 - App shell — sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
-- TanStack Router code-based 2-file pattern (`route` + lazy `page`) — no codegen, no `routeTree.gen.ts`, near-zero TanStack Start migration
-- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~588 KB, route chunks 1–43 KB)
+- TanStack Router file-based routing (`routes.ts` virtual config → generated, versioned `routeTree.gen.ts`) with a 2-file feature pattern (`route` + lazy component), near-zero TanStack Start migration
+- Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~355 KB, route chunks 1–43 KB)
 - TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
+- Typed i18n (`@packages/i18n`) — `en`/`fr` `.ts` catalogs bound to `t()` through `CustomTypeOptions`, so an unknown key fails `tsc`; locale from cookie then `user.locale`, never from the URL; `en`/`fr` key parity enforced by a test
 - shadcn-pure UI kit (`@packages/ui`) — typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
 
 **Infra, ops & DX**
@@ -149,17 +151,17 @@ Everything wired today, and the build order for what's next. Prefer prose? [`doc
 - Disaster-recovery runbook (PITR-first) · Railway reference deploy (config-as-code)
 - `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
 - Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
+- WCAG 2.1 AA gate on every PR — `@axe-core/playwright` over 11 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
 
 ### Roadmap
 
-Build order for a boilerplate — deploy-safety + legal non-negotiables first, then revenue, then finish/polish. Phase IDs link to their full spec in [`ROADMAP.md`](ROADMAP.md).
+The SaaS plumbing is shipped — auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 82-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
-- **M1 — Deploy-safe & legal** · ✅ rate-limit + strict CSP + CSRF + abuse quick-wins (s5a) **shipped** (Phase C.1 — see Security & hardening above; captcha + advanced abuse signals impossible-travel/geo still pending) · compliance docs (sub-processors, accessibility, DPA, DORA) · cookie consent + GPC/DNT
-- **M2 — Revenue** · ✅ **B.1 billing via `@better-auth/stripe` shipped** (Stripe Checkout + Billing Portal + idempotent webhooks + seat gate + 3-tier entitlements + `/pricing` + `/settings/billing` — see Billing section above) · feature & quota gating (config + middleware, no DDD)
-- **M3 — Finish half-shipped UIs** · ✅ **C.5 webhooks front shipped** (`/settings/webhooks` operator UI + public `/developers/events` catalog — see Event-driven section; SSRF guard + dual-secret rotation + auto-disable also landed) · audit-log admin page shipped (`/admin/audit-log`) · ✅ **C.6 recovery-codes UI shipped** (`RecoveryCodesCard` + backup-code fallback + `BackupCodeUsedNotifier` + 2 events → 54 total) · privacy dashboard
-- **M4 — Operate** · admin & impersonation (BetterAuth `admin` plugin) · API tokens / PATs (eval `@better-auth/api-key`) · OpenAPI docs (Scalar) · in-app notifications
-- **M5 — Quality & compliance gates** · Playwright e2e (full legal chain) + Lighthouse a11y CI · SOC2 Type II checklist · status page + SLO dashboards + OTel/Prometheus
-- **M6 — Enterprise & reach** · SSO SAML/OIDC + SCIM (BetterAuth `sso`) · i18n (TanStack locale routes + Lingui; `@better-auth/i18n` for auth errors) · Capacitor mobile · feature flags · marketing site
+- **A manual review pass** over the shipped surface — the last step before this is genuinely clone-ready.
+- **C.1 S5b/S6** — impossible-travel, ASN deny-list, captcha hook. Deferred for calibration: these need real traffic to tune.
+- **D.5 known debts** — three, including a duplicate deletion email if the worker crashes mid-batch.
+
+Cut and not returning: marketing site, status page + SLO dashboards, SOC2 checklist, OpenAPI docs, Capacitor shell, feature flags, GPC. Each was a per-clone decision, a third-party service to wire, or an ambition with nothing to exercise it. The specs live in git history.
 
 ---
 
@@ -167,16 +169,18 @@ Build order for a boilerplate — deploy-safety + legal non-negotiables first, t
 
 What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
 
-### Database — Postgres 17
+### Database — Postgres 18
 
 | | |
 |---|---|
-| **Image** | [`postgres:17-alpine`](https://hub.docker.com/_/postgres) |
+| **Image** | [`postgres:18-alpine`](https://hub.docker.com/_/postgres) |
 | **Host port** | `5433` (deliberately not the default `5432` — avoids collision with a system Postgres) |
 | **In-network** | `postgres:5432` (used by the api container) |
-| **Volume** | `postgres_data` (persistent across `compose down`) |
+| **Volume** | `postgres_data` (persistent across `compose down` — **not** across a Postgres major bump, see below) |
 | **Healthcheck** | `pg_isready` every 5 s — api waits for healthy before starting |
 | **Schema** | [Drizzle ORM](https://orm.drizzle.team) — sources in `packages/drizzle/src/schema/` |
+
+> **Action required if you already had `postgres_data` populated before this branch**: the volume mount moved from `/var/lib/postgresql/data` to `/var/lib/postgresql` (Postgres 18+ images store `PGDATA` in a major-version-specific subdirectory — [docker-library/postgres#1259](https://github.com/docker-library/postgres/pull/1259)). An existing volume won't crash on `docker compose up` — it will **silently reinitialize as an empty database**, since the image finds nothing at the new mount point and just creates a fresh one. Run `docker volume rm clean-stack_postgres_data` once before the first `up` on this branch, then rebuild dev data with `pnpm db:push && pnpm db:seed`.
 
 ```bash
 pnpm db:push            # dev — push schema directly (drizzle-kit push --force, non-TTY safe)
@@ -256,7 +260,7 @@ Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `app
 
 | Service | Image | Port (host) | Profile | Persistent volume |
 |---|---|---|---|---|
-| `postgres` | `postgres:17-alpine` | `5433` | default | `postgres_data` |
+| `postgres` | `postgres:18-alpine` | `5433` | default | `postgres_data` |
 | `api` | built (`apps/api/dev.Dockerfile`) | `3000` | default | — |
 | `app` | built (`apps/app/dev.Dockerfile`) | `5173` | default | — |
 | `seaweedfs` | `chrislusf/seaweedfs` | `8333` | `storage` | `seaweedfs_data` |
@@ -276,7 +280,7 @@ Three `.env` files, on purpose. **Do not collapse them into one at the root** �
 
 `pnpm bootstrap` (or `bash scripts/bootstrap.sh`) copies each `.env.example` → `.env` if missing. Idempotent — never overwrites.
 
-Only three variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), or `WEBHOOK_MASTER_KEY` is missing — a silent fallback there is worse than a refused boot. Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
+Only three variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), `WEBHOOK_MASTER_KEY`, or `API_TOKEN_PEPPER` is missing — a silent fallback there is worse than a refused boot. `API_TOKEN_PEPPER` (min 32 chars, `openssl rand -hex 32`) is the server secret that makes a database dump insufficient to forge tokens; `API_TOKEN_PREFIX` should be unique per clone (e.g. `myapp_`). Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
 
 ---
 
@@ -310,10 +314,11 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Auth** | BetterAuth + `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
 | **Email** | Resend (typed templates, idempotency, provider-side suppression) |
 | **Storage** | Cloudflare R2 prod · SeaweedFS dev (S3-compatible, opt-in) |
-| **DB** | Drizzle ORM + Postgres 17 |
+| **DB** | Drizzle ORM + Postgres 18 |
 | **API ↔ App** | Hono RPC (`hcWithType`) — end-to-end types |
+| **i18n** | `i18next` + `react-i18next` — typed `.ts` catalogs (`@packages/i18n`), locale outside the URL |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
-| **Tooling** | pnpm 10 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 11 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
 ---
 
@@ -323,8 +328,9 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 |---|---|
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md) — Phase 0 ✅; build order: M1 security perimeter + consent → M2 billing → M3 finish audit/webhooks/recovery UI → M4 admin + PATs → M5 e2e/a11y gates → M6 SSO/i18n/mobile |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, abuse signals, D.5 debts |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
+| **Back ↔ front surface map** | [`docs/SURFACE.md`](docs/SURFACE.md) — every live route, its front consumer or the reason it has none, enforced by a parity test |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) — endpoints, registry, graceful shutdown, per-PaaS recipes |

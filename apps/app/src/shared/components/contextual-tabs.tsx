@@ -3,32 +3,49 @@ import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { cn } from "@packages/ui/libs/utils.js";
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuthorization } from "../auth/use-authorization";
 
 interface TabItem {
   to: string;
-  label: string;
+  labelKey:
+    | "contextualTabs.organization"
+    | "contextualTabs.billing"
+    | "contextualTabs.webhooks"
+    | "contextualTabs.sso"
+    | "contextualTabs.account"
+    | "contextualTabs.notifications"
+    | "contextualTabs.privacy"
+    | "contextualTabs.apiTokens";
   icon?: LucideIcon;
   requires?: OrgPermissions;
   requiresOrg?: boolean;
 }
 
 const SETTINGS_TABS: readonly TabItem[] = [
-  { to: "/settings/organization", label: "Organization", requiresOrg: true },
+  { to: "/settings/organization", labelKey: "contextualTabs.organization", requiresOrg: true },
   {
     to: "/settings/billing",
-    label: "Billing",
+    labelKey: "contextualTabs.billing",
     requires: { billing: ["manage"] },
     requiresOrg: true,
   },
   {
     to: "/settings/webhooks",
-    label: "Webhooks",
+    labelKey: "contextualTabs.webhooks",
     requires: { webhooks: ["read"] },
     requiresOrg: true,
   },
-  { to: "/settings/account", label: "Account" },
-  { to: "/settings/privacy", label: "Privacy" },
+  {
+    to: "/settings/sso",
+    labelKey: "contextualTabs.sso",
+    requires: { organization: ["update"] },
+    requiresOrg: true,
+  },
+  { to: "/settings/account", labelKey: "contextualTabs.account" },
+  { to: "/settings/notifications", labelKey: "contextualTabs.notifications" },
+  { to: "/settings/privacy", labelKey: "contextualTabs.privacy" },
+  { to: "/settings/api-tokens", labelKey: "contextualTabs.apiTokens" },
 ];
 
 interface ContextualTabsProps {
@@ -36,6 +53,7 @@ interface ContextualTabsProps {
 }
 
 export function ContextualTabs({ className }: ContextualTabsProps) {
+  const { t } = useTranslation("common");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { can, hasMembership } = useAuthorization();
 
@@ -47,7 +65,7 @@ export function ContextualTabs({ className }: ContextualTabsProps) {
 
   return (
     <nav
-      aria-label="Settings sections"
+      aria-label={t("contextualTabs.ariaLabel")}
       className={cn("flex items-center gap-1 overflow-x-auto", className)}
     >
       {visibleTabs.map((tab) => {
@@ -56,7 +74,7 @@ export function ContextualTabs({ className }: ContextualTabsProps) {
           <NavLink key={tab.to} variant="underline" active={pathname === tab.to} asChild>
             <Link to={tab.to} className="gap-1.5">
               {Icon && <Icon className="size-3.5" />}
-              {tab.label}
+              {t(tab.labelKey)}
             </Link>
           </NavLink>
         );

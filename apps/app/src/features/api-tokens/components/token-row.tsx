@@ -1,0 +1,69 @@
+import { Badge } from "@packages/ui/components/ui/badge";
+import { Button } from "@packages/ui/components/ui/button";
+import { TableCell, TableRow } from "@packages/ui/components/ui/table";
+import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import type { ApiToken } from "../api/api-tokens.queries";
+import { tokenScopeDisplay } from "../token-scope";
+
+interface TokenRowProps {
+  token: ApiToken;
+  activeOrg: { id: string; name: string } | null | undefined;
+  onRevoke: (id: string) => void;
+  isRevoking: boolean;
+  guard: ImpersonationGuard;
+}
+
+export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: TokenRowProps) {
+  const { t } = useTranslation("settings");
+  const formatDate = useFormatDate();
+  const isRevoked = token.revokedAt !== null;
+  const isExpired =
+    !isRevoked && token.expiresAt !== null && new Date(token.expiresAt) < new Date();
+  const tokenScope = tokenScopeDisplay(token.organizationId, activeOrg);
+
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{token.name}</TableCell>
+      <TableCell className="font-mono text-sm">{token.tokenStart}…</TableCell>
+      <TableCell>
+        {tokenScope.kind === "personal" ? (
+          <Badge variant="outline">{t("apiTokens.scopePersonal")}</Badge>
+        ) : (
+          <Badge variant="secondary">{tokenScope.name ?? t("apiTokens.scopeOrganization")}</Badge>
+        )}
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-wrap gap-1">
+          {token.scopes.map((scope) => (
+            <Badge key={scope} variant="secondary">
+              {scope}
+            </Badge>
+          ))}
+        </div>
+      </TableCell>
+      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : "—"}</TableCell>
+      <TableCell>
+        {token.expiresAt ? formatDate(token.expiresAt) : t("apiTokens.neverExpires")}
+      </TableCell>
+      <TableCell>
+        {isRevoked && <Badge variant="destructive">{t("apiTokens.statusRevoked")}</Badge>}
+        {isExpired && <Badge variant="outline">{t("apiTokens.statusExpired")}</Badge>}
+      </TableCell>
+      <TableCell>
+        {!isRevoked && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isRevoking || guard.blocked}
+            {...guard.describeProps(isRevoking)}
+            onClick={() => onRevoke(token.id)}
+          >
+            {t("apiTokens.revokeAction")}
+          </Button>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}

@@ -1,6 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [".claude/**"],
   "workspaces": {
     "apps/api": {
       "entry": [
@@ -18,6 +17,9 @@
     },
     "apps/app": {
       "entry": [
+        "routes.ts",
+        "src/router/*.tsx",
+        "src/features/**/*.route.tsx",
         "src/shared/api/api-client.ts",
         "src/shared/api/mutations/*.ts",
         "src/shared/api/queries/*.ts",
@@ -25,7 +27,9 @@
         "src/shared/auth/plan-gate.tsx",
         "src/shared/auth/quota-gate.tsx",
         "src/shared/observability/noop.ts",
-        "src/shared/observability/sentry.ts"
+        "src/shared/observability/sentry.ts",
+        "a11y/*.setup.ts",
+        "a11y/*.spec.ts"
       ],
       "project": ["**/*.ts", "**/*.tsx"]
     },
@@ -34,6 +38,10 @@
       "ignore": ["**/stubs/**"]
     },
     "packages/drizzle": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/i18n": {
+      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/access-control": {
@@ -47,6 +55,7 @@
       "project": ["src/**/*.ts"]
     }
   },
+  "ignoreBinaries": ["src/index.ts"],
   "ignoreDependencies": [
     "@packages/test",
     "@packages/typescript-config",

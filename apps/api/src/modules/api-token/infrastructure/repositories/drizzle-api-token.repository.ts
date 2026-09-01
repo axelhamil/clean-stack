@@ -1,0 +1,258 @@
+import { Option, Result } from "@packages/ddd-kit";
+import type { ApiTokenRevokedReason } from "@packages/drizzle";
+import { and, apiTokenSchema, db, eq, isNull, lt, or } from "@packages/drizzle";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { ITransaction } from "../../../../shared/transaction";
+import type {
+  ApiTokenError,
+  ApiTokenRecord,
+  IApiTokenRepository,
+  TokenOwner,
+} from "../../application/ports/api-token.port";
+
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+const t = apiTokenSchema.apiToken;
+
+function storeFailure(err: unknown, op: string): ApiTokenError {
+  return {
+    code: "API_TOKEN_PROVIDER_FAILURE",
+    message: `database operation failed: ${op}`,
+    metadata: { cause: err instanceof Error ? err.message : String(err) },
+  };
+}
+
+/**
+ * The rows an owner may see and revoke. Always AND-joined on `userId`, so a
+ * member never reaches another member's token; the organization leg widens to
+ * "this organization OR no organization at all" so a token created with the
+ * "Personal" scope stays reachable while an organization is active — which it
+ * always is, every user owning a personal organization.
+ *
+ * Exported so the repository's other methods can compose it; the predicate
+ * itself is proven against a real Postgres by
+ * `scripts/check-api-token-visibility.ts` (`pnpm --filter api
+ * check:api-token-visibility`), not by the unit suite — that suite mocks
+ * `@packages/drizzle`'s `and`/`or`/`eq`/`isNull`, so it evaluates the mock,
+ * never the actual WHERE clause.
+ */
+export function visibleTokensFilter(owner: TokenOwner) {
+  return and(
+    eq(t.userId, owner.userId),
+    owner.kind === "personal"
+      ? isNull(t.organizationId)
+      : or(isNull(t.organizationId), eq(t.organizationId, owner.organizationId)),
+  );
+}
+
+export class DrizzleApiTokenRepository implements IApiTokenRepository {
+  constructor(private readonly instrumentation: IInstrumentation) {}
+
+  async insert(row: ApiTokenRecord, tx?: ITransaction): Promise<Result<void, ApiTokenError>> {
+    const invoker = tx ?? db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > insert" },
+      async () => {
+        try {
+          const query = invoker.insert(t).values({
+            id: row.id,
+            userId: row.userId,
+            organizationId: row.organizationId,
+            name: row.name,
+            scopes: row.scopes,
+            tokenHmac: row.tokenHmac,
+            pepperVersion: row.pepperVersion,
+            tokenStart: row.tokenStart,
+            lastUsedAt: row.lastUsedAt,
+            expiresAt: row.expiresAt,
+            revokedAt: row.revokedAt,
+            revokedReason: row.revokedReason,
+            createdAt: row.createdAt,
+          });
+          await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok();
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "insert"));
+        }
+      },
+    );
+  }
+
+  async listByOwner(owner: TokenOwner): Promise<Result<ApiTokenRecord[], ApiTokenError>> {
+    const invoker = db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > listByOwner" },
+      async () => {
+        try {
+          const query = invoker.select().from(t).where(visibleTokensFilter(owner));
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(rows as ApiTokenRecord[]);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "listByOwner"));
+        }
+      },
+    );
+  }
+
+  async findByIdForOwner(
+    id: string,
+    owner: TokenOwner,
+  ): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>> {
+    const invoker = db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > findByIdForOwner" },
+      async () => {
+        try {
+          const query = invoker
+            .select()
+            .from(t)
+            .where(and(eq(t.id, id), visibleTokensFilter(owner)))
+            .limit(1);
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(Option.fromNullable(rows[0] as ApiTokenRecord | undefined));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "findByIdForOwner"));
+        }
+      },
+    );
+  }
+
+  async findByHmac(hmac: string): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>> {
+    const invoker = db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > findByHmac" },
+      async () => {
+        try {
+          const query = invoker.select().from(t).where(eq(t.tokenHmac, hmac)).limit(1);
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(Option.fromNullable(rows[0] as ApiTokenRecord | undefined));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "findByHmac"));
+        }
+      },
+    );
+  }
+
+  async revoke(
+    id: string,
+    reason: ApiTokenRevokedReason,
+    tx?: ITransaction,
+  ): Promise<Result<void, ApiTokenError>> {
+    const invoker = tx ?? db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > revoke" },
+      async () => {
+        try {
+          const query = invoker
+            .update(t)
+            .set({ revokedAt: new Date(), revokedReason: reason })
+            .where(and(eq(t.id, id), isNull(t.revokedAt)));
+          await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok();
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "revoke"));
+        }
+      },
+    );
+  }
+
+  async revokeAllForMembership(
+    userId: string,
+    organizationId: string,
+    tx?: ITransaction,
+  ): Promise<Result<string[], ApiTokenError>> {
+    const invoker = tx ?? db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > revokeAllForMembership" },
+      async () => {
+        try {
+          const query = invoker
+            .update(t)
+            .set({ revokedAt: new Date(), revokedReason: "membership_lost" })
+            .where(
+              and(eq(t.userId, userId), eq(t.organizationId, organizationId), isNull(t.revokedAt)),
+            )
+            .returning({ id: t.id });
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(rows.map((r) => r.id));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "revokeAllForMembership"));
+        }
+      },
+    );
+  }
+
+  async touchLastUsed(id: string, bucketFloor: Date): Promise<Result<boolean, ApiTokenError>> {
+    const invoker = db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > touchLastUsed" },
+      async () => {
+        try {
+          const query = invoker
+            .update(t)
+            .set({ lastUsedAt: new Date() })
+            .where(and(eq(t.id, id), or(isNull(t.lastUsedAt), lt(t.lastUsedAt, bucketFloor))))
+            .returning({ id: t.id });
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(rows.length > 0);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "touchLastUsed"));
+        }
+      },
+    );
+  }
+
+  async rehash(
+    id: string,
+    hmac: string,
+    pepperVersion: number,
+  ): Promise<Result<void, ApiTokenError>> {
+    const invoker = db;
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > rehash" },
+      async () => {
+        try {
+          const query = invoker
+            .update(t)
+            .set({ tokenHmac: hmac, pepperVersion })
+            .where(eq(t.id, id));
+          await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok();
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure(err, "rehash"));
+        }
+      },
+    );
+  }
+}

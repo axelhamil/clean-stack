@@ -27,8 +27,8 @@ import type { WindowConfig } from "../ports/rate-limiter.port";
 
 // ── Mock @packages/drizzle ──────────────────────────────────────────────────
 // The adapter imports `rateLimitSchema` + the `RateLimitDbClient` type; the container
-// imports `getRateLimitDbClient`. Superset rule: expose all exports used anywhere in
-// the test suite (the mock leaks cross-test via bun's parallel `mock.module`).
+// imports `getRateLimitDbClient`. Both are needed here, nowhere else — the replacement
+// stays inside this file's module registry.
 const fakeDb = {};
 const fakeRateLimitClient = {};
 const fakeRateLimitRecord = { key: {}, points: {}, expire: {} };
@@ -54,11 +54,12 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
   webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   authSchema: {},
   schema: {},
   trackEventsOnSuccess: () => {},
@@ -70,10 +71,35 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: {
+    notification: {
+      id: { name: "id" },
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      category: { name: "category" },
+      eventType: { name: "event_type" },
+      groupKey: { name: "group_key" },
+      dedupKey: { name: "dedup_key" },
+      payload: { name: "payload" },
+      readAt: { name: "read_at" },
+      emailPendingAt: { name: "email_pending_at" },
+      emailSentAt: { name: "email_sent_at" },
+      createdAt: { name: "created_at" },
+    },
+    notificationPreference: {
+      id: { name: "id" },
+      scope: { name: "scope" },
+      scopeId: { name: "scope_id" },
+      category: { name: "category" },
+      channel: { name: "channel" },
+      enabled: { name: "enabled" },
+      frequency: { name: "frequency" },
+      locked: { name: "locked" },
+    },
+  },
 }));
 
 // ── Mock rate-limiter-flexible ──────────────────────────────────────────────
-// Full superset of all exports used anywhere in this test suite.
 // RateLimiterDrizzle is a spy constructor — no real DB calls.
 const drizzleCtorCalls: unknown[] = [];
 
@@ -124,6 +150,7 @@ function makeNoopInstrumentation(): IInstrumentation {
     startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
     capture: () => {},
     addBreadcrumb: () => {},
+    setSpanAttributes: () => {},
   };
 }
 
@@ -238,6 +265,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
         startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
         capture: captureSpy,
         addBreadcrumb: () => {},
+        setSpanAttributes: () => {},
       };
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);
@@ -351,6 +379,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
         startSpan: startSpanSpy as unknown as IInstrumentation["startSpan"],
         capture: () => {},
         addBreadcrumb: () => {},
+        setSpanAttributes: () => {},
       };
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);

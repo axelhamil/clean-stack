@@ -2,7 +2,7 @@ name: clean-stack
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     container_name: clean-stack-postgres
     restart: unless-stopped
     ports:
@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: clean_stack
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -47,6 +47,23 @@ services:
       - echo 's3.bucket.create -name clean-stack' | weed shell
         -master=seaweedfs:9333
     profiles: ["storage"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: clean-stack-keycloak
+    command: start-dev --http-port=8080
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    profiles: ["sso"]
 
   api:
     build:

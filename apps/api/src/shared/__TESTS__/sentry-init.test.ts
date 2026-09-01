@@ -10,6 +10,7 @@ mock.module("@sentry/bun", () => ({
   setTag: mock((_key: string, _value: string) => {}),
   setUser: mock((_user: unknown) => {}),
   setContext: mock((_key: string, _ctx: unknown) => {}),
+  getActiveSpan: mock(() => undefined as unknown),
 }));
 
 const { scrubEvent } = await import("../services/sentry-init");

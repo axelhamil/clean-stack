@@ -51,8 +51,8 @@ const fakeRow = {
   disabledAt: null,
 };
 
-// Mock exposes the FULL surface of @packages/drizzle — superset rule (see shared/CLAUDE.md):
-// mock.module leaks across parallel bun processes; partial mocks cause "Export not found" in others.
+// Only what this file's subject actually touches: test files do not share a module
+// registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => makeDbQuery(),
@@ -78,6 +78,7 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   outboxSchema: { outboxEvent: {} },
   auditLogSchema: { auditLog: {} },
@@ -115,7 +116,7 @@ mock.module("@packages/drizzle", () => ({
     },
   },
   authSchema: {},
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   schema: {},
   TransactionService: class {},
   trackEventsOnSuccess: () => {},
@@ -127,6 +128,32 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: {
+    notification: {
+      id: { name: "id" },
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      category: { name: "category" },
+      eventType: { name: "event_type" },
+      groupKey: { name: "group_key" },
+      dedupKey: { name: "dedup_key" },
+      payload: { name: "payload" },
+      readAt: { name: "read_at" },
+      emailPendingAt: { name: "email_pending_at" },
+      emailSentAt: { name: "email_sent_at" },
+      createdAt: { name: "created_at" },
+    },
+    notificationPreference: {
+      id: { name: "id" },
+      scope: { name: "scope" },
+      scopeId: { name: "scope_id" },
+      category: { name: "category" },
+      channel: { name: "channel" },
+      enabled: { name: "enabled" },
+      frequency: { name: "frequency" },
+      locked: { name: "locked" },
+    },
+  },
 }));
 
 const { DrizzleWebhookEndpointRepository } = await import(

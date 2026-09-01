@@ -11,11 +11,13 @@ import {
 } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
+import { Trans, useTranslation } from "react-i18next";
 import { type SignUpInput, signUpSchema } from "../../../shared/auth/auth.schema";
 import { PolicyLink } from "../../../shared/components/policy-link";
 import { useSignUp } from "../hooks/use-sign-up";
 
 export function SignUpForm() {
+  const { t } = useTranslation("auth");
   const mutation = useSignUp();
 
   const form = useForm<SignUpInput>({
@@ -33,28 +35,28 @@ export function SignUpForm() {
         <FormTextField
           control={form.control}
           name="name"
-          label="Name"
+          label={t("signUp.nameLabel")}
           autoComplete="name"
-          placeholder="Ada Lovelace"
+          placeholder={t("signUp.namePlaceholder")}
         />
 
         <FormTextField
           control={form.control}
           name="email"
-          label="Email"
+          label={t("emailField.label")}
           type="email"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder={t("emailField.placeholder")}
         />
 
         <FormTextField
           control={form.control}
           name="password"
-          label="Password"
+          label={t("signIn.passwordLabel")}
           type="password"
           autoComplete="new-password"
-          placeholder="••••••••"
-          description="At least 15 characters. Avoid passwords exposed in known data breaches."
+          placeholder={t("signIn.passwordPlaceholder")}
+          description={t("passwordField.hint")}
         />
 
         <FormField
@@ -66,9 +68,15 @@ export function SignUpForm() {
                 <FormControl>
                   <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel weight="normal">
-                  I accept the <PolicyLink type="privacy">Privacy Policy</PolicyLink> and{" "}
-                  <PolicyLink type="terms">Terms of Service</PolicyLink>
+                <FormLabel weight="normal" className="block leading-normal">
+                  <Trans
+                    ns="auth"
+                    i18nKey="signUp.accept"
+                    components={{
+                      privacy: <PolicyLink type="privacy" />,
+                      terms: <PolicyLink type="terms" />,
+                    }}
+                  />
                 </FormLabel>
               </div>
               <FormMessage />
@@ -77,7 +85,7 @@ export function SignUpForm() {
         />
 
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Creating account…" : "Create account"}
+          {mutation.isPending ? t("signUp.pending") : t("signUp.submit")}
         </Button>
       </form>
     </Form>

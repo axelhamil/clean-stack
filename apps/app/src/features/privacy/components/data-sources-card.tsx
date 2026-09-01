@@ -9,26 +9,30 @@ import {
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { SUB_PROCESSOR_KEYS } from "../../../shared/sub-processor-labels";
 import { SUB_PROCESSORS } from "../../../shared/sub-processors.config";
 
 const activeProcessors = SUB_PROCESSORS.filter((sp) => sp.status === "active");
 
 export function DataSourcesCard() {
+  const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Data sub-processors</CardTitle>
-        <CardDescription>
-          Third parties we use to operate the service (active only).
-        </CardDescription>
+        <CardTitle>{t("privacy.dataSources.title")}</CardTitle>
+        <CardDescription>{t("privacy.dataSources.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="flex flex-col divide-y">
           {activeProcessors.map((sp) => (
-            <li key={sp.name} className="flex flex-col gap-0.5 py-3">
+            <li key={sp.id} className="flex flex-col gap-0.5 py-3">
               <span className="text-sm font-medium">{sp.name}</span>
               <TypographyMuted className="text-xs">
-                {sp.purpose} · {sp.region}
+                {tCommon(SUB_PROCESSOR_KEYS[sp.id].purpose)} ·{" "}
+                {tCommon(SUB_PROCESSOR_KEYS[sp.id].region)}
               </TypographyMuted>
             </li>
           ))}
@@ -36,7 +40,7 @@ export function DataSourcesCard() {
       </CardContent>
       <CardFooter>
         <NavLink asChild variant="underline">
-          <Link to="/legal/sub-processors">View all sub-processors</Link>
+          <Link to="/legal/sub-processors">{t("privacy.dataSources.viewAll")}</Link>
         </NavLink>
       </CardFooter>
     </Card>

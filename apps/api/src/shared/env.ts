@@ -2,111 +2,164 @@ import { z } from "zod";
 
 declare const process: { env: Record<string, string | undefined> };
 
-const envSchema = z.object({
-  DATABASE_URL: z.url(),
-  BETTER_AUTH_URL: z.url(),
-  BETTER_AUTH_SECRET: z.string().min(32),
+const envSchema = z
+  .object({
+    DATABASE_URL: z.url(),
+    BETTER_AUTH_URL: z.url(),
+    BETTER_AUTH_SECRET: z.string().min(32),
 
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  PORT: z.coerce.number().optional(),
-  CORS_ORIGIN: z
-    .string()
-    .optional()
-    .transform((v) => v?.split(",").map((s) => s.trim())),
-  APP_URL: z.url(),
-  RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM: z.string().optional(),
-  INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
-  INTERNAL_AUTH_LAYERS: z
-    .string()
-    .optional()
-    .transform((v) =>
-      v
-        ?.split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    )
-    .pipe(
-      z
-        .array(z.enum(["signature", "private-network"]))
-        .min(1)
-        .optional(),
-    ),
-  RGPD_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).optional(),
-  RGPD_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().optional(),
-  RGPD_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().optional(),
-  S3_ENDPOINT: z.url().optional(),
-  S3_REGION: z.string().optional(),
-  S3_BUCKET: z.string().optional(),
-  S3_ACCESS_KEY: z.string().optional(),
-  S3_SECRET_KEY: z.string().optional(),
-  S3_FORCE_PATH_STYLE: z
-    .string()
-    .optional()
-    .transform((v) => v === "true"),
-  S3_PUBLIC_URL: z.url().optional(),
-  STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().optional(),
-  STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().optional(),
-  STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
-  WEBHOOK_MASTER_KEY: z
-    .string()
-    .regex(/^[0-9a-f]{64}$/i, "WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)")
-    .optional(),
-  AUDIT_TAMPER_EVIDENCE: z
-    .string()
-    .optional()
-    .transform((v) => v === "true"),
-  OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
-  EMAIL_MESSAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
-  AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
-  AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
-  WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
-  WEBHOOK_SECRET_GRACE_HOURS: z.coerce.number().int().positive().default(24),
-  WEBHOOK_AUTO_DISABLE_AFTER_DAYS: z.coerce.number().int().positive().default(5),
-  WEBHOOK_AUTO_DISABLE_MIN_FAILURES: z.coerce.number().int().positive().default(2),
-  WEBHOOK_RESPONSE_CAPTURE_BYTES: z.coerce.number().int().positive().default(4096),
-  CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
-  GIT_SHA: z.string().optional(),
-  BUILD_TIME: z.string().optional(),
-  SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),
-  SENTRY_DSN: z.url().optional(),
-  SENTRY_ENVIRONMENT: z.string().optional(),
-  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
-  HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
-  AUTH_SIGN_IN_ACCOUNT_MAX: z.coerce.number().int().positive().default(5),
-  AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC: z.coerce.number().int().positive().default(900),
-  DISPOSABLE_EMAIL_BLOCK_ENABLED: z
-    .string()
-    .optional()
-    .transform((v) => v !== "false"),
-  PLATFORM_ADMIN_IDS: z
-    .string()
-    .optional()
-    .transform(
-      (v) =>
+    NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    PORT: z.coerce.number().optional(),
+    SERVER_IDLE_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(255).default(120),
+    SWEEP_DEADLINE_MS: z.coerce.number().int().min(1000).default(90_000),
+    INTERNAL_FETCH_TIMEOUT_MS: z.coerce.number().int().min(1000).default(150_000),
+    CORS_ORIGIN: z
+      .string()
+      .optional()
+      .transform((v) => v?.split(",").map((s) => s.trim())),
+    APP_URL: z.url(),
+    RESEND_API_KEY: z.string().optional(),
+    RESEND_FROM: z.string().optional(),
+    INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
+    INTERNAL_AUTH_LAYERS: z
+      .string()
+      .optional()
+      .transform((v) =>
         v
           ?.split(",")
           .map((s) => s.trim())
-          .filter(Boolean) ?? [],
-    ),
-  PLATFORM_ADMIN_REQUIRE_MFA: z
-    .string()
-    .optional()
-    .transform((v) => v !== "false"),
-  DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
-  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
-  TRUSTED_PROXIES: z
-    .string()
-    .optional()
-    .transform((v) =>
-      v
-        ?.split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    ),
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-});
+          .filter(Boolean),
+      )
+      .pipe(
+        z
+          .array(z.enum(["signature", "private-network"]))
+          .min(1)
+          .optional(),
+      ),
+    RGPD_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).optional(),
+    RGPD_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().optional(),
+    RGPD_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().optional(),
+    S3_ENDPOINT: z.url().optional(),
+    S3_REGION: z.string().optional(),
+    S3_BUCKET: z.string().optional(),
+    S3_ACCESS_KEY: z.string().optional(),
+    S3_SECRET_KEY: z.string().optional(),
+    S3_FORCE_PATH_STYLE: z
+      .string()
+      .optional()
+      .transform((v) => v === "true"),
+    S3_PUBLIC_URL: z.url().optional(),
+    STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().optional(),
+    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().optional(),
+    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
+    WEBHOOK_MASTER_KEY: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/i, "WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)")
+      .optional(),
+    AUDIT_TAMPER_EVIDENCE: z
+      .string()
+      .optional()
+      .transform((v) => v === "true"),
+    OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+    EMAIL_MESSAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+    EMAIL_MESSAGE_FAILED_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+    AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+    AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+    WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+    WEBHOOK_SECRET_GRACE_HOURS: z.coerce.number().int().positive().default(24),
+    WEBHOOK_AUTO_DISABLE_AFTER_DAYS: z.coerce.number().int().positive().default(5),
+    WEBHOOK_AUTO_DISABLE_MIN_FAILURES: z.coerce.number().int().positive().default(2),
+    WEBHOOK_RESPONSE_CAPTURE_BYTES: z.coerce.number().int().positive().default(4096),
+    CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+    NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+    NOTIFICATION_DIGEST_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(8),
+    GIT_SHA: z.string().optional(),
+    BUILD_TIME: z.string().optional(),
+    SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),
+    SENTRY_DSN: z.url().optional(),
+    SENTRY_ENVIRONMENT: z.string().optional(),
+    SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+    HIBP_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+    AUTH_SIGN_IN_ACCOUNT_MAX: z.coerce.number().int().positive().default(5),
+    AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC: z.coerce.number().int().positive().default(900),
+    DISPOSABLE_EMAIL_BLOCK_ENABLED: z
+      .string()
+      .optional()
+      .transform((v) => v !== "false"),
+    PLATFORM_ADMIN_IDS: z
+      .string()
+      .optional()
+      .transform(
+        (v) =>
+          v
+            ?.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean) ?? [],
+      ),
+    PLATFORM_ADMIN_REQUIRE_MFA: z
+      .string()
+      .optional()
+      .transform((v) => v !== "false"),
+    DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
+    RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
+    TRUSTED_PROXIES: z
+      .string()
+      .optional()
+      .transform((v) =>
+        v
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    API_TOKEN_PEPPER: z.string().min(32).optional(),
+    API_TOKEN_PEPPER_PREVIOUS: z.string().min(32).optional(),
+    API_TOKEN_PREFIX: z
+      .string()
+      .regex(/^[a-z][a-z0-9]*_$/)
+      .default("clean_"),
+    API_TOKEN_MAX_EXPIRY_DAYS: z.coerce.number().int().positive().default(365),
+    API_TOKEN_LAST_USED_BUCKET_MIN: z.coerce.number().int().positive().default(15),
+    API_TOKEN_PEPPER_VERSION: z.coerce.number().int().positive().default(1),
+  })
+  .superRefine(validateEnvBounds);
+
+/**
+ * The three sweep-timeout bounds only work nested: the sweep must be able to finish
+ * and answer before the socket closes, and the socket must close before the client
+ * gives up. A `.env` that inverts them silently reproduces the bug this configuration
+ * exists to prevent, so it fails the boot instead.
+ *
+ * Exported (rather than inlined in the `superRefine` call) so tests can exercise the
+ * comparisons directly against plain literals — `env.ts` parses `process.env` at
+ * import time and throws on missing required vars, so importing `env` from a test
+ * would require a full `.env`.
+ */
+export function validateEnvBounds(
+  value: {
+    SERVER_IDLE_TIMEOUT_SECONDS: number;
+    SWEEP_DEADLINE_MS: number;
+    INTERNAL_FETCH_TIMEOUT_MS: number;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const idleMs = value.SERVER_IDLE_TIMEOUT_SECONDS * 1000;
+  if (value.SWEEP_DEADLINE_MS >= idleMs) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["SWEEP_DEADLINE_MS"],
+      message: `SWEEP_DEADLINE_MS (${value.SWEEP_DEADLINE_MS}) must be below SERVER_IDLE_TIMEOUT_SECONDS (${value.SERVER_IDLE_TIMEOUT_SECONDS}s = ${idleMs}ms), or the socket closes before the sweep can answer.`,
+    });
+  }
+  if (value.INTERNAL_FETCH_TIMEOUT_MS <= idleMs) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["INTERNAL_FETCH_TIMEOUT_MS"],
+      message: `INTERNAL_FETCH_TIMEOUT_MS (${value.INTERNAL_FETCH_TIMEOUT_MS}) must exceed SERVER_IDLE_TIMEOUT_SECONDS (${value.SERVER_IDLE_TIMEOUT_SECONDS}s = ${idleMs}ms), or the client gives up before the server answers.`,
+    });
+  }
+}
 
 const rawEnv = Object.fromEntries(
   Object.entries(process.env).map(([k, v]) => [k, v === "" ? undefined : v]),
@@ -114,7 +167,27 @@ const rawEnv = Object.fromEntries(
 
 export const env = envSchema.parse(rawEnv);
 
+// Bootstrap ships these as long-enough placeholders so local dev and CI checks
+// (check:sweep-lock, check:fanout) work out of the box — but "long enough" also
+// satisfies `.min(32)`, so a deploy that copies `.env.example` verbatim and forgets
+// to replace them would otherwise boot with a published secret. Reject the literal
+// placeholder text, not just its length.
+const PLACEHOLDER_SECRETS = new Set([
+  "replace-with-openssl-rand-hex-32-chars-minimum",
+  "replace-with-openssl-rand-base64-32",
+]);
+
 if (env.NODE_ENV === "production") {
+  if (env.INTERNAL_SIGNING_KEY && PLACEHOLDER_SECRETS.has(env.INTERNAL_SIGNING_KEY)) {
+    throw new Error(
+      "INTERNAL_SIGNING_KEY is still the .env.example placeholder. Generate a real one: openssl rand -hex 32",
+    );
+  }
+  if (PLACEHOLDER_SECRETS.has(env.BETTER_AUTH_SECRET)) {
+    throw new Error(
+      "BETTER_AUTH_SECRET is still the .env.example placeholder. Generate a real one: openssl rand -base64 32",
+    );
+  }
   if (!env.CORS_ORIGIN || env.CORS_ORIGIN.length === 0) {
     throw new Error(
       "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost — rejecting the real front and collapsing the CORS + CSRF allowlist.",
@@ -138,6 +211,11 @@ if (env.NODE_ENV === "production") {
   if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
     throw new Error(
       "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are required in production. Without them Checkout, the Billing Portal and webhook signature verification all fail.",
+    );
+  }
+  if (!env.API_TOKEN_PEPPER) {
+    throw new Error(
+      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret — a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
     );
   }
 }

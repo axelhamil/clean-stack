@@ -1,8 +1,26 @@
-import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { guestLayout } from "../../router/layouts";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { SignUpForm } from "./forms/sign-up-form";
 
-export const signUpRoute = createRoute({
-  getParentRoute: () => guestLayout,
-  path: "sign-up",
-  component: lazyRouteComponent(() => import("./sign-up.page"), "SignUpPage"),
+export const Route = createFileRoute("/_guest/sign-up")({
+  component: SignUpPage,
 });
+
+function SignUpPage() {
+  const { t } = useTranslation("auth");
+  return (
+    <AuthShell
+      title={t("signUp.title")}
+      description={t("signUp.description")}
+      footer={
+        <AuthShellFooter
+          lead={t("signUp.alreadyHaveAccount")}
+          link={<Link to="/sign-in">{t("signIn.submit")}</Link>}
+        />
+      }
+    >
+      <SignUpForm />
+    </AuthShell>
+  );
+}

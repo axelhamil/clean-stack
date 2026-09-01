@@ -10,6 +10,7 @@ const noopInstr = {
   startSpan: (_: unknown, fn: () => unknown) => fn(),
   capture: () => {},
   addBreadcrumb: () => {},
+  setSpanAttributes: () => {},
 };
 
 function makeTx(lastHashRows: () => { hash: string | null }[]) {

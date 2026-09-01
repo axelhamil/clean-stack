@@ -25,6 +25,16 @@ const STUB_VARS = {
     reason: "ticket #42",
     supportUrl: "https://example.com/support",
   },
+  api_token_leaked: {
+    name: "Ada",
+    tokenName: "CI token",
+    revokedAt: "6 août 2026 à 10:00",
+  },
+  notification_digest: {
+    category: "billing",
+    itemCount: "2",
+    itemsSummary: "billing.payment.failed, billing.payment.failed",
+  },
 } as const satisfies Record<EmailTemplateKey, unknown>;
 
 describe("renderTemplate", () => {
@@ -45,5 +55,15 @@ describe("renderTemplate", () => {
       expect(out.text.length).toBeGreaterThan(0);
       expect(out.subject.length).toBeGreaterThan(0);
     }
+  });
+
+  it("emphasises the token and organization names rather than inlining the tag", async () => {
+    const token = await renderTemplate("api_token_leaked", STUB_VARS.api_token_leaked);
+    expect(token.html).toContain("<strong>CI token</strong>");
+    expect(token.html).not.toContain("<token>");
+
+    const invite = await renderTemplate("org_invitation", STUB_VARS.org_invitation, "fr");
+    expect(invite.html).toContain("<strong>Acme</strong>");
+    expect(invite.html).not.toContain("<org>");
   });
 });

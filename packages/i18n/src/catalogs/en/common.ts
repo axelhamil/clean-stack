@@ -1,0 +1,313 @@
+export default {
+  brand: "clean-stack",
+  actions: {
+    save: "Save",
+    cancel: "Cancel",
+    retry: "Retry",
+    reload: "Reload",
+  },
+  roles: {
+    owner: "Owner",
+    admin: "Admin",
+    member: "Member",
+  },
+  errorBoundary: {
+    title: "Something went wrong",
+    body: "We've been notified and are looking into it. Try reloading the page.",
+  },
+  nav: {
+    dashboard: "Dashboard",
+    settings: "Settings",
+    admin: "Admin",
+  },
+  shell: {
+    brandLabel: "App",
+    search: "Search...",
+    openCommandPalette: "Open command palette",
+    logoAlt: "App logo",
+  },
+  commandPalette: {
+    searchPlaceholder: "Search pages, actions, organizations...",
+    noResults: "No results found.",
+    actionFailed: "Action failed",
+    groups: {
+      navigate: "Navigate",
+      switchOrganization: "Switch organization",
+      admin: "Admin",
+      legal: "Legal & privacy",
+      actions: "Actions",
+    },
+    nav: {
+      organization: "Settings — Organization",
+      billing: "Settings — Billing",
+      webhooks: "Settings — Webhooks",
+      account: "Settings — Account",
+      privacy: "Settings — Privacy",
+      eventCatalog: "Developers — Event catalog",
+    },
+    organizationActive: "active",
+    admin: {
+      auditLog: "Admin — Audit log",
+      accounts: "Admin — Accounts",
+      organizations: "Admin — Organizations",
+    },
+    theme: {
+      light: "Theme: Light",
+      dark: "Theme: Dark",
+      system: "Theme: System",
+      active: "active",
+    },
+    copyOrgSlug: "Copy org slug",
+    orgSlugCopiedToast: "Org slug copied to clipboard",
+  },
+  contextualTabs: {
+    ariaLabel: "Settings sections",
+    organization: "Organization",
+    billing: "Billing",
+    webhooks: "Webhooks",
+    sso: "Single sign-on",
+    account: "Account",
+    notifications: "Notifications",
+    privacy: "Privacy",
+    apiTokens: "API tokens",
+  },
+  orgSwitcher: {
+    searchPlaceholder: "Search organization...",
+    noResults: "No organization found.",
+    heading: "Organizations",
+    newOrganization: "New organization",
+    selectPlaceholder: "Select organization",
+    switchFailed: "Failed to switch organization",
+  },
+  developers: {
+    eventsTitle: "Event catalog",
+    eventsIntro:
+      "All subscribable events emitted by this platform. Subscribe to any of these via a webhook endpoint in your organization settings.",
+    eventsEnglishNote:
+      "Event names and their descriptions are part of the API reference and stay in English.",
+  },
+  userMenu: {
+    openMenu: "Open user menu",
+    account: "Account",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    signedOutToast: "Signed out",
+    signOutFailed: "Sign-out failed",
+  },
+  impersonation: {
+    activeSession: "Active impersonation session — acting as <name></name>",
+    remainingMinutes: "{{minutes}} min remaining",
+    expired: "session expired",
+    end: "End impersonation",
+    actionUnavailable: "Unavailable while impersonating.",
+  },
+  cookieBanner: {
+    ariaLabel: "Cookie consent",
+    message:
+      "We use cookies to operate this service. Optional cookies help improve your experience.",
+    policyLink: "Cookie policy",
+    rejectAll: "Reject all",
+    customize: "Customize",
+    acceptAll: "Accept all",
+    preferencesTitle: "Cookie preferences",
+  },
+  cookieConsent: {
+    title: "Manage your cookie preferences",
+    save: "Save preferences",
+    withdraw: "Withdraw all consent",
+    savedToast: "Preferences saved",
+    withdrawnToast: "Consent withdrawn",
+    categories: {
+      necessary: {
+        label: "Strictly necessary",
+        description: "Required for the service to function. Cannot be disabled.",
+      },
+      functional: {
+        label: "Functional",
+        description: "Enhance your experience (e.g. language or region preferences).",
+      },
+      analytics: {
+        label: "Analytics",
+        description: "Help us understand how visitors use the service (anonymised data).",
+      },
+      marketing: {
+        label: "Marketing",
+        description: "Allow personalised advertising and retargeting.",
+      },
+    },
+  },
+  legal: {
+    policies: {
+      privacyTitle: "Privacy Policy",
+      termsTitle: "Terms of Service",
+      versionLine: "Version {{version}} — effective {{date}}",
+      unavailableBanner:
+        "This document is not yet available in your language. You are reading the English version below.",
+    },
+    accessibility: {
+      title: "Accessibility statement",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Last reviewed: 2026-07-09",
+    },
+    cookies: {
+      title: "Cookie policy",
+      subtitle: "CNIL compliant — Last updated: 2026-07-09",
+      tableCaption: "Cookies in the {{category}} category used by this application",
+    },
+    dataRights: {
+      title: "Your data rights",
+      subtitle:
+        "RGPD Art. 13/14 transparency disclosure. Last updated on the date this page was deployed.",
+    },
+    subProcessors: {
+      title: "Sub-processor disclosure",
+      subtitle: "RGPD Art. 28 — Last updated: 2026-07-09",
+      table: {
+        name: "Name",
+        purpose: "Purpose",
+        region: "Region / Transfer basis",
+        dpa: "DPA",
+      },
+      resend: {
+        purpose: "Transactional email delivery",
+        region: "US (EU DPF-certified)",
+      },
+      r2: {
+        purpose: "Object storage (file uploads)",
+        region: "EU or US (zone configurable)",
+      },
+      betterAuth: {
+        purpose: "OAuth social authentication",
+        region: "US / EU (per provider)",
+      },
+      stripe: {
+        purpose: "Payment processing and billing",
+        region: "US (EU DPF-certified)",
+      },
+      umami: {
+        purpose: "Privacy-friendly web analytics",
+        region: "Configurable (self-hostable)",
+      },
+    },
+    accept: {
+      title: "Before you get started",
+      titleReacceptance: "Updated policies",
+      subtitle: "Please review and accept our Privacy Policy and Terms to continue.",
+      subtitleReacceptance:
+        "We've updated our policies. Please review the changes and accept to continue.",
+      updatedBadge: "Updated",
+      readFull: "Read the full {{title}}",
+      acceptButton: "Accept and continue",
+      acceptingButton: "Accepting…",
+    },
+    routes: {
+      dataRights: "Data rights (RGPD)",
+      privacyPolicy: "Privacy policy",
+      terms: "Terms of service",
+      subProcessors: "Sub-processors (RGPD Art. 28)",
+      accessibility: "Accessibility statement (EAA Art. 14)",
+      cookies: "Cookie policy (CNIL)",
+    },
+  },
+  policyAcceptance: {
+    acceptedToast: "Policies accepted — welcome!",
+    acceptFailed: "Could not record your acceptance. Please try again.",
+  },
+  legalFooter: {
+    ariaLabel: "Legal",
+  },
+  clipboard: {
+    copied: "{{label}} copied to clipboard",
+    copyLabel: "Copy {{label}}",
+  },
+  secretReveal: {
+    title: "Signing secret",
+    description: "Copy this now — it is shown only once and cannot be retrieved later.",
+    secretLabel: "Secret",
+    confirm: "I saved it",
+  },
+  theme: {
+    switchToLight: "Switch to light theme",
+    switchToDark: "Switch to dark theme",
+  },
+  notifications: {
+    title: "Notifications",
+    markAllRead: "Mark all as read",
+    empty: "You are all caught up.",
+    unreadNone: "Notifications, none unread",
+    unreadLabel_one: "Notifications, {{count}} unread",
+    unreadLabel_other: "Notifications, {{count}} unread",
+    andMore: "and {{count}} more",
+    newBadge: "New",
+    loadMore: "Load more",
+    loadingMore: "Loading…",
+    categories: {
+      security: "Security",
+      org: "Organization",
+      billing: "Billing",
+      activity: "Activity",
+      unknown: "Other",
+    },
+  },
+  dashboard: {
+    welcome: "Welcome back, {{name}}",
+    subtitle: "Here's what's happening today.",
+    gettingStartedTitle: "Getting started",
+    gettingStartedDescription: "Configure your workspace.",
+    gettingStartedBody:
+      "Invite teammates, configure billing, and start shipping. Everything lives under Settings.",
+    activityTitle: "Activity",
+    activityDescription: "Recent events in your workspace.",
+    activityEmpty: "Nothing yet — your activity will surface here.",
+    usageTitle: "Usage",
+    usageDescription: "Quota and limits for the current period.",
+    usageEmpty: "Hook up metering once a billable resource exists.",
+  },
+  orgNew: {
+    title: "Create organization",
+    subtitle: "Spin up a new workspace for your team.",
+    detailsTitle: "Organization details",
+    detailsDescription: "Give your organization a name and a unique slug.",
+    nameLabel: "Name",
+    namePlaceholder: "Acme",
+    createdToast: "Organization created",
+    createFailed: "Failed to create organization",
+  },
+  invitation: {
+    signInTitle: "Sign in to accept",
+    signInBody: "You need to be signed in to accept this invitation.",
+    joinTitle: "Join the organization",
+    signedInAs:
+      "Signed in as {{email}}. If this is the wrong account, sign out and sign back in with the invited email.",
+    acceptInvitation: "Accept invitation",
+    acceptedToast: "Invitation accepted",
+    acceptFailed: "Failed to accept invitation",
+  },
+  states: {
+    endpoint: {
+      active: "Active",
+      paused: "Paused",
+      autoDisabled: "Auto-disabled",
+    },
+    delivery: {
+      pending: "Pending",
+      success: "Success",
+      failed: "Failed",
+      deadLetter: "Dead letter",
+    },
+  },
+  pricing: {
+    title: "Pricing",
+    subtitle: "Pick the plan that fits your team.",
+    free: "Free",
+    perInterval: "{{amount}}/{{interval}}",
+    interval: {
+      day: "day",
+      week: "week",
+      month: "month",
+      year: "year",
+    },
+    currentPlanCta: "Current plan",
+    getStarted: "Get started",
+    upgrade: "Upgrade",
+  },
+} as const;

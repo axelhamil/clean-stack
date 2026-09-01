@@ -1,5 +1,7 @@
 import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import { and, db, emailSchema, eq, inArray, isNull, lte, or, sql } from "@packages/drizzle";
+import { isLocale } from "@packages/i18n";
+import { logger } from "../logger";
 import type {
   EmailMessageInsert,
   EmailMessageRecord,
@@ -15,10 +17,10 @@ export class DrizzleEmailQueue implements IEmailQueue {
   async enqueue(
     rows: EmailMessageInsert[],
     tx?: ITransaction,
-  ): Promise<Result<void, EmailQueueError>> {
+  ): Promise<Result<{ written: number }, EmailQueueError>> {
     const exec = tx ?? db;
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > enqueue" }, async () => {
-      if (rows.length === 0) return Result.ok<void, EmailQueueError>(undefined);
+      if (rows.length === 0) return Result.ok<{ written: number }, EmailQueueError>({ written: 0 });
       try {
         const values = rows.map((r) => ({
           id: uuidv7(),
@@ -26,14 +28,19 @@ export class DrizzleEmailQueue implements IEmailQueue {
           template: r.template.isSome() ? r.template.unwrap() : null,
           toAddress: r.toAddress,
           subject: r.subject,
+          locale: r.locale,
           payload: r.payload,
           status: "pending" as const,
           attempts: 0,
           nextAttemptAt: null,
           idempotencyKey: r.idempotencyKey.isSome() ? r.idempotencyKey.unwrap() : null,
         }));
-        const query = exec.insert(emailSchema.emailMessage).values(values);
-        await this.instrumentation.startSpan(
+        const query = exec
+          .insert(emailSchema.emailMessage)
+          .values(values)
+          .onConflictDoNothing({ target: emailSchema.emailMessage.idempotencyKey })
+          .returning({ id: emailSchema.emailMessage.id });
+        const written = await this.instrumentation.startSpan(
           {
             name: "insert into email_message",
             op: "db.query",
@@ -41,7 +48,13 @@ export class DrizzleEmailQueue implements IEmailQueue {
           },
           () => query,
         );
-        return Result.ok<void, EmailQueueError>(undefined);
+        if (written.length < values.length) {
+          logger.warn(
+            { requested: values.length, written: written.length },
+            "email enqueue suppressed duplicate rows — idempotency keys already present",
+          );
+        }
+        return Result.ok<{ written: number }, EmailQueueError>({ written: written.length });
       } catch (err) {
         this.instrumentation.capture(err);
         return Result.fail({
@@ -93,6 +106,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
             rows.map((r) => ({
               ...r,
               template: Option.fromNullable(r.template),
+              locale: Option.fromNullable(isLocale(r.locale) ? r.locale : null),
               nextAttemptAt: Option.fromNullable(r.nextAttemptAt),
               lastError: Option.fromNullable(r.lastError),
               idempotencyKey: Option.fromNullable(r.idempotencyKey),
@@ -116,22 +130,36 @@ export class DrizzleEmailQueue implements IEmailQueue {
     tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markSent" }, async () => {
+      if (ids.length === 0) return Result.ok<void, EmailQueueError>(undefined);
+
       const em = emailSchema.emailMessage;
       try {
-        for (const id of ids) {
-          const query = tx
-            .update(em)
-            .set({
-              status: "sent",
-              sentAt,
-              nextAttemptAt: null,
-              lastError: null,
-              providerMessageId: providerMessageIds[id] ?? null,
-              attempts: sql`${em.attempts} + 1`,
-            })
-            .where(eq(em.id, id));
-          await query.execute();
-        }
+        const cases = ids.map(
+          (id) => sql`WHEN ${em.id} = ${id} THEN ${providerMessageIds[id] ?? null}`,
+        );
+        const providerCase = sql`CASE ${sql.join(cases, sql` `)} ELSE NULL END`;
+
+        const query = tx
+          .update(em)
+          .set({
+            status: "sent",
+            sentAt,
+            nextAttemptAt: null,
+            lastError: null,
+            providerMessageId: providerCase,
+            attempts: sql`${em.attempts} + 1`,
+          })
+          .where(inArray(em.id, ids));
+
+        await this.instrumentation.startSpan(
+          {
+            name: query.toSQL().sql,
+            op: "db.query",
+            attributes: { "db.system.name": "postgresql" },
+          },
+          () => query.execute(),
+        );
+
         return Result.ok<void, EmailQueueError>(undefined);
       } catch (err) {
         this.instrumentation.capture(err);

@@ -55,4 +55,9 @@ describe("NoOpInstrumentation", () => {
       expect(result).toBeUndefined();
     });
   });
+
+  it("accepts setSpanAttributes without throwing", () => {
+    const instrumentation = new NoOpInstrumentation();
+    expect(() => instrumentation.setSpanAttributes({ deleted: 3 })).not.toThrow();
+  });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 
-// Mock node:dns/promises — superset of all exports to avoid cross-test leakage (shared CLAUDE.md rule)
+// Mock node:dns/promises — scoped to this file's module registry.
 const mockResolveMx = mock(
   async (_domain: string) => [] as { exchange: string; priority: number }[],
 );

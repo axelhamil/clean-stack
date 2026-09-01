@@ -21,16 +21,17 @@
   "dependencies": {
     "@packages/cookie-consent": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
+    "@packages/events": "workspace:*",
     "@packages/policies": "workspace:*",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.22.0"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
-    "@types/node": "^26.0.1",
-    "@types/pg": "^8.20.0",
+    "@types/node": "^26.4.0",
+    "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.10",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

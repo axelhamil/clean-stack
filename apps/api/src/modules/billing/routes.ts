@@ -5,6 +5,7 @@ import type { AuthVariables } from "../../shared/middleware/auth.middleware";
 import { requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { stripeClient } from "./infrastructure/stripe-client";
 
 export const billingRoutes = new Hono<{ Variables: AuthVariables }>()
@@ -20,6 +21,7 @@ export const billingRoutes = new Hono<{ Variables: AuthVariables }>()
   .post(
     "/portal",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ billing: ["manage"] }),

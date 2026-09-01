@@ -6,34 +6,11 @@ import { Switch } from "@packages/ui/components/ui/switch";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { withdrawConsentMutationOptions } from "../api/mutations/withdraw-consent";
 import { consentQueryOptions } from "../api/queries/consent";
-
-interface CategoryMeta {
-  label: string;
-  description: string;
-}
-
-const CATEGORY_META = {
-  necessary: {
-    label: "Strictly necessary",
-    description: "Required for the service to function. Cannot be disabled.",
-  },
-  functional: {
-    label: "Functional",
-    description: "Enhance your experience (e.g. language or region preferences).",
-  },
-  analytics: {
-    label: "Analytics",
-    description: "Help us understand how visitors use the service (anonymised data).",
-  },
-  marketing: {
-    label: "Marketing",
-    description: "Allow personalised advertising and retargeting.",
-  },
-} satisfies Record<string, CategoryMeta>;
 
 type OptionalKey = "functional" | "analytics" | "marketing";
 
@@ -45,6 +22,7 @@ interface ConsentSettingsProps {
 }
 
 export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
+  const { t } = useTranslation("common");
   const queryClient = useQueryClient();
   const { data } = useQuery(consentQueryOptions);
 
@@ -67,7 +45,7 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
     ...recordConsentMutationOptions,
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
-      toast.success("Preferences saved");
+      toast.success(t("cookieConsent.savedToast"));
       onSaved?.();
     },
   });
@@ -76,7 +54,7 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
     ...withdrawConsentMutationOptions,
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
-      toast.success("Consent withdrawn");
+      toast.success(t("cookieConsent.withdrawnToast"));
       onSaved?.();
     },
   });
@@ -95,19 +73,21 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
   return (
     <Card>
       <CardHeader>
-        <TypographyH2>Manage your cookie preferences</TypographyH2>
+        <TypographyH2>{t("cookieConsent.title")}</TypographyH2>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
           {ALL_CATEGORIES.map((cat: AllCategory) => {
-            const meta = CATEGORY_META[cat];
+            const label = t(`cookieConsent.categories.${cat}.label` as const);
             const isNecessary = cat === "necessary";
             const checked = isNecessary || enabled[cat as OptionalKey];
             return (
               <div key={cat} className="flex items-start justify-between gap-4">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor={`consent-${cat}`}>{meta.label}</Label>
-                  <TypographyMuted>{meta.description}</TypographyMuted>
+                  <Label htmlFor={`consent-${cat}`}>{label}</Label>
+                  <TypographyMuted>
+                    {t(`cookieConsent.categories.${cat}.description` as const)}
+                  </TypographyMuted>
                 </div>
                 <Switch
                   id={`consent-${cat}`}
@@ -116,7 +96,7 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
                     if (!isNecessary) setEnabled((prev) => ({ ...prev, [cat]: val }));
                   }}
                   disabled={isNecessary || isPending}
-                  aria-label={meta.label}
+                  aria-label={label}
                 />
               </div>
             );
@@ -124,10 +104,10 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
         </div>
         <div className="flex gap-2">
           <Button onClick={handleSave} disabled={isPending}>
-            Save preferences
+            {t("cookieConsent.save")}
           </Button>
           <Button variant="outline" onClick={handleWithdraw} disabled={isPending}>
-            Withdraw all consent
+            {t("cookieConsent.withdraw")}
           </Button>
         </div>
       </CardContent>

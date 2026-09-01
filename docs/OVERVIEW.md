@@ -49,8 +49,8 @@ Compliance is built into the foundation, before any feature, so a clone deployed
 - **Rectification (Art. 16)** — users edit their profile, change their email (with re-verification), and change their password.
 - **Erasure (Art. 17)** — a self-service delete that requires 2FA, holds a 7-day grace window (signing in cancels it), verifies the user isn't the sole owner of a shared organization, then a scheduled job wipes personal data and anonymizes references so shared audit trails stay intact.
 - **Portability (Art. 20)** — a self-service export that emails a signed, 7-day download link, throttled to once a day.
-- **Sub-processor disclosure (Art. 28)** — a public `/legal/sub-processors` page lists every sub-processor (active: Resend, Cloudflare R2, BetterAuth OAuth; planned: Stripe, GrowthBook, Umami) with purpose, region, and DPA link. The active/planned split keeps cloners aware of which additions require the 30-day advance notice to DPA contacts before going live.
-- **Accessibility statement (EAA Art. 14, mandatory since June 2025)** — a public `/legal/accessibility` page declares WCAG 2.1 AA / EN 301 549 v3.2.1 conformance, known limitations, and a contact alias for accessibility complaints. The page itself follows the pattern it prescribes: one `<h1>`, real `<h2>` section headings, a labelled mailto link.
+- **Sub-processor disclosure (Art. 28)** — a public `/legal/sub-processors` page lists every sub-processor (active: Resend, Cloudflare R2, BetterAuth OAuth; planned: Stripe, Umami) with purpose, region, and DPA link. The active/planned split keeps cloners aware of which additions require the 30-day advance notice to DPA contacts before going live.
+- **Accessibility statement (EAA Art. 14, mandatory since June 2025)** — a public `/legal/accessibility` page declares WCAG 2.1 AA / EN 301 549 v3.2.1 conformance, known limitations, and a contact alias for accessibility complaints. The page itself follows the pattern it prescribes: one `<h1>`, real `<h2>` section headings, a labelled mailto link. The claim is backed by a CI gate — every PR runs axe over seven pages in both colour schemes, plus keyboard, focus-trap and reduced-motion checks, and a `serious` violation blocks the merge.
 
 Public compliance pages cover data rights (`/legal/data-rights`), cookie categories (`/legal/cookies`), sub-processor disclosure (`/legal/sub-processors`), and the accessibility statement (`/legal/accessibility`). DPA and DORA-annex contract templates in `docs/legal/` cover EU enterprise client onboarding (a decision table routes: fintech → DPA + DORA annex; non-fintech EU B2B → DPA only).
 
@@ -78,11 +78,13 @@ Email runs on Resend with nine typed templates and idempotency keys, so a retry 
 
 The event backbone is the piece most teams get wrong. Here it's a transactional outbox: a domain event is written in the *same* database transaction as the state change it describes. No event is ever lost, and none is emitted for a write that rolled back — the dual-write problem, solved. A dedicated Postgres `LISTEN/NOTIFY` connection dispatches events the moment the transaction commits, with a 30-second poll as a safety net and row-level locking so multiple replicas share the work without a coordinator, a leader election, or Redis.
 
-- **54 typed events** (50 subscribable + 4 internal) are emitted automatically on every state change — auth, organization, upload, compliance, consent, security, billing, and webhook actions all included. Each payload is Zod-validated before it's written, so a malformed event rolls back its own transaction instead of corrupting the log.
+- **82 typed events** (35 public + 47 internal) are emitted automatically on every state change — auth, organization, upload, compliance, consent, security, billing, and webhook actions all included. Each payload is Zod-validated before it's written, so a malformed event rolls back its own transaction instead of corrupting the log.
 - An **append-only audit log** (90-day operational and 7-year compliance retention) satisfies SOC 2 and GDPR Art. 30. Every row names the actor who triggered it and is correlated to its request and error trace by a single ID. It's queryable through a capability-gated admin endpoint with actor, target, action, and time-range filters.
-- **Outbound webhooks** are a full feature, not just a signer: per-organization endpoints subscribe to the event types they care about (exact names, group wildcards like `billing.*`, or `*`), deliveries are HMAC-signed (Stripe-style), secrets are encrypted at rest and rotatable with a grace window (both old and new secrets sign during rotation so consumers can migrate without downtime), failed deliveries retry with decorrelated jitter and dead-letter after five attempts, and every delivery — including every individual HTTP attempt's request/response headers and body — is logged and individually replayable. Endpoints that keep failing auto-disable, surfacing a distinct badge from a user-paused endpoint. Webhook URLs are validated against a SSRF blocklist at registration and again at delivery time to prevent DNS-rebinding. The operator UI lives at `/settings/webhooks`; a public reference of all 50 subscribable events (with JSON schema per event type and a ready-to-paste Node.js verification snippet) is at `/developers/events`.
+- **Outbound webhooks** are a full feature, not just a signer: per-organization endpoints subscribe to the event types they care about (exact names, group wildcards like `billing.*`, or `*`), deliveries are HMAC-signed (Stripe-style), secrets are encrypted at rest and rotatable with a grace window (both old and new secrets sign during rotation so consumers can migrate without downtime), failed deliveries retry with decorrelated jitter and dead-letter after five attempts, and every delivery — including every individual HTTP attempt's request/response headers and body — is logged and individually replayable. Endpoints that keep failing auto-disable, surfacing a distinct badge from a user-paused endpoint. Webhook URLs are validated against a SSRF blocklist at registration and again at delivery time to prevent DNS-rebinding. The operator UI lives at `/settings/webhooks`; a public reference of all 35 public events (with JSON schema per event type and a ready-to-paste Node.js verification snippet) is at `/developers/events`.
 
-For your own code this is opt-out, not opt-in: declare an event, add it in your aggregate, run the use case — the audit row, the webhook fan-out, and any in-process handlers (auto-discovered, no registration list) happen for free.
+- **In-app notifications** are the third consumer of that same backbone, not a parallel system. A typed map marks 21 of the 82 events as notifiable and declares, per event, *who* should hear about it — expressed as a capability (`{ can: { billing: ["read"] } }`), never as a hardcoded list of roles, so adding a role never silently changes who gets notified. Fan-out happens inside the dispatch transaction as a single `INSERT ... SELECT`, and the same statement resolves a three-level preference cascade: an organization can set defaults, a member can override them, and an organization can lock a category to impose it. Alerts marked critical (password changed, payment failed) bypass all of it by design, and the interface says so rather than hiding a switch that would not work. The bell updates live over SSE — where the stream carries only a signal, never the payload, so a reconnect is self-healing and a dropped stream degrades to polling instead of showing stale data.
+
+For your own code this is opt-out, not opt-in: declare an event, add it in your aggregate, run the use case — the audit row, the webhook fan-out, the notification fan-out, and any in-process handlers (auto-discovered, no registration list) happen for free.
 
 ## Production operations, not a homework assignment
 
@@ -131,7 +133,7 @@ The app provides a public `/pricing` page (plan grid fed from the live Stripe ca
 
 - An **app shell** — sticky navigation, organization switcher, theme toggle, user menu, and a ⌘K command palette that navigates, switches org, changes theme, and only shows what the current user is allowed to reach
 - Complete **account, organization, and privacy screens** — profile with avatar upload, password change, passkey management, 2FA setup with recovery codes, member invitations and role management, ownership transfer, contextual danger zones (delete-account at the bottom of the Account page; org leave/delete at the bottom of the Organization page), and a `/settings/privacy` hub for active-session revoke, data export, consent management, policy acceptance status, and sub-processor disclosure
-- **Vite + React 19 + TanStack Router/Query** with a two-file route pattern and no code-generation step
+- **Vite + React 19 + TanStack Router/Query** with file-based routing (a single `routes.ts` virtual config generating a versioned `routeTree.gen.ts`) and a two-file feature pattern (`route` + lazy component)
 - **Route-level code-splitting** with hover-intent preloading, so navigation feels immediate
 - Forms on **React Hook Form + Zod**, a **shadcn/ui** component kit (base primitives plus purpose-built ones like a reveal-toggle password field and a typed-confirmation destructive dialog), system-aware theming with an animated view-transition, and toast notifications with a live countdown on rate-limit errors
 
@@ -142,12 +144,48 @@ The app provides a public `/pricing` page (plan grid fed from the live Stripe ca
 - **One command to clone and run**, Docker for either native hot-reload or a fully containerized dev loop with file-sync, and Turborepo caching
 - **A zero-warning pipeline** — lint, format, dead-code and duplication checks, type-check, Conventional Commits, and automated releases (semantic-release) enforced by git hooks — with no `--no-verify` escape hatch
 
+## Machine-to-machine access — Personal Access Tokens
+
+When a customer's system needs to call your API, it needs a durable credential that is not a browser session. Personal Access Tokens fill that role: scoped, expirable bearer tokens that the user creates from `/settings/tokens` and revokes at any time.
+
+The token format follows GitHub's convention: a configurable prefix (`clean_` by default, so cloners can set their own), 44 base58 body characters, and a 6-character CRC32 checksum. The checksum is verified before any database call — a mistyped or truncated token costs no round-trip.
+
+Tokens are never stored in plaintext. The server stores `HMAC-SHA256(pepper, raw_token)` in a unique-indexed column. The pepper is a server-side secret (`API_TOKEN_PEPPER`), so a database dump alone yields no usable tokens. Rotation is zero-downtime: a second pepper slot (`API_TOKEN_PEPPER_PREVIOUS`) lets the server accept tokens hashed with the old pepper and transparently rehash them on next use.
+
+**Why a separate sub-app rather than a flag on existing routes**: the token-reachable API lives at `/api/v1` inside a dedicated `Hono` instance that is mounted before the main app and is deliberately absent from `AppType` (the RPC type that the front uses). `sessionMiddleware` skips `/api/v1/*` entirely; token authentication is the only entry. This makes the contract structural rather than conditional — a route that serves token clients is in `/api/v1`, everything else is session-only. A flag-based approach drifts: a new route gets the flag in one team member's PR and not in another's, silently exposing session-only surfaces to token holders.
+
+What a third party holding a token can actually call — the three routes, the header, the scopes, the error codes, the rate limits, and the boundary of what is deliberately unreachable by token — is written for an outside integrator in [`docs/PUBLIC-API.md`](./PUBLIC-API.md).
+
+Tokens are revoked automatically when the issuing user loses org membership, and GitHub's Secret Scanning partner program is supported: a `POST /api/token-scanning/github` endpoint verifies the ECDSA P-256 signature, revokes the matching token, and emails the owner.
+
+## Enterprise SSO (OIDC / SAML) with SCIM provisioning
+
+The single biggest item procurement checks for at enterprise deal size — and the one most templates skip entirely. clean-stack ships it: per-organization identity provider registration (OIDC or SAML 2.0), domain ownership verification, and just-in-time account provisioning on first sign-in, from `/settings/sso`.
+
+- An org owner registers their identity provider once — issuer, client credentials for OIDC or entry point and certificate for SAML — and verifies they own the domain before it takes effect
+- The first person who signs in through that provider is provisioned automatically, landing as a member with no invitation step
+- An org can require SSO for its verified domain — every other sign-in path (password, magic-link, passkey) then redirects the user straight into the identity provider instead of showing them a dead end, because they did nothing wrong; their organization changed the rules
+- SCIM 2.0 keeps the org's roster in sync with the identity provider's own user directory — create, update, deactivate, and remove members without anyone touching `/settings/organization` by hand. Removing a SCIM user is an org departure: it ends that membership, not the person's account
+
+SAML registrations are hardened server-side regardless of what the client sends — SHA-256 signatures and signed assertions are forced, never optional. A local Keycloak profile (`docker compose --profile sso up keycloak -d`) makes the whole round-trip testable without a real Okta or Entra ID tenant.
+
+## Two languages, and the locale never touches the URL
+
+English and French ship in the box. Which one a visitor gets is decided by a cookie, then by what they saved on their account — never by the address bar. That choice is deliberate: locale-prefixed routes would have re-parented every page in the app and every link pointing at one, for a benefit (shareable per-language URLs) that a product with an account system rarely needs.
+
+The catalogs are TypeScript, not JSON, and that is the whole point: `t("auth.signIn.title")` is checked at build time, so a typo or a key you forgot to add is a compile error rather than a raw `auth.signIn.title` rendered to a customer. A test fails the build the moment the two catalogs stop having the same keys, or a French string is left byte-identical to its English source.
+
+Emails pick their language **per recipient**, not per batch, and the choice is frozen onto the queued row when the mail is enqueued — so a retry three hours later replays the same language even if the person switched theirs in between. Form validation messages, API error envelopes and the auth library's own error codes all resolve through the same catalogs, so a French user never gets a French form around an English error.
+
+Today `auth`, the account settings page and the app shell are translated. `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings` and the legal pages are still English — a stated scope decision, not an oversight, and it degrades quietly: a missing French key renders its English copy, never a key.
+
 ## What's next
 
-The roadmap follows a boilerplate's natural order — deploy-safety and legal first, revenue, then finish and polish.
+Short, and short on purpose — the plumbing is done, so the list is a review pass plus three items rather than a phase catalogue.
 
-- **Operate** — admin and impersonation, API tokens, OpenAPI docs, in-app notifications
-- **Reach** — SSO (SAML / OIDC) with SCIM, internationalization, Capacitor mobile, and a marketing site
+- **A manual review pass** over everything shipped, before calling the stack clone-ready.
+- **The rest of the translation** — the typed rail and the `auth` / account / shell surfaces shipped; the admin, billing, webhooks, SSO and legal pages are still English-only.
+- **Abuse signals and a captcha hook** — deferred until there's real traffic to calibrate them against.
 
 The full plan, with constraints and extension points, lives in [`../ROADMAP.md`](../ROADMAP.md).
 
@@ -162,6 +200,7 @@ The full plan, with constraints and extension points, lives in [`../ROADMAP.md`]
 | What's planned | [`../ROADMAP.md`](../ROADMAP.md) |
 | Modules and how they're removed | [`MODULES.md`](./MODULES.md) · [`REMOVABILITY.md`](./REMOVABILITY.md) |
 | Integrations (BetterAuth, Stripe, Resend, R2, DNS) | [`INTEGRATIONS.md`](./INTEGRATIONS.md) |
+| Public API reference (`/api/v1`, for token holders) | [`PUBLIC-API.md`](./PUBLIC-API.md) |
 | Event system (DX guide + walkthrough) | [`EVENTS.md`](./EVENTS.md) · [`EVENT_PIPELINE.md`](./EVENT_PIPELINE.md) |
 | Health probes and graceful shutdown | [`HEALTH-PROBES.md`](./HEALTH-PROBES.md) |
 | Scheduled jobs and internal auth | [`CRON.md`](./CRON.md) |

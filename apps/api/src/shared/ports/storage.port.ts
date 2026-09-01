@@ -1,4 +1,4 @@
-import type { AppError, Result } from "@packages/ddd-kit";
+import type { AppError, Option, Result } from "@packages/ddd-kit";
 
 export type StorageError = AppError<
   | "STORAGE_FORBIDDEN"
@@ -53,4 +53,8 @@ export interface IStorageService {
   deleteObjects(keys: string[]): Promise<Result<void, StorageError>>;
 
   publicUrlFor(key: string): string;
+
+  /** Inverse of `publicUrlFor`. `Option.none()` when the URL was not produced by
+   * this storage — a social-login avatar is a perfectly ordinary `user.image`. */
+  keyFromPublicUrl(url: string): Option<string>;
 }

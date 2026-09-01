@@ -1,15 +1,13 @@
 import { Button, Heading, Text } from "react-email";
-import type { EmailTemplates } from "../templates";
+import type { EmailProps } from "../templates";
 import { EmailLayout } from "./layout";
 
-type MagicLinkVars = EmailTemplates["magic_link"];
-interface MagicLinkProps extends MagicLinkVars {}
-export function MagicLink({ magicUrl }: MagicLinkProps) {
+export function MagicLink({ magicUrl, t }: EmailProps<"magic_link">) {
   return (
-    <EmailLayout preview="Your sign-in link">
-      <Heading as="h1">Sign in to your account</Heading>
-      <Text>Click the button below to sign in. This link is single-use and expires shortly.</Text>
-      <Button href={magicUrl}>Sign in</Button>
+    <EmailLayout preview={t("subjects.magicLink")} t={t}>
+      <Heading as="h1">{t("magicLink.heading")}</Heading>
+      <Text>{t("magicLink.body")}</Text>
+      <Button href={magicUrl}>{t("magicLink.cta")}</Button>
       <Text>{magicUrl}</Text>
     </EmailLayout>
   );

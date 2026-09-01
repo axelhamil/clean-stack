@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as realEvents from "@packages/events";
+import { EventTypes } from "@packages/events";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
-// Expose full export surface so parallel test files don't see missing exports.
 const insertExecute = mock(async () => {});
 const selectExecute = mock(async () => [] as unknown[]);
 const updateExecute = mock(async () => {});
@@ -56,6 +57,7 @@ mock.module("@packages/drizzle", () => ({
   arrayContains: () => ({}),
   sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
     raw: () => ({}),
+    identifier: () => ({}),
   }),
   outboxSchema: {
     outboxEvent: {
@@ -81,7 +83,7 @@ mock.module("@packages/drizzle", () => ({
     },
   },
   webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: {},
+  multiTenantSchema: { organization: { id: {} } },
   authSchema: {},
   schema: {},
   trackEventsOnSuccess: () => {},
@@ -93,66 +95,61 @@ mock.module("@packages/drizzle", () => ({
   },
   policiesSchema: {},
   consentSchema: {},
+  notificationSchema: {
+    notification: {
+      id: { name: "id" },
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      category: { name: "category" },
+      eventType: { name: "event_type" },
+      groupKey: { name: "group_key" },
+      dedupKey: { name: "dedup_key" },
+      payload: { name: "payload" },
+      readAt: { name: "read_at" },
+      emailPendingAt: { name: "email_pending_at" },
+      emailSentAt: { name: "email_sent_at" },
+      createdAt: { name: "created_at" },
+    },
+    notificationPreference: {
+      id: { name: "id" },
+      scope: { name: "scope" },
+      scopeId: { name: "scope_id" },
+      category: { name: "category" },
+      channel: { name: "channel" },
+      enabled: { name: "enabled" },
+      frequency: { name: "frequency" },
+      locked: { name: "locked" },
+    },
+  },
+  apiTokenSchema: {
+    apiToken: {
+      id: {},
+      userId: {},
+      organizationId: {},
+      name: {},
+      scopes: {},
+      tokenHmac: {},
+      pepperVersion: {},
+      tokenStart: {},
+      lastUsedAt: {},
+      expiresAt: {},
+      revokedAt: {},
+      revokedReason: {},
+      createdAt: {},
+      updatedAt: {},
+    },
+  },
 }));
 
 // ── Mock @packages/events ──────────────────────────────────────────────────
-// Expose the FULL export surface — bun's mock.module leaks across files.
-const EventTypesMock = {
-  USER_CREATED: "user.created",
-  USER_SIGNED_IN: "user.signed_in",
-  USER_SIGNED_OUT: "user.signed_out",
-  USER_EMAIL_VERIFIED: "user.email_verified",
-  USER_PASSWORD_RESET_REQUESTED: "user.password_reset.requested",
-  USER_PASSWORD_CHANGED: "user.password_changed",
-  USER_MAGIC_LINK_REQUESTED: "user.magic_link.requested",
-  USER_MFA_ENABLED: "user.mfa.enabled",
-  USER_MFA_DISABLED: "user.mfa.disabled",
-  USER_PASSKEY_ADDED: "user.passkey.added",
-  USER_PASSKEY_REMOVED: "user.passkey.removed",
-  USER_ACCOUNT_LINKED: "user.account.linked",
-  USER_ACCOUNT_UNLINKED: "user.account.unlinked",
-  USER_DELETION_REQUESTED: "user.deletion.requested",
-  USER_DELETION_CANCELLED: "user.deletion.cancelled",
-  USER_DELETED: "user.deleted",
-  USER_PROFILE_UPDATED: "user.profile.updated",
-  USER_EMAIL_CHANGE_REQUESTED: "user.email.change_requested",
-  USER_EXPORT_REQUESTED: "user.export.requested",
-  USER_EXPORT_COMPLETED: "user.export.completed",
-  ORG_CREATED: "org.created",
-  ORG_UPDATED: "org.updated",
-  ORG_DELETED: "org.deleted",
-  ORG_MEMBER_INVITED: "org.member.invited",
-  ORG_MEMBER_JOINED: "org.member.joined",
-  ORG_INVITATION_CANCELLED: "org.invitation.cancelled",
-  ORG_MEMBER_REMOVED: "org.member.removed",
-  ORG_MEMBER_ROLE_CHANGED: "org.member.role_changed",
-  UPLOAD_REQUESTED: "upload.requested",
-  UPLOAD_CONFIRMED: "upload.confirmed",
-  UPLOAD_DELETED: "upload.deleted",
-  WEBHOOK_ENDPOINT_CREATED: "webhook.endpoint.created",
-  WEBHOOK_ENDPOINT_UPDATED: "webhook.endpoint.updated",
-  WEBHOOK_ENDPOINT_DELETED: "webhook.endpoint.deleted",
-  WEBHOOK_TEST: "webhook.test",
-  WEBHOOK_ENDPOINT_SECRET_ROTATED: "webhook.endpoint.secret_rotated",
-  WEBHOOK_ENDPOINT_DISABLED: "webhook.endpoint.disabled",
-  WEBHOOK_DELIVERY_EXHAUSTED: "webhook.delivery.exhausted",
-  USER_POLICY_ACCEPTED: "user.policy.accepted",
-  USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
-  USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
-  SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
-  SECURITY_CSP_VIOLATION: "security.csp.violation",
-  SECURITY_CSRF_REJECTED: "security.csrf.rejected",
-  SECURITY_PASSWORD_BREACHED: "security.password.breached",
-  SECURITY_SIGNUP_REJECTED: "security.signup.rejected",
-  SECURITY_OPERATOR_AUDIT_ACCESSED: "security.operator.audit_accessed",
-  BILLING_SUBSCRIPTION_CREATED: "billing.subscription.created",
-  BILLING_SUBSCRIPTION_UPDATED: "billing.subscription.updated",
-  BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
-  BILLING_PAYMENT_FAILED: "billing.payment.failed",
-  BILLING_QUOTA_EXCEEDED: "billing.quota.exceeded",
-} as const;
-const stubPayload = { safeParse: () => ({ success: true }) };
+// The subject under test is the outbox writer, not payload validation, so every
+// payload schema is stubbed to always accept. Everything else is spread from the
+// real module and the stub map is derived from the real catalog — a hand-kept copy
+// would silently stop covering every event type added after it was written.
+const EventTypesMock = EventTypes;
+const stubPayload = { safeParse: () => ({ success: true as const, data: {} as never }) };
 mock.module("@packages/events", () => ({
+  ...realEvents,
   EventTypes: EventTypesMock,
   ALL_EVENT_TYPES: Object.values(EventTypesMock),
   isKnownEventType: (v: string) => Object.values(EventTypesMock).includes(v as never),
@@ -161,59 +158,6 @@ mock.module("@packages/events", () => ({
   PayloadByEventType: Object.fromEntries(
     Object.values(EventTypesMock).map((t) => [t, stubPayload]),
   ),
-  // Payload schemas (stubs — type-level only in this test)
-  UserCreatedPayload: stubPayload,
-  UserSignedInPayload: stubPayload,
-  UserSignedOutPayload: stubPayload,
-  UserEmailVerifiedPayload: stubPayload,
-  UserPasswordResetRequestedPayload: stubPayload,
-  UserPasswordChangedPayload: stubPayload,
-  UserMagicLinkRequestedPayload: stubPayload,
-  UserMfaEnabledPayload: stubPayload,
-  UserMfaDisabledPayload: stubPayload,
-  UserPasskeyAddedPayload: stubPayload,
-  UserPasskeyRemovedPayload: stubPayload,
-  UserAccountLinkedPayload: stubPayload,
-  UserAccountUnlinkedPayload: stubPayload,
-  UserDeletionRequestedPayload: stubPayload,
-  UserDeletionCancelledPayload: stubPayload,
-  UserDeletedPayload: stubPayload,
-  UserProfileUpdatedPayload: stubPayload,
-  UserEmailChangeRequestedPayload: stubPayload,
-  UserExportRequestedPayload: stubPayload,
-  UserExportCompletedPayload: stubPayload,
-  OrgCreatedPayload: stubPayload,
-  OrgUpdatedPayload: stubPayload,
-  OrgDeletedPayload: stubPayload,
-  OrgMemberInvitedPayload: stubPayload,
-  OrgMemberJoinedPayload: stubPayload,
-  OrgInvitationCancelledPayload: stubPayload,
-  OrgMemberRemovedPayload: stubPayload,
-  OrgMemberRoleChangedPayload: stubPayload,
-  UploadRequestedPayload: stubPayload,
-  UploadConfirmedPayload: stubPayload,
-  UploadDeletedPayload: stubPayload,
-  WebhookEndpointCreatedPayload: stubPayload,
-  WebhookEndpointUpdatedPayload: stubPayload,
-  WebhookEndpointDeletedPayload: stubPayload,
-  WebhookTestPayload: stubPayload,
-  WebhookEndpointSecretRotatedPayload: stubPayload,
-  WebhookEndpointDisabledPayload: stubPayload,
-  WebhookDeliveryExhaustedPayload: stubPayload,
-  UserPolicyAcceptedPayload: stubPayload,
-  UserCookieConsentGrantedPayload: stubPayload,
-  UserCookieConsentWithdrawnPayload: stubPayload,
-  SecurityRateLimitExceededPayload: stubPayload,
-  SecurityCspViolationPayload: stubPayload,
-  SecurityCsrfRejectedPayload: stubPayload,
-  SecurityPasswordBreachedPayload: stubPayload,
-  SecuritySignupRejectedPayload: stubPayload,
-  SecurityOperatorAuditAccessedPayload: stubPayload,
-  BillingSubscriptionCreatedPayload: stubPayload,
-  BillingSubscriptionUpdatedPayload: stubPayload,
-  BillingSubscriptionCancelledPayload: stubPayload,
-  BillingPaymentFailedPayload: stubPayload,
-  BillingQuotaExceededPayload: stubPayload,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────

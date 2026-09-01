@@ -1,0 +1,160 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  HUSKY: 0
+
+jobs:
+  a11y:
+    name: Accessibility gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clean_stack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_stack
+      # The preview server, not the dev server — CORS, CSRF and BetterAuth all read this.
+      CORS_ORIGIN: http://localhost:4173
+      APP_URL: http://localhost:4173
+      # The guard resolves MX records; leaving it on would make the seed depend on DNS.
+      DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
+      # Pinned explicitly so the CI log states which account the checks run
+      # against. Both db:seed and check:fanout resolve it through
+      # apps/api/scripts/seed-account.ts, which holds the same default — so
+      # they stay aligned whether or not this var is set.
+      SEED_EMAIL: dev@example.com
+      # check:sweep-lock and check:fanout sign requests against the ephemeral CI
+      # Postgres above — this key never authenticates a real deployment, so it can
+      # live in the workflow. apps/api/.env.example deliberately ships this var
+      # empty (fail-closed on every /internal/* route, including rgpd-sweep) rather
+      # than a shared placeholder that would ship a working key into every
+      # bootstrapped .env and every environment, staging included.
+      INTERNAL_SIGNING_KEY: ci-only-signing-key-3f9a1c7e2b6d4f80912345
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Resolve pnpm store
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
+
+      - name: Bootstrap env files
+        run: pnpm bootstrap
+
+      - name: Push schema
+        run: pnpm db:push
+
+      - name: Check the sweep lease against a real database
+        run: pnpm --filter api check:sweep-lock
+
+      - name: Seed the audited account
+        run: pnpm --filter api db:seed
+
+      - name: Check fanout preferences against a real database
+        # Must run after seeding: it looks up the SEED_EMAIL user by that email.
+        run: pnpm --filter api check:fanout
+
+      - name: Check the digest window against a real database
+        # Same reason as check:fanout — the frequency cascade and the due filter
+        # live inside SQL, which a mocked tx never evaluates. Needs the seed too.
+        run: pnpm --filter api check:digest
+
+      - name: Check api-token owner visibility against a real database
+        # Same reason as check:fanout — `visibleTokensFilter` builds a WHERE
+        # clause with and/or/eq/isNull, which a mocked tx never evaluates.
+        # Needs the seed too.
+        run: pnpm --filter api check:api-token-visibility
+
+      - name: Check the account-wipe rollback against a real database
+        # Only a real db.transaction can prove Postgres rolled the wipe back when
+        # the confirmation enqueue fails. Creates and removes its own probe user.
+        run: pnpm --filter api check:wipe-rollback
+
+      - name: Check the email-queue enqueue conflict against a real database
+        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape — a
+        # mocked tx asserts the call, never the outcome.
+        run: pnpm --filter api check:enqueue
+
+      - name: Check the email-queue markSent CASE against a real database
+        # Same reason: the CASE expression and the attempts increment are only
+        # evaluated by Postgres.
+        run: pnpm --filter api check:marksent
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      - name: Install Chromium
+        run: pnpm --filter app exec playwright install --with-deps chromium
+
+      - name: Start the API
+        working-directory: apps/api
+        run: |
+          bun src/index.ts > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3000/readyz > /dev/null; then
+              echo "api ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "api never became ready"; cat /tmp/api.log; exit 1
+
+      - name: Audit
+        run: pnpm turbo run check:a11y --filter=app
+
+      - name: API log
+        if: failure()
+        # A failure before the API is started leaves no log; `cat` would then
+        # fail too and bury the real error under a missing-file one.
+        run: cat /tmp/api.log || echo "no api log — the run failed before the API started" 
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: a11y-traces
+          path: apps/app/test-results/
+          retention-days: 7

@@ -1,4 +1,5 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
 import type { ITransaction } from "../../../../shared/transaction";
 
 export type RgpdError = AppError<
@@ -7,6 +8,7 @@ export type RgpdError = AppError<
   | "ACCOUNT_EXPORT_RATE_LIMITED"
   | "ACCOUNT_PASSWORD_INVALID"
   | "ACCOUNT_PASSWORD_REQUIRED"
+  | "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE"
   | "ACCOUNT_WIPE_PROVIDER_FAILURE"
   | "RGPD_REPOSITORY_PROVIDER_FAILURE"
   | "TWO_FACTOR_REQUIRED"
@@ -62,6 +64,7 @@ export interface UserExportPayload {
 export interface ExecuteWipeOutput {
   deletedOrgIds: string[];
   anonymizedEmail: string;
+  alreadyWiped: boolean;
 }
 
 export interface PendingDeletionRow {
@@ -73,6 +76,7 @@ export interface PendingDeletionRow {
 export interface UserDeletionState {
   email: string;
   name: string;
+  locale: Option<Locale>;
   twoFactorEnabled: boolean;
   pendingDeletionUntil: Option<Date>;
   deletedAt: Option<Date>;

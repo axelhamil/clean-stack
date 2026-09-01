@@ -24,6 +24,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.USER_EMAIL_CHANGE_REQUESTED]: "A user requested to change their email address.",
   [EventTypes.USER_EXPORT_REQUESTED]: "A user requested an export of their personal data.",
   [EventTypes.USER_EXPORT_COMPLETED]: "A user's personal data export is ready to download.",
+  [EventTypes.USER_LOCALE_CHANGED]: "A user changed their display language.",
   [EventTypes.ORG_CREATED]: "A new organization was created.",
   [EventTypes.ORG_UPDATED]: "An organization's settings were updated.",
   [EventTypes.ORG_DELETED]: "An organization was deleted.",
@@ -62,17 +63,39 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
     "An email was abandoned after exhausting all delivery attempts.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
-    "Un administrateur plateforme a démarré une session d'impersonation.",
-  [EventTypes.ADMIN_IMPERSONATION_STOPPED]: "Une session d'impersonation a pris fin.",
-  [EventTypes.ADMIN_USER_BANNED]: "Un administrateur plateforme a suspendu un compte.",
-  [EventTypes.ADMIN_USER_UNBANNED]:
-    "Un administrateur plateforme a levé la suspension d'un compte.",
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]:
-    "Un administrateur plateforme a modifié le rôle d'un compte.",
+    "A platform administrator started an impersonation session.",
+  [EventTypes.ADMIN_IMPERSONATION_STOPPED]:
+    "A platform administrator ended an impersonation session.",
+  [EventTypes.ADMIN_USER_BANNED]: "A platform administrator banned a user account.",
+  [EventTypes.ADMIN_USER_UNBANNED]: "A platform administrator lifted the ban on a user account.",
+  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "A platform administrator changed a user's platform role.",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]:
-    "Un administrateur plateforme a déclenché une réinitialisation de mot de passe.",
+    "A platform administrator triggered a password reset for a user.",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:
-    "Un administrateur plateforme a révoqué les sessions d'un compte.",
+    "A platform administrator revoked all active sessions for a user.",
+  [EventTypes.API_TOKEN_CREATED]: "A personal access token was created.",
+  [EventTypes.API_TOKEN_REVOKED]: "A personal access token was revoked.",
+  [EventTypes.API_TOKEN_USED]: "A personal access token was used to authenticate a request.",
+  [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]:
+    "A user updated their personal notification preferences.",
+  [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]:
+    "An organization administrator updated the organization notification preferences.",
+  [EventTypes.NOTIFICATION_READ]: "A user marked one or more of their notifications as read.",
+  [EventTypes.SSO_PROVIDER_REGISTERED]:
+    "An SSO identity provider was registered for an organization.",
+  [EventTypes.SSO_PROVIDER_UPDATED]: "An SSO identity provider's configuration was changed.",
+  [EventTypes.SSO_PROVIDER_DELETED]: "An SSO identity provider was removed from an organization.",
+  [EventTypes.SSO_DOMAIN_VERIFIED]: "An organization proved ownership of an SSO domain.",
+  [EventTypes.SSO_ENFORCEMENT_CHANGED]: "An organization turned SSO-only sign-in on or off.",
+  [EventTypes.SSO_LOGIN_SUCCESS]: "A user signed in through an SSO identity provider.",
+  [EventTypes.SSO_LOGIN_FAILURE]: "An SSO sign-in attempt was rejected.",
+  [EventTypes.SCIM_CONNECTION_CREATED]:
+    "A SCIM provisioning connection was created and its token issued.",
+  [EventTypes.SCIM_CONNECTION_DELETED]: "A SCIM provisioning connection was deleted.",
+  [EventTypes.SCIM_USER_CREATED]: "A user was provisioned into an organization through SCIM.",
+  [EventTypes.SCIM_USER_UPDATED]: "A user's attributes were updated through SCIM.",
+  [EventTypes.SCIM_USER_DEACTIVATED]: "A user was deactivated through SCIM.",
+  [EventTypes.SCIM_USER_DEPROVISIONED]: "A user was removed from an organization through SCIM.",
 };
 
 export function descriptionFor(eventType: string): string {

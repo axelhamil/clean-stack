@@ -113,6 +113,48 @@
       "when": 1785866840187,
       "tag": "0015_shiny_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786916487701,
+      "tag": "0016_aberrant_baron_strucker",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786917715364,
+      "tag": "0017_blue_speed_demon",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787989183402,
+      "tag": "0018_overjoyed_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788012569136,
+      "tag": "0019_wakeful_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788031401881,
+      "tag": "0020_futuristic_wong",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788264991754,
+      "tag": "0021_great_tana_nile",
+      "breakpoints": true
     }
   ]
 }

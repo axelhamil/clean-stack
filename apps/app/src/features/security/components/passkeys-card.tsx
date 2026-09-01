@@ -26,27 +26,35 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
-import { formatDate } from "../../../shared/utils";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import {
+  type ImpersonationGuard,
+  useImpersonationGuard,
+} from "../../../shared/auth/use-impersonation-guard";
+import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { AddPasskeyForm } from "../forms/add-passkey-form";
 import { useDeletePasskey } from "../hooks/use-delete-passkey";
 
 export function PasskeysCard() {
+  const { t } = useTranslation("settings");
   const { data, isLoading } = useQuery(passkeysQueryOptions);
   const [open, setOpen] = useState(false);
+  // `/passkey` is on the BetterAuth impersonation blocklist — both registering
+  // and deleting a passkey 403 while impersonating. One guard for the whole
+  // card so the list rows share a single description node.
+  const guard = useImpersonationGuard();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Passkeys</CardTitle>
-        <CardDescription>
-          Sign in with biometrics or a hardware key. Passkeys are phishing-resistant and replace
-          passwords.
-        </CardDescription>
+        <CardTitle>{t("passkeys.title")}</CardTitle>
+        <CardDescription>{t("passkeys.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {isLoading ? (
-          <TypographyMuted>Loading…</TypographyMuted>
+          <TypographyMuted>{t("passkeys.loading")}</TypographyMuted>
         ) : data && data.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {data.map((passkey) => (
@@ -57,28 +65,35 @@ export function PasskeysCard() {
                 deviceType={passkey.deviceType}
                 backedUp={passkey.backedUp}
                 createdAt={passkey.createdAt}
+                guard={guard}
               />
             ))}
           </ul>
         ) : (
-          <TypographyMuted>No passkeys yet.</TypographyMuted>
+          <TypographyMuted>{t("passkeys.empty")}</TypographyMuted>
         )}
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-fit">
+            <Button
+              variant="outline"
+              className="w-fit"
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
               <PlusIcon />
-              Add a passkey
+              {t("passkeys.add")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add a passkey</DialogTitle>
-              <DialogDescription>Give it a name so you can identify it later.</DialogDescription>
+              <DialogTitle>{t("passkeys.add")}</DialogTitle>
+              <DialogDescription>{t("passkeys.addDialogDescription")}</DialogDescription>
             </DialogHeader>
             <AddPasskeyForm onSuccess={() => setOpen(false)} />
           </DialogContent>
         </Dialog>
+        <ImpersonationReason guard={guard} />
       </CardContent>
     </Card>
   );
@@ -90,24 +105,28 @@ interface PasskeyRowProps {
   deviceType: string;
   backedUp: boolean;
   createdAt: Date;
+  guard: ImpersonationGuard;
 }
 
-function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowProps) {
+function PasskeyRow({ id, name, deviceType, backedUp, createdAt, guard }: PasskeyRowProps) {
+  const { t } = useTranslation("settings");
+  const formatDate = useFormatDate();
   const mutation = useDeletePasskey();
-  const created = formatDate(createdAt);
 
   return (
     <ListRow>
       <ListRowMedia>
         <KeyRoundIcon />
         <ListRowContent>
-          <TypographySmall>{name ?? "Unnamed passkey"}</TypographySmall>
+          <TypographySmall>{name ?? t("passkeys.unnamed")}</TypographySmall>
           <ListRowMeta>
             <Badge variant="secondary">
-              {deviceType === "singleDevice" ? "Device-bound" : "Synced"}
+              {deviceType === "singleDevice" ? t("passkeys.deviceBound") : t("passkeys.synced")}
             </Badge>
-            {backedUp && <Badge variant="outline">Backed up</Badge>}
-            <TypographyMuted>Added {created}</TypographyMuted>
+            {backedUp && <Badge variant="outline">{t("passkeys.backedUp")}</Badge>}
+            <TypographyMuted>
+              {t("passkeys.added", { date: formatDate(createdAt) })}
+            </TypographyMuted>
           </ListRowMeta>
         </ListRowContent>
       </ListRowMedia>
@@ -117,8 +136,9 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowPro
           variant="ghost"
           size="sm"
           onClick={() => mutation.mutate(id)}
-          disabled={mutation.isPending}
-          aria-label="Remove passkey"
+          disabled={mutation.isPending || guard.blocked}
+          {...guard.describeProps(mutation.isPending)}
+          aria-label={t("passkeys.remove")}
         >
           <Trash2Icon />
         </Button>

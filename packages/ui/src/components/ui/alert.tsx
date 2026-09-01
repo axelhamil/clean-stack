@@ -9,10 +9,14 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-card text-card-foreground",
+        // The description keeps full opacity: /90 over a card costs ~0.9 of contrast
+        // ratio, which no red dark enough to stay readable can absorb.
         destructive:
-          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 [&>svg]:text-current",
+          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive [&>svg]:text-current",
+        // `dark:bg-destructive/60` mirrors Button and Badge: at full opacity the dark
+        // token is light enough to drop white text to 2.76:1.
         banner:
-          "rounded-none border-x-0 bg-destructive text-destructive-foreground *:data-[slot=alert-description]:text-destructive-foreground/90 [&>svg]:text-current",
+          "rounded-none border-x-0 bg-destructive text-destructive-foreground *:data-[slot=alert-description]:text-destructive-foreground/90 dark:bg-destructive/60 [&>svg]:text-current",
       },
     },
     defaultVariants: {

@@ -1,0 +1,158 @@
+export default {
+  users: {
+    pageTitle: "Comptes",
+    searchPlaceholder: "Rechercher…",
+    loading: "Chargement…",
+    loadFailed: "Échec du chargement des comptes.",
+    loadMore: "Charger plus",
+    allRolesPlaceholder: "Tous les rôles",
+    allStatusesPlaceholder: "Tous les statuts",
+    allOption: "Tous",
+    roleUser: "Utilisateur",
+    suspendAccountTitle: "Suspendre le compte",
+    // Genuine cognate — "permanent" is spelled identically in French.
+    durationPermanent: "Permanent",
+    status: {
+      active: "Actif",
+      suspended: "Suspendu",
+    },
+    table: {
+      email: "E-mail",
+      name: "Nom",
+      role: "Rôle",
+      status: "Statut",
+      created: "Date de création",
+    },
+    detail: {
+      loading: "Chargement…",
+      loadFailed: "Échec du chargement du compte.",
+      identityTitle: "Identité",
+      twoFactorLabel: "Double authentification",
+      twoFactorEnabled: "Activée",
+      twoFactorDisabled: "Désactivée",
+      memberSinceLabel: "Membre depuis",
+      accountStatusTitle: "Statut du compte",
+      reactivate: "Réactiver",
+      suspend: "Suspendre",
+      impersonate: "Emprunter l'identité",
+      impersonateDialogTitle: "Emprunter l'identité du compte",
+      reasonLabel: "Motif",
+      expiresLabel: "Expiration",
+      revokeSessions: "Révoquer les sessions",
+      resetPassword: "Réinitialiser le mot de passe",
+      // "Compte" agrees masculine — these describe the account, never the
+      // person, so no gender is imposed on someone whose gender is unknown.
+      banSuccessToast: "Compte suspendu.",
+      unbanSuccessToast: "Compte réactivé.",
+      impersonateSuccessToast: "Emprunt d'identité démarré.",
+      revokeSessionsSuccessToast: "Sessions révoquées.",
+      resetPasswordSuccessToast: "E-mail de réinitialisation du mot de passe envoyé.",
+      changeRole: "Changer le rôle",
+      changeRoleTitle: "Changer le rôle de ce compte",
+      changeRoleDescription:
+        "Un administrateur de la plateforme accède aux données de toutes les organisations et au journal d'audit opérateur.",
+      roleOptionUser: "Utilisateur",
+      roleOptionAdmin: "Administrateur de la plateforme",
+      changeRoleSubmit: "Changer le rôle",
+      changeRoleSuccessToast: "Rôle mis à jour.",
+    },
+    sessions: {
+      title: "Sessions actives ({{count}})",
+      empty: "Aucune session active.",
+      // Acronym, identical in both languages.
+      ipHeader: "IP",
+      browserHeader: "Navigateur",
+      createdHeader: "Date de création",
+      expiresHeader: "Expiration",
+      // "Type" is the same word in French too, matching the "Actions" /
+      // "Webhooks" cognate exemptions already in the parity gate.
+      typeHeader: "Type",
+      typeImpersonation: "Emprunt d'identité",
+      // "Normal" is spelled identically in French too — a genuine cognate.
+      typeNormal: "Normal",
+    },
+    banForm: {
+      reasonLabel: "Motif",
+      reasonPlaceholder: "Motif de la suspension…",
+      durationLabel: "Durée",
+      duration24h: "24 heures",
+      duration7d: "7 jours",
+      duration30d: "30 jours",
+    },
+    impersonateForm: {
+      reasonLabel: "Motif",
+      reasonPlaceholder: "Décrivez le motif de l'emprunt d'identité…",
+      ticketRefLabel: "Référence du ticket (optionnel)",
+      ticketRefPlaceholder: "SUP-42",
+      submit: "Démarrer l'emprunt d'identité",
+    },
+  },
+  orgs: {
+    pageTitle: "Organisations",
+    searchPlaceholder: "Rechercher…",
+    loading: "Chargement…",
+    loadFailed: "Échec du chargement des organisations.",
+    loadMore: "Charger plus",
+    ssoEnforcementUpdatedToast: "Imposition du SSO mise à jour.",
+    ssoEnforcedAriaLabel: "SSO imposé pour {{name}}",
+    ssoEnforcementOffHint:
+      "Désactiver l'imposition du SSO permet aux membres de cette organisation de se reconnecter avec un mot de passe.",
+    table: {
+      name: "Nom",
+      // Genuine cognate — see the English catalog's comment.
+      slug: "Slug",
+      members: "Membres",
+      created: "Date de création",
+      ssoEnforced: "SSO imposé",
+    },
+    detail: {
+      loading: "Chargement…",
+      loadFailed: "Échec du chargement de l'organisation.",
+      detailsTitle: "Détails",
+      slugLabel: "Slug",
+      planLabel: "Forfait",
+      createdLabel: "Date de création",
+      membersTitle: "Membres",
+      table: {
+        email: "E-mail",
+        role: "Rôle",
+      },
+    },
+  },
+  auditLog: {
+    pageTitle: "Journal d'audit",
+    allActionsPlaceholder: "Toutes les actions",
+    allOption: "Toutes",
+    actorIdPlaceholder: "ID de l'acteur",
+    organizationIdPlaceholder: "ID de l'organisation",
+    loading: "Chargement…",
+    loadFailed: "Échec du chargement du journal d'audit.",
+    loadMore: "Charger plus",
+    detailsAction: "Détails",
+    table: {
+      occurredAt: "Survenu le",
+      actorType: "Type d'acteur",
+      // Same word in French too, matching the existing "Actions" / "Webhooks"
+      // cognate exemptions already in the parity gate.
+      action: "Action",
+      target: "Cible",
+      organization: "Organisation",
+    },
+    actorType: {
+      user: "Utilisateur",
+      system: "Système",
+      admin: "Administrateur",
+    },
+    chain: {
+      checking: "Vérification de la chaîne…",
+      verified: "Chaîne vérifiée ✓",
+      broken: "Chaîne rompue au n° {{sequence}}",
+    },
+    metadata: {
+      actorLabel: "Acteur",
+      occurredAtLabel: "Survenu le",
+      beforeLabel: "Avant",
+      afterLabel: "Après",
+    },
+  },
+} as const;

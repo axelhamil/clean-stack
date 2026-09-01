@@ -1,9 +1,12 @@
 export function buildSessionPayload<
-  U extends { id: string; role?: string | null },
+  U extends { id: string; role?: string | null; locale?: string | null },
   S extends { id: string; impersonatedBy?: string | null; activeOrganizationId?: string | null },
 >(user: U, session: S, platformAdminIds: string[], activeOrganizationRole?: string | null) {
   const isPlatformAdmin = platformAdminIds.includes(user.id) || user.role === "admin";
-  const enrichedUser = { ...user, isPlatformAdmin } as U & { isPlatformAdmin: boolean };
+  const enrichedUser = { ...user, isPlatformAdmin, locale: user.locale ?? null } as U & {
+    isPlatformAdmin: boolean;
+    locale: string | null;
+  };
   const enrichedSession = {
     ...session,
     impersonatedBy: session.impersonatedBy ?? null,
