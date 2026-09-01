@@ -1,6 +1,7 @@
 // `/internal/flush-notification-emails` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import {
+  alias,
   and,
   authSchema,
   count,
@@ -9,9 +10,11 @@ import {
   inArray,
   isNull,
   lte,
+  notInArray,
   notificationSchema,
   sql,
 } from "@packages/drizzle";
+import { NOTIFICATION_MAP } from "@packages/events";
 import { toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -82,6 +85,43 @@ export async function digestIdempotencyKey(ids: string[]): Promise<string> {
 
 const DEFAULT_BATCH_SIZE = 500;
 
+// Forced notifications (security, payment failures, …) join no preference row
+// at the fan-out either — the flush must honour the exact same exemption, or a
+// user who disabled email for `security` would silently start losing forced
+// digests it was never allowed to defer in the first place.
+const FORCED_EVENT_TYPES = Object.entries(NOTIFICATION_MAP)
+  .filter(([, config]) => config?.forced === true)
+  .map(([eventType]) => eventType);
+
+const p = notificationSchema.notificationPreference;
+const upMail = alias(p, "up_mail");
+const opMail = alias(p, "op_mail");
+
+/**
+ * Same precedence the fan-out resolves at insertion (`notification-fanout-
+ * subscriber.ts`): org-locked wins, then the user's own choice, then the
+ * org's unlocked default, then `TRUE`. Re-evaluated here, at send time,
+ * against the *current* row — a preference flipped after the notification
+ * was queued must be able to cancel a digest already scheduled.
+ */
+const forcedCheck =
+  FORCED_EVENT_TYPES.length > 0
+    ? sql`${notificationSchema.notification.eventType} IN (${sql.join(
+        FORCED_EVENT_TYPES.map((t) => sql`${t}`),
+        sql`, `,
+      )})`
+    : sql`FALSE`;
+
+const emailStillWanted = sql<boolean>`(
+  ${forcedCheck}
+  OR COALESCE(
+    CASE WHEN ${opMail.locked} THEN ${opMail.enabled} END,
+    ${upMail.enabled},
+    ${opMail.enabled},
+    TRUE
+  )
+)`;
+
 export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/flush-notification-emails", zV("json", bodySchema), async (c) => {
@@ -121,25 +161,91 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
         await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
         await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
 
-        const rows = await tx
-          .select({
-            id: n.id,
-            userId: n.userId,
-            category: n.category,
-            eventType: n.eventType,
-            email: u.email,
-            locale: u.locale,
-            payload: n.payload,
-          })
-          .from(n)
-          .innerJoin(u, eq(n.userId, u.id))
-          .where(and(lte(n.emailPendingAt, now), isNull(n.emailSentAt)))
-          .limit(batchSize)
-          .for("update", { skipLocked: true });
+        // `batchSize` bounds each round-trip to Postgres, not the run: the
+        // lease already rules out a *concurrent* run splitting a window, but
+        // capping a single run at one page reintroduced the same split
+        // sequentially — a backlog bigger than `batchSize` used to flush as
+        // two digests for one promised window. This pages through every row
+        // due *right now*, in the same transaction, and sends one digest per
+        // (user, category) for the whole set. `claimedIds` excludes rows this
+        // run already holds the lock on — `FOR UPDATE` does not re-skip its
+        // own transaction's locks, so without it the same page would repeat.
+        const rows: PendingRow[] = [];
+        const claimedIds: string[] = [];
+        let dropped = 0;
+
+        for (;;) {
+          const candidates = await tx
+            .select({
+              id: n.id,
+              userId: n.userId,
+              category: n.category,
+              eventType: n.eventType,
+              email: u.email,
+              locale: u.locale,
+              payload: n.payload,
+              emailStillWanted,
+            })
+            .from(n)
+            .innerJoin(u, eq(n.userId, u.id))
+            .leftJoin(
+              upMail,
+              and(
+                eq(upMail.scope, "user"),
+                eq(upMail.channel, "email"),
+                eq(upMail.category, n.category),
+                eq(upMail.scopeId, n.userId),
+              ),
+            )
+            .leftJoin(
+              opMail,
+              and(
+                eq(opMail.scope, "org"),
+                eq(opMail.channel, "email"),
+                eq(opMail.category, n.category),
+                eq(opMail.scopeId, n.organizationId),
+              ),
+            )
+            .where(
+              and(
+                lte(n.emailPendingAt, now),
+                isNull(n.emailSentAt),
+                claimedIds.length > 0 ? notInArray(n.id, claimedIds) : undefined,
+              ),
+            )
+            .limit(batchSize)
+            .for("update", { of: n, skipLocked: true });
+
+          if (candidates.length === 0) break;
+          claimedIds.push(...candidates.map((r) => r.id));
+
+          // A preference flipped after the notification was queued (email
+          // turned off, or the category left the org) is honoured here, not
+          // by rewriting the fan-out's decision. A dropped row is not
+          // eligible forever: its `emailPendingAt` is cleared so it stops
+          // matching the due-window filter on the next run — the
+          // notification itself, and its in-app read state, are untouched.
+          const droppedIds = candidates.filter((r) => !r.emailStillWanted).map((r) => r.id);
+          if (droppedIds.length > 0) {
+            await tx.update(n).set({ emailPendingAt: null }).where(inArray(n.id, droppedIds));
+            dropped += droppedIds.length;
+          }
+
+          rows.push(...(candidates.filter((r) => r.emailStillWanted) as PendingRow[]));
+
+          if (candidates.length < batchSize) break;
+        }
+
+        if (dropped > 0) {
+          logger.info(
+            { dropped },
+            "flush-notification-emails dropped rows whose preference changed",
+          );
+        }
 
         if (rows.length === 0) return { flushed: 0, notifications: 0 };
 
-        const digests = buildDigests(rows as PendingRow[]);
+        const digests = buildDigests(rows);
 
         const enqueued = await di.IEmailService.sendTemplateBatch(
           "notification_digest",

@@ -97,6 +97,13 @@ const setFrequency = (category: string, frequency: string) =>
     ON CONFLICT (scope, scope_id, category, channel)
     DO UPDATE SET frequency = ${frequency}, enabled = true`);
 
+const setEmailEnabled = (category: string, enabled: boolean) =>
+  db.execute(sql`
+    INSERT INTO notification_preference (id, scope, scope_id, category, channel, enabled, frequency, locked)
+    VALUES (gen_random_uuid()::text, 'user', ${userId}, ${category}, 'email', ${enabled}, 'immediate', false)
+    ON CONFLICT (scope, scope_id, category, channel)
+    DO UPDATE SET enabled = ${enabled}`);
+
 const fanout = (e: OutboxRecord) => db.transaction(async (tx) => subscriber.handle(e, tx));
 
 // Read the due column back as text. It is a tz-naive `timestamp` holding UTC, and
@@ -143,10 +150,14 @@ function loggedApp() {
 const app = loggedApp();
 const path = "/internal/flush-notification-emails";
 
-async function flush(): Promise<{ flushed: number; notifications: number; skipped?: boolean }> {
+async function flush(
+  options: { batchSize?: number } = {},
+): Promise<{ flushed: number; notifications: number; skipped?: boolean }> {
   const key = env.INTERNAL_SIGNING_KEY;
   if (!key) throw new Error("INTERNAL_SIGNING_KEY is not set — cannot sign a request");
-  const rawBody = JSON.stringify({});
+  const rawBody = JSON.stringify(
+    options.batchSize === undefined ? {} : { batchSize: options.batchSize },
+  );
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = await sign(
     canonicalize({
@@ -269,6 +280,68 @@ check(
   "each digest carries its own idempotency key",
   new Set((await enqueued()).map((e) => e.idempotency_key)).size === 4,
 );
+
+await reset();
+
+// ---------------------------------------------------------------------------
+console.log("[6] a preference disabled after scheduling cancels the digest at send time");
+await reset();
+await setFrequency("activity", "daily");
+await fanout(event(7));
+await setEmailEnabled("activity", false);
+await makeEverythingDue();
+const beforeDrop = await dueDates();
+check(
+  "the row is still pending right before the flush",
+  beforeDrop.some((r) => r.eventType === "user.export.completed" && !r.sent),
+  beforeDrop,
+);
+const droppedRun = await flush();
+check(
+  "nothing was sent — the preference was flipped off after scheduling",
+  droppedRun.flushed === 0 && droppedRun.notifications === 0,
+  droppedRun,
+);
+const afterDrop = await dueDates();
+check(
+  "the dropped row's email_pending_at was cleared, not left eligible forever",
+  afterDrop.length === 1 && afterDrop[0]?.due === null,
+  afterDrop,
+);
+check("no e-mail was enqueued for the dropped row", (await enqueued()).length === 0);
+
+// ---------------------------------------------------------------------------
+console.log("[7] a forced digest still sends despite the category's email being disabled");
+await reset();
+await setEmailEnabled("security", false);
+await fanout(forcedEvent());
+await makeEverythingDue();
+const forcedRun = await flush();
+check(
+  "the forced digest went out — forced notifications join no preference at the flush either",
+  forcedRun.flushed === 1 && forcedRun.notifications === 1,
+  forcedRun,
+);
+
+// ---------------------------------------------------------------------------
+console.log("[8] a backlog bigger than batchSize still becomes one digest, not one per page");
+await reset();
+await setFrequency("activity", "daily");
+for (let i = 10; i < 15; i++) await fanout(event(i));
+await makeEverythingDue();
+const paged = await flush({ batchSize: 2 }); // 5 due rows, pages of 2 → 3 pages
+check(
+  "one digest covers all 5 rows across 3 pages, not 3 separate digests",
+  paged.flushed === 1 && paged.notifications === 5,
+  paged,
+);
+check(
+  "exactly one e-mail, not one per page",
+  (await enqueued()).length === 1,
+  (await enqueued()).length,
+);
+const lastDigest = (await enqueued()).at(-1);
+check("the single digest carries all 5 items", lastDigest?.payload.itemCount === "5", lastDigest);
 
 await reset();
 

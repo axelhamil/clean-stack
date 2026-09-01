@@ -28,8 +28,12 @@ function storeFailure(err: unknown, op: string): ApiTokenError {
  * "Personal" scope stays reachable while an organization is active — which it
  * always is, every user owning a personal organization.
  *
- * Exported for the confinement test, which evaluates the predicate itself
- * rather than trusting the rows a mocked driver hands back.
+ * Exported so the repository's other methods can compose it; the predicate
+ * itself is proven against a real Postgres by
+ * `scripts/check-api-token-visibility.ts` (`pnpm --filter api
+ * check:api-token-visibility`), not by the unit suite — that suite mocks
+ * `@packages/drizzle`'s `and`/`or`/`eq`/`isNull`, so it evaluates the mock,
+ * never the actual WHERE clause.
  */
 export function visibleTokensFilter(owner: TokenOwner) {
   return and(

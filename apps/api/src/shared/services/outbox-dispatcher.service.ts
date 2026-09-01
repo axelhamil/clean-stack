@@ -71,6 +71,7 @@ export class OutboxDispatcher {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private draining = false;
   private stopping = false;
+  private started = false;
   private reconnectBackoff = RECONNECT_BACKOFF_MS;
   private userHandlers: Map<string, EventHandler[]> = new Map();
 
@@ -100,6 +101,8 @@ export class OutboxDispatcher {
   }
 
   async start(diLike?: Record<string, unknown>): Promise<void> {
+    if (this.started) return;
+    this.started = true;
     this.stopping = false;
     if (diLike) this.userHandlers = collectUserEventHandlers(diLike);
     await this.ensureNotifyTrigger();
@@ -114,6 +117,7 @@ export class OutboxDispatcher {
   }
 
   async stop(): Promise<void> {
+    this.started = false;
     this.stopping = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);

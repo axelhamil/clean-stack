@@ -16,6 +16,8 @@ class FakeClient implements OutboxListenClient {
   ended = false;
   listening = false;
   connectRejects = false;
+  private connectGate: Promise<void> | null = null;
+  private releaseConnectGate: (() => void) | null = null;
 
   on(event: string, listener: Handler): this {
     const existing = this.handlers.get(event) ?? [];
@@ -24,7 +26,25 @@ class FakeClient implements OutboxListenClient {
     return this;
   }
 
+  /**
+   * Makes this client's `connect()` hang until `releaseConnect()` is called.
+   * Lets a test land an `error` (and the `end` that follows it) while
+   * `connect()` is still in flight — deterministically, instead of racing on
+   * timing — to exercise the `disposed.has(client)` re-check that guards
+   * against adopting a client that died mid-connect.
+   */
+  suspendConnect(): void {
+    this.connectGate = new Promise((resolve) => {
+      this.releaseConnectGate = resolve;
+    });
+  }
+
+  releaseConnect(): void {
+    this.releaseConnectGate?.();
+  }
+
   async connect(): Promise<void> {
+    if (this.connectGate) await this.connectGate;
     if (this.connectRejects) throw new Error("connect refused");
   }
 
@@ -67,7 +87,7 @@ const fakeOutbox = {
   markFailed: async () => {},
 };
 
-function makeDispatcher(overrides: { failConnect?: boolean } = {}) {
+function makeDispatcher(overrides: { failConnect?: boolean; suspendConnect?: boolean } = {}) {
   const created: FakeClient[] = [];
   const dispatcher = new OutboxDispatcher(
     fakeOutbox,
@@ -79,6 +99,7 @@ function makeDispatcher(overrides: { failConnect?: boolean } = {}) {
       createClient: () => {
         const client = new FakeClient();
         client.connectRejects = overrides.failConnect === true;
+        if (overrides.suspendConnect && created.length === 0) client.suspendConnect();
         created.push(client);
         return client;
       },
@@ -91,6 +112,9 @@ function makeDispatcher(overrides: { failConnect?: boolean } = {}) {
 
 const connectListener = (dispatcher: OutboxDispatcher) =>
   (dispatcher as unknown as { connectListener(): Promise<void> }).connectListener();
+
+const liveClient = (dispatcher: OutboxDispatcher) =>
+  (dispatcher as unknown as { listenClient: OutboxListenClient | null }).listenClient;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -136,6 +160,34 @@ describe("OutboxDispatcher — reconnexion", () => {
 
     expect(created).toHaveLength(1);
     expect(created[0]?.ended).toBe(true);
+  });
+
+  test("une erreur pendant que connect() est en vol n'adopte jamais ce client, et ne planifie qu'une reconnexion", async () => {
+    const { dispatcher, created } = makeDispatcher({ suspendConnect: true });
+    const connecting = connectListener(dispatcher);
+    await wait(0); // laisse connectListener() atteindre `await client.connect()`
+
+    const client = created[0];
+    expect(created).toHaveLength(1);
+    if (!client) throw new Error("client not created");
+
+    // La panne survient alors que `connect()` est toujours en attente.
+    client.killBackend();
+    // `connect()` se resout seulement maintenant — le client est deja disposed.
+    client.releaseConnect();
+    await connecting;
+
+    expect(liveClient(dispatcher)).toBeNull();
+    expect(created).toHaveLength(1); // pas de 2e client tant que le backoff n'a pas expire
+
+    await wait(80);
+
+    expect(created).toHaveLength(2); // une seule reconnexion planifiee
+    expect(created.filter((c) => c.relaying)).toHaveLength(1);
+    expect(created[0]?.ended).toBe(true);
+    expect(liveClient(dispatcher)).toBe(created[1] ?? null);
+
+    await dispatcher.stop();
   });
 
   test("le backoff ne se reinitialise pas sur une connexion jamais etablie", async () => {

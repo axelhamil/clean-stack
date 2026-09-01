@@ -15,6 +15,7 @@
     "db:seed": "bun scripts/seed-dev-user.ts",
     "check:fanout": "bun scripts/check-fanout-preferences.ts",
     "check:digest": "bun scripts/check-digest-window.ts",
+    "check:api-token-visibility": "bun scripts/check-api-token-visibility.ts",
     "check:wipe-rollback": "bun scripts/check-wipe-rollback.ts",
     "check:marksent": "bun scripts/check-marksent.ts",
     "check:enqueue": "bun scripts/check-enqueue.ts",

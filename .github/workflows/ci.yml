@@ -100,6 +100,12 @@ jobs:
         # live inside SQL, which a mocked tx never evaluates. Needs the seed too.
         run: pnpm --filter api check:digest
 
+      - name: Check api-token owner visibility against a real database
+        # Same reason as check:fanout — `visibleTokensFilter` builds a WHERE
+        # clause with and/or/eq/isNull, which a mocked tx never evaluates.
+        # Needs the seed too.
+        run: pnpm --filter api check:api-token-visibility
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

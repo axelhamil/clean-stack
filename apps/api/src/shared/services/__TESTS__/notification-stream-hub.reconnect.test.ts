@@ -15,6 +15,8 @@ class FakeClient implements NotificationListenClient {
   ended = false;
   listening = false;
   connectRejects = false;
+  private connectGate: Promise<void> | null = null;
+  private releaseConnectGate: (() => void) | null = null;
 
   on(event: string, listener: Handler): this {
     const existing = this.handlers.get(event) ?? [];
@@ -23,7 +25,25 @@ class FakeClient implements NotificationListenClient {
     return this;
   }
 
+  /**
+   * Makes this client's `connect()` hang until `releaseConnect()` is called.
+   * Lets a test land an `error` (and the `end` that follows it) while
+   * `connect()` is still in flight — deterministically, instead of racing on
+   * timing — to exercise the `disposed.has(client)` re-check that guards
+   * against adopting a client that died mid-connect.
+   */
+  suspendConnect(): void {
+    this.connectGate = new Promise((resolve) => {
+      this.releaseConnectGate = resolve;
+    });
+  }
+
+  releaseConnect(): void {
+    this.releaseConnectGate?.();
+  }
+
   async connect(): Promise<void> {
+    if (this.connectGate) await this.connectGate;
     if (this.connectRejects) throw new Error("connect refused");
   }
 
@@ -61,12 +81,13 @@ class FakeClient implements NotificationListenClient {
   }
 }
 
-function makeHub(overrides: { failConnect?: boolean } = {}) {
+function makeHub(overrides: { failConnect?: boolean; suspendConnect?: boolean } = {}) {
   const created: FakeClient[] = [];
   const hub = new NotificationStreamHub(logger, "postgres://unused", new NoOpInstrumentation(), {
     createClient: () => {
       const client = new FakeClient();
       client.connectRejects = overrides.failConnect === true;
+      if (overrides.suspendConnect && created.length === 0) client.suspendConnect();
       created.push(client);
       return client;
     },
@@ -75,6 +96,9 @@ function makeHub(overrides: { failConnect?: boolean } = {}) {
   });
   return { hub, created };
 }
+
+const liveClient = (hub: NotificationStreamHub) =>
+  (hub as unknown as { listenClient: NotificationListenClient | null }).listenClient;
 
 const connectListener = (hub: NotificationStreamHub) =>
   (hub as unknown as { connectListener(): Promise<void> }).connectListener();
@@ -141,6 +165,34 @@ describe("NotificationStreamHub — reconnexion", () => {
 
     expect(created).toHaveLength(1);
     expect(created[0]?.ended).toBe(true);
+  });
+
+  test("une erreur pendant que connect() est en vol n'adopte jamais ce client, et ne planifie qu'une reconnexion", async () => {
+    const { hub, created } = makeHub({ suspendConnect: true });
+    const connecting = connectListener(hub);
+    await wait(0); // laisse connectListener() atteindre `await client.connect()`
+
+    const client = created[0];
+    expect(created).toHaveLength(1);
+    if (!client) throw new Error("client not created");
+
+    // La panne survient alors que `connect()` est toujours en attente.
+    client.killBackend();
+    // `connect()` se resout seulement maintenant — le client est deja disposed.
+    client.releaseConnect();
+    await connecting;
+
+    expect(liveClient(hub)).toBeNull();
+    expect(created).toHaveLength(1); // pas de 2e client tant que le backoff n'a pas expire
+
+    await wait(80);
+
+    expect(created).toHaveLength(2); // une seule reconnexion planifiee
+    expect(created.filter((c) => c.relaying)).toHaveLength(1);
+    expect(created[0]?.ended).toBe(true);
+    expect(liveClient(hub)).toBe(created[1] ?? null);
+
+    await hub.stop();
   });
 
   test("le backoff ne se reinitialise pas sur une connexion jamais etablie", async () => {
