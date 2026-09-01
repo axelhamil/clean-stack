@@ -258,7 +258,7 @@ Per-organization subscriptions, zero billing backoffice. Stripe Checkout for upg
 
 **Module** `apps/api/src/modules/billing/` — `CatalogService` (free-only when `STRIPE_SECRET_KEY` unset), `EntitlementsService`, `SubscriptionReadStore`, `StripeCatalogSourceAdapter`. Routes: `GET /billing/plans`, `GET /billing/subscription`, `POST /billing/checkout`, `POST /billing/portal`. **Frontend** `apps/app/src/features/billing/`: `/pricing` · `/settings/billing` · `useEntitlements()` · `<FeatureGate>` · `<PlanGate>`.
 
-**Quota gating (B.2, dormant)**: `ENTITLEMENTS[tier].quotas` + `assertQuota`/`requireQuota` middleware + `quota-reservation.ts` + `quota_usage` table + `useQuota`/`<QuotaGate>`. See [`docs/QUOTA-GATING.md`](./QUOTA-GATING.md).
+**Quota gating (B.2, dormant)**: `ENTITLEMENTS[tier].quotas` + `assertQuota`/`requireQuota` middleware + `quota-reservation.ts` + `quota_usage` table + `useQuota`/`<QuotaGate>`. See [`docs/QUOTA-GATING.md`](./QUOTA-GATING.md). The `quotas` module ships no route (never mounted) — see [`docs/SURFACE.md`](./SURFACE.md#backend-capabilities-with-no-http-surface) for why it can't appear in the route inventory below.
 
 **Env**: `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`.
 

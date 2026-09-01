@@ -330,6 +330,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md) — file-level inventory |
 | **What's next** | [`ROADMAP.md`](ROADMAP.md) — plumbing shipped; left: review pass, abuse signals, D.5 debts |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
+| **Back ↔ front surface map** | [`docs/SURFACE.md`](docs/SURFACE.md) — every live route, its front consumer or the reason it has none, enforced by a parity test |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md) — DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md) — visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md) — endpoints, registry, graceful shutdown, per-PaaS recipes |
