@@ -59,7 +59,7 @@ What remains is short on purpose. **Everything not listed here was cut** — a b
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058 — Gmail/Yahoo require it for bulk senders) and SPF + DKIM + DMARC `p=reject` (DNS, doc only).
 
-**Cut and not coming back**: marketing site (E.2), status page + SLO dashboards (D.1), SOC2 checklist (D.4), OpenAPI docs (D.2), Capacitor shell (F.1), feature flags (F.2), GPC (A.7), NIS2 readiness, and the per-phase "deferred" micro-items. Each was either a per-clone decision, a third-party service to wire, or an ambition with no substrate to exercise it. Git history has the specs if one becomes real.
+**Cut and not coming back**: marketing site (E.2), status page + SLO dashboards (D.1), SOC2 checklist (D.4), generated OpenAPI spec + Scalar UI (D.2 — the *generation* is cut, not the documentation: `/api/v1` is documented by hand in [`docs/PUBLIC-API.md`](docs/PUBLIC-API.md), which a three-route surface makes cheaper to keep honest than a generator), Capacitor shell (F.1), feature flags (F.2), GPC (A.7), NIS2 readiness, and the per-phase "deferred" micro-items. Each was either a per-clone decision, a third-party service to wire, or an ambition with no substrate to exercise it. Git history has the specs if one becomes real.
 
 **Out of scope**: HIPAA tooling, real-time WebSocket bus, third-party app marketplace, A/B testing framework, IAB TCF v2.2.
 

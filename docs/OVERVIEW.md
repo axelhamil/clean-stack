@@ -154,6 +154,8 @@ Tokens are never stored in plaintext. The server stores `HMAC-SHA256(pepper, raw
 
 **Why a separate sub-app rather than a flag on existing routes**: the token-reachable API lives at `/api/v1` inside a dedicated `Hono` instance that is mounted before the main app and is deliberately absent from `AppType` (the RPC type that the front uses). `sessionMiddleware` skips `/api/v1/*` entirely; token authentication is the only entry. This makes the contract structural rather than conditional — a route that serves token clients is in `/api/v1`, everything else is session-only. A flag-based approach drifts: a new route gets the flag in one team member's PR and not in another's, silently exposing session-only surfaces to token holders.
 
+What a third party holding a token can actually call — the three routes, the header, the scopes, the error codes, the rate limits, and the boundary of what is deliberately unreachable by token — is written for an outside integrator in [`docs/PUBLIC-API.md`](./PUBLIC-API.md).
+
 Tokens are revoked automatically when the issuing user loses org membership, and GitHub's Secret Scanning partner program is supported: a `POST /api/token-scanning/github` endpoint verifies the ECDSA P-256 signature, revokes the matching token, and emails the owner.
 
 ## Enterprise SSO (OIDC / SAML) with SCIM provisioning
@@ -198,6 +200,7 @@ The full plan, with constraints and extension points, lives in [`../ROADMAP.md`]
 | What's planned | [`../ROADMAP.md`](../ROADMAP.md) |
 | Modules and how they're removed | [`MODULES.md`](./MODULES.md) · [`REMOVABILITY.md`](./REMOVABILITY.md) |
 | Integrations (BetterAuth, Stripe, Resend, R2, DNS) | [`INTEGRATIONS.md`](./INTEGRATIONS.md) |
+| Public API reference (`/api/v1`, for token holders) | [`PUBLIC-API.md`](./PUBLIC-API.md) |
 | Event system (DX guide + walkthrough) | [`EVENTS.md`](./EVENTS.md) · [`EVENT_PIPELINE.md`](./EVENT_PIPELINE.md) |
 | Health probes and graceful shutdown | [`HEALTH-PROBES.md`](./HEALTH-PROBES.md) |
 | Scheduled jobs and internal auth | [`CRON.md`](./CRON.md) |
