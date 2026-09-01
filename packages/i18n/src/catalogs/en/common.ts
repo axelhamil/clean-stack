@@ -238,6 +238,8 @@ export default {
     unreadLabel_other: "Notifications, {{count}} unread",
     andMore: "and {{count}} more",
     newBadge: "New",
+    loadMore: "Load more",
+    loadingMore: "Loading…",
     categories: {
       security: "Security",
       org: "Organization",

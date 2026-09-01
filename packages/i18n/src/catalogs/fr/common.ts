@@ -243,6 +243,8 @@ export default {
     unreadLabel_other: "Notifications, {{count}} non lues",
     andMore: "et {{count}} de plus",
     newBadge: "Nouveau",
+    loadMore: "Charger plus",
+    loadingMore: "Chargement…",
     categories: {
       security: "Sécurité",
       org: "Organisation",

@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components
 import { ScrollArea } from "@packages/ui/components/ui/scroll-area";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +12,10 @@ import {
   markAllReadMutationOptions,
   markReadMutationOptions,
 } from "../api/mutations/notifications";
-import { notificationsQueryOptions, unreadCountQueryOptions } from "../api/queries/notifications";
+import {
+  notificationsInfiniteQueryOptions,
+  unreadCountQueryOptions,
+} from "../api/queries/notifications";
 import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
 import { groupNotifications } from "./group-notifications";
@@ -40,10 +43,16 @@ export function NotificationBell() {
     refetchIntervalInBackground: false,
   });
 
-  const { data: list } = useQuery({ ...notificationsQueryOptions(), enabled: open });
+  const {
+    data: list,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({ ...notificationsInfiniteQueryOptions(), enabled: open });
 
   const count = unread?.count ?? 0;
-  const groups = useMemo(() => groupNotifications(list?.items ?? []), [list]);
+  const items = useMemo(() => list?.pages.flatMap((page) => page.items) ?? [], [list]);
+  const groups = useMemo(() => groupNotifications(items), [items]);
 
   useEffect(
     () =>
@@ -114,6 +123,21 @@ export function NotificationBell() {
                 />
               ))}
             </ul>
+
+            {hasNextPage && (
+              <div className="flex justify-center p-3 pt-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isFetchingNextPage}
+                  onClick={() => void fetchNextPage()}
+                >
+                  {isFetchingNextPage
+                    ? t("notifications.loadingMore")
+                    : t("notifications.loadMore")}
+                </Button>
+              </div>
+            )}
           </ScrollArea>
         )}
       </PopoverContent>
