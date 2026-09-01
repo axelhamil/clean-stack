@@ -30,6 +30,7 @@ import { toastError } from "../../shared/api/errors/toast";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
+import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
@@ -75,19 +76,25 @@ function WebhooksPage() {
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryListItem | null>(null);
   const [deliveryFilters, setDeliveryFilters] = useState<DeliveryFilters>({});
 
-  const endpoints = useQuery(webhookEndpointsQueryOptions());
+  const organizationId = useActiveOrgId();
+  const endpoints = useQuery(webhookEndpointsQueryOptions(organizationId));
 
-  const deliveries = useInfiniteQuery({
-    ...webhookDeliveriesInfiniteQueryOptions(selectedEndpointId ?? "", deliveryFilters),
-    enabled: selectedEndpointId !== null,
-  });
+  const deliveries = useInfiniteQuery(
+    webhookDeliveriesInfiniteQueryOptions(
+      organizationId,
+      selectedEndpointId ?? "",
+      deliveryFilters,
+    ),
+  );
 
   const create = useMutation({
     ...createEndpointMutationOptions,
     onSuccess: (res) => {
       setRevealSecret(res.secret);
       setCreating(false);
-      void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
+      void qc.invalidateQueries({
+        queryKey: webhookEndpointsQueryOptions(organizationId).queryKey,
+      });
       toast.success(t("settings:webhooks.createdToast"));
     },
     onError: (err) =>
@@ -103,7 +110,9 @@ function WebhooksPage() {
     ...updateEndpointMutationOptions,
     onSuccess: () => {
       setEditing(null);
-      void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
+      void qc.invalidateQueries({
+        queryKey: webhookEndpointsQueryOptions(organizationId).queryKey,
+      });
       toast.success(t("settings:webhooks.updatedToast"));
     },
     onError: (err) =>
@@ -118,7 +127,9 @@ function WebhooksPage() {
   const del = useMutation({
     ...deleteEndpointMutationOptions,
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
+      void qc.invalidateQueries({
+        queryKey: webhookEndpointsQueryOptions(organizationId).queryKey,
+      });
       toast.success(t("settings:webhooks.deletedToast"));
     },
     onError: (err) =>

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { subscriptionQueryOptions } from "../../shared/api/queries/subscription";
+import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { PricingTable } from "../../shared/components/pricing-table";
 
 export const Route = createFileRoute("/pricing")({
@@ -16,7 +17,11 @@ function PricingPage() {
   const { t } = useTranslation("common");
   const { data: session } = useQuery(sessionQueryOptions);
   const { data: activeOrg } = useQuery({ ...activeOrgQueryOptions, enabled: Boolean(session) });
-  const { data: sub } = useQuery({ ...subscriptionQueryOptions, enabled: Boolean(session) });
+  const organizationId = useActiveOrgId();
+  const { data: sub } = useQuery({
+    ...subscriptionQueryOptions(organizationId),
+    enabled: organizationId !== null && Boolean(session),
+  });
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-8 p-8">

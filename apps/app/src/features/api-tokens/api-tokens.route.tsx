@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
+import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
 import { getErrorsT } from "../../shared/i18n/get-errors-t";
@@ -46,14 +47,15 @@ function ApiTokensPage() {
   const [creating, setCreating] = useState(false);
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
-  const tokens = useQuery(apiTokensQueryOptions());
+  const organizationId = useActiveOrgId();
+  const tokens = useQuery(apiTokensQueryOptions(organizationId));
 
   const create = useMutation({
     ...createTokenMutationOptions,
     onSuccess: (res) => {
       setRevealToken(res.token);
       setCreating(false);
-      void qc.invalidateQueries({ queryKey: ["settings", "api-tokens"] });
+      void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.createdToast"));
     },
     onError: (err) =>
@@ -66,7 +68,7 @@ function ApiTokensPage() {
   const revoke = useMutation({
     ...deleteTokenMutationOptions,
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "api-tokens"] });
+      void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.revokedToast"));
     },
     onError: (err) =>

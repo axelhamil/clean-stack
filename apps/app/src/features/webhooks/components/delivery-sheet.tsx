@@ -9,6 +9,7 @@ import {
 } from "@packages/ui/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import type { DeliveryAttempt, DeliveryListItem } from "../api/webhooks.queries";
 import { webhookDeliveryDetailQueryOptions } from "../api/webhooks.queries";
@@ -85,10 +86,10 @@ export function DeliverySheet({
   guard,
 }: DeliverySheetProps) {
   const { t } = useTranslation(["settings", "common"]);
-  const detail = useQuery({
-    ...webhookDeliveryDetailQueryOptions(endpointId, delivery?.id ?? ""),
-    enabled: delivery !== null,
-  });
+  const organizationId = useActiveOrgId();
+  const detail = useQuery(
+    webhookDeliveryDetailQueryOptions(organizationId, endpointId, delivery?.id ?? ""),
+  );
 
   return (
     <Sheet open={delivery !== null} onOpenChange={(open) => !open && onClose()}>

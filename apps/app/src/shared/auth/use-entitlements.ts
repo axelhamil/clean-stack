@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Tier } from "../api/queries/billing-types";
 import { subscriptionQueryOptions } from "../api/queries/subscription";
+import { useActiveOrgId } from "./use-active-org-id";
 
 const TIER_RANK: Record<Tier, number> = { free: 0, pro: 1, business: 2 };
 
@@ -47,6 +48,7 @@ export function buildEntitlementsView(data: EntitlementsData | undefined) {
 }
 
 export function useEntitlements() {
-  const { data } = useQuery(subscriptionQueryOptions);
+  const organizationId = useActiveOrgId();
+  const { data } = useQuery(subscriptionQueryOptions(organizationId));
   return buildEntitlementsView(data);
 }
