@@ -26,11 +26,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../shared/api/errors/toast";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
+import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   createEndpointMutationOptions,
@@ -87,7 +89,13 @@ function WebhooksPage() {
       void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
       toast.success(t("settings:webhooks.createdToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.createWebhookEndpoint", {
+          defaultValue: "Failed to create webhook endpoint",
+        }),
+      ),
   });
 
   const update = useMutation({
@@ -97,7 +105,13 @@ function WebhooksPage() {
       void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
       toast.success(t("settings:webhooks.updatedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.updateWebhookEndpoint", {
+          defaultValue: "Failed to update webhook endpoint",
+        }),
+      ),
   });
 
   const del = useMutation({
@@ -106,7 +120,13 @@ function WebhooksPage() {
       void qc.invalidateQueries({ queryKey: ["settings", "webhooks", "endpoints"] });
       toast.success(t("settings:webhooks.deletedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.deleteWebhookEndpoint", {
+          defaultValue: "Failed to delete webhook endpoint",
+        }),
+      ),
   });
 
   const rotate = useMutation({
@@ -115,19 +135,35 @@ function WebhooksPage() {
       setRevealSecret(res.secret);
       toast.success(t("settings:webhooks.secretRotatedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.rotateWebhookSecret", { defaultValue: "Failed to rotate secret" }),
+      ),
   });
 
   const sendTest = useMutation({
     ...sendTestMutationOptions,
     onSuccess: () => toast.success(t("settings:webhooks.testSentToast")),
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.sendWebhookTestEvent", {
+          defaultValue: "Failed to send test event",
+        }),
+      ),
   });
 
   const replay = useMutation({
     ...replayDeliveryMutationOptions,
     onSuccess: () => toast.success(t("settings:webhooks.deliveryReplayedToast")),
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.replayWebhookDelivery", {
+          defaultValue: "Failed to replay delivery",
+        }),
+      ),
   });
 
   const dialogOpen = creating || editing !== null;

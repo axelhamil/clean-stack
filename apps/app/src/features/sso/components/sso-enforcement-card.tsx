@@ -10,9 +10,11 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 
@@ -39,7 +41,13 @@ export function SsoEnforcementCard() {
       void qc.invalidateQueries({ queryKey: activeOrgQueryOptions.queryKey });
       toast.success(t("sso.enforcementCard.updatedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.updateSsoEnforcement", {
+          defaultValue: "Failed to update SSO enforcement",
+        }),
+      ),
   });
 
   return (

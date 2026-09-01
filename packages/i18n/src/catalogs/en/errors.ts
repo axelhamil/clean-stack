@@ -239,5 +239,17 @@ export default {
     loadAuditLog: "Failed to load audit log",
     verifyAuditChain: "Failed to verify chain",
     updateAvatar: "Failed to update avatar",
+    changeEmail: "Failed to request email change",
+    updateProfile: "Failed to update profile",
+    addPasskey: "Couldn't add that passkey. Please try again.",
+    deletePasskey: "Couldn't remove that passkey. Please try again.",
+    enableTwoFactor: "Couldn't enable two-factor authentication. Please try again.",
+    disableTwoFactor: "Couldn't disable two-factor authentication. Please try again.",
+    verifyTwoFactorSetup: "Couldn't verify that code. Please try again.",
+    regenerateBackupCodes: "Couldn't regenerate your recovery codes. Please try again.",
+    revokeSession: "Failed to revoke session",
+    // Distinct from `revokeUserSessions` above (an admin revoking someone
+    // else's sessions) — this is a user revoking their own other sessions.
+    revokeOtherSessions: "Failed to revoke sessions",
   },
 } as const;

@@ -16,7 +16,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../shared/api/errors/toast";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
+import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
@@ -40,7 +42,13 @@ function AdminOrgsPage() {
       toast.success(t("orgs.ssoEnforcementUpdatedToast"));
       void queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.updateAdminOrgSsoEnforcement", {
+          defaultValue: "Failed to update SSO enforcement",
+        }),
+      ),
   });
 
   return (

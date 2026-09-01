@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { PasswordPromptInput } from "../security.schema";
 
 export function useDisableTwoFactor() {
@@ -25,6 +27,12 @@ export function useDisableTwoFactor() {
       });
       broadcastAuthChange();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.disableTwoFactor", {
+          defaultValue: "Couldn't disable two-factor authentication. Please try again.",
+        }),
+      ),
   });
 }

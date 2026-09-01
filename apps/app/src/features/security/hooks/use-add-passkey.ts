@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { AddPasskeyInput } from "../security.schema";
 
 export function useAddPasskey() {
@@ -26,7 +28,13 @@ export function useAddPasskey() {
       });
     },
     onError: (err) => {
-      if (err.message !== "Cancelled") toast.error(err.message);
+      if (err.message !== "Cancelled")
+        toastError(
+          err,
+          getErrorsT()("fallback.addPasskey", {
+            defaultValue: "Couldn't add that passkey. Please try again.",
+          }),
+        );
     },
   });
 }

@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { PasswordPromptInput } from "../security.schema";
 
 export interface EnableTwoFactorResult {
@@ -31,6 +32,12 @@ export function useEnableTwoFactor() {
       });
       broadcastAuthChange();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.enableTwoFactor", {
+          defaultValue: "Couldn't enable two-factor authentication. Please try again.",
+        }),
+      ),
   });
 }

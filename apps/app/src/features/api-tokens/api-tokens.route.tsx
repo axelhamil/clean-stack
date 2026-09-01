@@ -17,8 +17,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../shared/api/errors/toast";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
+import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { createTokenMutationOptions, deleteTokenMutationOptions } from "./api/api-tokens.mutations";
 import { apiTokensQueryOptions } from "./api/api-tokens.queries";
 import type { TokenFormInput } from "./api-tokens.schema";
@@ -53,7 +55,11 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: ["settings", "api-tokens"] });
       toast.success(t("apiTokens.createdToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.createApiToken", { defaultValue: "Failed to create API token" }),
+      ),
   });
 
   const revoke = useMutation({
@@ -62,7 +68,11 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: ["settings", "api-tokens"] });
       toast.success(t("apiTokens.revokedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.revokeApiToken", { defaultValue: "Failed to revoke API token" }),
+      ),
   });
 
   return (
