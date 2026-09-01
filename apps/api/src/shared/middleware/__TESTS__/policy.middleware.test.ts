@@ -64,6 +64,9 @@ describe("requireCurrentPolicies", () => {
       headers: { "x-test-context": JSON.stringify(staleUserSession) },
     });
     expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+      "POLICY_ACCEPTANCE_REQUIRED",
+    );
   });
 
   it("passes a user whose acceptances are current", async () => {
@@ -123,6 +126,9 @@ describe("requireCurrentPolicies on /api/v1", () => {
       body: JSON.stringify({ name: "New Name" }),
     });
     expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+      "POLICY_ACCEPTANCE_REQUIRED",
+    );
   });
 
   it("leaves a public-api read ungated", async () => {

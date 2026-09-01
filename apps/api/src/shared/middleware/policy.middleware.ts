@@ -17,7 +17,11 @@ export const requireCurrentPolicies = createMiddleware<{
 
   const r = await di.PolicyAcceptanceService.hasAcceptedCurrent(user.id);
   if (r.isFailure) throw new AppErrorException(r.getError());
-  if (!r.getValue()) throw new HTTPException(409, { message: "Policy acceptance required" });
+  if (!r.getValue())
+    throw new AppErrorException({
+      code: "POLICY_ACCEPTANCE_REQUIRED",
+      message: "Policy acceptance required",
+    });
 
   await next();
 });

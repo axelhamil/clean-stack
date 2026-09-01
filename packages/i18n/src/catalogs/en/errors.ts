@@ -118,6 +118,7 @@ export default {
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "This action is unavailable while you are impersonating another user.",
+    POLICY_ACCEPTANCE_REQUIRED: "Our terms have been updated. Accept the new version to continue.",
   },
   // Covers `HTTP_<status>` codes — raised by `HTTPException` sites with no
   // business code (`error.middleware.ts`) — for statuses the API actually

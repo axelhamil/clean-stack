@@ -113,6 +113,8 @@ export default {
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "Cette action est indisponible pendant l'emprunt d'identité d'un autre utilisateur.",
+    POLICY_ACCEPTANCE_REQUIRED:
+      "Nos conditions ont été mises à jour. Acceptez la nouvelle version pour continuer.",
   },
   byStatus: {
     "400": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",

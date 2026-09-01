@@ -1,5 +1,6 @@
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { watchPolicyRefusals } from "./shared/api/errors/policy-refusal";
 import { queryClient } from "./shared/api/query-client";
 
 export const router = createRouter({
@@ -11,6 +12,8 @@ export const router = createRouter({
   defaultPendingMinMs: 300,
   scrollRestoration: true,
 });
+
+watchPolicyRefusals(queryClient, () => router.invalidate());
 
 declare module "@tanstack/react-router" {
   interface Register {
