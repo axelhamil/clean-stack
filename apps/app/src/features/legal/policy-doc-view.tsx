@@ -7,7 +7,7 @@ import { cn } from "@packages/ui/libs/utils.js";
 import { useTranslation } from "react-i18next";
 import { POLICY_TITLE_KEYS } from "../../shared/legal/policy-labels";
 import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
-import { isEnglishFallback, policyBodyFor } from "./policies";
+import { isEnglishFallback, policyBodyFor } from "./policies/bodies";
 import { POLICY_DOCS } from "./policies.config";
 
 interface PolicyDocViewProps {

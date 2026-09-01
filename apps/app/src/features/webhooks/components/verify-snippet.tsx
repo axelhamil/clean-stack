@@ -1,3 +1,5 @@
+import { CodeBlock } from "@packages/ui/components/ui/code-block";
+import { Panel } from "@packages/ui/components/ui/panel";
 import { useTranslation } from "react-i18next";
 
 const SNIPPET = `import crypto from "node:crypto";
@@ -30,13 +32,15 @@ export function VerifySnippet() {
   const { t } = useTranslation("settings");
 
   return (
-    <details className="rounded-md border p-3">
-      <summary className="cursor-pointer text-sm font-medium">
-        {t("webhooks.verifySnippetHeading")}
-      </summary>
-      <pre className="mt-3 overflow-x-auto rounded bg-muted p-3 text-xs">
-        <code>{SNIPPET}</code>
-      </pre>
-    </details>
+    <Panel asChild>
+      <details>
+        <summary className="cursor-pointer text-sm font-medium">
+          {t("webhooks.verifySnippetHeading")}
+        </summary>
+        <CodeBlock className="mt-3">
+          <code>{SNIPPET}</code>
+        </CodeBlock>
+      </details>
+    </Panel>
   );
 }

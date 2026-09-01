@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { Panel } from "@packages/ui/components/ui/panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@packages/ui/components/ui/tabs";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -72,7 +73,7 @@ export function ProviderCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {existing ? (
-          <div className="flex flex-col gap-3 rounded-md border p-4">
+          <Panel size="md" className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <TypographySmall>
                 {t("sso.providerCard.typeAndDomain", {
@@ -87,7 +88,7 @@ export function ProviderCard() {
               value={existing.spMetadataUrl}
             />
             <TypographyMuted>{t("sso.providerCard.singleProviderNotice")}</TypographyMuted>
-          </div>
+          </Panel>
         ) : (
           <Tabs value={kind} onValueChange={(v) => setKind(v as "oidc" | "saml")}>
             <TabsList>

@@ -86,7 +86,7 @@ function ApiTokensPage() {
   return (
     <main className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <TypographyH1>{t("apiTokens.pageTitle")}</TypographyH1>
+        <TypographyH1 variant="page">{t("apiTokens.pageTitle")}</TypographyH1>
         <Button
           onClick={() => setCreating(true)}
           disabled={guard.blocked}

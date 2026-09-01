@@ -41,7 +41,7 @@ function AdminAuditLogPage() {
   return (
     <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
       <div className="flex items-center gap-4">
-        <TypographyH1>{t("auditLog.pageTitle")}</TypographyH1>
+        <TypographyH1 variant="page">{t("auditLog.pageTitle")}</TypographyH1>
         <ChainBadge />
       </div>
 
