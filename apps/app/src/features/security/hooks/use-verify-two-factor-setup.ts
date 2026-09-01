@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
@@ -18,7 +19,7 @@ export function useVerifyTwoFactorSetup() {
       const { error } = await authClient.twoFactor.verifyTotp({
         code: input.code,
       });
-      if (error) throw new Error(error.message ?? t("twoFactor.verifyFailed"));
+      if (error) throw toAuthClientError(error, t("twoFactor.verifyFailed"));
     },
     onSuccess: async () => {
       toast.success(t("twoFactor.enabledToast"));

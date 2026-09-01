@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
@@ -15,7 +16,7 @@ export function useRevokeSession() {
     mutationKey: ["sessions", "revoke"],
     mutationFn: async (token: string) => {
       const { error } = await authClient.revokeSession({ token });
-      if (error) throw new Error(error.message ?? t("sessions.revokeFailed"));
+      if (error) throw toAuthClientError(error, t("sessions.revokeFailed"));
     },
     onSuccess: async () => {
       toast.success(t("sessions.revokedToast"));

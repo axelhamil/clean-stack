@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
@@ -18,7 +19,7 @@ export function useAddPasskey() {
       if (result?.error) {
         if (result.error.message?.toLowerCase().includes("not allowed"))
           throw new Error("Cancelled");
-        throw new Error(result.error.message ?? t("passkeys.addFailed"));
+        throw toAuthClientError(result.error, t("passkeys.addFailed"));
       }
     },
     onSuccess: async () => {

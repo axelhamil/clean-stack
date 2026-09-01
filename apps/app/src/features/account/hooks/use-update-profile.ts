@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
@@ -16,7 +17,7 @@ export function useUpdateProfile() {
     mutationKey: ["account", "update-profile"],
     mutationFn: async (input: UpdateProfileInput) => {
       const { error } = await authClient.updateUser({ name: input.name });
-      if (error) throw new Error(error.message ?? t("account.profileUpdateFailed"));
+      if (error) throw toAuthClientError(error, t("account.profileUpdateFailed"));
     },
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
