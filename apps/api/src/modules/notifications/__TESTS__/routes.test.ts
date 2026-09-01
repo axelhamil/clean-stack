@@ -79,6 +79,9 @@ mock.module("../../../container", () => ({
     IOutboxRepository: {
       enqueue: mockEnqueue,
     },
+    PolicyAcceptanceService: {
+      hasAcceptedCurrent: mock(async () => Result.ok(true)),
+    },
   },
 }));
 

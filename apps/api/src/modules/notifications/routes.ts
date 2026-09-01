@@ -9,6 +9,7 @@ import { logger } from "../../shared/logger";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { MAX_STREAMS_PER_USER } from "../../shared/services/notification-stream-hub";
 import { zV } from "../../shared/validator";
 import {
@@ -48,14 +49,21 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ count: result.getValue() });
   })
-  .post("/read", requireAuth, denyImpersonated, zV("json", markReadSchema), async (c) => {
-    const { ids } = c.req.valid("json");
-    const userId = c.get("user").id;
-    const result = await di.INotificationStore.markRead(userId, ids, new Date());
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true as const });
-  })
-  .post("/read-all", requireAuth, denyImpersonated, async (c) => {
+  .post(
+    "/read",
+    requireAuth,
+    requireCurrentPolicies,
+    denyImpersonated,
+    zV("json", markReadSchema),
+    async (c) => {
+      const { ids } = c.req.valid("json");
+      const userId = c.get("user").id;
+      const result = await di.INotificationStore.markRead(userId, ids, new Date());
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      return c.json({ ok: true as const });
+    },
+  )
+  .post("/read-all", requireAuth, requireCurrentPolicies, denyImpersonated, async (c) => {
     const userId = c.get("user").id;
     const result = await di.INotificationStore.markAllRead(userId, new Date());
     if (result.isFailure) throw new AppErrorException(result.getError());
@@ -67,34 +75,41 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ items: result.getValue() });
   })
-  .put("/preferences", requireAuth, denyImpersonated, zV("json", preferenceSchema), async (c) => {
-    const body = c.req.valid("json");
-    const userId = c.get("user").id;
-    const result = await di.INotificationStore.upsertPreference({
-      scope: "user",
-      scopeId: userId,
-      category: body.category,
-      channel: body.channel,
-      enabled: body.enabled,
-      frequency: body.frequency,
-      locked: false,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    await emitEvent(
-      di.IOutboxRepository,
-      EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
-      "notification_preference",
-      userId,
-      {
-        userId,
+  .put(
+    "/preferences",
+    requireAuth,
+    requireCurrentPolicies,
+    denyImpersonated,
+    zV("json", preferenceSchema),
+    async (c) => {
+      const body = c.req.valid("json");
+      const userId = c.get("user").id;
+      const result = await di.INotificationStore.upsertPreference({
+        scope: "user",
+        scopeId: userId,
         category: body.category,
         channel: body.channel,
         enabled: body.enabled,
         frequency: body.frequency,
-      },
-    );
-    return c.json({ ok: true as const });
-  })
+        locked: false,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      await emitEvent(
+        di.IOutboxRepository,
+        EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
+        "notification_preference",
+        userId,
+        {
+          userId,
+          category: body.category,
+          channel: body.channel,
+          enabled: body.enabled,
+          frequency: body.frequency,
+        },
+      );
+      return c.json({ ok: true as const });
+    },
+  )
   .get(
     "/org-preferences",
     requireAuth,
@@ -110,6 +125,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
   .put(
     "/org-preferences",
     requireAuth,
+    requireCurrentPolicies,
     requireOrg,
     requireOrgPermission({ organization: ["update"] }),
     denyImpersonated,

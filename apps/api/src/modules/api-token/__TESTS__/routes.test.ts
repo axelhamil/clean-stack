@@ -29,6 +29,9 @@ const mockRevoke = mock(async (): Promise<Result<void, ApiTokenError>> => Result
 mock.module("../../../container", () => ({
   di: {
     ApiTokenService: { create: mockCreate, list: mockList, revoke: mockRevoke },
+    PolicyAcceptanceService: {
+      hasAcceptedCurrent: mock(async () => Result.ok(true)),
+    },
   },
 }));
 
