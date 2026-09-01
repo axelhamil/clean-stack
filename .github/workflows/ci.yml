@@ -106,6 +106,21 @@ jobs:
         # Needs the seed too.
         run: pnpm --filter api check:api-token-visibility
 
+      - name: Check the account-wipe rollback against a real database
+        # Only a real db.transaction can prove Postgres rolled the wipe back when
+        # the confirmation enqueue fails. Creates and removes its own probe user.
+        run: pnpm --filter api check:wipe-rollback
+
+      - name: Check the email-queue enqueue conflict against a real database
+        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape — a
+        # mocked tx asserts the call, never the outcome.
+        run: pnpm --filter api check:enqueue
+
+      - name: Check the email-queue markSent CASE against a real database
+        # Same reason: the CASE expression and the attempts increment are only
+        # evaluated by Postgres.
+        run: pnpm --filter api check:marksent
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
