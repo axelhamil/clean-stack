@@ -11,6 +11,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -21,8 +22,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
+import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   isPlatformRole,
@@ -33,6 +36,7 @@ import {
   banUserMutationOptions,
   resetPasswordMutationOptions,
   revokeSessionsMutationOptions,
+  setRoleMutationOptions,
   startImpersonationMutationOptions,
   unbanUserMutationOptions,
 } from "./api/admin-users.mutations";
@@ -40,6 +44,7 @@ import { adminUserQueryOptions } from "./api/admin-users.queries";
 import { SessionsCard } from "./components/sessions-card";
 import { BanForm } from "./forms/ban-form";
 import { ImpersonateForm } from "./forms/impersonate-form";
+import { SetRoleForm } from "./forms/set-role-form";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/users/$id")({
   component: AdminUserDetailPage,
@@ -53,6 +58,7 @@ function AdminUserDetailPage() {
   const queryClient = useQueryClient();
   const [banOpen, setBanOpen] = useState(false);
   const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [roleOpen, setRoleOpen] = useState(false);
 
   const query = useQuery(adminUserQueryOptions(id));
 
@@ -104,6 +110,20 @@ function AdminUserDetailPage() {
     onError: (err) => toast.error(err.message),
   });
 
+  const setRoleMutation = useMutation({
+    ...setRoleMutationOptions,
+    onSuccess: () => {
+      toast.success(t("users.detail.changeRoleSuccessToast"));
+      setRoleOpen(false);
+      void invalidateUser();
+    },
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.setUserRole", { defaultValue: "Failed to change role" }),
+      ),
+  });
+
   if (query.isLoading) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
@@ -140,13 +160,35 @@ function AdminUserDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span>{t("users.table.role")}</span>
-              <span>
+              <span className="flex items-center gap-2">
                 {user.role ? (
                   <Badge variant="secondary">
                     {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
                   </Badge>
                 ) : (
                   "—"
+                )}
+                {user.role && isPlatformRole(user.role) && (
+                  <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        {t("users.detail.changeRole")}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{t("users.detail.changeRoleTitle")}</DialogTitle>
+                        <DialogDescription>
+                          {t("users.detail.changeRoleDescription")}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <SetRoleForm
+                        currentRole={user.role}
+                        isPending={setRoleMutation.isPending}
+                        onSubmit={(values) => setRoleMutation.mutate({ id, ...values })}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 )}
               </span>
             </div>

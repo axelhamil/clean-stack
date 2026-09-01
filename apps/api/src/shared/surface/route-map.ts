@@ -139,7 +139,9 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /uploads/confirm": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
   "POST /uploads/download": { uiLess: "dormant-by-design" },
   "POST /uploads/presign": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
-  "PUT /admin/users/:id/role": { uiLess: "dormant-by-design" },
+  "PUT /admin/users/:id/role": {
+    consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
+  },
   "PUT /me/locale": { consumer: "apps/app/src/shared/api/mutations/set-locale.ts" },
   "PUT /notifications/org-preferences": {
     consumer: "apps/app/src/shared/api/mutations/notifications.ts",

@@ -208,6 +208,7 @@ export default {
     revokeUserSessions: "Échec de la révocation des sessions",
     resetUserPassword: "Échec de l'envoi de la réinitialisation du mot de passe",
     startImpersonation: "Échec du démarrage de l'emprunt d'identité",
+    setUserRole: "Échec du changement de rôle",
     loadAdminUsers: "Échec du chargement des comptes",
     loadAdminUser: "Échec du chargement du compte",
     loadAdminOrgs: "Échec du chargement des organisations",

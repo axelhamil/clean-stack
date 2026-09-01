@@ -222,6 +222,7 @@ export default {
     revokeUserSessions: "Failed to revoke sessions",
     resetUserPassword: "Failed to send password reset",
     startImpersonation: "Failed to start impersonation",
+    setUserRole: "Failed to change role",
     loadAdminUsers: "Failed to load accounts",
     loadAdminUser: "Failed to load account",
     loadAdminOrgs: "Failed to load organizations",

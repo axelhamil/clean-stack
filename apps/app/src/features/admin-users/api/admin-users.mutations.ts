@@ -9,9 +9,11 @@ const $unban = api.admin.users[":id"].unban.$post;
 const $revokeSessions = api.admin.users[":id"].sessions.$delete;
 const $resetPassword = api.admin.users[":id"]["reset-password"].$post;
 const $startImpersonation = api.admin.impersonation[":id"].start.$post;
+const $setRole = api.admin.users[":id"].role.$put;
 
 type BanBody = InferRequestType<typeof $ban>["json"];
 type StartImpersonationBody = InferRequestType<typeof $startImpersonation>["json"];
+type SetRoleBody = InferRequestType<typeof $setRole>["json"];
 
 export const banUserMutationOptions = mutationOptions({
   mutationKey: ["admin", "users", "ban"] as const,
@@ -79,5 +81,18 @@ export const startImpersonationMutationOptions = mutationOptions({
         }),
       );
     return (await res.json()) as InferResponseType<typeof $startImpersonation, 200>;
+  },
+});
+
+export const setRoleMutationOptions = mutationOptions({
+  mutationKey: ["admin", "users", "set-role"] as const,
+  mutationFn: async ({ id, ...json }: SetRoleBody & { id: string }) => {
+    const res = await $setRole({ param: { id }, json });
+    if (!res.ok)
+      await throwApiError(
+        res,
+        getErrorsT()("fallback.setUserRole", { defaultValue: "Failed to change role" }),
+      );
+    return (await res.json()) as InferResponseType<typeof $setRole, 200>;
   },
 });

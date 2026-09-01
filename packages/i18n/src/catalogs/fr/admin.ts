@@ -47,6 +47,14 @@ export default {
       impersonateSuccessToast: "Emprunt d'identité démarré.",
       revokeSessionsSuccessToast: "Sessions révoquées.",
       resetPasswordSuccessToast: "E-mail de réinitialisation du mot de passe envoyé.",
+      changeRole: "Changer le rôle",
+      changeRoleTitle: "Changer le rôle de ce compte",
+      changeRoleDescription:
+        "Un administrateur de la plateforme accède aux données de toutes les organisations et au journal d'audit opérateur.",
+      roleOptionUser: "Utilisateur",
+      roleOptionAdmin: "Administrateur de la plateforme",
+      changeRoleSubmit: "Changer le rôle",
+      changeRoleSuccessToast: "Rôle mis à jour.",
     },
     sessions: {
       title: "Sessions actives ({{count}})",
