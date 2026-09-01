@@ -73,7 +73,7 @@ mock.module("@packages/drizzle", () => ({
   apiTokenSchema: {},
 }));
 
-import { ensureNotificationTrigger } from "../notification-trigger";
+import { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } from "../notification-trigger";
 
 describe("ensureNotificationTrigger", () => {
   function makeClient() {
@@ -91,17 +91,27 @@ describe("ensureNotificationTrigger", () => {
 
     await ensureNotificationTrigger(client as never);
 
-    expect(client.execute).toHaveBeenCalledTimes(2);
+    expect(client.execute).toHaveBeenCalledTimes(3);
 
     const fnDdl = executed[0]?.toSQL().sql ?? "";
-    const triggerDdl = executed[1]?.toSQL().sql ?? "";
+    const insertDdl = executed[1]?.toSQL().sql ?? "";
+    const readDdl = executed[2]?.toSQL().sql ?? "";
 
     expect(fnDdl).toContain("CREATE OR REPLACE");
-    expect(fnDdl).toContain("notification_created");
+    expect(fnDdl).toContain("notification_changed");
     expect(fnDdl).toContain("NEW.user_id");
 
-    expect(triggerDdl).toContain("CREATE OR REPLACE");
-    expect(triggerDdl).toContain("notification_notify_trigger");
+    expect(insertDdl).toContain("CREATE OR REPLACE");
+    expect(insertDdl).toContain("notification_notify_trigger");
+    expect(insertDdl).toContain("AFTER INSERT ON notification");
+
+    expect(readDdl).toContain("notification_read_notify_trigger");
+    expect(readDdl).toContain("AFTER UPDATE OF read_at ON notification");
+    expect(readDdl).toContain("OLD.read_at IS DISTINCT FROM NEW.read_at");
+  });
+
+  test("le signal de lecture passe par le meme canal que la creation", () => {
+    expect(NOTIFICATION_NOTIFY_CHANNEL).toBe("notification_changed");
   });
 
   test("est idempotent - deux appels ne levent pas d'erreur", async () => {
@@ -110,7 +120,7 @@ describe("ensureNotificationTrigger", () => {
     await ensureNotificationTrigger(client as never);
     await ensureNotificationTrigger(client as never);
 
-    expect(client.execute).toHaveBeenCalledTimes(4);
+    expect(client.execute).toHaveBeenCalledTimes(6);
 
     const sqls = (client.execute as ReturnType<typeof mock>).mock.calls.map(
       (c) => (c[0] as { toSQL: () => { sql: string } }).toSQL().sql,
