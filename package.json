@@ -30,7 +30,7 @@
     "@packages/typescript-config": "workspace:*",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
-    "conventional-changelog-conventionalcommits": "^10.4.0",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "husky": "^9.1.7",
     "jscpd": "^5.0.16",
     "knip": "^6.32.3",
