@@ -11,6 +11,7 @@ import {
   notificationSchema,
 } from "@packages/drizzle";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { ITransaction } from "../../../../shared/transaction";
 import type {
   INotificationStore,
   NotificationError,
@@ -90,21 +91,24 @@ export class DrizzleNotificationStore implements INotificationStore {
     userId: string,
     ids: string[],
     now: Date,
-  ): Promise<Result<void, NotificationError>> {
+    tx?: ITransaction,
+  ): Promise<Result<string[], NotificationError>> {
+    const exec = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > markRead" },
       async () => {
         try {
           const n = notificationSchema.notification;
-          const query = db
+          const query = exec
             .update(n)
             .set({ readAt: now })
-            .where(and(eq(n.userId, userId), inArray(n.id, ids)));
-          await this.instrumentation.startSpan(
+            .where(and(eq(n.userId, userId), inArray(n.id, ids)))
+            .returning({ id: n.id });
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok();
+          return Result.ok(rows.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(writeFailure(err));
@@ -113,21 +117,27 @@ export class DrizzleNotificationStore implements INotificationStore {
     );
   }
 
-  async markAllRead(userId: string, now: Date): Promise<Result<void, NotificationError>> {
+  async markAllRead(
+    userId: string,
+    now: Date,
+    tx?: ITransaction,
+  ): Promise<Result<string[], NotificationError>> {
+    const exec = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > markAllRead" },
       async () => {
         try {
           const n = notificationSchema.notification;
-          const query = db
+          const query = exec
             .update(n)
             .set({ readAt: now })
-            .where(and(eq(n.userId, userId), isNull(n.readAt)));
-          await this.instrumentation.startSpan(
+            .where(and(eq(n.userId, userId), isNull(n.readAt)))
+            .returning({ id: n.id });
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok();
+          return Result.ok(rows.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(writeFailure(err));

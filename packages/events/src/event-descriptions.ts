@@ -80,6 +80,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A user updated their personal notification preferences.",
   [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]:
     "An organization administrator updated the organization notification preferences.",
+  [EventTypes.NOTIFICATION_READ]: "A user marked one or more of their notifications as read.",
   [EventTypes.SSO_PROVIDER_REGISTERED]:
     "An SSO identity provider was registered for an organization.",
   [EventTypes.SSO_PROVIDER_UPDATED]: "An SSO identity provider's configuration was changed.",

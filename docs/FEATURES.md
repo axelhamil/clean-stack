@@ -218,7 +218,7 @@ PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No 
 - **Dispatcher** — in-process Bun worker, `pg.Client` LISTEN + 30s poll fallback, `FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers inside the dispatch TX (atomic); `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`) — append-only (SOC2 / ISO 27001). `operational` (90d) vs `compliance` (7y) retention. Optional tamper-evidence hash chain (`AUDIT_TAMPER_EVIDENCE`). Operator UI at `/admin/audit-log` (filters, pagination, chain verify) — gated `requirePlatformAdmin`.
 - **Outbound webhooks** — HMAC-SHA256 signed (Stripe-style), AEAD-encrypted secrets (XChaCha20-Poly1305 + HKDF per org), decorrelated jitter retry (1m/5m/30m/2h/12h), dead-letter after 5 attempts, replay. See §Outbound webhooks for the full front-end surface.
-- **Catalog** `@packages/events` — **81 events** (35 public / 46 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
+- **Catalog** `@packages/events` — **82 events** (35 public / 47 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
 - **Request correlation** — `X-Request-Id` threaded into `outbox_event.metadata` and `audit_log.request_id` via `AsyncLocalStorage`.
 
 See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler, multi-tenant safety, BetterAuth bridge, HMAC verification).
@@ -395,7 +395,7 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 
 `apps/app/src/features/notifications/` keeps only `/settings/notifications` (route + page); the org defaults card lives in `features/organization/components/org-notification-defaults-card.tsx` behind `<Can requires={{ organization: ["update"] }}>` — a route under `orgScopeLayout` would collide, since it flattens children under `settings/`.
 
-**Events**: none added. Notification creation deliberately emits nothing (it would loop with its own subscriber). Preference *mutations* do emit `notification.preference.updated` / `notification.org_preference.updated` — they are persistent state changes. Catalog stays **67 / 28 public / 39 internal**.
+**Events**: notification *creation* deliberately emits nothing (it would loop with its own subscriber). Every other persistent state change here does emit: preference mutations (`notification.preference.updated`, `notification.org_preference.updated`) and the read transition (`notification.read`, subject == actor, so `userId` alone carries §7).
 
 **Dev seed** `apps/api/scripts/seed-dev-user.ts` (`pnpm --filter api db:seed`) — creates a verified account through `auth.api.signUpEmail`, so it crosses the real sign-up hooks. `SEED_EMAIL` must use a domain with a real MX record (default `dev@example.com`); the disposable-email guard rejects `.test`. `SEED_PASSWORD` must contain neither the email local part, the user name, nor the app name — `shared/password-policy.ts` rejects all three. The script records the initial policy acceptance itself: verifying the email in SQL bypasses the `/verify-email` hook that normally does it, and without it every sign-in lands on `/legal/accept`.
 

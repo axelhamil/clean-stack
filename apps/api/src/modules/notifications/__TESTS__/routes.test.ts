@@ -55,8 +55,12 @@ const mockList = mock(
   async (): Promise<Result<NotificationRecord[], NotificationError>> => Result.ok([NOTIFICATION]),
 );
 const mockUnreadCount = mock(async (): Promise<Result<number, NotificationError>> => Result.ok(3));
-const mockMarkRead = mock(async (): Promise<Result<void, NotificationError>> => Result.ok());
-const mockMarkAllRead = mock(async (): Promise<Result<void, NotificationError>> => Result.ok());
+const mockMarkRead = mock(
+  async (): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
+);
+const mockMarkAllRead = mock(
+  async (): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
+);
 const mockListPreferences = mock(
   async (): Promise<Result<PreferenceRecord[], NotificationError>> => Result.ok([PREFERENCE]),
 );
@@ -78,6 +82,9 @@ mock.module("../../../container", () => ({
     },
     IOutboxRepository: {
       enqueue: mockEnqueue,
+    },
+    ITransactionService: {
+      run: async (callback: (tx: unknown) => Promise<unknown>) => callback({}),
     },
     PolicyAcceptanceService: {
       hasAcceptedCurrent: mock(async () => Result.ok(true)),
@@ -197,6 +204,65 @@ describe("POST /notifications/read - mark-read", () => {
       body: JSON.stringify({ ids: [] }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /notifications/read - evenement de domaine", () => {
+  it("emet notification.read dans la meme transaction", async () => {
+    currentSession = {};
+    mockMarkRead.mockClear();
+    mockEnqueue.mockClear();
+    const app = makeApp();
+    const res = await app.request("/notifications/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: ["notif-1"] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    // biome-ignore lint/suspicious/noExplicitAny: test assertion
+    const [events, , tx] = (mockEnqueue.mock.calls[0] ?? []) as any[];
+    expect(events[0].eventType).toBe("notification.read");
+    expect(events[0].payload).toEqual({
+      userId: "user-1",
+      scope: "selection",
+      count: 1,
+      notificationIds: ["notif-1"],
+    });
+    expect(tx).toBeDefined();
+  });
+
+  it("n'emet rien quand aucune ligne n'a change", async () => {
+    currentSession = {};
+    mockEnqueue.mockClear();
+    mockMarkRead.mockImplementationOnce(async () => Result.ok([]));
+    const app = makeApp();
+    await app.request("/notifications/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: ["notif-etranger"] }),
+    });
+
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("read-all rapporte un compte sans recopier des ids non bornes", async () => {
+    currentSession = {};
+    mockEnqueue.mockClear();
+    mockMarkAllRead.mockImplementationOnce(async () => Result.ok(["a", "b", "c"]));
+    const app = makeApp();
+    await app.request("/notifications/read-all", { method: "POST" });
+
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    // biome-ignore lint/suspicious/noExplicitAny: test assertion
+    const [events] = (mockEnqueue.mock.calls[0] ?? []) as any[];
+    expect(events[0].payload).toEqual({
+      userId: "user-1",
+      scope: "all",
+      count: 3,
+      notificationIds: [],
+    });
   });
 });
 

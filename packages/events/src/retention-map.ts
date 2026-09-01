@@ -71,6 +71,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.API_TOKEN_USED]: "operational",
   [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: "compliance",
   [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: "compliance",
+  [EventTypes.NOTIFICATION_READ]: "operational",
   [EventTypes.SSO_PROVIDER_REGISTERED]: "compliance",
   [EventTypes.SSO_PROVIDER_UPDATED]: "compliance",
   [EventTypes.SSO_PROVIDER_DELETED]: "compliance",

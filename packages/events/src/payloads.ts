@@ -482,6 +482,23 @@ export type NotificationOrgPreferenceUpdatedPayload = z.infer<
   typeof NotificationOrgPreferenceUpdatedPayload
 >;
 
+// Subject and actor are the same person: both routes carry `denyImpersonated`
+// and the update is scoped to rows the caller owns, so no admin or system can
+// reach it on someone else's behalf. `userId` alone therefore satisfies §7 —
+// there is no second party to name, and `actorUserId` would only restate it.
+//
+// `notificationIds` carries what actually changed for an explicit selection
+// (bounded by the request body at 100). "Mark all as read" reports `count`
+// only: the unread set has no bound, and copying it into the outbox and the
+// audit row would buy a detail nobody reads at the price of rows of arbitrary
+// size.
+export const NotificationReadPayload = UserRef.extend({
+  scope: z.enum(["selection", "all"]),
+  count: z.number().int().positive(),
+  notificationIds: z.array(z.string()),
+});
+export type NotificationReadPayload = z.infer<typeof NotificationReadPayload>;
+
 const SsoProviderRef = z.object({
   actorUserId: z.string(),
   organizationId: z.string(),
@@ -634,6 +651,7 @@ export const PayloadByEventType = {
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
   [EventTypes.NOTIFICATION_PREFERENCE_UPDATED]: NotificationPreferenceUpdatedPayload,
   [EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED]: NotificationOrgPreferenceUpdatedPayload,
+  [EventTypes.NOTIFICATION_READ]: NotificationReadPayload,
   [EventTypes.SSO_PROVIDER_REGISTERED]: SsoProviderRegisteredPayload,
   [EventTypes.SSO_PROVIDER_UPDATED]: SsoProviderUpdatedPayload,
   [EventTypes.SSO_PROVIDER_DELETED]: SsoProviderDeletedPayload,

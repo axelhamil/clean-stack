@@ -58,15 +58,49 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     async (c) => {
       const { ids } = c.req.valid("json");
       const userId = c.get("user").id;
-      const result = await di.INotificationStore.markRead(userId, ids, new Date());
-      if (result.isFailure) throw new AppErrorException(result.getError());
+
+      await di.ITransactionService.run(async (tx) => {
+        const result = await di.INotificationStore.markRead(userId, ids, new Date(), tx);
+        if (result.isFailure) throw new AppErrorException(result.getError());
+        const marked = result.getValue();
+        // Nothing matched: no state changed, so there is nothing to observe.
+        if (marked.length === 0) return;
+
+        await emitEvent(
+          di.IOutboxRepository,
+          EventTypes.NOTIFICATION_READ,
+          "notification",
+          userId,
+          { userId, scope: "selection", count: marked.length, notificationIds: marked },
+          {},
+          tx,
+        );
+      });
+
       return c.json({ ok: true as const });
     },
   )
   .post("/read-all", requireAuth, requireCurrentPolicies, denyImpersonated, async (c) => {
     const userId = c.get("user").id;
-    const result = await di.INotificationStore.markAllRead(userId, new Date());
-    if (result.isFailure) throw new AppErrorException(result.getError());
+
+    await di.ITransactionService.run(async (tx) => {
+      const result = await di.INotificationStore.markAllRead(userId, new Date(), tx);
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const marked = result.getValue();
+      // Nothing was unread: no state changed, so there is nothing to observe.
+      if (marked.length === 0) return;
+
+      await emitEvent(
+        di.IOutboxRepository,
+        EventTypes.NOTIFICATION_READ,
+        "notification",
+        userId,
+        { userId, scope: "all", count: marked.length, notificationIds: [] },
+        {},
+        tx,
+      );
+    });
+
     return c.json({ ok: true as const });
   })
   .get("/preferences", requireAuth, async (c) => {

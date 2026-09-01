@@ -71,6 +71,7 @@ export const VISIBILITY = {
   "email.delivery.exhausted": "internal",
   "notification.preference.updated": "internal",
   "notification.org_preference.updated": "internal",
+  "notification.read": "internal",
   "sso.provider.registered": "internal",
   "sso.provider.updated": "internal",
   "sso.provider.deleted": "internal",
