@@ -12,7 +12,7 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 
 **SSOT** `@packages/policies`: `POLICY_TYPES`, `POLICY_VERSIONS`, `POLICY_CHANGELOG`. Schema: `packages/drizzle/src/schema/policies.ts` (`policy_acceptance`, append-only).
 
-**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — 409 on stale, mounted on business routes (Phase H.1), with explicit exclusions for `/me/policies/accept`, `/me/policies`, RGPD Art. 17/20 routes, sign-out/session reads, and impersonated sessions. Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
+**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — `POLICY_ACCEPTANCE_REQUIRED` (409) on stale. It is an **allowlist, not a global mount with exclusions**: it is declared route by route on the 20 mutating business routes of `profile`, `webhooks`, `api-token`, `organization`, `notifications`, `billing` and `uploads`, plus `PATCH /api/v1/me` (Phase H.1). Everything else is ungated, and the reasons differ — the policy routes themselves (gating them would block the only route that clears the gate), RGPD Art. 17/20 (a data-subject right cannot be conditioned on accepting terms), sign-out and session reads (a user must always be able to leave), `/consents` (no `requireAuth` at all — the cookie banner records for anonymous visitors, and withdrawal is the same family of right as RGPD), the whole `/admin/*` surface (operator tooling: gating it would 409-wall an operator out of the console, `POST /admin/impersonation/stop` included), impersonated sessions (checked inside the middleware, not at the mount), and every read-only route. The front turns that 409 into the redirect to `/legal/accept` (`shared/api/errors/policy-refusal.ts`). Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
 
 **Frontend** `apps/app/src/features/legal/`: sign-up checkbox; public `/legal/privacy-policy` + `/legal/terms`; acceptance gate `/legal/accept` (outside `_shell`). `POLICY_URLS` — hosting on external CMS is a one-line swap.
 
@@ -450,7 +450,7 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 `apps/api/src/shared/surface/` — the checked-in map of every backend route to what consumes it, and the honesty test that keeps it truthful.
 
 - **`back-routes.ts`** — the real route table, read off the live Hono app (not hand-maintained): 71 keys. Construction (`apps/api/src/app.ts`) is split from boot (`index.ts`) so a test can import `app.routes` without starting the outbox dispatcher or the workers.
-- **`front-consumers.ts`** — 50 call sites extracted from `apps/app`'s source.
+- **`front-consumers.ts`** — 52 call sites extracted from `apps/app`'s source.
 - **`route-map.ts`** — `Record<"METHOD /path", Consumer | UiLessReason>` over the 71 routes: 19 have no front consumer, classified as 9 `internal-cron`, 3 `infra-probe`, 3 `public-api`, 2 `provider-callback`, 1 `library-owned`, 1 `dormant-by-design`. Nothing is deleted for being unconsumed — a boilerplate keeps dormant scaffolding ready, declared in writing rather than silently absent.
 - **Parity test** (4 assertions) — diffs the map against the live route set and the extracted consumer list; a stale `UiLessReason` row dies the moment a front consumer appears for it.
 - **`docs/SURFACE.md`** explains the mechanism and, in prose, the backend capabilities with no HTTP surface at all (the `quotas` module) — structurally invisible to the map, since it has no `routes.ts` and is never mounted.
@@ -459,7 +459,7 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 
 **Behavioural parity**: 28 call sites converted from raw backend English to localized copy; the impersonation refusal has its own business code (`IMPERSONATION_ACTION_FORBIDDEN`, previously a generic `HTTP_403`); guarded actions are disabled at the screen with their reason exposed without a mouse, on top of the localized refusal that already arrives after the fact.
 
-**`requireCurrentPolicies` is mounted on business routes**, reversing Phase A.2 decision 5 ("composable, not mounted globally") — see the corrected line above and [`docs/HISTORY.md`](HISTORY.md)'s Phase H.1 entry.
+**`requireCurrentPolicies` is mounted on business routes**, reversing Phase A.2 decision 5 ("composable, not mounted globally") — see the corrected line above and [`docs/HISTORY.md`](HISTORY.md)'s Phase H.1 entry. It stays an allowlist: what is gated is enumerated, and what is not is enumerated with its reason, rather than described as "everything minus a few exclusions".
 
 No new event type — the catalog is unchanged at **81 total / 35 public / 46 internal**.
 
