@@ -22,6 +22,7 @@ apps/api/src/
     internal-routes/            `/internal/*` gate: `internal-signature` (HMAC primitives + server verify middleware), `private-network.middleware` (loopback/RFC1918), `internal-layers` (env-driven composer), `internal-fetch` (client-side signed-fetch)
     ports/                      Cross-context port interfaces
     services/                   Cross-context port impls (when no module owns the impl)
+    surface/                    Back↔front surface map: `back-routes.ts` (live route table from `app.ts`), `front-consumers.ts` (front-end `api.*.$method` call-site scan), `route-map.ts` (documented per-route intent) — `surface-parity.test.ts` fails on drift. See `docs/SURFACE.md`.
     env.ts, logger.ts           Process-level singletons
     transaction.ts              `type ITransaction = Transaction` — single swap-point exception
   modules/<context>/            See src/modules/CLAUDE.md for layered rules
@@ -32,10 +33,12 @@ apps/api/src/
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   auth.ts                       BetterAuth singleton — deliberate exception to modules/ rule (config-as-code, lib owns model). Routes auto-mount via plugin (`/api/auth/*`).
   auth-queries.ts               Typed Drizzle data-access for the bridge — plain functions (no port/DI/aggregate; auth is not domain), `tx?`-aware. Keeps `auth.ts` config + event-wiring only, never inline `db.*`.
-  client.ts, index.ts           `hcWithType` factory / server entry (chained `.route()` preserves `AppType`)
+  app.ts                        `Hono` construction — chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
+  index.ts                      Server entry: `Bun.serve()`, DI preload, worker starts, graceful shutdown. Imports `app` from `app.ts`, re-exports `AppType`.
+  client.ts                     `hcWithType` factory — `hc<AppType>` (`AppType` from `app.ts`)
 ```
 
-**Module boundary.** Within a module, layers import inwards (`infrastructure/` → `application/` → `domain/`). Cross-module: domain events, `shared/ports/`, or `shared/services/` only. **Modules NEVER import each other** — not even ports. `module.ts` imported only by `container.ts`; routes only by `index.ts`. Re-exporting routes from `module.ts` recreates the cycle `module → routes → container → module` (Biome flags).
+**Module boundary.** Within a module, layers import inwards (`infrastructure/` → `application/` → `domain/`). Cross-module: domain events, `shared/ports/`, or `shared/services/` only. **Modules NEVER import each other** — not even ports. `module.ts` imported only by `container.ts`; routes only by `app.ts`. Re-exporting routes from `module.ts` recreates the cycle `module → routes → container → module` (Biome flags).
 
 **Removability.** `trash modules/<context>/` + remove `.addModule()`/`app.route()` lines + `export *` in schema barrel. TS error-points the rest. Shared kernel always has ≥ 2 consumers OR is cross-cutting infra.
 
@@ -82,7 +85,7 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 **No `console.*` in production** — all logs through `pino` (JSON stdout in prod, `pino-pretty` in dev). HTTP: `hono-pino` with `referRequestIdKey: "requestId"`; status-driven log level (`5xx→error`, `4xx→warn`, `2xx/3xx→info`).
 
-**One `app.onError(...)`, no per-route `try/catch`**: `createErrorHandler(instrumentation)` called once in `index.ts` after `di.build()`. **Why factory**: avoids a runtime cycle if any module ever imports `shared/middleware/` — factory takes the dep as parameter, stays cycle-immune. Envelope: `HTTPException` → `{ error: { code, message, requestId } }` (logged at `error` only ≥ 500). Unknown → `500 INTERNAL_ERROR` (stack only outside prod).
+**One `app.onError(...)`, no per-route `try/catch`**: `createErrorHandler(instrumentation)` called once in `app.ts`, `di` already built (`container.ts`). **Why factory**: avoids a runtime cycle if any module ever imports `shared/middleware/` — factory takes the dep as parameter, stays cycle-immune. Envelope: `HTTPException` → `{ error: { code, message, requestId } }` (logged at `error` only ≥ 500). Unknown → `500 INTERNAL_ERROR` (stack only outside prod).
 
 Domain & application use `Result<T, E>` (no throw); controller translates → `HTTPException`. Never invent custom per-route error envelopes.
 

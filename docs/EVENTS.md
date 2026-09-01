@@ -238,14 +238,16 @@ Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. During a secret rotatio
 Reject if timestamp drift > 5 min (replay protection). Use the `x-webhook-idempotency` header (`<eventId>:<endpointId>`) to dedupe on your side.
 
 ```ts
-// Receiver verification
+// Receiver verification — the shipped copy-paste version lives in
+// apps/app/src/features/webhooks/components/verify-snippet.tsx
 const sigHeader = req.headers["x-webhook-signature"];
-const [tsPart, sigPart] = sigHeader.split(",");
-const ts = Number(tsPart.split("=")[1]);
-const sig = sigPart.split("=")[1];
+const ts = Number(sigHeader.match(/t=([^,]+)/)?.[1]);
+// Number("abc") is NaN and NaN > 300 is false, so the finite check is load-bearing.
+if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 const expected = hmacSha256(`${ts}.${rawBody}`, secret);
-if (!timingSafeEqual(sig, expected)) return reject(401);
-if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
+// Every v1= value, not the first — during rotation both secrets sign.
+const provided = sigHeader.match(/v1=([0-9a-f]+)/g)?.map((m) => m.slice(3)) ?? [];
+if (!provided.some((sig) => timingSafeEqual(sig, expected))) return reject(401);
 ```
 
 ## Architecture choices (SOTA 2026)
@@ -307,7 +309,7 @@ export const NOTIFICATION_MAP = {
 
 **Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement — une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) et le passage à l'état lu (`notification.read`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **82 événements / 35 publics / 47 internes**.
 
-**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 80 événements sont audit-only).
+**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 82 événements sont audit-only).
 
 **La cascade de préférences est résolue dans la requête d'insertion**, jamais en amont ni destinataire par destinataire : un `LEFT JOIN notification_preference` par portée et par canal, sur le même `INSERT ... SELECT`.
 

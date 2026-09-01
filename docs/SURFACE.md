@@ -15,7 +15,7 @@ the failure names — a consumer path if a screen calls it, or a `UiLessReason` 
 
 **What is deliberately not enumerated**: `/api/auth/*`. BetterAuth builds its own route table inside
 `better-call` and does not export it; only SSO and SCIM paths are frozen, in
-`apps/api/src/shared/auth/sso-paths.ts`. The wildcard is one `library-owned` row, and the front's 49
+`apps/api/src/shared/auth/sso-paths.ts`. The wildcard is one `library-owned` row, and the front's 53
 `authClient` calls are its consumers.
 
 **Running the test**: `back-routes.ts` imports the app, which loads `shared/env.ts` (Zod-validated) —

@@ -12,7 +12,7 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 
 **SSOT** `@packages/policies`: `POLICY_TYPES`, `POLICY_VERSIONS`, `POLICY_CHANGELOG`. Schema: `packages/drizzle/src/schema/policies.ts` (`policy_acceptance`, append-only).
 
-**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — `POLICY_ACCEPTANCE_REQUIRED` (409) on stale. It is an **allowlist, not a global mount with exclusions**: it is declared route by route on the 20 mutating business routes of `profile`, `webhooks`, `api-token`, `organization`, `notifications`, `billing` and `uploads`, plus `PATCH /api/v1/me` (Phase H.1). Everything else is ungated, and the reasons differ — the policy routes themselves (gating them would block the only route that clears the gate), RGPD Art. 17/20 (a data-subject right cannot be conditioned on accepting terms), sign-out and session reads (a user must always be able to leave), `/consents` (no `requireAuth` at all — the cookie banner records for anonymous visitors, and withdrawal is the same family of right as RGPD), the whole `/admin/*` surface (operator tooling: gating it would 409-wall an operator out of the console, `POST /admin/impersonation/stop` included), impersonated sessions (checked inside the middleware, not at the mount), and every read-only route. The front turns that 409 into the redirect to `/legal/accept` (`shared/api/errors/policy-refusal.ts`). Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
+**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — `POLICY_ACCEPTANCE_REQUIRED` (409) on stale. It is an **allowlist, not a global mount with exclusions**: it is declared route by route on the 19 mutating business routes of `profile`, `webhooks`, `api-token`, `organization`, `notifications`, `billing` and `uploads`, plus `PATCH /api/v1/me` (Phase H.1). Everything else is ungated, and the reasons differ — the policy routes themselves (gating them would block the only route that clears the gate), RGPD Art. 17/20 (a data-subject right cannot be conditioned on accepting terms), sign-out and session reads (a user must always be able to leave), `/consents` (no `requireAuth` at all — the cookie banner records for anonymous visitors, and withdrawal is the same family of right as RGPD), the whole `/admin/*` surface (operator tooling: gating it would 409-wall an operator out of the console, `POST /admin/impersonation/stop` included), impersonated sessions (checked inside the middleware, not at the mount), and every read-only route. The front turns that 409 into the redirect to `/legal/accept` (`shared/api/errors/policy-refusal.ts`). Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
 
 **Frontend** `apps/app/src/features/legal/`: sign-up checkbox; public `/legal/privacy-policy` + `/legal/terms`; acceptance gate `/legal/accept` (outside `_shell`). `POLICY_URLS` — hosting on external CMS is a one-line swap.
 
@@ -106,7 +106,7 @@ Three-step flow: `presign` → client `PUT` → `confirm`. Server is blind durin
 
 - **Owner-scoped keys** — `<userId>/<scope>/<uuid>-<filename>`. Download + confirm reject keys without the requesting user's prefix.
 - **Confirm mandatory** — `HeadObject` validates size/contentType, deletes on mismatch. (R2 has no presigned POST policy — hence PUT + confirm.)
-- Use-cases: `create-upload-url`, `confirm-upload`, `create-download-url`. Routes: `POST /uploads/presign`, `POST /uploads/confirm`, `POST /uploads/download`.
+- Use-cases: `create-upload-url`, `confirm-upload`, `create-download-url`, `delete-upload`. Routes: `POST /uploads/presign`, `POST /uploads/confirm`, `POST /uploads/download`, `DELETE /uploads` (accepts `{ key }` or `{ url }` — the server derives the object key from the public URL, so the front never learns the storage key format; used to delete the replaced object on an avatar re-upload, closing the storage leak). All four are gated by `requireCurrentPolicies`.
 - Dev opt-in: `docker compose --profile storage up seaweedfs seaweedfs-init -d` (host port `8333`).
 
 Module: `apps/api/src/modules/uploads/`.
@@ -331,7 +331,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 **Schema** `packages/drizzle/src/schema/api-token.ts` — `api_token(id, userId FK, organizationId FK nullable, name, tokenHmac unique, pepperVersion, tokenStart, scopes jsonb, lastUsedAt, expiresAt, revokedAt, revokedReason, createdAt, updatedAt)`.
 
 **Backend** `apps/api/src/modules/api-token/`:
-- `ApiTokenService` — `create`, `list`, `revoke`. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).
+- `ApiTokenService` — `create`, `list`, `revoke`. `list` takes a `TokenOwner` (`{ kind: "personal" }` or `{ kind: "orgAndPersonal" }`) — a caller with an active organization sees that organization's tokens *and* their own org-less personal tokens together; with no active organization, only the personal ones. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).
 - `DrizzleApiTokenRepository` implements `ScopedRepository<ApiToken, RepoScope>` (wrong-owner → `Option.none()` / `NOT_FOUND`, never 403).
 - `revokeTokensOnMembershipLost` event handler — cascades revocation on `org.member.removed`.
 - Routes `apps/api/src/modules/api-token/routes.ts` — `GET/POST /settings/tokens`, `DELETE /settings/tokens/:id` (session-auth; `denyImpersonated` on writes).
@@ -352,7 +352,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 **Event visibility** `packages/events/src/visibility-map.ts` — 82-event catalog with explicit `public` / `internal` classification (35 public / 47 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
-**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **67 total / 28 public / 39 internal**.
+**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **82 total / 35 public / 47 internal**.
 
 **Email** `packages/emails/src/components/api-token-leaked.tsx` — template sent to the token owner when GitHub Secret Scanning reports a match.
 
@@ -389,7 +389,7 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 **Crons** on the `/internal/*` rail: `flush-notification-emails` (1 min, batch capped at 5000) and `sweep-notifications` (**read rows only** — an unread notification outlives retention).
 
 **Frontend** — everything cross-cutting is in `apps/app/src/shared/notifications/`, because `shared/` may not import `features/` (the bell mounts in `app-shell`) and the preference matrix has two route-owning consumers that may not import each other:
-- `notification-bell.tsx` / `notification-item.tsx` — bell, badge, dropdown inbox. Row labels reuse `EVENT_DESCRIPTIONS`; grouped rows read "and N more".
+- `notification-bell.tsx` / `notification-item.tsx` — bell, badge, dropdown inbox. Row labels reuse `EVENT_DESCRIPTIONS`; grouped rows read "and N more". History is a single `useInfiniteQuery` over the cursor (not one query per cursor), with a "load more" control appending pages rather than replacing them.
 - `use-notification-stream.ts` — `fetch` + `ReadableStream`, **not `EventSource`** (which cannot carry an `Authorization` header, breaking any bearer-authenticated client). Exponential backoff with jitter, `AbortController` on unmount. `handleStreamChunk` is pure and returns its trailing partial frame, because a stream splits SSE frames wherever it likes.
 - `notification-broadcast.ts` — mark-as-read propagates cross-tab over `createBroadcastChannel` and applies to the cache without refetching.
 - `preference-matrix.tsx` / `build-preference-matrix.ts` — the grid is rebuilt for all four categories from the explicitly-stored rows alone; an absent cell renders as enabled/immediate, which is what the fan-out applies. A fully-forced category renders disabled **with its reason**, never hidden.
@@ -417,7 +417,7 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 - **SAML is hardened on every write path** — `normalizeSamlConfig` (`shared/auth/saml-config.ts`) forces `signatureAlgorithm: "sha256"` and `wantAssertionsSigned: true` and rejects the whole `sha1`/`md5` family, on `/sso/register` **and** `/sso/update-provider`; it is spread-based so a partial update can neither weaken the security fields nor clobber identity fields it didn't send.
 - **Before→after handoffs go through `RequestSnapshots<T>`** (`shared/auth/request-snapshots.ts`), never a bare `Map`: a freshness TTL bounds how long a stranded entry stays pickable and an `accepts()` predicate lets the consumer's own identity (the organization id) confirm ownership. A `hooks.before` write whose `hooks.after` never fires — a 404ing SCIM `DELETE`, for one — would otherwise poison an unrelated later request and forge its audit actor.
 - **Rate limiting**: `/api/auth/scim/*` carries `SCIM_POLICY` (60/min + 1000/h, fail-closed, security events on); `/api/auth/send-verification-email` carries the same fail-closed 3/15min policy as its public "email a stranger" siblings.
-- 13 events (`sso.provider.{registered,updated,deleted}`, `sso.domain.verified`, `sso.enforcement.changed`, `sso.login.{success,failure}`, `scim.connection.{created,deleted}`, `scim.user.{created,updated,deactivated,deprovisioned}`) — full source list in [`docs/EVENTS.md`](EVENTS.md#via-authts-hooksafter-phase-c7--better-authsso--better-authscim). Catalog now **80 / 34 public / 46 internal**.
+- 13 events (`sso.provider.{registered,updated,deleted}`, `sso.domain.verified`, `sso.enforcement.changed`, `sso.login.{success,failure}`, `scim.connection.{created,deleted}`, `scim.user.{created,updated,deactivated,deprovisioned}`) — full source list in [`docs/EVENTS.md`](EVENTS.md#via-authts-hooksafter-phase-c7--better-authsso--better-authscim). Catalog now **82 / 35 public / 47 internal**.
 
 **Frontend** `apps/app/src/features/sso/` — `/settings/sso` page: provider registration forms (OIDC + SAML, `forms/{oidc,saml}-provider-form.tsx`), `<DomainVerificationCard>`, `<ScimConnectionCard>`, `<SsoEnforcementCard>`. `apps/app/src/shared/auth/auth-client.ts` adds `ssoClient({ domainVerification: { enabled: true } })` + `scimClient()`.
 
@@ -463,7 +463,7 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 
 **`requireCurrentPolicies` is mounted on business routes**, reversing Phase A.2 decision 5 ("composable, not mounted globally") — see the corrected line above and [`docs/HISTORY.md`](HISTORY.md)'s Phase H.1 entry. It stays an allowlist: what is gated is enumerated, and what is not is enumerated with its reason, rather than described as "everything minus a few exclusions".
 
-No new event type — the catalog is unchanged at **81 total / 35 public / 46 internal**.
+No new event type — the catalog is unchanged at **82 total / 35 public / 47 internal**.
 
 ---
 
