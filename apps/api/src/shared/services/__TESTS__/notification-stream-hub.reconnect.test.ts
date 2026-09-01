@@ -81,13 +81,17 @@ class FakeClient implements NotificationListenClient {
   }
 }
 
-function makeHub(overrides: { failConnect?: boolean; suspendConnect?: boolean } = {}) {
+function makeHub(
+  overrides: { failConnect?: boolean; suspendConnect?: boolean; failFirstConnect?: boolean } = {},
+) {
   const created: FakeClient[] = [];
   const hub = new NotificationStreamHub(logger, "postgres://unused", new NoOpInstrumentation(), {
     createClient: () => {
       const client = new FakeClient();
-      client.connectRejects = overrides.failConnect === true;
-      if (overrides.suspendConnect && created.length === 0) client.suspendConnect();
+      const first = created.length === 0;
+      client.connectRejects =
+        overrides.failConnect === true || (overrides.failFirstConnect === true && first);
+      if (overrides.suspendConnect && first) client.suspendConnect();
       created.push(client);
       return client;
     },
@@ -191,6 +195,37 @@ describe("NotificationStreamHub — reconnexion", () => {
     expect(created.filter((c) => c.relaying)).toHaveLength(1);
     expect(created[0]?.ended).toBe(true);
     expect(liveClient(hub)).toBe(created[1] ?? null);
+
+    await hub.stop();
+  });
+
+  test("une panne en vol suivie d'un connect() qui echoue ne planifie qu'une reconnexion", async () => {
+    // Le seul chemin ou les deux appels a scheduleReconnect() se produisent
+    // vraiment. `dispose()` retire les listeners de facon synchrone, donc le
+    // `end` qui suit un `error` ne rappelle plus rien : la double planification
+    // ne peut plus venir de la. Elle vient d'ici — le handler `error` planifie
+    // pendant que `connect()` est en vol, puis `connect()` rejette et le `catch`
+    // de connectListener planifie une seconde fois. Sans la garde d'unicite,
+    // deux timers arment deux connexions, ce que ce test compte.
+    const { hub, created } = makeHub({ suspendConnect: true, failFirstConnect: true });
+    const connecting = connectListener(hub);
+    await wait(0); // laisse connectListener() atteindre `await client.connect()`
+
+    const client = created[0];
+    if (!client) throw new Error("client not created");
+
+    client.killBackend(); // 1er scheduleReconnect, depuis le handler `error`
+    client.releaseConnect(); // connect() rejette -> 2e scheduleReconnect, depuis le `catch`
+    await connecting;
+
+    expect(liveClient(hub)).toBeNull();
+
+    // Un seul backoff s'est ecoule : avec une seule reconnexion en vol il n'y a
+    // qu'un client de plus. Sans la garde il y en a deux, arme's a 25 et 50 ms.
+    await wait(90);
+
+    expect(created).toHaveLength(2);
+    expect(created.filter((c) => c.relaying)).toHaveLength(1);
 
     await hub.stop();
   });
