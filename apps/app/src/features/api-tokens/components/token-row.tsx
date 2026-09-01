@@ -2,6 +2,7 @@ import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { ApiToken } from "../api/api-tokens.queries";
 
@@ -9,17 +10,10 @@ interface TokenRowProps {
   token: ApiToken;
   onRevoke: (id: string) => void;
   isRevoking: boolean;
-  disabledReason?: string;
-  describedBy?: string;
+  guard: ImpersonationGuard;
 }
 
-export function TokenRow({
-  token,
-  onRevoke,
-  isRevoking,
-  disabledReason,
-  describedBy,
-}: TokenRowProps) {
+export function TokenRow({ token, onRevoke, isRevoking, guard }: TokenRowProps) {
   const { t } = useTranslation("settings");
   const formatDate = useFormatDate();
   const isRevoked = token.revokedAt !== null;
@@ -52,9 +46,8 @@ export function TokenRow({
           <Button
             variant="ghost"
             size="sm"
-            disabled={isRevoking || Boolean(disabledReason)}
-            title={disabledReason}
-            aria-describedby={describedBy}
+            disabled={isRevoking || guard.blocked}
+            {...guard.describeProps(isRevoking)}
             onClick={() => onRevoke(token.id)}
           >
             {t("apiTokens.revokeAction")}

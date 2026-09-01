@@ -116,8 +116,7 @@ function AcceptPoliciesPage() {
           className="w-full"
           onClick={() => mutation.mutate({})}
           disabled={mutation.isPending || guard.blocked}
-          title={guard.reason}
-          aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+          {...guard.describeProps(mutation.isPending)}
         >
           {mutation.isPending ? t("legal.accept.acceptingButton") : t("legal.accept.acceptButton")}
         </Button>

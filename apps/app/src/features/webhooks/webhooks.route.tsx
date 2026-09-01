@@ -190,8 +190,7 @@ function WebhooksPage() {
           <Button
             onClick={() => setCreating(true)}
             disabled={guard.blocked}
-            title={guard.reason}
-            aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+            {...guard.describeProps()}
           >
             {t("settings:webhooks.addEndpoint")}
           </Button>
@@ -227,8 +226,7 @@ function WebhooksPage() {
                 onSendTest={(ep) => sendTest.mutate(ep.id)}
                 onRotate={(ep) => rotate.mutate(ep.id)}
                 onDelete={(ep) => del.mutate(ep.id)}
-                disabledReason={guard.reason}
-                describedBy={guard.blocked ? guard.descriptionId : undefined}
+                guard={guard}
               />
             ))}
           </TableBody>
@@ -334,8 +332,7 @@ function WebhooksPage() {
             canReplay={can({ webhooks: ["write"] })}
             onReplay={(deliveryId) => replay.mutate({ endpointId: selectedEndpointId, deliveryId })}
             onClose={() => setSelectedDelivery(null)}
-            disabledReason={guard.reason}
-            describedBy={guard.blocked ? guard.descriptionId : undefined}
+            guard={guard}
           />
         </>
       )}
@@ -357,8 +354,7 @@ function WebhooksPage() {
             }
             submitLabel={editing ? t("common:actions.save") : t("settings:webhooks.createAction")}
             isPending={create.isPending || update.isPending}
-            disabledReason={guard.reason}
-            describedBy={guard.blocked ? guard.descriptionId : undefined}
+            guard={guard}
             onSubmit={(v) => (editing ? update.mutate({ id: editing.id, ...v }) : create.mutate(v))}
           />
         </DialogContent>

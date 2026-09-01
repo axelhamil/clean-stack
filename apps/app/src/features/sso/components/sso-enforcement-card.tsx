@@ -51,12 +51,9 @@ export function SsoEnforcementCard() {
       ),
   });
 
-  // A verified-domain gap already freezes the switch on its own — only
-  // attribute the freeze to impersonation when that is actually the cause,
-  // otherwise the tooltip would name a reason that isn't why the control is
-  // stuck.
+  // A verified-domain gap already freezes the switch on its own; `describeProps`
+  // is what keeps the tooltip from naming impersonation in that case.
   const otherwiseFrozen = setEnforcement.isPending || (!enforced && !hasVerifiedProvider);
-  const impersonationFrozen = guard.blocked && !otherwiseFrozen;
 
   return (
     <Can requires={{ organization: ["update"] }}>
@@ -71,8 +68,7 @@ export function SsoEnforcementCard() {
               aria-label={t("sso.enforcementCard.switchAriaLabel")}
               checked={enforced}
               disabled={otherwiseFrozen || guard.blocked}
-              title={impersonationFrozen ? guard.reason : undefined}
-              aria-describedby={impersonationFrozen ? guard.descriptionId : undefined}
+              {...guard.describeProps(otherwiseFrozen)}
               onCheckedChange={(next) => setEnforcement.mutate(next)}
             />
             <span className="text-sm">

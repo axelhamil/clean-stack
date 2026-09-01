@@ -30,7 +30,6 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
   const nextAllowedAt = last ? new Date(last.getTime() + RATE_LIMIT_HOURS * 60 * 60 * 1000) : null;
   const cooldown = Boolean(nextAllowedAt && nextAllowedAt > new Date());
   const otherwiseDisabled = mutation.isPending || cooldown;
-  const impersonationFrozen = guard.blocked && !otherwiseDisabled;
 
   return (
     <Card>
@@ -43,8 +42,7 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
           type="button"
           variant="outline"
           disabled={otherwiseDisabled || guard.blocked}
-          title={impersonationFrozen ? guard.reason : undefined}
-          aria-describedby={impersonationFrozen ? guard.descriptionId : undefined}
+          {...guard.describeProps(otherwiseDisabled)}
           onClick={() => mutation.mutate()}
         >
           <DownloadIcon />

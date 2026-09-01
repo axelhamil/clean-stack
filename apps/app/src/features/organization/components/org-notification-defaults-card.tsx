@@ -49,8 +49,7 @@ export function OrgNotificationDefaultsCard() {
             onChange={handleChange}
             showLock
             disabled={isPending}
-            blockedReason={guard.reason}
-            describedBy={guard.blocked ? guard.descriptionId : undefined}
+            guard={guard}
           />
         </CardContent>
       </Card>

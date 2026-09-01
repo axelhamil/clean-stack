@@ -83,8 +83,7 @@ function ApiTokensPage() {
         <Button
           onClick={() => setCreating(true)}
           disabled={guard.blocked}
-          title={guard.reason}
-          aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+          {...guard.describeProps()}
         >
           {t("apiTokens.newTokenAction")}
         </Button>
@@ -117,8 +116,7 @@ function ApiTokensPage() {
                 token={token}
                 onRevoke={(id) => revoke.mutate(id)}
                 isRevoking={revoke.isPending && revoke.variables === token.id}
-                disabledReason={guard.reason}
-                describedBy={guard.blocked ? guard.descriptionId : undefined}
+                guard={guard}
               />
             ))}
           </TableBody>
@@ -134,8 +132,7 @@ function ApiTokensPage() {
             defaultValues={DEFAULT_VALUES}
             submitLabel={t("apiTokens.createAction")}
             isPending={create.isPending}
-            disabledReason={guard.reason}
-            describedBy={guard.blocked ? guard.descriptionId : undefined}
+            guard={guard}
             onSubmit={(v) => create.mutate(v)}
           />
         </DialogContent>

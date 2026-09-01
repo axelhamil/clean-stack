@@ -22,6 +22,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import {
   API_SCOPES,
   type TokenFormInput,
@@ -33,8 +34,7 @@ interface TokenFormProps {
   defaultValues: TokenFormInput;
   submitLabel: string;
   isPending: boolean;
-  disabledReason?: string;
-  describedBy?: string;
+  guard: ImpersonationGuard;
   onSubmit: (values: TokenFormInput) => void;
 }
 
@@ -42,8 +42,7 @@ export function TokenForm({
   defaultValues,
   submitLabel,
   isPending,
-  disabledReason,
-  describedBy,
+  guard,
   onSubmit,
 }: TokenFormProps) {
   const { t } = useTranslation("settings");
@@ -157,9 +156,8 @@ export function TokenForm({
 
         <Button
           type="submit"
-          disabled={isPending || Boolean(disabledReason)}
-          title={disabledReason}
-          aria-describedby={describedBy}
+          disabled={isPending || guard.blocked}
+          {...guard.describeProps(isPending)}
         >
           {submitLabel}
         </Button>

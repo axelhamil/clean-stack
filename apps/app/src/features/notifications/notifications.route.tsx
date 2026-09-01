@@ -55,8 +55,7 @@ function NotificationsPage() {
             rows={rows}
             onChange={handleChange}
             disabled={isPending}
-            blockedReason={guard.reason}
-            describedBy={guard.blocked ? guard.descriptionId : undefined}
+            guard={guard}
           />
         </CardContent>
       </Card>

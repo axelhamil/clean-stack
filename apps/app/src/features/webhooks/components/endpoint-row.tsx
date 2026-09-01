@@ -16,6 +16,7 @@ import {
 } from "@packages/ui/components/ui/tooltip";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
 import { ENDPOINT_STATUS_KEYS } from "../webhook-labels";
@@ -35,8 +36,7 @@ interface EndpointRowProps {
   onRotate: (endpoint: WebhookEndpoint) => void;
   onDelete: (endpoint: WebhookEndpoint) => void;
   onSelect: (endpoint: WebhookEndpoint) => void;
-  disabledReason?: string;
-  describedBy?: string;
+  guard: ImpersonationGuard;
 }
 
 export function EndpointRow({
@@ -47,8 +47,7 @@ export function EndpointRow({
   onRotate,
   onDelete,
   onSelect,
-  disabledReason,
-  describedBy,
+  guard,
 }: EndpointRowProps) {
   const { t } = useTranslation(["settings", "common"]);
   const formatDate = useFormatDate();
@@ -97,34 +96,30 @@ export function EndpointRow({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onEdit(endpoint)}
-                  disabled={Boolean(disabledReason)}
-                  title={disabledReason}
-                  aria-describedby={describedBy}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
                 >
                   {t("settings:webhooks.endpointRow.edit")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onSendTest(endpoint)}
-                  disabled={Boolean(disabledReason)}
-                  title={disabledReason}
-                  aria-describedby={describedBy}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
                 >
                   {t("settings:webhooks.endpointRow.sendTest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onRotate(endpoint)}
-                  disabled={Boolean(disabledReason)}
-                  title={disabledReason}
-                  aria-describedby={describedBy}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
                 >
                   {t("settings:webhooks.endpointRow.rotateSecret")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onDelete(endpoint)}
-                  disabled={Boolean(disabledReason)}
-                  title={disabledReason}
-                  aria-describedby={describedBy}
+                  disabled={guard.blocked}
+                  {...guard.describeProps()}
                   className="text-destructive focus:text-destructive"
                 >
                   {t("settings:webhooks.endpointRow.delete")}

@@ -64,8 +64,7 @@ function BillingPage() {
             <Button
               onClick={() => portal.mutate()}
               disabled={portal.isPending || guard.blocked}
-              title={guard.reason}
-              aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+              {...guard.describeProps(portal.isPending)}
             >
               {t("billing.manageBilling")}
             </Button>

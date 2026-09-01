@@ -60,8 +60,7 @@ export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProp
             type="submit"
             variant="destructive"
             disabled={mutation.isPending || guard.blocked}
-            title={guard.reason}
-            aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+            {...guard.describeProps(mutation.isPending)}
           >
             {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
           </AlertDialogAction>

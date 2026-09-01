@@ -84,36 +84,36 @@ function AdminOrgsPage() {
             <TableBody>
               {query.data?.pages
                 .flatMap((p) => p.items)
-                .map((org) => (
-                  <TableRow key={org.id}>
-                    <TableCell>
-                      <NavLink asChild variant="plain">
-                        <Link to="/admin/orgs/$orgId" params={{ orgId: org.id }}>
-                          {org.name}
-                        </Link>
-                      </NavLink>
-                    </TableCell>
-                    <TableCell>{org.slug}</TableCell>
-                    <TableCell>{org.memberCount}</TableCell>
-                    <TableCell>{formatDate(org.createdAt)}</TableCell>
-                    <TableCell>
-                      <Switch
-                        aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
-                        checked={org.ssoEnforced}
-                        disabled={
-                          (ssoEnforcementMutation.isPending &&
-                            ssoEnforcementMutation.variables?.id === org.id) ||
-                          guard.blocked
-                        }
-                        title={guard.reason}
-                        aria-describedby={guard.blocked ? guard.descriptionId : undefined}
-                        onCheckedChange={(enforced) =>
-                          ssoEnforcementMutation.mutate({ id: org.id, enforced })
-                        }
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                .map((org) => {
+                  const saving =
+                    ssoEnforcementMutation.isPending &&
+                    ssoEnforcementMutation.variables?.id === org.id;
+                  return (
+                    <TableRow key={org.id}>
+                      <TableCell>
+                        <NavLink asChild variant="plain">
+                          <Link to="/admin/orgs/$orgId" params={{ orgId: org.id }}>
+                            {org.name}
+                          </Link>
+                        </NavLink>
+                      </TableCell>
+                      <TableCell>{org.slug}</TableCell>
+                      <TableCell>{org.memberCount}</TableCell>
+                      <TableCell>{formatDate(org.createdAt)}</TableCell>
+                      <TableCell>
+                        <Switch
+                          aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
+                          checked={org.ssoEnforced}
+                          disabled={saving || guard.blocked}
+                          {...guard.describeProps(saving)}
+                          onCheckedChange={(enforced) =>
+                            ssoEnforcementMutation.mutate({ id: org.id, enforced })
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
             </TableBody>
           </Table>
 

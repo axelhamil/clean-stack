@@ -39,8 +39,6 @@ export function LanguageCard() {
 
   const current = isLocale(i18n.language) ? i18n.language : "en";
   const otherwiseDisabled = mutation.isPending || (pending ?? current) === current;
-  const impersonationFrozen = guard.blocked && !otherwiseDisabled;
-  const disabled = otherwiseDisabled || guard.blocked;
 
   return (
     <Card>
@@ -66,9 +64,8 @@ export function LanguageCard() {
         </div>
         <Button
           className="self-start"
-          disabled={disabled}
-          title={impersonationFrozen ? guard.reason : undefined}
-          aria-describedby={impersonationFrozen ? guard.descriptionId : undefined}
+          disabled={otherwiseDisabled || guard.blocked}
+          {...guard.describeProps(otherwiseDisabled)}
           onClick={() => mutation.mutate({ locale: pending ?? current })}
         >
           {t("common:actions.save")}

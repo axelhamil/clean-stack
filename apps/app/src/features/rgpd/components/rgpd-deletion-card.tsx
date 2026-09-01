@@ -77,8 +77,7 @@ function PendingState({ until }: PendingStateProps) {
           variant="outline"
           className="self-start"
           disabled={cancel.isPending || guard.blocked}
-          title={guard.reason}
-          aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+          {...guard.describeProps(cancel.isPending)}
           onClick={() => cancel.mutate()}
         >
           {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}

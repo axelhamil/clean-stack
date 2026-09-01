@@ -68,6 +68,8 @@ export function NotificationBell() {
     onSuccess: () => propagate({ all: true }),
   });
 
+  const nothingToMarkRead = count === 0 || markAllRead.isPending;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -88,9 +90,8 @@ export function NotificationBell() {
             variant="ghost"
             size="sm"
             onClick={() => markAllRead.mutate()}
-            disabled={count === 0 || markAllRead.isPending || guard.blocked}
-            title={guard.reason}
-            aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+            disabled={nothingToMarkRead || guard.blocked}
+            {...guard.describeProps(nothingToMarkRead)}
           >
             {t("notifications.markAllRead")}
           </Button>
@@ -109,8 +110,7 @@ export function NotificationBell() {
                   key={group.key}
                   group={group}
                   onRead={(ids) => markRead.mutate({ ids })}
-                  disabledReason={guard.reason}
-                  describedBy={guard.blocked ? guard.descriptionId : undefined}
+                  guard={guard}
                 />
               ))}
             </ul>
