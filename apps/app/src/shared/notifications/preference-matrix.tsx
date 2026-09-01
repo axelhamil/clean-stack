@@ -118,7 +118,7 @@ export function PreferenceMatrix({
 
           return (
             <TableRow key={row.category}>
-              <TableCell>
+              <TableCell className="max-w-48 whitespace-normal">
                 <TypographySmall>{categoryLabel}</TypographySmall>
                 {noteKey && <TypographyMuted>{t(noteKey)}</TypographyMuted>}
               </TableCell>
