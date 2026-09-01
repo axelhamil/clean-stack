@@ -63,8 +63,15 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
         const result = await di.INotificationStore.markRead(userId, ids, new Date(), tx);
         if (result.isFailure) throw new AppErrorException(result.getError());
         const marked = result.getValue();
-        // Nothing matched: no state changed, so there is nothing to observe.
-        if (marked.length === 0) return;
+
+        // An id the caller does not own, or that no longer exists, matches
+        // nothing. Answering `200 {ok:true}` claims an action that never
+        // happened, and the client decrements its badge by the ids it sent. A
+        // 403 would leak the row's existence, so the whole batch is NOT_FOUND
+        // and the transaction rolls back — all of it applied, or none of it.
+        if (marked.length !== new Set(ids).size) {
+          throw new HTTPException(404, { message: "NOTIFICATION_NOT_FOUND" });
+        }
 
         await emitEvent(
           di.IOutboxRepository,

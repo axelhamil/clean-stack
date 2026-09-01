@@ -233,18 +233,49 @@ describe("POST /notifications/read - evenement de domaine", () => {
     expect(tx).toBeDefined();
   });
 
-  it("n'emet rien quand aucune ligne n'a change", async () => {
+  it("repond 404 et n'emet rien sur la notification d'autrui", async () => {
     currentSession = {};
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok([]));
     const app = makeApp();
-    await app.request("/notifications/read", {
+    const res = await app.request("/notifications/read", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ids: ["notif-etranger"] }),
     });
 
+    expect(res.status).toBe(404);
     expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("refuse le lot entier quand un seul id est etranger", async () => {
+    currentSession = {};
+    mockEnqueue.mockClear();
+    mockMarkRead.mockImplementationOnce(async () => Result.ok(["notif-1"]));
+    const app = makeApp();
+    const res = await app.request("/notifications/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: ["notif-1", "notif-etranger"] }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("tolere un id repete dans le corps de la requete", async () => {
+    currentSession = {};
+    mockEnqueue.mockClear();
+    mockMarkRead.mockImplementationOnce(async () => Result.ok(["notif-1"]));
+    const app = makeApp();
+    const res = await app.request("/notifications/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: ["notif-1", "notif-1"] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
   });
 
   it("read-all rapporte un compte sans recopier des ids non bornes", async () => {
