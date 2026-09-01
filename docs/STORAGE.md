@@ -53,3 +53,13 @@ Three steps; the server is blind during the actual transfer (client PUTs straigh
 3. `POST /uploads/confirm` → server `HeadObject`s the real size/content-type, **deletes on mismatch**, returns the verified `{ key, size, contentType, publicUrl }`.
 
 `confirm` is mandatory — trusting client-declared size/content-type without it is the enforcement gap. Client entry point: `createUploadMutationOptions` (`apps/app/src/shared/api/mutations/create-upload.ts`) runs all three and resolves only after `confirm` succeeds, so the UI never sees a "maybe uploaded" state.
+
+## Deleting a replaced object
+
+`DELETE /uploads` accepts `{ key }` **or** `{ url }`. The front never sees a storage key — `apps/app/src/shared/env.ts` has no storage variable — so it always sends `{ url }`, the public URL it already holds (e.g. `user.image`). The server derives the key from the URL via `IStorageService.keyFromPublicUrl`, the exact inverse of `publicUrlFor`, then runs the derived key through the same owner-prefix guard a submitted `key` goes through. A URL this storage didn't produce (a social-login avatar, say) resolves to `Option.none()` and the endpoint returns `{ deleted: false }` — not an error, not a `STORAGE_FORBIDDEN`, because a foreign URL is an entirely ordinary `user.image`.
+
+Avatar replacement (`apps/app/src/features/account/components/upload-avatar.tsx`) uploads the new object and updates `user.image` **before** deleting the old one via `deleteUploadByUrl` (`create-upload.ts`). The order is deliberate: if the delete fails, the cost is one orphaned object, not an account left with no avatar. That failure is reported to telemetry (`captureError`) and swallowed for the user — the avatar change already succeeded.
+
+## Why `POST /uploads/download` ships without a consumer
+
+`POST /uploads/download` presigns a GET for a private object and is intentionally `dormant-by-design` in `apps/api/src/shared/surface/route-map.ts` — this is a boilerplate, not a product: nothing here currently stores a private object a user needs to read back, but the first feature that does (a private document, an export) needs presigned reads, not a new endpoint. It stays implemented, guarded, and tested so that feature doesn't start from zero.

@@ -4,10 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { createUpload } from "../../../shared/api/mutations/create-upload";
+import { createUpload, deleteUploadByUrl } from "../../../shared/api/mutations/create-upload";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { captureError } from "../../../shared/observability/sentry";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
@@ -34,9 +35,17 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
   const mutation = useMutation({
     mutationKey: ["account", "update-avatar"],
     mutationFn: async (file: File) => {
+      const previousImage = session?.user.image ?? null;
       const { publicUrl } = await createUpload({ file, scope: "avatars" });
       const { error } = await authClient.updateUser({ image: publicUrl });
       if (error) throw new Error(error.message ?? t("account.avatarUpdateFailed"));
+
+      if (previousImage && previousImage !== publicUrl) {
+        await deleteUploadByUrl(previousImage).catch((err: unknown) => {
+          captureError(err, { context: "avatar.deletePrevious" });
+        });
+      }
+
       return publicUrl;
     },
     onSuccess: (publicUrl) => {

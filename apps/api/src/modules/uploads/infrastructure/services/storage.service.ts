@@ -10,7 +10,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -23,6 +23,7 @@ import type {
   StorageError,
   UploadObjectInput,
 } from "../../../../shared/ports/storage.port";
+import { keySchema } from "../../application/dto/_key";
 
 const S3_DELETE_BATCH = 1000;
 const fail = createDbFailure("STORAGE_PROVIDER_FAILURE");
@@ -264,5 +265,12 @@ export class S3StorageService implements IStorageService {
 
   publicUrlFor(key: string): string {
     return `${this.publicUrl}/${key}`;
+  }
+
+  keyFromPublicUrl(url: string): Option<string> {
+    const prefix = `${this.publicUrl}/`;
+    if (!url.startsWith(prefix)) return Option.none();
+    const key = url.slice(prefix.length);
+    return keySchema.safeParse(key).success ? Option.some(key) : Option.none();
   }
 }

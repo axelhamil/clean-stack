@@ -47,5 +47,5 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
 
     if (result.isFailure) throw new AppErrorException(result.getError());
 
-    return c.json({ ok: true as const });
+    return c.json(result.getValue());
   });

@@ -28,7 +28,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "DELETE /settings/webhooks/:id": {
     consumer: "apps/app/src/features/webhooks/api/webhooks.mutations.ts",
   },
-  "DELETE /uploads": { uiLess: "dormant-by-design" },
+  "DELETE /uploads": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
   "GET /admin/audit-log": {
     consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
   },

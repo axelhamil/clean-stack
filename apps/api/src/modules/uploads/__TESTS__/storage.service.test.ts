@@ -213,4 +213,23 @@ describe("S3StorageService (custom logic only)", () => {
     const url = service.publicUrlFor("user-1/avatar.png");
     expect(url).toContain("user-1/avatar.png");
   });
+
+  // -------------------------------------------------------------------------
+  // keyFromPublicUrl
+  // -------------------------------------------------------------------------
+  it("keyFromPublicUrl is the inverse of publicUrlFor", () => {
+    const key = "user-1/avatars/abc-photo.png";
+    const roundTripped = service.keyFromPublicUrl(service.publicUrlFor(key));
+    expect(roundTripped.unwrap()).toBe(key);
+  });
+
+  it("keyFromPublicUrl returns none for a URL from another origin", () => {
+    expect(service.keyFromPublicUrl("https://lh3.googleusercontent.com/a/photo.jpg").isNone()).toBe(
+      true,
+    );
+  });
+
+  it("keyFromPublicUrl returns none for a URL that only looks like a prefix match", () => {
+    expect(service.keyFromPublicUrl(`${service.publicUrlFor("")}../escaped`).isNone()).toBe(true);
+  });
 });
