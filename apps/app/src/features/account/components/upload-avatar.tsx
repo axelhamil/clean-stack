@@ -9,6 +9,7 @@ import { createUpload, deleteUploadByUrl } from "../../../shared/api/mutations/c
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { captureError } from "../../../shared/observability/sentry";
 
@@ -25,9 +26,10 @@ function getInitials(name: string): string {
 
 interface UploadAvatarProps {
   name: string;
+  guard: ImpersonationGuard;
 }
 
-export function UploadAvatar({ name }: UploadAvatarProps) {
+export function UploadAvatar({ name, guard }: UploadAvatarProps) {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const { data: session } = useQuery(sessionQueryOptions);
@@ -98,7 +100,8 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
         type="button"
         variant="outline"
         size="sm"
-        disabled={mutation.isPending}
+        disabled={mutation.isPending || guard.blocked}
+        {...guard.describeProps(mutation.isPending)}
         onClick={() => inputRef.current?.click()}
       >
         {mutation.isPending ? t("account.uploading") : t("account.changeAvatar")}

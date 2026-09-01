@@ -28,6 +28,11 @@ import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import {
+  type ImpersonationGuard,
+  useImpersonationGuard,
+} from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { AddPasskeyForm } from "../forms/add-passkey-form";
 import { useDeletePasskey } from "../hooks/use-delete-passkey";
@@ -36,6 +41,10 @@ export function PasskeysCard() {
   const { t } = useTranslation("settings");
   const { data, isLoading } = useQuery(passkeysQueryOptions);
   const [open, setOpen] = useState(false);
+  // `/passkey` is on the BetterAuth impersonation blocklist — both registering
+  // and deleting a passkey 403 while impersonating. One guard for the whole
+  // card so the list rows share a single description node.
+  const guard = useImpersonationGuard();
 
   return (
     <Card>
@@ -56,6 +65,7 @@ export function PasskeysCard() {
                 deviceType={passkey.deviceType}
                 backedUp={passkey.backedUp}
                 createdAt={passkey.createdAt}
+                guard={guard}
               />
             ))}
           </ul>
@@ -65,7 +75,12 @@ export function PasskeysCard() {
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-fit">
+            <Button
+              variant="outline"
+              className="w-fit"
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
               <PlusIcon />
               {t("passkeys.add")}
             </Button>
@@ -78,6 +93,7 @@ export function PasskeysCard() {
             <AddPasskeyForm onSuccess={() => setOpen(false)} />
           </DialogContent>
         </Dialog>
+        <ImpersonationReason guard={guard} />
       </CardContent>
     </Card>
   );
@@ -89,9 +105,10 @@ interface PasskeyRowProps {
   deviceType: string;
   backedUp: boolean;
   createdAt: Date;
+  guard: ImpersonationGuard;
 }
 
-function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowProps) {
+function PasskeyRow({ id, name, deviceType, backedUp, createdAt, guard }: PasskeyRowProps) {
   const { t } = useTranslation("settings");
   const formatDate = useFormatDate();
   const mutation = useDeletePasskey();
@@ -119,7 +136,8 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt }: PasskeyRowPro
           variant="ghost"
           size="sm"
           onClick={() => mutation.mutate(id)}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || guard.blocked}
+          {...guard.describeProps(mutation.isPending)}
           aria-label={t("passkeys.remove")}
         >
           <Trash2Icon />

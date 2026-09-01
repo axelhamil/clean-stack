@@ -16,11 +16,14 @@ import {
 } from "@packages/ui/components/ui/dialog";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { ChangePasswordForm } from "../forms/change-password-form";
 
 export function ChangePasswordCard() {
   const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
+  const guard = useImpersonationGuard();
 
   return (
     <Card>
@@ -31,7 +34,9 @@ export function ChangePasswordCard() {
       <CardContent>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline">{t("account.changePasswordButton")}</Button>
+            <Button variant="outline" disabled={guard.blocked} {...guard.describeProps()}>
+              {t("account.changePasswordButton")}
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -41,6 +46,7 @@ export function ChangePasswordCard() {
             <ChangePasswordForm onSuccess={() => setOpen(false)} />
           </DialogContent>
         </Dialog>
+        <ImpersonationReason guard={guard} />
       </CardContent>
     </Card>
   );
