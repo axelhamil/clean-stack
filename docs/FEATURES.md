@@ -12,7 +12,7 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 
 **SSOT** `@packages/policies`: `POLICY_TYPES`, `POLICY_VERSIONS`, `POLICY_CHANGELOG`. Schema: `packages/drizzle/src/schema/policies.ts` (`policy_acceptance`, append-only).
 
-**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — 409 on stale, composable not global. Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
+**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — 409 on stale, mounted on business routes (Phase H.1), with explicit exclusions for `/me/policies/accept`, `/me/policies`, RGPD Art. 17/20 routes, sign-out/session reads, and impersonated sessions. Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
 
 **Frontend** `apps/app/src/features/legal/`: sign-up checkbox; public `/legal/privacy-policy` + `/legal/terms`; acceptance gate `/legal/accept` (outside `_shell`). `POLICY_URLS` — hosting on external CMS is a one-line swap.
 
@@ -442,6 +442,26 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 **Legal pages** `apps/app/src/features/legal/policies/`: `en.tsx` holds the real (placeholder) legal bodies, `fr.tsx` re-exports them verbatim — a clone-owner replaces `fr.tsx` with real French legal text, not a dev task this repo can do for them. `policies.config.tsx` selects the locale module and feeds `policy-doc-view.tsx`. All six legal routes (`privacy`, `terms`, `accessibility`, `cookies`, `data-rights`, `sub-processors`) render translated chrome around that body, and every one of them mounts the shared `<UntranslatedBodyBanner>` (`features/legal/components/untranslated-body-banner.tsx`) so a French reader is told, in French, that the prose below is not translated — a French title over a silent English body was a real defect on four of these pages before this component existed.
 
 **Two documented, permanent exceptions to "everything through `t()`" that are not legal prose**: `EVENT_DESCRIPTIONS` (`packages/events/src/event-descriptions.ts`) stays English with the rest of the API documentation surface — it renders on `/settings/webhooks` beside machine event names (`org.member.added`) that were never translatable either. `apps/app/src/shared/sub-processors.config.ts` stays English because it restates the signed DPA and is legal evidence, not display copy — but the two fields a user actually reads off it, `purpose` and `region`, are translated through `common.legal.subProcessors.*`, named by `shared/sub-processor-labels.ts` and consumed by both `/settings/privacy`'s `DataSourcesCard` and the public `/legal/sub-processors` page.
+
+---
+
+## Back ↔ front surface parity ✅ Phase H.1
+
+`apps/api/src/shared/surface/` — the checked-in map of every backend route to what consumes it, and the honesty test that keeps it truthful.
+
+- **`back-routes.ts`** — the real route table, read off the live Hono app (not hand-maintained): 71 keys. Construction (`apps/api/src/app.ts`) is split from boot (`index.ts`) so a test can import `app.routes` without starting the outbox dispatcher or the workers.
+- **`front-consumers.ts`** — 50 call sites extracted from `apps/app`'s source.
+- **`route-map.ts`** — `Record<"METHOD /path", Consumer | UiLessReason>` over the 71 routes: 21 have no front consumer, classified as 9 `internal-cron`, 3 `infra-probe`, 3 `public-api`, 2 `provider-callback`, 1 `library-owned`, 2 `dormant-by-design`. Nothing is deleted for being unconsumed — a boilerplate keeps dormant scaffolding ready, declared in writing rather than silently absent.
+- **Parity test** (4 assertions) — diffs the map against the live route set and the extracted consumer list; a stale `UiLessReason` row dies the moment a front consumer appears for it.
+- **`docs/SURFACE.md`** explains the mechanism and, in prose, the backend capabilities with no HTTP surface at all (the `quotas` module) — structurally invisible to the map, since it has no `routes.ts` and is never mounted.
+
+**Two gaps closed**: the admin role-change UI is wired (previously API-only); the avatar-replace storage leak is closed by deriving the object key server-side from the public URL (`DELETE /uploads` now accepts `{ key }` or `{ url }`), so the front never learns the storage key format.
+
+**Behavioural parity**: 28 call sites converted from raw backend English to localized copy; the impersonation refusal has its own business code (`IMPERSONATION_ACTION_FORBIDDEN`, previously a generic `HTTP_403`); guarded actions are disabled at the screen with their reason exposed without a mouse, on top of the localized refusal that already arrives after the fact.
+
+**`requireCurrentPolicies` is mounted on business routes**, reversing Phase A.2 decision 5 ("composable, not mounted globally") — see the corrected line above and [`docs/HISTORY.md`](HISTORY.md)'s Phase H.1 entry.
+
+No new event type — the catalog is unchanged at **81 total / 35 public / 46 internal**.
 
 ---
 
