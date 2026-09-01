@@ -3,6 +3,10 @@ import { authSchema, db, eq, multiTenantSchema, notificationSchema, sql } from "
 import type { OutboxRecord } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";
+import { requireLocalDatabase } from "./require-local-database";
+import { seedEmail } from "./seed-account";
+
+requireLocalDatabase("check-fanout-preferences");
 
 let failed = false;
 
@@ -11,14 +15,19 @@ function check(label: string, ok: boolean) {
   if (!ok) failed = true;
 }
 
-const email = process.env.SEED_EMAIL ?? "axxl41+dev@gmail.com";
+const email = seedEmail();
 const [user] = await db
   .select({ id: authSchema.user.id })
   .from(authSchema.user)
   .where(eq(authSchema.user.email, email))
   .limit(1);
 
-if (!user) throw new Error(`no user for ${email}`);
+if (!user) {
+  throw new Error(
+    `no user for ${email} — run \`pnpm --filter api db:seed\` first, ` +
+      "or point this check at another account with SEED_EMAIL.",
+  );
+}
 const userId = user.id;
 
 const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation());

@@ -39,9 +39,10 @@ jobs:
       APP_URL: http://localhost:4173
       # The guard resolves MX records; leaving it on would make the seed depend on DNS.
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
-      # Single source of truth for the seeded account's email: db:seed (defaults to
-      # this same value) and check:fanout (which looks the user up by SEED_EMAIL)
-      # both read this one var, so they can never drift apart again.
+      # Pinned explicitly so the CI log states which account the checks run
+      # against. Both db:seed and check:fanout resolve it through
+      # apps/api/scripts/seed-account.ts, which holds the same default — so
+      # they stay aligned whether or not this var is set.
       SEED_EMAIL: dev@example.com
       # check:sweep-lock and check:fanout sign requests against the ephemeral CI
       # Postgres above — this key never authenticates a real deployment, so it can
