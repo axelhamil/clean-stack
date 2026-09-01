@@ -151,7 +151,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - Disaster-recovery runbook (PITR-first) · Railway reference deploy (config-as-code)
 - `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
 - Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
-- WCAG 2.1 AA gate on every PR — `@axe-core/playwright` over 8 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
+- WCAG 2.1 AA gate on every PR — `@axe-core/playwright` over 11 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
 
 ### Roadmap
 

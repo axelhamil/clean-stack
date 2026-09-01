@@ -471,7 +471,7 @@ No new event type — the catalog is unchanged at **82 total / 35 public / 47 in
 
 `apps/app/a11y/` — Playwright as an axe driver, not an E2E suite. Run by `.github/workflows/ci.yml` on every PR into `dev`/`main`, and locally with `pnpm --filter app check:a11y`. Details and local setup in [`apps/app/a11y/README.md`](../apps/app/a11y/README.md).
 
-- `pages.ts` — 4 public + 3 authenticated pages, each audited in light **and** dark (18 tests). Adding a page is one array entry.
+- `pages.ts` — 4 public + 7 authenticated pages, each audited in light **and** dark (22 tests). Adding a page is one array entry.
 - `a11y.spec.ts` — zero `serious`/`critical` WCAG 2.1 A/AA violations, exactly one `<main>` and one `<h1>`, and an assertion on the **final URL**: a gate redirect (no session, stale policies) renders a page that passes every other check, so without it the suite audits the redirect target and reports green. Dark is a `colorScheme` loop over the same page lists — `next-themes` defaults to `system`, so emulating the preference is all it takes, and it caught a contrast failure light never shows.
 - `interaction.spec.ts` — tab order across every `/sign-in` control, command-palette focus trap (10 Tab presses, released on Escape), and `prefers-reduced-motion: reduce` skipping the theme view transition (watched with a `MutationObserver`, since `theme-transitioning` is removed once the transition ends).
 - `auth.setup.ts` — signs in **with the keyboard** and stores `storageState`. One sign-in per run is a hard budget: `/sign-in` allows 5 per 15 min per IP and the block is held in the API process, so a second one would lock a developer out after three local runs.
