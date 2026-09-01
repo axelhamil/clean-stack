@@ -139,5 +139,8 @@ export const di = container()
   .add("BackupCodeUsedNotifier", (c) =>
     backupCodeUsedNotifier({ IEmailService: c.IEmailService, IProfileStore: c.IProfileStore }),
   )
-  .add("NotificationStreamHub", () => new NotificationStreamHub(logger, env.DATABASE_URL))
+  .add(
+    "NotificationStreamHub",
+    (c) => new NotificationStreamHub(logger, env.DATABASE_URL, c.IInstrumentation),
+  )
   .build();

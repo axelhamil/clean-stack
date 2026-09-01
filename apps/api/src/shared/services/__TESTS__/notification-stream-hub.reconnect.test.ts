@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { logger } from "../../logger";
+import { NoOpInstrumentation } from "../noop-instrumentation";
 import { type NotificationListenClient, NotificationStreamHub } from "../notification-stream-hub";
 
 type Handler = (arg?: unknown) => void;
@@ -62,7 +63,7 @@ class FakeClient implements NotificationListenClient {
 
 function makeHub(overrides: { failConnect?: boolean } = {}) {
   const created: FakeClient[] = [];
-  const hub = new NotificationStreamHub(logger, "postgres://unused", {
+  const hub = new NotificationStreamHub(logger, "postgres://unused", new NoOpInstrumentation(), {
     createClient: () => {
       const client = new FakeClient();
       client.connectRejects = overrides.failConnect === true;

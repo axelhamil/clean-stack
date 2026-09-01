@@ -1,6 +1,7 @@
 import { db } from "@packages/drizzle";
 import { Client } from "pg";
 import type { Logger } from "../logger";
+import type { IInstrumentation } from "../ports/instrumentation.port";
 import { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } from "./notification-trigger";
 
 const RECONNECT_BACKOFF_MS = 1_000;
@@ -43,6 +44,7 @@ export class NotificationStreamHub {
   constructor(
     private readonly logger: Logger,
     private readonly databaseUrl: string,
+    private readonly instrumentation: IInstrumentation,
     options: NotificationStreamHubOptions = {},
   ) {
     this.createClient =
@@ -82,6 +84,7 @@ export class NotificationStreamHub {
         handle();
       } catch (err) {
         this.logger.warn({ err }, "notification stream handle failed");
+        this.instrumentation.capture(err);
       }
     }
   }
@@ -90,7 +93,14 @@ export class NotificationStreamHub {
     if (this.started) return;
     this.started = true;
     this.stopping = false;
-    await ensureNotificationTrigger(db);
+    await this.instrumentation.startSpan({ name: "NotificationStreamHub > start" }, async () => {
+      try {
+        await ensureNotificationTrigger(db);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        throw err;
+      }
+    });
     await this.connectListener();
     this.logger.info("notification stream hub started");
   }
@@ -110,6 +120,7 @@ export class NotificationStreamHub {
         await client.end();
       } catch (err) {
         this.logger.warn({ err }, "notification stream hub client end failed");
+        this.instrumentation.capture(err);
       }
     }
     this.subscribers.clear();
@@ -126,33 +137,49 @@ export class NotificationStreamHub {
     });
     client.on("error", (err) => {
       this.logger.warn({ err }, "notification stream hub listener error, will reconnect");
+      this.instrumentation.capture(err);
       dispose();
       this.scheduleReconnect();
     });
     client.on("end", () => {
       if (this.stopping) return;
       this.logger.warn("notification stream hub listener ended, will reconnect");
+      this.instrumentation.addBreadcrumb({
+        category: "notification-stream",
+        message: "listener connection ended, reconnecting",
+        level: "warning",
+      });
       dispose();
       this.scheduleReconnect();
     });
 
-    try {
-      await client.connect();
-      await client.query(`LISTEN ${NOTIFICATION_NOTIFY_CHANNEL}`);
-      // `error` can fire while `connect()` is still in flight: the client was
-      // torn down under us and must not be adopted, or it would leak.
-      if (this.disposed.has(client) || this.stopping) {
-        dispose();
-        return;
-      }
-      this.listenClient = client;
-      this.reconnectBackoff = this.baseBackoffMs;
-      this.logger.debug("notification stream hub listener connected");
-    } catch (err) {
-      this.logger.warn({ err }, "notification stream hub listener initial connect failed");
-      dispose();
-      this.scheduleReconnect();
-    }
+    return this.instrumentation.startSpan(
+      { name: "NotificationStreamHub > connectListener" },
+      async () => {
+        const listen = `LISTEN ${NOTIFICATION_NOTIFY_CHANNEL}`;
+        try {
+          await client.connect();
+          await this.instrumentation.startSpan(
+            { name: listen, op: "db.query", attributes: { "db.system.name": "postgresql" } },
+            () => client.query(listen),
+          );
+          // `error` can fire while `connect()` is still in flight: the client was
+          // torn down under us and must not be adopted, or it would leak.
+          if (this.disposed.has(client) || this.stopping) {
+            dispose();
+            return;
+          }
+          this.listenClient = client;
+          this.reconnectBackoff = this.baseBackoffMs;
+          this.logger.debug("notification stream hub listener connected");
+        } catch (err) {
+          this.logger.warn({ err }, "notification stream hub listener initial connect failed");
+          this.instrumentation.capture(err);
+          dispose();
+          this.scheduleReconnect();
+        }
+      },
+    );
   }
 
   /**
