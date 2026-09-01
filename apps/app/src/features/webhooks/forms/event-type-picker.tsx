@@ -42,10 +42,14 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="max-h-[45vh] space-y-4 overflow-y-auto pr-1">
       {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
       <label className="flex items-center gap-2">
-        <Checkbox checked={allSelected} onCheckedChange={(c) => toggle("*", c === true)} />
+        <Checkbox
+          className="shrink-0"
+          checked={allSelected}
+          onCheckedChange={(c) => toggle("*", c === true)}
+        />
         <span className="font-medium">{t("webhooks.eventTypePicker.allEvents")}</span>
       </label>
       {groups.map((g) => {
@@ -67,14 +71,17 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
               {g.events.map((type) => {
                 return (
                   // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally
-                  <label key={type} className="flex items-center gap-2 text-sm">
+                  <label key={type} className="flex items-start gap-2 text-sm">
                     <Checkbox
+                      className="mt-0.5 shrink-0"
                       checked={groupSelected || allSelected || selected.has(type)}
                       disabled={groupSelected}
                       onCheckedChange={(c) => toggle(type, c === true)}
                     />
-                    <span className="font-mono">{type}</span>
-                    <span className="text-muted-foreground">{descriptionFor(type)}</span>
+                    <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                      <span className="break-all font-mono">{type}</span>
+                      <span className="text-muted-foreground">{descriptionFor(type)}</span>
+                    </span>
                   </label>
                 );
               })}

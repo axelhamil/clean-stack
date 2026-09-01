@@ -19,6 +19,8 @@ import {
 import { ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { DisableTwoFactorForm } from "../forms/disable-two-factor-form";
 import { EnableTwoFactorForm } from "../forms/enable-two-factor-form";
 
@@ -29,6 +31,7 @@ interface TwoFactorCardProps {
 export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
   const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
+  const guard = useImpersonationGuard();
   const action = enabled ? t("twoFactor.disableAction") : t("twoFactor.enableAction");
 
   return (
@@ -45,7 +48,11 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
       <CardContent>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button variant={enabled ? "destructive" : "outline"}>
+            <Button
+              variant={enabled ? "destructive" : "outline"}
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
               {enabled ? <ShieldOffIcon /> : <ShieldCheckIcon />}
               {action}
             </Button>
@@ -66,6 +73,7 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
             )}
           </DialogContent>
         </Dialog>
+        <ImpersonationReason guard={guard} />
       </CardContent>
     </Card>
   );

@@ -9,6 +9,8 @@ import {
 } from "@packages/ui/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import type { DeliveryAttempt, DeliveryListItem } from "../api/webhooks.queries";
 import { webhookDeliveryDetailQueryOptions } from "../api/webhooks.queries";
 import { DELIVERY_STATUS_KEYS, isDeliveryStatus } from "../webhook-labels";
@@ -72,6 +74,7 @@ interface DeliverySheetProps {
   canReplay: boolean;
   onReplay: (deliveryId: string) => void;
   onClose: () => void;
+  guard: ImpersonationGuard;
 }
 
 export function DeliverySheet({
@@ -80,16 +83,17 @@ export function DeliverySheet({
   canReplay,
   onReplay,
   onClose,
+  guard,
 }: DeliverySheetProps) {
   const { t } = useTranslation(["settings", "common"]);
-  const detail = useQuery({
-    ...webhookDeliveryDetailQueryOptions(endpointId, delivery?.id ?? ""),
-    enabled: delivery !== null,
-  });
+  const organizationId = useActiveOrgId();
+  const detail = useQuery(
+    webhookDeliveryDetailQueryOptions(organizationId, endpointId, delivery?.id ?? ""),
+  );
 
   return (
     <Sheet open={delivery !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetContent className="w-full sm:max-w-xl">
         {delivery && (
           <>
             <SheetHeader>
@@ -104,7 +108,13 @@ export function DeliverySheet({
               </SheetDescription>
             </SheetHeader>
             {canReplay && (
-              <Button className="my-4" variant="outline" onClick={() => onReplay(delivery.id)}>
+              <Button
+                className="my-4"
+                variant="outline"
+                disabled={guard.blocked}
+                {...guard.describeProps()}
+                onClick={() => onReplay(delivery.id)}
+              >
                 {t("webhooks.deliverySheet.replay")}
               </Button>
             )}

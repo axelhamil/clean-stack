@@ -10,11 +10,12 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { generateScimTokenMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 import { CopyRow } from "./copy-row";
@@ -36,7 +37,13 @@ export function ScimConnectionCard() {
   const generate = useMutation({
     ...generateScimTokenMutationOptions,
     onSuccess: (token) => setRevealToken(token),
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.generateScimToken", {
+          defaultValue: "Failed to generate the SCIM token",
+        }),
+      ),
   });
 
   return (

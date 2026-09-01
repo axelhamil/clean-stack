@@ -4,6 +4,7 @@ import type {
   NotificationFrequency,
   NotificationPreferenceScope,
 } from "@packages/events";
+import type { ITransaction } from "../../../../shared/transaction";
 
 export type { NotificationChannel, NotificationFrequency };
 export type PreferenceScope = NotificationPreferenceScope;
@@ -43,8 +44,18 @@ export interface INotificationStore {
     limit: number,
   ): Promise<Result<NotificationRecord[], NotificationError>>;
   unreadCount(userId: string): Promise<Result<number, NotificationError>>;
-  markRead(userId: string, ids: string[], now: Date): Promise<Result<void, NotificationError>>;
-  markAllRead(userId: string, now: Date): Promise<Result<void, NotificationError>>;
+  /** Resolves with the ids actually written — a foreign or missing id is simply absent. */
+  markRead(
+    userId: string,
+    ids: string[],
+    now: Date,
+    tx?: ITransaction,
+  ): Promise<Result<string[], NotificationError>>;
+  markAllRead(
+    userId: string,
+    now: Date,
+    tx?: ITransaction,
+  ): Promise<Result<string[], NotificationError>>;
   listPreferences(
     scope: PreferenceScope,
     scopeId: string,

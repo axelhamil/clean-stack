@@ -4,6 +4,7 @@ import { api } from "../api-client";
 
 const $presign = api.uploads.presign.$post;
 const $confirm = api.uploads.confirm.$post;
+const $delete = api.uploads.$delete;
 
 type PresignBody = InferRequestType<typeof $presign>["json"];
 type ConfirmResponse = InferResponseType<typeof $confirm, 200>;
@@ -71,3 +72,8 @@ export const createUploadMutationOptions = mutationOptions({
   mutationKey: ["uploads", "create"] as const,
   mutationFn: createUpload,
 });
+
+export async function deleteUploadByUrl(url: string): Promise<void> {
+  const res = await $delete({ json: { url } });
+  if (!res.ok) throw new Error(`Delete failed: HTTP ${res.status}`);
+}

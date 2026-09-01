@@ -4,6 +4,26 @@ export interface ApiError extends Error {
   status?: number;
 }
 
+interface AuthClientErrorInput {
+  code?: string;
+  status?: number;
+  message?: string;
+}
+
+/**
+ * BetterAuth client calls (`authClient.*`) reject with `{ code, status, message }`
+ * rather than a thrown `Error` — carry that shape into an `ApiError` so
+ * `formatApiError`/`toastError` can resolve `byCode` downstream the same way
+ * they do for `throwApiError`. Without this, a plain `new Error(message)` loses
+ * the code and the catalog lookup always falls through to the caller's fallback.
+ */
+export function toAuthClientError(error: AuthClientErrorInput, fallbackMessage: string): ApiError {
+  const err = new Error(error.message ?? fallbackMessage) as ApiError;
+  err.code = error.code;
+  err.status = error.status;
+  return err;
+}
+
 interface ErrorEnvelope {
   error?: { code?: string; message?: string; metadata?: Record<string, unknown> };
 }

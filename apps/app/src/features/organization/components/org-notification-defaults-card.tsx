@@ -12,6 +12,9 @@ import { toast } from "sonner";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
 import { Can } from "../../../shared/auth/can";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { buildPreferenceMatrix } from "../../../shared/notifications/build-preference-matrix";
 import {
   type PreferenceChange,
@@ -21,13 +24,17 @@ import {
 export function OrgNotificationDefaultsCard() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
-  const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions);
+  const guard = useImpersonationGuard();
+  const organizationId = useActiveOrgId();
+  const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions(organizationId));
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
     ...updateOrgPreferenceMutationOptions,
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: orgNotificationPreferencesQueryOptions.queryKey }),
+      queryClient.invalidateQueries({
+        queryKey: orgNotificationPreferencesQueryOptions(organizationId).queryKey,
+      }),
     onError: () => toast.error(t("organization.saveDefaultsFailed")),
   });
 
@@ -41,9 +48,16 @@ export function OrgNotificationDefaultsCard() {
           <CardDescription>{t("organization.notificationDefaultsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <PreferenceMatrix rows={rows} onChange={handleChange} showLock disabled={isPending} />
+          <PreferenceMatrix
+            rows={rows}
+            onChange={handleChange}
+            showLock
+            disabled={isPending}
+            guard={guard}
+          />
         </CardContent>
       </Card>
+      <ImpersonationReason guard={guard} />
     </Can>
   );
 }

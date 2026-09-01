@@ -90,7 +90,7 @@ endpoints; you wire your own scheduler.
 | Endpoint | Recommended cadence | Purpose |
 |---|---|---|
 | `POST /internal/rgpd-sweep` | Daily, e.g. `0 3 * * *` UTC | Wipes accounts whose 7-day grace window has elapsed. Idempotent — safe to over-schedule. |
-| `POST /internal/flush-notification-emails` | Every minute | Groups pending notification emails into per-user/category digests and enqueues them. This cadence is what `immediate` means for email; true real-time is the SSE stream's job. |
+| `POST /internal/flush-notification-emails` | Every minute | Groups notification emails that have come due into per-user/category digests and enqueues them. This cadence is what `immediate` means for email; true real-time is the SSE stream's job. `hourly` / `daily` rows come due on wall-clock anchors stamped at fan-out — see `docs/CRON.md` § Digest windows. |
 | `POST /internal/sweep-notifications` | Daily | Purges **read** notifications past `NOTIFICATION_RETENTION_DAYS`. Unread rows are never purged, whatever their age. |
 | `POST /internal/sweep-email-messages` | Daily | Purges `sent` rows past `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d, from `sent_at`) and `failed` rows past `EMAIL_MESSAGE_FAILED_RETENTION_DAYS` (default 90d, from `created_at`). |
 | `POST /internal/sweep-{webhook-delivery,audit-log,outbox}` | Daily, **in this order** | Retention purge of the event pipeline tables. The order is not cosmetic: `ON DELETE RESTRICT` foreign keys make the reverse order fail. |

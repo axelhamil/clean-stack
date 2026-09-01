@@ -13,6 +13,8 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { updatePreferenceMutationOptions } from "../../shared/api/mutations/notifications";
 import { notificationPreferencesQueryOptions } from "../../shared/api/queries/notifications";
+import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { buildPreferenceMatrix } from "../../shared/notifications/build-preference-matrix";
 import {
   type PreferenceChange,
@@ -26,6 +28,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/notifications"
 function NotificationsPage() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
+  const guard = useImpersonationGuard();
   const { data, isPending } = useQuery(notificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
@@ -48,9 +51,15 @@ function NotificationsPage() {
           <CardDescription>{t("notifications.preferencesDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <PreferenceMatrix rows={rows} onChange={handleChange} disabled={isPending} />
+          <PreferenceMatrix
+            rows={rows}
+            onChange={handleChange}
+            disabled={isPending}
+            guard={guard}
+          />
         </CardContent>
       </Card>
+      <ImpersonationReason guard={guard} />
     </main>
   );
 }

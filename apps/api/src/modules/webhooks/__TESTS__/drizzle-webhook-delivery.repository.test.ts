@@ -35,8 +35,8 @@ function makeDbQuery() {
   return buildQuery(async () => dbBehavior());
 }
 
-// Mock exposes the FULL surface of @packages/drizzle — superset rule (see shared/CLAUDE.md):
-// mock.module leaks across parallel bun processes; partial mocks cause "Export not found" in others.
+// Only what this file's subject actually touches: test files do not share a module
+// registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => makeDbQuery(),

@@ -12,6 +12,7 @@ import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { Switch } from "@packages/ui/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { type WebhookFormInput, webhookFormSchema } from "../webhooks.schema";
 import { EventTypePicker } from "./event-type-picker";
 
@@ -19,10 +20,17 @@ interface WebhookFormProps {
   defaultValues: WebhookFormInput;
   submitLabel: string;
   isPending: boolean;
+  guard: ImpersonationGuard;
   onSubmit: (values: WebhookFormInput) => void;
 }
 
-export function WebhookForm({ defaultValues, submitLabel, isPending, onSubmit }: WebhookFormProps) {
+export function WebhookForm({
+  defaultValues,
+  submitLabel,
+  isPending,
+  guard,
+  onSubmit,
+}: WebhookFormProps) {
   const { t } = useTranslation("settings");
   const form = useForm<WebhookFormInput>({
     resolver: zodResolver(webhookFormSchema),
@@ -63,7 +71,11 @@ export function WebhookForm({ defaultValues, submitLabel, isPending, onSubmit }:
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending || guard.blocked}
+          {...guard.describeProps(isPending)}
+        >
           {submitLabel}
         </Button>
       </form>

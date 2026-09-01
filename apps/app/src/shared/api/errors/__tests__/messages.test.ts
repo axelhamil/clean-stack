@@ -66,4 +66,25 @@ describe("formatApiError", () => {
       enCatalog.errors.byCode.REQUEST_INVALID,
     );
   });
+
+  it("resolves the impersonation refusal to its own copy, not the generic 403", () => {
+    expect(
+      formatApiError({ code: "IMPERSONATION_ACTION_FORBIDDEN", status: 403 }, "fallback", t),
+    ).toBe(enCatalog.errors.byCode.IMPERSONATION_ACTION_FORBIDDEN);
+  });
+
+  it("resolves the policy refusal to its own copy, not the generic 409", () => {
+    expect(formatApiError({ code: "POLICY_ACCEPTANCE_REQUIRED", status: 409 }, "fallback", t)).toBe(
+      enCatalog.errors.byCode.POLICY_ACCEPTANCE_REQUIRED,
+    );
+    expect(enCatalog.errors.byCode.POLICY_ACCEPTANCE_REQUIRED).not.toBe(
+      enCatalog.errors.byStatus["409"],
+    );
+  });
+
+  it("resolves a quota refusal through the suffix table", () => {
+    expect(formatApiError({ code: "BILLING_QUOTA_EXCEEDED", status: 429 }, "fallback", t)).toBe(
+      enCatalog.errors.bySuffix.QUOTA_EXCEEDED,
+    );
+  });
 });

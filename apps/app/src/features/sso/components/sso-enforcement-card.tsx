@@ -10,8 +10,12 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 
@@ -25,6 +29,7 @@ interface OrgWithSsoEnforcement {
 export function SsoEnforcementCard() {
   const qc = useQueryClient();
   const { t } = useTranslation("settings");
+  const guard = useImpersonationGuard();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
@@ -37,8 +42,18 @@ export function SsoEnforcementCard() {
       void qc.invalidateQueries({ queryKey: activeOrgQueryOptions.queryKey });
       toast.success(t("sso.enforcementCard.updatedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.updateSsoEnforcement", {
+          defaultValue: "Failed to update SSO enforcement",
+        }),
+      ),
   });
+
+  // A verified-domain gap already freezes the switch on its own; `describeProps`
+  // is what keeps the tooltip from naming impersonation in that case.
+  const otherwiseFrozen = setEnforcement.isPending || (!enforced && !hasVerifiedProvider);
 
   return (
     <Can requires={{ organization: ["update"] }}>
@@ -52,7 +67,8 @@ export function SsoEnforcementCard() {
             <Switch
               aria-label={t("sso.enforcementCard.switchAriaLabel")}
               checked={enforced}
-              disabled={setEnforcement.isPending || (!enforced && !hasVerifiedProvider)}
+              disabled={otherwiseFrozen || guard.blocked}
+              {...guard.describeProps(otherwiseFrozen)}
               onCheckedChange={(next) => setEnforcement.mutate(next)}
             />
             <span className="text-sm">
@@ -66,6 +82,7 @@ export function SsoEnforcementCard() {
           )}
         </CardContent>
       </Card>
+      <ImpersonationReason guard={guard} />
     </Can>
   );
 }

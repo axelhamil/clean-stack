@@ -1,11 +1,12 @@
 import { authSchema, db, eq } from "@packages/drizzle";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
+import { seedEmail } from "./seed-account";
 
 // `.test` is reserved and can never carry an MX record, which the disposable-email
 // guard reads as throwaway; the password must avoid the email local part, the user
 // name and the app name (see shared/password-policy.ts).
-const email = process.env.SEED_EMAIL ?? "dev@example.com";
+const email = seedEmail();
 const password = process.env.SEED_PASSWORD ?? "Nimbus-Harbor-42-Quartz";
 const name = process.env.SEED_NAME ?? "Dev User";
 

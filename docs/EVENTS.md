@@ -238,14 +238,16 @@ Header: `x-webhook-signature: t=<unix>,v1=<hex-sha256>`. During a secret rotatio
 Reject if timestamp drift > 5 min (replay protection). Use the `x-webhook-idempotency` header (`<eventId>:<endpointId>`) to dedupe on your side.
 
 ```ts
-// Receiver verification
+// Receiver verification — the shipped copy-paste version lives in
+// apps/app/src/features/webhooks/components/verify-snippet.tsx
 const sigHeader = req.headers["x-webhook-signature"];
-const [tsPart, sigPart] = sigHeader.split(",");
-const ts = Number(tsPart.split("=")[1]);
-const sig = sigPart.split("=")[1];
+const ts = Number(sigHeader.match(/t=([^,]+)/)?.[1]);
+// Number("abc") is NaN and NaN > 300 is false, so the finite check is load-bearing.
+if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
 const expected = hmacSha256(`${ts}.${rawBody}`, secret);
-if (!timingSafeEqual(sig, expected)) return reject(401);
-if (Math.abs(Date.now() / 1000 - ts) > 300) return reject(401);
+// Every v1= value, not the first — during rotation both secrets sign.
+const provided = sigHeader.match(/v1=([0-9a-f]+)/g)?.map((m) => m.slice(3)) ?? [];
+if (!provided.some((sig) => timingSafeEqual(sig, expected))) return reject(401);
 ```
 
 ## Architecture choices (SOTA 2026)
@@ -305,9 +307,9 @@ export const NOTIFICATION_MAP = {
 - `forced?: true` — contourne les préférences utilisateur et le batching email (bypass critique du SOTA).
 - `groupBy` et `dedupWindow` — fenêtre de déduplication et clé de regroupement lecteur (style Linear "X et 3 autres").
 
-**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement — une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **81 événements / 35 publics / 46 internes**.
+**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement — une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) et le passage à l'état lu (`notification.read`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **82 événements / 35 publics / 47 internes**.
 
-**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 80 événements sont audit-only).
+**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` — une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 82 événements sont audit-only).
 
 **La cascade de préférences est résolue dans la requête d'insertion**, jamais en amont ni destinataire par destinataire : un `LEFT JOIN notification_preference` par portée et par canal, sur le même `INSERT ... SELECT`.
 
@@ -319,11 +321,11 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 **Pourquoi dans le SQL et pas dans un service.** L'audience d'organisation est un `INSERT ... SELECT` sur `member` : résoudre les préférences en TypeScript imposerait soit une boucle par destinataire, soit un pré-chargement de toutes les lignes de préférence de l'organisation. Un service `resolve()` a existé en parallèle du fan-out sans jamais être appelé, et sa cascade avait déjà divergé (il ignorait les défauts d'organisation non verrouillés) — il a été supprimé. **Une seule implémentation, à l'endroit où elle s'applique.**
 
-**Vérification.** `pnpm --filter api check:fanout` (`apps/api/scripts/check-fanout-preferences.ts`) exécute 8 cas contre Postgres : in-app coupé, email coupé seul, `forced`, aucune préférence, filtrage d'un membre dans une audience d'organisation, verrou d'organisation contre choix utilisateur, défaut d'organisation appliqué, choix utilisateur prioritaire sur un défaut. **À relancer après toute modification du fan-out** : aucun test unitaire ne peut couvrir ces cas, une transaction mockée n'évalue aucun `WHERE` et le dépôt n'a pas de harnais d'intégration base. C'est ce script, et lui seul, qui a révélé qu'un `CASE WHEN ... THEN $date` casse l'inférence de type de Postgres (cast `::timestamp` obligatoire).
+**Vérification.** `pnpm --filter api check:fanout` (`apps/api/scripts/check-fanout-preferences.ts`) exécute 8 cas contre Postgres : in-app coupé, email coupé seul, `forced`, aucune préférence, filtrage d'un membre dans une audience d'organisation, verrou d'organisation contre choix utilisateur, défaut d'organisation appliqué, choix utilisateur prioritaire sur un défaut. `pnpm --filter api check:digest` (`apps/api/scripts/check-digest-window.ts`) en exécute 19 de plus sur la fenêtre de regroupement : les trois cadences (`immediate` / `hourly` / `daily`) et l'échéance qu'elles écrivent dans `email_pending_at`, l'immunité des événements `forced`, la fenêtre vide qui n'envoie rien, le regroupement en un seul e-mail, et le bail de `flush-notification-emails` face à deux exécutions concurrentes. **À relancer après toute modification du fan-out** : aucun test unitaire ne peut couvrir ces cas, une transaction mockée n'évalue aucun `WHERE` et le dépôt n'a pas de harnais d'intégration base. C'est ce script, et lui seul, qui a révélé qu'un `CASE WHEN ... THEN $date` casse l'inférence de type de Postgres (cast `::timestamp` obligatoire).
 
 ## BetterAuth bridge — what fires what
 
-The boilerplate emits **81 events** (35 public + 46 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used), **2 from `modules/notifications/`** (Phase D.3 — preference.updated, org_preference.updated), **13 from `sso`/`scim`** (Phase C.7 — 7 `sso.*` provider/domain/enforcement/login events + 6 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a — `user.locale.changed`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **82 events** (35 public + 47 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **7 from `modules/webhooks/`** (3 CRUD + 4 internal: test, secret_rotated, disabled, exhausted), 1 from `modules/policies/`, **2 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3 — 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4 — created, revoked, used), **3 from `modules/notifications/`** (Phase D.3 — preference.updated, org_preference.updated, read), **13 from `sso`/`scim`** (Phase C.7 — 7 `sso.*` provider/domain/enforcement/login events + 6 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a — `user.locale.changed`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber` — they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED` — `databaseHooks.user.create.after`
@@ -471,7 +473,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (81 events: 35 public + 46 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (82 events: 35 public + 47 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`) — consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |

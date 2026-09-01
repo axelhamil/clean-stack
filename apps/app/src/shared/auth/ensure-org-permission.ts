@@ -2,6 +2,7 @@ import { authorizeRole, type OrgPermissions, type OrgRole } from "@packages/acce
 import type { QueryClient } from "@tanstack/react-query";
 import { redirect } from "@tanstack/react-router";
 import { currentMembershipQueryOptions } from "../api/queries/current-membership";
+import { ensureActiveOrgId } from "./use-active-org-id";
 
 interface EnsureOrgPermissionOptions {
   redirectTo?: string;
@@ -13,7 +14,10 @@ export function ensureOrgPermission(
   { redirectTo = "/settings/organization", connector }: EnsureOrgPermissionOptions = {},
 ) {
   return async ({ context }: { context: { queryClient: QueryClient } }) => {
-    const membership = await context.queryClient.ensureQueryData(currentMembershipQueryOptions);
+    const organizationId = await ensureActiveOrgId(context.queryClient);
+    const membership = await context.queryClient.ensureQueryData(
+      currentMembershipQueryOptions(organizationId),
+    );
     const role = membership?.role as OrgRole | undefined;
     if (!authorizeRole(role, permissions, connector)) {
       throw redirect({ to: redirectTo });

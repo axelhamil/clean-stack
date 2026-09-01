@@ -11,3 +11,8 @@ export const impersonateFormSchema = z.object({
   ticketRef: z.string().trim().max(100).optional(),
 });
 export type ImpersonateFormInput = z.infer<typeof impersonateFormSchema>;
+
+export const setRoleFormSchema = z.object({
+  role: z.enum(["admin", "user"]),
+});
+export type SetRoleFormInput = z.infer<typeof setRoleFormSchema>;

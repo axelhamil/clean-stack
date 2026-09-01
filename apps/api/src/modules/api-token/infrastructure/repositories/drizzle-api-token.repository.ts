@@ -21,12 +21,26 @@ function storeFailure(err: unknown, op: string): ApiTokenError {
   };
 }
 
-function ownerFilter(owner: TokenOwner) {
+/**
+ * The rows an owner may see and revoke. Always AND-joined on `userId`, so a
+ * member never reaches another member's token; the organization leg widens to
+ * "this organization OR no organization at all" so a token created with the
+ * "Personal" scope stays reachable while an organization is active — which it
+ * always is, every user owning a personal organization.
+ *
+ * Exported so the repository's other methods can compose it; the predicate
+ * itself is proven against a real Postgres by
+ * `scripts/check-api-token-visibility.ts` (`pnpm --filter api
+ * check:api-token-visibility`), not by the unit suite — that suite mocks
+ * `@packages/drizzle`'s `and`/`or`/`eq`/`isNull`, so it evaluates the mock,
+ * never the actual WHERE clause.
+ */
+export function visibleTokensFilter(owner: TokenOwner) {
   return and(
     eq(t.userId, owner.userId),
-    owner.organizationId === null
+    owner.kind === "personal"
       ? isNull(t.organizationId)
-      : eq(t.organizationId, owner.organizationId),
+      : or(isNull(t.organizationId), eq(t.organizationId, owner.organizationId)),
   );
 }
 
@@ -73,7 +87,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
       { name: "DrizzleApiTokenRepository > listByOwner" },
       async () => {
         try {
-          const query = invoker.select().from(t).where(ownerFilter(owner));
+          const query = invoker.select().from(t).where(visibleTokensFilter(owner));
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
@@ -99,7 +113,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           const query = invoker
             .select()
             .from(t)
-            .where(and(eq(t.id, id), ownerFilter(owner)))
+            .where(and(eq(t.id, id), visibleTokensFilter(owner)))
             .limit(1);
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },

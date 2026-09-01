@@ -8,6 +8,8 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import {
@@ -24,6 +26,7 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
   const { t: tSettings } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
   const mutation = useRequestDeletion({ onClose });
+  const guard = useImpersonationGuard();
   const form = useForm<RequestDeletionWithPasswordInput>({
     resolver: zodResolver(requestDeletionWithPasswordSchema),
     defaultValues: { password: "" },
@@ -56,10 +59,16 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
         />
         <AlertDialogFooter>
           <AlertDialogCancel type="button">{tCommon("actions.cancel")}</AlertDialogCancel>
-          <AlertDialogAction type="submit" variant="destructive" disabled={mutation.isPending}>
+          <AlertDialogAction
+            type="submit"
+            variant="destructive"
+            disabled={mutation.isPending || guard.blocked}
+            {...guard.describeProps(mutation.isPending)}
+          >
             {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
+        <ImpersonationReason guard={guard} />
       </form>
     </Form>
   );

@@ -12,7 +12,7 @@ RGPD Art. 7 demonstrability — records which version each user accepted and whe
 
 **SSOT** `@packages/policies`: `POLICY_TYPES`, `POLICY_VERSIONS`, `POLICY_CHANGELOG`. Schema: `packages/drizzle/src/schema/policies.ts` (`policy_acceptance`, append-only).
 
-**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — 409 on stale, composable not global. Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
+**Backend** `apps/api/src/modules/policies/` — `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`) — `POLICY_ACCEPTANCE_REQUIRED` (409) on stale. It is an **allowlist, not a global mount with exclusions**: it is declared route by route on the 19 mutating business routes of `profile`, `webhooks`, `api-token`, `organization`, `notifications`, `billing` and `uploads`, plus `PATCH /api/v1/me` (Phase H.1). Everything else is ungated, and the reasons differ — the policy routes themselves (gating them would block the only route that clears the gate), RGPD Art. 17/20 (a data-subject right cannot be conditioned on accepting terms), sign-out and session reads (a user must always be able to leave), `/consents` (no `requireAuth` at all — the cookie banner records for anonymous visitors, and withdrawal is the same family of right as RGPD), the whole `/admin/*` surface (operator tooling: gating it would 409-wall an operator out of the console, `POST /admin/impersonation/stop` included), impersonated sessions (checked inside the middleware, not at the mount), and every read-only route. The front turns that 409 into the redirect to `/legal/accept` (`shared/api/errors/policy-refusal.ts`). Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
 
 **Frontend** `apps/app/src/features/legal/`: sign-up checkbox; public `/legal/privacy-policy` + `/legal/terms`; acceptance gate `/legal/accept` (outside `_shell`). `POLICY_URLS` — hosting on external CMS is a one-line swap.
 
@@ -106,7 +106,7 @@ Three-step flow: `presign` → client `PUT` → `confirm`. Server is blind durin
 
 - **Owner-scoped keys** — `<userId>/<scope>/<uuid>-<filename>`. Download + confirm reject keys without the requesting user's prefix.
 - **Confirm mandatory** — `HeadObject` validates size/contentType, deletes on mismatch. (R2 has no presigned POST policy — hence PUT + confirm.)
-- Use-cases: `create-upload-url`, `confirm-upload`, `create-download-url`. Routes: `POST /uploads/presign`, `POST /uploads/confirm`, `POST /uploads/download`.
+- Use-cases: `create-upload-url`, `confirm-upload`, `create-download-url`, `delete-upload`. Routes: `POST /uploads/presign`, `POST /uploads/confirm`, `POST /uploads/download`, `DELETE /uploads` (accepts `{ key }` or `{ url }` — the server derives the object key from the public URL, so the front never learns the storage key format; used to delete the replaced object on an avatar re-upload, closing the storage leak). All four are gated by `requireCurrentPolicies`.
 - Dev opt-in: `docker compose --profile storage up seaweedfs seaweedfs-init -d` (host port `8333`).
 
 Module: `apps/api/src/modules/uploads/`.
@@ -218,7 +218,7 @@ PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No 
 - **Dispatcher** — in-process Bun worker, `pg.Client` LISTEN + 30s poll fallback, `FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers inside the dispatch TX (atomic); `onEvent` handlers post-commit (isolated).
 - **Audit log** (`audit_log`) — append-only (SOC2 / ISO 27001). `operational` (90d) vs `compliance` (7y) retention. Optional tamper-evidence hash chain (`AUDIT_TAMPER_EVIDENCE`). Operator UI at `/admin/audit-log` (filters, pagination, chain verify) — gated `requirePlatformAdmin`.
 - **Outbound webhooks** — HMAC-SHA256 signed (Stripe-style), AEAD-encrypted secrets (XChaCha20-Poly1305 + HKDF per org), decorrelated jitter retry (1m/5m/30m/2h/12h), dead-letter after 5 attempts, replay. See §Outbound webhooks for the full front-end surface.
-- **Catalog** `@packages/events` — **81 events** (35 public / 46 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
+- **Catalog** `@packages/events` — **82 events** (35 public / 47 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
 - **Request correlation** — `X-Request-Id` threaded into `outbox_event.metadata` and `audit_log.request_id` via `AsyncLocalStorage`.
 
 See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler, multi-tenant safety, BetterAuth bridge, HMAC verification).
@@ -258,7 +258,7 @@ Per-organization subscriptions, zero billing backoffice. Stripe Checkout for upg
 
 **Module** `apps/api/src/modules/billing/` — `CatalogService` (free-only when `STRIPE_SECRET_KEY` unset), `EntitlementsService`, `SubscriptionReadStore`, `StripeCatalogSourceAdapter`. Routes: `GET /billing/plans`, `GET /billing/subscription`, `POST /billing/checkout`, `POST /billing/portal`. **Frontend** `apps/app/src/features/billing/`: `/pricing` · `/settings/billing` · `useEntitlements()` · `<FeatureGate>` · `<PlanGate>`.
 
-**Quota gating (B.2, dormant)**: `ENTITLEMENTS[tier].quotas` + `assertQuota`/`requireQuota` middleware + `quota-reservation.ts` + `quota_usage` table + `useQuota`/`<QuotaGate>`. See [`docs/QUOTA-GATING.md`](./QUOTA-GATING.md).
+**Quota gating (B.2, dormant)**: `ENTITLEMENTS[tier].quotas` + `assertQuota`/`requireQuota` middleware + `quota-reservation.ts` + `quota_usage` table + `useQuota`/`<QuotaGate>`. See [`docs/QUOTA-GATING.md`](./QUOTA-GATING.md). The `quotas` module ships no route (never mounted) — see [`docs/SURFACE.md`](./SURFACE.md#backend-capabilities-with-no-http-surface) for why it can't appear in the route inventory below.
 
 **Env**: `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`.
 
@@ -331,13 +331,13 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 **Schema** `packages/drizzle/src/schema/api-token.ts` — `api_token(id, userId FK, organizationId FK nullable, name, tokenHmac unique, pepperVersion, tokenStart, scopes jsonb, lastUsedAt, expiresAt, revokedAt, revokedReason, createdAt, updatedAt)`.
 
 **Backend** `apps/api/src/modules/api-token/`:
-- `ApiTokenService` — `create`, `list`, `revoke`. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).
+- `ApiTokenService` — `create`, `list`, `revoke`. `list` takes a `TokenOwner` (`{ kind: "personal" }` or `{ kind: "orgAndPersonal" }`) — a caller with an active organization sees that organization's tokens *and* their own org-less personal tokens together; with no active organization, only the personal ones. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).
 - `DrizzleApiTokenRepository` implements `ScopedRepository<ApiToken, RepoScope>` (wrong-owner → `Option.none()` / `NOT_FOUND`, never 403).
 - `revokeTokensOnMembershipLost` event handler — cascades revocation on `org.member.removed`.
 - Routes `apps/api/src/modules/api-token/routes.ts` — `GET/POST /settings/tokens`, `DELETE /settings/tokens/:id` (session-auth; `denyImpersonated` on writes).
 - Scanning route `apps/api/src/modules/api-token/scanning.routes.ts` — `POST /api/token-scanning/github` (ECDSA P-256 signature verification against GitHub's live public-key endpoint; revokes + emails owner on match).
 
-**Public API sub-app** `apps/api/src/public-api/` — a separate `Hono` instance mounted at `/api/v1`, outside `AppType`. `sessionMiddleware` skips `/api/v1/*` entirely; the sub-app mounts `requireApiToken` on all routes. Token-reachable routes: `GET /api/v1/me`, `GET /api/v1/organizations`. **Why a separate sub-app rather than a flag on existing routes**: any route that mounts both `requireAuth` and `requireApiToken` eventually drifts — a new route gets one but not the other. The sub-app makes the contract structural: what is in `/api/v1` is reachable by token, everything else is session-only. The global rate-limit policy is also bypassed at `/api/v1/*` and replaced with per-token + per-IP axes.
+**Public API sub-app** `apps/api/src/public-api/` — a separate `Hono` instance mounted at `/api/v1`, outside `AppType`. `sessionMiddleware` skips `/api/v1/*` entirely; the sub-app mounts `requireApiToken` on all routes. Token-reachable routes: `GET /api/v1/me`, `GET /api/v1/organizations`, `PATCH /api/v1/me`. **Why a separate sub-app rather than a flag on existing routes**: any route that mounts both `requireAuth` and `requireApiToken` eventually drifts — a new route gets one but not the other. The sub-app makes the contract structural: what is in `/api/v1` is reachable by token, everything else is session-only. The global rate-limit policy is also bypassed at `/api/v1/*` and replaced with per-token + per-IP axes. **The integrator-facing reference for this surface — routes, token format, scopes, error codes, rate-limit headers — is [`docs/PUBLIC-API.md`](./PUBLIC-API.md)**; this entry documents why the sub-app exists, that one documents how to call it.
 
 **Middleware** `apps/api/src/shared/middleware/api-token.middleware.ts` — `requireApiToken(deps, { scopes })`. Validates checksum, resolves HMAC (with previous-pepper fallback + transparent rehash), checks expiry, checks ban, sets `c.var.{user, tokenScopes, orgId, apiTokenId}`.
 
@@ -350,9 +350,9 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx` — name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts` — list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts` — 67-event catalog with explicit `public` / `internal` classification (28 public / 39 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts` — 82-event catalog with explicit `public` / `internal` classification (35 public / 47 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
-**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **67 total / 28 public / 39 internal**.
+**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **82 total / 35 public / 47 internal**.
 
 **Email** `packages/emails/src/components/api-token-leaked.tsx` — template sent to the token owner when GitHub Secret Scanning reports a match.
 
@@ -364,13 +364,15 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 Persistent inbox behind a bell, real-time over SSE, three-level preferences. No new event type: D.3 *consumes* the catalog.
 
-**Catalog projection** `packages/events/src/notification-map.ts` — third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 67 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced — `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
+**Catalog projection** `packages/events/src/notification-map.ts` — third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 82 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced — `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
 
 **Audience by capability, never by role tuple**: `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `ORG_ROLES.filter(authorizeRole)` resolves at boot, leaving `WHERE member.role = ANY($1)`.
 
-**Schema** `packages/drizzle/src/schema/notification.ts` — `notification(id, userId FK, organizationId FK nullable, category, eventType, groupKey, dedupKey, payload jsonb, readAt, emailPendingAt, emailSentAt, createdAt)` + `notification_preference(scope 'user'|'org', scopeId, category, channel, enabled, frequency, locked)`. Five indexes, three partial: unread count, email-pending, and the dedup unique index `(userId, dedupKey) WHERE dedup_key IS NOT NULL`. **`organizationId` nullable is a documented exception to org-scoping rule #3** — `user.password_changed` belongs to no org.
+**Schema** `packages/drizzle/src/schema/notification.ts` — `notification(id, userId FK, organizationId FK nullable, category, eventType, groupKey, dedupKey, payload jsonb, readAt, emailPendingAt, emailSentAt, createdAt)` — `emailPendingAt` is a **due** instant, not an occurrence one: the fan-out resolves the recipient's `frequency` preference and stamps the end of the chosen window there, which is what makes `hourly` / `daily` real without the flush knowing about preferences at all + `notification_preference(scope 'user'|'org', scopeId, category, channel, enabled, frequency, locked)`. Five indexes, three partial: unread count, email-pending, and the dedup unique index `(userId, dedupKey) WHERE dedup_key IS NOT NULL`. **`organizationId` nullable is a documented exception to org-scoping rule #3** — `user.password_changed` belongs to no org.
 
 **Fan-out** `apps/api/src/shared/services/notification-fanout-subscriber.ts` — an `OutboxSubscriber` running inside the dispatch TX beside audit and webhook fan-out, not an `onEvent` post-commit handler (which is best-effort, so a lost notification would fail silently). One `INSERT ... SELECT` over the recipient set, never N inserts in a loop. The recipient set is either a single user or `SELECT user_id FROM member WHERE ...`; everything downstream is shared.
+
+**Payload allowlist** `packages/events/src/notification-map.ts` — every notifiable event declares `payloadFields`, and `GET /notifications` returns `publicNotificationPayload(eventType, payload)` rather than the stored jsonb. The row keeps the whole event payload; what crosses to the browser is chosen. Required and empty-is-valid on purpose: without the list, any field added to an event payload later (an invitation token, a storage key) would ship to the recipient's browser by default.
 
 **Preference cascade, applied in that same statement** via one `LEFT JOIN notification_preference` per scope per channel:
 
@@ -378,16 +380,16 @@ Persistent inbox behind a bell, real-time over SSE, three-level preferences. No 
 org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 ```
 
-`forced: true` short-circuits all four and emits no joins at all. The in-app decision is the `WHERE`; the email decision is a `CASE` filling `emailPendingAt`, so a user who keeps in-app but drops email simply gets a row with no pending mail. **Verified against Postgres via `pnpm --filter api check:fanout`** (`apps/api/scripts/check-fanout-preferences.ts`, 8 cases): a mocked transaction evaluates no `WHERE`, so unit tests structurally cannot cover this, and the repo has no DB integration harness. Re-run it after touching the fan-out.
+`forced: true` short-circuits all four and emits no joins at all. The in-app decision is the `WHERE`; the email decision is a `CASE` filling `emailPendingAt`, so a user who keeps in-app but drops email simply gets a row with no pending mail. The same `CASE` also resolves the recipient's `frequency` through the same cascade and stamps the **due** instant — the end of the chosen window — rather than the occurrence one, which is the whole of the digest-window feature (`digestDueAt`, `shared/services/digest-schedule.ts`; anchors on the next full hour / next `NOTIFICATION_DIGEST_HOUR_UTC`, default 8). `forced` events emit no frequency branch at all, so a security alert is never deferred. **Verified against Postgres via `pnpm --filter api check:fanout`** (`apps/api/scripts/check-fanout-preferences.ts`, 8 cases) **and `pnpm --filter api check:digest`** (`apps/api/scripts/check-digest-window.ts`, 19 cases spanning the three cadences, the empty window, grouping, and the flush's single-flight lease): a mocked transaction evaluates no `WHERE`, so unit tests structurally cannot cover this, and the repo has no DB integration harness. Re-run both after touching the fan-out.
 
-**Real-time** `apps/api/src/shared/services/notification-stream-hub.ts` + `GET /notifications/stream` — Postgres trigger `pg_notify('notification_created', user_id)`, one `LISTEN` connection per instance (never per client), `streamSSE` with a 25 s heartbeat, capped at `MAX_STREAMS_PER_USER`. **The stream carries a signal, never data**: the client's only reaction is `invalidateQueries(["notifications"])`, which makes reconnection self-healing and removes `Last-Event-ID`, replay, and merge logic entirely.
+**Real-time** `apps/api/src/shared/services/notification-stream-hub.ts` + `GET /notifications/stream` — Postgres triggers `pg_notify('notification_changed', user_id)` on insert **and** on the `read_at` transition (so a read on one device converges the badge on every other), one `LISTEN` connection per instance (never per client), `streamSSE` with a 25 s heartbeat, capped at `MAX_STREAMS_PER_USER`. **The stream carries a signal, never data**: the client's only reaction is `invalidateQueries(["notifications"])`, which makes reconnection self-healing and removes `Last-Event-ID`, replay, and merge logic entirely.
 
 **Routes** `apps/api/src/modules/notifications/routes.ts` — `GET /notifications`, `GET /unread-count`, `POST /read`, `POST /read-all`, `GET|PUT /preferences`, `GET|PUT /org-preferences` (the org pair gated by `requireOrgPermission({ organization: ["update"] })`), `GET /stream`. Writes carry `denyImpersonated`.
 
 **Crons** on the `/internal/*` rail: `flush-notification-emails` (1 min, batch capped at 5000) and `sweep-notifications` (**read rows only** — an unread notification outlives retention).
 
 **Frontend** — everything cross-cutting is in `apps/app/src/shared/notifications/`, because `shared/` may not import `features/` (the bell mounts in `app-shell`) and the preference matrix has two route-owning consumers that may not import each other:
-- `notification-bell.tsx` / `notification-item.tsx` — bell, badge, dropdown inbox. Row labels reuse `EVENT_DESCRIPTIONS`; grouped rows read "and N more".
+- `notification-bell.tsx` / `notification-item.tsx` — bell, badge, dropdown inbox. Row labels reuse `EVENT_DESCRIPTIONS`; grouped rows read "and N more". History is a single `useInfiniteQuery` over the cursor (not one query per cursor), with a "load more" control appending pages rather than replacing them.
 - `use-notification-stream.ts` — `fetch` + `ReadableStream`, **not `EventSource`** (which cannot carry an `Authorization` header, breaking any bearer-authenticated client). Exponential backoff with jitter, `AbortController` on unmount. `handleStreamChunk` is pure and returns its trailing partial frame, because a stream splits SSE frames wherever it likes.
 - `notification-broadcast.ts` — mark-as-read propagates cross-tab over `createBroadcastChannel` and applies to the cache without refetching.
 - `preference-matrix.tsx` / `build-preference-matrix.ts` — the grid is rebuilt for all four categories from the explicitly-stored rows alone; an absent cell renders as enabled/immediate, which is what the fan-out applies. A fully-forced category renders disabled **with its reason**, never hidden.
@@ -395,7 +397,7 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 
 `apps/app/src/features/notifications/` keeps only `/settings/notifications` (route + page); the org defaults card lives in `features/organization/components/org-notification-defaults-card.tsx` behind `<Can requires={{ organization: ["update"] }}>` — a route under `orgScopeLayout` would collide, since it flattens children under `settings/`.
 
-**Events**: none added. Notification creation deliberately emits nothing (it would loop with its own subscriber). Preference *mutations* do emit `notification.preference.updated` / `notification.org_preference.updated` — they are persistent state changes. Catalog stays **67 / 28 public / 39 internal**.
+**Events**: notification *creation* deliberately emits nothing (it would loop with its own subscriber). Every other persistent state change here does emit: preference mutations (`notification.preference.updated`, `notification.org_preference.updated`) and the read transition (`notification.read`, subject == actor, so `userId` alone carries §7).
 
 **Dev seed** `apps/api/scripts/seed-dev-user.ts` (`pnpm --filter api db:seed`) — creates a verified account through `auth.api.signUpEmail`, so it crosses the real sign-up hooks. `SEED_EMAIL` must use a domain with a real MX record (default `dev@example.com`); the disposable-email guard rejects `.test`. `SEED_PASSWORD` must contain neither the email local part, the user name, nor the app name — `shared/password-policy.ts` rejects all three. The script records the initial policy acceptance itself: verifying the email in SQL bypasses the `/verify-email` hook that normally does it, and without it every sign-in lands on `/legal/accept`.
 
@@ -415,7 +417,7 @@ org row with locked=true  >  user row  >  org row (unlocked default)  >  enabled
 - **SAML is hardened on every write path** — `normalizeSamlConfig` (`shared/auth/saml-config.ts`) forces `signatureAlgorithm: "sha256"` and `wantAssertionsSigned: true` and rejects the whole `sha1`/`md5` family, on `/sso/register` **and** `/sso/update-provider`; it is spread-based so a partial update can neither weaken the security fields nor clobber identity fields it didn't send.
 - **Before→after handoffs go through `RequestSnapshots<T>`** (`shared/auth/request-snapshots.ts`), never a bare `Map`: a freshness TTL bounds how long a stranded entry stays pickable and an `accepts()` predicate lets the consumer's own identity (the organization id) confirm ownership. A `hooks.before` write whose `hooks.after` never fires — a 404ing SCIM `DELETE`, for one — would otherwise poison an unrelated later request and forge its audit actor.
 - **Rate limiting**: `/api/auth/scim/*` carries `SCIM_POLICY` (60/min + 1000/h, fail-closed, security events on); `/api/auth/send-verification-email` carries the same fail-closed 3/15min policy as its public "email a stranger" siblings.
-- 13 events (`sso.provider.{registered,updated,deleted}`, `sso.domain.verified`, `sso.enforcement.changed`, `sso.login.{success,failure}`, `scim.connection.{created,deleted}`, `scim.user.{created,updated,deactivated,deprovisioned}`) — full source list in [`docs/EVENTS.md`](EVENTS.md#via-authts-hooksafter-phase-c7--better-authsso--better-authscim). Catalog now **80 / 34 public / 46 internal**.
+- 13 events (`sso.provider.{registered,updated,deleted}`, `sso.domain.verified`, `sso.enforcement.changed`, `sso.login.{success,failure}`, `scim.connection.{created,deleted}`, `scim.user.{created,updated,deactivated,deprovisioned}`) — full source list in [`docs/EVENTS.md`](EVENTS.md#via-authts-hooksafter-phase-c7--better-authsso--better-authscim). Catalog now **82 / 35 public / 47 internal**.
 
 **Frontend** `apps/app/src/features/sso/` — `/settings/sso` page: provider registration forms (OIDC + SAML, `forms/{oidc,saml}-provider-form.tsx`), `<DomainVerificationCard>`, `<ScimConnectionCard>`, `<SsoEnforcementCard>`. `apps/app/src/shared/auth/auth-client.ts` adds `ssoClient({ domainVerification: { enabled: true } })` + `scimClient()`.
 
@@ -442,6 +444,26 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 **Legal pages** `apps/app/src/features/legal/policies/`: `en.tsx` holds the real (placeholder) legal bodies, `fr.tsx` re-exports them verbatim — a clone-owner replaces `fr.tsx` with real French legal text, not a dev task this repo can do for them. `policies.config.tsx` selects the locale module and feeds `policy-doc-view.tsx`. All six legal routes (`privacy`, `terms`, `accessibility`, `cookies`, `data-rights`, `sub-processors`) render translated chrome around that body, and every one of them mounts the shared `<UntranslatedBodyBanner>` (`features/legal/components/untranslated-body-banner.tsx`) so a French reader is told, in French, that the prose below is not translated — a French title over a silent English body was a real defect on four of these pages before this component existed.
 
 **Two documented, permanent exceptions to "everything through `t()`" that are not legal prose**: `EVENT_DESCRIPTIONS` (`packages/events/src/event-descriptions.ts`) stays English with the rest of the API documentation surface — it renders on `/settings/webhooks` beside machine event names (`org.member.added`) that were never translatable either. `apps/app/src/shared/sub-processors.config.ts` stays English because it restates the signed DPA and is legal evidence, not display copy — but the two fields a user actually reads off it, `purpose` and `region`, are translated through `common.legal.subProcessors.*`, named by `shared/sub-processor-labels.ts` and consumed by both `/settings/privacy`'s `DataSourcesCard` and the public `/legal/sub-processors` page.
+
+---
+
+## Back ↔ front surface parity ✅ Phase H.1
+
+`apps/api/src/shared/surface/` — the checked-in map of every backend route to what consumes it, and the honesty test that keeps it truthful.
+
+- **`back-routes.ts`** — the real route table, read off the live Hono app (not hand-maintained): 71 keys. Construction (`apps/api/src/app.ts`) is split from boot (`index.ts`) so a test can import `app.routes` without starting the outbox dispatcher or the workers.
+- **`front-consumers.ts`** — 52 call sites extracted from `apps/app`'s source.
+- **`route-map.ts`** — `Record<"METHOD /path", Consumer | UiLessReason>` over the 71 routes: 19 have no front consumer, classified as 9 `internal-cron`, 3 `infra-probe`, 3 `public-api`, 2 `provider-callback`, 1 `library-owned`, 1 `dormant-by-design`. Nothing is deleted for being unconsumed — a boilerplate keeps dormant scaffolding ready, declared in writing rather than silently absent.
+- **Parity test** (4 assertions) — diffs the map against the live route set and the extracted consumer list; a stale `UiLessReason` row dies the moment a front consumer appears for it.
+- **`docs/SURFACE.md`** explains the mechanism and, in prose, the backend capabilities with no HTTP surface at all (the `quotas` module) — structurally invisible to the map, since it has no `routes.ts` and is never mounted.
+
+**Two gaps closed**: the admin role-change UI is wired (previously API-only); the avatar-replace storage leak is closed by deriving the object key server-side from the public URL (`DELETE /uploads` now accepts `{ key }` or `{ url }`), so the front never learns the storage key format.
+
+**Behavioural parity**: 28 call sites converted from raw backend English to localized copy; the impersonation refusal has its own business code (`IMPERSONATION_ACTION_FORBIDDEN`, previously a generic `HTTP_403`); guarded actions are disabled at the screen with their reason exposed without a mouse, on top of the localized refusal that already arrives after the fact.
+
+**`requireCurrentPolicies` is mounted on business routes**, reversing Phase A.2 decision 5 ("composable, not mounted globally") — see the corrected line above and [`docs/HISTORY.md`](HISTORY.md)'s Phase H.1 entry. It stays an allowlist: what is gated is enumerated, and what is not is enumerated with its reason, rather than described as "everything minus a few exclusions".
+
+No new event type — the catalog is unchanged at **82 total / 35 public / 47 internal**.
 
 ---
 

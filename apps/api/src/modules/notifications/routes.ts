@@ -1,5 +1,5 @@
 import { AppErrorException, Option } from "@packages/ddd-kit";
-import { EventTypes } from "@packages/events";
+import { EventTypes, publicNotificationPayload } from "@packages/events";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
@@ -9,6 +9,7 @@ import { logger } from "../../shared/logger";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { MAX_STREAMS_PER_USER } from "../../shared/services/notification-stream-hub";
 import { zV } from "../../shared/validator";
 import {
@@ -38,6 +39,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
         organizationId: n.organizationId.toNull(),
         groupKey: n.groupKey.toNull(),
         readAt: n.readAt.toNull(),
+        payload: publicNotificationPayload(n.eventType, n.payload),
       })),
       nextCursor,
     });
@@ -48,17 +50,65 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ count: result.getValue() });
   })
-  .post("/read", requireAuth, denyImpersonated, zV("json", markReadSchema), async (c) => {
-    const { ids } = c.req.valid("json");
+  .post(
+    "/read",
+    requireAuth,
+    requireCurrentPolicies,
+    denyImpersonated,
+    zV("json", markReadSchema),
+    async (c) => {
+      const { ids } = c.req.valid("json");
+      const userId = c.get("user").id;
+
+      await di.ITransactionService.run(async (tx) => {
+        const result = await di.INotificationStore.markRead(userId, ids, new Date(), tx);
+        if (result.isFailure) throw new AppErrorException(result.getError());
+        const marked = result.getValue();
+
+        // An id the caller does not own, or that no longer exists, matches
+        // nothing. Answering `200 {ok:true}` claims an action that never
+        // happened, and the client decrements its badge by the ids it sent. A
+        // 403 would leak the row's existence, so the whole batch is NOT_FOUND
+        // and the transaction rolls back — all of it applied, or none of it.
+        if (marked.length !== new Set(ids).size) {
+          throw new HTTPException(404, { message: "NOTIFICATION_NOT_FOUND" });
+        }
+
+        await emitEvent(
+          di.IOutboxRepository,
+          EventTypes.NOTIFICATION_READ,
+          "notification",
+          userId,
+          { userId, scope: "selection", count: marked.length, notificationIds: marked },
+          {},
+          tx,
+        );
+      });
+
+      return c.json({ ok: true as const });
+    },
+  )
+  .post("/read-all", requireAuth, requireCurrentPolicies, denyImpersonated, async (c) => {
     const userId = c.get("user").id;
-    const result = await di.INotificationStore.markRead(userId, ids, new Date());
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true as const });
-  })
-  .post("/read-all", requireAuth, denyImpersonated, async (c) => {
-    const userId = c.get("user").id;
-    const result = await di.INotificationStore.markAllRead(userId, new Date());
-    if (result.isFailure) throw new AppErrorException(result.getError());
+
+    await di.ITransactionService.run(async (tx) => {
+      const result = await di.INotificationStore.markAllRead(userId, new Date(), tx);
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const marked = result.getValue();
+      // Nothing was unread: no state changed, so there is nothing to observe.
+      if (marked.length === 0) return;
+
+      await emitEvent(
+        di.IOutboxRepository,
+        EventTypes.NOTIFICATION_READ,
+        "notification",
+        userId,
+        { userId, scope: "all", count: marked.length, notificationIds: [] },
+        {},
+        tx,
+      );
+    });
+
     return c.json({ ok: true as const });
   })
   .get("/preferences", requireAuth, async (c) => {
@@ -67,34 +117,41 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ items: result.getValue() });
   })
-  .put("/preferences", requireAuth, denyImpersonated, zV("json", preferenceSchema), async (c) => {
-    const body = c.req.valid("json");
-    const userId = c.get("user").id;
-    const result = await di.INotificationStore.upsertPreference({
-      scope: "user",
-      scopeId: userId,
-      category: body.category,
-      channel: body.channel,
-      enabled: body.enabled,
-      frequency: body.frequency,
-      locked: false,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    await emitEvent(
-      di.IOutboxRepository,
-      EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
-      "notification_preference",
-      userId,
-      {
-        userId,
+  .put(
+    "/preferences",
+    requireAuth,
+    requireCurrentPolicies,
+    denyImpersonated,
+    zV("json", preferenceSchema),
+    async (c) => {
+      const body = c.req.valid("json");
+      const userId = c.get("user").id;
+      const result = await di.INotificationStore.upsertPreference({
+        scope: "user",
+        scopeId: userId,
         category: body.category,
         channel: body.channel,
         enabled: body.enabled,
         frequency: body.frequency,
-      },
-    );
-    return c.json({ ok: true as const });
-  })
+        locked: false,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      await emitEvent(
+        di.IOutboxRepository,
+        EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
+        "notification_preference",
+        userId,
+        {
+          userId,
+          category: body.category,
+          channel: body.channel,
+          enabled: body.enabled,
+          frequency: body.frequency,
+        },
+      );
+      return c.json({ ok: true as const });
+    },
+  )
   .get(
     "/org-preferences",
     requireAuth,
@@ -110,6 +167,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
   .put(
     "/org-preferences",
     requireAuth,
+    requireCurrentPolicies,
     requireOrg,
     requireOrgPermission({ organization: ["update"] }),
     denyImpersonated,

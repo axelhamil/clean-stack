@@ -20,6 +20,11 @@ import { useQuery } from "@tanstack/react-query";
 import { LogOutIcon, MonitorIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import {
+  type ImpersonationGuard,
+  useImpersonationGuard,
+} from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { useRevokeOtherSessions } from "../hooks/use-revoke-other-sessions";
 import { useRevokeSession } from "../hooks/use-revoke-session";
@@ -46,6 +51,10 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
   const { data, isLoading } = useQuery(sessionsQueryOptions);
   const revokeOthers = useRevokeOtherSessions();
   const { t } = useTranslation("settings");
+  // `/revoke-session` and `/revoke-other-sessions` are on the BetterAuth
+  // impersonation blocklist — an admin borrowing this account cannot end its
+  // sessions.
+  const guard = useImpersonationGuard();
 
   const others = data?.filter((s) => s.token !== currentSessionToken) ?? [];
 
@@ -60,7 +69,8 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
               variant="outline"
               size="sm"
               onClick={() => revokeOthers.mutate()}
-              disabled={revokeOthers.isPending}
+              disabled={revokeOthers.isPending || guard.blocked}
+              {...guard.describeProps(revokeOthers.isPending)}
             >
               <LogOutIcon />
               {t("sessions.signOutOthers")}
@@ -81,12 +91,14 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
                 ipAddress={session.ipAddress ?? undefined}
                 userAgent={session.userAgent ?? undefined}
                 expiresAt={session.expiresAt}
+                guard={guard}
               />
             ))}
           </ul>
         ) : (
           <TypographyMuted>{t("sessions.empty")}</TypographyMuted>
         )}
+        <ImpersonationReason guard={guard} />
       </CardContent>
     </Card>
   );
@@ -98,9 +110,10 @@ interface SessionRowProps {
   ipAddress?: string;
   userAgent?: string;
   expiresAt: Date;
+  guard: ImpersonationGuard;
 }
 
-function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt }: SessionRowProps) {
+function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt, guard }: SessionRowProps) {
   const formatDate = useFormatDate();
   const mutation = useRevokeSession();
   const { t } = useTranslation("settings");
@@ -130,7 +143,8 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt }: Sessi
             variant="ghost"
             size="sm"
             onClick={() => mutation.mutate(token)}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || guard.blocked}
+            {...guard.describeProps(mutation.isPending)}
           >
             {t("sessions.revoke")}
           </Button>

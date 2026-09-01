@@ -193,32 +193,6 @@ const mockFindUserById = mock(async () => ({
   locale: "fr",
 }));
 
-// mock.module leaks: admin-action.service.test.ts and admin-impersonation.routes.test.ts
-// mock shared/event-emitter so emitEvent captures to a local array without calling
-// outbox.enqueue. If either runs before this file, outbox.enqueue is never called in
-// scanning.routes.ts and the "emits one event per token" assertion fails (0 calls).
-// Restore real behaviour (calling outbox.enqueue) regardless of run order.
-mock.module("../../../shared/event-emitter", () => ({
-  emitEvent: async (
-    outbox: { enqueue: (...args: unknown[]) => Promise<void> },
-    eventType: string,
-    aggregateType: string,
-    aggregateId: string,
-    payload: unknown,
-    opts: { organizationId?: string | null } = {},
-    tx?: unknown,
-  ) => {
-    const id = crypto.randomUUID();
-    const event = { eventType, dateOccurred: new Date(), aggregateId, payload };
-    await outbox.enqueue(
-      [event],
-      { source: "app/api", aggregateType, organizationId: opts.organizationId, id },
-      tx,
-    );
-    return id;
-  },
-}));
-
 const { createApiTokenScanningRoutes } = await import("../scanning.routes");
 
 const app = new Hono()

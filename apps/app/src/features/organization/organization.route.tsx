@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/org
 function OrganizationPage() {
   const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
-  const { data: membership } = useQuery(currentMembershipQueryOptions);
+  const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
   const { data: members = [] } = useQuery(
     org ? orgMembersQueryOptions(org.id) : { ...orgMembersQueryOptions(""), enabled: false },
   );

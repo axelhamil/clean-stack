@@ -16,6 +16,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../shared/api/errors/toast";
+import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
+import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
@@ -29,6 +33,7 @@ function AdminOrgsPage() {
   const formatDate = useFormatDate();
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
+  const guard = useImpersonationGuard();
 
   const query = useInfiniteQuery(adminOrgsInfiniteQueryOptions(search));
 
@@ -38,7 +43,13 @@ function AdminOrgsPage() {
       toast.success(t("orgs.ssoEnforcementUpdatedToast"));
       void queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.updateAdminOrgSsoEnforcement", {
+          defaultValue: "Failed to update SSO enforcement",
+        }),
+      ),
   });
 
   return (
@@ -73,37 +84,41 @@ function AdminOrgsPage() {
             <TableBody>
               {query.data?.pages
                 .flatMap((p) => p.items)
-                .map((org) => (
-                  <TableRow key={org.id}>
-                    <TableCell>
-                      <NavLink asChild variant="plain">
-                        <Link to="/admin/orgs/$orgId" params={{ orgId: org.id }}>
-                          {org.name}
-                        </Link>
-                      </NavLink>
-                    </TableCell>
-                    <TableCell>{org.slug}</TableCell>
-                    <TableCell>{org.memberCount}</TableCell>
-                    <TableCell>{formatDate(org.createdAt)}</TableCell>
-                    <TableCell>
-                      <Switch
-                        aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
-                        checked={org.ssoEnforced}
-                        disabled={
-                          ssoEnforcementMutation.isPending &&
-                          ssoEnforcementMutation.variables?.id === org.id
-                        }
-                        onCheckedChange={(enforced) =>
-                          ssoEnforcementMutation.mutate({ id: org.id, enforced })
-                        }
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                .map((org) => {
+                  const saving =
+                    ssoEnforcementMutation.isPending &&
+                    ssoEnforcementMutation.variables?.id === org.id;
+                  return (
+                    <TableRow key={org.id}>
+                      <TableCell>
+                        <NavLink asChild variant="plain">
+                          <Link to="/admin/orgs/$orgId" params={{ orgId: org.id }}>
+                            {org.name}
+                          </Link>
+                        </NavLink>
+                      </TableCell>
+                      <TableCell>{org.slug}</TableCell>
+                      <TableCell>{org.memberCount}</TableCell>
+                      <TableCell>{formatDate(org.createdAt)}</TableCell>
+                      <TableCell>
+                        <Switch
+                          aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
+                          checked={org.ssoEnforced}
+                          disabled={saving || guard.blocked}
+                          {...guard.describeProps(saving)}
+                          onCheckedChange={(enforced) =>
+                            ssoEnforcementMutation.mutate({ id: org.id, enforced })
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
             </TableBody>
           </Table>
 
           <TypographyMuted>{t("orgs.ssoEnforcementOffHint")}</TypographyMuted>
+          <ImpersonationReason guard={guard} />
 
           {query.hasNextPage && (
             <Button

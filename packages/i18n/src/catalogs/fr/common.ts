@@ -99,6 +99,7 @@ export default {
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
+    actionUnavailable: "Indisponible pendant l'emprunt d'identité.",
   },
   cookieBanner: {
     ariaLabel: "Consentement aux cookies",
@@ -242,6 +243,8 @@ export default {
     unreadLabel_other: "Notifications, {{count}} non lues",
     andMore: "et {{count}} de plus",
     newBadge: "Nouveau",
+    loadMore: "Charger plus",
+    loadingMore: "Chargement…",
     categories: {
       security: "Sécurité",
       org: "Organisation",

@@ -111,7 +111,7 @@ On `SIGTERM` / `SIGINT`:
 
 1. `lifecycleState.signalShutdown()` — `/readyz` immediately returns `503` (status `"fail"`, output `"shutting down"`). The LB stops routing new requests within one probe interval (~5 s).
 2. Wait `SHUTDOWN_GRACE_PERIOD_MS` (default `15000`, env-tunable) for in-flight requests to drain.
-3. Stop the outbox dispatcher + webhook delivery worker (each with its own 25 s timeout).
+3. Stop the four background runners in parallel — webhook delivery worker, email delivery worker, outbox dispatcher, notification stream hub (each with its own 25 s timeout, and a step that throws or times out never blocks the others).
 4. `process.exit(0)`.
 
 **Without this flip**, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.

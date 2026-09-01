@@ -99,6 +99,7 @@ export default {
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",
+    actionUnavailable: "Unavailable while impersonating.",
   },
   cookieBanner: {
     ariaLabel: "Cookie consent",
@@ -237,6 +238,8 @@ export default {
     unreadLabel_other: "Notifications, {{count}} unread",
     andMore: "and {{count}} more",
     newBadge: "New",
+    loadMore: "Load more",
+    loadingMore: "Loading…",
     categories: {
       security: "Security",
       org: "Organization",

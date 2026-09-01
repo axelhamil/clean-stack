@@ -42,8 +42,7 @@ const fakeTx = {
 };
 
 // ---------------------------------------------------------------------------
-// Drizzle mock — full superset so parallel test files don't see missing exports
-// (see shared/CLAUDE.md anti-pattern note)
+// Drizzle mock — scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
 mock.module("@packages/drizzle", () => ({
   db: fakeTx,

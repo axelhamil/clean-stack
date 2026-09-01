@@ -5,6 +5,7 @@ import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
 import { zV } from "../../shared/validator";
 
@@ -19,6 +20,7 @@ const actionSvc = new AdminActionService(
 export const organizationSettingsRoutes = new Hono<{ Variables: AuthVariables }>().post(
   "/sso-enforcement",
   requireAuth,
+  requireCurrentPolicies,
   requireOrg,
   requireOrgPermission({ organization: ["update"] }),
   denyImpersonated,

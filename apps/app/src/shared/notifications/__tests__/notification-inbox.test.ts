@@ -36,7 +36,10 @@ const makeNotification = (overrides: Partial<Notification> & { id: string }): No
   }) as Notification;
 
 const seedList = (client: QueryClient, items: Notification[]) => {
-  client.setQueryData(["notifications", "list", null], { items, nextCursor: null });
+  client.setQueryData(["notifications", "list"], {
+    pages: [{ items, nextCursor: null }],
+    pageParams: [undefined],
+  });
 };
 
 describe("groupNotifications", () => {
@@ -173,13 +176,42 @@ describe("applyRead", () => {
 
     applyRead(client, { ids: ["a", "b"] }, "2026-08-16T12:00:00.000Z");
 
-    const list = client.getQueryData(["notifications", "list", null]) as { items: Notification[] };
-    expect(list.items.map((item) => item.readAt)).toEqual([
+    const list = client.getQueryData(["notifications", "list"]) as {
+      pages: { items: Notification[] }[];
+    };
+    expect(list.pages[0]?.items.map((item) => item.readAt)).toEqual([
       "2026-08-16T12:00:00.000Z",
       "2026-08-16T12:00:00.000Z",
       null,
     ]);
     expect(client.getQueryData(["notifications", "unread-count"])).toEqual({ count: 1 });
+  });
+
+  test("marque les lignes a travers plusieurs pages chargees via charger plus", () => {
+    const client = new QueryClient();
+    client.setQueryData(["notifications", "list"], {
+      pages: [
+        { items: [makeNotification({ id: "a" }), makeNotification({ id: "b" })], nextCursor: "c1" },
+        { items: [makeNotification({ id: "c" }), makeNotification({ id: "d" })], nextCursor: null },
+      ],
+      pageParams: [undefined, "c1"],
+    });
+    client.setQueryData(["notifications", "unread-count"], { count: 4 });
+
+    applyRead(client, { ids: ["a", "d"] }, "2026-08-16T12:00:00.000Z");
+
+    const list = client.getQueryData(["notifications", "list"]) as {
+      pages: { items: Notification[] }[];
+    };
+    expect(list.pages[0]?.items.map((item) => item.readAt)).toEqual([
+      "2026-08-16T12:00:00.000Z",
+      null,
+    ]);
+    expect(list.pages[1]?.items.map((item) => item.readAt)).toEqual([
+      null,
+      "2026-08-16T12:00:00.000Z",
+    ]);
+    expect(client.getQueryData(["notifications", "unread-count"])).toEqual({ count: 2 });
   });
 
   test("marquer deux fois la meme ligne ne decremente qu'une fois", () => {

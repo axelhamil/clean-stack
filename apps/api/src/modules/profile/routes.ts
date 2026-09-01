@@ -5,12 +5,14 @@ import { di } from "../../container";
 import { emitEvent } from "../../shared/event-emitter";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
+import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { zV } from "../../shared/validator";
 import { localeSchema } from "./profile.schema";
 
 export const profileRoutes = new Hono<{ Variables: AuthVariables }>().put(
   "/locale",
   requireAuth,
+  requireCurrentPolicies,
   denyImpersonated,
   zV("json", localeSchema),
   async (c) => {

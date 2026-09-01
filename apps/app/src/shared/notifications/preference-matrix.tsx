@@ -23,6 +23,7 @@ import {
 } from "@packages/ui/components/ui/table";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../auth/use-impersonation-guard";
 import type { PreferenceRow } from "./build-preference-matrix";
 import { CATEGORY_KEYS } from "./notification-item";
 
@@ -39,6 +40,7 @@ interface PreferenceMatrixProps {
   onChange: (change: PreferenceChange) => void;
   showLock?: boolean;
   disabled?: boolean;
+  guard: ImpersonationGuard;
 }
 
 // Reuses Task 3's `CATEGORY_KEYS` (shared/notifications/notification-item.tsx)
@@ -73,6 +75,7 @@ export function PreferenceMatrix({
   onChange,
   showLock = false,
   disabled = false,
+  guard,
 }: PreferenceMatrixProps) {
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
@@ -93,7 +96,14 @@ export function PreferenceMatrix({
         {rows.map((row) => {
           const forced = forcedLevelOf(row.category);
           const noteKey = FORCED_NOTE_KEYS[forced];
-          const frozen = disabled || forced === "all";
+          // The row can be frozen for three unrelated reasons (pending save,
+          // an org-forced category, impersonation); the frequency select adds a
+          // fourth (its channel is off). `describeProps` is what keeps a
+          // forced-category row from explaining itself with a sentence about
+          // impersonation, which isn't its cause.
+          const otherwiseFrozen = disabled || forced === "all";
+          const frozen = otherwiseFrozen || guard.blocked;
+          const describe = guard.describeProps(otherwiseFrozen);
           const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
 
           const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>
@@ -108,7 +118,7 @@ export function PreferenceMatrix({
 
           return (
             <TableRow key={row.category}>
-              <TableCell>
+              <TableCell className="max-w-48 whitespace-normal">
                 <TypographySmall>{categoryLabel}</TypographySmall>
                 {noteKey && <TypographyMuted>{t(noteKey)}</TypographyMuted>}
               </TableCell>
@@ -117,6 +127,7 @@ export function PreferenceMatrix({
                 <Switch
                   checked={row.in_app.enabled}
                   disabled={frozen}
+                  {...describe}
                   onCheckedChange={(enabled) => emit("in_app", { enabled })}
                   aria-label={t("notifications.inAppAriaLabel", { category: categoryLabel })}
                 />
@@ -126,6 +137,7 @@ export function PreferenceMatrix({
                 <Switch
                   checked={row.email.enabled}
                   disabled={frozen}
+                  {...describe}
                   onCheckedChange={(enabled) => emit("email", { enabled })}
                   aria-label={t("notifications.emailAriaLabel", { category: categoryLabel })}
                 />
@@ -143,6 +155,7 @@ export function PreferenceMatrix({
                     aria-label={t("notifications.emailFrequencyAriaLabel", {
                       category: categoryLabel,
                     })}
+                    {...guard.describeProps(otherwiseFrozen || !row.email.enabled)}
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -161,6 +174,7 @@ export function PreferenceMatrix({
                   <Switch
                     checked={row.in_app.locked}
                     disabled={frozen}
+                    {...describe}
                     onCheckedChange={(locked) => {
                       emit("in_app", { locked });
                       emit("email", { locked });

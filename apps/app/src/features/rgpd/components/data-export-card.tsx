@@ -9,6 +9,8 @@ import {
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { DownloadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { useRequestExport } from "../hooks/use-request-export";
 
@@ -22,10 +24,12 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
   const formatDateTime = useFormatDateTime();
   const { t } = useTranslation("settings");
   const mutation = useRequestExport();
+  const guard = useImpersonationGuard();
 
   const last = lastExportRequestedAt ? new Date(lastExportRequestedAt) : null;
   const nextAllowedAt = last ? new Date(last.getTime() + RATE_LIMIT_HOURS * 60 * 60 * 1000) : null;
   const cooldown = Boolean(nextAllowedAt && nextAllowedAt > new Date());
+  const otherwiseDisabled = mutation.isPending || cooldown;
 
   return (
     <Card>
@@ -37,7 +41,8 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
         <Button
           type="button"
           variant="outline"
-          disabled={mutation.isPending || cooldown}
+          disabled={otherwiseDisabled || guard.blocked}
+          {...guard.describeProps(otherwiseDisabled)}
           onClick={() => mutation.mutate()}
         >
           <DownloadIcon />
@@ -48,6 +53,7 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
             {t("dataExport.nextAvailable", { date: formatDateTime(nextAllowedAt) })}
           </TypographyMuted>
         )}
+        <ImpersonationReason guard={guard} />
       </CardContent>
     </Card>
   );

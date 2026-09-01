@@ -3,7 +3,7 @@ import { Option, Result } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 
 // ---------------------------------------------------------------------------
-// Drizzle mock — full superset so parallel test files don't see missing exports
+// Drizzle mock — scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
 let dbTransactionResult: unknown = [];
 

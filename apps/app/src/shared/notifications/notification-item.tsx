@@ -8,6 +8,7 @@ import {
 } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
+import type { ImpersonationGuard } from "../auth/use-impersonation-guard";
 import { useFormatDate } from "../i18n/use-format-date";
 import type { NotificationGroup } from "./group-notifications";
 import { labelOf } from "./notification-labels";
@@ -15,6 +16,7 @@ import { labelOf } from "./notification-labels";
 interface NotificationItemProps {
   group: NotificationGroup;
   onRead: (ids: string[]) => void;
+  guard: ImpersonationGuard;
 }
 
 // Exported so the mapping itself — not just "every variant is present" — is
@@ -55,7 +57,7 @@ function isNotificationCategory(value: string): value is NotificationCategory {
   return (NOTIFICATION_CATEGORIES as readonly string[]).includes(value);
 }
 
-export function NotificationItem({ group, onRead }: NotificationItemProps) {
+export function NotificationItem({ group, onRead, guard }: NotificationItemProps) {
   const { t } = useTranslation("common");
   const formatDate = useFormatDate();
   const { latest, count, unread } = group;
@@ -66,7 +68,8 @@ export function NotificationItem({ group, onRead }: NotificationItemProps) {
         <button
           type="button"
           onClick={() => unread && onRead(group.ids)}
-          disabled={!unread}
+          disabled={!unread || guard.blocked}
+          {...guard.describeProps(!unread)}
           className="flex flex-col items-start gap-1 text-left"
         >
           <TypographySmall>{labelOf(latest)}</TypographySmall>

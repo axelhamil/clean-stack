@@ -39,9 +39,10 @@ jobs:
       APP_URL: http://localhost:4173
       # The guard resolves MX records; leaving it on would make the seed depend on DNS.
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
-      # Single source of truth for the seeded account's email: db:seed (defaults to
-      # this same value) and check:fanout (which looks the user up by SEED_EMAIL)
-      # both read this one var, so they can never drift apart again.
+      # Pinned explicitly so the CI log states which account the checks run
+      # against. Both db:seed and check:fanout resolve it through
+      # apps/api/scripts/seed-account.ts, which holds the same default — so
+      # they stay aligned whether or not this var is set.
       SEED_EMAIL: dev@example.com
       # check:sweep-lock and check:fanout sign requests against the ephemeral CI
       # Postgres above — this key never authenticates a real deployment, so it can
@@ -94,6 +95,32 @@ jobs:
         # Must run after seeding: it looks up the SEED_EMAIL user by that email.
         run: pnpm --filter api check:fanout
 
+      - name: Check the digest window against a real database
+        # Same reason as check:fanout — the frequency cascade and the due filter
+        # live inside SQL, which a mocked tx never evaluates. Needs the seed too.
+        run: pnpm --filter api check:digest
+
+      - name: Check api-token owner visibility against a real database
+        # Same reason as check:fanout — `visibleTokensFilter` builds a WHERE
+        # clause with and/or/eq/isNull, which a mocked tx never evaluates.
+        # Needs the seed too.
+        run: pnpm --filter api check:api-token-visibility
+
+      - name: Check the account-wipe rollback against a real database
+        # Only a real db.transaction can prove Postgres rolled the wipe back when
+        # the confirmation enqueue fails. Creates and removes its own probe user.
+        run: pnpm --filter api check:wipe-rollback
+
+      - name: Check the email-queue enqueue conflict against a real database
+        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape — a
+        # mocked tx asserts the call, never the outcome.
+        run: pnpm --filter api check:enqueue
+
+      - name: Check the email-queue markSent CASE against a real database
+        # Same reason: the CASE expression and the attempts increment are only
+        # evaluated by Postgres.
+        run: pnpm --filter api check:marksent
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -121,7 +148,9 @@ jobs:
 
       - name: API log
         if: failure()
-        run: cat /tmp/api.log
+        # A failure before the API is started leaves no log; `cat` would then
+        # fail too and bury the real error under a missing-file one.
+        run: cat /tmp/api.log || echo "no api log — the run failed before the API started" 
 
       - uses: actions/upload-artifact@v4
         if: failure()

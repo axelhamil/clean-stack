@@ -69,6 +69,7 @@ export const EventTypes = {
   EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
   NOTIFICATION_PREFERENCE_UPDATED: "notification.preference.updated",
   NOTIFICATION_ORG_PREFERENCE_UPDATED: "notification.org_preference.updated",
+  NOTIFICATION_READ: "notification.read",
   SSO_PROVIDER_REGISTERED: "sso.provider.registered",
   SSO_PROVIDER_UPDATED: "sso.provider.updated",
   SSO_PROVIDER_DELETED: "sso.provider.deleted",

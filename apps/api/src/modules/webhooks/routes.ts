@@ -5,6 +5,7 @@ import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
+import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { zV } from "../../shared/validator";
 import { createEndpointBodySchema } from "./application/dto/create-endpoint.dto";
 import { listDeliveriesQuerySchema } from "./application/dto/list-deliveries.dto";
@@ -41,6 +42,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
@@ -81,6 +83,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .patch(
     "/:id",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
@@ -118,6 +121,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .delete(
     "/:id",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
@@ -216,6 +220,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/test",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
@@ -245,6 +250,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/rotate-secret",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),
@@ -280,6 +286,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .post(
     "/:id/deliveries/:deliveryId/replay",
     requireAuth,
+    requireCurrentPolicies,
     denyImpersonated,
     requireOrg,
     requireOrgPermission({ webhooks: ["write"] }),

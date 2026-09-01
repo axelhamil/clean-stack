@@ -49,6 +49,14 @@ export default {
       impersonateSuccessToast: "Impersonation started.",
       revokeSessionsSuccessToast: "Sessions revoked.",
       resetPasswordSuccessToast: "Password reset email sent.",
+      changeRole: "Change role",
+      changeRoleTitle: "Change this account's role",
+      changeRoleDescription:
+        "A platform admin can reach every organization's data and the operator audit log.",
+      roleOptionUser: "User",
+      roleOptionAdmin: "Platform admin",
+      changeRoleSubmit: "Change role",
+      changeRoleSuccessToast: "Role updated.",
     },
     sessions: {
       title: "Active sessions ({{count}})",

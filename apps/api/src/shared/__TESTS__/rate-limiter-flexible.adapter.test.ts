@@ -27,8 +27,8 @@ import type { WindowConfig } from "../ports/rate-limiter.port";
 
 // ── Mock @packages/drizzle ──────────────────────────────────────────────────
 // The adapter imports `rateLimitSchema` + the `RateLimitDbClient` type; the container
-// imports `getRateLimitDbClient`. Superset rule: expose all exports used anywhere in
-// the test suite (the mock leaks cross-test via bun's parallel `mock.module`).
+// imports `getRateLimitDbClient`. Both are needed here, nowhere else — the replacement
+// stays inside this file's module registry.
 const fakeDb = {};
 const fakeRateLimitClient = {};
 const fakeRateLimitRecord = { key: {}, points: {}, expire: {} };
@@ -100,7 +100,6 @@ mock.module("@packages/drizzle", () => ({
 }));
 
 // ── Mock rate-limiter-flexible ──────────────────────────────────────────────
-// Full superset of all exports used anywhere in this test suite.
 // RateLimiterDrizzle is a spy constructor — no real DB calls.
 const drizzleCtorCalls: unknown[] = [];
 

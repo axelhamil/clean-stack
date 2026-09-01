@@ -8,7 +8,7 @@ internal endpoints (`POST /internal/<job>`); you wire your own scheduler.
 | Endpoint | Body | What it does |
 |---|---|---|
 | `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun, truncated }`. `processed` is `succeeded.length + failed.length` — accounts actually attempted, not the batch size, so a truncated run reports what it really did. Time-budgeted like the retention sweeps below (checked *between* account wipes, never inside one — an account wipe is a single transaction and must never be cut in half), but deliberately holds no lease and its selection query is not `SKIP LOCKED`, so two overlapping runs can pick the same account; the anonymizing update is guarded by `deletedAt IS NULL`, making the wipe itself idempotent so the loser of the race short-circuits without double-wiping. |
-| `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups pending notification emails into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Note: "immediate" frequency means "at the next cron tick" — true real-time delivery is handled by the SSE event stream, not email. |
+| `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups notification emails that have **come due** into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Due-ness is decided at fan-out, not here — see § Digest windows below. Note: "immediate" frequency means "at the next cron tick" — true real-time delivery is handled by the SSE event stream, not email. Holds the `flush-notification-emails` lease (§ Single-flight) and answers `{ skipped: true }` when another run holds it. |
 | `POST /internal/sweep-notifications` | `{ batchSize?: number; dryRun?: boolean }` | Purges read notifications older than `NOTIFICATION_RETENTION_DAYS` (default 30d). Unread notifications are never purged regardless of age. Recommended cadence: daily. |
 
 ## Authentication
@@ -48,14 +48,57 @@ will fail until they're added by hand:
 SWEEP_DEADLINE_MS=90000
 SERVER_IDLE_TIMEOUT_SECONDS=120
 INTERNAL_FETCH_TIMEOUT_MS=150000
-INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)   # required to run check:sweep-lock/check:fanout locally
+INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)   # required to run check:sweep-lock/check:fanout/check:digest locally
 ```
+
+### Digest windows
+
+`notification_preference.frequency` (`immediate` / `hourly` / `daily`) is read
+**at fan-out**, not at flush. `NotificationFanoutSubscriber` resolves it through
+the same org-lock → user → org-default → fallback cascade it already resolves
+`enabled` with, and writes the resulting *due* instant into
+`notification.email_pending_at`. The flush query is unchanged — it has always
+selected `email_pending_at <= now()` — so the whole feature is one column's
+meaning: that column is "when this may be mailed", never "when this happened".
+
+Reading it at the flush instead would mean re-resolving every recipient's
+preference per tick, for rows the fan-out had already joined against that exact
+preference row inside the dispatch transaction. One join, once, at write time.
+
+The window is anchored on wall-clock boundaries (`digestDueAt`,
+`apps/api/src/shared/services/digest-schedule.ts`): the next full hour for
+`hourly`, the next `NOTIFICATION_DIGEST_HOUR_UTC` (default `8`) for `daily`.
+Deliberately **not** "24 h after the last send", which drifts a little further
+every cycle and is not reproducible in a test. The boundary is strict — an event
+landing exactly on the anchor goes in the next window, because the digest for the
+one it sits on has already been cut.
+
+Two consequences worth knowing:
+
+- **`forced` notifications never defer.** They join no preference row at all, so
+  there is nothing to read a frequency from — `email_pending_at` is the instant
+  the event occurred. That is the point: every forced event in the catalogue is
+  one the recipient must see while it still matters (password changed, MFA
+  toggled, passkey added, deletion requested, payment failed, subscription
+  cancelled, API token created). Holding those for tomorrow's digest turns a
+  security alert into a post-mortem.
+- **Changing the preference does not reschedule what is already queued.** The
+  window is stamped at fan-out; rows written before the change keep the due date
+  they were given. The new preference applies from the moment it is set.
+
+An empty window sends nothing: the flush selects due rows and returns
+`{ flushed: 0, notifications: 0 }` without touching the email queue when there
+are none — the digest is never an empty email.
 
 ### Single-flight
 
-Each sweep label holds a lease in `sweep_lock` for the duration of its run. A
-second call for the same label while one is running answers `{ skipped: true }`
-without touching a row. The lease is time-boxed (twice `SWEEP_DEADLINE_MS`), so
+Each sweep label holds a lease in `sweep_lock` for the duration of its run — the
+retention sweeps and `flush-notification-emails` alike. A second call for the
+same label while one is running answers `{ skipped: true }` without touching a
+row. The flush takes the lease for a reason its `FOR UPDATE SKIP LOCKED` select
+does not cover: two concurrent runs can never claim the *same* notification, but
+they can each claim *half* of one user's due rows and each mail a digest — no
+duplicate, two emails for a window the user was promised one of. The lease is time-boxed (twice `SWEEP_DEADLINE_MS`), so
 a process killed mid-sweep frees the label on its own rather than wedging it —
 which is why this is a lease row and not a session advisory lock, whose release
 would be tied to a pooled connection.
