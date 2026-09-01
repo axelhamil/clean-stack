@@ -16,6 +16,7 @@ interface NotificationItemProps {
   group: NotificationGroup;
   onRead: (ids: string[]) => void;
   disabledReason?: string;
+  describedBy?: string;
 }
 
 // Exported so the mapping itself — not just "every variant is present" — is
@@ -56,7 +57,12 @@ function isNotificationCategory(value: string): value is NotificationCategory {
   return (NOTIFICATION_CATEGORIES as readonly string[]).includes(value);
 }
 
-export function NotificationItem({ group, onRead, disabledReason }: NotificationItemProps) {
+export function NotificationItem({
+  group,
+  onRead,
+  disabledReason,
+  describedBy,
+}: NotificationItemProps) {
   const { t } = useTranslation("common");
   const formatDate = useFormatDate();
   const { latest, count, unread } = group;
@@ -69,6 +75,7 @@ export function NotificationItem({ group, onRead, disabledReason }: Notification
           onClick={() => unread && onRead(group.ids)}
           disabled={!unread || Boolean(disabledReason)}
           title={unread ? disabledReason : undefined}
+          aria-describedby={unread ? describedBy : undefined}
           className="flex flex-col items-start gap-1 text-left"
         >
           <TypographySmall>{labelOf(latest)}</TypographySmall>

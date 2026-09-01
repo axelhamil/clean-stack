@@ -40,6 +40,7 @@ interface PreferenceMatrixProps {
   showLock?: boolean;
   disabled?: boolean;
   blockedReason?: string;
+  describedBy?: string;
 }
 
 // Reuses Task 3's `CATEGORY_KEYS` (shared/notifications/notification-item.tsx)
@@ -75,6 +76,7 @@ export function PreferenceMatrix({
   showLock = false,
   disabled = false,
   blockedReason,
+  describedBy,
 }: PreferenceMatrixProps) {
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
@@ -95,7 +97,15 @@ export function PreferenceMatrix({
         {rows.map((row) => {
           const forced = forcedLevelOf(row.category);
           const noteKey = FORCED_NOTE_KEYS[forced];
-          const frozen = disabled || forced === "all" || Boolean(blockedReason);
+          // The row can be frozen for three unrelated reasons (pending save,
+          // an org-forced category, impersonation) — only surface the
+          // impersonation reason when it is actually the one holding the
+          // switch shut, otherwise a forced-category row would explain
+          // itself with a sentence about a state that isn't its cause.
+          const frozenByImpersonation = Boolean(blockedReason) && !disabled && forced !== "all";
+          const frozen = disabled || forced === "all" || frozenByImpersonation;
+          const impersonationTitle = frozenByImpersonation ? blockedReason : undefined;
+          const impersonationDescribedBy = frozenByImpersonation ? describedBy : undefined;
           const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
 
           const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>
@@ -119,7 +129,8 @@ export function PreferenceMatrix({
                 <Switch
                   checked={row.in_app.enabled}
                   disabled={frozen}
-                  title={blockedReason}
+                  title={impersonationTitle}
+                  aria-describedby={impersonationDescribedBy}
                   onCheckedChange={(enabled) => emit("in_app", { enabled })}
                   aria-label={t("notifications.inAppAriaLabel", { category: categoryLabel })}
                 />
@@ -129,7 +140,8 @@ export function PreferenceMatrix({
                 <Switch
                   checked={row.email.enabled}
                   disabled={frozen}
-                  title={blockedReason}
+                  title={impersonationTitle}
+                  aria-describedby={impersonationDescribedBy}
                   onCheckedChange={(enabled) => emit("email", { enabled })}
                   aria-label={t("notifications.emailAriaLabel", { category: categoryLabel })}
                 />
@@ -147,7 +159,8 @@ export function PreferenceMatrix({
                     aria-label={t("notifications.emailFrequencyAriaLabel", {
                       category: categoryLabel,
                     })}
-                    title={blockedReason}
+                    title={impersonationTitle}
+                    aria-describedby={impersonationDescribedBy}
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -166,7 +179,8 @@ export function PreferenceMatrix({
                   <Switch
                     checked={row.in_app.locked}
                     disabled={frozen}
-                    title={blockedReason}
+                    title={impersonationTitle}
+                    aria-describedby={impersonationDescribedBy}
                     onCheckedChange={(locked) => {
                       emit("in_app", { locked });
                       emit("email", { locked });

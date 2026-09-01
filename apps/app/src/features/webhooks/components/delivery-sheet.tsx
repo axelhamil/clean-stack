@@ -73,6 +73,7 @@ interface DeliverySheetProps {
   onReplay: (deliveryId: string) => void;
   onClose: () => void;
   disabledReason?: string;
+  describedBy?: string;
 }
 
 export function DeliverySheet({
@@ -82,6 +83,7 @@ export function DeliverySheet({
   onReplay,
   onClose,
   disabledReason,
+  describedBy,
 }: DeliverySheetProps) {
   const { t } = useTranslation(["settings", "common"]);
   const detail = useQuery({
@@ -111,6 +113,7 @@ export function DeliverySheet({
                 variant="outline"
                 disabled={Boolean(disabledReason)}
                 title={disabledReason}
+                aria-describedby={describedBy}
                 onClick={() => onReplay(delivery.id)}
               >
                 {t("webhooks.deliverySheet.replay")}

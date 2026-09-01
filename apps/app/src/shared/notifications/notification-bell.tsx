@@ -13,6 +13,7 @@ import {
   markReadMutationOptions,
 } from "../api/mutations/notifications";
 import { notificationsQueryOptions, unreadCountQueryOptions } from "../api/queries/notifications";
+import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
 import { groupNotifications } from "./group-notifications";
 import {
@@ -29,7 +30,7 @@ const POLL_INTERVAL_MS = 30_000;
 export function NotificationBell() {
   const { t } = useTranslation("common");
   const queryClient = useQueryClient();
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
   const [open, setOpen] = useState(false);
   const { connected } = useNotificationStream();
 
@@ -87,12 +88,14 @@ export function NotificationBell() {
             variant="ghost"
             size="sm"
             onClick={() => markAllRead.mutate()}
-            disabled={count === 0 || markAllRead.isPending || blocked}
-            title={reason}
+            disabled={count === 0 || markAllRead.isPending || guard.blocked}
+            title={guard.reason}
+            aria-describedby={guard.blocked ? guard.descriptionId : undefined}
           >
             {t("notifications.markAllRead")}
           </Button>
         </div>
+        <ImpersonationReason guard={guard} />
 
         <Separator />
 
@@ -106,7 +109,8 @@ export function NotificationBell() {
                   key={group.key}
                   group={group}
                   onRead={(ids) => markRead.mutate({ ids })}
-                  disabledReason={reason}
+                  disabledReason={guard.reason}
+                  describedBy={guard.blocked ? guard.descriptionId : undefined}
                 />
               ))}
             </ul>

@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
+import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
@@ -65,7 +66,7 @@ function WebhooksPage() {
   const qc = useQueryClient();
   const { can } = useAuthorization();
   const canWrite = can({ webhooks: ["write"] });
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
 
   const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(null);
   const [editing, setEditing] = useState<WebhookEndpoint | null>(null);
@@ -186,11 +187,17 @@ function WebhooksPage() {
           </Link>
         </div>
         <Can requires={{ webhooks: ["write"] }}>
-          <Button onClick={() => setCreating(true)} disabled={blocked} title={reason}>
+          <Button
+            onClick={() => setCreating(true)}
+            disabled={guard.blocked}
+            title={guard.reason}
+            aria-describedby={guard.blocked ? guard.descriptionId : undefined}
+          >
             {t("settings:webhooks.addEndpoint")}
           </Button>
         </Can>
       </div>
+      <ImpersonationReason guard={guard} />
 
       {endpoints.isLoading ? (
         <p>{t("settings:webhooks.loading")}</p>
@@ -220,7 +227,8 @@ function WebhooksPage() {
                 onSendTest={(ep) => sendTest.mutate(ep.id)}
                 onRotate={(ep) => rotate.mutate(ep.id)}
                 onDelete={(ep) => del.mutate(ep.id)}
-                disabledReason={reason}
+                disabledReason={guard.reason}
+                describedBy={guard.blocked ? guard.descriptionId : undefined}
               />
             ))}
           </TableBody>
@@ -326,7 +334,8 @@ function WebhooksPage() {
             canReplay={can({ webhooks: ["write"] })}
             onReplay={(deliveryId) => replay.mutate({ endpointId: selectedEndpointId, deliveryId })}
             onClose={() => setSelectedDelivery(null)}
-            disabledReason={reason}
+            disabledReason={guard.reason}
+            describedBy={guard.blocked ? guard.descriptionId : undefined}
           />
         </>
       )}
@@ -348,7 +357,8 @@ function WebhooksPage() {
             }
             submitLabel={editing ? t("common:actions.save") : t("settings:webhooks.createAction")}
             isPending={create.isPending || update.isPending}
-            disabledReason={reason}
+            disabledReason={guard.reason}
+            describedBy={guard.blocked ? guard.descriptionId : undefined}
             onSubmit={(v) => (editing ? update.mutate({ id: editing.id, ...v }) : create.mutate(v))}
           />
         </DialogContent>

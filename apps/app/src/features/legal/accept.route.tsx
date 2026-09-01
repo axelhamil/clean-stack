@@ -18,6 +18,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { policiesQueryOptions } from "../../shared/api/queries/policies";
+import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { PolicyLink } from "../../shared/components/policy-link";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
@@ -38,7 +39,7 @@ function AcceptPoliciesPage() {
   const { t } = useTranslation("common");
   const { redirect } = Route.useSearch();
   const navigate = useNavigate();
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
   const { data: policies } = useQuery(policiesQueryOptions);
 
   const staleTypes = policies
@@ -114,11 +115,13 @@ function AcceptPoliciesPage() {
         <Button
           className="w-full"
           onClick={() => mutation.mutate({})}
-          disabled={mutation.isPending || blocked}
-          title={reason}
+          disabled={mutation.isPending || guard.blocked}
+          title={guard.reason}
+          aria-describedby={guard.blocked ? guard.descriptionId : undefined}
         >
           {mutation.isPending ? t("legal.accept.acceptingButton") : t("legal.accept.acceptButton")}
         </Button>
+        <ImpersonationReason guard={guard} />
       </div>
     </main>
   );

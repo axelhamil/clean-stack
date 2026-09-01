@@ -8,6 +8,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
@@ -25,7 +26,7 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
   const { t: tSettings } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
   const mutation = useRequestDeletion({ onClose });
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
   const form = useForm<RequestDeletionWithPasswordInput>({
     resolver: zodResolver(requestDeletionWithPasswordSchema),
     defaultValues: { password: "" },
@@ -61,12 +62,14 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
           <AlertDialogAction
             type="submit"
             variant="destructive"
-            disabled={mutation.isPending || blocked}
-            title={reason}
+            disabled={mutation.isPending || guard.blocked}
+            title={guard.reason}
+            aria-describedby={guard.blocked ? guard.descriptionId : undefined}
           >
             {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
+        <ImpersonationReason guard={guard} />
       </form>
     </Form>
   );

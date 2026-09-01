@@ -17,6 +17,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
+import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
@@ -32,7 +33,7 @@ function AdminOrgsPage() {
   const formatDate = useFormatDate();
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
 
   const query = useInfiniteQuery(adminOrgsInfiniteQueryOptions(search));
 
@@ -102,9 +103,10 @@ function AdminOrgsPage() {
                         disabled={
                           (ssoEnforcementMutation.isPending &&
                             ssoEnforcementMutation.variables?.id === org.id) ||
-                          blocked
+                          guard.blocked
                         }
-                        title={reason}
+                        title={guard.reason}
+                        aria-describedby={guard.blocked ? guard.descriptionId : undefined}
                         onCheckedChange={(enforced) =>
                           ssoEnforcementMutation.mutate({ id: org.id, enforced })
                         }
@@ -116,6 +118,7 @@ function AdminOrgsPage() {
           </Table>
 
           <TypographyMuted>{t("orgs.ssoEnforcementOffHint")}</TypographyMuted>
+          <ImpersonationReason guard={guard} />
 
           {query.hasNextPage && (
             <Button

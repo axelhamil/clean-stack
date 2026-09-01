@@ -20,6 +20,7 @@ interface WebhookFormProps {
   submitLabel: string;
   isPending: boolean;
   disabledReason?: string;
+  describedBy?: string;
   onSubmit: (values: WebhookFormInput) => void;
 }
 
@@ -28,6 +29,7 @@ export function WebhookForm({
   submitLabel,
   isPending,
   disabledReason,
+  describedBy,
   onSubmit,
 }: WebhookFormProps) {
   const { t } = useTranslation("settings");
@@ -74,6 +76,7 @@ export function WebhookForm({
           type="submit"
           disabled={isPending || Boolean(disabledReason)}
           title={disabledReason}
+          aria-describedby={describedBy}
         >
           {submitLabel}
         </Button>

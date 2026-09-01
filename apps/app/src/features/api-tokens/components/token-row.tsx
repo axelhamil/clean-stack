@@ -10,9 +10,16 @@ interface TokenRowProps {
   onRevoke: (id: string) => void;
   isRevoking: boolean;
   disabledReason?: string;
+  describedBy?: string;
 }
 
-export function TokenRow({ token, onRevoke, isRevoking, disabledReason }: TokenRowProps) {
+export function TokenRow({
+  token,
+  onRevoke,
+  isRevoking,
+  disabledReason,
+  describedBy,
+}: TokenRowProps) {
   const { t } = useTranslation("settings");
   const formatDate = useFormatDate();
   const isRevoked = token.revokedAt !== null;
@@ -47,6 +54,7 @@ export function TokenRow({ token, onRevoke, isRevoking, disabledReason }: TokenR
             size="sm"
             disabled={isRevoking || Boolean(disabledReason)}
             title={disabledReason}
+            aria-describedby={describedBy}
             onClick={() => onRevoke(token.id)}
           >
             {t("apiTokens.revokeAction")}

@@ -36,6 +36,7 @@ interface EndpointRowProps {
   onDelete: (endpoint: WebhookEndpoint) => void;
   onSelect: (endpoint: WebhookEndpoint) => void;
   disabledReason?: string;
+  describedBy?: string;
 }
 
 export function EndpointRow({
@@ -47,6 +48,7 @@ export function EndpointRow({
   onDelete,
   onSelect,
   disabledReason,
+  describedBy,
 }: EndpointRowProps) {
   const { t } = useTranslation(["settings", "common"]);
   const formatDate = useFormatDate();
@@ -97,6 +99,7 @@ export function EndpointRow({
                   onClick={() => onEdit(endpoint)}
                   disabled={Boolean(disabledReason)}
                   title={disabledReason}
+                  aria-describedby={describedBy}
                 >
                   {t("settings:webhooks.endpointRow.edit")}
                 </DropdownMenuItem>
@@ -104,6 +107,7 @@ export function EndpointRow({
                   onClick={() => onSendTest(endpoint)}
                   disabled={Boolean(disabledReason)}
                   title={disabledReason}
+                  aria-describedby={describedBy}
                 >
                   {t("settings:webhooks.endpointRow.sendTest")}
                 </DropdownMenuItem>
@@ -111,6 +115,7 @@ export function EndpointRow({
                   onClick={() => onRotate(endpoint)}
                   disabled={Boolean(disabledReason)}
                   title={disabledReason}
+                  aria-describedby={describedBy}
                 >
                   {t("settings:webhooks.endpointRow.rotateSecret")}
                 </DropdownMenuItem>
@@ -119,6 +124,7 @@ export function EndpointRow({
                   onClick={() => onDelete(endpoint)}
                   disabled={Boolean(disabledReason)}
                   title={disabledReason}
+                  aria-describedby={describedBy}
                   className="text-destructive focus:text-destructive"
                 >
                   {t("settings:webhooks.endpointRow.delete")}

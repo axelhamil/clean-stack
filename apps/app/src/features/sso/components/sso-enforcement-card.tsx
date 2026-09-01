@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
@@ -28,7 +29,7 @@ interface OrgWithSsoEnforcement {
 export function SsoEnforcementCard() {
   const qc = useQueryClient();
   const { t } = useTranslation("settings");
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
@@ -50,6 +51,13 @@ export function SsoEnforcementCard() {
       ),
   });
 
+  // A verified-domain gap already freezes the switch on its own — only
+  // attribute the freeze to impersonation when that is actually the cause,
+  // otherwise the tooltip would name a reason that isn't why the control is
+  // stuck.
+  const otherwiseFrozen = setEnforcement.isPending || (!enforced && !hasVerifiedProvider);
+  const impersonationFrozen = guard.blocked && !otherwiseFrozen;
+
   return (
     <Can requires={{ organization: ["update"] }}>
       <Card>
@@ -62,8 +70,9 @@ export function SsoEnforcementCard() {
             <Switch
               aria-label={t("sso.enforcementCard.switchAriaLabel")}
               checked={enforced}
-              disabled={setEnforcement.isPending || (!enforced && !hasVerifiedProvider) || blocked}
-              title={reason}
+              disabled={otherwiseFrozen || guard.blocked}
+              title={impersonationFrozen ? guard.reason : undefined}
+              aria-describedby={impersonationFrozen ? guard.descriptionId : undefined}
               onCheckedChange={(next) => setEnforcement.mutate(next)}
             />
             <span className="text-sm">
@@ -77,6 +86,7 @@ export function SsoEnforcementCard() {
           )}
         </CardContent>
       </Card>
+      <ImpersonationReason guard={guard} />
     </Can>
   );
 }

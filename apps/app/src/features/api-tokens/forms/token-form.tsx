@@ -34,6 +34,7 @@ interface TokenFormProps {
   submitLabel: string;
   isPending: boolean;
   disabledReason?: string;
+  describedBy?: string;
   onSubmit: (values: TokenFormInput) => void;
 }
 
@@ -42,6 +43,7 @@ export function TokenForm({
   submitLabel,
   isPending,
   disabledReason,
+  describedBy,
   onSubmit,
 }: TokenFormProps) {
   const { t } = useTranslation("settings");
@@ -157,6 +159,7 @@ export function TokenForm({
           type="submit"
           disabled={isPending || Boolean(disabledReason)}
           title={disabledReason}
+          aria-describedby={describedBy}
         >
           {submitLabel}
         </Button>

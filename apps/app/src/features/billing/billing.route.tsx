@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../shared/api/queries/org-members";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
+import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useEntitlements } from "../../shared/auth/use-entitlements";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { PricingTable } from "../../shared/components/pricing-table";
@@ -34,7 +35,7 @@ function BillingPage() {
   });
   const ent = useEntitlements();
   const portal = useOpenPortal();
-  const { blocked, reason } = useImpersonationGuard();
+  const guard = useImpersonationGuard();
   const isPaid = ent.tier !== "free";
   const memberCount = members.length;
   const statusLabel = isSubscriptionStatus(ent.status) ? t(STATUS_KEYS[ent.status]) : ent.status;
@@ -62,14 +63,16 @@ function BillingPage() {
           {isPaid && (
             <Button
               onClick={() => portal.mutate()}
-              disabled={portal.isPending || blocked}
-              title={reason}
+              disabled={portal.isPending || guard.blocked}
+              title={guard.reason}
+              aria-describedby={guard.blocked ? guard.descriptionId : undefined}
             >
               {t("billing.manageBilling")}
             </Button>
           )}
         </CardContent>
       </Card>
+      <ImpersonationReason guard={guard} />
       {!isPaid && (
         <PricingTable isAuthenticated currentTier={ent.tier} activeOrgId={activeOrg?.id ?? null} />
       )}
