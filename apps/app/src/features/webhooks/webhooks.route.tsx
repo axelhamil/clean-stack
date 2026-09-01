@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Select,
@@ -192,13 +193,10 @@ function WebhooksPage() {
     <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <TypographyH1>{t("settings:webhooks.pageTitle")}</TypographyH1>
-          <Link
-            to="/developers/events"
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-          >
-            {t("settings:webhooks.viewEventCatalog")}
-          </Link>
+          <TypographyH1 variant="page">{t("settings:webhooks.pageTitle")}</TypographyH1>
+          <NavLink variant="plain" asChild>
+            <Link to="/developers/events">{t("settings:webhooks.viewEventCatalog")}</Link>
+          </NavLink>
         </div>
         <Can requires={{ webhooks: ["write"] }}>
           <Button

@@ -1,4 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
+import { CopyableValue } from "@packages/ui/components/ui/copyable-value";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
-import { CopyIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -29,11 +29,6 @@ export function SecretRevealDialog({
   const resolvedDescription = description ?? t("secretReveal.description");
   const secretLabel = t("secretReveal.secretLabel");
 
-  const copy = () => {
-    if (!secret) return;
-    void navigator.clipboard.writeText(secret);
-    toast.success(t("clipboard.copied", { label: secretLabel }));
-  };
   return (
     <Dialog open={secret !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
@@ -41,17 +36,11 @@ export function SecretRevealDialog({
           <DialogTitle>{resolvedTitle}</DialogTitle>
           <DialogDescription>{resolvedDescription}</DialogDescription>
         </DialogHeader>
-        <div className="flex items-center gap-2 rounded-md border bg-muted p-3 font-mono text-sm break-all">
-          <span className="flex-1">{secret}</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={copy}
-            aria-label={t("clipboard.copyLabel", { label: secretLabel })}
-          >
-            <CopyIcon className="size-4" />
-          </Button>
-        </div>
+        <CopyableValue
+          value={secret ?? ""}
+          copyLabel={t("clipboard.copyLabel", { label: secretLabel })}
+          onCopied={() => toast.success(t("clipboard.copied", { label: secretLabel }))}
+        />
         <DialogFooter>
           <Button onClick={onClose}>{t("secretReveal.confirm")}</Button>
         </DialogFooter>

@@ -1,5 +1,7 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { CodeBlock } from "@packages/ui/components/ui/code-block";
+import { Panel } from "@packages/ui/components/ui/panel";
 import {
   Sheet,
   SheetContent,
@@ -29,9 +31,9 @@ function RequestResponse({ attempt }: RequestResponseProps) {
           <summary className="cursor-pointer text-xs text-muted-foreground">
             {t("webhooks.deliverySheet.requestHeaders")}
           </summary>
-          <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+          <CodeBlock size="sm" className="mt-1">
             {JSON.stringify(attempt.requestHeaders, null, 2)}
-          </pre>
+          </CodeBlock>
         </details>
       )}
       {attempt.requestBody !== null && (
@@ -39,9 +41,9 @@ function RequestResponse({ attempt }: RequestResponseProps) {
           <summary className="cursor-pointer text-xs text-muted-foreground">
             {t("webhooks.deliverySheet.requestBody")}
           </summary>
-          <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+          <CodeBlock size="sm" className="mt-1">
             {attempt.requestBody}
-          </pre>
+          </CodeBlock>
         </details>
       )}
       {attempt.responseHeaders !== null && (
@@ -49,9 +51,9 @@ function RequestResponse({ attempt }: RequestResponseProps) {
           <summary className="cursor-pointer text-xs text-muted-foreground">
             {t("webhooks.deliverySheet.responseHeaders")}
           </summary>
-          <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+          <CodeBlock size="sm" className="mt-1">
             {JSON.stringify(attempt.responseHeaders, null, 2)}
-          </pre>
+          </CodeBlock>
         </details>
       )}
       {attempt.responseBody !== null && (
@@ -59,9 +61,9 @@ function RequestResponse({ attempt }: RequestResponseProps) {
           <summary className="cursor-pointer text-xs text-muted-foreground">
             {t("webhooks.deliverySheet.responseBody")}
           </summary>
-          <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+          <CodeBlock size="sm" className="mt-1">
             {attempt.responseBody}
-          </pre>
+          </CodeBlock>
         </details>
       )}
     </div>
@@ -126,36 +128,38 @@ export function DeliverySheet({
             {detail.data && (
               <ol className="space-y-4">
                 {detail.data.attemptHistory.map((a) => (
-                  <li key={a.id} className="rounded-md border p-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {t("webhooks.deliverySheet.attemptNumber", { number: a.attemptNumber })}
-                      </span>
-                      <Badge
-                        variant={
-                          a.responseStatus !== null && a.responseStatus < 400
-                            ? "default"
-                            : "destructive"
-                        }
-                      >
-                        {a.responseStatus ?? a.error ?? t("webhooks.deliverySheet.noResponse")}
-                      </Badge>
-                    </div>
-                    {a.durationMs !== null && (
-                      <p className="text-muted-foreground">{a.durationMs} ms</p>
-                    )}
-                    {a.error && <p className="text-destructive">{a.error}</p>}
-                    <RequestResponse attempt={a} />
-                  </li>
+                  <Panel key={a.id} asChild className="text-xs">
+                    <li>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">
+                          {t("webhooks.deliverySheet.attemptNumber", { number: a.attemptNumber })}
+                        </span>
+                        <Badge
+                          variant={
+                            a.responseStatus !== null && a.responseStatus < 400
+                              ? "default"
+                              : "destructive"
+                          }
+                        >
+                          {a.responseStatus ?? a.error ?? t("webhooks.deliverySheet.noResponse")}
+                        </Badge>
+                      </div>
+                      {a.durationMs !== null && (
+                        <p className="text-muted-foreground">{a.durationMs} ms</p>
+                      )}
+                      {a.error && <p className="text-destructive">{a.error}</p>}
+                      <RequestResponse attempt={a} />
+                    </li>
+                  </Panel>
                 ))}
               </ol>
             )}
             {detail.data && (
               <section className="mt-6">
                 <h3 className="mb-2 text-sm font-medium">{t("webhooks.deliverySheet.payload")}</h3>
-                <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
+                <CodeBlock>
                   <code>{JSON.stringify(detail.data.payload, null, 2)}</code>
-                </pre>
+                </CodeBlock>
               </section>
             )}
           </>

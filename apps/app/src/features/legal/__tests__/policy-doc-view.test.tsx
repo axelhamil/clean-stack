@@ -2,7 +2,7 @@ import { createI18n, enCatalog, loadCatalog } from "@packages/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import { describe, expect, it, vi } from "vitest";
-import { isEnglishFallback, policyBodyFor } from "../policies";
+import { isEnglishFallback, policyBodyFor } from "../policies/bodies";
 import { PolicyDocView } from "../policy-doc-view";
 
 // `POLICY_VERSIONS`/`POLICY_CHANGELOG` currently give privacy/terms the same
