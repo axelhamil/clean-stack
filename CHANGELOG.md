@@ -1,3 +1,9 @@
+## [1.24.1](https://github.com/axelhamil/clean-stack/compare/v1.24.0...v1.24.1) (2026-09-01)
+
+### Refactor
+
+* **ui:** promote the three surfaces features kept redrawing by hand ([1b2fc4b](https://github.com/axelhamil/clean-stack/commit/1b2fc4ba72c7b75f8e339ae3a45eff4aa9722580))
+
 ## [1.24.0](https://github.com/axelhamil/clean-stack/compare/v1.23.0...v1.24.0) (2026-09-01)
 
 ### Features
