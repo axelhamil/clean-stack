@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import * as realEvents from "@packages/events";
 import { EventTypes } from "@packages/events";
 import { z } from "zod";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
@@ -19,75 +20,15 @@ const RealOrgMemberRemovedPayload = z.object({
 
 // Superset rule: expose ALL EventTypes values so files loaded after this mock
 // (e.g. scanning.routes.ts) don't receive undefined for unrelated event types.
-const FULL_EVENT_TYPES = {
-  USER_CREATED: "user.created",
-  USER_SIGNED_IN: "user.signed_in",
-  USER_SIGNED_OUT: "user.signed_out",
-  USER_EMAIL_VERIFIED: "user.email_verified",
-  USER_PASSWORD_RESET_REQUESTED: "user.password_reset.requested",
-  USER_PASSWORD_CHANGED: "user.password_changed",
-  USER_MAGIC_LINK_REQUESTED: "user.magic_link.requested",
-  USER_MFA_ENABLED: "user.mfa.enabled",
-  USER_MFA_DISABLED: "user.mfa.disabled",
-  USER_MFA_BACKUP_CODES_REGENERATED: "user.mfa.backup_codes_regenerated",
-  USER_MFA_BACKUP_CODE_USED: "user.mfa.backup_code_used",
-  USER_PASSKEY_ADDED: "user.passkey.added",
-  USER_PASSKEY_REMOVED: "user.passkey.removed",
-  USER_ACCOUNT_LINKED: "user.account.linked",
-  USER_ACCOUNT_UNLINKED: "user.account.unlinked",
-  USER_DELETION_REQUESTED: "user.deletion.requested",
-  USER_DELETION_CANCELLED: "user.deletion.cancelled",
-  USER_DELETED: "user.deleted",
-  USER_PROFILE_UPDATED: "user.profile.updated",
-  USER_EMAIL_CHANGE_REQUESTED: "user.email.change_requested",
-  USER_EXPORT_REQUESTED: "user.export.requested",
-  USER_EXPORT_COMPLETED: "user.export.completed",
-  ORG_CREATED: "org.created",
-  ORG_UPDATED: "org.updated",
-  ORG_DELETED: "org.deleted",
-  ORG_MEMBER_INVITED: "org.member.invited",
-  ORG_MEMBER_JOINED: "org.member.joined",
-  ORG_INVITATION_CANCELLED: "org.invitation.cancelled",
-  ORG_MEMBER_REMOVED: "org.member.removed",
-  ORG_MEMBER_ROLE_CHANGED: "org.member.role_changed",
-  UPLOAD_REQUESTED: "upload.requested",
-  UPLOAD_CONFIRMED: "upload.confirmed",
-  UPLOAD_DELETED: "upload.deleted",
-  WEBHOOK_ENDPOINT_CREATED: "webhook.endpoint.created",
-  WEBHOOK_ENDPOINT_UPDATED: "webhook.endpoint.updated",
-  WEBHOOK_ENDPOINT_DELETED: "webhook.endpoint.deleted",
-  WEBHOOK_TEST: "webhook.test",
-  WEBHOOK_ENDPOINT_SECRET_ROTATED: "webhook.endpoint.secret_rotated",
-  WEBHOOK_ENDPOINT_DISABLED: "webhook.endpoint.disabled",
-  WEBHOOK_DELIVERY_EXHAUSTED: "webhook.delivery.exhausted",
-  API_TOKEN_CREATED: "api_token.created",
-  API_TOKEN_REVOKED: "api_token.revoked",
-  API_TOKEN_USED: "api_token.used",
-  USER_POLICY_ACCEPTED: "user.policy.accepted",
-  USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
-  USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
-  SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
-  SECURITY_CSP_VIOLATION: "security.csp.violation",
-  SECURITY_CSRF_REJECTED: "security.csrf.rejected",
-  SECURITY_PASSWORD_BREACHED: "security.password.breached",
-  SECURITY_SIGNUP_REJECTED: "security.signup.rejected",
-  SECURITY_OPERATOR_AUDIT_ACCESSED: "security.operator.audit_accessed",
-  BILLING_SUBSCRIPTION_CREATED: "billing.subscription.created",
-  BILLING_SUBSCRIPTION_UPDATED: "billing.subscription.updated",
-  BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
-  BILLING_PAYMENT_FAILED: "billing.payment.failed",
-  BILLING_QUOTA_EXCEEDED: "billing.quota.exceeded",
-  ADMIN_IMPERSONATION_STARTED: "admin.impersonation.started",
-  ADMIN_IMPERSONATION_STOPPED: "admin.impersonation.stopped",
-  ADMIN_USER_BANNED: "admin.user.banned",
-  ADMIN_USER_UNBANNED: "admin.user.unbanned",
-  ADMIN_USER_ROLE_CHANGED: "admin.user.role_changed",
-  ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
-  ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
-  EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
-} as const;
+// The real catalog, never a hand-kept copy: `mock.module` leaks across the whole
+// process, so a stale copy here silently blanks every event type added since it
+// was written — in *other* test files, wherever they happen to run after this one.
+const FULL_EVENT_TYPES = EventTypes;
 
 mock.module("@packages/events", () => ({
+  // Spread first: a partial mock of this module leaks process-wide and turns
+  // every export it forgets into `undefined` in unrelated test files.
+  ...realEvents,
   EventTypes: FULL_EVENT_TYPES,
   OrgMemberRemovedPayload: RealOrgMemberRemovedPayload,
 }));
