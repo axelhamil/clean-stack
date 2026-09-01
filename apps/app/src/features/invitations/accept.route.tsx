@@ -7,7 +7,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -29,7 +31,7 @@ function AcceptInvitationPage() {
 
   if (!session) {
     return (
-      <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
+      <main className={cn(pageContainerVariants({ width: "form" }), "flex flex-col gap-4 py-6")}>
         <TypographyH1>{t("invitation.signInTitle")}</TypographyH1>
         <TypographyMuted>{t("invitation.signInBody")}</TypographyMuted>
         <Button asChild>
@@ -42,7 +44,7 @@ function AcceptInvitationPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
+    <main className={cn(pageContainerVariants({ width: "form" }), "flex flex-col gap-6 py-6")}>
       <TypographyH1>{t("invitation.acceptInvitation")}</TypographyH1>
       <Card>
         <CardHeader>

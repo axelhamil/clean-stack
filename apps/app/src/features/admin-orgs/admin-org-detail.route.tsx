@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@packages/ui/components/ui/card";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Table,
   TableBody,
@@ -8,6 +9,7 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -28,7 +30,7 @@ function AdminOrgDetailPage() {
 
   if (query.isLoading) {
     return (
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+      <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
         <p>{t("orgs.detail.loading")}</p>
       </main>
     );
@@ -36,7 +38,7 @@ function AdminOrgDetailPage() {
 
   if (query.isError || !query.data) {
     return (
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+      <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
         <p>{t("orgs.detail.loadFailed")}</p>
       </main>
     );
@@ -45,7 +47,7 @@ function AdminOrgDetailPage() {
   const org = query.data;
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
       <header>
         <TypographyH1 variant="page">{org.name}</TypographyH1>
       </header>

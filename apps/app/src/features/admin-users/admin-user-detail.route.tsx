@@ -16,7 +16,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -150,7 +152,7 @@ function AdminUserDetailPage() {
 
   if (query.isLoading) {
     return (
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+      <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
         <p>{t("users.detail.loading")}</p>
       </main>
     );
@@ -158,7 +160,7 @@ function AdminUserDetailPage() {
 
   if (query.isError || !query.data) {
     return (
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+      <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
         <p>{t("users.detail.loadFailed")}</p>
       </main>
     );
@@ -167,7 +169,7 @@ function AdminUserDetailPage() {
   const user = query.data;
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
       <header>
         <TypographyH1 variant="page">{user.name}</TypographyH1>
       </header>

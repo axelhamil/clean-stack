@@ -1,4 +1,6 @@
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -24,7 +26,7 @@ function PricingPage() {
   });
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 p-8">
+    <main className={cn(pageContainerVariants(), "flex flex-col gap-8 py-8")}>
       <header className="flex flex-col gap-2">
         <TypographyH1>{t("pricing.title")}</TypographyH1>
         <TypographyMuted>{t("pricing.subtitle")}</TypographyMuted>

@@ -2,7 +2,9 @@ import { BrandLink } from "@packages/ui/components/ui/brand-link";
 import { Button } from "@packages/ui/components/ui/button";
 import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { Separator } from "@packages/ui/components/ui/separator";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
@@ -53,7 +55,7 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="glass-header sticky top-0 z-30 border-b">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
+        <div className={cn(pageContainerVariants(), "flex h-14 items-center gap-4")}>
           <BrandLink asChild>
             <Link to="/dashboard">
               <LogoMark />
@@ -116,7 +118,9 @@ export function AppShell({ user, children }: AppShellProps) {
         </div>
 
         {pathname.startsWith("/settings") && (
-          <ContextualTabs className="border-t mx-auto max-w-7xl px-4 sm:px-6" />
+          <div className="border-t">
+            <ContextualTabs className={pageContainerVariants()} />
+          </div>
         )}
       </header>
 

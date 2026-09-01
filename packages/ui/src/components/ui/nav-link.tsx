@@ -5,9 +5,13 @@ import type * as React from "react";
 import { cn } from "../../libs/utils";
 
 const navLinkVariants = cva(
-  "inline-flex shrink-0 items-center text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+  "inline-flex shrink-0 items-center transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
   {
     variants: {
+      size: {
+        sm: "text-xs",
+        md: "text-sm",
+      },
       variant: {
         plain: "text-muted-foreground hover:text-foreground",
         pill: "rounded-md px-3 py-1.5",
@@ -42,6 +46,7 @@ const navLinkVariants = cva(
       },
     ],
     defaultVariants: {
+      size: "md",
       variant: "plain",
       active: false,
     },
@@ -50,6 +55,7 @@ const navLinkVariants = cva(
 
 function NavLink({
   className,
+  size,
   variant,
   active,
   asChild = false,
@@ -64,7 +70,7 @@ function NavLink({
       data-slot="nav-link"
       data-variant={variant}
       data-active={active ? "" : undefined}
-      className={cn(navLinkVariants({ variant, active, className }))}
+      className={cn(navLinkVariants({ size, variant, active, className }))}
       {...props}
     />
   );

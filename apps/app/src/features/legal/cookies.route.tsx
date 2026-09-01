@@ -1,6 +1,7 @@
 import { CONSENT_CATEGORIES, type ConsentCategory } from "@packages/cookie-consent";
 import { toLocale } from "@packages/i18n";
 import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Table,
   TableBody,
@@ -16,6 +17,7 @@ import {
   TypographyMuted,
   TypographyP,
 } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ConsentSettings } from "../../shared/components/consent-settings";
@@ -63,7 +65,7 @@ function CookiesPage() {
   const { t, i18n } = useTranslation("common");
   const locale = toLocale(i18n.language);
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-6 py-6")}>
       <header className="flex flex-col gap-2">
         <TypographyH1>{t("legal.cookies.title")}</TypographyH1>
         <TypographyMuted>{t("legal.cookies.subtitle")}</TypographyMuted>

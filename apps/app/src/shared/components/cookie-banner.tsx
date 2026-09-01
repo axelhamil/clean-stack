@@ -6,8 +6,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -51,7 +53,12 @@ export function CookieBanner() {
         aria-modal="false"
         className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg"
       >
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between md:p-6">
+        <div
+          className={cn(
+            pageContainerVariants(),
+            "flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between md:py-6",
+          )}
+        >
           <TypographyMuted className="flex-1">
             {t("cookieBanner.message")}{" "}
             <TextLink href="/legal/cookies">{t("cookieBanner.policyLink")}</TextLink>.
