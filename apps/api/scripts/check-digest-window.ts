@@ -342,6 +342,24 @@ check(
 );
 const lastDigest = (await enqueued()).at(-1);
 check("the single digest carries all 5 items", lastDigest?.payload.itemCount === "5", lastDigest);
+const summaryTerms = (lastDigest?.payload.itemsSummary ?? "").split(", ").filter(Boolean);
+check(
+  "each of the 5 rows contributed exactly one item — no row seen twice across pages",
+  summaryTerms.length === 5,
+  summaryTerms,
+);
+const afterPaged = await dueDates();
+check(
+  "every row across all 3 pages was marked sent, none left pending",
+  afterPaged.length === 5 && afterPaged.every((r) => r.sent),
+  afterPaged,
+);
+const pagedReplay = await flush({ batchSize: 2 });
+check(
+  "a replay of the same paged window sends nothing — no row was left re-selectable",
+  pagedReplay.flushed === 0 && pagedReplay.notifications === 0,
+  pagedReplay,
+);
 
 await reset();
 

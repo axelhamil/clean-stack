@@ -10,7 +10,6 @@ import {
   inArray,
   isNull,
   lte,
-  notInArray,
   notificationSchema,
   sql,
 } from "@packages/drizzle";
@@ -167,11 +166,20 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
         // sequentially — a backlog bigger than `batchSize` used to flush as
         // two digests for one promised window. This pages through every row
         // due *right now*, in the same transaction, and sends one digest per
-        // (user, category) for the whole set. `claimedIds` excludes rows this
-        // run already holds the lock on — `FOR UPDATE` does not re-skip its
-        // own transaction's locks, so without it the same page would repeat.
+        // (user, category) for the whole set.
+        //
+        // Every row leaving a page is resolved before the next page is read
+        // — dropped rows get `emailPendingAt = null`, kept rows get
+        // `emailSentAt = now` right here, not after the whole loop — so
+        // neither can still match the `WHERE` below on the next iteration.
+        // `FOR UPDATE SKIP LOCKED` does not re-skip locks held by this same
+        // transaction: a row left unresolved between pages would come back
+        // on the next one. Marking it immediately, inside the same
+        // transaction as the eventual send, keeps atomicity (a failed send
+        // rolls every page's marks back together) without an accumulator
+        // that grows — and a bound query parameter list — with the size of
+        // the backlog.
         const rows: PendingRow[] = [];
-        const claimedIds: string[] = [];
         let dropped = 0;
 
         for (;;) {
@@ -206,18 +214,11 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
                 eq(opMail.scopeId, n.organizationId),
               ),
             )
-            .where(
-              and(
-                lte(n.emailPendingAt, now),
-                isNull(n.emailSentAt),
-                claimedIds.length > 0 ? notInArray(n.id, claimedIds) : undefined,
-              ),
-            )
+            .where(and(lte(n.emailPendingAt, now), isNull(n.emailSentAt)))
             .limit(batchSize)
             .for("update", { of: n, skipLocked: true });
 
           if (candidates.length === 0) break;
-          claimedIds.push(...candidates.map((r) => r.id));
 
           // A preference flipped after the notification was queued (email
           // turned off, or the category left the org) is honoured here, not
@@ -231,7 +232,19 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
             dropped += droppedIds.length;
           }
 
-          rows.push(...(candidates.filter((r) => r.emailStillWanted) as PendingRow[]));
+          const allowed = candidates.filter((r) => r.emailStillWanted) as PendingRow[];
+          if (allowed.length > 0) {
+            await tx
+              .update(n)
+              .set({ emailSentAt: now })
+              .where(
+                inArray(
+                  n.id,
+                  allowed.map((r) => r.id),
+                ),
+              );
+            rows.push(...allowed);
+          }
 
           if (candidates.length < batchSize) break;
         }
@@ -270,7 +283,6 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
         }
 
         const notificationIds = rows.map((r) => r.id);
-        await tx.update(n).set({ emailSentAt: now }).where(inArray(n.id, notificationIds));
 
         logger.info(
           { flushed: digests.length, notifications: notificationIds.length },
