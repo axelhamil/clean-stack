@@ -95,6 +95,11 @@ jobs:
         # Must run after seeding: it looks up the SEED_EMAIL user by that email.
         run: pnpm --filter api check:fanout
 
+      - name: Check the digest window against a real database
+        # Same reason as check:fanout — the frequency cascade and the due filter
+        # live inside SQL, which a mocked tx never evaluates. Needs the seed too.
+        run: pnpm --filter api check:digest
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

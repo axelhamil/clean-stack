@@ -48,7 +48,7 @@ Remaining work for clean-stack, plus the design record of each shipped phase. **
 
 ## 🚧 What's left
 
-The plumbing a SaaS boilerplate owes its cloner is shipped: auth + MFA, multi-tenant with a capability SSOT, RGPD Art. 17/20, cookie consent, policy versioning, billing + quota gating, security perimeter, admin + impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC + SAML) + SCIM provisioning, a typed i18n rail (`en`/`fr`), event rail (81 events / 35 public / 46 internal), Railway reference deploy. Per-phase detail below, as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).
+The plumbing a SaaS boilerplate owes its cloner is shipped: auth + MFA, multi-tenant with a capability SSOT, RGPD Art. 17/20, cookie consent, policy versioning, billing + quota gating, security perimeter, admin + impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC + SAML) + SCIM provisioning, a typed i18n rail (`en`/`fr`), event rail (82 events / 35 public / 47 internal), Railway reference deploy. Per-phase detail below, as-built record in [`docs/HISTORY.md`](docs/HISTORY.md).
 
 What remains is short on purpose. **Everything not listed here was cut** — a boilerplate that carries a wishlist of twelve unbuilt phases reads as unfinished when it isn't.
 

@@ -337,7 +337,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - Routes `apps/api/src/modules/api-token/routes.ts` — `GET/POST /settings/tokens`, `DELETE /settings/tokens/:id` (session-auth; `denyImpersonated` on writes).
 - Scanning route `apps/api/src/modules/api-token/scanning.routes.ts` — `POST /api/token-scanning/github` (ECDSA P-256 signature verification against GitHub's live public-key endpoint; revokes + emails owner on match).
 
-**Public API sub-app** `apps/api/src/public-api/` — a separate `Hono` instance mounted at `/api/v1`, outside `AppType`. `sessionMiddleware` skips `/api/v1/*` entirely; the sub-app mounts `requireApiToken` on all routes. Token-reachable routes: `GET /api/v1/me`, `GET /api/v1/organizations`. **Why a separate sub-app rather than a flag on existing routes**: any route that mounts both `requireAuth` and `requireApiToken` eventually drifts — a new route gets one but not the other. The sub-app makes the contract structural: what is in `/api/v1` is reachable by token, everything else is session-only. The global rate-limit policy is also bypassed at `/api/v1/*` and replaced with per-token + per-IP axes. **The integrator-facing reference for this surface — routes, token format, scopes, error codes, rate-limit headers — is [`docs/PUBLIC-API.md`](./PUBLIC-API.md)**; this entry documents why the sub-app exists, that one documents how to call it.
+**Public API sub-app** `apps/api/src/public-api/` — a separate `Hono` instance mounted at `/api/v1`, outside `AppType`. `sessionMiddleware` skips `/api/v1/*` entirely; the sub-app mounts `requireApiToken` on all routes. Token-reachable routes: `GET /api/v1/me`, `GET /api/v1/organizations`, `PATCH /api/v1/me`. **Why a separate sub-app rather than a flag on existing routes**: any route that mounts both `requireAuth` and `requireApiToken` eventually drifts — a new route gets one but not the other. The sub-app makes the contract structural: what is in `/api/v1` is reachable by token, everything else is session-only. The global rate-limit policy is also bypassed at `/api/v1/*` and replaced with per-token + per-IP axes. **The integrator-facing reference for this surface — routes, token format, scopes, error codes, rate-limit headers — is [`docs/PUBLIC-API.md`](./PUBLIC-API.md)**; this entry documents why the sub-app exists, that one documents how to call it.
 
 **Middleware** `apps/api/src/shared/middleware/api-token.middleware.ts` — `requireApiToken(deps, { scopes })`. Validates checksum, resolves HMAC (with previous-pepper fallback + transparent rehash), checks expiry, checks ban, sets `c.var.{user, tokenScopes, orgId, apiTokenId}`.
 
@@ -350,7 +350,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx` — name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts` — list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts` — 67-event catalog with explicit `public` / `internal` classification (28 public / 39 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts` — 82-event catalog with explicit `public` / `internal` classification (35 public / 47 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
 **Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **67 total / 28 public / 39 internal**.
 
@@ -364,7 +364,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 Persistent inbox behind a bell, real-time over SSE, three-level preferences. No new event type: D.3 *consumes* the catalog.
 
-**Catalog projection** `packages/events/src/notification-map.ts` — third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 67 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced — `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
+**Catalog projection** `packages/events/src/notification-map.ts` — third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 82 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced — `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
 
 **Audience by capability, never by role tuple**: `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `ORG_ROLES.filter(authorizeRole)` resolves at boot, leaving `WHERE member.role = ANY($1)`.
 
