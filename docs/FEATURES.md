@@ -451,7 +451,7 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 
 - **`back-routes.ts`** — the real route table, read off the live Hono app (not hand-maintained): 71 keys. Construction (`apps/api/src/app.ts`) is split from boot (`index.ts`) so a test can import `app.routes` without starting the outbox dispatcher or the workers.
 - **`front-consumers.ts`** — 50 call sites extracted from `apps/app`'s source.
-- **`route-map.ts`** — `Record<"METHOD /path", Consumer | UiLessReason>` over the 71 routes: 21 have no front consumer, classified as 9 `internal-cron`, 3 `infra-probe`, 3 `public-api`, 2 `provider-callback`, 1 `library-owned`, 2 `dormant-by-design`. Nothing is deleted for being unconsumed — a boilerplate keeps dormant scaffolding ready, declared in writing rather than silently absent.
+- **`route-map.ts`** — `Record<"METHOD /path", Consumer | UiLessReason>` over the 71 routes: 19 have no front consumer, classified as 9 `internal-cron`, 3 `infra-probe`, 3 `public-api`, 2 `provider-callback`, 1 `library-owned`, 1 `dormant-by-design`. Nothing is deleted for being unconsumed — a boilerplate keeps dormant scaffolding ready, declared in writing rather than silently absent.
 - **Parity test** (4 assertions) — diffs the map against the live route set and the extracted consumer list; a stale `UiLessReason` row dies the moment a front consumer appears for it.
 - **`docs/SURFACE.md`** explains the mechanism and, in prose, the backend capabilities with no HTTP surface at all (the `quotas` module) — structurally invisible to the map, since it has no `routes.ts` and is never mounted.
 
