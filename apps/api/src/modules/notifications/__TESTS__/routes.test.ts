@@ -64,11 +64,15 @@ const mockMarkAllRead = mock(
 const mockListPreferences = mock(
   async (): Promise<Result<PreferenceRecord[], NotificationError>> => Result.ok([PREFERENCE]),
 );
+// Les parametres sont declares — sans eux `mock.calls` est type `[]` et les
+// assertions sur le handle de transaction ne compilent pas.
 const mockUpsertPreference = mock(
-  async (): Promise<Result<void, NotificationError>> => Result.ok(),
+  async (_input: unknown, _tx?: unknown): Promise<Result<void, NotificationError>> => Result.ok(),
 );
 
-const mockEnqueue = mock(async () => {});
+const mockEnqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+
+const TX = { sentinel: "transaction" };
 
 mock.module("../../../container", () => ({
   di: {
@@ -84,7 +88,7 @@ mock.module("../../../container", () => ({
       enqueue: mockEnqueue,
     },
     ITransactionService: {
-      run: async (callback: (tx: unknown) => Promise<unknown>) => callback({}),
+      run: async (callback: (tx: unknown) => Promise<unknown>) => callback(TX),
     },
     PolicyAcceptanceService: {
       hasAcceptedCurrent: mock(async () => Result.ok(true)),
@@ -341,6 +345,25 @@ describe("PUT /notifications/preferences", () => {
     expect(mockUpsertPreference).toHaveBeenCalledTimes(1);
   });
 
+  it("ecrit la preference et emet l'evenement dans la meme transaction", async () => {
+    currentSession = {};
+    mockUpsertPreference.mockClear();
+    mockEnqueue.mockClear();
+    const app = makeApp();
+    const res = await app.request("/notifications/preferences", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ category: "billing", channel: "email", enabled: false }),
+    });
+    expect(res.status).toBe(200);
+    // Le compte d'appels ne prouve rien : les deux ecritures peuvent tres bien
+    // avoir lieu hors transaction. Ce qui compte est qu'elles portent le MEME
+    // handle — un crash entre les deux laisserait sinon une preference changee
+    // sans evenement, donc sans trace d'audit.
+    expect(mockUpsertPreference.mock.calls[0]?.[1]).toBe(TX);
+    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
+  });
+
   it("rejette une session impersonnifiee (403)", async () => {
     currentSession = { impersonatedBy: "admin-99" };
     const app = makeApp();
@@ -400,6 +423,29 @@ describe("PUT /notifications/org-preferences", () => {
     });
     expect(res.status).toBe(200);
     expect(mockUpsertPreference).toHaveBeenCalledTimes(1);
+  });
+
+  it("ecrit la preference org et emet l'evenement dans la meme transaction", async () => {
+    currentSession = { activeOrganizationId: "org-1" };
+    mockUpsertPreference.mockClear();
+    mockEnqueue.mockClear();
+    const app = makeApp();
+    const res = await app.request("/notifications/org-preferences", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        category: "security",
+        channel: "in_app",
+        enabled: true,
+        locked: true,
+      }),
+    });
+    expect(res.status).toBe(200);
+    // Meme raison que cote user : le verrouillage org est un evenement
+    // compliance, une preference verrouillee sans evenement est un trou
+    // d'audit que rien ne rattrape apres coup.
+    expect(mockUpsertPreference.mock.calls[0]?.[1]).toBe(TX);
+    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
   });
 
   it("rejette une session impersonnifiee (403)", async () => {

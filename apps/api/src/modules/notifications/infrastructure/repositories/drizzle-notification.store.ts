@@ -172,13 +172,17 @@ export class DrizzleNotificationStore implements INotificationStore {
     );
   }
 
-  async upsertPreference(input: PreferenceInput): Promise<Result<void, NotificationError>> {
+  async upsertPreference(
+    input: PreferenceInput,
+    tx?: ITransaction,
+  ): Promise<Result<void, NotificationError>> {
+    const exec = tx ?? db;
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > upsertPreference" },
       async () => {
         try {
           const p = notificationSchema.notificationPreference;
-          const query = db
+          const query = exec
             .insert(p)
             .values({
               id: crypto.randomUUID(),

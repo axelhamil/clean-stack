@@ -60,5 +60,8 @@ export interface INotificationStore {
     scope: PreferenceScope,
     scopeId: string,
   ): Promise<Result<PreferenceRecord[], NotificationError>>;
-  upsertPreference(input: PreferenceInput): Promise<Result<void, NotificationError>>;
+  upsertPreference(
+    input: PreferenceInput,
+    tx?: ITransaction,
+  ): Promise<Result<void, NotificationError>>;
 }
