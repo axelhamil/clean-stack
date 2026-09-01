@@ -44,7 +44,7 @@ function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
-      if (entry === "__TESTS__" || entry === "node_modules") continue;
+      if (/^__tests__$/i.test(entry) || entry === "node_modules") continue;
       yield* walk(full);
       continue;
     }

@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { extractRouteFromChain, listFrontConsumers } from "../front-consumers";
 
 describe("extractRouteFromChain", () => {
@@ -28,5 +31,18 @@ describe("listFrontConsumers", () => {
 
     const presign = consumers.find((c) => c.route === "POST /uploads/presign");
     expect(presign?.file).toBe("apps/app/src/shared/api/mutations/create-upload.ts");
+  });
+});
+
+describe("listFrontConsumers case-insensitive __tests__ exclusion", () => {
+  it("ignores a non-.test file dropped in a lowercase __tests__ dir", () => {
+    const root = mkdtempSync(join(tmpdir(), "front-consumers-"));
+    const testsDir = join(root, "__tests__");
+    mkdirSync(testsDir);
+    writeFileSync(join(testsDir, "fixture.ts"), "api.uploads.presign.$post();\n");
+
+    expect(listFrontConsumers(root)).toEqual([]);
+
+    rmSync(root, { recursive: true, force: true });
   });
 });
