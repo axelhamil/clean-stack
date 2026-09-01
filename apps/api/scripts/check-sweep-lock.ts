@@ -35,6 +35,9 @@ import { purgeBatchWithTimeout } from "../src/shared/internal-routes/sweep-purge
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
+import { requireLocalDatabase } from "./require-local-database";
+
+requireLocalDatabase("check-sweep-lock");
 
 let failed = false;
 
