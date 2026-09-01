@@ -1,5 +1,5 @@
 import { AppErrorException, Option } from "@packages/ddd-kit";
-import { EventTypes } from "@packages/events";
+import { EventTypes, publicNotificationPayload } from "@packages/events";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
@@ -39,6 +39,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
         organizationId: n.organizationId.toNull(),
         groupKey: n.groupKey.toNull(),
         readAt: n.readAt.toNull(),
+        payload: publicNotificationPayload(n.eventType, n.payload),
       })),
       nextCursor,
     });

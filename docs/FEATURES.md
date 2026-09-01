@@ -372,6 +372,8 @@ Persistent inbox behind a bell, real-time over SSE, three-level preferences. No 
 
 **Fan-out** `apps/api/src/shared/services/notification-fanout-subscriber.ts` — an `OutboxSubscriber` running inside the dispatch TX beside audit and webhook fan-out, not an `onEvent` post-commit handler (which is best-effort, so a lost notification would fail silently). One `INSERT ... SELECT` over the recipient set, never N inserts in a loop. The recipient set is either a single user or `SELECT user_id FROM member WHERE ...`; everything downstream is shared.
 
+**Payload allowlist** `packages/events/src/notification-map.ts` — every notifiable event declares `payloadFields`, and `GET /notifications` returns `publicNotificationPayload(eventType, payload)` rather than the stored jsonb. The row keeps the whole event payload; what crosses to the browser is chosen. Required and empty-is-valid on purpose: without the list, any field added to an event payload later (an invitation token, a storage key) would ship to the recipient's browser by default.
+
 **Preference cascade, applied in that same statement** via one `LEFT JOIN notification_preference` per scope per channel:
 
 ```

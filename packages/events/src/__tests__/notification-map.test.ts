@@ -5,6 +5,7 @@ import {
   isNotifiable,
   NOTIFICATION_MAP,
   notificationConfigOf,
+  publicNotificationPayload,
 } from "../notification-map";
 
 describe("NOTIFICATION_MAP", () => {
@@ -43,6 +44,34 @@ describe("NOTIFICATION_MAP", () => {
     expect(forcedLevelOf("billing")).toBe("some");
     expect(forcedLevelOf("org")).toBe("none");
     expect(forcedLevelOf("activity")).toBe("none");
+  });
+
+  test("chaque event notifiable declare explicitement ce qui part au navigateur", () => {
+    for (const [type, config] of Object.entries(NOTIFICATION_MAP)) {
+      expect(Array.isArray(config.payloadFields), `${type} sans liste blanche`).toBe(true);
+    }
+  });
+
+  test("publicNotificationPayload ne laisse passer que les champs declares", () => {
+    const visible = publicNotificationPayload("org.member.invited", {
+      organizationId: "org-1",
+      invitationId: "token-secret",
+      inviterUserId: "user-9",
+      email: "a@b.com",
+      role: "member",
+    });
+
+    expect(visible).toEqual({ email: "a@b.com", role: "member" });
+  });
+
+  test("publicNotificationPayload ne rend rien pour un event inconnu ou un payload absent", () => {
+    expect(publicNotificationPayload("event.inexistant", { secret: 1 })).toEqual({});
+    expect(publicNotificationPayload("org.member.invited", null)).toEqual({});
+    expect(publicNotificationPayload("org.member.invited", "chaine")).toEqual({});
+  });
+
+  test("un champ declare mais absent du payload n'apparait pas comme undefined", () => {
+    expect(publicNotificationPayload("user.passkey.added", { userId: "u1" })).toEqual({});
   });
 
   test("un event forced n'est jamais batche par dedupWindow", () => {
