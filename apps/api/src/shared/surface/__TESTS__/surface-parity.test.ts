@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { routes } from "../../../app";
-import { listBackRoutes } from "../back-routes";
+import { listBackRoutes, type RouteKey } from "../back-routes";
 import { listFrontConsumers } from "../front-consumers";
 import { ROUTE_MAP } from "../route-map";
 
@@ -24,11 +24,22 @@ describe("surface parity", () => {
     expect(wronglyDeclared).toEqual([]);
   });
 
+  // Comparing the file and not just the route is the whole point of the map: a
+  // route-only check degrades the `consumer` field to a boolean ("something,
+  // somewhere, calls this"), so moving a call from one file to another leaves
+  // the declared path pointing at a file that no longer holds the call — green.
   it("every declared consumer file still contains a call to its route", () => {
     const consumers = listFrontConsumers();
     const broken = Object.entries(ROUTE_MAP)
-      .filter(([route, entry]) => "consumer" in entry && !consumers.some((c) => c.route === route))
-      .map(([route]) => route);
+      .filter((pair): pair is [RouteKey, { consumer: string }] => "consumer" in pair[1])
+      .filter(
+        ([route, entry]) => !consumers.some((c) => c.route === route && c.file === entry.consumer),
+      )
+      .map(([route, entry]) => ({
+        route,
+        declared: entry.consumer,
+        actual: consumers.filter((c) => c.route === route).map((c) => c.file),
+      }));
 
     expect(broken).toEqual([]);
   });
