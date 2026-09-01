@@ -33,10 +33,17 @@ interface TokenFormProps {
   defaultValues: TokenFormInput;
   submitLabel: string;
   isPending: boolean;
+  disabledReason?: string;
   onSubmit: (values: TokenFormInput) => void;
 }
 
-export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: TokenFormProps) {
+export function TokenForm({
+  defaultValues,
+  submitLabel,
+  isPending,
+  disabledReason,
+  onSubmit,
+}: TokenFormProps) {
   const { t } = useTranslation("settings");
   const { hasMembership, can } = useAuthorization();
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
@@ -146,7 +153,11 @@ export function TokenForm({ defaultValues, submitLabel, isPending, onSubmit }: T
           )}
         />
 
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending || Boolean(disabledReason)}
+          title={disabledReason}
+        >
           {submitLabel}
         </Button>
       </form>

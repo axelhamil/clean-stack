@@ -16,6 +16,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
@@ -29,6 +30,7 @@ function AdminOrgsPage() {
   const formatDate = useFormatDate();
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
+  const { blocked, reason } = useImpersonationGuard();
 
   const query = useInfiniteQuery(adminOrgsInfiniteQueryOptions(search));
 
@@ -90,9 +92,11 @@ function AdminOrgsPage() {
                         aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
                         checked={org.ssoEnforced}
                         disabled={
-                          ssoEnforcementMutation.isPending &&
-                          ssoEnforcementMutation.variables?.id === org.id
+                          (ssoEnforcementMutation.isPending &&
+                            ssoEnforcementMutation.variables?.id === org.id) ||
+                          blocked
                         }
+                        title={reason}
                         onCheckedChange={(enforced) =>
                           ssoEnforcementMutation.mutate({ id: org.id, enforced })
                         }

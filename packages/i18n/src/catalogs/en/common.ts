@@ -99,6 +99,7 @@ export default {
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",
+    actionUnavailable: "Unavailable while impersonating.",
   },
   cookieBanner: {
     ariaLabel: "Cookie consent",

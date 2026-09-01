@@ -24,6 +24,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toastError } from "../../../shared/api/errors/toast";
 import { preflightDeletionQueryOptions } from "../../../shared/api/queries/account-deletion";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
 import { useFormatDate, useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { RequestDeletionPasswordForm } from "../forms/request-deletion-password-form";
@@ -54,6 +55,7 @@ function PendingState({ until }: PendingStateProps) {
   const formatDate = useFormatDate();
   const formatDateTime = useFormatDateTime();
   const cancel = useCancelDeletion();
+  const { blocked, reason } = useImpersonationGuard();
   return (
     <Card>
       <CardHeader>
@@ -73,7 +75,8 @@ function PendingState({ until }: PendingStateProps) {
           type="button"
           variant="outline"
           className="self-start"
-          disabled={cancel.isPending}
+          disabled={cancel.isPending || blocked}
+          title={reason}
           onClick={() => cancel.mutate()}
         >
           {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}

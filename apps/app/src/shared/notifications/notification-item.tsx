@@ -15,6 +15,7 @@ import { labelOf } from "./notification-labels";
 interface NotificationItemProps {
   group: NotificationGroup;
   onRead: (ids: string[]) => void;
+  disabledReason?: string;
 }
 
 // Exported so the mapping itself — not just "every variant is present" — is
@@ -55,7 +56,7 @@ function isNotificationCategory(value: string): value is NotificationCategory {
   return (NOTIFICATION_CATEGORIES as readonly string[]).includes(value);
 }
 
-export function NotificationItem({ group, onRead }: NotificationItemProps) {
+export function NotificationItem({ group, onRead, disabledReason }: NotificationItemProps) {
   const { t } = useTranslation("common");
   const formatDate = useFormatDate();
   const { latest, count, unread } = group;
@@ -66,7 +67,8 @@ export function NotificationItem({ group, onRead }: NotificationItemProps) {
         <button
           type="button"
           onClick={() => unread && onRead(group.ids)}
-          disabled={!unread}
+          disabled={!unread || Boolean(disabledReason)}
+          title={unread ? disabledReason : undefined}
           className="flex flex-col items-start gap-1 text-left"
         >
           <TypographySmall>{labelOf(latest)}</TypographySmall>

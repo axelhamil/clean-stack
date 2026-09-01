@@ -15,6 +15,7 @@ import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../shared/api/queries/org-members";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useEntitlements } from "../../shared/auth/use-entitlements";
+import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { PricingTable } from "../../shared/components/pricing-table";
 import { isSubscriptionStatus, STATUS_KEYS, TIER_KEYS } from "./billing-labels";
 import { useOpenPortal } from "./hooks/use-open-portal";
@@ -33,6 +34,7 @@ function BillingPage() {
   });
   const ent = useEntitlements();
   const portal = useOpenPortal();
+  const { blocked, reason } = useImpersonationGuard();
   const isPaid = ent.tier !== "free";
   const memberCount = members.length;
   const statusLabel = isSubscriptionStatus(ent.status) ? t(STATUS_KEYS[ent.status]) : ent.status;
@@ -58,7 +60,11 @@ function BillingPage() {
             </>
           )}
           {isPaid && (
-            <Button onClick={() => portal.mutate()} disabled={portal.isPending}>
+            <Button
+              onClick={() => portal.mutate()}
+              disabled={portal.isPending || blocked}
+              title={reason}
+            >
               {t("billing.manageBilling")}
             </Button>
           )}

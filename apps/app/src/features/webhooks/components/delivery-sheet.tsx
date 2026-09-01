@@ -72,6 +72,7 @@ interface DeliverySheetProps {
   canReplay: boolean;
   onReplay: (deliveryId: string) => void;
   onClose: () => void;
+  disabledReason?: string;
 }
 
 export function DeliverySheet({
@@ -80,6 +81,7 @@ export function DeliverySheet({
   canReplay,
   onReplay,
   onClose,
+  disabledReason,
 }: DeliverySheetProps) {
   const { t } = useTranslation(["settings", "common"]);
   const detail = useQuery({
@@ -104,7 +106,13 @@ export function DeliverySheet({
               </SheetDescription>
             </SheetHeader>
             {canReplay && (
-              <Button className="my-4" variant="outline" onClick={() => onReplay(delivery.id)}>
+              <Button
+                className="my-4"
+                variant="outline"
+                disabled={Boolean(disabledReason)}
+                title={disabledReason}
+                onClick={() => onReplay(delivery.id)}
+              >
                 {t("webhooks.deliverySheet.replay")}
               </Button>
             )}

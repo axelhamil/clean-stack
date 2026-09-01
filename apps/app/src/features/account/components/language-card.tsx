@@ -15,19 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
-import { isImpersonating } from "../../../shared/auth/is-impersonating";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { changeLocale } from "../../../shared/i18n/i18n";
 import { useSetLocaleMutation } from "../../../shared/i18n/use-set-locale-mutation";
 
 export function LanguageCard() {
   const { t, i18n } = useTranslation(["settings", "common"]);
-  const { data: session } = useQuery(sessionQueryOptions);
+  const { blocked, reason } = useImpersonationGuard();
   const [pending, setPending] = useState<Locale | undefined>();
 
   const mutation = useSetLocaleMutation({
@@ -39,8 +37,7 @@ export function LanguageCard() {
   });
 
   const current = isLocale(i18n.language) ? i18n.language : "en";
-  const disabled =
-    mutation.isPending || (pending ?? current) === current || isImpersonating(session);
+  const disabled = mutation.isPending || (pending ?? current) === current || blocked;
 
   return (
     <Card>
@@ -67,6 +64,7 @@ export function LanguageCard() {
         <Button
           className="self-start"
           disabled={disabled}
+          title={blocked ? reason : undefined}
           onClick={() => mutation.mutate({ locale: pending ?? current })}
         >
           {t("common:actions.save")}

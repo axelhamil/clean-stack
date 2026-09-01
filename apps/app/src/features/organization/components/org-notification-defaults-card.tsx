@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
 import { Can } from "../../../shared/auth/can";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { buildPreferenceMatrix } from "../../../shared/notifications/build-preference-matrix";
 import {
   type PreferenceChange,
@@ -21,6 +22,7 @@ import {
 export function OrgNotificationDefaultsCard() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
+  const { reason } = useImpersonationGuard();
   const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
@@ -41,7 +43,13 @@ export function OrgNotificationDefaultsCard() {
           <CardDescription>{t("organization.notificationDefaultsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <PreferenceMatrix rows={rows} onChange={handleChange} showLock disabled={isPending} />
+          <PreferenceMatrix
+            rows={rows}
+            onChange={handleChange}
+            showLock
+            disabled={isPending}
+            blockedReason={reason}
+          />
         </CardContent>
       </Card>
     </Can>

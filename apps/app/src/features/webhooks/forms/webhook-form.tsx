@@ -19,10 +19,17 @@ interface WebhookFormProps {
   defaultValues: WebhookFormInput;
   submitLabel: string;
   isPending: boolean;
+  disabledReason?: string;
   onSubmit: (values: WebhookFormInput) => void;
 }
 
-export function WebhookForm({ defaultValues, submitLabel, isPending, onSubmit }: WebhookFormProps) {
+export function WebhookForm({
+  defaultValues,
+  submitLabel,
+  isPending,
+  disabledReason,
+  onSubmit,
+}: WebhookFormProps) {
   const { t } = useTranslation("settings");
   const form = useForm<WebhookFormInput>({
     resolver: zodResolver(webhookFormSchema),
@@ -63,7 +70,11 @@ export function WebhookForm({ defaultValues, submitLabel, isPending, onSubmit }:
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending || Boolean(disabledReason)}
+          title={disabledReason}
+        >
           {submitLabel}
         </Button>
       </form>

@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useAuthorization } from "../../shared/auth/use-authorization";
+import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
@@ -62,6 +63,7 @@ function WebhooksPage() {
   const qc = useQueryClient();
   const { can } = useAuthorization();
   const canWrite = can({ webhooks: ["write"] });
+  const { blocked, reason } = useImpersonationGuard();
 
   const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(null);
   const [editing, setEditing] = useState<WebhookEndpoint | null>(null);
@@ -148,7 +150,9 @@ function WebhooksPage() {
           </Link>
         </div>
         <Can requires={{ webhooks: ["write"] }}>
-          <Button onClick={() => setCreating(true)}>{t("settings:webhooks.addEndpoint")}</Button>
+          <Button onClick={() => setCreating(true)} disabled={blocked} title={reason}>
+            {t("settings:webhooks.addEndpoint")}
+          </Button>
         </Can>
       </div>
 
@@ -180,6 +184,7 @@ function WebhooksPage() {
                 onSendTest={(ep) => sendTest.mutate(ep.id)}
                 onRotate={(ep) => rotate.mutate(ep.id)}
                 onDelete={(ep) => del.mutate(ep.id)}
+                disabledReason={reason}
               />
             ))}
           </TableBody>
@@ -285,6 +290,7 @@ function WebhooksPage() {
             canReplay={can({ webhooks: ["write"] })}
             onReplay={(deliveryId) => replay.mutate({ endpointId: selectedEndpointId, deliveryId })}
             onClose={() => setSelectedDelivery(null)}
+            disabledReason={reason}
           />
         </>
       )}
@@ -306,6 +312,7 @@ function WebhooksPage() {
             }
             submitLabel={editing ? t("common:actions.save") : t("settings:webhooks.createAction")}
             isPending={create.isPending || update.isPending}
+            disabledReason={reason}
             onSubmit={(v) => (editing ? update.mutate({ id: editing.id, ...v }) : create.mutate(v))}
           />
         </DialogContent>

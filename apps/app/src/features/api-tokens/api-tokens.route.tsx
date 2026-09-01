@@ -17,6 +17,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
 import { createTokenMutationOptions, deleteTokenMutationOptions } from "./api/api-tokens.mutations";
 import { apiTokensQueryOptions } from "./api/api-tokens.queries";
@@ -38,6 +39,7 @@ const DEFAULT_VALUES: TokenFormInput = {
 function ApiTokensPage() {
   const { t } = useTranslation("settings");
   const qc = useQueryClient();
+  const { blocked, reason } = useImpersonationGuard();
   const [creating, setCreating] = useState(false);
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
@@ -67,7 +69,9 @@ function ApiTokensPage() {
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{t("apiTokens.pageTitle")}</h1>
-        <Button onClick={() => setCreating(true)}>{t("apiTokens.newTokenAction")}</Button>
+        <Button onClick={() => setCreating(true)} disabled={blocked} title={reason}>
+          {t("apiTokens.newTokenAction")}
+        </Button>
       </div>
 
       {tokens.isLoading ? (
@@ -96,6 +100,7 @@ function ApiTokensPage() {
                 token={token}
                 onRevoke={(id) => revoke.mutate(id)}
                 isRevoking={revoke.isPending && revoke.variables === token.id}
+                disabledReason={reason}
               />
             ))}
           </TableBody>
@@ -111,6 +116,7 @@ function ApiTokensPage() {
             defaultValues={DEFAULT_VALUES}
             submitLabel={t("apiTokens.createAction")}
             isPending={create.isPending}
+            disabledReason={reason}
             onSubmit={(v) => create.mutate(v)}
           />
         </DialogContent>

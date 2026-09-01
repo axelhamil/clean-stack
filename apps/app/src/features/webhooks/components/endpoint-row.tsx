@@ -35,6 +35,7 @@ interface EndpointRowProps {
   onRotate: (endpoint: WebhookEndpoint) => void;
   onDelete: (endpoint: WebhookEndpoint) => void;
   onSelect: (endpoint: WebhookEndpoint) => void;
+  disabledReason?: string;
 }
 
 export function EndpointRow({
@@ -45,6 +46,7 @@ export function EndpointRow({
   onRotate,
   onDelete,
   onSelect,
+  disabledReason,
 }: EndpointRowProps) {
   const { t } = useTranslation(["settings", "common"]);
   const formatDate = useFormatDate();
@@ -91,18 +93,32 @@ export function EndpointRow({
             {canWrite && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onEdit(endpoint)}>
+                <DropdownMenuItem
+                  onClick={() => onEdit(endpoint)}
+                  disabled={Boolean(disabledReason)}
+                  title={disabledReason}
+                >
                   {t("settings:webhooks.endpointRow.edit")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSendTest(endpoint)}>
+                <DropdownMenuItem
+                  onClick={() => onSendTest(endpoint)}
+                  disabled={Boolean(disabledReason)}
+                  title={disabledReason}
+                >
                   {t("settings:webhooks.endpointRow.sendTest")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onRotate(endpoint)}>
+                <DropdownMenuItem
+                  onClick={() => onRotate(endpoint)}
+                  disabled={Boolean(disabledReason)}
+                  title={disabledReason}
+                >
                   {t("settings:webhooks.endpointRow.rotateSecret")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onDelete(endpoint)}
+                  disabled={Boolean(disabledReason)}
+                  title={disabledReason}
                   className="text-destructive focus:text-destructive"
                 >
                   {t("settings:webhooks.endpointRow.delete")}

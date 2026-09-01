@@ -99,6 +99,7 @@ export default {
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
+    actionUnavailable: "Indisponible pendant l'usurpation d'identité.",
   },
   cookieBanner: {
     ariaLabel: "Consentement aux cookies",

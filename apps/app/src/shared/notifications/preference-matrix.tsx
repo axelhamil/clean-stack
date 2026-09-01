@@ -39,6 +39,7 @@ interface PreferenceMatrixProps {
   onChange: (change: PreferenceChange) => void;
   showLock?: boolean;
   disabled?: boolean;
+  blockedReason?: string;
 }
 
 // Reuses Task 3's `CATEGORY_KEYS` (shared/notifications/notification-item.tsx)
@@ -73,6 +74,7 @@ export function PreferenceMatrix({
   onChange,
   showLock = false,
   disabled = false,
+  blockedReason,
 }: PreferenceMatrixProps) {
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
@@ -93,7 +95,7 @@ export function PreferenceMatrix({
         {rows.map((row) => {
           const forced = forcedLevelOf(row.category);
           const noteKey = FORCED_NOTE_KEYS[forced];
-          const frozen = disabled || forced === "all";
+          const frozen = disabled || forced === "all" || Boolean(blockedReason);
           const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
 
           const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>
@@ -117,6 +119,7 @@ export function PreferenceMatrix({
                 <Switch
                   checked={row.in_app.enabled}
                   disabled={frozen}
+                  title={blockedReason}
                   onCheckedChange={(enabled) => emit("in_app", { enabled })}
                   aria-label={t("notifications.inAppAriaLabel", { category: categoryLabel })}
                 />
@@ -126,6 +129,7 @@ export function PreferenceMatrix({
                 <Switch
                   checked={row.email.enabled}
                   disabled={frozen}
+                  title={blockedReason}
                   onCheckedChange={(enabled) => emit("email", { enabled })}
                   aria-label={t("notifications.emailAriaLabel", { category: categoryLabel })}
                 />
@@ -143,6 +147,7 @@ export function PreferenceMatrix({
                     aria-label={t("notifications.emailFrequencyAriaLabel", {
                       category: categoryLabel,
                     })}
+                    title={blockedReason}
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -161,6 +166,7 @@ export function PreferenceMatrix({
                   <Switch
                     checked={row.in_app.locked}
                     disabled={frozen}
+                    title={blockedReason}
                     onCheckedChange={(locked) => {
                       emit("in_app", { locked });
                       emit("email", { locked });

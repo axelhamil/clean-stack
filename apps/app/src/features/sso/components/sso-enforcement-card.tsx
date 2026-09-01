@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 
@@ -25,6 +26,7 @@ interface OrgWithSsoEnforcement {
 export function SsoEnforcementCard() {
   const qc = useQueryClient();
   const { t } = useTranslation("settings");
+  const { blocked, reason } = useImpersonationGuard();
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
@@ -52,7 +54,8 @@ export function SsoEnforcementCard() {
             <Switch
               aria-label={t("sso.enforcementCard.switchAriaLabel")}
               checked={enforced}
-              disabled={setEnforcement.isPending || (!enforced && !hasVerifiedProvider)}
+              disabled={setEnforcement.isPending || (!enforced && !hasVerifiedProvider) || blocked}
+              title={reason}
               onCheckedChange={(next) => setEnforcement.mutate(next)}
             />
             <span className="text-sm">
