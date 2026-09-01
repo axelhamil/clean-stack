@@ -116,6 +116,8 @@ export default {
     YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
       "You don't have permission to access this organization.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
+    IMPERSONATION_ACTION_FORBIDDEN:
+      "This action is unavailable while you are impersonating another user.",
   },
   // Covers `HTTP_<status>` codes — raised by `HTTPException` sites with no
   // business code (`error.middleware.ts`) — for statuses the API actually
@@ -132,6 +134,8 @@ export default {
   },
   bySuffix: {
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
+    QUOTA_EXCEEDED: "You have reached the limit for your plan.",
+    PAYMENT_REQUIRED: "Your plan does not include this feature.",
     NOT_FOUND: "Not found.",
     FORBIDDEN: "You don't have permission to do this.",
     UNAUTHORIZED: "Please sign in again.",
@@ -234,5 +238,6 @@ export default {
     updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
     loadAuditLog: "Failed to load audit log",
     verifyAuditChain: "Failed to verify chain",
+    updateAvatar: "Failed to update avatar",
   },
 } as const;

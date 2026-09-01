@@ -111,6 +111,8 @@ export default {
     YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
       "Vous n'avez pas la permission d'accéder à cette organisation.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
+    IMPERSONATION_ACTION_FORBIDDEN:
+      "Cette action est indisponible pendant l'usurpation d'identité d'un autre utilisateur.",
   },
   byStatus: {
     "400": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
@@ -123,6 +125,8 @@ export default {
   },
   bySuffix: {
     RATE_LIMITED: "Trop de requêtes. Patientez un instant avant de réessayer.",
+    QUOTA_EXCEEDED: "Vous avez atteint la limite de votre offre.",
+    PAYMENT_REQUIRED: "Votre offre n'inclut pas cette fonctionnalité.",
     NOT_FOUND: "Introuvable.",
     FORBIDDEN: "Vous n'avez pas la permission d'effectuer cette action.",
     UNAUTHORIZED: "Veuillez vous reconnecter.",
@@ -216,5 +220,6 @@ export default {
     updateAdminOrgSsoEnforcement: "Échec de la mise à jour de l'imposition du SSO",
     loadAuditLog: "Échec du chargement du journal d'audit",
     verifyAuditChain: "Échec de la vérification de la chaîne",
+    updateAvatar: "Échec de la mise à jour de l'avatar",
   },
 } as const;

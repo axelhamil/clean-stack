@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { createUpload, deleteUploadByUrl } from "../../../shared/api/mutations/create-upload";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import { captureError } from "../../../shared/observability/sentry";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -55,7 +57,11 @@ export function UploadAvatar({ name }: UploadAvatarProps) {
       broadcastAuthChange();
       toast.success(t("account.avatarUpdatedToast"));
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.updateAvatar", { defaultValue: "Failed to update avatar" }),
+      ),
   });
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

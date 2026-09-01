@@ -20,6 +20,8 @@ import type { ApiError } from "./api-error";
 
 const SUFFIXES = [
   "RATE_LIMITED",
+  "QUOTA_EXCEEDED",
+  "PAYMENT_REQUIRED",
   "INTEGRITY_FAILED",
   "PROVIDER_FAILURE",
   "NOT_FOUND",

@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { openBillingPortalMutationOptions } from "../../../shared/api/mutations/open-billing-portal";
+import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 
 export function useOpenPortal() {
   return useMutation({
@@ -8,6 +9,12 @@ export function useOpenPortal() {
     onSuccess: ({ url }: { url: string }) => {
       window.location.href = url;
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.openBillingPortal", {
+          defaultValue: "Failed to open billing portal",
+        }),
+      ),
   });
 }

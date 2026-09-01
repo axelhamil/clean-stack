@@ -71,7 +71,11 @@ function AdminUserDetailPage() {
       setBanOpen(false);
       void invalidateUser();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.banUser", { defaultValue: "Failed to suspend account" }),
+      ),
   });
 
   const unbanMutation = useMutation({
@@ -80,7 +84,11 @@ function AdminUserDetailPage() {
       toast.success(t("users.detail.unbanSuccessToast"));
       void invalidateUser();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.unbanUser", { defaultValue: "Failed to reactivate account" }),
+      ),
   });
 
   const impersonateMutation = useMutation({
@@ -92,7 +100,13 @@ function AdminUserDetailPage() {
       broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.startImpersonation", {
+          defaultValue: "Failed to start impersonation",
+        }),
+      ),
   });
 
   const revokeSessionsMutation = useMutation({
@@ -101,13 +115,23 @@ function AdminUserDetailPage() {
       toast.success(t("users.detail.revokeSessionsSuccessToast"));
       void invalidateUser();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.revokeUserSessions", { defaultValue: "Failed to revoke sessions" }),
+      ),
   });
 
   const resetPasswordMutation = useMutation({
     ...resetPasswordMutationOptions,
     onSuccess: () => toast.success(t("users.detail.resetPasswordSuccessToast")),
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastError(
+        err,
+        getErrorsT()("fallback.resetUserPassword", {
+          defaultValue: "Failed to send password reset",
+        }),
+      ),
   });
 
   const setRoleMutation = useMutation({
