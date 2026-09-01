@@ -19,6 +19,8 @@ import { z } from "zod";
 import { di } from "../../container";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { sweepLockFor } from "./sweep-lock";
+import { sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
@@ -99,62 +101,80 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
       return c.json({ dryRun: true, eligible, flushed: 0, notifications: 0 });
     }
 
-    const { flushed, notifications } = await db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
-      await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-      await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+    // Single-flight, same lease table the retention sweeps use.
+    //
+    // `FOR UPDATE SKIP LOCKED` below already makes a double *send* impossible —
+    // two runs can never claim the same row. What it does not prevent is two
+    // runs each claiming *half* of one user's due notifications and each mailing
+    // a digest: no duplicate, but two e-mails for a window the user was promised
+    // one of. Now that the window is a promise the selector makes, that split is
+    // the failure mode worth a lease.
+    const lock = sweepLockFor("flush-notification-emails", sweepSpans(di.IInstrumentation));
+    if (!(await lock.acquire())) {
+      logger.info("flush-notification-emails skipped — lease held by a concurrent run");
+      return c.json({ dryRun: false, skipped: true, flushed: 0, notifications: 0 });
+    }
 
-      const rows = await tx
-        .select({
-          id: n.id,
-          userId: n.userId,
-          category: n.category,
-          eventType: n.eventType,
-          email: u.email,
-          locale: u.locale,
-          payload: n.payload,
-        })
-        .from(n)
-        .innerJoin(u, eq(n.userId, u.id))
-        .where(and(lte(n.emailPendingAt, now), isNull(n.emailSentAt)))
-        .limit(batchSize)
-        .for("update", { skipLocked: true });
+    try {
+      const { flushed, notifications } = await db.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+        await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
+        await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
 
-      if (rows.length === 0) return { flushed: 0, notifications: 0 };
+        const rows = await tx
+          .select({
+            id: n.id,
+            userId: n.userId,
+            category: n.category,
+            eventType: n.eventType,
+            email: u.email,
+            locale: u.locale,
+            payload: n.payload,
+          })
+          .from(n)
+          .innerJoin(u, eq(n.userId, u.id))
+          .where(and(lte(n.emailPendingAt, now), isNull(n.emailSentAt)))
+          .limit(batchSize)
+          .for("update", { skipLocked: true });
 
-      const digests = buildDigests(rows as PendingRow[]);
+        if (rows.length === 0) return { flushed: 0, notifications: 0 };
 
-      const enqueued = await di.IEmailService.sendTemplateBatch(
-        "notification_digest",
-        await Promise.all(
-          digests.map(async (d) => ({
-            to: d.email,
-            variables: {
-              category: d.category,
-              itemCount: String(d.items.length),
-              itemsSummary: d.items.map((i) => i.eventType).join(", "),
-            },
-            locale: toLocale(d.locale),
-            idempotencyKey: await digestIdempotencyKey(d.notificationIds),
-          })),
-        ),
-        { tx: tx as unknown as import("../transaction").ITransaction },
-      );
+        const digests = buildDigests(rows as PendingRow[]);
 
-      if (enqueued.isFailure) {
-        logger.error({ err: enqueued.getError() }, "flush-notification-emails enqueue failed");
-        throw new Error(enqueued.getError().message);
-      }
+        const enqueued = await di.IEmailService.sendTemplateBatch(
+          "notification_digest",
+          await Promise.all(
+            digests.map(async (d) => ({
+              to: d.email,
+              variables: {
+                category: d.category,
+                itemCount: String(d.items.length),
+                itemsSummary: d.items.map((i) => i.eventType).join(", "),
+              },
+              locale: toLocale(d.locale),
+              idempotencyKey: await digestIdempotencyKey(d.notificationIds),
+            })),
+          ),
+          { tx: tx as unknown as import("../transaction").ITransaction },
+        );
 
-      const notificationIds = rows.map((r) => r.id);
-      await tx.update(n).set({ emailSentAt: now }).where(inArray(n.id, notificationIds));
+        if (enqueued.isFailure) {
+          logger.error({ err: enqueued.getError() }, "flush-notification-emails enqueue failed");
+          throw new Error(enqueued.getError().message);
+        }
 
-      logger.info(
-        { flushed: digests.length, notifications: notificationIds.length },
-        "flush-notification-emails done",
-      );
-      return { flushed: digests.length, notifications: notificationIds.length };
-    });
+        const notificationIds = rows.map((r) => r.id);
+        await tx.update(n).set({ emailSentAt: now }).where(inArray(n.id, notificationIds));
 
-    return c.json({ dryRun: false, flushed, notifications });
+        logger.info(
+          { flushed: digests.length, notifications: notificationIds.length },
+          "flush-notification-emails done",
+        );
+        return { flushed: digests.length, notifications: notificationIds.length };
+      });
+
+      return c.json({ dryRun: false, skipped: false, flushed, notifications });
+    } finally {
+      await lock.release();
+    }
   });

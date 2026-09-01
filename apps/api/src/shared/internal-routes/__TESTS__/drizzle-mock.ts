@@ -71,7 +71,14 @@ export const drizzleMock = () => ({
   sweepSchema: {
     sweepLock: { label: {}, owner: {}, lockedAt: {}, lockedUntil: {} },
   },
-  multiTenantSchema: { organization: { id: {} } },
+  multiTenantSchema: {
+    organization: { id: {} },
+    member: {
+      userId: { name: "user_id" },
+      organizationId: { name: "organization_id" },
+      role: { name: "role" },
+    },
+  },
   authSchema: {},
   ssoSchema: {},
   schema: {},

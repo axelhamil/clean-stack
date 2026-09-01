@@ -77,7 +77,7 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 
 **Out of scope** (explicit):
 - Native push (mobile / browser) — Phase F, needs a device-token registry.
-- Frequency-driven digest windows: the column and the UI exist, the flush cron still treats every pending row the same. Honouring `hourly` / `daily` is a cron change, not a schema change.
+- ~~Frequency-driven digest windows: the column and the UI exist, the flush cron still treats every pending row the same.~~ **Closed.** The window is resolved at fan-out and stamped into `email_pending_at`, which turned out to need no cron change at all — the flush already selected on that column. See `docs/CRON.md` § Digest windows.
 - Generalized real-time bus. The stream is notification-shaped on purpose; a generic bus is a different product.
 
 ---

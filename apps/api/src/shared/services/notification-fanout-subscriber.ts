@@ -4,12 +4,14 @@ import {
   inArray,
   multiTenantSchema,
   notificationSchema,
+  type SQL,
   sql,
   type Transaction,
 } from "@packages/drizzle";
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { OutboxRecord } from "../ports/outbox.port";
+import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";
 import type { OutboxSubscriber } from "./outbox-subscriber";
 import { resolveAudience } from "./resolve-audience";
 
@@ -44,16 +46,30 @@ function preferenceJoin(
       AND ${scopeMatch}`;
 }
 
-const allows = (orgAlias: string, userAlias: string) =>
+/**
+ * Org-locked value wins, then the user's own, then the org's unlocked default,
+ * then the fallback — the same precedence for whichever preference column is
+ * being resolved, so `enabled` and `frequency` can never drift apart.
+ */
+const resolve = (orgAlias: string, userAlias: string, columnName: string, fallback: SQL) =>
   sql`COALESCE(
-    CASE WHEN ${column(orgAlias, p.locked.name)} THEN ${column(orgAlias, p.enabled.name)} END,
-    ${column(userAlias, p.enabled.name)},
-    ${column(orgAlias, p.enabled.name)},
-    TRUE
+    CASE WHEN ${column(orgAlias, p.locked.name)} THEN ${column(orgAlias, columnName)} END,
+    ${column(userAlias, columnName)},
+    ${column(orgAlias, columnName)},
+    ${fallback}
   )`;
 
 function deliveryRules(category: string, organizationId: string | null, forced: boolean) {
-  if (forced) return { joins: sql``, inApp: sql`TRUE`, email: sql`TRUE` };
+  // A forced notification joins no preference row at all, so there is nothing to
+  // read a frequency from — and nothing that may defer it. Every forced event in
+  // the catalogue is one the recipient must see while it still matters (password
+  // changed, MFA toggled, passkey added, deletion requested, payment failed):
+  // holding those back until tomorrow's digest turns a security alert into a
+  // post-mortem. `'immediate'` here is a literal, not a default that a preference
+  // could override.
+  if (forced) {
+    return { joins: sql``, inApp: sql`TRUE`, email: sql`TRUE`, frequency: null };
+  }
 
   const joins = sql`
     ${preferenceJoin("up_app", "user", "in_app", category, organizationId)}
@@ -61,13 +77,42 @@ function deliveryRules(category: string, organizationId: string | null, forced: 
     ${preferenceJoin("up_mail", "user", "email", category, organizationId)}
     ${preferenceJoin("op_mail", "org", "email", category, organizationId)}`;
 
-  return { joins, inApp: allows("op_app", "up_app"), email: allows("op_mail", "up_mail") };
+  return {
+    joins,
+    inApp: resolve("op_app", "up_app", p.enabled.name, sql`TRUE`),
+    email: resolve("op_mail", "up_mail", p.enabled.name, sql`TRUE`),
+    frequency: resolve("op_mail", "up_mail", p.frequency.name, sql`'immediate'`),
+  };
+}
+
+/**
+ * The instant the row becomes eligible for a digest e-mail, branching on the
+ * frequency the join resolved — or the instant it occurred, when there is no
+ * join to branch on (`frequency: null`, i.e. a forced notification).
+ *
+ * The candidate timestamps are computed in TypeScript and bound as parameters;
+ * only the choice between them happens in SQL. The alternative — `date_trunc`
+ * arithmetic inside the statement — would put the window rule in the one place
+ * no unit test can reach.
+ */
+function emailDueAt(occurredAt: Date, frequency: SQL | null, anchorHourUtc: number) {
+  const at = (f: "immediate" | "hourly" | "daily") =>
+    digestDueAt(occurredAt, f, anchorHourUtc).toISOString();
+  if (frequency === null) return sql`${at("immediate")}::timestamp`;
+  return sql`CASE ${frequency}
+              WHEN 'hourly' THEN ${at("hourly")}::timestamp
+              WHEN 'daily' THEN ${at("daily")}::timestamp
+              ELSE ${at("immediate")}::timestamp
+            END`;
 }
 
 export class NotificationFanoutSubscriber implements OutboxSubscriber {
   readonly name = "notification-fanout";
 
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  constructor(
+    private readonly instrumentation: IInstrumentation,
+    private readonly digestHourUtc: number = DEFAULT_DIGEST_HOUR_UTC,
+  ) {}
 
   async handle(event: OutboxRecord, tx: Transaction): Promise<void> {
     return this.instrumentation.startSpan(
@@ -121,7 +166,9 @@ export class NotificationFanoutSubscriber implements OutboxSubscriber {
               ${config.groupBy ? `${event.eventType}:${event.aggregateId}` : null},
               ${dedupKeyFor(event, config.dedupWindow)},
               ${JSON.stringify(event.payload)}::jsonb,
-              CASE WHEN ${rules.email} THEN ${event.occurredAt.toISOString()}::timestamp END
+              CASE WHEN ${rules.email}
+                THEN ${emailDueAt(event.occurredAt, rules.frequency, this.digestHourUtc)}
+              END
             FROM ${recipients} r
             ${rules.joins}
             WHERE ${rules.inApp}
