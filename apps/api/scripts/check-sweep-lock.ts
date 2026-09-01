@@ -5,11 +5,8 @@
 //
 // A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE` — the whole point of
 // `acquireSweepLease` is the conditional UPDATE the database performs, so this checks it
-// against a real Postgres instead. Wired to a script, not `bun:test`: nearly every test
-// file in this suite calls `mock.module("@packages/drizzle", ...)`, bun runs the whole
-// suite in one process, and that replacement is process-wide and permanent — sharing a
-// process with those files would silently swap `db`/`eq`/`sql` for stand-ins that never
-// touch Postgres. See apps/api/src/shared/CLAUDE.md ("write an executable check against a
+// against a real Postgres instead. Wired to a script, not `bun:test`, because it needs a
+// live database: the unit suite runs without one. See apps/api/src/shared/CLAUDE.md ("write an executable check against a
 // real database and wire it to a script") and `check-fanout-preferences.ts` for the
 // reference shape. Run: `pnpm --filter api check:sweep-lock` — re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).

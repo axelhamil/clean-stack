@@ -21,9 +21,9 @@
     "check:sweep-lock": "bun scripts/check-sweep-lock.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
-    "test": "bun test --pass-with-no-tests",
-    "test:watch": "bun test --watch --pass-with-no-tests",
-    "test:coverage": "bun test --coverage --pass-with-no-tests"
+    "test": "bun test --isolate --parallel --pass-with-no-tests",
+    "test:watch": "bun test --isolate --watch --pass-with-no-tests",
+    "test:coverage": "bun test --isolate --parallel --coverage --pass-with-no-tests"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1119.0",

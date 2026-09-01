@@ -1,12 +1,11 @@
 /**
- * A mock factory aiming at the full `@packages/drizzle` export surface.
+ * A shared `@packages/drizzle` stand-in for the sweep-route tests.
  *
- * `mock.module` replaces the entire module and bun leaks module mocks across files
- * within one `bun test` run, so an export missing here breaks whichever test file
- * runs next — not the one that declared the mock. Nothing enforces completeness
- * against the real module, though: an export gets added the moment a test needs
- * it (four were added this way in the sweep instrumentation branch alone), so
- * treat this as aiming at exhaustive, not as a guarantee of it.
+ * It exists to avoid three files re-declaring the same fake `db` and schema shapes,
+ * not to protect anything outside them: a module replacement is scoped to the test
+ * file that declares it. Everything here is a stand-in with no SQL semantics — the
+ * comparison helpers return markers, so a test that reads them is asserting on this
+ * file, not on a query (see `apps/api/src/shared/CLAUDE.md`).
  */
 export const drizzleMock = () => ({
   db: {},

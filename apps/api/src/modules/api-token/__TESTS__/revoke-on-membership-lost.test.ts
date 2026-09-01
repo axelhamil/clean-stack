@@ -1,66 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import * as realEvents from "@packages/events";
 import { EventTypes } from "@packages/events";
-import { z } from "zod";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import { revokeTokensOnMembershipLost } from "../application/event-handlers/revoke-on-membership-lost";
 import type { ApiTokenError, IApiTokenRepository } from "../application/ports/api-token.port";
-
-// mock.module leaks: drizzle-outbox.service.test.ts stubs ALL @packages/events payload
-// schemas with { safeParse: () => ({ success: true, data: {} }) }. When this file runs
-// after it, OrgMemberRemovedPayload.safeParse always returns success with empty data —
-// userId and organizationId become undefined and the "invalid payload" guard stops working.
-// Re-mock with the real Zod schema so the handler validates correctly regardless of order.
-const RealOrgMemberRemovedPayload = z.object({
-  organizationId: z.string(),
-  actorUserId: z.string(),
-  userId: z.string(),
-});
-
-// Superset rule: expose ALL EventTypes values so files loaded after this mock
-// (e.g. scanning.routes.ts) don't receive undefined for unrelated event types.
-// The real catalog, never a hand-kept copy: `mock.module` leaks across the whole
-// process, so a stale copy here silently blanks every event type added since it
-// was written — in *other* test files, wherever they happen to run after this one.
-const FULL_EVENT_TYPES = EventTypes;
-
-mock.module("@packages/events", () => ({
-  // Spread first: a partial mock of this module leaks process-wide and turns
-  // every export it forgets into `undefined` in unrelated test files.
-  ...realEvents,
-  EventTypes: FULL_EVENT_TYPES,
-  OrgMemberRemovedPayload: RealOrgMemberRemovedPayload,
-}));
-
-// mock.module leaks: admin-action.service.test.ts and admin-impersonation.routes.test.ts
-// mock shared/event-emitter to capture emitted events into a local array, without calling
-// outbox.enqueue. If either runs before this file, emitEvent no longer calls outbox.enqueue
-// and the "emits one event per token" assertion fails. Provide the real behaviour here.
-mock.module("../../../shared/event-emitter", () => ({
-  emitEvent: async (
-    outbox: IOutboxRepository,
-    eventType: string,
-    aggregateType: string,
-    aggregateId: string,
-    payload: unknown,
-    opts: { organizationId?: string | null } = {},
-    tx?: unknown,
-  ) => {
-    const id = crypto.randomUUID();
-    const event = { eventType, dateOccurred: new Date(), aggregateId, payload };
-    await outbox.enqueue(
-      [event],
-      { source: "app/api", aggregateType, organizationId: opts.organizationId, id },
-      tx as never,
-    );
-    return id;
-  },
-}));
-
-const { revokeTokensOnMembershipLost } = await import(
-  "../application/event-handlers/revoke-on-membership-lost"
-);
 
 function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository {
   return {

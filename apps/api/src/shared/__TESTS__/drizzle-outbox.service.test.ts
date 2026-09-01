@@ -4,7 +4,6 @@ import * as realEvents from "@packages/events";
 import { EventTypes } from "@packages/events";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
-// Expose full export surface so parallel test files don't see missing exports.
 const insertExecute = mock(async () => {});
 const selectExecute = mock(async () => [] as unknown[]);
 const updateExecute = mock(async () => {});
@@ -143,15 +142,13 @@ mock.module("@packages/drizzle", () => ({
 }));
 
 // ── Mock @packages/events ──────────────────────────────────────────────────
-// Expose the FULL export surface — bun's mock.module leaks across files.
-// The real catalog, never a hand-kept copy: `mock.module` leaks across the whole
-// process, so a stale copy here silently blanks every event type added since it
-// was written — in *other* test files, wherever they happen to run after this one.
+// The subject under test is the outbox writer, not payload validation, so every
+// payload schema is stubbed to always accept. Everything else is spread from the
+// real module and the stub map is derived from the real catalog — a hand-kept copy
+// would silently stop covering every event type added after it was written.
 const EventTypesMock = EventTypes;
 const stubPayload = { safeParse: () => ({ success: true as const, data: {} as never }) };
 mock.module("@packages/events", () => ({
-  // Spread first: a partial mock of this module leaks process-wide and turns
-  // every export it forgets into `undefined` in unrelated test files.
   ...realEvents,
   EventTypes: EventTypesMock,
   ALL_EVENT_TYPES: Object.values(EventTypesMock),
@@ -161,72 +158,6 @@ mock.module("@packages/events", () => ({
   PayloadByEventType: Object.fromEntries(
     Object.values(EventTypesMock).map((t) => [t, stubPayload]),
   ),
-  // Payload schemas (stubs — type-level only in this test)
-  UserCreatedPayload: stubPayload,
-  UserSignedInPayload: stubPayload,
-  UserSignedOutPayload: stubPayload,
-  UserEmailVerifiedPayload: stubPayload,
-  UserPasswordResetRequestedPayload: stubPayload,
-  UserPasswordChangedPayload: stubPayload,
-  UserMagicLinkRequestedPayload: stubPayload,
-  UserMfaEnabledPayload: stubPayload,
-  UserMfaDisabledPayload: stubPayload,
-  UserPasskeyAddedPayload: stubPayload,
-  UserPasskeyRemovedPayload: stubPayload,
-  UserAccountLinkedPayload: stubPayload,
-  UserAccountUnlinkedPayload: stubPayload,
-  UserDeletionRequestedPayload: stubPayload,
-  UserDeletionCancelledPayload: stubPayload,
-  UserDeletedPayload: stubPayload,
-  UserProfileUpdatedPayload: stubPayload,
-  UserEmailChangeRequestedPayload: stubPayload,
-  UserExportRequestedPayload: stubPayload,
-  UserExportCompletedPayload: stubPayload,
-  OrgCreatedPayload: stubPayload,
-  OrgUpdatedPayload: stubPayload,
-  OrgDeletedPayload: stubPayload,
-  OrgMemberInvitedPayload: stubPayload,
-  OrgMemberJoinedPayload: stubPayload,
-  OrgInvitationCancelledPayload: stubPayload,
-  OrgMemberRemovedPayload: stubPayload,
-  OrgMemberRoleChangedPayload: stubPayload,
-  UploadRequestedPayload: stubPayload,
-  UploadConfirmedPayload: stubPayload,
-  UploadDeletedPayload: stubPayload,
-  WebhookEndpointCreatedPayload: stubPayload,
-  WebhookEndpointUpdatedPayload: stubPayload,
-  WebhookEndpointDeletedPayload: stubPayload,
-  WebhookTestPayload: stubPayload,
-  WebhookEndpointSecretRotatedPayload: stubPayload,
-  WebhookEndpointDisabledPayload: stubPayload,
-  WebhookDeliveryExhaustedPayload: stubPayload,
-  UserPolicyAcceptedPayload: stubPayload,
-  UserCookieConsentGrantedPayload: stubPayload,
-  UserCookieConsentWithdrawnPayload: stubPayload,
-  SecurityRateLimitExceededPayload: stubPayload,
-  SecurityCspViolationPayload: stubPayload,
-  SecurityCsrfRejectedPayload: stubPayload,
-  SecurityPasswordBreachedPayload: stubPayload,
-  SecuritySignupRejectedPayload: stubPayload,
-  SecurityOperatorAuditAccessedPayload: stubPayload,
-  BillingSubscriptionCreatedPayload: stubPayload,
-  BillingSubscriptionUpdatedPayload: stubPayload,
-  BillingSubscriptionCancelledPayload: stubPayload,
-  BillingPaymentFailedPayload: stubPayload,
-  BillingQuotaExceededPayload: stubPayload,
-  AdminImpersonationStartedPayload: stubPayload,
-  AdminImpersonationStoppedPayload: stubPayload,
-  AdminUserBannedPayload: stubPayload,
-  AdminUserUnbannedPayload: stubPayload,
-  AdminUserRoleChangedPayload: stubPayload,
-  AdminUserPasswordResetPayload: stubPayload,
-  AdminUserSessionsRevokedPayload: stubPayload,
-  ApiTokenCreatedPayload: stubPayload,
-  ApiTokenRevokedPayload: stubPayload,
-  ApiTokenUsedPayload: stubPayload,
-  UserMfaBackupCodesRegeneratedPayload: stubPayload,
-  UserMfaBackupCodeUsedPayload: stubPayload,
-  EmailDeliveryExhaustedPayload: stubPayload,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────

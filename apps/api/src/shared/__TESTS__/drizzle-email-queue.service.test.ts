@@ -136,6 +136,9 @@ const rowFixture = (to: string) => ({
 describe("DrizzleEmailQueue.enqueue", () => {
   beforeEach(() => {
     insertReturns = null;
+    inserted.length = 0;
+    execCalls.length = 0;
+    warnSpy.mockClear();
   });
 
   it("assigns an id and pending status to every row", async () => {
@@ -207,7 +210,6 @@ describe("DrizzleEmailQueue.enqueue", () => {
   });
 
   it("warns when fewer rows are written than requested", async () => {
-    warnSpy.mockClear();
     insertReturns = (rows) => rows.slice(1).map(() => ({ id: "id" }));
 
     await new DrizzleEmailQueue(new NoOpInstrumentation()).enqueue([

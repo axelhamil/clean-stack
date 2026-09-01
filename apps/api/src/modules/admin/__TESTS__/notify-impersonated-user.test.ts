@@ -1,44 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
-import * as realEvents from "@packages/events";
 import { EventTypes } from "@packages/events";
-import { z } from "zod";
+import { notifyImpersonatedUser } from "../application/event-handlers/notify-impersonated-user";
 
 const capture = mock(() => {});
 const sendTemplate = mock(async () => Result.ok());
-
-// mock.module leaks: drizzle-outbox.service.test.ts stubs ALL @packages/events payload
-// schemas with { safeParse: () => ({ success: true, data: {} }) }. When this file runs
-// after it, AdminImpersonationStartedPayload.safeParse returns empty data and
-// new Date(undefined).toLocaleString() throws — sendTemplate is never reached.
-// Re-mock with the real schema so the handler validates correctly regardless of run order.
-const ActorRef = z.object({ actorUserId: z.string() });
-const UserRef = z.object({ userId: z.string() });
-const RealAdminImpersonationStartedPayload = ActorRef.merge(UserRef).extend({
-  reason: z.string().min(1),
-  ticketRef: z.string().optional(),
-  ip: z.string().nullable(),
-  expiresAt: z.string(),
-});
-
-// Superset rule: expose ALL EventTypes values so files loaded after this mock
-// (e.g. scanning.routes.ts) don't receive undefined for unrelated event types.
-// The real catalog, never a hand-kept copy: `mock.module` leaks across the whole
-// process, so a stale copy here silently blanks every event type added since it
-// was written — in *other* test files, wherever they happen to run after this one.
-const FULL_EVENT_TYPES = EventTypes;
-
-mock.module("@packages/events", () => ({
-  // Spread first: a partial mock of this module leaks process-wide and turns
-  // every export it forgets into `undefined` in unrelated test files.
-  ...realEvents,
-  EventTypes: FULL_EVENT_TYPES,
-  AdminImpersonationStartedPayload: RealAdminImpersonationStartedPayload,
-}));
-
-const { notifyImpersonatedUser } = await import(
-  "../application/event-handlers/notify-impersonated-user"
-);
 
 const instrumentation = {
   capture,

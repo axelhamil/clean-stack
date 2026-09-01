@@ -35,11 +35,8 @@ function makeDbQuery() {
   return buildQuery(async () => dbBehavior());
 }
 
-// mock.module leaks: drizzle-webhook-*.repository.test.ts and admin tests mock
-// @packages/drizzle with a stub db. When this file runs after them, the `db`
-// imported at module-load time is the stub, not the real Postgres connection.
-// Re-mock before the dynamic import so the repository always gets the controlled
-// db regardless of run order. Superset rule: expose every export used by the suite.
+// Declared before the dynamic import below so the repository binds this `db` at
+// module-load time. The replacement stays inside this file's module registry.
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => makeDbQuery(),

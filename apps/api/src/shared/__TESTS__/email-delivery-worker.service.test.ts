@@ -92,13 +92,9 @@ mock.module("@packages/drizzle", () => ({
   },
 }));
 
-// `@packages/emails` is intentionally NOT mocked here: `mock.module` replaces a
-// specifier for the lifetime of the `bun test` process (it leaks into every
-// other file, loaded or not — see apps/api/src/shared/CLAUDE.md). A stub here
-// would collide with `email-locale.test.ts`, which needs the real
-// `renderTemplate` to assert on actual per-locale subjects/bodies. Nothing in
-// this file asserts on rendered content (only on which row got claimed/sent),
-// so exercising the real renderer is both safe and cheap.
+// `@packages/emails` is intentionally NOT mocked here: nothing in this file asserts
+// on rendered content (only on which row got claimed/sent), so exercising the real
+// renderer is both cheaper than a stub and closer to what ships.
 
 const { EmailDeliveryWorker, chunkIdempotencyKey } = await import(
   "../services/email-delivery-worker.service"

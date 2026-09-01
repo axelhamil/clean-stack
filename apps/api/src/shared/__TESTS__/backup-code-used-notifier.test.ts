@@ -2,21 +2,9 @@ import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
-import { z } from "zod";
 import type { IEmailService } from "../ports/email.port";
 import type { IProfileStore } from "../ports/profile.port";
-
-// mock.module leaks across files: drizzle-outbox.service.test.ts stubs EVERY
-// @packages/events payload schema with `{ safeParse: () => ({ success: true, data: {} }) }`.
-// Loaded after it, this file's handler would accept any payload and read an
-// undefined email. Re-mock with the real schema so validation holds whatever
-// the file order is — same superset rule as revoke-on-membership-lost.test.ts.
-mock.module("@packages/events", () => ({
-  EventTypes,
-  UserMfaBackupCodeUsedPayload: z.object({ userId: z.string(), email: z.string() }),
-}));
-
-const { backupCodeUsedNotifier } = await import("../services/backup-code-used-notifier");
+import { backupCodeUsedNotifier } from "../services/backup-code-used-notifier";
 
 function makeEmailService() {
   const sendTemplate = mock(async () => Result.ok<void, never>(undefined));
@@ -41,7 +29,7 @@ describe("backupCodeUsedNotifier", () => {
     });
 
     await handler.handle({
-      eventType: "user.mfa.backup_code_used",
+      eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
       aggregateId: "u1",
       dateOccurred: new Date(),
       payload: { userId: "u1", email: "axel@example.com" },
@@ -68,7 +56,7 @@ describe("backupCodeUsedNotifier", () => {
     });
 
     await handler.handle({
-      eventType: "user.mfa.backup_code_used",
+      eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
       aggregateId: "u1",
       dateOccurred: new Date(),
       payload: { userId: "u1", email: "axel@example.com" },
@@ -91,7 +79,7 @@ describe("backupCodeUsedNotifier", () => {
     });
 
     await handler.handle({
-      eventType: "user.mfa.backup_code_used",
+      eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
       aggregateId: "u1",
       dateOccurred: new Date(),
       payload: { wrong: true },
@@ -114,7 +102,7 @@ describe("backupCodeUsedNotifier", () => {
 
     await expect(
       handler.handle({
-        eventType: "user.mfa.backup_code_used",
+        eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
         aggregateId: "u1",
         dateOccurred: new Date(),
         payload: { userId: "u1", email: "axel@example.com" },
