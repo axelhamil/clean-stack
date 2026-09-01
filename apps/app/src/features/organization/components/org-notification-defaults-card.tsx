@@ -13,6 +13,7 @@ import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutation
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
 import { Can } from "../../../shared/auth/can";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { buildPreferenceMatrix } from "../../../shared/notifications/build-preference-matrix";
 import {
@@ -24,13 +25,16 @@ export function OrgNotificationDefaultsCard() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
-  const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions);
+  const organizationId = useActiveOrgId();
+  const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions(organizationId));
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
     ...updateOrgPreferenceMutationOptions,
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: orgNotificationPreferencesQueryOptions.queryKey }),
+      queryClient.invalidateQueries({
+        queryKey: orgNotificationPreferencesQueryOptions(organizationId).queryKey,
+      }),
     onError: () => toast.error(t("organization.saveDefaultsFailed")),
   });
 

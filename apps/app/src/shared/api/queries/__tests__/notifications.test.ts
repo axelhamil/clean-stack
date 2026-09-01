@@ -46,6 +46,17 @@ describe("cles de query notifications", () => {
     expect(notificationsInfiniteQueryOptions().queryKey[0]).toBe("notifications");
     expect(unreadCountQueryOptions.queryKey[0]).toBe("notifications");
     expect(notificationPreferencesQueryOptions.queryKey[0]).toBe("notifications");
-    expect(orgNotificationPreferencesQueryOptions.queryKey[0]).toBe("notifications");
+    expect(orgNotificationPreferencesQueryOptions(null).queryKey[0]).toBe("notifications");
+  });
+
+  test("les preferences d organisation sont mises en cache par organisation", () => {
+    expect(orgNotificationPreferencesQueryOptions("org-a").queryKey).not.toEqual(
+      orgNotificationPreferencesQueryOptions("org-b").queryKey,
+    );
+    expect(orgNotificationPreferencesQueryOptions(null).queryKey).toEqual([
+      "notifications",
+      "org-preferences",
+      null,
+    ]);
   });
 });

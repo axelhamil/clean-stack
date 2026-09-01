@@ -76,18 +76,21 @@ export const notificationPreferencesQueryOptions = queryOptions({
   },
 });
 
-export const orgNotificationPreferencesQueryOptions = queryOptions({
-  queryKey: ["notifications", "org-preferences"] as const,
-  queryFn: async ({ signal }) => {
-    const res = await $orgPreferences({}, { init: { signal } });
-    if (!res.ok) {
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.loadOrgNotificationPreferences", {
-          defaultValue: "Failed to load org notification preferences",
-        }),
-      );
-    }
-    return (await res.json()) as NotificationPreferencesResponse;
-  },
-});
+// The route is `requireOrg`, so the response is the active organization's — the key
+// has to name it or one entry serves every organization the user switches between.
+export const orgNotificationPreferencesQueryOptions = (organizationId: string | null) =>
+  queryOptions({
+    queryKey: ["notifications", "org-preferences", organizationId] as const,
+    queryFn: async ({ signal }) => {
+      const res = await $orgPreferences({}, { init: { signal } });
+      if (!res.ok) {
+        await throwApiError(
+          res,
+          getErrorsT()("fallback.loadOrgNotificationPreferences", {
+            defaultValue: "Failed to load org notification preferences",
+          }),
+        );
+      }
+      return (await res.json()) as NotificationPreferencesResponse;
+    },
+  });
