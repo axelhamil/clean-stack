@@ -112,7 +112,7 @@ export default {
       "Vous n'avez pas la permission d'accéder à cette organisation.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
     IMPERSONATION_ACTION_FORBIDDEN:
-      "Cette action est indisponible pendant l'usurpation d'identité d'un autre utilisateur.",
+      "Cette action est indisponible pendant l'emprunt d'identité d'un autre utilisateur.",
   },
   byStatus: {
     "400": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
