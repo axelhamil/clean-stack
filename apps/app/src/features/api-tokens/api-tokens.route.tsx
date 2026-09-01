@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -83,9 +84,9 @@ function ApiTokensPage() {
   });
 
   return (
-    <section className="flex flex-col gap-6">
+    <main className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("apiTokens.pageTitle")}</h1>
+        <TypographyH1>{t("apiTokens.pageTitle")}</TypographyH1>
         <Button
           onClick={() => setCreating(true)}
           disabled={guard.blocked}
@@ -151,6 +152,6 @@ function ApiTokensPage() {
         onClose={() => setRevealToken(null)}
         title={t("apiTokens.secretDialogTitle")}
       />
-    </section>
+    </main>
   );
 }

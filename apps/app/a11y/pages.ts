@@ -19,4 +19,7 @@ export const AUTHENTICATED_PAGES: readonly AuditedPage[] = [
   { name: "account settings", path: "/settings/account" },
   { name: "privacy settings", path: "/settings/privacy" },
   { name: "sso settings", path: "/settings/sso" },
+  { name: "api tokens settings", path: "/settings/api-tokens" },
+  { name: "notification settings", path: "/settings/notifications" },
+  { name: "webhook settings", path: "/settings/webhooks" },
 ];

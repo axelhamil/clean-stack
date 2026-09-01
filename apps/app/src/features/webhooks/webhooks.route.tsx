@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -188,10 +189,10 @@ function WebhooksPage() {
   };
 
   return (
-    <section className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">{t("settings:webhooks.pageTitle")}</h1>
+          <TypographyH1>{t("settings:webhooks.pageTitle")}</TypographyH1>
           <Link
             to="/developers/events"
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
@@ -374,6 +375,6 @@ function WebhooksPage() {
       </Dialog>
 
       <SecretRevealDialog secret={revealSecret} onClose={() => setRevealSecret(null)} />
-    </section>
+    </main>
   );
 }
