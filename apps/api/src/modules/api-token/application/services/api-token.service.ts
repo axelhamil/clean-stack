@@ -5,11 +5,12 @@ import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ITransaction } from "../../../../shared/transaction";
-import type {
-  ApiTokenError,
-  ApiTokenRecord,
-  IApiTokenRepository,
-  TokenOwner,
+import {
+  type ApiTokenError,
+  type ApiTokenRecord,
+  type IApiTokenRepository,
+  ownerReaches,
+  type TokenOwner,
 } from "../ports/api-token.port";
 
 export type CreateTokenServiceInput = {
@@ -126,6 +127,14 @@ export class ApiTokenService {
         });
       }
       const record = option.unwrap();
+      // Second gate on the same rule the query already applied: a row out of
+      // the caller's reach is reported absent, never forbidden.
+      if (!ownerReaches(owner, record)) {
+        return Result.fail<void, ApiTokenError>({
+          code: "API_TOKEN_NOT_FOUND",
+          message: "Token not found.",
+        });
+      }
 
       let failure: ApiTokenError | null = null;
       try {
@@ -165,8 +174,10 @@ export class ApiTokenService {
   }
 
   async list(owner: TokenOwner): Promise<Result<ApiTokenRecord[], ApiTokenError>> {
-    return this.instrumentation.startSpan({ name: "ApiTokenService > list" }, () =>
-      this.repo.listByOwner(owner),
-    );
+    return this.instrumentation.startSpan({ name: "ApiTokenService > list" }, async () => {
+      const result = await this.repo.listByOwner(owner);
+      if (result.isFailure) return result;
+      return Result.ok(result.getValue().filter((record) => ownerReaches(owner, record)));
+    });
   }
 }

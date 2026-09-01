@@ -8,7 +8,7 @@ import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.mi
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { zV } from "../../shared/validator";
 import { createTokenBodySchema } from "./application/dto/create-token.dto";
-import type { TokenOwner } from "./application/ports/api-token.port";
+import { tokenOwnerForSession } from "./application/ports/api-token.port";
 
 type Vars = AuthVariables;
 
@@ -16,10 +16,7 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
   .get("/", requireAuth, async (c) => {
     const user = c.get("user");
     const session = c.get("session");
-    const owner: TokenOwner = {
-      userId: user.id,
-      organizationId: session.activeOrganizationId ?? null,
-    };
+    const owner = tokenOwnerForSession(user.id, session.activeOrganizationId ?? null);
     const result = await di.ApiTokenService.list(owner);
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({
@@ -66,10 +63,7 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
     const user = c.get("user");
     const session = c.get("session");
     const id = c.req.param("id");
-    const owner: TokenOwner = {
-      userId: user.id,
-      organizationId: session.activeOrganizationId ?? null,
-    };
+    const owner = tokenOwnerForSession(user.id, session.activeOrganizationId ?? null);
     const result = await di.ApiTokenService.revoke(id, owner, user.id);
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ deleted: true });

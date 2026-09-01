@@ -257,12 +257,12 @@ describe("DrizzleApiTokenRepository", () => {
         return call === 1 ? [fakeRow] : [];
       };
 
-      const mine = await repo.findByIdForOwner("tok-1", { userId: "user-1", organizationId: null });
+      const mine = await repo.findByIdForOwner("tok-1", { kind: "personal", userId: "user-1" });
       expect(mine.getValue().isSome()).toBe(true);
 
       const theirs = await repo.findByIdForOwner("tok-1", {
+        kind: "personal",
         userId: "user-other",
-        organizationId: null,
       });
       expect(theirs.getValue().isNone()).toBe(true);
     });

@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
+import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
@@ -49,6 +50,9 @@ function ApiTokensPage() {
 
   const organizationId = useActiveOrgId();
   const tokens = useQuery(apiTokensQueryOptions(organizationId));
+  // The list mixes the active organization's tokens with the caller's personal
+  // ones, so each row needs the organization's name to say which is which.
+  const { data: activeOrg } = useQuery(activeOrgQueryOptions);
 
   const create = useMutation({
     ...createTokenMutationOptions,
@@ -104,6 +108,7 @@ function ApiTokensPage() {
             <TableRow>
               <TableHead>{t("apiTokens.table.nameHeader")}</TableHead>
               <TableHead>{t("apiTokens.table.tokenHeader")}</TableHead>
+              <TableHead>{t("apiTokens.table.tokenScopeHeader")}</TableHead>
               <TableHead>{t("apiTokens.table.scopesHeader")}</TableHead>
               <TableHead>{t("apiTokens.table.lastUsedHeader")}</TableHead>
               <TableHead>{t("apiTokens.table.expiresHeader")}</TableHead>
@@ -116,6 +121,7 @@ function ApiTokensPage() {
               <TokenRow
                 key={token.id}
                 token={token}
+                activeOrg={activeOrg}
                 onRevoke={(id) => revoke.mutate(id)}
                 isRevoking={revoke.isPending && revoke.variables === token.id}
                 guard={guard}

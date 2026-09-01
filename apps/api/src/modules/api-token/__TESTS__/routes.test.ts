@@ -1,6 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
-import type { ApiTokenError, ApiTokenRecord } from "../application/ports/api-token.port";
+import type {
+  ApiTokenError,
+  ApiTokenRecord,
+  TokenOwner,
+} from "../application/ports/api-token.port";
 
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
@@ -23,8 +27,16 @@ const RAW = "clean_raw_token_value_never_persisted";
 const mockCreate = mock(async () =>
   Result.ok<{ record: ApiTokenRecord; raw: string }, ApiTokenError>({ record: RECORD, raw: RAW }),
 );
-const mockList = mock(async () => Result.ok<ApiTokenRecord[], ApiTokenError>([RECORD]));
-const mockRevoke = mock(async (): Promise<Result<void, ApiTokenError>> => Result.ok());
+const mockList = mock(async (_owner: TokenOwner) =>
+  Result.ok<ApiTokenRecord[], ApiTokenError>([RECORD]),
+);
+const mockRevoke = mock(
+  async (
+    _id: string,
+    _owner: TokenOwner,
+    _actorUserId: string,
+  ): Promise<Result<void, ApiTokenError>> => Result.ok(),
+);
 
 mock.module("../../../container", () => ({
   di: {
@@ -142,5 +154,47 @@ describe("DELETE /settings/tokens/:id — wrong owner returns 404", () => {
     const app = makeApp();
     const res = await app.request("/settings/tokens/tok-other", { method: "DELETE" });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("session → visibility scope", () => {
+  it("lists the active organization's tokens together with the caller's personal ones", async () => {
+    currentSession = { activeOrganizationId: "org-active" };
+    mockList.mockClear();
+    const app = makeApp();
+
+    const res = await app.request("/settings/tokens", { method: "GET" });
+
+    expect(res.status).toBe(200);
+    expect(mockList.mock.calls[0]?.[0]).toEqual({
+      kind: "orgAndPersonal",
+      userId: "user-1",
+      organizationId: "org-active",
+    });
+  });
+
+  it("falls back to personal-only when the session carries no active organization", async () => {
+    currentSession = { activeOrganizationId: null };
+    mockList.mockClear();
+    const app = makeApp();
+
+    await app.request("/settings/tokens", { method: "GET" });
+
+    expect(mockList.mock.calls[0]?.[0]).toEqual({ kind: "personal", userId: "user-1" });
+  });
+
+  it("revokes under the same widened scope, so a personal token stays revocable", async () => {
+    currentSession = { activeOrganizationId: "org-active" };
+    mockRevoke.mockClear();
+    const app = makeApp();
+
+    const res = await app.request("/settings/tokens/tok-1", { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect(mockRevoke.mock.calls[0]?.[1]).toEqual({
+      kind: "orgAndPersonal",
+      userId: "user-1",
+      organizationId: "org-active",
+    });
   });
 });

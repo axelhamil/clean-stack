@@ -406,7 +406,13 @@ export default {
       lastUsedHeader: "Last used",
       expiresHeader: "Expires",
       statusHeader: "Status",
+      tokenScopeHeader: "Token scope",
     },
+    // The list holds both scopes the create form offers, so each row says which
+    // one it is; `scopeOrganization` is the fallback when the organization's
+    // name isn't loaded yet.
+    scopePersonal: "Personal",
+    scopeOrganization: "Organization",
     neverExpires: "Never",
     statusRevoked: "Revoked",
     statusExpired: "Expired",

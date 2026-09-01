@@ -73,11 +73,140 @@ describe("ApiTokenService", () => {
         Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none<ApiTokenRecord>()),
       ),
     });
+    const result = await makeService(repo).revoke("tok1", { kind: "personal", userId: "u2" }, "u2");
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("API_TOKEN_NOT_FOUND");
+    expect(repo.revoke).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Visibility scope — the list must hold both scopes the create form offers,
+// and nothing else. The repository is deliberately made leaky here: what is
+// under test is the rule, not the WHERE clause that also encodes it.
+// ---------------------------------------------------------------------------
+
+function record(over: Partial<ApiTokenRecord>): ApiTokenRecord {
+  return {
+    id: "tok",
+    userId: "user-1",
+    organizationId: null,
+    name: "ci",
+    scopes: ["read:profile"],
+    tokenHmac: "hmac",
+    pepperVersion: 1,
+    tokenStart: "clean_ab",
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+    revokedReason: null,
+    createdAt: new Date("2024-01-01"),
+    ...over,
+  };
+}
+
+const MINE_PERSONAL = record({ id: "mine-personal", organizationId: null });
+const MINE_ACTIVE_ORG = record({ id: "mine-active-org", organizationId: "org-active" });
+const MINE_OTHER_ORG = record({ id: "mine-other-org", organizationId: "org-other" });
+const THEIRS_PERSONAL = record({ id: "theirs-personal", userId: "user-2" });
+const THEIRS_ACTIVE_ORG = record({
+  id: "theirs-active-org",
+  userId: "user-2",
+  organizationId: "org-active",
+});
+
+const LEAKY_REPO_ROWS = [
+  MINE_PERSONAL,
+  MINE_ACTIVE_ORG,
+  MINE_OTHER_ORG,
+  THEIRS_PERSONAL,
+  THEIRS_ACTIVE_ORG,
+];
+
+describe("ApiTokenService.list — visibility scope", () => {
+  const leakyRepo = () =>
+    makeRepo({
+      listByOwner: mock(async () => Result.ok<ApiTokenRecord[], ApiTokenError>(LEAKY_REPO_ROWS)),
+    });
+
+  it("shows the caller's personal token alongside the active organization's", async () => {
+    const result = await makeService(leakyRepo()).list({
+      kind: "orgAndPersonal",
+      userId: "user-1",
+      organizationId: "org-active",
+    });
+
+    expect(result.isSuccess).toBe(true);
+    expect(result.getValue().map((r) => r.id)).toEqual(["mine-personal", "mine-active-org"]);
+  });
+
+  it("never surfaces another organization's token nor another user's", async () => {
+    const visible = (
+      await makeService(leakyRepo()).list({
+        kind: "orgAndPersonal",
+        userId: "user-1",
+        organizationId: "org-active",
+      })
+    )
+      .getValue()
+      .map((r) => r.id);
+
+    expect(visible).not.toContain("mine-other-org");
+    expect(visible).not.toContain("theirs-personal");
+    expect(visible).not.toContain("theirs-active-org");
+  });
+
+  it("shows only org-less tokens when the session carries no active organization", async () => {
+    const result = await makeService(leakyRepo()).list({ kind: "personal", userId: "user-1" });
+
+    expect(result.getValue().map((r) => r.id)).toEqual(["mine-personal"]);
+  });
+});
+
+describe("ApiTokenService.revoke — visibility scope", () => {
+  const repoReturning = (found: ApiTokenRecord) =>
+    makeRepo({
+      findByIdForOwner: mock(async () =>
+        Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.some(found)),
+      ),
+    });
+
+  it("revokes a personal token while an organization is active", async () => {
+    const repo = repoReturning(MINE_PERSONAL);
+
     const result = await makeService(repo).revoke(
-      "tok1",
-      { userId: "u2", organizationId: null },
-      "u2",
+      "mine-personal",
+      { kind: "orgAndPersonal", userId: "user-1", organizationId: "org-active" },
+      "user-1",
     );
+
+    expect(result.isSuccess).toBe(true);
+    expect(repo.revoke).toHaveBeenCalled();
+  });
+
+  it("reports a token from another organization absent rather than forbidden", async () => {
+    const repo = repoReturning(MINE_OTHER_ORG);
+
+    const result = await makeService(repo).revoke(
+      "mine-other-org",
+      { kind: "orgAndPersonal", userId: "user-1", organizationId: "org-active" },
+      "user-1",
+    );
+
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().code).toBe("API_TOKEN_NOT_FOUND");
+    expect(repo.revoke).not.toHaveBeenCalled();
+  });
+
+  it("reports another user's personal token absent rather than forbidden", async () => {
+    const repo = repoReturning(THEIRS_PERSONAL);
+
+    const result = await makeService(repo).revoke(
+      "theirs-personal",
+      { kind: "orgAndPersonal", userId: "user-1", organizationId: "org-active" },
+      "user-1",
+    );
+
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("API_TOKEN_NOT_FOUND");
     expect(repo.revoke).not.toHaveBeenCalled();
