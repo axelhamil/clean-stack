@@ -24,7 +24,15 @@ function useRoleOptions() {
 }
 
 interface SetRoleFormProps {
-  currentRole: PlatformRole;
+  /**
+   * `null` when the account carries no platform role, or one this build does
+   * not recognize — the `role` column is nullable with no SQL default, so
+   * legacy and imported accounts reach this form with nothing to preselect.
+   * The select falls back to the platform's own default role, while the
+   * "nothing changed yet" test keeps comparing against the real current value,
+   * so BOTH roles stay assignable to such an account.
+   */
+  currentRole: PlatformRole | null;
   isPending: boolean;
   onSubmit: (values: SetRoleFormInput) => void;
 }
@@ -35,7 +43,7 @@ export function SetRoleForm({ currentRole, isPending, onSubmit }: SetRoleFormPro
   const form = useForm<SetRoleFormInput>({
     resolver: zodResolver(setRoleFormSchema),
     mode: "onChange",
-    defaultValues: { role: currentRole },
+    defaultValues: { role: currentRole ?? "user" },
   });
 
   const role = form.watch("role");

@@ -192,28 +192,26 @@ function AdminUserDetailPage() {
                 ) : (
                   "—"
                 )}
-                {user.role && isPlatformRole(user.role) && (
-                  <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        {t("users.detail.changeRole")}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{t("users.detail.changeRoleTitle")}</DialogTitle>
-                        <DialogDescription>
-                          {t("users.detail.changeRoleDescription")}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <SetRoleForm
-                        currentRole={user.role}
-                        isPending={setRoleMutation.isPending}
-                        onSubmit={(values) => setRoleMutation.mutate({ id, ...values })}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                )}
+                <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {t("users.detail.changeRole")}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{t("users.detail.changeRoleTitle")}</DialogTitle>
+                      <DialogDescription>
+                        {t("users.detail.changeRoleDescription")}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <SetRoleForm
+                      currentRole={user.role && isPlatformRole(user.role) ? user.role : null}
+                      isPending={setRoleMutation.isPending}
+                      onSubmit={(values) => setRoleMutation.mutate({ id, ...values })}
+                    />
+                  </DialogContent>
+                </Dialog>
               </span>
             </div>
             <div className="flex items-center justify-between">
