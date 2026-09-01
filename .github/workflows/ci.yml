@@ -148,7 +148,9 @@ jobs:
 
       - name: API log
         if: failure()
-        run: cat /tmp/api.log
+        # A failure before the API is started leaves no log; `cat` would then
+        # fail too and bury the real error under a missing-file one.
+        run: cat /tmp/api.log || echo "no api log — the run failed before the API started" 
 
       - uses: actions/upload-artifact@v4
         if: failure()

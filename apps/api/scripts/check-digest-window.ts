@@ -268,10 +268,17 @@ await setFrequency("activity", "daily");
 await fanout(event(6));
 await makeEverythingDue();
 const [a, b] = await Promise.all([flush(), flush()]);
+// The invariant is "one window, one digest" — not *how* the loser lost. A run
+// that finds the lease held reports `skipped: true`; one that starts after the
+// winner released reports `skipped: false, flushed: 0`. Both are correct, and
+// which one happens is scheduling, not behaviour: asserting on `skipped` made
+// this check fail on a slower runner while nothing was wrong. The lease's own
+// contention semantics are covered by `check:sweep-lock`, against the same
+// table; what belongs here is that the second run sent nothing.
 check(
-  "exactly one of the two runs did the work",
-  [a, b].filter((r) => r.skipped === true).length === 1 &&
-    [a, b].filter((r) => r.flushed === 1).length === 1,
+  "exactly one of the two runs did the work, and the other sent nothing",
+  [a, b].filter((r) => r.flushed === 1).length === 1 &&
+    [a, b].filter((r) => r.flushed === 0 && r.notifications === 0).length === 1,
   [a, b],
 );
 check("exactly one extra e-mail", (await enqueued()).length === 4);
