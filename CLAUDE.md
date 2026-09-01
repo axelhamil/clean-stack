@@ -2,7 +2,7 @@
 
 Generic monorepo boilerplate. Clean Architecture + DDD. No business features.
 
-**What ships** (inventory, not rules): [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the plain-language guided tour · [`docs/FEATURES.md`](docs/FEATURES.md) is the file-level inventory · [`ROADMAP.md`](ROADMAP.md) is what's next.
+**What ships** (inventory, not rules): [`docs/OVERVIEW.md`](docs/OVERVIEW.md) is the plain-language guided tour · [`docs/FEATURES.md`](docs/FEATURES.md) is the file-level inventory · [`docs/PUBLIC-API.md`](docs/PUBLIC-API.md) is the third-party reference for `/api/v1` · [`ROADMAP.md`](ROADMAP.md) is what's next.
 
 > **Detailed rules live in sub-CLAUDE.md files — auto-loaded by Claude Code via recursive lookup the moment you read/edit a file under the path.**
 > - `apps/api/CLAUDE.md` → high-level server (CQRS, DI inwire, Hono RPC, BetterAuth server, storage, org scoping, logging). Read before touching `packages/{ddd-kit,drizzle,access-control}/**` too.
