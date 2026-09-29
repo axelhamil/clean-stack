@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
-import type { ApiTokenRecord } from "../application/ports/api-token.port";
+import type { ApiTokenRecord } from "../../../shared/ports/api-token.port";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)

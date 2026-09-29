@@ -3,8 +3,8 @@ import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { generateToken, hmacToken } from "../../../shared/crypto/api-token";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import type { ApiTokenError, ApiTokenRecord } from "../../../shared/ports/api-token.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
-import type { ApiTokenError, ApiTokenRecord } from "../application/ports/api-token.port";
 import { GithubKeyVerifier } from "../infrastructure/services/github-key-verifier";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

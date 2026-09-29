@@ -16,8 +16,8 @@
 // and cleaned up). Local database only, `requireLocalDatabase` enforces it.
 
 import { apiTokenSchema, authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
-import type { TokenOwner } from "../src/modules/api-token/application/ports/api-token.port";
 import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
+import type { TokenOwner } from "../src/shared/ports/api-token.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { checkRecorder, findSeededUserId } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";

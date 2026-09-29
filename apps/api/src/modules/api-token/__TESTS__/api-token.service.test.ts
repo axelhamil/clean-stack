@@ -1,11 +1,11 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   ApiTokenError,
   ApiTokenRecord,
   IApiTokenRepository,
-} from "../application/ports/api-token.port";
+} from "../../../shared/ports/api-token.port";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { ApiTokenService } from "../application/services/api-token.service";
 
 function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository {

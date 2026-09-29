@@ -1,14 +1,14 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { and, apiTokenSchema, db, eq, isNull, lt, or } from "@packages/drizzle";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   ApiTokenError,
   ApiTokenRecord,
   ApiTokenRevokedReason,
   IApiTokenRepository,
   TokenOwner,
-} from "../../application/ports/api-token.port";
+} from "../../../../shared/ports/api-token.port";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { ITransaction } from "../../../../shared/transaction";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const t = apiTokenSchema.apiToken;

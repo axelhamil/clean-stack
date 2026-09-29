@@ -6,10 +6,10 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { hmacToken, parseToken } from "../../shared/crypto/api-token";
 import { emitEvent } from "../../shared/event-emitter";
+import type { IApiTokenRepository } from "../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../shared/ports/outbox.port";
 import type { ITransaction } from "../../shared/transaction";
-import type { IApiTokenRepository } from "./application/ports/api-token.port";
 
 export interface ScanningDeps {
   githubKeyVerifier: { verify(keyId: string, sig: string, body: string): Promise<boolean> };

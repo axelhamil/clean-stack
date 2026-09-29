@@ -1,5 +1,5 @@
 import type { Option, Result } from "@packages/ddd-kit";
-import type { ITransaction } from "../../../../shared/transaction";
+import type { ITransaction } from "../transaction";
 
 export type ApiTokenError = {
   code: "API_TOKEN_PROVIDER_FAILURE" | "API_TOKEN_NOT_FOUND" | "API_TOKEN_EXPIRY_INVALID";

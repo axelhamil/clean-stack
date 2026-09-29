@@ -5,9 +5,9 @@ import { HTTPException } from "hono/http-exception";
 import type { SessionUser } from "../../auth";
 import { findUserById } from "../../auth-queries";
 import type { ApiScope } from "../../modules/api-token/application/dto/create-token.dto";
-import type { IApiTokenRepository } from "../../modules/api-token/application/ports/api-token.port";
 import { hmacToken, parseToken } from "../crypto/api-token";
 import { emitEvent } from "../event-emitter";
+import type { IApiTokenRepository } from "../ports/api-token.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 export interface ApiTokenVariables {

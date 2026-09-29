@@ -2,11 +2,8 @@ import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import * as realAuthQueries from "../../auth-queries";
-import type {
-  ApiTokenRecord,
-  IApiTokenRepository,
-} from "../../modules/api-token/application/ports/api-token.port";
 import { generateToken, hmacToken } from "../../shared/crypto/api-token";
+import type { ApiTokenRecord, IApiTokenRepository } from "../../shared/ports/api-token.port";
 import type { RateLimitDecision, RateLimitError } from "../../shared/ports/rate-limiter.port";
 import { createPublicApiV1 } from "../index";
 

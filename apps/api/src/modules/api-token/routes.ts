@@ -6,9 +6,9 @@ import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.mi
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
+import { type ApiTokenRecord, tokenOwnerForSession } from "../../shared/ports/api-token.port";
 import { zV } from "../../shared/validator";
 import { createTokenBodySchema } from "./application/dto/create-token.dto";
-import { type ApiTokenRecord, tokenOwnerForSession } from "./application/ports/api-token.port";
 
 type Vars = AuthVariables;
 

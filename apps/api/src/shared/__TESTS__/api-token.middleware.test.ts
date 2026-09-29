@@ -1,8 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import type { ApiTokenRecord } from "../../modules/api-token/application/ports/api-token.port";
 import { generateToken, hmacToken } from "../crypto/api-token";
+import type { ApiTokenRecord } from "../ports/api-token.port";
 
 const PREFIX = "clean_";
 const PEPPER = "a".repeat(32);

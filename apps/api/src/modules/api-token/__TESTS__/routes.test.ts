@@ -4,7 +4,7 @@ import type {
   ApiTokenError,
   ApiTokenRecord,
   TokenOwner,
-} from "../application/ports/api-token.port";
+} from "../../../shared/ports/api-token.port";
 
 const RECORD: ApiTokenRecord = {
   id: "tok-1",

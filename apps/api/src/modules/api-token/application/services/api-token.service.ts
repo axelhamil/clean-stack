@@ -2,16 +2,16 @@ import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { generateToken, hmacToken } from "../../../../shared/crypto/api-token";
 import { emitEvent } from "../../../../shared/event-emitter";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import {
   type ApiTokenError,
   type ApiTokenRecord,
   type IApiTokenRepository,
   ownerReaches,
   type TokenOwner,
-} from "../ports/api-token.port";
+} from "../../../../shared/ports/api-token.port";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import type { ITransaction } from "../../../../shared/transaction";
 
 export type CreateTokenServiceInput = {
   userId: string;
