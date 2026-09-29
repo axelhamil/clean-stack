@@ -103,14 +103,15 @@ mock.module("../../../container", () => ({
 let currentSession: Record<string, unknown> = {};
 let allowOrgPermission = true;
 
+const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
 mock.module("../../../shared/middleware/auth.middleware", () => ({
+  ...realAuthMiddleware,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   requireAuth: async (c: any, next: () => Promise<void>) => {
     c.set("user", { id: "user-1" });
     c.set("session", currentSession);
     await next();
   },
-  AuthVariables: {},
 }));
 
 mock.module("../../../shared/middleware/org.middleware", () => ({

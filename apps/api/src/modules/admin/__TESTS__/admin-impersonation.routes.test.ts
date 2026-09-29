@@ -50,13 +50,14 @@ let currentSession: Record<string, unknown> = {
   createdAt: new Date(Date.now() - 10_000),
 };
 
+const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
 mock.module("../../../shared/middleware/auth.middleware", () => ({
+  ...realAuthMiddleware,
   requireAuth: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
     c.set("user", { id: "admin-1", role: "admin", twoFactorEnabled: true });
     c.set("session", currentSession);
     await next();
   },
-  AuthVariables: {},
 }));
 
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
