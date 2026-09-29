@@ -21,24 +21,26 @@ export class StripeCatalogSource implements IStripeCatalogSource {
             { name: "stripe.prices.list", op: "http.client" },
             () => this.stripe.prices.list({ active: true, expand: ["data.product"] }),
           );
-          return res.data
-            .map((price): StripePriceLite | null => {
-              const product = price.product as Stripe.Product;
-              const tier = product.metadata?.tier;
-              if (!tier) return null;
-              return {
+
+          return res.data.flatMap((price): StripePriceLite[] => {
+            const product = price.product as Stripe.Product;
+            const tier = product.metadata?.tier;
+            if (!tier) return [];
+
+            return [
+              {
                 priceId: price.id,
                 tier,
                 unitAmount: price.unit_amount ?? 0,
                 currency: price.currency,
-                interval: Option.fromNullable(price.recurring?.interval ?? null),
+                interval: Option.fromNullable(price.recurring?.interval),
                 productName: product.name,
                 marketingFeatures: (product.marketing_features ?? [])
                   .map((f) => f.name)
                   .filter((n): n is string => Boolean(n)),
-              };
-            })
-            .filter((p): p is StripePriceLite => p !== null);
+              },
+            ];
+          });
         } catch (err) {
           this.instrumentation.capture(err);
           throw err;
