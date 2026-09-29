@@ -5,7 +5,7 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 ## What lives here
 
 - `api/` — api-client, query-client, queries/, mutations/, errors/ (`api-error`, `messages`, `toast`, `policy-refusal`). Refusals render as localized copy, never raw backend text: the error code resolves through the `errors` catalog (`byCode`, then `bySuffix`, then the caller's fallback), so a new backend code needs its copy in both `en` and `fr`. `policy-refusal.ts` invalidates the router on `POLICY_ACCEPTANCE_REQUIRED` so `_shell`'s existing redirect fires; never add a second redirect mechanism.
-- `auth/` — auth-client, auth-broadcast, `Can` + `useAuthorization`, gates (`ensure-org-permission`, `ensure-platform-admin`, `feature-gate`, `plan-gate`, `quota-gate`), `use-entitlements`, `use-active-org-id`, `use-set-active-org`, `use-sign-out`, `use-impersonation-guard`, role-labels, `*.schema.ts`, dev-only `authorization-devtool`
+- `auth/` — auth-client, auth-broadcast, `Can` + `useAuthorization`, gates (`ensure-org-permission`, `ensure-platform-admin`, `feature-gate`, `plan-gate`, `quota-gate`), `use-entitlements`, `use-active-org-id`, `use-set-active-org`, `use-refresh-session`, `use-sign-out`, `use-impersonation-guard`, role-labels, `*.schema.ts`, dev-only `authorization-devtool`
 - `components/` — cross-feature UI (app-shell, org-switcher, command-palette, cookie-banner, legal-footer, secret-reveal-dialog, pricing-table, impersonation-banner, …)
 - `hooks/` — `use-consent`, `use-broadcast-channel`
 - `legal/`, `legal-routes.ts`, `sub-processors.config.ts`, `sub-processor-labels.ts` — legal surface shared by the shell and the legal pages
@@ -51,7 +51,7 @@ Auth state enforced by **layout routes with `id` (no path)** — `_guest`, `_pro
 
 **Single source of session truth — TanStack Query, not React state.** Router context exposes only `queryClient`. Gates' `beforeLoad` reads `ensureQueryData(sessionQueryOptions)` (staleTime aligned with `cookieCache.maxAge`). No `useSession()` React bridge, no race.
 
-**After auth mutations, push state into the query, then navigate.** Sign-in/verify/magic-link/2FA: `await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey })`. Sign-out: `setQueryData(..., null)`. Then `void navigate({ to })`.
+**After auth mutations, push state into the query, then navigate.** Sign-in/verify/magic-link/2FA/profile/deletion schedule: `await refreshSession()` from `useRefreshSession()`, which refetches the session in this tab and then broadcasts to the others. Sign-out: `setQueryData(..., null)`. Then `void navigate({ to })`.
 
 **Token-consuming routes stay outside the gates** — attach to `rootRoute` directly. Under `_guest` they'd be 302'd away the moment the token signs the user in. Token effects use `useRef(false)` against StrictMode double-fire.
 

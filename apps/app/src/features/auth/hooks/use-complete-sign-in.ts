@@ -1,8 +1,6 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
+import { useRefreshSession } from "../../../shared/auth/use-refresh-session";
 
 /**
  * Every flow that ends with a signed-in browser (password, passkey, magic link,
@@ -11,15 +9,14 @@ import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
  * passkey autofill effect lists it as a dependency.
  */
 export function useCompleteSignIn(): (redirectTo?: string) => Promise<void> {
-  const queryClient = useQueryClient();
+  const refreshSession = useRefreshSession();
   const navigate = useNavigate();
 
   return useCallback(
     async (redirectTo?: string) => {
-      await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
+      await refreshSession();
       void navigate({ to: redirectTo ?? "/" });
     },
-    [queryClient, navigate],
+    [refreshSession, navigate],
   );
 }
