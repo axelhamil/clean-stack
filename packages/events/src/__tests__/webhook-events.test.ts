@@ -10,8 +10,8 @@ import {
 import { RETENTION_MAP } from "../retention-map";
 
 describe("webhook events", () => {
-  it("catalog contains exactly 83 event types", () => {
-    expect(ALL_EVENT_TYPES).toHaveLength(83);
+  it("catalog contains exactly 84 event types", () => {
+    expect(ALL_EVENT_TYPES).toHaveLength(84);
   });
 
   it("declares the delivery lifecycle event constants", () => {

@@ -49,6 +49,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.USER_POLICY_ACCEPTED]: "A user accepted a legal policy version.",
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: "Cookie consent was granted.",
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: "Cookie consent was withdrawn.",
+  [EventTypes.USER_COOKIE_CONSENT_LINKED]:
+    "Cookie consent given before sign-in was attached to the account.",
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: "A rate limit was exceeded.",
   [EventTypes.SECURITY_CSP_VIOLATION]: "A Content-Security-Policy violation was reported.",
   [EventTypes.SECURITY_CSRF_REJECTED]: "A request was rejected by CSRF origin checks.",

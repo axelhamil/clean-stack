@@ -48,6 +48,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.USER_POLICY_ACCEPTED]: "compliance",
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: "compliance",
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: "compliance",
+  [EventTypes.USER_COOKIE_CONSENT_LINKED]: "compliance",
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: "operational",
   [EventTypes.SECURITY_CSP_VIOLATION]: "operational",
   [EventTypes.SECURITY_CSRF_REJECTED]: "operational",

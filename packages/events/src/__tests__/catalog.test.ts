@@ -34,3 +34,21 @@ describe("sso and scim events", () => {
     expect(parsed.success).toBe(true);
   });
 });
+
+describe("cookie consent linked event", () => {
+  const schema = PayloadByEventType[EventTypes.USER_COOKIE_CONSENT_LINKED];
+
+  it("names the signed-in user and the records it now owns", () => {
+    const parsed = schema.safeParse({
+      userId: "u1",
+      subjectId: "subj-1",
+      consentRecordIds: ["c1"],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("refuses a link that attached no record", () => {
+    const parsed = schema.safeParse({ userId: "u1", subjectId: "subj-1", consentRecordIds: [] });
+    expect(parsed.success).toBe(false);
+  });
+});

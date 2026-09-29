@@ -51,6 +51,7 @@ export const VISIBILITY = {
   "user.policy.accepted": "public",
   "user.cookie_consent.granted": "public",
   "user.cookie_consent.withdrawn": "public",
+  "user.cookie_consent.linked": "internal",
   "security.rate_limit.exceeded": "internal",
   "security.csp.violation": "internal",
   "security.csrf.rejected": "internal",

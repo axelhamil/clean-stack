@@ -121,8 +121,39 @@ export class ConsentService {
     return this.store.findActiveBySubject(subjectId, policyVersion);
   }
 
+  /**
+   * Attaches the consent a browser gave before sign-in to the account. Runs at every
+   * login carrying the consent cookie, so the event is emitted only when a record
+   * actually changed owner.
+   */
   async reconcile(subjectId: string, userId: string): Promise<Result<void, ConsentError>> {
-    return this.store.linkSubjectToUser(subjectId, userId);
+    try {
+      return await this.uow.run(async (tx) => {
+        const linked = await this.store.linkSubjectToUser(subjectId, userId, tx);
+        if (linked.isFailure) return Result.fail<void, ConsentError>(linked.getError());
+
+        const consentRecordIds = linked.getValue();
+        if (consentRecordIds.length === 0) return Result.ok<ConsentError>();
+
+        await emitEvent(
+          this.outbox,
+          EventTypes.USER_COOKIE_CONSENT_LINKED,
+          "user",
+          userId,
+          { userId, subjectId, consentRecordIds },
+          {},
+          tx,
+        );
+        return Result.ok<ConsentError>();
+      });
+    } catch (err) {
+      this.instrumentation.capture(err);
+      return Result.fail({
+        code: "CONSENT_PROVIDER_FAILURE",
+        message: "cookie consent reconcile failed",
+        metadata: { cause: err instanceof Error ? err.message : String(err) },
+      });
+    }
   }
 
   private async append(

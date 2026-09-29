@@ -49,6 +49,7 @@ export const EventTypes = {
   USER_POLICY_ACCEPTED: "user.policy.accepted",
   USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
   USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
+  USER_COOKIE_CONSENT_LINKED: "user.cookie_consent.linked",
   SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
   SECURITY_CSP_VIOLATION: "security.csp.violation",
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",

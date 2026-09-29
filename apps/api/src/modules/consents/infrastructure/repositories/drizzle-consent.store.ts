@@ -142,7 +142,7 @@ export class DrizzleConsentStore implements IConsentStore {
     subjectId: string,
     userId: string,
     tx?: ITransaction,
-  ): Promise<Result<void, ConsentError>> {
+  ): Promise<Result<string[], ConsentError>> {
     const exec = tx ?? db;
 
     return this.instrumentation.startSpan(
@@ -152,14 +152,15 @@ export class DrizzleConsentStore implements IConsentStore {
           const query = exec
             .update(cr)
             .set({ userId })
-            .where(and(eq(cr.subjectId, subjectId), isNull(cr.userId)));
+            .where(and(eq(cr.subjectId, subjectId), isNull(cr.userId)))
+            .returning({ id: cr.id });
 
-          await this.instrumentation.startSpan(
+          const linked = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
 
-          return Result.ok();
+          return Result.ok(linked.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure(err, "linkSubjectToUser"));

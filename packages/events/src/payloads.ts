@@ -295,6 +295,12 @@ export const UserCookieConsentWithdrawnPayload = z.object({
 });
 export type UserCookieConsentWithdrawnPayload = z.infer<typeof UserCookieConsentWithdrawnPayload>;
 
+export const UserCookieConsentLinkedPayload = UserRef.extend({
+  subjectId: z.string(),
+  consentRecordIds: z.array(z.string()).min(1),
+});
+export type UserCookieConsentLinkedPayload = z.infer<typeof UserCookieConsentLinkedPayload>;
+
 export const SecurityRateLimitExceededPayload = z.object({
   actorUserId: z.string().nullable(),
   ip: z.string().max(45),
@@ -639,6 +645,7 @@ export const PayloadByEventType = {
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,
+  [EventTypes.USER_COOKIE_CONSENT_LINKED]: UserCookieConsentLinkedPayload,
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
   [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,

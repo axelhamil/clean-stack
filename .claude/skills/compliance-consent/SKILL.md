@@ -21,7 +21,7 @@ Records which policy version each user accepted and when.
 Records device-scoped consent (guest→user reconciled at login).
 
 - **`@packages/cookie-consent`** is the SSOT (`CONSENT_CATEGORIES`, `OPTIONAL_CATEGORIES`, `CONSENT_COOKIE_NAME = "cc_sid"`, `COOKIE_CONSENT_VERSION`, grant/refusal TTL). Bump `COOKIE_CONSENT_VERSION` → all users re-prompted.
-- **`ConsentService`**: `record` (append-only, latest wins) · `withdraw` · `getActive` (with subjectId fallback for logged-in users with no record) · `reconcile(subjectId, userId)` (UPDATE `user_id IS NULL` rows). `DrizzleConsentStore` is §8-instrumented.
+- **`ConsentService`**: `record` (append-only, latest wins) · `withdraw` · `getActive` (with subjectId fallback for logged-in users with no record) · `reconcile(subjectId, userId)` (UPDATE `user_id IS NULL` rows, emits `user.cookie_consent.linked` in the same transaction when at least one row changed owner). `DrizzleConsentStore` is §8-instrumented.
 - **Routes `/consents` — public, `optionalAuth`**. **Rate-limit `CONSENT_POST_POLICY` on POST/DELETE only — GET is exempt**: GET is called on every render prefetch; rate-limiting it saturates the window on normal reloads and blocks the consent banner.
 - Cookie `cc_sid`: `httpOnly`, `secure: isProd`, `sameSite: isProd ? "none" : "lax"`, `path: "/"`. **No `__Host-` prefix** — cross-origin deploy requires `sameSite: "none"`, incompatible with `__Host-` (same constraint as the BetterAuth session cookie).
 - **Sweep** (`sweep-consents.route.ts`, HMAC-gated): purges `user_id IS NULL AND expires_at < cutoff` (env `CONSENT_RETENTION_DAYS=365`).

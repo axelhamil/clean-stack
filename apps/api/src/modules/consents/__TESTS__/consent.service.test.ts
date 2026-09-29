@@ -59,7 +59,7 @@ function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
     findActiveByUser: mock(async () =>
       Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
     ),
-    linkSubjectToUser: mock(async () => Result.ok<ConsentError>()),
+    linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>([])),
     ...overrides,
   };
 }
@@ -233,14 +233,39 @@ describe("ConsentService", () => {
   });
 
   describe("reconcile", () => {
-    it("links the browser's orphan consent records to the user", async () => {
-      const store = makeStore();
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+    it("links the browser's orphan consent records to the user and emits USER_COOKIE_CONSENT_LINKED", async () => {
+      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const store = makeStore({
+        linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>(["c1", "c2"])),
+      });
+      const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
 
       const result = await service.reconcile("subj-1", "u1");
 
       expect(result.isSuccess).toBe(true);
-      expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1");
+      expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1", fakeTx);
+      expect(enqueued).toEqual([
+        {
+          eventType: EventTypes.USER_COOKIE_CONSENT_LINKED,
+          aggregateId: "u1",
+          payload: { userId: "u1", subjectId: "subj-1", consentRecordIds: ["c1", "c2"] },
+        },
+      ]);
+    });
+
+    it("emits nothing when every record was already linked", async () => {
+      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const service = new ConsentService(
+        makeStore(),
+        spyOutbox,
+        noopUow,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.reconcile("subj-1", "u1");
+
+      expect(result.isSuccess).toBe(true);
+      expect(enqueued).toEqual([]);
     });
   });
 });
