@@ -1511,10 +1511,13 @@ const authOptions = {
             }
           }
 
-          if (session.activeOrganizationId) return { data: session };
+          // BetterAuth fills ipAddress from raw X-Forwarded-For; keep the trusted-proxy value instead.
+          const trusted = { ...session, ipAddress: requestClientIp() };
+          if (session.activeOrganizationId) return { data: trusted };
+
           try {
             const orgId = await ensurePersonalOrgFor(session.userId);
-            return { data: { ...session, activeOrganizationId: orgId } };
+            return { data: { ...trusted, activeOrganizationId: orgId } };
           } catch (err) {
             logger.error(
               { err, userId: session.userId },
