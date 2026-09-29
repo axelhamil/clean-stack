@@ -114,7 +114,15 @@ app.use("/csp-report", securityRateLimit(CSP_REPORT_POLICY));
 app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
 
 app.use("*", requestId());
-app.use("*", (c, next) => runWithRequestContext({ requestId: c.get("requestId") }, next));
+app.use("*", (c, next) => {
+  let clientIp: string | undefined;
+  const context = {
+    requestId: c.get("requestId"),
+    clientIp: () => (clientIp ??= resolveClientIp(c)),
+  };
+
+  return runWithRequestContext(context, next);
+});
 app.use("*", httpLogger);
 app.use(
   "*",

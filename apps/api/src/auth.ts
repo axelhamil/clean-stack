@@ -74,6 +74,7 @@ import {
 } from "./shared/middleware/impersonation-blocklist";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
+import { getClientIp } from "./shared/request-context";
 
 const isProd = env.NODE_ENV === "production";
 
@@ -337,12 +338,13 @@ async function emitSubscriptionEvent(
 }
 
 /**
- * Best-effort client IP from a BetterAuth hook's `ctx.headers` for audit-only
- * event payloads. NOT the trusted-proxy resolver (`resolveClientIp`, Hono layer,
- * unreachable from here), acceptable because these emits are non-blocking audit.
+ * Client IP for event payloads and compliance records, as resolved by the
+ * trusted-proxy resolver for the current request (`app.ts` puts it in the request
+ * context, a BetterAuth hook has no Hono context of its own). Never read
+ * `X-Forwarded-For` here: any client can send one.
  */
-function clientIpFromHeaders(headers?: Headers): string | null {
-  return headers?.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 45) ?? null;
+function requestClientIp(): string | null {
+  return getClientIp()?.slice(0, 45) ?? null;
 }
 
 /**
@@ -897,7 +899,7 @@ const authOptions = {
       if (path === "/sign-in/email") {
         const email = body?.email as string | undefined;
         if (!email) return;
-        const ip = clientIpFromHeaders(ctx.headers) ?? "unknown";
+        const ip = requestClientIp() ?? "unknown";
         const rl = await di.IRateLimiter.consume(`auth-sign-in:account:${email}`, [
           {
             policyName: "auth-sign-in-account",
@@ -1063,7 +1065,7 @@ const authOptions = {
             await emitBestEffort(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
               actorUserId: null,
               email: actorEmail,
-              ip: clientIpFromHeaders(ctx.headers),
+              ip: requestClientIp(),
               reason: "disposable_email" as const,
             });
             throw new APIError("UNPROCESSABLE_ENTITY", {
@@ -1096,7 +1098,7 @@ const authOptions = {
         await emitBestEffort(EventTypes.SECURITY_PASSWORD_BREACHED, "security", path, {
           actorUserId,
           email: actorEmail ?? null,
-          ip: clientIpFromHeaders(ctx.headers),
+          ip: requestClientIp(),
           path,
         });
       }
@@ -1125,7 +1127,7 @@ const authOptions = {
             providerId,
             domain: provider?.domain ?? "unknown",
             reason: ctx.context.returned.message,
-            ip: clientIpFromHeaders(ctx.headers) ?? "unknown",
+            ip: requestClientIp() ?? "unknown",
           },
           provider?.organizationId ?? null,
         );
@@ -1281,10 +1283,7 @@ const authOptions = {
             "policy staleness check failed at verify-email",
           );
         } else if (stale.getValue().length > 0) {
-          const ip =
-            ctx.context.newSession?.session?.ipAddress ||
-            ctx.context.session?.session?.ipAddress ||
-            undefined;
+          const ip = requestClientIp() ?? undefined;
           const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
           if (recorded.isFailure) {
             logger.error(
