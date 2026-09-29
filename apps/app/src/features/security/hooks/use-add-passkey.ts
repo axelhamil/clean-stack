@@ -16,11 +16,13 @@ export function useAddPasskey() {
     mutationKey: ["passkeys", "add"],
     mutationFn: async (input: AddPasskeyInput) => {
       const result = await authClient.passkey.addPasskey({ name: input.name });
-      if (result?.error) {
-        if (result.error.message?.toLowerCase().includes("not allowed"))
-          throw new Error("Cancelled");
-        throw toAuthClientError(result.error, t("passkeys.addFailed"));
+      if (!result?.error) return;
+
+      if (result.error.message?.toLowerCase().includes("not allowed")) {
+        throw new Error("Cancelled");
       }
+
+      throw toAuthClientError(result.error, t("passkeys.addFailed"));
     },
     onSuccess: async () => {
       toast.success(t("passkeys.addedToast"));
@@ -29,13 +31,14 @@ export function useAddPasskey() {
       });
     },
     onError: (err) => {
-      if (err.message !== "Cancelled")
-        toastError(
-          err,
-          getErrorsT()("fallback.addPasskey", {
-            defaultValue: "Couldn't add that passkey. Please try again.",
-          }),
-        );
+      if (err.message === "Cancelled") return;
+
+      toastError(
+        err,
+        getErrorsT()("fallback.addPasskey", {
+          defaultValue: "Couldn't add that passkey. Please try again.",
+        }),
+      );
     },
   });
 }
