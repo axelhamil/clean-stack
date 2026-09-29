@@ -8,7 +8,6 @@ import {
 } from "@packages/ui/components/ui/card";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import type { ReactNode } from "react";
 import { LegalFooter } from "../../../shared/components/legal-footer";
 import { ThemeToggle } from "../../../shared/components/theme-toggle";
@@ -36,7 +35,7 @@ export function AuthShell({ title, description, children, footer, className }: A
             {description && <CardDescription>{description}</CardDescription>}
           </CardHeader>
 
-          <CardContent className={cn(className)}>{children}</CardContent>
+          <CardContent className={className}>{children}</CardContent>
 
           {footer && <CardFooter>{footer}</CardFooter>}
         </Card>

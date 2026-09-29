@@ -1,9 +1,9 @@
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
+import { useConsumeToken } from "./hooks/use-consume-token";
 import { useVerifyMagicLink } from "./hooks/use-verify-magic-link";
 
 const magicLinkSearchSchema = z.object({
@@ -32,14 +32,7 @@ interface ConsumeTokenProps {
 function ConsumeToken({ token }: ConsumeTokenProps) {
   const { t } = useTranslation("auth");
   const mutation = useVerifyMagicLink();
-  const fired = useRef(false);
-
-  useEffect(() => {
-    if (fired.current) return;
-    fired.current = true;
-
-    mutation.mutate(token);
-  }, [token, mutation.mutate]);
+  useConsumeToken(token, mutation.mutate);
 
   if (mutation.isError) return <MagicLinkError message={mutation.error.message} />;
 

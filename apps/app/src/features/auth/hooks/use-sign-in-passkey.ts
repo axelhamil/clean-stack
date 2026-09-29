@@ -1,18 +1,15 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
 import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
+import { useCompleteSignIn } from "./use-complete-sign-in";
 
 export function useSignInPasskey(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const completeSignIn = useCompleteSignIn();
   const abortRef = useRef<AbortController | null>(null);
 
   return useMutation({
@@ -25,30 +22,27 @@ export function useSignInPasskey(redirectTo?: string) {
       const result = await authClient.signIn.passkey({
         fetchOptions: { signal: controller.signal },
       });
-      if (result?.error) {
-        const msg = result.error.message?.toLowerCase() ?? "";
-        if (msg.includes("not allowed") || msg.includes("cancel")) throw new Error("Cancelled");
-        // The passkey leg is server-enforced like the three email-bearing ones, so it
-        // gets the same redirect rather than a bare `SSO_REQUIRED` toast.
-        if (await redirectToSsoIfRequired(result.error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
-        throw new Error(resolveAuthError(result.error, "passkey.failed", t, tErrors));
+      if (!result?.error) return;
+
+      const message = result.error.message?.toLowerCase() ?? "";
+      if (message.includes("not allowed") || message.includes("cancel")) {
+        throw new Error("Cancelled");
       }
+
+      // The passkey leg is server-enforced like the three email-bearing ones, so it
+      // gets the same redirect rather than a bare `SSO_REQUIRED` toast.
+      if (await redirectToSsoIfRequired(result.error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+
+      throw new Error(resolveAuthError(result.error, "passkey.failed", t, tErrors));
     },
     onSuccess: async () => {
       toast.success(t("signIn.success"));
-      await queryClient.refetchQueries({
-        queryKey: sessionQueryOptions.queryKey,
-      });
-      broadcastAuthChange();
-      void navigate({ to: redirectTo ?? "/" });
+      await completeSignIn(redirectTo);
     },
     onError: (err) => {
-      if (
-        err.name === "AbortError" ||
-        err.message === "Cancelled" ||
-        err.message === SSO_REDIRECT_IN_PROGRESS
-      )
-        return;
+      if (err.name === "AbortError") return;
+      if (err.message === "Cancelled" || err.message === SSO_REDIRECT_IN_PROGRESS) return;
+
       toast.error(err.message);
     },
   });
