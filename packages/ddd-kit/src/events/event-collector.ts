@@ -15,24 +15,26 @@ export const EventCollector = {
   },
 
   add(events: IDomainEvent | IDomainEvent[]): void {
+    const list = Array.isArray(events) ? events : [events];
     const ctx = storage.getStore();
-    if (!ctx) {
-      const list = Array.isArray(events) ? events : [events];
-      if (list.length > 0) {
-        outOfContextLogger?.("EventCollector.add called outside runWithContext — events lost", {
-          eventTypes: list.map((e) => e.eventType),
-          aggregateIds: list.map((e) => e.aggregateId),
-        });
-      }
+
+    if (ctx) {
+      ctx.events.push(...list);
       return;
     }
-    if (Array.isArray(events)) ctx.events.push(...events);
-    else ctx.events.push(events);
+
+    if (list.length === 0) return;
+
+    outOfContextLogger?.("EventCollector.add called outside runWithContext, events lost", {
+      eventTypes: list.map((e) => e.eventType),
+      aggregateIds: list.map((e) => e.aggregateId),
+    });
   },
 
   drain(): IDomainEvent[] {
     const ctx = storage.getStore();
     if (!ctx) return [];
+
     const drained = ctx.events.slice();
     ctx.events.length = 0;
     return drained;

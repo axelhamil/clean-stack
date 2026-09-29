@@ -72,6 +72,18 @@ describe("EventCollector (ALS)", () => {
     expect(eventsB[0]?.aggregateId).toBe("agg-B");
   });
 
+  it("reports events added outside a context instead of collecting them", () => {
+    const reports: Array<Record<string, unknown> | undefined> = [];
+    EventCollector.setOutOfContextLogger((_message, meta) => reports.push(meta));
+
+    EventCollector.add([]);
+    EventCollector.add(new TestEvent("agg-1", 1));
+    EventCollector.setOutOfContextLogger(null);
+
+    expect(reports).toEqual([{ eventTypes: ["test.event"], aggregateIds: ["agg-1"] }]);
+    expect(EventCollector.drain()).toEqual([]);
+  });
+
   it("does not leak events outside the context after it closes", async () => {
     await EventCollector.runWithContext(async () => {
       EventCollector.add(new TestEvent("agg-1", 1));
