@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { validateEnvBounds } from "../env";
+import { validateEnvBounds } from "../env-bounds";
 
-// Exercises the real guard (`superRefine` in env.ts) against plain literals — never
-// imports `env` itself, since env.ts parses `process.env` at import time and throws
+// Exercises the real guard (`superRefine` in env.ts) against plain literals. Never
+// imports `env.ts` itself, since env.ts parses `process.env` at import time and throws
 // on a missing `DATABASE_URL` and friends. No `.env` required for this file.
 const boundsSchema = z
   .object({
