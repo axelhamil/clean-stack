@@ -44,7 +44,7 @@ function DataRightsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <TypographyP className="my-0">
+          <TypographyP>
             From <strong>Settings → Account</strong>, request a data export. We email you a signed
             download link valid for 7 days. The archive is a JSON document containing your account
             profile, session metadata, organization memberships, and invitations you sent.
@@ -63,7 +63,7 @@ function DataRightsPage() {
         <CardContent className="flex flex-col gap-4">
           <section className="flex flex-col gap-2">
             <TypographyH2>What gets deleted</TypographyH2>
-            <TypographyList className="my-0">
+            <TypographyList>
               <li>Your name and profile image</li>
               <li>All active sessions, OAuth account links, and passkeys</li>
               <li>Two-factor authentication factors and backup codes</li>
@@ -73,7 +73,7 @@ function DataRightsPage() {
           </section>
           <section className="flex flex-col gap-2">
             <TypographyH2>What gets anonymized</TypographyH2>
-            <TypographyList className="my-0">
+            <TypographyList>
               <li>
                 Your user row stays in the database with a placeholder email like{" "}
                 <code>deleted-&lt;uuid&gt;@anonymized.local</code> and a tombstone name. This keeps
@@ -87,7 +87,7 @@ function DataRightsPage() {
           </section>
           <section className="flex flex-col gap-2">
             <TypographyH2>What is retained</TypographyH2>
-            <TypographyList className="my-0">
+            <TypographyList>
               <li>
                 Audit log entries linked to your past actions are retained for legal compliance,
                 with the actor reference becoming a tombstone (no PII).
@@ -100,7 +100,7 @@ function DataRightsPage() {
           </section>
           <section className="flex flex-col gap-2">
             <TypographyH2>Pre-flight ownership check</TypographyH2>
-            <TypographyP className="my-0">
+            <TypographyP>
               If you are the sole owner of a non-personal organization that has other members, you
               must first transfer ownership or delete that organization. We do not auto-transfer
               ownership: that decision belongs to you.
@@ -108,7 +108,7 @@ function DataRightsPage() {
           </section>
           <section className="flex flex-col gap-2">
             <TypographyH2>Grace window</TypographyH2>
-            <TypographyP className="my-0">
+            <TypographyP>
               After confirming deletion, your account enters a <strong>7-day grace window</strong>.
               You can sign in during this period and cancel the deletion. After the grace expires,
               the wipe is irreversible.
@@ -122,7 +122,7 @@ function DataRightsPage() {
           <CardTitle>Right to access, rectification, restriction, objection</CardTitle>
         </CardHeader>
         <CardContent>
-          <TypographyP className="my-0">
+          <TypographyP>
             For other rights guaranteed by RGPD Art. 15/16/18/21 (including correcting inaccurate
             data, restricting processing, or objecting to specific uses), contact your data
             protection officer. (Replace this paragraph with your DPO contact details when forking

@@ -23,7 +23,7 @@ export function PrivacyPolicyBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>1. Data We Collect</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           We collect information you provide directly (name, email address, password) and
           information generated through your use of the service (session data, usage logs, IP
           addresses). We do not sell your personal data to third parties.
@@ -32,7 +32,7 @@ export function PrivacyPolicyBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>2. How We Use Your Data</TypographyH2>
-        <TypographyList className="my-0">
+        <TypographyList>
           <li>To provide and improve the service.</li>
           <li>To authenticate you and maintain session security.</li>
           <li>To send transactional emails (account verification, password reset).</li>
@@ -42,7 +42,7 @@ export function PrivacyPolicyBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>3. Data Retention</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           Account data is retained for the duration of your account. You may request deletion at any
           time via Settings → Account. Audit records tied to legal compliance may be retained longer
           per applicable law, with PII anonymized.
@@ -51,7 +51,7 @@ export function PrivacyPolicyBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>4. Your Rights (RGPD)</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           You have the right to access, rectify, erase, restrict, and port your data. See the{" "}
           <TextLink href="/legal/data-rights">Data Rights</TextLink> page for procedures. Contact
           your Data Protection Officer (DPO) for formal requests. Replace this paragraph with actual
@@ -61,7 +61,7 @@ export function PrivacyPolicyBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>5. Cookies</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           We use strictly necessary HTTP-only cookies for authentication. No tracking or advertising
           cookies. No third-party analytics without explicit consent.
         </TypographyP>
@@ -87,7 +87,7 @@ export function TermsBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>1. Acceptance</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           By creating an account you agree to these Terms. If you do not agree, do not use the
           service. We may update these Terms; continued use after the effective date constitutes
           acceptance of the revised Terms.
@@ -96,7 +96,7 @@ export function TermsBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>2. Permitted Use</TypographyH2>
-        <TypographyList className="my-0">
+        <TypographyList>
           <li>You must be 16 years or older to create an account.</li>
           <li>You may not use the service for illegal purposes or to harm others.</li>
           <li>You are responsible for all activity under your account.</li>
@@ -106,7 +106,7 @@ export function TermsBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>3. Intellectual Property</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           The service and its original content remain the property of the provider. You retain
           ownership of data you submit. You grant us a limited license to process your data to
           deliver the service.
@@ -115,7 +115,7 @@ export function TermsBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>4. Service Availability</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           We strive for high availability but do not guarantee uninterrupted access. We reserve the
           right to suspend or terminate accounts that violate these Terms.
         </TypographyP>
@@ -123,7 +123,7 @@ export function TermsBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH2>5. Limitation of Liability</TypographyH2>
-        <TypographyP className="my-0">
+        <TypographyP>
           To the extent permitted by law, our liability is limited to the amount you paid us in the
           past twelve months. Replace with your jurisdiction-appropriate clause.
         </TypographyP>
@@ -131,7 +131,7 @@ export function TermsBody(): ReactElement {
 
       <section className="flex flex-col gap-3">
         <TypographyH3>Sections to complete</TypographyH3>
-        <TypographyList className="my-0">
+        <TypographyList>
           <li>Governing law and dispute resolution</li>
           <li>Indemnification</li>
           <li>Payment terms (if applicable)</li>

@@ -61,13 +61,7 @@ function TypographyH4({ className, ...props }: React.ComponentProps<"h4">) {
 }
 
 function TypographyP({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="typography-p"
-      className={cn("leading-7 [&:not(:first-child)]:mt-6", className)}
-      {...props}
-    />
-  );
+  return <p data-slot="typography-p" className={cn("leading-7", className)} {...props} />;
 }
 
 function TypographyLead({ className, ...props }: React.ComponentProps<"p">) {
@@ -137,7 +131,7 @@ function TypographyList({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
       data-slot="typography-list"
-      className={cn("my-6 ml-6 list-disc [&>li]:mt-2", className)}
+      className={cn("ml-6 list-disc [&>li]:mt-2", className)}
       {...props}
     />
   );

@@ -82,7 +82,7 @@ function CookiesPage() {
           <TypographyH2>What are cookies?</TypographyH2>
         </CardHeader>
         <CardContent>
-          <TypographyP className="my-0">
+          <TypographyP>
             Cookies are small text files placed on your device by your browser when you visit a
             website. They allow us to remember your preferences and measure how the service is used.
             You can control which optional cookies are active using the preferences panel below.

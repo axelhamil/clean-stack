@@ -99,7 +99,7 @@ function SubProcessorsPage() {
           <TypographyH2>What is a sub-processor?</TypographyH2>
         </CardHeader>
         <CardContent>
-          <TypographyP className="my-0">
+          <TypographyP>
             A sub-processor is a third party engaged by the data controller (us) to process personal
             data on your behalf, as defined under RGPD Art. 28. These third parties receive access
             to personal data only to the extent necessary to operate the service. We ensure each
@@ -138,7 +138,7 @@ function SubProcessorsPage() {
           <TypographyH2>Change notice</TypographyH2>
         </CardHeader>
         <CardContent>
-          <TypographyP className="my-0">
+          <TypographyP>
             In accordance with RGPD Art. 28§2, we will notify you at least 30 days before adding or
             replacing any sub-processor. If you object to a change, you may terminate the agreement
             before the change takes effect. Notifications are sent to the contact address on your
