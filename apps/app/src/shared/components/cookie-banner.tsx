@@ -32,10 +32,10 @@ export function CookieBanner() {
 
   if (data === undefined) return null;
 
-  const rawCategories = (data as { categories?: string[] | null }).categories ?? null;
-  const rawPolicyVersion = (data as { policyVersion?: string | null }).policyVersion ?? null;
+  const categories = data.categories ?? null;
+  const policyVersion = data.policyVersion ?? null;
 
-  if (rawCategories !== null && rawPolicyVersion === COOKIE_CONSENT_VERSION) return null;
+  if (categories !== null && policyVersion === COOKIE_CONSENT_VERSION) return null;
 
   const handleAcceptAll = () => {
     record.mutate({ categories: [...OPTIONAL_CATEGORIES] });

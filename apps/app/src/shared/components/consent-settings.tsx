@@ -1,4 +1,4 @@
-import { OPTIONAL_CATEGORIES } from "@packages/cookie-consent";
+import { CONSENT_CATEGORIES, OPTIONAL_CATEGORIES } from "@packages/cookie-consent";
 import { Button } from "@packages/ui/components/ui/button";
 import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import { Label } from "@packages/ui/components/ui/label";
@@ -12,10 +12,7 @@ import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { withdrawConsentMutationOptions } from "../api/mutations/withdraw-consent";
 import { consentQueryOptions } from "../api/queries/consent";
 
-type OptionalKey = "functional" | "analytics" | "marketing";
-
-const ALL_CATEGORIES = ["necessary", "functional", "analytics", "marketing"] as const;
-type AllCategory = (typeof ALL_CATEGORIES)[number];
+type OptionalKey = (typeof OPTIONAL_CATEGORIES)[number];
 
 interface ConsentSettingsProps {
   onSaved?: () => void;
@@ -33,7 +30,7 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
   });
 
   useEffect(() => {
-    const current = (data as { categories?: string[] | null } | undefined)?.categories;
+    const current = data?.categories;
     setEnabled({
       functional: current?.includes("functional") ?? false,
       analytics: current?.includes("analytics") ?? false,
@@ -41,22 +38,20 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
     });
   }, [data]);
 
+  const settle = async (message: string) => {
+    await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
+    toast.success(message);
+    onSaved?.();
+  };
+
   const record = useMutation({
     ...recordConsentMutationOptions,
-    onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
-      toast.success(t("cookieConsent.savedToast"));
-      onSaved?.();
-    },
+    onSuccess: () => settle(t("cookieConsent.savedToast")),
   });
 
   const withdraw = useMutation({
     ...withdrawConsentMutationOptions,
-    onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
-      toast.success(t("cookieConsent.withdrawnToast"));
-      onSaved?.();
-    },
+    onSuccess: () => settle(t("cookieConsent.withdrawnToast")),
   });
 
   const isPending = record.isPending || withdraw.isPending;
@@ -77,7 +72,7 @@ export function ConsentSettings({ onSaved }: ConsentSettingsProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          {ALL_CATEGORIES.map((cat: AllCategory) => {
+          {CONSENT_CATEGORIES.map((cat) => {
             const label = t(`cookieConsent.categories.${cat}.label` as const);
             const isNecessary = cat === "necessary";
             const checked = isNecessary || enabled[cat as OptionalKey];
