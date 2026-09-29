@@ -6,9 +6,9 @@ import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.mi
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
+import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
 import { zV } from "../../shared/validator";
 import { listOrgsQuerySchema } from "./application/dto/list-orgs.dto";
-import { setSsoEnforcementBodySchema } from "./application/dto/set-sso-enforcement.dto";
 
 const actionSvc = new AdminActionService(
   di.IOutboxRepository,
