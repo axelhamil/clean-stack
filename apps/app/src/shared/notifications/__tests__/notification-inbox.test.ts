@@ -7,8 +7,13 @@ import { describe, expect, test } from "vitest";
 import type { Notification } from "../../api/queries/notifications";
 import { groupNotifications } from "../group-notifications";
 import { applyRead } from "../notification-broadcast";
-import { CATEGORY_KEYS, categoryKeyFor } from "../notification-item";
-import { badgeLabel, labelOf, unreadLabel } from "../notification-labels";
+import {
+  badgeLabel,
+  CATEGORY_KEYS,
+  categoryKeyFor,
+  labelOf,
+  unreadLabel,
+} from "../notification-labels";
 
 function pluralKey(locale: "en" | "fr", count: number): "unreadLabel_one" | "unreadLabel_other" {
   return new Intl.PluralRules(locale).select(count) === "one"

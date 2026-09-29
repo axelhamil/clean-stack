@@ -25,7 +25,7 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useTranslation } from "react-i18next";
 import type { ImpersonationGuard } from "../auth/use-impersonation-guard";
 import type { PreferenceRow } from "./build-preference-matrix";
-import { CATEGORY_KEYS } from "./notification-item";
+import { CATEGORY_KEYS } from "./notification-labels";
 
 export interface PreferenceChange {
   category: NotificationCategory;
@@ -42,14 +42,6 @@ interface PreferenceMatrixProps {
   disabled?: boolean;
   guard: ImpersonationGuard;
 }
-
-// Reuses Task 3's `CATEGORY_KEYS` (shared/notifications/notification-item.tsx)
-// rather than declaring a second category->key map: this matrix's `row.category`
-// is the same `NotificationCategory` union, so a second copy would be two
-// records naming the same categories (recipe rule #2's second occurrence).
-// Resolved through `common`'s own `t`, not this component's `settings` one —
-// the keys aren't namespace-prefixed because Task 3 wrote them for a plain
-// `useTranslation("common")` call site.
 
 // `satisfies Record<NotificationFrequency, string>` proves every frequency has
 // AN entry; `__tests__/preference-matrix.test.ts` asserts the mapping itself
@@ -104,6 +96,7 @@ export function PreferenceMatrix({
           const otherwiseFrozen = disabled || forced === "all";
           const frozen = otherwiseFrozen || guard.blocked;
           const describe = guard.describeProps(otherwiseFrozen);
+          // Category keys live in `common` (the inbox shares them), not `settings`.
           const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
 
           const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>

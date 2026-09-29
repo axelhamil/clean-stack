@@ -1,8 +1,46 @@
-import { descriptionFor } from "@packages/events";
+import {
+  descriptionFor,
+  NOTIFICATION_CATEGORIES,
+  type NotificationCategory,
+} from "@packages/events";
 import type { TFunction } from "i18next";
 import type { Notification } from "../api/queries/notifications";
 
 const BADGE_CEILING = 9;
+
+// Exported so the mapping itself (not just "every variant is present") is
+// asserted in tests: `satisfies Record<NotificationCategory, string>` proves
+// coverage but not correctness, e.g. it would happily accept `org` mapped to
+// the "security" key. Shared by the inbox item and the preference matrix,
+// which both label the same `NotificationCategory` union.
+export const CATEGORY_KEYS = {
+  security: "notifications.categories.security",
+  org: "notifications.categories.org",
+  billing: "notifications.categories.billing",
+  activity: "notifications.categories.activity",
+} as const satisfies Record<NotificationCategory, string>;
+
+const UNKNOWN_CATEGORY_KEY = "notifications.categories.unknown";
+
+type CategoryKey = (typeof CATEGORY_KEYS)[NotificationCategory] | typeof UNKNOWN_CATEGORY_KEY;
+
+// A notification's `category` arrives widened to `string` by Hono's response
+// inference, and the `GET /notifications` read path has no runtime validation
+// (the `z.enum(NOTIFICATION_CATEGORIES)` schema only guards the preference
+// PUT bodies). A guard, not a cast, is what proves the value belongs to the
+// union here.
+function isNotificationCategory(value: string): value is NotificationCategory {
+  return (NOTIFICATION_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
+ * Resolves a wire-typed category to its catalog key, falling back when the value
+ * is not one this build knows. Kept out of the JSX so the fallback branch is
+ * reachable from a test: an untested fallback has never been shown to work.
+ */
+export function categoryKeyFor(category: string): CategoryKey {
+  return isNotificationCategory(category) ? CATEGORY_KEYS[category] : UNKNOWN_CATEGORY_KEY;
+}
 
 function humanizeEventType(eventType: string): string {
   const words = eventType.replaceAll(".", " ").replaceAll("_", " ").trim();

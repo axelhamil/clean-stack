@@ -1,10 +1,9 @@
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "../api/api-client";
-import { notificationsListQueryKey } from "../api/queries/notifications";
+import { notificationsListQueryKey, unreadCountQueryOptions } from "../api/queries/notifications";
 import { addBreadcrumb } from "../observability/sentry";
 
-const UNREAD_COUNT_QUERY_KEY = ["notifications", "unread-count"] as const;
 const FRAME_SEPARATOR = /\r?\n\r?\n/;
 const LINE_SEPARATOR = /\r?\n/;
 const RETRY_BASE_MS = 1_000;
@@ -31,7 +30,7 @@ export function handleStreamChunk(chunk: string, queryClient: QueryClient): stri
       // re-fetch every one of them on every single push. Mark it stale
       // instead (`refetchType: "none"`) so it catches up next time the
       // panel opens, rather than firing an N-page refetch on each event.
-      void queryClient.invalidateQueries({ queryKey: UNREAD_COUNT_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: unreadCountQueryOptions.queryKey });
       void queryClient.invalidateQueries({
         queryKey: notificationsListQueryKey,
         refetchType: "none",
