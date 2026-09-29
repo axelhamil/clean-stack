@@ -6,7 +6,7 @@ import { toastError } from "../../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import type { VerifyTotpSetupInput } from "../security.schema";
 
 export function useVerifyTwoFactorSetup() {
@@ -28,12 +28,6 @@ export function useVerifyTwoFactorSetup() {
       });
       broadcastAuthChange();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.verifyTwoFactorSetup", {
-          defaultValue: "Couldn't verify that code. Please try again.",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("verifyTwoFactorSetup")),
   });
 }

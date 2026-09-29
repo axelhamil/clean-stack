@@ -6,7 +6,7 @@ import { toastError } from "../../../shared/api/errors/toast";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 
 export function useRevokeOtherSessions() {
   const { t } = useTranslation("settings");
@@ -25,10 +25,6 @@ export function useRevokeOtherSessions() {
       });
       broadcastAuthChange();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.revokeOtherSessions", { defaultValue: "Failed to revoke sessions" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("revokeOtherSessions")),
   });
 }

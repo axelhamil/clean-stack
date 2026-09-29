@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   isPlatformRole,
@@ -73,11 +73,7 @@ function AdminUserDetailPage() {
       setBanOpen(false);
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.banUser", { defaultValue: "Failed to suspend account" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("banUser")),
   });
 
   const unbanMutation = useMutation({
@@ -86,11 +82,7 @@ function AdminUserDetailPage() {
       toast.success(t("users.detail.unbanSuccessToast"));
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.unbanUser", { defaultValue: "Failed to reactivate account" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("unbanUser")),
   });
 
   const impersonateMutation = useMutation({
@@ -102,13 +94,7 @@ function AdminUserDetailPage() {
       broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.startImpersonation", {
-          defaultValue: "Failed to start impersonation",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("startImpersonation")),
   });
 
   const revokeSessionsMutation = useMutation({
@@ -117,23 +103,13 @@ function AdminUserDetailPage() {
       toast.success(t("users.detail.revokeSessionsSuccessToast"));
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.revokeUserSessions", { defaultValue: "Failed to revoke sessions" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("revokeUserSessions")),
   });
 
   const resetPasswordMutation = useMutation({
     ...resetPasswordMutationOptions,
     onSuccess: () => toast.success(t("users.detail.resetPasswordSuccessToast")),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.resetUserPassword", {
-          defaultValue: "Failed to send password reset",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("resetUserPassword")),
   });
 
   const setRoleMutation = useMutation({
@@ -143,11 +119,7 @@ function AdminUserDetailPage() {
       setRoleOpen(false);
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.setUserRole", { defaultValue: "Failed to change role" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("setUserRole")),
   });
 
   if (query.isLoading) {

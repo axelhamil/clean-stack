@@ -7,7 +7,7 @@ import { createUpload, deleteUploadByUrl } from "../../../shared/api/mutations/c
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { captureError } from "../../../shared/observability/sentry";
 
 export function useUpdateAvatar(previousImage: string | null) {
@@ -38,10 +38,6 @@ export function useUpdateAvatar(previousImage: string | null) {
       broadcastAuthChange();
       toast.success(t("account.avatarUpdatedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.updateAvatar", { defaultValue: "Failed to update avatar" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("updateAvatar")),
   });
 }

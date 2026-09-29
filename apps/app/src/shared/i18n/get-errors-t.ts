@@ -1,3 +1,4 @@
+import { enCatalog } from "@packages/i18n";
 import type { TFunction } from "i18next";
 import { getI18n } from "./i18n";
 
@@ -13,4 +14,16 @@ export function getErrorsT(): TFunction<"errors"> {
   if (instance) return instance.getFixedT(instance.language, "errors");
   return ((key: string, opts?: { defaultValue?: string }) =>
     opts?.defaultValue ?? key) as TFunction<"errors">;
+}
+
+export type ErrorFallbackKey = keyof typeof enCatalog.errors.fallback;
+
+/**
+ * The last-resort copy for a failed request (`errors.fallback.*`), resolved
+ * when it is called, which is always at failure time: `throwApiError` calls it
+ * while building the error, a hook's `onError` while raising the toast. Before
+ * boot it answers with the English catalog value, never the raw key.
+ */
+export function errorFallback(key: ErrorFallbackKey): string {
+  return getErrorsT()(`fallback.${key}`, { defaultValue: enCatalog.errors.fallback[key] });
 }

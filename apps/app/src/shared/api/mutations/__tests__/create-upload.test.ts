@@ -28,12 +28,12 @@ describe("createUpload", () => {
     expect(isUnexpectedMutationError(err)).toBe(false);
   });
 
-  it("keeps the previous message when the refusal has no JSON body", async () => {
+  it("falls back to the catalog copy when the refusal has no JSON body", async () => {
     presign.mockResolvedValue(new Response(null, { status: 502 }));
     const file = new File(["x"], "avatar.png", { type: "image/png" });
 
     const err = await createUpload({ file }).catch((e: unknown) => e);
 
-    expect(err).toMatchObject({ status: 502, message: "Presign failed: HTTP 502" });
+    expect(err).toMatchObject({ status: 502, message: "Failed to prepare the upload" });
   });
 });

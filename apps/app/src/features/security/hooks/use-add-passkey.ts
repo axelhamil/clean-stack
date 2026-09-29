@@ -5,7 +5,7 @@ import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { PASSKEY_CANCELLED } from "../../../shared/observability/error-classifier";
 import type { AddPasskeyInput } from "../security.schema";
 
@@ -34,12 +34,7 @@ export function useAddPasskey() {
     onError: (err) => {
       if (err.message === PASSKEY_CANCELLED) return;
 
-      toastError(
-        err,
-        getErrorsT()("fallback.addPasskey", {
-          defaultValue: "Couldn't add that passkey. Please try again.",
-        }),
-      );
+      toastError(err, errorFallback("addPasskey"));
     },
   });
 }

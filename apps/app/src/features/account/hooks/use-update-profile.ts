@@ -6,7 +6,7 @@ import { toastError } from "../../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import type { UpdateProfileInput } from "../account.schema";
 
 export function useUpdateProfile() {
@@ -24,10 +24,6 @@ export function useUpdateProfile() {
       broadcastAuthChange();
       toast.success(t("account.profileUpdatedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.updateProfile", { defaultValue: "Failed to update profile" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("updateProfile")),
   });
 }

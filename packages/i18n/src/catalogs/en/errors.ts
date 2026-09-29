@@ -252,5 +252,11 @@ export default {
     // Distinct from `revokeUserSessions` above (an admin revoking someone
     // else's sessions): this is a user revoking their own other sessions.
     revokeOtherSessions: "Failed to revoke sessions",
+    setLocale: "Failed to update language",
+    preflightDeletion: "Failed to check whether the account can be deleted",
+    presignUpload: "Failed to prepare the upload",
+    confirmUpload: "Failed to confirm the upload",
+    deleteUpload: "Failed to delete the file",
+    upgradeSubscription: "Failed to start the upgrade",
   },
 } as const;

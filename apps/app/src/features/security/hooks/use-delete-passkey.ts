@@ -5,7 +5,7 @@ import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 
 export function useDeletePasskey() {
   const { t } = useTranslation("settings");
@@ -23,12 +23,6 @@ export function useDeletePasskey() {
         queryKey: passkeysQueryOptions.queryKey,
       });
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.deletePasskey", {
-          defaultValue: "Couldn't remove that passkey. Please try again.",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("deletePasskey")),
   });
 }

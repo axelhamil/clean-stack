@@ -15,7 +15,7 @@ import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { generateScimTokenMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 import { CopyRow } from "./copy-row";
@@ -37,13 +37,7 @@ export function ScimConnectionCard() {
   const generate = useMutation({
     ...generateScimTokenMutationOptions,
     onSuccess: (token) => setRevealToken(token),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.generateScimToken", {
-          defaultValue: "Failed to generate the SCIM token",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("generateScimToken")),
   });
 
   return (

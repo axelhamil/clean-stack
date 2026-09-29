@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
@@ -45,13 +45,7 @@ function AdminOrgsPage() {
       toast.success(t("orgs.ssoEnforcementUpdatedToast"));
       void queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.updateAdminOrgSsoEnforcement", {
-          defaultValue: "Failed to update SSO enforcement",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("updateAdminOrgSsoEnforcement")),
   });
 
   return (

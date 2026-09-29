@@ -1,5 +1,6 @@
 import { mutationOptions } from "@tanstack/react-query";
 import { authClient } from "../../auth/auth-client";
+import { errorFallback } from "../../i18n/get-errors-t";
 import { toAuthClientError } from "../errors/api-error";
 
 export interface UpgradeInput {
@@ -31,6 +32,6 @@ export const upgradeSubscriptionMutationOptions = mutationOptions({
       successUrl: `${window.location.origin}/settings/billing?upgraded=1`,
       cancelUrl: `${window.location.origin}/settings/billing`,
     });
-    if (error) throw toAuthClientError(error, "Upgrade failed");
+    if (error) throw toAuthClientError(error, errorFallback("upgradeSubscription"));
   },
 });

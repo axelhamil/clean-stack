@@ -2,7 +2,6 @@ import { mutationOptions } from "@tanstack/react-query";
 import type { InferRequestType, InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
 import { throwApiError } from "../../../shared/api/errors/api-error";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 
 const $create = api.settings.tokens.$post;
 const $delete = api.settings.tokens[":id"].$delete;
@@ -14,11 +13,7 @@ export const createTokenMutationOptions = mutationOptions({
   mutationKey: ["settings", "api-tokens", "create"] as const,
   mutationFn: async (input: CreateTokenBody) => {
     const res = await $create({ json: input });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.createApiToken", { defaultValue: "Failed to create API token" }),
-      );
+    if (!res.ok) await throwApiError(res, "createApiToken");
     return (await res.json()) as CreateTokenResponse;
   },
 });
@@ -27,11 +22,7 @@ export const deleteTokenMutationOptions = mutationOptions({
   mutationKey: ["settings", "api-tokens", "delete"] as const,
   mutationFn: async (id: string) => {
     const res = await $delete({ param: { id } });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.revokeApiToken", { defaultValue: "Failed to revoke API token" }),
-      );
+    if (!res.ok) await throwApiError(res, "revokeApiToken");
     return (await res.json()) as InferResponseType<typeof $delete, 200>;
   },
 });

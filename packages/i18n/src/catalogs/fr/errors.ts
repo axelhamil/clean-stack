@@ -233,5 +233,11 @@ export default {
     regenerateBackupCodes: "Impossible de régénérer vos codes de récupération. Veuillez réessayer.",
     revokeSession: "Échec de la révocation de la session",
     revokeOtherSessions: "Échec de la révocation des sessions",
+    setLocale: "Échec de la mise à jour de la langue",
+    preflightDeletion: "Impossible de vérifier si le compte peut être supprimé",
+    presignUpload: "Échec de la préparation de l'envoi",
+    confirmUpload: "Échec de la confirmation de l'envoi",
+    deleteUpload: "Échec de la suppression du fichier",
+    upgradeSubscription: "Échec du lancement de la mise à niveau",
   },
 } as const;

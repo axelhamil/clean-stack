@@ -8,7 +8,7 @@ export const preflightDeletionQueryOptions = queryOptions({
   queryKey: ["rgpd", "preflight-deletion"] as const,
   queryFn: async () => {
     const res = await $preflight();
-    if (!res.ok) await throwApiError(res, `Preflight failed: HTTP ${res.status}`);
+    if (!res.ok) await throwApiError(res, "preflightDeletion");
 
     return res.json();
   },

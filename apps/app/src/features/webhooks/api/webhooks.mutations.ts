@@ -2,7 +2,6 @@ import { mutationOptions } from "@tanstack/react-query";
 import type { InferRequestType, InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
 import { throwApiError } from "../../../shared/api/errors/api-error";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 
 const $create = api.settings.webhooks.$post;
 const $update = api.settings.webhooks[":id"].$patch;
@@ -20,13 +19,7 @@ export const createEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "create"] as const,
   mutationFn: async (input: CreateEndpointBody) => {
     const res = await $create({ json: input });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.createWebhookEndpoint", {
-          defaultValue: "Failed to create webhook endpoint",
-        }),
-      );
+    if (!res.ok) await throwApiError(res, "createWebhookEndpoint");
     return (await res.json()) as CreateEndpointResponse;
   },
 });
@@ -35,13 +28,7 @@ export const updateEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "update"] as const,
   mutationFn: async ({ id, ...json }: UpdateEndpointBody & { id: string }) => {
     const res = await $update({ param: { id }, json });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.updateWebhookEndpoint", {
-          defaultValue: "Failed to update webhook endpoint",
-        }),
-      );
+    if (!res.ok) await throwApiError(res, "updateWebhookEndpoint");
     return (await res.json()) as InferResponseType<typeof $update, 200>;
   },
 });
@@ -50,13 +37,7 @@ export const deleteEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "delete"] as const,
   mutationFn: async (id: string) => {
     const res = await $delete({ param: { id } });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.deleteWebhookEndpoint", {
-          defaultValue: "Failed to delete webhook endpoint",
-        }),
-      );
+    if (!res.ok) await throwApiError(res, "deleteWebhookEndpoint");
     return (await res.json()) as InferResponseType<typeof $delete, 200>;
   },
 });
@@ -65,13 +46,7 @@ export const replayDeliveryMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "replay"] as const,
   mutationFn: async ({ endpointId, deliveryId }: { endpointId: string; deliveryId: string }) => {
     const res = await $replay({ param: { id: endpointId, deliveryId } });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.replayWebhookDelivery", {
-          defaultValue: "Failed to replay delivery",
-        }),
-      );
+    if (!res.ok) await throwApiError(res, "replayWebhookDelivery");
     return (await res.json()) as InferResponseType<typeof $replay, 201>;
   },
 });
@@ -80,11 +55,7 @@ export const rotateSecretMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "rotate"] as const,
   mutationFn: async (id: string) => {
     const res = await $rotate({ param: { id } });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.rotateWebhookSecret", { defaultValue: "Failed to rotate secret" }),
-      );
+    if (!res.ok) await throwApiError(res, "rotateWebhookSecret");
     return (await res.json()) as RotateSecretResponse;
   },
 });
@@ -93,13 +64,7 @@ export const sendTestMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "test"] as const,
   mutationFn: async (id: string) => {
     const res = await $test({ param: { id } });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.sendWebhookTestEvent", {
-          defaultValue: "Failed to send test event",
-        }),
-      );
+    if (!res.ok) await throwApiError(res, "sendWebhookTestEvent");
     return res.json();
   },
 });

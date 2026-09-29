@@ -24,7 +24,7 @@ import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { createTokenMutationOptions, deleteTokenMutationOptions } from "./api/api-tokens.mutations";
 import { apiTokensQueryOptions } from "./api/api-tokens.queries";
 import type { TokenFormInput } from "./api-tokens.schema";
@@ -63,11 +63,7 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.createdToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.createApiToken", { defaultValue: "Failed to create API token" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("createApiToken")),
   });
 
   const revoke = useMutation({
@@ -76,11 +72,7 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.revokedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.revokeApiToken", { defaultValue: "Failed to revoke API token" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("revokeApiToken")),
   });
 
   return (

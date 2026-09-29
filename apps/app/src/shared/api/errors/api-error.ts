@@ -1,3 +1,5 @@
+import { type ErrorFallbackKey, errorFallback } from "../../i18n/get-errors-t";
+
 export interface ApiError extends Error {
   code?: string;
   metadata?: Record<string, unknown>;
@@ -68,9 +70,15 @@ function retryAfterSeconds(header: string): number | undefined {
   return Math.max(0, Math.ceil((date - Date.now()) / 1000));
 }
 
+/**
+ * Throws the `ApiError` a failed response describes. `fallbackKey` names the
+ * `errors.fallback.*` copy used when the body carries no message; it is
+ * resolved here, at throw time, so every call site passes a key and none
+ * repeats the translation lookup.
+ */
 export async function throwApiError(
   res: ApiFailureResponse,
-  fallbackMessage: string,
+  fallbackKey: ErrorFallbackKey,
 ): Promise<never> {
   let payload: ErrorEnvelope = {};
   try {
@@ -79,7 +87,7 @@ export async function throwApiError(
     // A failure without a JSON body keeps the caller's fallback message.
   }
 
-  const err = new Error(payload.error?.message ?? fallbackMessage) as ApiError;
+  const err = new Error(payload.error?.message ?? errorFallback(fallbackKey)) as ApiError;
   err.code = payload.error?.code;
   err.metadata = payload.error?.metadata;
   err.status = res.status;

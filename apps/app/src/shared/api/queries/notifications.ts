@@ -1,6 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
-import { getErrorsT } from "../../i18n/get-errors-t";
 import { api } from "../api-client";
 import { throwApiError } from "../errors/api-error";
 
@@ -33,12 +32,7 @@ export const notificationsInfiniteQueryOptions = () =>
         { init: { signal } },
       );
       if (!res.ok) {
-        await throwApiError(
-          res,
-          getErrorsT()("fallback.loadNotifications", {
-            defaultValue: "Failed to load notifications",
-          }),
-        );
+        await throwApiError(res, "loadNotifications");
       }
       return (await res.json()) as NotificationsResponse;
     },
@@ -51,10 +45,7 @@ export const unreadCountQueryOptions = queryOptions({
   queryFn: async ({ signal }) => {
     const res = await $unreadCount({}, { init: { signal } });
     if (!res.ok) {
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.loadUnreadCount", { defaultValue: "Failed to load unread count" }),
-      );
+      await throwApiError(res, "loadUnreadCount");
     }
     return (await res.json()) as UnreadCountResponse;
   },
@@ -65,12 +56,7 @@ export const notificationPreferencesQueryOptions = queryOptions({
   queryFn: async ({ signal }) => {
     const res = await $preferences({}, { init: { signal } });
     if (!res.ok) {
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.loadNotificationPreferences", {
-          defaultValue: "Failed to load notification preferences",
-        }),
-      );
+      await throwApiError(res, "loadNotificationPreferences");
     }
     return (await res.json()) as NotificationPreferencesResponse;
   },
@@ -84,12 +70,7 @@ export const orgNotificationPreferencesQueryOptions = (organizationId: string | 
     queryFn: async ({ signal }) => {
       const res = await $orgPreferences({}, { init: { signal } });
       if (!res.ok) {
-        await throwApiError(
-          res,
-          getErrorsT()("fallback.loadOrgNotificationPreferences", {
-            defaultValue: "Failed to load org notification preferences",
-          }),
-        );
+        await throwApiError(res, "loadOrgNotificationPreferences");
       }
       return (await res.json()) as NotificationPreferencesResponse;
     },

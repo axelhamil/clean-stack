@@ -44,7 +44,7 @@ export async function createUpload({
       ...(expiresInSeconds ? { expiresInSeconds } : {}),
     },
   });
-  if (!presignRes.ok) await throwApiError(presignRes, `Presign failed: HTTP ${presignRes.status}`);
+  if (!presignRes.ok) await throwApiError(presignRes, "presignUpload");
 
   const presigned = await presignRes.json();
 
@@ -65,7 +65,7 @@ export async function createUpload({
       expectedContentType: presigned.expectedContentType,
     },
   });
-  if (!confirmRes.ok) await throwApiError(confirmRes, `Confirm failed: HTTP ${confirmRes.status}`);
+  if (!confirmRes.ok) await throwApiError(confirmRes, "confirmUpload");
 
   return confirmRes.json();
 }
@@ -77,5 +77,5 @@ export const createUploadMutationOptions = mutationOptions({
 
 export async function deleteUploadByUrl(url: string): Promise<void> {
   const res = await $delete({ json: { url } });
-  if (!res.ok) await throwApiError(res, `Delete failed: HTTP ${res.status}`);
+  if (!res.ok) await throwApiError(res, "deleteUpload");
 }

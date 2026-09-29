@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { authClient } from "../../auth/auth-client";
-import { getErrorsT } from "../../i18n/get-errors-t";
+import { errorFallback } from "../../i18n/get-errors-t";
 import { toAuthClientError } from "../errors/api-error";
 
 export const passkeysQueryOptions = queryOptions({
@@ -8,10 +8,7 @@ export const passkeysQueryOptions = queryOptions({
   queryFn: async () => {
     const { data, error } = await authClient.passkey.listUserPasskeys();
     if (error) {
-      throw toAuthClientError(
-        error,
-        getErrorsT()("fallback.loadPasskeys", { defaultValue: "Failed to load passkeys" }),
-      );
+      throw toAuthClientError(error, errorFallback("loadPasskeys"));
     }
 
     return data ?? [];

@@ -2,7 +2,6 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
 import { throwApiError } from "../../../shared/api/errors/api-error";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 
 const $listOrgs = api.admin.orgs.$get;
 const $getOrg = api.admin.orgs[":id"].$get;
@@ -24,11 +23,7 @@ export const adminOrgsInfiniteQueryOptions = (search: string) =>
         },
         { init: { signal } },
       );
-      if (!res.ok)
-        await throwApiError(
-          res,
-          getErrorsT()("fallback.loadAdminOrgs", { defaultValue: "Failed to load organizations" }),
-        );
+      if (!res.ok) await throwApiError(res, "loadAdminOrgs");
       return (await res.json()) as AdminOrgsPage;
     },
     initialPageParam: undefined as string | undefined,
@@ -40,11 +35,7 @@ export const adminOrgDetailQueryOptions = (id: string) =>
     queryKey: ["admin", "orgs", "detail", id] as const,
     queryFn: async ({ signal }) => {
       const res = await $getOrg({ param: { id } }, { init: { signal } });
-      if (!res.ok)
-        await throwApiError(
-          res,
-          getErrorsT()("fallback.loadAdminOrg", { defaultValue: "Failed to load organization" }),
-        );
+      if (!res.ok) await throwApiError(res, "loadAdminOrg");
       return (await res.json()) as AdminOrgDetail;
     },
   });
