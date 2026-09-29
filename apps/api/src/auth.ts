@@ -1,3 +1,6 @@
+// Type-only anchors: the inferred `auth` type references these packages' types, and TS
+// can only name them portably from a direct dependency. @simplewebauthn/server must
+// therefore stay on the major @better-auth/passkey depends on (13, up to passkey 1.7).
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
