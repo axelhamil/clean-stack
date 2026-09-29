@@ -120,7 +120,7 @@ export function EndpointRow({
                   onClick={() => onDelete(endpoint)}
                   disabled={guard.blocked}
                   {...guard.describeProps()}
-                  className="text-destructive focus:text-destructive"
+                  variant="destructive"
                 >
                   {t("settings:webhooks.endpointRow.delete")}
                 </DropdownMenuItem>

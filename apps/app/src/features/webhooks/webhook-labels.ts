@@ -1,16 +1,17 @@
+import type { Badge } from "@packages/ui/components/ui/badge";
+import type { ComponentProps } from "react";
 import type { WebhookDeliveryStatus } from "./api/webhooks.queries";
 import type { EndpointStatus } from "./components/endpoint-row";
 
-// `endpoint-row.tsx` renders the `EndpointStatus` union both as the plain
-// badge text (active/paused) and, hard-coded today, inside the
-// "auto-disabled" tooltip badge. `satisfies Record<EndpointStatus, string>`
-// only proves every status has AN entry — it cannot prove each one points at
-// the RIGHT key, so `__tests__/webhook-labels.test.ts` asserts the mapping
-// directly. No guard here, deliberately: `status` is computed locally from a
-// closed union, so the compiler already proves the lookup exhaustive. The day
-// it becomes wire-sourced its type widens to `string` and `tsc` demands a
-// guard then — which protects more than a guard nothing calls, and a comment
-// claiming a fallback the call site does not have.
+type BadgeVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>;
+
+// `endpoint-row.tsx` renders every `EndpointStatus` through this lookup, the
+// "auto-disabled" tooltip badge included. `satisfies Record<EndpointStatus, string>`
+// only proves every status has AN entry, not that each one points at the RIGHT
+// key, so `__tests__/webhook-labels.test.ts` asserts the mapping directly. No
+// guard here, deliberately: `status` is computed locally from a closed union,
+// so the compiler already proves the lookup exhaustive. The day it becomes
+// wire-sourced its type widens to `string` and `tsc` demands a guard then.
 export const ENDPOINT_STATUS_KEYS = {
   active: "common:states.endpoint.active",
   paused: "common:states.endpoint.paused",
@@ -39,3 +40,10 @@ export const DELIVERY_STATUS_KEYS = {
   failed: "common:states.delivery.failed",
   dead_letter: "common:states.delivery.deadLetter",
 } as const satisfies Record<WebhookDeliveryStatus, string>;
+
+export const DELIVERY_STATUS_BADGE_VARIANTS = {
+  pending: "secondary",
+  success: "default",
+  failed: "destructive",
+  dead_letter: "destructive",
+} as const satisfies Record<WebhookDeliveryStatus, BadgeVariant>;

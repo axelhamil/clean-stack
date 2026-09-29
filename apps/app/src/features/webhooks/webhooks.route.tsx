@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -56,7 +56,11 @@ import { EndpointRow } from "./components/endpoint-row";
 import { VerifySnippet } from "./components/verify-snippet";
 import { WebhookForm } from "./forms/webhook-form";
 import type { DeliveryFilters } from "./webhook-delivery-filters";
-import { DELIVERY_STATUS_KEYS, isDeliveryStatus } from "./webhook-labels";
+import {
+  DELIVERY_STATUS_BADGE_VARIANTS,
+  DELIVERY_STATUS_KEYS,
+  isDeliveryStatus,
+} from "./webhook-labels";
 
 export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/webhooks")({
   beforeLoad: ensureOrgPermission({ webhooks: ["read"] }),
@@ -213,7 +217,7 @@ function WebhooksPage() {
       ) : endpoints.isError ? (
         <p>{t("errors:fallback.loadWebhookEndpoints")}</p>
       ) : endpoints.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">{t("settings:webhooks.noEndpoints")}</p>
+        <TypographyMuted>{t("settings:webhooks.noEndpoints")}</TypographyMuted>
       ) : (
         <Table>
           <TableHeader>
@@ -254,7 +258,7 @@ function WebhooksPage() {
               onValueChange={(v) =>
                 setDeliveryFilters((f) => ({
                   ...f,
-                  status: (v as DeliveryFilters["status"]) || undefined,
+                  status: isDeliveryStatus(v) ? v : undefined,
                 }))
               }
             >
@@ -298,15 +302,7 @@ function WebhooksPage() {
                       <TableRow key={d.id}>
                         <TableCell className="font-mono text-sm">{d.eventType}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              d.status === "success"
-                                ? "default"
-                                : d.status === "dead_letter" || d.status === "failed"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
+                          <Badge variant={DELIVERY_STATUS_BADGE_VARIANTS[d.status]}>
                             {isDeliveryStatus(d.status)
                               ? t(DELIVERY_STATUS_KEYS[d.status])
                               : d.status}
@@ -339,7 +335,7 @@ function WebhooksPage() {
           <DeliverySheet
             endpointId={selectedEndpointId}
             delivery={selectedDelivery}
-            canReplay={can({ webhooks: ["write"] })}
+            canReplay={canWrite}
             onReplay={(deliveryId) => replay.mutate({ endpointId: selectedEndpointId, deliveryId })}
             onClose={() => setSelectedDelivery(null)}
             guard={guard}
