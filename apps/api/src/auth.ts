@@ -1094,7 +1094,10 @@ const authOptions = {
         { email: actorEmail, name: actorName, appName: "clean-stack" },
         di.IPasswordBreachService,
       );
-      if (result?.isBreach) {
+      if (result.isNone()) return;
+
+      const violation = result.unwrap();
+      if (violation.isBreach) {
         await emitBestEffort(EventTypes.SECURITY_PASSWORD_BREACHED, "security", path, {
           actorUserId,
           email: actorEmail ?? null,
@@ -1102,7 +1105,7 @@ const authOptions = {
           path,
         });
       }
-      if (result !== null) throw new APIError("UNPROCESSABLE_ENTITY", { message: result.message });
+      throw new APIError("UNPROCESSABLE_ENTITY", { message: violation.message });
     }),
     after: createAuthMiddleware(async (ctx) => {
       const path = ctx.path;
