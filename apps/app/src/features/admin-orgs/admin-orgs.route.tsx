@@ -1,7 +1,6 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { Switch } from "@packages/ui/components/ui/switch";
 import {
   Table,
@@ -12,7 +11,6 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -49,7 +47,7 @@ function AdminOrgsPage() {
   });
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <header>
         <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
       </header>

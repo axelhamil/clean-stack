@@ -1,6 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Select,
   SelectContent,
@@ -16,7 +15,6 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -45,7 +43,7 @@ function AdminUsersPage() {
   const query = useInfiniteQuery(adminUsersInfiniteQueryOptions(filters));
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <header>
         <TypographyH1 variant="page">{t("users.pageTitle")}</TypographyH1>
       </header>
