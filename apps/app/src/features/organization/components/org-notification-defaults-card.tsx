@@ -8,7 +8,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { toastError } from "../../../shared/api/errors/toast";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
 import { Can } from "../../../shared/auth/can";
@@ -35,7 +35,7 @@ export function OrgNotificationDefaultsCard() {
       queryClient.invalidateQueries({
         queryKey: orgNotificationPreferencesQueryOptions(organizationId).queryKey,
       }),
-    onError: () => toast.error(t("organization.saveDefaultsFailed")),
+    onError: (err) => toastError(err, t("organization.saveDefaultsFailed")),
   });
 
   const handleChange = (change: PreferenceChange) => update.mutate(change);
