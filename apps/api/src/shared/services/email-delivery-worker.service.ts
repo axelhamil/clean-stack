@@ -6,7 +6,7 @@ import { DEFAULT_LOCALE } from "@packages/i18n";
 import { Resend } from "resend";
 import { env } from "../env";
 import { emitEvent } from "../event-emitter";
-import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../jitter";
+import { expectedDelayFromAttempts, nextAttemptAt } from "../jitter";
 import type { Logger } from "../logger";
 import type { EmailMessageRecord, IEmailQueue } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
@@ -41,10 +41,6 @@ type BatchResult = {
 };
 interface BatchSender {
   batchSend(entries: BatchEntry[], idempotencyKey: string | null): Promise<BatchResult>;
-}
-
-function expectedDelayFromAttempts(currentAttempts: number): number {
-  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
 }
 
 async function sha256Hex(value: string): Promise<string> {

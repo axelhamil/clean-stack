@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  expectedDelayFromAttempts,
   isDeadLetter,
   JITTER_BASE_MS,
   JITTER_CAP_MS,
@@ -74,5 +75,16 @@ describe("nextAttemptAt", () => {
     const dateMs = result.date.getTime();
     expect(dateMs).toBeGreaterThanOrEqual(before + JITTER_BASE_MS);
     expect(dateMs).toBeLessThanOrEqual(after + JITTER_CAP_MS);
+  });
+});
+
+describe("expectedDelayFromAttempts", () => {
+  it("starts at JITTER_BASE_MS and grows by JITTER_MULTIPLIER per attempt", () => {
+    expect(expectedDelayFromAttempts(0)).toBe(JITTER_BASE_MS);
+    expect(expectedDelayFromAttempts(2)).toBe(JITTER_BASE_MS * JITTER_MULTIPLIER ** 2);
+  });
+
+  it("treats a negative attempt count as the first attempt", () => {
+    expect(expectedDelayFromAttempts(-3)).toBe(JITTER_BASE_MS);
   });
 });

@@ -1,7 +1,7 @@
 import { type EventHandler, type IDomainEvent, isEventHandler, Option } from "@packages/ddd-kit";
 import { db, sql } from "@packages/drizzle";
 import { Client } from "pg";
-import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../jitter";
+import { expectedDelayFromAttempts, nextAttemptAt } from "../jitter";
 import type { Logger } from "../logger";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository, OutboxRecord } from "../ports/outbox.port";
@@ -12,10 +12,6 @@ const POLL_INTERVAL_MS = 30_000;
 const RECONNECT_BACKOFF_MS = 1_000;
 const RECONNECT_MAX_BACKOFF_MS = 30_000;
 const NOTIFY_CHANNEL = "outbox_event";
-
-function expectedDelayFromAttempts(currentAttempts: number): number {
-  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
-}
 
 function recordToDomainEvent(rec: OutboxRecord): IDomainEvent {
   return {

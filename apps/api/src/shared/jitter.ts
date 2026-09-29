@@ -1,5 +1,5 @@
 /**
- * Decorrelated jitter retry math — AWS "Exponential Backoff and Jitter" pattern.
+ * Decorrelated jitter retry math, after the AWS "Exponential Backoff and Jitter" pattern.
  *
  * Each delay is sampled uniformly in `[BASE, max(BASE, lastDelay × MULTIPLIER)]`
  * rather than `[0, cap]`, which avoids the thundering-herd that pure random
@@ -15,6 +15,15 @@ export function nextDelayMs(lastDelayMs: number): number {
   const upper = Math.max(JITTER_BASE_MS, lastDelayMs * JITTER_MULTIPLIER);
   const delay = JITTER_BASE_MS + Math.random() * (upper - JITTER_BASE_MS);
   return Math.min(JITTER_CAP_MS, Math.floor(delay));
+}
+
+/**
+ * The delay the previous retry would have waited after `currentAttempts` failures,
+ * fed back into `nextDelayMs` as its `lastDelayMs`. Workers only persist the attempt
+ * count, never the delay they actually slept, so the growth curve is rebuilt from it.
+ */
+export function expectedDelayFromAttempts(currentAttempts: number): number {
+  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
 }
 
 /** Returns true when the event has exhausted all retry attempts and should be parked. */
