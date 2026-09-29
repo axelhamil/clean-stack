@@ -4,6 +4,7 @@ import {
   entitlementsForTier,
   hasFeature,
   hasSeatAvailable,
+  isTier,
   meetsPlan,
   rankOf,
 } from "../config";
@@ -17,6 +18,12 @@ describe("billing config", () => {
   it("entitlementsForTier falls back to free on unknown tier", () => {
     expect(entitlementsForTier("garbage")).toEqual(ENTITLEMENTS.free);
     expect(entitlementsForTier("pro")).toEqual(ENTITLEMENTS.pro);
+  });
+
+  it("isTier rejects names inherited from Object.prototype", () => {
+    expect(isTier("toString")).toBe(false);
+    expect(isTier("constructor")).toBe(false);
+    expect(entitlementsForTier("constructor")).toEqual(ENTITLEMENTS.free);
   });
 
   it("hasFeature reads the view's feature set", () => {

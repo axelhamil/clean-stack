@@ -31,7 +31,7 @@ export const ENTITLEMENTS: Record<Tier, Entitlement> = {
 };
 
 export function isTier(value: string): value is Tier {
-  return value in ENTITLEMENTS;
+  return Object.hasOwn(ENTITLEMENTS, value);
 }
 
 export function entitlementsForTier(tier: string): Entitlement {
