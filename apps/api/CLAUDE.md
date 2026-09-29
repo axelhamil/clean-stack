@@ -76,7 +76,7 @@ export const xModule = defineModule()((b) =>
 ## Commands
 
 - **Tests**: `pnpm --filter api test` (`bun test --isolate --parallel`); a bare `bun test` drops file isolation.
-- **Real-database checks**: `pnpm --filter api check:{fanout,digest,api-token-visibility,wipe-rollback,marksent,enqueue,sweep-lock}` (scripts in `scripts/`, refuse a non-local database via `require-local-database.ts`, all wired in `.github/workflows/ci.yml`). A new SQL-heavy decision the mocks cannot cover gets a script AND a CI step.
+- **Real-database checks**: `pnpm --filter api check:{fanout,digest,api-token-visibility,wipe-rollback,uow-rollback,marksent,enqueue,sweep-lock}` (scripts in `scripts/`, refuse a non-local database via `require-local-database.ts`, all wired in `.github/workflows/ci.yml`). A new SQL-heavy decision the mocks cannot cover gets a script AND a CI step.
 
 ## Hono RPC (end-to-end type safety)
 

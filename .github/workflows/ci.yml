@@ -111,6 +111,11 @@ jobs:
         # the confirmation enqueue fails. Creates and removes its own probe user.
         run: pnpm --filter api check:wipe-rollback
 
+      - name: Check the unit-of-work rollback on a failed Result against a real database
+        # A mocked unit of work only proves the service throws inside db.transaction;
+        # only Postgres proves the earlier write and its outbox row are discarded.
+        run: pnpm --filter api check:uow-rollback
+
       - name: Check the email-queue enqueue conflict against a real database
         # `onConflictDoNothing` is a Postgres behaviour, not a builder shape — a
         # mocked tx asserts the call, never the outcome.

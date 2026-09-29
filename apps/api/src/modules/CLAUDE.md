@@ -65,6 +65,7 @@ async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
 
 **Hard rules**:
 - `uow.run()` cannot be nested: it always opens from `db` (independent commit, no savepoint), and a rolled-back inner write could not un-collect the in-memory `EventCollector` buffer, so its events would still be emitted. `TransactionService.run()` throws if `EventCollector.hasContext()` is already true.
+- A callback that resolves to a failed `Result` rolls the whole transaction back (writes and collected events) and `run()` resolves to that `Result`. Return the failure, never throw a sentinel to force the rollback. **Why**: a failure is all or nothing without the caller remembering to throw, and a thrown sentinel has to be told apart from a real crash in every `catch`. Proven against Postgres by `check:uow-rollback`.
 - Repos must call `trackEventsOnSuccess(result, aggregate)` (helper in `@packages/drizzle`) inside their `save`/`create` impl, otherwise events stay on the aggregate buffer and are silently lost.
 - `addEvent()` outside `uow.run()` = events lost (warning logged in dev via `EventCollector.setOutOfContextLogger`).
 

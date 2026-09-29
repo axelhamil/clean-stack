@@ -32,12 +32,13 @@ import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.servi
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "../src/modules/uploads/infrastructure/services/noop-storage.service";
 import { logger } from "../src/shared/logger";
+import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
 import { QueuedEmailService } from "../src/shared/services/email.service";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
-const instrumentation = new NoOpInstrumentation();
+const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const PROBE_MARKER = "wipe-rollback-probe";
 const userId = `check-wipe-rollback-${crypto.randomUUID()}`;
 const probeEmail = `${PROBE_MARKER}-${userId}@example.com`;
@@ -95,7 +96,7 @@ async function main(): Promise<void> {
     new DrizzleRgpdRepository(logger, instrumentation),
     new NoOpStorageService(),
     email,
-    new TransactionService(),
+    new TransactionService(instrumentation),
     outbox,
     instrumentation,
   );

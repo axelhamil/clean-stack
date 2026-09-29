@@ -80,7 +80,7 @@ export const di = container()
   .add(
     "ITransactionService",
     (c) =>
-      new TransactionService(async (events, tx) => {
+      new TransactionService(c.IInstrumentation, async (events, tx) => {
         await c.IOutboxRepository.enqueue(events, { source: "app/api" }, tx);
       }),
   )
