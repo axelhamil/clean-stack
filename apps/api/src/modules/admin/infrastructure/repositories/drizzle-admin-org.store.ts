@@ -23,20 +23,22 @@ import type {
 } from "../../application/ports/admin-org-store.port";
 import type { AdminStoreError } from "../../application/ports/admin-user-store.port";
 
-const organization = multiTenantSchema.organization;
-const member = multiTenantSchema.member;
-const subscription = billingSchema.subscription;
 const fail = createDbFailure("ADMIN_QUERY_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-const orgColumns = {
-  id: organization.id,
-  name: organization.name,
-  slug: organization.slug,
-  createdAt: organization.createdAt,
-  ssoEnforced: organization.ssoEnforced,
-  memberCount: count(member.id),
-};
+// Built per call, not at import: schema columns are read lazily so a test that
+// stands in for the drizzle package without them can still import this file.
+function orgColumns() {
+  const { organization, member } = multiTenantSchema;
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    createdAt: organization.createdAt,
+    ssoEnforced: organization.ssoEnforced,
+    memberCount: count(member.id),
+  };
+}
 
 export class DrizzleAdminOrgStore implements IAdminOrgStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
@@ -44,6 +46,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
   async listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgRow[], AdminStoreError>> {
     return this.instrumentation.startSpan({ name: "DrizzleAdminOrgStore > listOrgs" }, async () => {
       try {
+        const { organization, member } = multiTenantSchema;
         const conditions = [];
         if (input.search) {
           conditions.push(
@@ -56,7 +59,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
         if (input.cursor) conditions.push(lt(organization.createdAt, new Date(input.cursor)));
 
         const query = db
-          .select(orgColumns)
+          .select(orgColumns())
           .from(organization)
           .leftJoin(member, eq(member.organizationId, organization.id))
           .where(conditions.length ? and(...conditions) : undefined)
@@ -82,8 +85,9 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
       { name: "DrizzleAdminOrgStore > findOrgById" },
       async () => {
         try {
+          const { organization, member } = multiTenantSchema;
           const query = db
-            .select(orgColumns)
+            .select(orgColumns())
             .from(organization)
             .leftJoin(member, eq(member.organizationId, organization.id))
             .where(eq(organization.id, id))
@@ -111,6 +115,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
       { name: "DrizzleAdminOrgStore > listMembersOf" },
       async () => {
         try {
+          const { member } = multiTenantSchema;
           const query = db
             .select({
               userId: member.userId,
@@ -140,6 +145,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
       { name: "DrizzleAdminOrgStore > findPlanFor" },
       async () => {
         try {
+          const { subscription } = billingSchema;
           const query = db
             .select({ plan: subscription.plan })
             .from(subscription)

@@ -22,29 +22,33 @@ import type {
   IAdminUserStore,
 } from "../../application/ports/admin-user-store.port";
 
-const user = authSchema.user;
-const session = authSchema.session;
-const member = multiTenantSchema.member;
-const organization = multiTenantSchema.organization;
 const fail = createDbFailure("ADMIN_QUERY_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-const userColumns = {
-  id: user.id,
-  email: user.email,
-  name: user.name,
-  role: user.role,
-  banned: user.banned,
-  banReason: user.banReason,
-  banExpires: user.banExpires,
-  twoFactorEnabled: user.twoFactorEnabled,
-  createdAt: user.createdAt,
-};
+// Built per call, not at import: schema columns are read lazily so a test that
+// stands in for the drizzle package without them can still import this file.
+function userColumns() {
+  const { user } = authSchema;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    banned: user.banned,
+    banReason: user.banReason,
+    banExpires: user.banExpires,
+    twoFactorEnabled: user.twoFactorEnabled,
+    createdAt: user.createdAt,
+  };
+}
 
-type UserSelection = Pick<typeof user.$inferSelect, keyof typeof userColumns>;
+type UserSelection = Pick<
+  typeof authSchema.user.$inferSelect,
+  keyof ReturnType<typeof userColumns>
+>;
 
 type SessionSelection = Pick<
-  typeof session.$inferSelect,
+  typeof authSchema.session.$inferSelect,
   "id" | "createdAt" | "expiresAt" | "ipAddress" | "userAgent" | "impersonatedBy"
 >;
 
@@ -81,6 +85,8 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
       { name: "DrizzleAdminUserStore > listUsers" },
       async () => {
         try {
+          const { user } = authSchema;
+          const { member } = multiTenantSchema;
           const conditions = [];
           if (input.search) {
             conditions.push(
@@ -103,7 +109,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
           }
 
           const query = db
-            .select(userColumns)
+            .select(userColumns())
             .from(user)
             .where(conditions.length ? and(...conditions) : undefined)
             .orderBy(desc(user.createdAt))
@@ -128,7 +134,8 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
       { name: "DrizzleAdminUserStore > findUserById" },
       async () => {
         try {
-          const query = db.select(userColumns).from(user).where(eq(user.id, id)).limit(1);
+          const { user } = authSchema;
+          const query = db.select(userColumns()).from(user).where(eq(user.id, id)).limit(1);
 
           const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
@@ -149,6 +156,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
       { name: "DrizzleAdminUserStore > listSessionsFor" },
       async () => {
         try {
+          const { session } = authSchema;
           const query = db
             .select({
               id: session.id,
@@ -181,6 +189,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
       { name: "DrizzleAdminUserStore > listMembershipsFor" },
       async () => {
         try {
+          const { member, organization } = multiTenantSchema;
           const query = db
             .select({
               organizationId: member.organizationId,
