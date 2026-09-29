@@ -26,7 +26,7 @@ export interface UseAuthorizationResult {
 export function useAuthorization(): UseAuthorizationResult {
   const organizationId = useActiveOrgId();
   const { data: membership, isPending } = useQuery(currentMembershipQueryOptions(organizationId));
-  const role = membership?.role as OrgRole | undefined;
+  const role = membership?.role;
   const hasMembership = role !== undefined;
   const can = (permissions: OrgPermissions, connector?: "OR" | "AND") =>
     authorizeRole(role, permissions, connector);
