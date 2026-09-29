@@ -8,8 +8,8 @@ import {
   SIGNATURE_HEADER,
   sign,
 } from "../../../shared/internal-routes/internal-signature";
-import { NoOpInstrumentation } from "../../../shared/middleware/../services/noop-instrumentation";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 
 type SweepOutput = {
   processed: number;
@@ -20,14 +20,16 @@ type SweepOutput = {
 };
 type SweepResult = Result<SweepOutput, { code: string; message: string }>;
 
+const SWEEP_OK: SweepOutput = {
+  processed: 2,
+  succeeded: ["u1", "u2"],
+  failed: [],
+  dryRun: false,
+  truncated: false,
+};
+
 const mockedExecute = mock<(...args: unknown[]) => Promise<SweepResult>>(async () =>
-  Result.ok({
-    processed: 2,
-    succeeded: ["u1", "u2"],
-    failed: [],
-    dryRun: false,
-    truncated: false,
-  }),
+  Result.ok(SWEEP_OK),
 );
 
 mock.module("../../../container", () => ({
@@ -70,29 +72,25 @@ async function signedHeaders(method: string, path: string, body: object) {
   };
 }
 
+async function postSignedSweep(body: object) {
+  const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
+
+  return makeApp().request("/internal/rgpd-sweep", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
 describe("POST /internal/rgpd-sweep", () => {
   beforeEach(() => {
     mockedExecute.mockClear();
-    mockedExecute.mockResolvedValue(
-      Result.ok({
-        processed: 2,
-        succeeded: ["u1", "u2"],
-        failed: [],
-        dryRun: false,
-        truncated: false,
-      }),
-    );
+    mockedExecute.mockResolvedValue(Result.ok(SWEEP_OK));
   });
 
   describe("when the request carries a valid signature", () => {
     it("should pass through to the use case and return its output", async () => {
-      const body = { dryRun: false };
-      const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
-      const res = await makeApp().request("/internal/rgpd-sweep", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      const res = await postSignedSweep({ dryRun: false });
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({
         processed: 2,
@@ -102,13 +100,7 @@ describe("POST /internal/rgpd-sweep", () => {
     });
 
     it("should forward the validated body fields to the use case", async () => {
-      const body = { batchSize: 25, dryRun: true };
-      const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
-      await makeApp().request("/internal/rgpd-sweep", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      await postSignedSweep({ batchSize: 25, dryRun: true });
       expect(mockedExecute).toHaveBeenCalledWith({
         batchSize: 25,
         dryRun: true,
@@ -117,13 +109,7 @@ describe("POST /internal/rgpd-sweep", () => {
     });
 
     it("should fall back to the env default batchSize when omitted", async () => {
-      const body = { dryRun: false };
-      const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
-      await makeApp().request("/internal/rgpd-sweep", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      await postSignedSweep({ dryRun: false });
       expect(mockedExecute).toHaveBeenCalledWith({
         batchSize: env.RGPD_SWEEP_BATCH_SIZE,
         dryRun: false,
@@ -146,25 +132,13 @@ describe("POST /internal/rgpd-sweep", () => {
 
   describe("when the body fails zod validation", () => {
     it("should reject with 400 (batchSize must be positive)", async () => {
-      const body = { batchSize: -1 };
-      const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
-      const res = await makeApp().request("/internal/rgpd-sweep", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      const res = await postSignedSweep({ batchSize: -1 });
       expect(res.status).toBe(400);
       expect(mockedExecute).not.toHaveBeenCalled();
     });
 
     it("should reject with 400 when batchSize exceeds the cap", async () => {
-      const body = { batchSize: 10000 };
-      const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
-      const res = await makeApp().request("/internal/rgpd-sweep", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      const res = await postSignedSweep({ batchSize: 10000 });
       expect(res.status).toBe(400);
     });
   });
@@ -177,13 +151,7 @@ describe("POST /internal/rgpd-sweep", () => {
           message: "user vanished",
         }),
       );
-      const body = { dryRun: false };
-      const headers = await signedHeaders("POST", "/internal/rgpd-sweep", body);
-      const res = await makeApp().request("/internal/rgpd-sweep", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      const res = await postSignedSweep({ dryRun: false });
       expect(res.status).toBe(404);
       const errBody = (await res.json()) as { error: { code: string } };
       expect(errBody.error.code).toBe("ACCOUNT_DELETION_NOT_FOUND");

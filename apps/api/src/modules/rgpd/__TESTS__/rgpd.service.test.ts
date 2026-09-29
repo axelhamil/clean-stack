@@ -3,6 +3,7 @@ import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
+import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { IStorageService } from "../../../shared/ports/storage.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
@@ -67,6 +68,25 @@ const noopOutbox: IOutboxRepository = {
   markFailed: async () => {},
 };
 
+function graceElapsedStateFor(userId: string): UserDeletionState {
+  return {
+    ...baseState,
+    email: `${userId}@example.com`,
+    pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
+  };
+}
+
+function recordingOutbox() {
+  const enqueued: Array<{ eventType: string; aggregateId: string }> = [];
+  const outbox: IOutboxRepository = {
+    ...noopOutbox,
+    enqueue: async (events) => {
+      for (const e of events) enqueued.push({ eventType: e.eventType, aggregateId: e.aggregateId });
+    },
+  };
+  return { outbox, enqueued };
+}
+
 function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
   return {
     findSoleOwnedNonPersonalOrgsWithMembers: mock(async () => Result.ok<never[], RgpdError>([])),
@@ -118,6 +138,24 @@ function makeEmail(): IEmailService {
   } as unknown as IEmailService;
 }
 
+function buildService(deps: {
+  repo: IRgpdRepository;
+  email: IEmailService;
+  storage?: IStorageService;
+  uow?: IUnitOfWork<never>;
+  outbox?: IOutboxRepository;
+  instrumentation?: IInstrumentation;
+}): RgpdService {
+  return new RgpdService(
+    deps.repo,
+    deps.storage ?? makeStorage(),
+    deps.email,
+    deps.uow ?? tx,
+    deps.outbox ?? noopOutbox,
+    deps.instrumentation ?? new NoOpInstrumentation(),
+  );
+}
+
 function makeService(opts: {
   email?: IEmailService;
   readyForWipe?: string[];
@@ -134,26 +172,11 @@ function makeService(opts: {
       ? mock(async () => Result.ok<Option<UserDeletionState>, RgpdError>(Option.none()))
       : mock(async (userId: string) =>
           Result.ok<Option<UserDeletionState>, RgpdError>(
-            Option.some({
-              email: `${userId}@example.com`,
-              name: "User",
-              locale: Option.some("fr" as const),
-              twoFactorEnabled: false,
-              pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
-              deletedAt: Option.none(),
-              lastExportRequestedAt: Option.none(),
-            }),
+            Option.some(graceElapsedStateFor(userId)),
           ),
         ),
   });
-  return new RgpdService(
-    repo,
-    makeStorage(),
-    opts.email ?? makeEmail(),
-    tx,
-    noopOutbox,
-    new NoOpInstrumentation(),
-  );
+  return buildService({ repo, email: opts.email ?? makeEmail() });
 }
 
 describe("RgpdService", () => {
@@ -168,14 +191,7 @@ describe("RgpdService", () => {
   describe("preflightAccountDeletion", () => {
     it("returns an empty blockingOrgs list when user has no blocking orgs", async () => {
       const repo = makeRepo();
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.preflightAccountDeletion({ userId: "u1" });
 
@@ -193,14 +209,7 @@ describe("RgpdService", () => {
           Result.ok<SoleOwnedOrgWithMembers[], RgpdError>(blocking),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.preflightAccountDeletion({ userId: "u1" });
 
@@ -218,14 +227,7 @@ describe("RgpdService", () => {
           ]),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestAccountDeletion({ userId: "u1", password: "secret" });
 
@@ -241,14 +243,7 @@ describe("RgpdService", () => {
       const repo = makeRepo({
         verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(false)),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestAccountDeletion({ userId: "u1", password: "wrong" });
 
@@ -258,14 +253,7 @@ describe("RgpdService", () => {
 
     it("marks pending and emails when password is valid and 2FA disabled", async () => {
       const repo = makeRepo();
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestAccountDeletion({ userId: "u1", password: "good" });
 
@@ -287,14 +275,7 @@ describe("RgpdService", () => {
           ),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestAccountDeletion({ userId: "u1", password: "ignored" });
 
@@ -311,14 +292,7 @@ describe("RgpdService", () => {
         ),
         verifyTotp: mock(async () => Result.ok<boolean, RgpdError>(false)),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestAccountDeletion({ userId: "u1", totpCode: "000000" });
 
@@ -335,14 +309,7 @@ describe("RgpdService", () => {
           ),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestAccountDeletion({ userId: "u1", password: "anything" });
 
@@ -364,14 +331,7 @@ describe("RgpdService", () => {
           ),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.cancelAccountDeletion({ userId: "u1" });
 
@@ -387,14 +347,7 @@ describe("RgpdService", () => {
 
     it("returns ACCOUNT_DELETION_NOT_FOUND when nothing is pending", async () => {
       const repo = makeRepo();
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.cancelAccountDeletion({ userId: "u1" });
 
@@ -417,14 +370,7 @@ describe("RgpdService", () => {
         ),
       });
       const storage = makeStorage();
-      const service = new RgpdService(
-        repo,
-        storage,
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email, storage });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -447,14 +393,7 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -488,14 +427,7 @@ describe("RgpdService", () => {
           Result.fail<void, EmailError>({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
         ),
       };
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        failEmail,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email: failEmail });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -520,7 +452,7 @@ describe("RgpdService", () => {
         startTransaction: async (cb) => cb({} as never),
         run: async () => {
           // Simulates Postgres failing to ROLLBACK (e.g. connection loss) after the
-          // sentinel throw — a different error surfaces from `run`, not "rollback".
+          // sentinel throw: a different error surfaces from `run`, not "rollback".
           throw new Error("connection terminated unexpectedly");
         },
       };
@@ -530,14 +462,12 @@ describe("RgpdService", () => {
         captured.push(err);
       };
 
-      const service = new RgpdService(
+      const service = buildService({
         repo,
-        makeStorage(),
-        failEmail,
-        brokenTx,
-        noopOutbox,
-        capturingInstrumentation,
-      );
+        email: failEmail,
+        uow: brokenTx,
+        instrumentation: capturingInstrumentation,
+      });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -552,24 +482,8 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
         ),
       });
-      const enqueued: Array<{ eventType: string; aggregateId: string }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events)
-            enqueued.push({ eventType: e.eventType, aggregateId: e.aggregateId });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        spyOutbox,
-        new NoOpInstrumentation(),
-      );
+      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const service = buildService({ repo, email, outbox: spyOutbox });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -595,23 +509,8 @@ describe("RgpdService", () => {
           }),
         ),
       });
-      const enqueued: Array<{ eventType: string }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events) enqueued.push({ eventType: e.eventType });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        spyOutbox,
-        new NoOpInstrumentation(),
-      );
+      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const service = buildService({ repo, email, outbox: spyOutbox });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -635,14 +534,7 @@ describe("RgpdService", () => {
           ),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -662,14 +554,7 @@ describe("RgpdService", () => {
           ),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -678,7 +563,7 @@ describe("RgpdService", () => {
       expect(repo.executeWipe).not.toHaveBeenCalled();
     });
 
-    it("does not throw when storage cleanup fails — wipe is already committed", async () => {
+    it("does not throw when storage cleanup fails because the wipe is already committed", async () => {
       const repo = makeRepo({
         getUserDeletionState: mock(async () =>
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
@@ -689,14 +574,7 @@ describe("RgpdService", () => {
           Result.fail({ code: "STORAGE_PROVIDER_FAILURE" as const, message: "boom" }),
         ) as IStorageService["listObjectKeys"],
       });
-      const service = new RgpdService(
-        repo,
-        storage,
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email, storage });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
@@ -720,15 +598,7 @@ describe("RgpdService", () => {
         findUsersReadyForWipe: mock(async () => Result.ok<PendingDeletionRow[], RgpdError>(rows)),
         getUserDeletionState: mock(async (userId: string) =>
           Result.ok<Option<UserDeletionState>, RgpdError>(
-            Option.some({
-              email: `${userId}@example.com`,
-              name: "User",
-              locale: Option.some("fr" as const),
-              twoFactorEnabled: false,
-              pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
-              deletedAt: Option.none(),
-              lastExportRequestedAt: Option.none(),
-            }),
+            Option.some(graceElapsedStateFor(userId)),
           ),
         ),
         ...overrides,
@@ -737,14 +607,7 @@ describe("RgpdService", () => {
 
     it("returns the pending list without calling wipe in dryRun mode", async () => {
       const repo = makeBatchRepo(pendingRows);
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.processPendingDeletions({ batchSize: 50, dryRun: true });
 
@@ -763,14 +626,7 @@ describe("RgpdService", () => {
           Result.ok<PendingDeletionRow[], RgpdError>(pendingRows.slice(0, limit)),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.processPendingDeletions({ batchSize: 2 });
 
@@ -781,14 +637,7 @@ describe("RgpdService", () => {
 
     it("processes all rows and reports successes (happy path)", async () => {
       const repo = makeBatchRepo(pendingRows);
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.processPendingDeletions({});
 
@@ -800,33 +649,18 @@ describe("RgpdService", () => {
       expect(output.failed).toHaveLength(0);
     });
 
-    it("aggregates failures without throwing — other users still processed", async () => {
+    it("aggregates failures without throwing while other users are still processed", async () => {
       const repo = makeBatchRepo(pendingRows, {
         getUserDeletionState: mock(async (userId: string) => {
           if (userId === "u2") {
             return Result.ok<Option<UserDeletionState>, RgpdError>(Option.none());
           }
           return Result.ok<Option<UserDeletionState>, RgpdError>(
-            Option.some({
-              email: `${userId}@example.com`,
-              name: "User",
-              locale: Option.some("fr" as const),
-              twoFactorEnabled: false,
-              pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
-              deletedAt: Option.none(),
-              lastExportRequestedAt: Option.none(),
-            }),
+            Option.some(graceElapsedStateFor(userId)),
           );
         }),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.processPendingDeletions({});
 
@@ -862,21 +696,14 @@ describe("RgpdService", () => {
     it("stops between wipes once the budget is spent and reports truncated", async () => {
       // A clock that jumps 60ms per read: deadlineAt = 60 + 100 = 160. The first
       // in-loop check reads 120 (< 160, wipe runs); the second reads 180 (>= 160,
-      // stop before starting the next wipe) — one account wiped, two deferred.
+      // stop before starting the next wipe): one account wiped, two deferred.
       let readCount = 0;
       const fakeClock = () => {
         readCount += 1;
         return readCount * 60;
       };
       const repo = makeBatchRepo(pendingRows);
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.processPendingDeletions({
         batchSize: 3,
@@ -896,14 +723,7 @@ describe("RgpdService", () => {
 
     it("reports truncated: false when every account finishes inside the budget", async () => {
       const repo = makeBatchRepo(pendingRows);
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.processPendingDeletions({
         batchSize: 3,
@@ -935,14 +755,7 @@ describe("RgpdService", () => {
           throw new Error("db failure");
         },
       };
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        badTx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email, uow: badTx });
 
       const result = await service.processPendingDeletions({});
 
@@ -960,14 +773,7 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.none()),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestDataExport({ userId: "u1" });
 
@@ -983,14 +789,7 @@ describe("RgpdService", () => {
           ),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestDataExport({ userId: "u1" });
 
@@ -1007,14 +806,7 @@ describe("RgpdService", () => {
           }),
         ),
       });
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email });
 
       const result = await service.requestDataExport({ userId: "u1" });
 
@@ -1025,14 +817,7 @@ describe("RgpdService", () => {
     it("uploads payload, presigns download URL, emails the user and returns expiresAt", async () => {
       const repo = makeRepo();
       const storage = makeStorage();
-      const service = new RgpdService(
-        repo,
-        storage,
-        email,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email, storage });
 
       const result = await service.requestDataExport({ userId: "u1" });
 
@@ -1057,14 +842,7 @@ describe("RgpdService", () => {
           Result.fail({ code: "EMAIL_SEND_FAILED" as const, message: "smtp error" }),
         ),
       } as unknown as IEmailService;
-      const service = new RgpdService(
-        repo,
-        makeStorage(),
-        failEmail,
-        tx,
-        noopOutbox,
-        new NoOpInstrumentation(),
-      );
+      const service = buildService({ repo, email: failEmail });
 
       const result = await service.requestDataExport({ userId: "u1" });
 
