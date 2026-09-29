@@ -2,6 +2,7 @@ import { Badge } from "@packages/ui/components/ui/badge";
 import {
   ListRow,
   ListRowAction,
+  ListRowButton,
   ListRowContent,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
@@ -26,12 +27,10 @@ export function NotificationItem({ group, onRead, guard }: NotificationItemProps
   return (
     <ListRow>
       <ListRowContent>
-        <button
-          type="button"
+        <ListRowButton
           onClick={() => unread && onRead(group.ids)}
           disabled={!unread || guard.blocked}
           {...guard.describeProps(!unread)}
-          className="flex flex-col items-start gap-1 text-left"
         >
           <TypographySmall>{labelOf(latest)}</TypographySmall>
           <ListRowMeta>
@@ -40,7 +39,7 @@ export function NotificationItem({ group, onRead, guard }: NotificationItemProps
               <TypographyMuted>{t("notifications.andMore", { count: count - 1 })}</TypographyMuted>
             )}
           </ListRowMeta>
-        </button>
+        </ListRowButton>
       </ListRowContent>
       <ListRowAction>
         <Badge variant={unread ? "default" : "secondary"}>
