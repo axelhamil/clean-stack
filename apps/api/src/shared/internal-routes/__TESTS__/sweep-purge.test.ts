@@ -1,5 +1,6 @@
 import { mock } from "bun:test";
-import { drizzleMock } from "./drizzle-mock";
+
+const realDrizzle = await import("@packages/drizzle");
 
 const executed: string[] = [];
 
@@ -20,7 +21,7 @@ function fakeQuery(sql: string, rows: Array<{ id: string }>) {
 }
 
 mock.module("@packages/drizzle", () => ({
-  ...drizzleMock(),
+  ...realDrizzle,
   db: {
     transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -37,9 +38,8 @@ const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
 const { isNotNull } = await import("@packages/drizzle");
 
-// A present predicate (the stand-in's marker, not real SQL), mirroring what every route
-// passes: `where: undefined` would be refused by the guard `purgeBatchWithTimeout` fails
-// closed on.
+// A present predicate, mirroring what every route passes: `where: undefined` would be
+// refused by the guard `purgeBatchWithTimeout` fails closed on.
 const someWhere = () => isNotNull({} as never) as never;
 
 describe("purgeBatchWithTimeout", () => {
