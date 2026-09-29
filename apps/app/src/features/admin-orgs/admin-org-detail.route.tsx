@@ -64,7 +64,7 @@ function AdminOrgDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span>{t("orgs.detail.planLabel")}</span>
-              <span>{org.plan ?? "—"}</span>
+              <span>{org.plan ?? "-"}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>{t("orgs.detail.createdLabel")}</span>

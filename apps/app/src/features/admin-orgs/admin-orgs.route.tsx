@@ -90,6 +90,7 @@ function AdminOrgsPage() {
                   const saving =
                     ssoEnforcementMutation.isPending &&
                     ssoEnforcementMutation.variables?.id === org.id;
+
                   return (
                     <TableRow key={org.id}>
                       <TableCell>
