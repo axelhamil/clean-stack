@@ -1,5 +1,9 @@
+import {
+  type EntitlementsView,
+  entitlementsForTier,
+  isTier,
+} from "../../../../shared/entitlements";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import { type EntitlementsView, entitlementsForTier, isTier } from "../../config";
 import type { ISubscriptionReadStore } from "../ports/subscription-read.port";
 
 function freeView(): EntitlementsView {

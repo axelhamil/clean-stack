@@ -12,7 +12,7 @@ import {
   meetsPlan,
   type QuotaKey,
   type Tier,
-} from "../../modules/billing/config";
+} from "../entitlements";
 import { emitEvent } from "../event-emitter";
 import { logger } from "../logger";
 

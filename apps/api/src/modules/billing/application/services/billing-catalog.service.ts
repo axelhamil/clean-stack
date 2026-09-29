@@ -1,5 +1,5 @@
+import { ENTITLEMENTS, type Feature, isTier, type Tier } from "../../../../shared/entitlements";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import { ENTITLEMENTS, type Feature, isTier, type Tier } from "../../config";
 import type { IStripeCatalogSource } from "../ports/stripe-catalog.port";
 
 export interface PlanCatalogItem {

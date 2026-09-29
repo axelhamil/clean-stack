@@ -249,7 +249,7 @@ Deploy-safe perimeter — rate-limit, strict CSP, and stateless CSRF, wired befo
 
 Per-organization subscriptions, zero billing backoffice. Stripe Checkout for upgrades, Stripe Billing Portal for management.
 
-**State**: `subscription` table (webhook-synced) — never `organization.metadata` (untyped, diverges under out-of-order webhooks). **Hybrid catalog** (`apps/api/src/modules/billing/config.ts`): prices + copy in Stripe Products; entitlements + `maxMembers` in typed `ENTITLEMENTS` map; `metadata.tier` is the join key.
+**State**: `subscription` table (webhook-synced) — never `organization.metadata` (untyped, diverges under out-of-order webhooks). **Hybrid catalog** (`apps/api/src/shared/entitlements.ts`): prices + copy in Stripe Products; entitlements + `maxMembers` in typed `ENTITLEMENTS` map; `metadata.tier` is the join key.
 
 **Three gate axes** (transferable pattern for any premium feature):
 - **Role**: `billing:["read","manage"]` in `@packages/access-control`.

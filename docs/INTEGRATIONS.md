@@ -178,11 +178,11 @@ The billing module uses `@better-auth/stripe`. The plugin owns the webhook endpo
 ### Stripe setup checklist
 
 1. **Create a Stripe account** and enable billing features (Stripe Dashboard → Settings → Billing).
-2. **Create Products and Prices** for each paid plan. Each paid Product *must* carry `metadata.tier = <your-tier-key>` — this is the join key to the `ENTITLEMENTS` map in `apps/api/src/modules/billing/config.ts`. Set `marketing_features` on each Product for the pricing-page bullet list.
+2. **Create Products and Prices** for each paid plan. Each paid Product *must* carry `metadata.tier = <your-tier-key>` — this is the join key to the `ENTITLEMENTS` map in `apps/api/src/shared/entitlements.ts`. Set `marketing_features` on each Product for the pricing-page bullet list.
 3. **Add a webhook endpoint** in the Stripe Dashboard pointing at `https://<your-api-domain>/api/auth/stripe/webhook`. Subscribe to at minimum: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
 4. **Copy the webhook signing secret** (starts with `whsec_`) into `STRIPE_WEBHOOK_SECRET`.
 
-### Entitlements contract (`apps/api/src/modules/billing/config.ts`)
+### Entitlements contract (`apps/api/src/shared/entitlements.ts`)
 
 Each entry in `ENTITLEMENTS` must have a key matching a `metadata.tier` value on a Stripe Product:
 
@@ -342,7 +342,7 @@ publicly accessible HTTPS endpoint and a GitHub review of the integration:
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC) — green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
 - [ ] Stripe Products created with `metadata.tier` set; `ENTITLEMENTS` in
-      `apps/api/src/modules/billing/config.ts` matches every tier key
+      `apps/api/src/shared/entitlements.ts` matches every tier key
 - [ ] Stripe webhook endpoint registered for the 4 required event types;
       `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` set (or omit both for free-only)
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`

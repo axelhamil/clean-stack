@@ -5,7 +5,7 @@ description: Use when working on billing, plans, tiers, seats, feature flags or 
 
 # Billing (`modules/billing/` + `stripe()` plugin)
 
-Pragmatic infra, **NOT DDD**. `config.ts` holds `ENTITLEMENTS[tier]` (features/rank/maxMembers, `null` = unlimited). `@better-auth/stripe` plugin owns subscription state (its `subscription` table, webhook-synced). Stripe owns price/display (`metadata.tier` join key). Typed config is the single business-rules SSOT — never duplicate into a domain model.
+Pragmatic infra, **NOT DDD**. `shared/entitlements.ts` holds `ENTITLEMENTS[tier]` (features/rank/maxMembers, `null` = unlimited). `@better-auth/stripe` plugin owns subscription state (its `subscription` table, webhook-synced). Stripe owns price/display (`metadata.tier` join key). Typed config is the single business-rules SSOT — never duplicate into a domain model.
 
 ## Four gate axes (independent, never conflated)
 

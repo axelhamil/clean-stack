@@ -49,7 +49,6 @@ import {
   authorizeSubscriptionReference,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
-import { hasFeature, hasSeatAvailable } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { memberRemovalActor, type ScimDeprovisionActor } from "./shared/auth/member-removal-actor";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
@@ -64,6 +63,7 @@ import {
   SSO_PATHS,
   scimProviderIdFromToken,
 } from "./shared/auth/sso-paths";
+import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
 import { emitEvent } from "./shared/event-emitter";
 import { logger } from "./shared/logger";

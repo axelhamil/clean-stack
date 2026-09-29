@@ -1,6 +1,6 @@
 import type { AnyPgColumn, AnyPgTable } from "@packages/drizzle";
 import { count, eq, sql } from "@packages/drizzle";
-import type { QuotaKey } from "../../modules/billing/config";
+import type { QuotaKey } from "../entitlements";
 import { assertQuota } from "../middleware/billing.middleware";
 import type { ITransaction } from "../transaction";
 
