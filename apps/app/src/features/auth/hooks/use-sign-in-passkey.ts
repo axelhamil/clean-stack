@@ -3,7 +3,11 @@ import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { authClient } from "../../../shared/auth/auth-client";
-import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
+import {
+  PASSKEY_CANCELLED,
+  SSO_REDIRECT_IN_PROGRESS,
+} from "../../../shared/observability/error-classifier";
+import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
 import { useCompleteSignIn } from "./use-complete-sign-in";
 
 export function useSignInPasskey(redirectTo?: string) {
@@ -26,7 +30,7 @@ export function useSignInPasskey(redirectTo?: string) {
 
       const message = result.error.message?.toLowerCase() ?? "";
       if (message.includes("not allowed") || message.includes("cancel")) {
-        throw new Error("Cancelled");
+        throw new Error(PASSKEY_CANCELLED);
       }
 
       // The passkey leg is server-enforced like the three email-bearing ones, so it
@@ -41,7 +45,7 @@ export function useSignInPasskey(redirectTo?: string) {
     },
     onError: (err) => {
       if (err.name === "AbortError") return;
-      if (err.message === "Cancelled" || err.message === SSO_REDIRECT_IN_PROGRESS) return;
+      if (err.message === PASSKEY_CANCELLED || err.message === SSO_REDIRECT_IN_PROGRESS) return;
 
       toast.error(err.message);
     },

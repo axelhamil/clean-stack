@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SignUpInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
-import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
+import { SSO_REDIRECT_IN_PROGRESS } from "../../../shared/observability/error-classifier";
+import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
 
 export function useSignUp() {
   const { t } = useTranslation("auth");

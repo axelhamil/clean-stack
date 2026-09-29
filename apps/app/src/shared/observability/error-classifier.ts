@@ -9,7 +9,20 @@ export function isUnexpectedError(error: unknown): boolean {
   return typeof status !== "number" || status >= 500;
 }
 
-const FLOW_CONTROL_MESSAGES = new Set(["Cancelled", "email-not-verified-redirect"]);
+/**
+ * Messages a mutation throws on purpose to stop its own flow (a closed passkey
+ * prompt, a redirect already under way). The hooks throw these exact constants so
+ * the allowlist below cannot drift from what they throw.
+ */
+export const PASSKEY_CANCELLED = "Cancelled";
+export const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
+export const SSO_REDIRECT_IN_PROGRESS = "sso-redirect-in-progress";
+
+const FLOW_CONTROL_MESSAGES = new Set<string>([
+  PASSKEY_CANCELLED,
+  EMAIL_NOT_VERIFIED_REDIRECT,
+  SSO_REDIRECT_IN_PROGRESS,
+]);
 
 export function isUnexpectedMutationError(error: unknown): boolean {
   if (!isUnexpectedError(error)) return false;

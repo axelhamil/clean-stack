@@ -6,6 +6,7 @@ import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
 import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { PASSKEY_CANCELLED } from "../../../shared/observability/error-classifier";
 import type { AddPasskeyInput } from "../security.schema";
 
 export function useAddPasskey() {
@@ -19,7 +20,7 @@ export function useAddPasskey() {
       if (!result?.error) return;
 
       if (result.error.message?.toLowerCase().includes("not allowed")) {
-        throw new Error("Cancelled");
+        throw new Error(PASSKEY_CANCELLED);
       }
 
       throw toAuthClientError(result.error, t("passkeys.addFailed"));
@@ -31,7 +32,7 @@ export function useAddPasskey() {
       });
     },
     onError: (err) => {
-      if (err.message === "Cancelled") return;
+      if (err.message === PASSKEY_CANCELLED) return;
 
       toastError(
         err,

@@ -9,8 +9,6 @@ interface BetterAuthError {
   providerId?: string;
 }
 
-export const SSO_REDIRECT_IN_PROGRESS = "sso-redirect-in-progress";
-
 /**
  * BetterAuth errors stop surfacing the raw server string and go through the
  * same code-keyed `errors` catalog as the API errors, so there is one
