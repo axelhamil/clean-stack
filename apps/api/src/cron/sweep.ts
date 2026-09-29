@@ -2,7 +2,7 @@ import {
   DEFAULT_INTERNAL_FETCH_TIMEOUT_MS,
   signedInternalFetch,
 } from "../shared/internal-routes/internal-fetch";
-import { classifySweepResult } from "./sweep-result";
+import { classifySweepResult, type SweepResponseShape } from "./sweep-result";
 
 const baseUrl = process.env.API_URL;
 const signingKey = process.env.INTERNAL_SIGNING_KEY;
@@ -93,11 +93,7 @@ for (const path of sweeps) {
   }
 
   const elapsed = Date.now() - started;
-  let parsed: {
-    truncated?: boolean;
-    skipped?: boolean;
-    stopReasons?: Record<string, string>;
-  };
+  let parsed: SweepResponseShape;
   try {
     parsed = JSON.parse(body);
   } catch {

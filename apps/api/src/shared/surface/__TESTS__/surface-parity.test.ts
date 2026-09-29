@@ -44,12 +44,6 @@ describe("surface parity", () => {
     expect(broken).toEqual([]);
   });
 
-  // listBackRoutes() drops every method === "ALL" entry to keep middleware mounts (app.use(...))
-  // out of the map. That filter is blind to *why* an entry is "ALL": a future real route
-  // deliberately mounted with app.all(...) would vanish the same way, silently, with no test
-  // ever failing — it just never shows up anywhere. The only known legitimate "ALL" route today
-  // is the opaque BetterAuth mount, so this assertion pins that as the sole exception and turns
-  // any other "ALL" entry into a hard failure instead of a silent gap.
   // Hono represents every `app.use(path, middleware)` mount as a method "ALL" entry, exactly
   // like a genuine `app.all(path, handler)` route would be — there is no structural field that
   // tells the two apart, only the path. `listBackRoutes` drops every ALL entry outright to keep

@@ -65,8 +65,8 @@ function isFromOurApp(documentUri: string, appUrl: string | undefined): boolean 
 
 // Permissive CORS: browsers send reports with Origin: null (sandboxed iframes)
 // and application/reports+json triggers a preflight (non-simple content-type).
-// Credentials are not relevant for report-only endpoints. Exported so index.ts
-// can register it BEFORE the global restrictive cors — hono/cors terminates
+// Credentials are not relevant for report-only endpoints. Exported so app.ts
+// can register it BEFORE the global restrictive cors: hono/cors terminates
 // OPTIONS, so whichever cors sees the preflight first wins.
 export const cspReportCors = cors({
   origin: "*",
