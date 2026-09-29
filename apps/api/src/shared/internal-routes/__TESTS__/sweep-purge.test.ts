@@ -37,9 +37,10 @@ const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
 const { isNotNull } = await import("@packages/drizzle");
 
-// A real predicate, mirroring what every route actually passes — `where: undefined`
-// would now be refused by the guard `purgeBatchWithTimeout` fails closed on.
-const realWhere = () => isNotNull({} as never) as never;
+// A present predicate (the stand-in's marker, not real SQL), mirroring what every route
+// passes: `where: undefined` would be refused by the guard `purgeBatchWithTimeout` fails
+// closed on.
+const someWhere = () => isNotNull({} as never) as never;
 
 describe("purgeBatchWithTimeout", () => {
   it("returns the number of deleted rows", async () => {
@@ -47,7 +48,7 @@ describe("purgeBatchWithTimeout", () => {
     const deleted = await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
-      where: realWhere(),
+      where: someWhere(),
       orderBy: {} as never,
       batchSize: 100,
       spans,
@@ -79,7 +80,7 @@ describe("purgeBatchWithTimeout", () => {
     await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
-      where: realWhere(),
+      where: someWhere(),
       orderBy: {} as never,
       batchSize: 100,
       spans,
@@ -95,7 +96,7 @@ describe("purgeBatchWithTimeout", () => {
 
 describe("requireFilter", () => {
   it("returns the filter unchanged when given one", () => {
-    const filter = realWhere();
+    const filter = someWhere();
     expect(requireFilter(filter, "some-label")).toBe(filter);
   });
 

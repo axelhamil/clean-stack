@@ -12,7 +12,7 @@ const row = (userId: string, category: string, id: string, locale: string | null
 });
 
 describe("buildDigests", () => {
-  test("groupe par utilisateur et par categorie", () => {
+  test("groups by user and by category", () => {
     const digests = buildDigests([
       row("u1", "billing", "n1"),
       row("u1", "billing", "n2"),
@@ -25,18 +25,18 @@ describe("buildDigests", () => {
     expect(billingU1?.notificationIds).toEqual(["n1", "n2"]);
   });
 
-  test("un lot vide ne produit aucun digest", () => {
+  test("an empty batch produces no digest", () => {
     expect(buildDigests([])).toEqual([]);
   });
 
-  test("preserve la locale du destinataire dans le digest", () => {
+  test("keeps the recipient locale on the digest", () => {
     const digests = buildDigests([row("u1", "billing", "n1", "fr")]);
     expect(digests[0]?.locale).toBe("fr");
   });
 });
 
 describe("digestIdempotencyKey", () => {
-  test("produit une cle de longueur constante quel que soit le nombre d'ids", async () => {
+  test("produces a fixed-length key whatever the number of ids", async () => {
     const key2 = await digestIdempotencyKey(["n1", "n2"]);
     const key500 = await digestIdempotencyKey(Array.from({ length: 500 }, (_, i) => `n${i}`));
     expect(key2).toHaveLength(64);

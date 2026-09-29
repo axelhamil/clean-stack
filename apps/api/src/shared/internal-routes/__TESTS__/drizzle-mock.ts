@@ -1,11 +1,12 @@
 /**
  * A shared `@packages/drizzle` stand-in for the sweep-route tests.
  *
- * It exists to avoid three files re-declaring the same fake `db` and schema shapes,
- * not to protect anything outside them: a module replacement is scoped to the test
- * file that declares it. Everything here is a stand-in with no SQL semantics — the
- * comparison helpers return markers, so a test that reads them is asserting on this
- * file, not on a query (see `apps/api/src/shared/CLAUDE.md`).
+ * It exists to avoid the files that replace the query builder re-declaring the same
+ * fake `db` and schema shapes, not to protect anything outside them: a module
+ * replacement is scoped to the test file that declares it. Everything here is a
+ * stand-in with no SQL semantics (the comparison helpers return markers), so a test
+ * that reads them is asserting on this file, not on a query (see
+ * `apps/api/src/shared/CLAUDE.md`).
  */
 export const drizzleMock = () => ({
   db: {},
@@ -30,8 +31,8 @@ export const drizzleMock = () => ({
   getRateLimitDbClient: () => ({}),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) => ({
-      // Reconstructs the literal SQL text so a test can assert on `String(sql\`...\`)` —
-      // e.g. confirming a `SET LOCAL` guard fired — without a real drizzle `sql` tag.
+      // Reconstructs the literal SQL text so a test can assert on `String(sql\`...\`)`
+      // (e.g. confirming a `SET LOCAL` guard fired) without a real drizzle `sql` tag.
       toString: () =>
         strings.reduce(
           (acc, part, i) => `${acc}${part}${i < values.length ? String(values[i]) : ""}`,
