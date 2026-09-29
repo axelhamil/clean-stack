@@ -12,14 +12,17 @@ Hono on Bun, Clean Architecture + DDD, vertical-slice modules, inwire DI, Better
 | `billing-entitlements` | tiers, seats, feature flags, quota gating |
 | `compliance-consent` | policy versioning, cookie consent |
 | `email-delivery` | email queue, delivery worker, Resend batching |
+| `feature-slice` | implementing a story end to end once acceptance criteria exist |
 
 ## Layout (vertical slice / modular monolith)
 
 ```
 apps/api/src/
   shared/                       Cross-cutting infra (no business) — see src/shared/CLAUDE.md
-    middleware/                 Hono middlewares: auth, error, logger, org, rate-limit (factory + policies + trusted-proxy IP), csrf (Origin-allowlist)
+    middleware/                 Hono middlewares: auth, error, logger, org, policy, billing (feature/plan/quota gates), api-token, platform-admin, deny-impersonated (+ impersonation-blocklist), rate-limit (factory + policies + trusted-proxy IP), csrf (Origin-allowlist)
     internal-routes/            `/internal/*` gate: `internal-signature` (HMAC primitives + server verify middleware), `private-network.middleware` (loopback/RFC1918), `internal-layers` (env-driven composer), `internal-fetch` (client-side signed-fetch)
+    auth/                       Auth-adjacent helpers for the BetterAuth bridge (SAML config, SSO enforcement/paths, request snapshots)
+    crypto/, db/                `api-token.ts` hashing; `quota-reservation.ts` (`reserveQuota`, TX-scoped)
     ports/                      Cross-context port interfaces
     services/                   Cross-context port impls (when no module owns the impl)
     surface/                    Back↔front surface map: `back-routes.ts` (live route table from `app.ts`), `front-consumers.ts` (front-end `api.*.$method` call-site scan), `route-map.ts` (documented per-route intent) — `surface-parity.test.ts` fails on drift. See `docs/SURFACE.md`.
@@ -30,11 +33,13 @@ apps/api/src/
     v1/                         Route files exposed to PAT consumers (opt-in only — each route file is explicit)
     index.ts                    `createPublicApiV1(deps)` factory — mounts `requireApiToken` + dual rate-limit
     require-scope.ts            `requireScope(scope)` guard used inside `/api/v1/*` route files
+  cron/                         Standalone bundled sweep caller (`sweep.ts`), runs as its own process, see `docs/CRON.md`
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   auth.ts                       BetterAuth singleton — deliberate exception to modules/ rule (config-as-code, lib owns model). Routes auto-mount via plugin (`/api/auth/*`).
   auth-queries.ts               Typed Drizzle data-access for the bridge — plain functions (no port/DI/aggregate; auth is not domain), `tx?`-aware. Keeps `auth.ts` config + event-wiring only, never inline `db.*`.
   app.ts                        `Hono` construction — chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
   index.ts                      Server entry: `Bun.serve()`, DI preload, worker starts, graceful shutdown. Imports `app` from `app.ts`, re-exports `AppType`.
+  migrate.ts                    Migration entry (`pnpm --filter api migrate`); `start` runs it before the server
   client.ts                     `hcWithType` factory — `hc<AppType>` (`AppType` from `app.ts`)
 ```
 
@@ -64,9 +69,14 @@ export const xModule = defineModule()((b) =>
 
 1. **`declare module 'inwire'` per file that registers** — co-located with `.add()`. `container.ts` declares cross-cutting bindings it adds directly.
 2. **Never `defineModule<TDeps>()`** with explicit generic — fallback for forward-refs only.
-3. **`Di = typeof di`** after `.build()` — derived runtime shape, not the global `AppDeps` interface.
+3. **Use `typeof di`** for the derived runtime shape after `.build()`,, not the global `AppDeps` interface.
 4. **All deps via DI** — `di.XxxUseCase.execute(...)`; never `new Xxx(...)` (bypasses container, breaks per-test impl swap). No service locators.
 5. **Transactions managed in controllers**, passed to use cases/services.
+
+## Commands
+
+- **Tests**: `pnpm --filter api test` (`bun test --isolate --parallel`); a bare `bun test` drops file isolation.
+- **Real-database checks**: `pnpm --filter api check:{fanout,digest,api-token-visibility,wipe-rollback,marksent,enqueue,sweep-lock}` (scripts in `scripts/`, refuse a non-local database via `require-local-database.ts`, all wired in `.github/workflows/ci.yml`). A new SQL-heavy decision the mocks cannot cover gets a script AND a CI step.
 
 ## Hono RPC (end-to-end type safety)
 
@@ -74,7 +84,7 @@ API exports `AppType`; app consumes via `hono/client`. Routes **must be chained*
 
 **Exception — `/api/v1` is deliberately outside `AppType`.** `createPublicApiV1(deps)` is mounted with `app.route("/api/v1", ...)` before the `const routes = app.get(...).route(...)` chain. It is **not** chained into `routes` and therefore not part of `AppType`. This is intentional: `/api/v1` serves external PAT consumers, not the typed RPC client. Adding it to the chain would expose every public-API route to `hcWithType`, which the internal client does not need, and would impose `AppType`'s session-based `Variables` shape on routes that carry `ApiTokenVariables`. If you see a new route file under `public-api/` that isn't in `AppType`, this is correct — do not chain it.
 
-`apps/api/package.json` subpath exports: `.` → `AppType`+runtime; `./client` → `hcWithType`.
+`apps/api/package.json` subpath exports: `.` → `AppType`+runtime; `./app` → the `Hono` app; `./client` → `hcWithType`.
 
 - **Trailing-slash normalize the `baseUrl`** — `hc` drops the last segment if missing.
 - **`AbortSignal`** via per-call second arg → `await $get({}, { init: { signal } })`.

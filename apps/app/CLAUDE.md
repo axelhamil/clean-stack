@@ -9,9 +9,9 @@ apps/app/
   routes.ts                     Virtual route tree — rootRoute/layout/route/index, paths relative to routesDirectory "./src"
   src/
     main.tsx                    createRoot + <AppProviders />
-    router.tsx                  Pure assembly: createRouter({ routeTree }) — routeTree.gen.ts is generated but versioned (committed so `tsc --noEmit` works from a fresh clone without a prior build)
-    router/                     One file per layout/gate (`__root.tsx`, `_guest.tsx`, `_protected.tsx`, `_shell.tsx`, `_admin.tsx`, `_org-scope.tsx`, `settings.tsx`) + non-route leaves (`index.route.tsx`, `settings-index.route.tsx`)
-    shared/                     Cross-cutting (no business) — see src/shared/CLAUDE.md
+    router.tsx                  createRouter({ routeTree, context: { queryClient }, preload/pending defaults }) + `watchPolicyRefusals` wiring (router and query client meet here). routeTree.gen.ts is generated but versioned (committed so `tsc --noEmit` works from a fresh clone without a prior build)
+    router/                     One file per layout/gate (`__root.tsx`, `_guest.tsx`, `_protected.tsx`, `_shell.tsx`, `_admin.tsx`, `_org-scope.tsx`, `settings.tsx`) + non-route leaves (`index.route.tsx`, `settings-index.route.tsx`, `should-redirect-to-legal-accept.ts`)
+    shared/                     Cross-cutting (no business): api client + errors, auth, i18n, notifications, observability, legal, hooks. See src/shared/CLAUDE.md
     features/<feature>/         Sub-domain — see src/features/CLAUDE.md
 ```
 
@@ -39,8 +39,14 @@ Files `kebab-case.tsx`; components `PascalCase` named exports; hooks `use-<verb>
 
 1. **`className` is for layout only** — `flex` (default), `w-*`, `h-*`, `mx-auto`, `gap-*`, responsive breakpoints. **`grid` reserved for true 2D**; `flex flex-col gap-*` for any vertical stack. Colors/typography/radius/shadows/look-defining paddings live in **theme** (`@theme` in `globals.css`) or in the primitive itself. Inline `bg-foo text-bar p-3` = theme drift = no design system.
 2. **Always shadcn first, stay shadcn-pure** — check `@packages/ui/components/ui/*` and the [shadcn registry](https://ui.shadcn.com/docs/components) before custom. **Use the actual slots** (`Card`+`CardHeader`+`CardTitle`) — wrong slot forces hacks (`pt-6`, `space-y-4`). No wrapper variants, no `data-slot="*"` overrides. Adjustments → theme or primitive. Custom (last resort) lives in `@packages/ui/components/ui/*`, never inline in a feature.
-3. **Exactly one `<main>` per rendered page**. `__root.tsx` and pathless gates are passthroughs (`component: Outlet`) — never wrap in landmarks. Each `<feature>.route.tsx` owns its `<header>`/`<main>`/`<footer>`. Same for `<h1>` (one per page).
+3. **Exactly one `<main>` per rendered page**. `__root.tsx` and pathless gates are passthroughs (`component: Outlet`) — never wrap in landmarks. Each `<feature>.route.tsx` owns its `<header>`/`<main>`/`<footer>`. Same for `<h1>` (one per page). This is a CI gate: a new page needs one entry in `apps/app/a11y/pages.ts` (axe light and dark, exactly one `<main>` and one `<h1>`).
 
 **Theme & dark mode**: `next-themes` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`). Toggle uses View Transitions API with `prefers-reduced-motion` fallback. View-transition CSS in `globals.css`.
 
-**Typography contract**: text via shadcn typography exports (named, not namespace). Custom typography → theme or Typography component. `className` on Typography for layout only.
+**Typography contract**: text via shadcn typography exports (named, not namespace). Custom typography → theme or Typography component. `className` on Typography for layout only. Page title is `<TypographyH1 variant="page">`; a settings tab whose card already carries the visible title renders `<TypographyH1 className="sr-only">` so the page keeps exactly one `<h1>`. Never a raw `<h1 className="text-2xl …">`.
+
+**Page width**: `pageContainerVariants({ width })` from `@packages/ui/components/ui/page-container` (`app` 5xl default, `prose` 3xl legal/reference, `form` md lone-form pages, `wide` 7xl footer). Call sites add only `flex`/`gap-*`/`py-*`, never a hand-picked `max-w-*` or `px-*`.
+
+## Commands
+
+`pnpm --filter app test` (vitest) · `pnpm --filter app type-check` (app + `a11y/` project) · `pnpm turbo run check:a11y --filter=app` (Playwright + axe over the preview build, needs a running API, see `a11y/README.md`).
