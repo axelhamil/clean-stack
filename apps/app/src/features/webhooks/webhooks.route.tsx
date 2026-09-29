@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Select,
   SelectContent,
@@ -24,7 +23,6 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -190,7 +188,7 @@ function WebhooksPage() {
   };
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <TypographyH1 variant="page">{t("settings:webhooks.pageTitle")}</TypographyH1>
