@@ -154,7 +154,7 @@ describe("GithubKeyVerifier", () => {
 });
 
 // ── scanning.routes.ts endpoint tests ────────────────────────────────────────
-// Uses factory injection — no mock.module for container or auth-queries,
+// Uses factory injection (no mock.module for container or auth-queries),
 // so no global state pollution across the test suite.
 
 const TOKEN_PREFIX = "clean_";
@@ -264,6 +264,13 @@ describe("POST /api/token-scanning/github", () => {
     mockVerify.mockImplementation(async () => false);
     const res = await postScan(makeBody([{ token: KNOWN_RAW, type: "clean_token" }]));
     expect(res.status).toBe(403);
+    expect(mockFindByHmac).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when the signed body is valid JSON but not a list of scan entries", async () => {
+    const res = await postScan(JSON.stringify({ token: "clean_x", type: "api_token" }));
+
+    expect(res.status).toBe(400);
     expect(mockFindByHmac).not.toHaveBeenCalled();
   });
 

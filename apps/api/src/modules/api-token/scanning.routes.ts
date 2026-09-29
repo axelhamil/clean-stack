@@ -3,6 +3,7 @@ import { EventTypes } from "@packages/events";
 import { type Locale, toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 import { hmacToken, parseToken } from "../../shared/crypto/api-token";
 import { emitEvent } from "../../shared/event-emitter";
 import type { IInstrumentation } from "../../shared/ports/instrumentation.port";
@@ -32,7 +33,9 @@ export interface ScanningDeps {
   pepperPrevious?: string;
 }
 
-type ScanEntry = { token: string; type: string; url?: string };
+const scanPayloadSchema = z.array(
+  z.object({ token: z.string(), type: z.string(), url: z.string().optional() }),
+);
 
 export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
   return new Hono().post("/github", async (c) => {
@@ -48,12 +51,16 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
     const valid = await deps.githubKeyVerifier.verify(keyId, sigB64, rawBody);
     if (!valid) throw new HTTPException(403, { message: "INVALID_SIGNATURE" });
 
-    let entries: ScanEntry[];
+    let json: unknown;
     try {
-      entries = JSON.parse(rawBody) as ScanEntry[];
+      json = JSON.parse(rawBody);
     } catch {
       throw new HTTPException(400, { message: "INVALID_BODY" });
     }
+
+    const payload = scanPayloadSchema.safeParse(json);
+    if (!payload.success) throw new HTTPException(400, { message: "INVALID_BODY" });
+    const entries = payload.data;
 
     const results = await Promise.all(
       entries.map(async (entry) => {
