@@ -5,6 +5,7 @@ import { env as realEnv } from "../../env";
 mock.module("../../env", () => ({ env: { ...realEnv, AUDIT_TAMPER_EVIDENCE: true } }));
 
 const { AuditEventSubscriber } = await import("../audit-event-subscriber");
+const { computeAuditHash } = await import("../audit-hash");
 
 const noopInstr = {
   startSpan: (_: unknown, fn: () => unknown) => fn(),
@@ -85,5 +86,55 @@ describe("AuditEventSubscriber hash chain", () => {
     const row = captured[0];
     if (!row) throw new Error("expected a captured row");
     expect(row.prevHash).toBe("abc123");
+  });
+
+  it("stores the hash verifyChain recomputes from the persisted row", async () => {
+    const { tx, captured } = makeTx(() => []);
+    await new AuditEventSubscriber(noopInstr as never).handle(event("e3") as never, tx as never);
+
+    const row = captured[0];
+    if (!row) throw new Error("expected a captured row");
+    const recomputed = computeAuditHash({
+      id: row.id as string,
+      action: row.action as string,
+      actorId: row.actorId as string | null,
+      actorType: row.actorType as string,
+      organizationId: row.organizationId as string | null,
+      targetType: row.targetType as string,
+      targetId: row.targetId as string,
+      metadata: row.metadata,
+      occurredAt: (row.occurredAt as Date).toISOString(),
+      requestId: row.requestId as string | null,
+      retention: row.retention as string,
+      prevHash: row.prevHash as string,
+    });
+
+    expect(row.hash).toBe(recomputed);
+  });
+});
+
+describe("AuditEventSubscriber actor", () => {
+  const withPayload = (payload: Record<string, unknown>) => ({ ...event("e4"), payload });
+
+  it("records the payload actor as a user", async () => {
+    const { tx, captured } = makeTx(() => []);
+    await new AuditEventSubscriber(noopInstr as never).handle(
+      withPayload({ userId: "subject", inviterUserId: "inviter" }) as never,
+      tx as never,
+    );
+
+    expect(captured[0]?.actorId).toBe("inviter");
+    expect(captured[0]?.actorType).toBe("user");
+  });
+
+  it("falls back to a system actor when no actor key holds a user id", async () => {
+    const { tx, captured } = makeTx(() => []);
+    await new AuditEventSubscriber(noopInstr as never).handle(
+      withPayload({ actorUserId: "", foo: "bar" }) as never,
+      tx as never,
+    );
+
+    expect(captured[0]?.actorId).toBeNull();
+    expect(captured[0]?.actorType).toBe("system");
   });
 });

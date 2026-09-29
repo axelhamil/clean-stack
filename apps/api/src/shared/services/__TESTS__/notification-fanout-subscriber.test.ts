@@ -32,7 +32,7 @@ function fakeTx() {
 }
 
 describe("NotificationFanoutSubscriber", () => {
-  test("ignore un event absent du map", async () => {
+  test("ignores an event missing from the notification map", async () => {
     const { tx, calls } = fakeTx();
     const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation());
 
@@ -41,7 +41,7 @@ describe("NotificationFanoutSubscriber", () => {
     expect(calls()).toBe(0);
   });
 
-  test("ignore un event dont l'audience ne resout personne", async () => {
+  test("ignores an event whose audience resolves to nobody", async () => {
     const { tx, calls } = fakeTx();
     const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation());
 
@@ -50,7 +50,7 @@ describe("NotificationFanoutSubscriber", () => {
     expect(calls()).toBe(0);
   });
 
-  test("insere pour un event self notifiable", async () => {
+  test("inserts for a notifiable self event", async () => {
     const { tx, calls } = fakeTx();
     const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation());
 

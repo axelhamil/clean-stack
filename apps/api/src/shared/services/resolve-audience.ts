@@ -1,41 +1,26 @@
 import { type OrgRole, rolesWith } from "@packages/access-control";
+import type { Option } from "@packages/ddd-kit";
 import type { Audience } from "@packages/events";
 import type { OutboxRecord } from "../ports/outbox.port";
+import { ACTOR_KEYS, readUserId } from "./event-actor";
 
 export type AudienceTarget =
   | { kind: "user"; userId: string }
   | { kind: "org"; organizationId: string; roles: OrgRole[] | "all" };
 
-function readUserId(payload: unknown, keys: readonly string[]): string | null {
-  if (typeof payload !== "object" || payload === null) return null;
-  const record = payload as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.length > 0) return value;
-  }
-  return null;
-}
+const SELF_KEYS = ["userId", "ownerUserId"] as const;
 
-export function resolveAudience(audience: Audience, event: OutboxRecord): AudienceTarget | null {
-  if (audience === "self") {
-    const userId = readUserId(event.payload, ["userId", "ownerUserId"]);
-    return userId ? { kind: "user", userId } : null;
-  }
+const toUser = (userId: string): AudienceTarget => ({ kind: "user", userId });
 
-  if (audience === "actor") {
-    const userId = readUserId(event.payload, [
-      "actorUserId",
-      "inviterUserId",
-      "ownerUserId",
-      "userId",
-    ]);
-    return userId ? { kind: "user", userId } : null;
-  }
+export function resolveAudience(audience: Audience, event: OutboxRecord): Option<AudienceTarget> {
+  if (audience === "self") return readUserId(event.payload, SELF_KEYS).map(toUser);
+  if (audience === "actor") return readUserId(event.payload, ACTOR_KEYS).map(toUser);
 
-  if (event.organizationId.isNone()) return null;
-  const organizationId = event.organizationId.unwrap();
-
-  if (audience === "org:all") return { kind: "org", organizationId, roles: "all" };
-
-  return { kind: "org", organizationId, roles: rolesWith(audience.can) };
+  return event.organizationId.map(
+    (organizationId): AudienceTarget => ({
+      kind: "org",
+      organizationId,
+      roles: audience === "org:all" ? "all" : rolesWith(audience.can),
+    }),
+  );
 }

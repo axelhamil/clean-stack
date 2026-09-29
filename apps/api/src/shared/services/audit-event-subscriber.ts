@@ -4,16 +4,15 @@ import { retentionFor } from "@packages/events";
 import { env } from "../env";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { OutboxRecord } from "../ports/outbox.port";
-import { type AuditHashInput, computeAuditHash, GENESIS_HASH } from "./audit-hash";
+import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
+import { ACTOR_KEYS, readUserId } from "./event-actor";
 import type { OutboxSubscriber } from "./outbox-subscriber";
 
 function extractActor(event: OutboxRecord): { id: string | null; type: AuditActorType } {
-  const p = event.payload as Record<string, unknown> | null | undefined;
-  if (p && typeof p.actorUserId === "string") return { id: p.actorUserId, type: "user" };
-  if (p && typeof p.inviterUserId === "string") return { id: p.inviterUserId, type: "user" };
-  if (p && typeof p.ownerUserId === "string") return { id: p.ownerUserId, type: "user" };
-  if (p && typeof p.userId === "string") return { id: p.userId, type: "user" };
-  return { id: null, type: "system" };
+  const actorId = readUserId(event.payload, ACTOR_KEYS);
+  if (actorId.isNone()) return { id: null, type: "system" };
+
+  return { id: actorId.unwrap(), type: "user" };
 }
 
 export class AuditEventSubscriber implements OutboxSubscriber {
@@ -28,54 +27,49 @@ export class AuditEventSubscriber implements OutboxSubscriber {
         if (retention === "none") return;
 
         const actor = extractActor(event);
+        const al = auditLogSchema.auditLog;
+        const entry = {
+          id: `audit-${event.id}`,
+          action: event.eventType,
+          actorId: actor.id,
+          actorType: actor.type,
+          organizationId: event.organizationId.toNull(),
+          targetType: event.aggregateType,
+          targetId: event.aggregateId,
+          requestId: event.metadata.requestId ?? null,
+          retention,
+        };
 
         let prevHash: string | null = null;
         let hash: string | null = null;
         if (env.AUDIT_TAMPER_EVIDENCE) {
           await tx.execute(sql`select pg_advisory_xact_lock(hashtext('audit_log_chain'))`);
           const last = await tx
-            .select({ hash: auditLogSchema.auditLog.hash })
-            .from(auditLogSchema.auditLog)
-            .where(isNotNull(auditLogSchema.auditLog.hash))
-            .orderBy(desc(auditLogSchema.auditLog.sequence))
+            .select({ hash: al.hash })
+            .from(al)
+            .where(isNotNull(al.hash))
+            .orderBy(desc(al.sequence))
             .limit(1)
             .execute();
           prevHash = last[0]?.hash ?? GENESIS_HASH;
-          const hashInput: AuditHashInput = {
-            id: `audit-${event.id}`,
-            action: event.eventType,
-            actorId: actor.id,
-            actorType: actor.type,
-            organizationId: event.organizationId.toNull(),
-            targetType: event.aggregateType,
-            targetId: event.aggregateId,
+          hash = computeAuditHash({
+            ...entry,
             metadata: event.payload,
             occurredAt: event.occurredAt.toISOString(),
-            requestId: event.metadata.requestId ?? null,
-            retention,
             prevHash,
-          };
-          hash = computeAuditHash(hashInput);
+          });
         }
 
         const query = tx
-          .insert(auditLogSchema.auditLog)
+          .insert(al)
           .values({
-            id: `audit-${event.id}`,
-            actorId: actor.id,
-            actorType: actor.type,
-            organizationId: event.organizationId.toNull(),
-            action: event.eventType,
-            targetType: event.aggregateType,
-            targetId: event.aggregateId,
+            ...entry,
             metadata: event.payload as Record<string, unknown>,
-            requestId: event.metadata.requestId ?? null,
-            retention,
             occurredAt: event.occurredAt,
             prevHash,
             hash,
           })
-          .onConflictDoNothing({ target: auditLogSchema.auditLog.id });
+          .onConflictDoNothing({ target: al.id });
         await this.instrumentation.startSpan(
           {
             name: query.toSQL().sql,
