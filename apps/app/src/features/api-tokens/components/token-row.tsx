@@ -4,6 +4,7 @@ import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { useTranslation } from "react-i18next";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import type { ApiToken } from "../api/api-tokens.queries";
 import { tokenScopeDisplay } from "../token-scope";
 
@@ -43,7 +44,7 @@ export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: Toke
           ))}
         </div>
       </TableCell>
-      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : "-"}</TableCell>
+      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : EMPTY_VALUE}</TableCell>
       <TableCell>
         {token.expiresAt ? formatDate(token.expiresAt) : t("apiTokens.neverExpires")}
       </TableCell>

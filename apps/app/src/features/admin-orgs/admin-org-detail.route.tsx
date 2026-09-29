@@ -15,6 +15,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { isOrgRole, ROLE_LABEL_KEYS } from "../../shared/auth/role-labels";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../shared/utils";
 import { adminOrgDetailQueryOptions } from "./api/admin-orgs.queries";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs/$orgId")({
@@ -64,7 +65,7 @@ function AdminOrgDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span>{t("orgs.detail.planLabel")}</span>
-              <span>{org.plan ?? "-"}</span>
+              <span>{org.plan ?? EMPTY_VALUE}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>{t("orgs.detail.createdLabel")}</span>

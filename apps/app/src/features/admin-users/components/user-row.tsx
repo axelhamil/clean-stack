@@ -4,6 +4,7 @@ import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import {
   isPlatformRole,
   PLATFORM_ROLE_LABEL_KEYS,
@@ -35,7 +36,7 @@ export function UserRow({ item }: UserRowProps) {
             {isPlatformRole(item.role) ? t(PLATFORM_ROLE_LABEL_KEYS[item.role]) : item.role}
           </Badge>
         ) : (
-          "-"
+          EMPTY_VALUE
         )}
       </TableCell>
       <TableCell>

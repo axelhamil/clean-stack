@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@packages/ui/compo
 import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import type { AuditRow } from "../api/audit-log.queries";
 
 interface MetadataDiff {
@@ -40,7 +41,7 @@ export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
             <dl className="flex flex-col gap-2">
               <div>
                 <dt className="text-sm font-medium">{t("auditLog.metadata.actorLabel")}</dt>
-                <dd className="text-sm">{row.actorId ?? "-"}</dd>
+                <dd className="text-sm">{row.actorId ?? EMPTY_VALUE}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium">{t("auditLog.metadata.occurredAtLabel")}</dt>

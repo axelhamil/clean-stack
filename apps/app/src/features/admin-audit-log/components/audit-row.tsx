@@ -3,6 +3,7 @@ import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { useTranslation } from "react-i18next";
 import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import type { AuditRow } from "../api/audit-log.queries";
 import { AUDIT_ACTOR_TYPE_LABEL_KEYS } from "../audit-actor-type-labels";
 
@@ -30,7 +31,7 @@ export function AuditTableRow({ row, onSelect }: AuditRowProps) {
       <TableCell>
         {row.targetType} / {row.targetId}
       </TableCell>
-      <TableCell>{row.organizationId ?? "-"}</TableCell>
+      <TableCell>{row.organizationId ?? EMPTY_VALUE}</TableCell>
       <TableCell>
         <Button variant="ghost" size="sm" onClick={() => onSelect(row)}>
           {t("auditLog.detailsAction")}

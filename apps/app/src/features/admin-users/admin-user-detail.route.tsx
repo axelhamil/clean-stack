@@ -29,6 +29,7 @@ import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
 import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../shared/utils";
 import {
   isPlatformRole,
   PLATFORM_ROLE_LABEL_KEYS,
@@ -164,7 +165,7 @@ function AdminUserDetailPage() {
                     {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
                   </Badge>
                 ) : (
-                  "-"
+                  EMPTY_VALUE
                 )}
                 <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
                   <DialogTrigger asChild>
