@@ -7,8 +7,6 @@ export type ApiTokenError = {
   metadata?: Record<string, unknown>;
 };
 
-export type ApiTokenRevokedReason = "user" | "membership_lost" | "leaked";
-
 export type ApiTokenRecord = {
   id: string;
   userId: string;
@@ -21,9 +19,14 @@ export type ApiTokenRecord = {
   lastUsedAt: Date | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
-  revokedReason: ApiTokenRevokedReason | null;
+  revokedReason: "user" | "membership_lost" | "leaked" | null;
   createdAt: Date;
 };
+
+// Derived rather than named first: the record type reaches the front through
+// Hono RPC inference, which can only print a literal union, not an alias
+// declared inside the api package.
+export type ApiTokenRevokedReason = NonNullable<ApiTokenRecord["revokedReason"]>;
 
 /**
  * Which token rows an authenticated actor may see and revoke.
