@@ -1,5 +1,6 @@
-import type { Option } from "@packages/ddd-kit";
+import type { Option, Result } from "@packages/ddd-kit";
 import type { ListOrgsInput } from "../dto/list-orgs.dto";
+import type { AdminStoreError } from "./admin-user-store.port";
 
 export interface AdminOrgRow {
   id: string;
@@ -17,8 +18,8 @@ export interface AdminOrgMemberRow {
 }
 
 export interface IAdminOrgStore {
-  listOrgs(input: ListOrgsInput): Promise<AdminOrgRow[]>;
-  findOrgById(id: string): Promise<Option<AdminOrgRow>>;
-  listMembersOf(organizationId: string): Promise<AdminOrgMemberRow[]>;
-  findPlanFor(organizationId: string): Promise<Option<string>>;
+  listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgRow[], AdminStoreError>>;
+  findOrgById(id: string): Promise<Result<Option<AdminOrgRow>, AdminStoreError>>;
+  listMembersOf(organizationId: string): Promise<Result<AdminOrgMemberRow[], AdminStoreError>>;
+  findPlanFor(organizationId: string): Promise<Result<Option<string>, AdminStoreError>>;
 }

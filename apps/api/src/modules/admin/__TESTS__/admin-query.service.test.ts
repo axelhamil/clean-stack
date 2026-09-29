@@ -1,273 +1,180 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Option } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import type { AdminOrgRow, IAdminOrgStore } from "../application/ports/admin-org-store.port";
+import type {
+  AdminSessionRow,
+  AdminStoreError,
+  AdminUserRow,
+  IAdminUserStore,
+} from "../application/ports/admin-user-store.port";
+import { AdminQueryService } from "../application/services/admin-query.service";
 
-const rows = [
-  {
-    id: "u-1",
-    email: "a@example.com",
-    name: "A",
-    role: "admin",
-    banned: false,
-    banReason: null,
-    banExpires: null,
-    twoFactorEnabled: true,
-    createdAt: new Date("2026-01-01"),
-  },
-];
-
-type SqlMarker = { _op: string; args: unknown[] };
-const mk =
-  (op: string) =>
-  (...args: unknown[]): SqlMarker => ({ _op: op, args });
-
-function buildQuery(result: () => Promise<unknown[]>) {
-  const q: Record<string, unknown> = {
-    toSQL: () => ({ sql: "SELECT 1", params: [] }),
-    execute: result,
-    where: () => buildQuery(result),
-  };
-  for (const m of [
-    "select",
-    "from",
-    "limit",
-    "orderBy",
-    "innerJoin",
-    "leftJoin",
-    "insert",
-    "update",
-    "delete",
-    "values",
-    "set",
-    "returning",
-    "for",
-  ]) {
-    q[m] = () => buildQuery(result);
-  }
-  return q;
-}
-
-mock.module("@packages/drizzle", () => ({
-  db: {
-    select: () => buildQuery(async () => []),
-    insert: () => buildQuery(async () => []),
-    update: () => buildQuery(async () => []),
-    delete: () => buildQuery(async () => []),
-  },
-  authSchema: {
-    user: {
-      id: {},
-      email: {},
-      name: {},
-      role: {},
-      banned: {},
-      banReason: {},
-      banExpires: {},
-      twoFactorEnabled: {},
-      createdAt: {},
-    },
-    session: {
-      id: {},
-      createdAt: {},
-      expiresAt: {},
-      ipAddress: {},
-      userAgent: {},
-      impersonatedBy: {},
-      userId: {},
-    },
-  },
-  multiTenantSchema: {
-    member: { userId: {}, organizationId: {}, role: {} },
-    organization: { id: {}, name: {} },
-  },
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: { hash: {}, sequence: {}, id: {} } },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      url: {},
-      secretCipher: {},
-      eventTypes: {},
-      enabled: {},
-      createdAt: {},
-      updatedAt: {},
-      previousSecretCipher: {},
-      previousSecretExpiresAt: {},
-      consecutiveFailures: {},
-      firstFailedAt: {},
-      disabledAt: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  emailSchema: {},
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
-  and: mk("and"),
-  or: mk("or"),
-  eq: mk("eq"),
-  lt: mk("lt"),
-  lte: mk("lte"),
-  gt: mk("gt"),
-  gte: mk("gte"),
-  inArray: mk("inArray"),
-  isNull: mk("isNull"),
-  isNotNull: mk("isNotNull"),
-  ilike: mk("ilike"),
-  asc: mk("asc"),
-  desc: mk("desc"),
-  not: mk("not"),
-  like: mk("like"),
-  count: mk("count"),
-  arrayContains: mk("arrayContains"),
-  sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
-}));
-
-const { AdminQueryService } = await import("../application/services/admin-query.service");
-
-const instrumentation = {
-  startSpan: <T>(_o: unknown, fn: () => T) => fn(),
-  capture: mock(() => {}),
-  addBreadcrumb: mock(() => {}),
-  setSpanAttributes: mock(() => {}),
+const USER: AdminUserRow = {
+  id: "u-1",
+  email: "a@example.com",
+  name: "A",
+  role: Option.some("admin"),
+  banned: false,
+  banReason: Option.none(),
+  banExpires: Option.none(),
+  twoFactorEnabled: true,
+  createdAt: new Date("2026-01-01"),
 };
 
-function serviceReturning(result: unknown[]) {
-  const store = {
-    listUsers: mock(async () => result),
+const ORG: AdminOrgRow = {
+  id: "o-1",
+  name: "Acme",
+  slug: "acme",
+  memberCount: 3,
+  createdAt: new Date("2026-01-01"),
+  ssoEnforced: false,
+};
+
+const STORE_FAILURE: AdminStoreError = {
+  code: "ADMIN_QUERY_PROVIDER_FAILURE",
+  message: "db down",
+};
+
+const ok = <T>(value: T) => Result.ok<T, AdminStoreError>(value);
+const failed = <T>() => Result.fail<T, AdminStoreError>(STORE_FAILURE);
+
+function userStore(overrides: Partial<IAdminUserStore> = {}): IAdminUserStore {
+  return {
+    listUsers: mock(async () => ok([USER])),
+    findUserById: mock(async () => ok(Option.some(USER))),
+    listSessionsFor: mock(async () => ok([])),
+    listMembershipsFor: mock(async () => ok([])),
+    ...overrides,
   };
-  return new AdminQueryService(store as never, instrumentation as never, {} as never);
+}
+
+function orgStore(overrides: Partial<IAdminOrgStore> = {}): IAdminOrgStore {
+  return {
+    listOrgs: mock(async () => ok([ORG])),
+    findOrgById: mock(async () => ok(Option.some(ORG))),
+    listMembersOf: mock(async () => ok([])),
+    findPlanFor: mock(async () => ok(Option.none<string>())),
+    ...overrides,
+  };
+}
+
+function service(users = userStore(), orgs = orgStore()) {
+  return new AdminQueryService(users, new NoOpInstrumentation(), orgs);
 }
 
 describe("AdminQueryService", () => {
   describe("listUsers", () => {
-    it("returns the page items with Option-wrapped nullable columns", async () => {
-      const service = serviceReturning(rows);
-      const result = await service.listUsers({ limit: 50 });
-      expect(result.isSuccess).toBe(true);
-      const page = result.getValue();
+    it("returns the store rows as page items", async () => {
+      const page = (await service().listUsers({ limit: 50 })).getValue();
+
       expect(page.items[0]?.role.unwrap()).toBe("admin");
       expect(page.items[0]?.banReason.isNone()).toBe(true);
     });
 
     it("returns no cursor when the page is not full", async () => {
-      const service = serviceReturning(rows);
-      const page = (await service.listUsers({ limit: 50 })).getValue();
+      const page = (await service().listUsers({ limit: 50 })).getValue();
+
       expect(page.nextCursor.isNone()).toBe(true);
     });
 
-    it("returns a cursor when the page is exactly full", async () => {
-      const service = serviceReturning(rows);
-      const page = (await service.listUsers({ limit: 1 })).getValue();
-      expect(page.nextCursor.isSome()).toBe(true);
+    it("returns the last createdAt as cursor when the page is exactly full", async () => {
+      const page = (await service().listUsers({ limit: 1 })).getValue();
+
       expect(page.nextCursor.unwrap()).toBe(new Date("2026-01-01").toISOString());
     });
 
-    it("passes organizationId filter through to the store", async () => {
-      const store = { listUsers: mock(async () => rows) };
-      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
-      await service.listUsers({ limit: 50, organizationId: "org-1" });
-      expect(store.listUsers).toHaveBeenCalledWith(
+    it("passes the organizationId filter through to the store", async () => {
+      const users = userStore();
+
+      await service(users).listUsers({ limit: 50, organizationId: "org-1" });
+
+      expect(users.listUsers).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org-1" }),
       );
     });
 
-    it("captures the error and fails when the store throws", async () => {
-      const store = {
-        listUsers: mock(async () => {
-          throw new Error("boom");
-        }),
-      };
-      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
-      const result = await service.listUsers({ limit: 50 });
-      expect(result.isFailure).toBe(true);
-      expect(instrumentation.capture).toHaveBeenCalled();
+    it("propagates a store failure", async () => {
+      const users = userStore({ listUsers: mock(async () => failed<AdminUserRow[]>()) });
+
+      const result = await service(users).listUsers({ limit: 50 });
+
+      expect(result.getError()).toEqual(STORE_FAILURE);
     });
   });
 
   describe("getUser", () => {
     it("returns none when the user does not exist", async () => {
-      const store = {
-        listUsers: mock(async () => []),
-        findUserById: mock(async () => Option.none()),
-        listSessionsFor: mock(async () => []),
-        listMembershipsFor: mock(async () => []),
-      };
-      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
-      const result = await service.getUser("missing");
-      expect(result.isSuccess).toBe(true);
+      const users = userStore({ findUserById: mock(async () => ok(Option.none<AdminUserRow>())) });
+
+      const result = await service(users).getUser("missing");
+
       expect(result.getValue().isNone()).toBe(true);
+      expect(users.listSessionsFor).not.toHaveBeenCalled();
     });
 
     it("assembles sessions and memberships for an existing user", async () => {
-      const store = {
-        listUsers: mock(async () => []),
-        findUserById: mock(async () => Option.some(rows[0])),
-        listSessionsFor: mock(async () => [
-          {
-            id: "s-1",
-            createdAt: new Date("2026-02-01"),
-            expiresAt: new Date("2026-02-02"),
-            ipAddress: "1.2.3.4",
-            userAgent: null,
-            impersonatedBy: "admin-1",
-          },
-        ]),
-        listMembershipsFor: mock(async () => [
-          { organizationId: "o-1", organizationName: "Acme", role: "owner" },
-        ]),
-      };
-      const service = new AdminQueryService(store as never, instrumentation as never, {} as never);
-      const detail = (await service.getUser("u-1")).getValue().unwrap();
+      const users = userStore({
+        listSessionsFor: mock(async () =>
+          ok([
+            {
+              id: "s-1",
+              createdAt: new Date("2026-02-01"),
+              expiresAt: new Date("2026-02-02"),
+              ipAddress: Option.some("1.2.3.4"),
+              userAgent: Option.none<string>(),
+              impersonatedBy: Option.some("admin-1"),
+            },
+          ]),
+        ),
+        listMembershipsFor: mock(async () =>
+          ok([{ organizationId: "o-1", organizationName: "Acme", role: "owner" }]),
+        ),
+      });
+
+      const detail = (await service(users).getUser("u-1")).getValue().unwrap();
+
       expect(detail.sessions[0]?.impersonatedBy.unwrap()).toBe("admin-1");
       expect(detail.memberships[0]?.organizationName).toBe("Acme");
+    });
+
+    it("fails when a related lookup fails", async () => {
+      const users = userStore({ listSessionsFor: mock(async () => failed<AdminSessionRow[]>()) });
+
+      const result = await service(users).getUser("u-1");
+
+      expect(result.isFailure).toBe(true);
+    });
+  });
+
+  describe("listOrgs", () => {
+    it("lists orgs with their member count", async () => {
+      const page = (await service().listOrgs({ limit: 50 })).getValue();
+
+      expect(page.items[0]?.memberCount).toBe(3);
+    });
+  });
+
+  describe("getOrg", () => {
+    it("returns none for an unknown org", async () => {
+      const orgs = orgStore({ findOrgById: mock(async () => ok(Option.none<AdminOrgRow>())) });
+
+      const result = await service(userStore(), orgs).getOrg("nope");
+
+      expect(result.getValue().isNone()).toBe(true);
+    });
+
+    it("exposes the plan as an Option when the org has no subscription", async () => {
+      const orgs = orgStore({
+        listMembersOf: mock(async () =>
+          ok([{ userId: "u-1", email: "a@example.com", role: "owner" }]),
+        ),
+      });
+
+      const detail = (await service(userStore(), orgs).getOrg("o-1")).getValue().unwrap();
+
+      expect(detail.plan.isNone()).toBe(true);
+      expect(detail.members).toHaveLength(1);
     });
   });
 });

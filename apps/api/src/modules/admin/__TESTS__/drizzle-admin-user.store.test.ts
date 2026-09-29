@@ -41,12 +41,11 @@ function makeDbQuery() {
   return buildQuery(async () => dbBehavior());
 }
 
+// Only what this file's subject actually touches: test files do not share a module
+// registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => makeDbQuery(),
-    insert: () => makeDbQuery(),
-    update: () => makeDbQuery(),
-    delete: () => makeDbQuery(),
   },
   authSchema: {
     user: {
@@ -66,95 +65,13 @@ mock.module("@packages/drizzle", () => ({
     member: { userId: {}, organizationId: {} },
     organization: { id: {} },
   },
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: { hash: {}, sequence: {}, id: {} } },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      url: {},
-      secretCipher: {},
-      eventTypes: {},
-      enabled: {},
-      createdAt: {},
-      updatedAt: {},
-      previousSecretCipher: {},
-      previousSecretExpiresAt: {},
-      consecutiveFailures: {},
-      firstFailedAt: {},
-      disabledAt: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  emailSchema: {},
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
   and: mk("and"),
   or: mk("or"),
   eq: mk("eq"),
   lt: mk("lt"),
-  lte: mk("lte"),
-  gt: mk("gt"),
-  gte: mk("gte"),
   inArray: mk("inArray"),
-  isNull: mk("isNull"),
-  isNotNull: mk("isNotNull"),
   ilike: mk("ilike"),
-  asc: mk("asc"),
   desc: mk("desc"),
-  not: mk("not"),
-  like: mk("like"),
-  count: mk("count"),
-  arrayContains: mk("arrayContains"),
-  sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
 }));
 
 const { DrizzleAdminUserStore } = await import(
@@ -188,16 +105,18 @@ describe("DrizzleAdminUserStore", () => {
   });
 
   describe("listUsers", () => {
-    it("returns rows from the db", async () => {
+    it("maps db rows, turning nullable columns into Options", async () => {
       dbBehavior = async () => [fakeRow];
-      const rows = await store.listUsers({ limit: 50 });
+      const rows = (await store.listUsers({ limit: 50 })).getValue();
       expect(rows).toHaveLength(1);
       expect(rows[0]?.id).toBe("u-1");
+      expect(rows[0]?.role.unwrap()).toBe("admin");
+      expect(rows[0]?.banReason.isNone()).toBe(true);
     });
 
     it("passes and(inArray(...)) to .where() when organizationId is set", async () => {
       await store.listUsers({ limit: 50, organizationId: "org-1" });
-      const mainArg = capturedWhereArgs[capturedWhereArgs.length - 1] as SqlMarker;
+      const mainArg = capturedWhereArgs.at(-1) as SqlMarker;
       expect(mainArg).toBeDefined();
       expect(mainArg._op).toBe("and");
       const hasInArray = mainArg.args.some((a) => (a as SqlMarker)?._op === "inArray");
@@ -206,7 +125,7 @@ describe("DrizzleAdminUserStore", () => {
 
     it("passes undefined to .where() when organizationId is absent", async () => {
       await store.listUsers({ limit: 50 });
-      expect(capturedWhereArgs[capturedWhereArgs.length - 1]).toBeUndefined();
+      expect(capturedWhereArgs.at(-1)).toBeUndefined();
     });
 
     it("emits outer and inner db.query spans", async () => {
@@ -220,7 +139,7 @@ describe("DrizzleAdminUserStore", () => {
       expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
     });
 
-    it("captures the error and rethrows when the db fails", async () => {
+    it("captures the error and returns a failure when the db fails", async () => {
       const boom = new Error("db boom");
       const captureSpy = spyOn(instrumentation, "capture");
       let callCount = 0;
@@ -230,7 +149,8 @@ describe("DrizzleAdminUserStore", () => {
         return (cb as () => Promise<unknown>)();
       }) as typeof instrumentation.startSpan);
 
-      await expect(store.listUsers({ limit: 50 })).rejects.toThrow("db boom");
+      const result = await store.listUsers({ limit: 50 });
+      expect(result.getError().code).toBe("ADMIN_QUERY_PROVIDER_FAILURE");
       expect(captureSpy).toHaveBeenCalledWith(boom);
     });
   });

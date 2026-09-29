@@ -1,4 +1,4 @@
-import { Option } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -13,6 +13,7 @@ import {
   or,
   sql,
 } from "@packages/drizzle";
+import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListOrgsInput } from "../../application/dto/list-orgs.dto";
 import type {
@@ -20,160 +21,143 @@ import type {
   AdminOrgRow,
   IAdminOrgStore,
 } from "../../application/ports/admin-org-store.port";
+import type { AdminStoreError } from "../../application/ports/admin-user-store.port";
+
+const organization = multiTenantSchema.organization;
+const member = multiTenantSchema.member;
+const subscription = billingSchema.subscription;
+const fail = createDbFailure("ADMIN_QUERY_PROVIDER_FAILURE");
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+
+const orgColumns = {
+  id: organization.id,
+  name: organization.name,
+  slug: organization.slug,
+  createdAt: organization.createdAt,
+  ssoEnforced: organization.ssoEnforced,
+  memberCount: count(member.id),
+};
 
 export class DrizzleAdminOrgStore implements IAdminOrgStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async listOrgs(input: ListOrgsInput): Promise<AdminOrgRow[]> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminOrgStore > listOrgs" },
-        async () => {
-          const conditions = [];
-          if (input.search) {
-            conditions.push(
-              or(
-                ilike(multiTenantSchema.organization.name, `%${input.search}%`),
-                ilike(multiTenantSchema.organization.slug, `%${input.search}%`),
-              ),
-            );
-          }
-          if (input.cursor) {
-            conditions.push(lt(multiTenantSchema.organization.createdAt, new Date(input.cursor)));
-          }
-
-          const query = db
-            .select({
-              id: multiTenantSchema.organization.id,
-              name: multiTenantSchema.organization.name,
-              slug: multiTenantSchema.organization.slug,
-              createdAt: multiTenantSchema.organization.createdAt,
-              ssoEnforced: multiTenantSchema.organization.ssoEnforced,
-              memberCount: count(multiTenantSchema.member.id),
-            })
-            .from(multiTenantSchema.organization)
-            .leftJoin(
-              multiTenantSchema.member,
-              eq(multiTenantSchema.member.organizationId, multiTenantSchema.organization.id),
-            )
-            .where(conditions.length ? and(...conditions) : undefined)
-            .groupBy(multiTenantSchema.organization.id)
-            .orderBy(desc(multiTenantSchema.organization.createdAt))
-            .limit(input.limit);
-
-          return this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
-            () => query.execute(),
+  async listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgRow[], AdminStoreError>> {
+    return this.instrumentation.startSpan({ name: "DrizzleAdminOrgStore > listOrgs" }, async () => {
+      try {
+        const conditions = [];
+        if (input.search) {
+          conditions.push(
+            or(
+              ilike(organization.name, `%${input.search}%`),
+              ilike(organization.slug, `%${input.search}%`),
+            ),
           );
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+        }
+        if (input.cursor) conditions.push(lt(organization.createdAt, new Date(input.cursor)));
+
+        const query = db
+          .select(orgColumns)
+          .from(organization)
+          .leftJoin(member, eq(member.organizationId, organization.id))
+          .where(conditions.length ? and(...conditions) : undefined)
+          .groupBy(organization.id)
+          .orderBy(desc(organization.createdAt))
+          .limit(input.limit);
+
+        const rows = await this.instrumentation.startSpan(
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
+        );
+
+        return Result.ok(rows);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin organization list failed");
+      }
+    });
   }
 
-  async findOrgById(id: string): Promise<Option<AdminOrgRow>> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminOrgStore > findOrgById" },
-        async () => {
+  async findOrgById(id: string): Promise<Result<Option<AdminOrgRow>, AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminOrgStore > findOrgById" },
+      async () => {
+        try {
           const query = db
-            .select({
-              id: multiTenantSchema.organization.id,
-              name: multiTenantSchema.organization.name,
-              slug: multiTenantSchema.organization.slug,
-              createdAt: multiTenantSchema.organization.createdAt,
-              ssoEnforced: multiTenantSchema.organization.ssoEnforced,
-              memberCount: count(multiTenantSchema.member.id),
-            })
-            .from(multiTenantSchema.organization)
-            .leftJoin(
-              multiTenantSchema.member,
-              eq(multiTenantSchema.member.organizationId, multiTenantSchema.organization.id),
-            )
-            .where(eq(multiTenantSchema.organization.id, id))
-            .groupBy(multiTenantSchema.organization.id)
+            .select(orgColumns)
+            .from(organization)
+            .leftJoin(member, eq(member.organizationId, organization.id))
+            .where(eq(organization.id, id))
+            .groupBy(organization.id)
             .limit(1);
 
-          const rows = await this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Option.fromNullable(rows[0] ?? null);
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+
+          return Result.ok(Option.fromNullable(row));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin organization lookup failed");
+        }
+      },
+    );
   }
 
-  async listMembersOf(organizationId: string): Promise<AdminOrgMemberRow[]> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminOrgStore > listMembersOf" },
-        async () => {
+  async listMembersOf(
+    organizationId: string,
+  ): Promise<Result<AdminOrgMemberRow[], AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminOrgStore > listMembersOf" },
+      async () => {
+        try {
           const query = db
             .select({
-              userId: multiTenantSchema.member.userId,
+              userId: member.userId,
               email: authSchema.user.email,
-              role: multiTenantSchema.member.role,
+              role: member.role,
             })
-            .from(multiTenantSchema.member)
-            .innerJoin(authSchema.user, eq(authSchema.user.id, multiTenantSchema.member.userId))
-            .where(eq(multiTenantSchema.member.organizationId, organizationId));
-
-          return this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
-            () => query.execute(),
-          );
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
-  }
-
-  async findPlanFor(organizationId: string): Promise<Option<string>> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminOrgStore > findPlanFor" },
-        async () => {
-          const query = db
-            .select({ plan: billingSchema.subscription.plan })
-            .from(billingSchema.subscription)
-            .where(eq(billingSchema.subscription.referenceId, organizationId))
-            .orderBy(sql`${billingSchema.subscription.periodStart} DESC NULLS LAST`)
-            .limit(1);
+            .from(member)
+            .innerJoin(authSchema.user, eq(authSchema.user.id, member.userId))
+            .where(eq(member.organizationId, organizationId));
 
           const rows = await this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Option.fromNullable(rows[0]?.plan ?? null);
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+
+          return Result.ok(rows);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin organization member list failed");
+        }
+      },
+    );
+  }
+
+  async findPlanFor(organizationId: string): Promise<Result<Option<string>, AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminOrgStore > findPlanFor" },
+      async () => {
+        try {
+          const query = db
+            .select({ plan: subscription.plan })
+            .from(subscription)
+            .where(eq(subscription.referenceId, organizationId))
+            .orderBy(sql`${subscription.periodStart} DESC NULLS LAST`)
+            .limit(1);
+
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(Option.fromNullable(row?.plan));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin organization plan lookup failed");
+        }
+      },
+    );
   }
 }

@@ -1,124 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { EventTypes } from "@packages/events";
 
-type SqlMarker = { _op: string; args: unknown[] };
-const mk =
-  (op: string) =>
-  (...args: unknown[]): SqlMarker => ({ _op: op, args });
-
-mock.module("@packages/drizzle", () => ({
-  db: {
-    select: () => ({}),
-    insert: () => ({}),
-    update: () => ({}),
-    delete: () => ({}),
-  },
-  authSchema: {
-    user: {
-      id: {},
-      email: {},
-      name: {},
-      role: {},
-      banned: {},
-      banReason: {},
-      banExpires: {},
-      twoFactorEnabled: {},
-      createdAt: {},
-    },
-    session: {},
-  },
-  multiTenantSchema: { member: { userId: {}, organizationId: {} }, organization: { id: {} } },
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: { hash: {}, sequence: {}, id: {} } },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      url: {},
-      secretCipher: {},
-      eventTypes: {},
-      enabled: {},
-      createdAt: {},
-      updatedAt: {},
-      previousSecretCipher: {},
-      previousSecretExpiresAt: {},
-      consecutiveFailures: {},
-      firstFailedAt: {},
-      disabledAt: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  emailSchema: {},
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
-  and: mk("and"),
-  or: mk("or"),
-  eq: mk("eq"),
-  lt: mk("lt"),
-  lte: mk("lte"),
-  gt: mk("gt"),
-  gte: mk("gte"),
-  inArray: mk("inArray"),
-  isNull: mk("isNull"),
-  isNotNull: mk("isNotNull"),
-  ilike: mk("ilike"),
-  asc: mk("asc"),
-  desc: mk("desc"),
-  not: mk("not"),
-  like: mk("like"),
-  count: mk("count"),
-  arrayContains: mk("arrayContains"),
-  sql: Object.assign(mk("sql"), { raw: mk("sql.raw"), identifier: () => ({}) }),
-}));
-
 mock.module("hono/bun", () => ({
   getConnInfo: () => ({ remote: { address: "127.0.0.1" } }),
 }));
@@ -183,7 +65,7 @@ const { createErrorHandler } = await import("../../../shared/middleware/error.mi
 const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
 // Mounted behind the real error handler: a validation rejection is now an
-// `AppErrorException`, which only Hono's `onError` turns into a 400 — a bare
+// `AppErrorException`, which only Hono's `onError` turns into a 400; a bare
 // sub-router would report it as an unhandled 500 and hide the contract.
 const app = new Hono<{ Variables: { requestId: string } }>()
   .use("*", async (c, next) => {
@@ -217,12 +99,12 @@ describe("POST /admin/impersonation/:id/start", () => {
     const res = await app.request("/u-2/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ reason: "ticket 42 — cannot upload avatar" }),
+      body: JSON.stringify({ reason: "ticket 42: cannot upload avatar" }),
     });
     expect(res.status).toBe(200);
     expect(res.headers.getSetCookie()).toContain("session=impersonated; Path=/; HttpOnly");
     const event = emitted.find((e) => e.type === EventTypes.ADMIN_IMPERSONATION_STARTED);
-    expect(event?.payload.reason).toBe("ticket 42 — cannot upload avatar");
+    expect(event?.payload.reason).toBe("ticket 42: cannot upload avatar");
     expect(event?.payload.actorUserId).toBe("admin-1");
     expect(event?.payload.userId).toBe("u-2");
     expect(event?.payload.actorUserId).not.toBe(event?.payload.userId);
