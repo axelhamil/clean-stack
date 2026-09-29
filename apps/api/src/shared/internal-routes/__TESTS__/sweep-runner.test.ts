@@ -1,6 +1,6 @@
 import { describe, expect, it, spyOn } from "bun:test";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
-import { MAX_BATCHES, runRetentionSweep } from "../sweep-runner";
+import { MAX_BATCHES, releaseLease, runRetentionSweep } from "../sweep-runner";
 import { sweepSpans } from "../sweep-span";
 
 const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
@@ -461,5 +461,36 @@ describe("runRetentionSweep instrumentation", () => {
     });
 
     expect(spy).toHaveBeenCalledWith(releaseFailure, expect.anything());
+  });
+});
+
+describe("releaseLease", () => {
+  // The flush route used to `await lock.release()` bare in its `finally`: a release
+  // failure after a committed flush turned a successful run into a 500, and masked
+  // the original error when the flush itself had thrown.
+  it("resolves when the release throws, and logs and captures the failure", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const capture = spyOn(instrumentation, "capture");
+    const errors: unknown[] = [];
+    const releaseFailure = new Error("release failed");
+
+    await expect(
+      releaseLease(
+        {
+          acquire: async () => true,
+          release: async () => {
+            throw releaseFailure;
+          },
+        },
+        "flush-notification-emails",
+        { error: (obj: unknown) => errors.push(obj) } as never,
+        sweepSpans(instrumentation),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(errors).toHaveLength(1);
+    expect(capture).toHaveBeenCalledWith(releaseFailure, {
+      metadata: { label: "flush-notification-emails", phase: "lease-release" },
+    });
   });
 });

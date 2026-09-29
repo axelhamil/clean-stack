@@ -81,6 +81,27 @@ export type SweepResponse = {
   skipped: boolean;
 };
 
+/**
+ * Releases a lease without letting the release decide the outcome of the run.
+ *
+ * Swallowed on purpose: a failed release must not fail a run that did its work, and
+ * the lease expires on its own. Swallowed *silently* is the bug: a label that keeps
+ * failing to release is invisible until it wedges, so it is logged and captured.
+ */
+export async function releaseLease(
+  lock: SweepLock,
+  label: string,
+  logger: Pick<PinoLogger, "error">,
+  spans: SweepSpans,
+): Promise<void> {
+  try {
+    await lock.release();
+  } catch (err) {
+    logger.error({ err, label }, "lease release failed");
+    spans.capture(err, { label, phase: "lease-release" });
+  }
+}
+
 export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise<SweepResponse> {
   return opts.spans.span({ name: `sweep > ${opts.label}`, op: "function" }, async () => {
     const batchSize = opts.body.batchSize ?? 5000;
@@ -176,15 +197,7 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
         stopReasons[pass.label] = run.stopReason;
       }
     } finally {
-      try {
-        await opts.lock.release();
-      } catch (err) {
-        opts.logger.error({ err, label: opts.label }, "lease release failed");
-        // Swallowed on purpose — a failed release must not fail a sweep that did its
-        // work, and the lease expires on its own. Swallowed *silently* is the bug:
-        // a label that keeps failing to release is invisible until it wedges.
-        opts.spans.capture(err, { label: opts.label, phase: "lease-release" });
-      }
+      await releaseLease(opts.lock, opts.label, opts.logger, opts.spans);
     }
 
     const truncated = Object.values(stopReasons).some((r) => r === "budget" || r === "batch-cap");
