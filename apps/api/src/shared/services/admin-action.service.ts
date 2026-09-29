@@ -17,7 +17,7 @@ type ActionResult = Promise<Result<void, AdminActionError>>;
  * routes (`modules/admin/admin-orgs.routes.ts`) and the org-owner settings
  * routes (`modules/organization/routes.ts`) both call `setSsoEnforcement`.
  * It also imports the BetterAuth singleton (`auth.ts`) directly, which
- * itself depends on the DI container — registering this class inside a
+ * itself depends on the DI container: registering this class inside a
  * module's `defineModule()` would create an import cycle
  * (`module.ts` → this file → `auth.ts` → `container.ts` → `module.ts`).
  * Route files instantiate it ad hoc from already-built `di` bindings
@@ -125,10 +125,18 @@ export class AdminActionService {
   }): ActionResult {
     return this.run("setSsoEnforcement", async () => {
       await this.uow.run(async (tx) => {
-        await tx
+        const query = tx
           .update(multiTenantSchema.organization)
           .set({ ssoEnforced: input.enforced })
           .where(eq(multiTenantSchema.organization.id, input.organizationId));
+        await this.instrumentation.startSpan(
+          {
+            name: query.toSQL().sql,
+            op: "db.query",
+            attributes: { "db.system.name": "postgresql" },
+          },
+          () => query.execute(),
+        );
 
         await emitEvent(
           this.outbox,

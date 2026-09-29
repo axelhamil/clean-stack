@@ -38,7 +38,14 @@ const instrumentation = {
 };
 
 const fakeTx = {
-  update: () => ({ set: () => ({ where: async () => undefined }) }),
+  update: () => ({
+    set: () => ({
+      where: () => ({
+        toSQL: () => ({ sql: "update organization" }),
+        execute: async () => undefined,
+      }),
+    }),
+  }),
 } as never;
 
 const noopUow = {
