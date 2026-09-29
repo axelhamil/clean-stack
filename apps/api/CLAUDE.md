@@ -75,7 +75,7 @@ export const xModule = defineModule()((b) =>
 
 ## Commands
 
-- **Tests**: `pnpm --filter api test` (`bun test --isolate --parallel`); a bare `bun test` drops file isolation.
+- **Tests**: `pnpm --filter api test` (`bun test --isolate --parallel`); a bare `bun test` drops file isolation. `bunfig.toml` preloads `src/__TESTS__/preload.ts`, which supplies a test-only `INTERNAL_SIGNING_KEY` when none is exported, so a fresh `pnpm bootstrap` runs green without a real key in `.env.example`.
 - **Real-database checks**: `pnpm --filter api check:{fanout,digest,api-token-visibility,wipe-rollback,uow-rollback,marksent,enqueue,sweep-lock}` (scripts in `scripts/`, refuse a non-local database via `require-local-database.ts`, all wired in `.github/workflows/ci.yml`). A new SQL-heavy decision the mocks cannot cover gets a script AND a CI step.
 
 ## Hono RPC (end-to-end type safety)
