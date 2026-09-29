@@ -30,20 +30,10 @@ const findUserByIdSpy = mock(async (_id: string) => ({
   banExpires: null as Date | null,
 }));
 
+const realAuthQueries = await import("../../auth-queries");
 mock.module("../../auth-queries", () => ({
+  ...realAuthQueries,
   findUserById: findUserByIdSpy,
-  updateUserName: async () => {},
-  findUserOrganizations: async () => [],
-  findActiveMemberOrgId: async () => undefined,
-  insertPersonalOrgWithOwner: async () => {},
-  setPendingEmail: async () => {},
-  deleteOrgIfEmpty: async () => false,
-  clearConfirmedPendingEmail: async () => false,
-  findLatestPasskey: async () => undefined,
-  findLatestLinkedAccount: async () => undefined,
-  findActiveMemberRole: async () => null,
-  findOrgOwnerUserId: async () => null,
-  countActiveMembers: async () => 0,
 }));
 
 const { requireApiToken } = await import("../middleware/api-token.middleware");

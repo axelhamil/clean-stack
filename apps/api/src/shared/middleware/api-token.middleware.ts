@@ -40,39 +40,34 @@ export function requireApiToken(
 
     const raw = authHeader.slice(7);
 
-    // Checksum validation happens before any repo call — a malformed token must
+    // Checksum validation happens before any repo call: a malformed token must
     // not cost a round-trip to the database (the checksum is the cost barrier).
     const parsed = parseToken(raw, deps.prefix);
     if (!parsed.isSuccess) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
-    const currentHmac = hmacToken(raw, deps.pepper);
-    const currentLookup = await deps.repo.findByHmac(currentHmac);
-    if (!currentLookup.isSuccess) {
-      throw new HTTPException(503, { message: "Service Unavailable" });
-    }
+    const lookup = async (hmac: string) => {
+      const found = await deps.repo.findByHmac(hmac);
+      if (!found.isSuccess) throw new HTTPException(503, { message: "Service Unavailable" });
+      return found.getValue();
+    };
 
-    let record = currentLookup.getValue().isSome() ? currentLookup.getValue().unwrap() : null;
+    const currentHmac = hmacToken(raw, deps.pepper);
+    let match = await lookup(currentHmac);
 
     // Track whether the token was found via the previous pepper so we can rehash
-    // AFTER validity checks — never write to the DB for a revoked or expired token.
+    // AFTER validity checks: never write to the DB for a revoked or expired token.
     let needsRehash = false;
-    if (!record && deps.pepperPrevious) {
-      const previousHmac = hmacToken(raw, deps.pepperPrevious);
-      const previousLookup = await deps.repo.findByHmac(previousHmac);
-      if (!previousLookup.isSuccess) {
-        throw new HTTPException(503, { message: "Service Unavailable" });
-      }
-      if (previousLookup.getValue().isSome()) {
-        record = previousLookup.getValue().unwrap();
-        needsRehash = true;
-      }
+    if (match.isNone() && deps.pepperPrevious) {
+      match = await lookup(hmacToken(raw, deps.pepperPrevious));
+      needsRehash = match.isSome();
     }
 
-    if (!record) {
+    if (match.isNone()) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
+    const record = match.unwrap();
 
     const now = new Date();
     if (record.revokedAt !== null) {
@@ -82,8 +77,6 @@ export function requireApiToken(
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
-    // Rehash only after the token is confirmed valid — avoids writing to the DB
-    // for revoked or expired tokens that happened to use the previous pepper.
     if (needsRehash) {
       await deps.repo.rehash(record.id, currentHmac, deps.pepperVersion);
     }
@@ -113,7 +106,7 @@ export function requireApiToken(
     // apiTokenId must be set before the per-token rate-limit policy runs.
     c.set("apiTokenId", record.id);
     c.set("user", user);
-    c.set("tokenScopes", record.scopes as ApiScope[]);
+    c.set("tokenScopes", recordScopes);
     c.set("orgId", record.organizationId);
 
     const bucketFloor = new Date(Date.now() - deps.bucketMin * 60_000);

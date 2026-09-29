@@ -25,6 +25,11 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
     const orgId = c.get("session")?.activeOrganizationId ?? undefined;
     const trackerContext = { requestId, userId, orgId, path: c.req.path, method: c.req.method };
 
+    const reportServerError = (message: string) => {
+      logger.error({ err, requestId, path: c.req.path }, message);
+      instrumentation.capture(err, trackerContext);
+    };
+
     if (err instanceof AppErrorException) {
       const status = httpStatusFromCode(err.code) as ContentfulStatusCode;
 
@@ -36,10 +41,7 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
           ...(err.metadata ? { metadata: err.metadata } : {}),
         },
       };
-      if (status >= 500) {
-        logger.error({ err, requestId, path: c.req.path }, err.message);
-        instrumentation.capture(err, trackerContext);
-      }
+      if (status >= 500) reportServerError(err.message);
 
       return c.json(body, status);
     }
@@ -53,10 +55,7 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
           requestId,
         },
       };
-      if (status >= 500) {
-        logger.error({ err, requestId, path: c.req.path }, err.message);
-        instrumentation.capture(err, trackerContext);
-      }
+      if (status >= 500) reportServerError(err.message);
 
       return c.json(body, status);
     }

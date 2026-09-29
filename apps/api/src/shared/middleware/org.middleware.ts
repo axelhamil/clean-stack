@@ -4,12 +4,12 @@ import {
   type OrgPermissions,
   type OrgRole,
 } from "@packages/access-control";
-import { and, db, eq, schema } from "@packages/drizzle";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { SessionData, SessionUser } from "../../auth";
+import { findActiveMemberRole } from "../../auth-queries";
 
 const orgRoleSchema = z.enum(ORG_ROLES);
 
@@ -52,12 +52,7 @@ async function resolveRole(
     if (fromSession) return fromSession;
   }
 
-  const [row] = await db
-    .select({ role: schema.member.role })
-    .from(schema.member)
-    .where(and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, userId)))
-    .limit(1);
-  return parseRole(row?.role);
+  return parseRole(await findActiveMemberRole(userId, orgId));
 }
 
 export const requireOrgPermission = (permissions: OrgPermissions) =>
@@ -65,7 +60,7 @@ export const requireOrgPermission = (permissions: OrgPermissions) =>
     const orgId = c.get("orgId");
     if (!orgId)
       throw new HTTPException(500, {
-        message: "requireOrgPermission: orgId missing — chain requireOrg before",
+        message: "requireOrgPermission: orgId missing, chain requireOrg before",
       });
 
     const role = await resolveRole(c, orgId, c.get("user").id);
