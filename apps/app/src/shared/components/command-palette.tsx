@@ -27,6 +27,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@packages/ui/components/ui/command";
+import { CommandHint } from "@packages/ui/components/ui/command-hint";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -371,9 +372,7 @@ export function CommandPalette() {
                   >
                     <Icon />
                     <span className="flex-1 truncate">{entry.label}</span>
-                    {entry.hint && (
-                      <span className="text-xs text-muted-foreground">{entry.hint}</span>
-                    )}
+                    {entry.hint && <CommandHint>{entry.hint}</CommandHint>}
                     {entry.shortcut && <CommandShortcut>{entry.shortcut.display}</CommandShortcut>}
                   </CommandItem>
                 );
