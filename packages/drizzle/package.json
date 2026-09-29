@@ -24,14 +24,14 @@
     "@packages/events": "workspace:*",
     "@packages/policies": "workspace:*",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "pg": "^8.23.0"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.3",
     "@types/pg": "^8.23.1",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2"
   }
 }
