@@ -8,5 +8,5 @@ export const presignDownloadBodySchema = z.object({
     .number()
     .int()
     .positive()
-    .default((env.STORAGE_PRESIGN_TTL_MIN_SECONDS ?? 60) * 10),
+    .default(env.STORAGE_PRESIGN_TTL_MIN_SECONDS * 10),
 });

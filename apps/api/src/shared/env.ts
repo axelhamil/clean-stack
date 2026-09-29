@@ -51,8 +51,8 @@ const envSchema = z
       .transform((v) => v === "true"),
     S3_PUBLIC_URL: z.url().optional(),
     STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().optional(),
-    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().optional(),
-    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
+    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().default(60),
+    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().default(3600),
     WEBHOOK_MASTER_KEY: z
       .string()
       .regex(/^[0-9a-f]{64}$/i, "WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)")
