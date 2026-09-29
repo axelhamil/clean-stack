@@ -1,5 +1,6 @@
 import { Result, uuidv7 } from "@packages/ddd-kit";
 import { and, db, eq, quotaUsageSchema, sql } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -11,9 +12,7 @@ import type {
 const qu = quotaUsageSchema.quotaUsage;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function failure(err: unknown, op: string): QuotaError {
-  return { code: "QUOTA_PROVIDER_FAILURE", message: `quota_usage ${op} failed: ${String(err)}` };
-}
+const failure = dbOperationFailure("QUOTA_PROVIDER_FAILURE");
 
 function usageRowOf(orgId: string, resource: string, period: QuotaPeriod) {
   return and(

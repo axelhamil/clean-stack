@@ -1,5 +1,6 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { and, apiTokenSchema, db, eq, isNull, lt, or } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   ApiTokenError,
   ApiTokenRecord,
@@ -31,13 +32,7 @@ function toRecord(row: typeof t.$inferSelect): ApiTokenRecord {
   };
 }
 
-function storeFailure(err: unknown, op: string): ApiTokenError {
-  return {
-    code: "API_TOKEN_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const storeFailure = dbOperationFailure("API_TOKEN_PROVIDER_FAILURE");
 
 /**
  * The rows an owner may see and revoke. Always AND-joined on `userId`, so a

@@ -19,3 +19,16 @@ export function createDbFailure<TCode extends ErrorCode>(code: TCode) {
     return Result.fail({ code, message });
   };
 }
+
+/**
+ * Factory for the error a store returns when a query throws: the operation in the
+ * message, the driver's text as `metadata.cause`. The store has already captured
+ * the error to telemetry, so this only shapes it for the caller.
+ */
+export function dbOperationFailure<TCode extends ErrorCode>(code: TCode) {
+  return (err: unknown, op: string): AppError<TCode> => ({
+    code,
+    message: `database operation failed: ${op}`,
+    metadata: { cause: err instanceof Error ? err.message : String(err) },
+  });
+}

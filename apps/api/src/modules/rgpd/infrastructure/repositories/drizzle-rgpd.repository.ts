@@ -4,6 +4,7 @@ import { Option, Result } from "@packages/ddd-kit";
 import { and, db, eq, gt, inArray, isNull, like, lte, not, or, schema } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
 import { symmetricDecrypt, verifyPassword as verifyHash } from "better-auth/crypto";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -22,13 +23,7 @@ const dbAttrs = { "db.system.name": "postgresql" } as const;
 const ANONYMIZED_DOMAIN = "anonymized.local";
 const ANONYMIZED_NAME = "[deleted]";
 
-function repositoryFailure(err: unknown, op: string): RgpdError {
-  return {
-    code: "RGPD_REPOSITORY_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const repositoryFailure = dbOperationFailure("RGPD_REPOSITORY_PROVIDER_FAILURE");
 
 export class DrizzleRgpdRepository implements IRgpdRepository {
   constructor(

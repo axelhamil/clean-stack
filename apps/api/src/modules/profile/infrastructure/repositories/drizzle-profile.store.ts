@@ -1,19 +1,14 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { authSchema, db, eq, type SQL } from "@packages/drizzle";
 import { isLocale, type Locale } from "@packages/i18n";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IProfileStore, ProfileError } from "../../../../shared/ports/profile.port";
 import type { ITransaction } from "../../../../shared/transaction";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function storeFailure(err: unknown, op: string): ProfileError {
-  return {
-    code: "PROFILE_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const storeFailure = dbOperationFailure("PROFILE_PROVIDER_FAILURE");
 
 export class DrizzleProfileStore implements IProfileStore {
   constructor(private readonly instrumentation: IInstrumentation) {}

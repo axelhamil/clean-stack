@@ -10,6 +10,7 @@ import {
   lt,
   notificationSchema,
 } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -23,19 +24,9 @@ import type {
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function readFailure(err: unknown): NotificationError {
-  return {
-    code: "NOTIFICATION_PROVIDER_FAILURE",
-    message: err instanceof Error ? err.message : "unknown",
-  };
-}
+const readFailure = dbOperationFailure("NOTIFICATION_PROVIDER_FAILURE");
 
-function writeFailure(err: unknown): NotificationError {
-  return {
-    code: "NOTIFICATION_WRITE_PROVIDER_FAILURE",
-    message: err instanceof Error ? err.message : "unknown",
-  };
-}
+const writeFailure = dbOperationFailure("NOTIFICATION_WRITE_PROVIDER_FAILURE");
 
 export class DrizzleNotificationStore implements INotificationStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
@@ -59,7 +50,7 @@ export class DrizzleNotificationStore implements INotificationStore {
         return Result.ok(rows.map((row) => this.toRecord(row)));
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(readFailure(err));
+        return Result.fail(readFailure(err, "list"));
       }
     });
   }
@@ -81,7 +72,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows[0]?.count ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(readFailure(err));
+          return Result.fail(readFailure(err, "unreadCount"));
         }
       },
     );
@@ -111,7 +102,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(writeFailure(err));
+          return Result.fail(writeFailure(err, "markRead"));
         }
       },
     );
@@ -140,7 +131,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(writeFailure(err));
+          return Result.fail(writeFailure(err, "markAllRead"));
         }
       },
     );
@@ -166,7 +157,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows.map((row) => this.toPreference(row)));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(readFailure(err));
+          return Result.fail(readFailure(err, "listPreferences"));
         }
       },
     );
@@ -211,7 +202,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(writeFailure(err));
+          return Result.fail(writeFailure(err, "upsertPreference"));
         }
       },
     );

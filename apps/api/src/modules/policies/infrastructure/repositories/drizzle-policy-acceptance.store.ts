@@ -1,6 +1,7 @@
 import { Result } from "@packages/ddd-kit";
 import { db, desc, eq, policiesSchema } from "@packages/drizzle";
 import type { PolicyType } from "@packages/policies";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -12,13 +13,7 @@ import type {
 const pa = policiesSchema.policyAcceptance;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function storeFailure(err: unknown, op: string): PolicyError {
-  return {
-    code: "POLICY_ACCEPTANCE_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const storeFailure = dbOperationFailure("POLICY_ACCEPTANCE_PROVIDER_FAILURE");
 
 export class DrizzlePolicyAcceptanceStore implements IPolicyAcceptanceStore {
   constructor(private readonly instrumentation: IInstrumentation) {}

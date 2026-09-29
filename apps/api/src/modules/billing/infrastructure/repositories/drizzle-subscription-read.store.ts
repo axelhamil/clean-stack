@@ -1,5 +1,6 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { and, billingSchema, db, eq, inArray } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -12,13 +13,7 @@ const sub = billingSchema.subscription;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const ACTIVE_STATUSES = ["active", "trialing"] as const;
 
-function storeFailure(err: unknown, op: string): BillingError {
-  return {
-    code: "BILLING_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const storeFailure = dbOperationFailure("BILLING_PROVIDER_FAILURE");
 
 function activeSubscriptionOf(referenceId: string) {
   return and(eq(sub.referenceId, referenceId), inArray(sub.status, [...ACTIVE_STATUSES]));

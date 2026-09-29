@@ -1,5 +1,6 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { and, consentSchema, db, desc, eq, gt, isNull, type SQL } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -11,13 +12,7 @@ import type {
 const cr = consentSchema.consentRecord;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function storeFailure(err: unknown, op: string): ConsentError {
-  return {
-    code: "CONSENT_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const storeFailure = dbOperationFailure("CONSENT_PROVIDER_FAILURE");
 
 function toRow(r: typeof cr.$inferSelect): ConsentRecordRow {
   return {
