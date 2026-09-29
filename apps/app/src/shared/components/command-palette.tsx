@@ -17,7 +17,6 @@
  *    (suppressed while typing in inputs/textareas/contenteditable)
  */
 
-import type { OrgPermissions } from "@packages/access-control";
 import {
   CommandDialog,
   CommandEmpty,
@@ -57,7 +56,7 @@ import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { sessionQueryOptions } from "../api/queries/session";
 import { isPlatformAdmin } from "../auth/is-platform-admin";
-import { useAuthorization } from "../auth/use-authorization";
+import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { useSignOut } from "../auth/use-sign-out";
 import { LEGAL_ROUTES } from "../legal-routes";
@@ -87,7 +86,7 @@ const SIGN_OUT_SHORTCUT: CommandShortcutBinding = {
   match: (e) => e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "q",
 };
 
-interface NavigationRoute {
+interface NavigationRoute extends NavigationRequirement {
   to: string;
   labelKey:
     | "nav.dashboard"
@@ -98,8 +97,6 @@ interface NavigationRoute {
     | "commandPalette.nav.privacy"
     | "commandPalette.nav.eventCatalog";
   icon: LucideIcon;
-  requires?: OrgPermissions;
-  requiresOrg?: boolean;
 }
 
 const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
@@ -131,12 +128,9 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
 
 function useNavigationGroup(t: TFunction<"common">): CommandGroupConfig {
   const navigate = useNavigate();
-  const { can, hasMembership } = useAuthorization();
-  const visible = NAVIGATION_ROUTES.filter((route) => {
-    if (route.requiresOrg && !hasMembership) return false;
-    if (route.requires) return can(route.requires);
-    return true;
-  });
+  const { canReach } = useAuthorization();
+  const visible = NAVIGATION_ROUTES.filter(canReach);
+
   return {
     heading: t("commandPalette.groups.navigate"),
     items: visible.map((route) => ({
