@@ -1,5 +1,6 @@
 import { mutationOptions } from "@tanstack/react-query";
 import { authClient } from "../../auth/auth-client";
+import { toAuthClientError } from "../errors/api-error";
 
 export interface UpgradeInput {
   tier: string;
@@ -12,8 +13,11 @@ interface SubscriptionUpgradeArgs {
   successUrl: string;
   cancelUrl: string;
 }
+
 interface SubscriptionActions {
-  upgrade: (args: SubscriptionUpgradeArgs) => Promise<{ error: { message?: string } | null }>;
+  upgrade: (
+    args: SubscriptionUpgradeArgs,
+  ) => Promise<{ error: { code?: string; status?: number; message?: string } | null }>;
 }
 
 export const upgradeSubscriptionMutationOptions = mutationOptions({
@@ -27,6 +31,6 @@ export const upgradeSubscriptionMutationOptions = mutationOptions({
       successUrl: `${window.location.origin}/settings/billing?upgraded=1`,
       cancelUrl: `${window.location.origin}/settings/billing`,
     });
-    if (error) throw new Error(error.message ?? "Upgrade failed");
+    if (error) throw toAuthClientError(error, "Upgrade failed");
   },
 });
