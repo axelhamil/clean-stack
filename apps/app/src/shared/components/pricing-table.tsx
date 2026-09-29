@@ -33,7 +33,7 @@ export function resolvePricingCta({ isAuthenticated, tier, currentTier }: Pricin
 // "year"` (`Stripe.Price.Recurring.Interval`); the wire contract widens it to
 // `string | null` (`PlanCatalogItem.interval`), so the value must be guarded,
 // never cast, before it can key into the catalog. `satisfies Record<PlanInterval,
-// string>` only proves every variant has AN entry — it cannot prove each one
+// string>` only proves every variant has AN entry: it cannot prove each one
 // points at the RIGHT one, so `__tests__/pricing-table.test.ts` asserts the
 // mapping directly, not just its exhaustiveness.
 export type PlanInterval = "day" | "week" | "month" | "year";
@@ -54,7 +54,7 @@ export const INTERVAL_KEYS = {
 // Replaces a hand-built `${amount} ${CURRENCY}/${interval}` string, which is
 // wrong per locale (English wants `$12/month`, French wants `12 €/mois`) and
 // untranslatable besides. `Intl.NumberFormat` produces the whole localized
-// amount — symbol, spacing and position included — so nothing here
+// amount (symbol, spacing and position included), so nothing here
 // concatenates a currency symbol by hand.
 function formatPlanPrice(t: TFunction<"common">, locale: string, plan: PlanCatalogItem): string {
   if (plan.unitAmount === 0) return t("pricing.free");

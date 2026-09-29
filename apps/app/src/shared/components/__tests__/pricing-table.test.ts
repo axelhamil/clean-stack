@@ -13,7 +13,7 @@ function resolve(key: string): string | undefined {
 
 describe("INTERVAL_KEYS", () => {
   // `satisfies Record<PlanInterval, string>` only proves every interval has
-  // AN entry — it does not prove each one points at the RIGHT one. A swapped
+  // AN entry: it does not prove each one points at the RIGHT one. A swapped
   // pair (e.g. `month` reading `pricing.interval.year`) still type-checks
   // and ships silently, so this asserts the mapping itself, one entry at a
   // time, not just its exhaustiveness.

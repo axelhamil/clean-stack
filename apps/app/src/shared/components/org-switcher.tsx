@@ -48,7 +48,7 @@ export function OrgSwitcher() {
         <Button variant="ghost" size="sm" className="h-9 gap-2 px-2">
           <Avatar className="size-6 rounded-md">
             <AvatarFallback className="rounded-md text-[10px] font-medium">
-              {activeOrg ? initialsOf(activeOrg.name) : "—"}
+              {activeOrg ? initialsOf(activeOrg.name) : "?"}
             </AvatarFallback>
           </Avatar>
           <TypographySmall className="max-w-32 truncate">

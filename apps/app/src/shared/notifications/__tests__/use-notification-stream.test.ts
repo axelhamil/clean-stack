@@ -9,7 +9,7 @@ const fakeClient = () => {
 
 /**
  * A controllable `ReadableStream<Uint8Array>` stand-in: `push` resolves the pending
- * `read()` with a frame, `cancel` (spied) resolves it with `done: true` — the same
+ * `read()` with a frame, `cancel` (spied) resolves it with `done: true`, the same
  * settlement a real stream gives a reader it is told to cancel while a read is in
  * flight, which is what lets a stalled `consume()` return instead of hanging forever.
  */
@@ -95,7 +95,7 @@ describe("handleStreamChunk", () => {
   });
 });
 
-describe("consume — garde-temps de silence", () => {
+describe("consume: garde-temps de silence", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -119,7 +119,7 @@ describe("consume — garde-temps de silence", () => {
     await done;
   });
 
-  test("une trame recue — y compris un ping — repousse le delai de silence", async () => {
+  test("une trame recue (y compris un ping) repousse le delai de silence", async () => {
     const { client } = fakeClient();
     const { body, cancel, push } = makeFakeStream();
 

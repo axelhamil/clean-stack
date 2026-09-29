@@ -3,7 +3,7 @@
  *
  * Each group is built by its own `useXxxGroup()` hook returning a
  * `CommandGroupConfig` (or `null` to hide it conditionally). All hooks are
- * composed in `useCommandGroups()` — the rendering loop is data-driven.
+ * composed in `useCommandGroups()`: the rendering loop is data-driven.
  *
  * Extend:
  *  - new entry in an existing group → push into the relevant array

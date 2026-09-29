@@ -25,7 +25,7 @@ export function handleStreamChunk(chunk: string, queryClient: QueryClient): stri
 
     if (isNotification) {
       // The badge stays live: always invalidate+refetch the single
-      // unread-count query. The list is an infinite query — if the user has
+      // unread-count query. The list is an infinite query: if the user has
       // "load more"'d through several pages, an eager refetch here would
       // re-fetch every one of them on every single push. Mark it stale
       // instead (`refetchType: "none"`) so it catches up next time the
@@ -65,7 +65,7 @@ export async function consume(body: ReadableStream<Uint8Array>, queryClient: Que
   let buffer = "";
 
   // A silent-but-open connection (e.g. a proxy that keeps the socket up but stops
-  // relaying) never rejects `reader.read()` on its own — only a rearmed stall timeout
+  // relaying) never rejects `reader.read()` on its own: only a rearmed stall timeout
   // that cancels the reader can surface it. Rearmed on every frame, `ping` included, not
   // just notifications, so a healthy but quiet stream never trips it.
   let stallTimer: ReturnType<typeof setTimeout> | null = null;

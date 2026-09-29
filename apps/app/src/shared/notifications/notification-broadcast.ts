@@ -27,7 +27,7 @@ export function applyRead(
   let newlyRead = 0;
 
   // The list is one infinite query (all loaded pages under one cache entry),
-  // so patching it in place — instead of invalidating — keeps every page the
+  // so patching it in place (instead of invalidating) keeps every page the
   // user already scrolled to "load more" through, rather than dropping them
   // back to a single page on the next refetch.
   queryClient.setQueriesData<NotificationsListCache>(

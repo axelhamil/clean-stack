@@ -126,11 +126,11 @@ describe("unreadLabel", () => {
 
   test("zero non-lu garde sa propre formulation, pas un compte a zero", () => {
     // `unreadLabel` special-cases count === 0 onto `unreadNone` rather than
-    // letting it fall through to the `_one`/`_other` plural pair — i18next
+    // letting it fall through to the `_one`/`_other` plural pair: i18next
     // has no `_zero` category either locale's `Intl.PluralRules` selects,
     // but that only forbids the plural mechanism, not the wording. This
     // asserts the actual catalog copy survives: "none unread" in English,
-    // "aucune non lue" in French — never "0 unread".
+    // "aucune non lue" in French, never "0 unread".
     expect(enCatalog.common.notifications.unreadNone).toBe("Notifications, none unread");
     expect(frCatalog.common.notifications.unreadNone).toBe("Notifications, aucune non lue");
   });
@@ -138,8 +138,8 @@ describe("unreadLabel", () => {
   test("le francais accorde le pluriel differemment de l'anglais des le premier compte", () => {
     // This is why `unreadLabel(t, count)` must never be pinned to a literal
     // for count >= 1 either: French agrees "non lue" (singular) at 1 and
-    // "non lues" (plural) from 2 on, while English's "unread" never changes
-    // — only the catalog (not a hardcoded string) can tell which applies.
+    // "non lues" (plural) from 2 on, while English's "unread" never changes.
+    // Only the catalog (not a hardcoded string) can tell which applies.
     expect(new Intl.PluralRules("fr").select(1)).toBe("one");
     expect(new Intl.PluralRules("fr").select(2)).toBe("other");
     expect(frCatalog.common.notifications.unreadLabel_one).not.toBe(
@@ -156,7 +156,7 @@ describe("unreadLabel", () => {
 describe("CATEGORY_KEYS", () => {
   test("chaque categorie pointe sur sa propre cle de traduction, jamais sur une autre", () => {
     // `satisfies Record<NotificationCategory, string>` only proves every
-    // category is present — it happily accepts `org` mapped to the
+    // category is present: it happily accepts `org` mapped to the
     // "security" key. This is the assertion that actually catches a swap.
     expect(CATEGORY_KEYS.security).toBe("notifications.categories.security");
     expect(CATEGORY_KEYS.org).toBe("notifications.categories.org");

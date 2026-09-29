@@ -8,7 +8,7 @@ import { activeOrgQueryOptions } from "../api/queries/active-org";
  * "no active organization" is a valid transient state (see Org-scoping rule 2),
  * and it is also a distinct server-side scope for the queries that accept it.
  *
- * Every org-scoped query key is built from this — never from `undefined`, which
+ * Every org-scoped query key is built from this, never from `undefined`, which
  * a key cannot carry without two different scopes collapsing onto one entry.
  */
 export function useActiveOrgId(): string | null {

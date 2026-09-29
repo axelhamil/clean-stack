@@ -13,7 +13,7 @@ function resolve(key: string): string | undefined {
 
 describe("FREQUENCY_KEYS", () => {
   // `satisfies Record<NotificationFrequency, string>` only proves every
-  // frequency has AN entry — it does not prove each entry points at the RIGHT
+  // frequency has AN entry: it does not prove each entry points at the RIGHT
   // one. A swapped pair (e.g. `hourly` reading `frequency.daily`) still
   // type-checks, so this asserts the mapping itself.
   it("maps each frequency to its own catalog key, never a swapped one", () => {

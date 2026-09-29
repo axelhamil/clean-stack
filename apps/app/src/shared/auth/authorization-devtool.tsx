@@ -1,5 +1,5 @@
 /**
- * Authorization DevTool — dev-only floating panel.
+ * Authorization DevTool: dev-only floating panel.
  *
  * Visualises the active session's role and the full capability matrix derived
  * from `STATEMENTS` × `roles` in `@packages/access-control`. Use it to verify
@@ -47,7 +47,7 @@ export function AuthorizationDevTool() {
               Authorization
             </CardTitle>
             <CardDescription>
-              Role: <Badge variant="secondary">{role ?? "none"}</Badge> · Org: {org?.name ?? "—"}
+              Role: <Badge variant="secondary">{role ?? "none"}</Badge> · Org: {org?.name ?? "none"}
             </CardDescription>
             <CardAction>
               <Button variant="ghost" size="icon" className="size-7" onClick={() => setOpen(false)}>

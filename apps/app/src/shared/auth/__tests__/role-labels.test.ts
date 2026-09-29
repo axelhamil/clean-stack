@@ -14,7 +14,7 @@ function resolve(prefixedKey: string): string | undefined {
 }
 
 describe("ROLE_LABEL_KEYS", () => {
-  // `satisfies Record<OrgRole, string>` only proves every role has AN entry —
+  // `satisfies Record<OrgRole, string>` only proves every role has AN entry:
   // it does not prove each entry points at the RIGHT one. A swapped pair
   // (e.g. `owner` reading `common:roles.admin`) still type-checks, so this
   // asserts the mapping itself, not just its exhaustiveness.
