@@ -1,3 +1,5 @@
+import { Option } from "@packages/ddd-kit";
+
 /**
  * Decorrelated jitter retry math, after the AWS "Exponential Backoff and Jitter" pattern.
  *
@@ -32,15 +34,11 @@ export function isDeadLetter(attempt: number): boolean {
 }
 
 /**
- * Returns the absolute `Date` for the next retry and the computed delay, or
- * `{ date: null, delayMs: -1 }` when the next attempt would exceed the dead-letter
- * threshold. Callers store `date` directly in `next_attempt_at`.
+ * The absolute instant of the next retry, or none when the next attempt would
+ * exceed the dead-letter threshold. Callers store it in `next_attempt_at`.
  */
-export function nextAttemptAt(
-  currentAttempts: number,
-  lastDelayMs: number,
-): { date: Date | null; delayMs: number } {
-  if (isDeadLetter(currentAttempts + 1)) return { date: null, delayMs: -1 };
-  const delayMs = nextDelayMs(lastDelayMs);
-  return { date: new Date(Date.now() + delayMs), delayMs };
+export function nextAttemptAt(currentAttempts: number, lastDelayMs: number): Option<Date> {
+  if (isDeadLetter(currentAttempts + 1)) return Option.none();
+
+  return Option.some(new Date(Date.now() + nextDelayMs(lastDelayMs)));
 }

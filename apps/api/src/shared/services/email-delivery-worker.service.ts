@@ -165,8 +165,11 @@ export class EmailDeliveryWorker {
 
   private async reschedule(rowRecord: EmailMessageRecord, error: string): Promise<void> {
     const attempts = rowRecord.attempts + 1;
-    const { date } = nextAttemptAt(attempts, expectedDelayFromAttempts(attempts));
-    return this.settle(rowRecord, error, Option.fromNullable(date));
+    return this.settle(
+      rowRecord,
+      error,
+      nextAttemptAt(attempts, expectedDelayFromAttempts(attempts)),
+    );
   }
 
   private async settle(

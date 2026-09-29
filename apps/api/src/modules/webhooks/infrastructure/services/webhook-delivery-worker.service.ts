@@ -4,7 +4,7 @@ import { EventTypes } from "@packages/events";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
-import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../../../../shared/jitter";
+import { expectedDelayFromAttempts, nextAttemptAt } from "../../../../shared/jitter";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
@@ -21,10 +21,6 @@ const POLL_INTERVAL_MS = 5_000;
 const BATCH_SIZE = 10;
 const FETCH_TIMEOUT_MS = 30_000;
 const CLAIM_WINDOW_MS = BATCH_SIZE * FETCH_TIMEOUT_MS + 30_000;
-
-function expectedDelayFromAttempts(currentAttempts: number): number {
-  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
-}
 
 function shouldAutoDisable(
   { consecutiveFailures, firstFailedAt }: { consecutiveFailures: number; firstFailedAt: Date },
@@ -476,14 +472,14 @@ export class WebhookDeliveryWorker {
     tx: Parameters<IWebhookDeliveryRepository["updateStatus"]>[2],
   ): Promise<void> {
     const newAttempts = delivery.attempts + 1;
-    const { date } = nextAttemptAt(newAttempts, expectedDelayFromAttempts(newAttempts));
-    const status: "failed" | "dead_letter" = date === null ? "dead_letter" : "failed";
+    const retryAt = nextAttemptAt(newAttempts, expectedDelayFromAttempts(newAttempts));
+    const status: "failed" | "dead_letter" = retryAt.isNone() ? "dead_letter" : "failed";
     const upd = await this.deliveries.updateStatus(
       delivery.id,
       {
         status,
         attempts: newAttempts,
-        nextAttemptAt: Option.fromNullable(date),
+        nextAttemptAt: retryAt,
         lastError: Option.some(error),
         lastResponseStatus: responseStatus,
       },

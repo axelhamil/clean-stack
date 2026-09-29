@@ -1,4 +1,4 @@
-import { type EventHandler, type IDomainEvent, isEventHandler, Option } from "@packages/ddd-kit";
+import { type EventHandler, type IDomainEvent, isEventHandler } from "@packages/ddd-kit";
 import { db, sql } from "@packages/drizzle";
 import { expectedDelayFromAttempts, nextAttemptAt } from "../jitter";
 import type { Logger } from "../logger";
@@ -179,11 +179,11 @@ export class OutboxDispatcher {
                     { err, eventId: event.id, eventType: event.eventType },
                     "outbox event built-in subscriber failed",
                   );
-                  const { date } = nextAttemptAt(
+                  const retryAt = nextAttemptAt(
                     event.attempts + 1,
                     expectedDelayFromAttempts(event.attempts + 1),
                   );
-                  await this.outbox.markFailed(event.id, errMsg, Option.fromNullable(date), tx);
+                  await this.outbox.markFailed(event.id, errMsg, retryAt, tx);
                 }
               }
               return { dispatched: ok, total: events.length };
