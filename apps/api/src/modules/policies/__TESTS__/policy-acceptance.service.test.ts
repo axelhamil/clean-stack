@@ -7,6 +7,7 @@ import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IPolicyAcceptanceStore,
+  PolicyAcceptanceRecord,
   PolicyError,
 } from "../application/ports/policy-acceptance.port";
 import { PolicyAcceptanceService } from "../application/services/policy-acceptance.service";
@@ -60,10 +61,14 @@ describe("PolicyAcceptanceService", () => {
         new NoOpInstrumentation(),
       );
 
-      const result = await service.accept("u1", ["privacy", "terms"]);
+      const result = await service.accept("u1", ["privacy", "terms"], "198.51.100.7");
 
       expect(result.isSuccess).toBe(true);
       expect(store.insert).toHaveBeenCalledTimes(2);
+      const insertedRow = (store.insert as ReturnType<typeof mock>).mock.calls[0]?.[0] as
+        | PolicyAcceptanceRecord
+        | undefined;
+      expect(insertedRow?.ipAddress.unwrapOr("none")).toBe("198.51.100.7");
       expect(store.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: "u1",
