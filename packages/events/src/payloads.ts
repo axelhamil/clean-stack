@@ -452,7 +452,7 @@ export const ApiTokenCreatedPayload = z.object({
   tokenId: z.string(),
   name: z.string(),
   scopes: z.array(z.string()),
-  expiresAt: z.date().nullable(),
+  expiresAt: z.coerce.date().nullable(),
 });
 export type ApiTokenCreatedPayload = z.infer<typeof ApiTokenCreatedPayload>;
 

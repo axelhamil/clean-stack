@@ -52,3 +52,25 @@ describe("cookie consent linked event", () => {
     expect(parsed.success).toBe(false);
   });
 });
+
+describe("api token created event", () => {
+  it("reads back an expiry serialized to JSON by the outbox", () => {
+    const expiresAt = new Date("2027-01-01T00:00:00.000Z");
+    const stored = JSON.parse(
+      JSON.stringify({
+        userId: "u1",
+        actorUserId: "u1",
+        organizationId: null,
+        tokenId: "t1",
+        name: "ci",
+        scopes: ["read:profile"],
+        expiresAt,
+      }),
+    );
+
+    const parsed = PayloadByEventType[EventTypes.API_TOKEN_CREATED].safeParse(stored);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.expiresAt).toEqual(expiresAt);
+  });
+});
