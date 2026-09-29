@@ -20,7 +20,7 @@ function ipKeyFn(name: string): (c: Context) => string {
 
 // Two windows with two different jobs: the minute window bounds a BURST, the hour
 // window is the sustained anti-abuse ceiling. They must be tuned against what one
-// page view actually costs — measured here, a signed-in page view fires up to 8 API
+// page view actually costs, measured here, a signed-in page view fires up to 8 API
 // calls (session, consents, policies, notifications stream + count, three
 // organization endpoints), so a 60/min burst window meant ~7 navigations per minute
 // before a legitimate user got a 429. 300/min tolerates ~35 navigations in a burst
@@ -29,7 +29,7 @@ function ipKeyFn(name: string): (c: Context) => string {
 // credential path carries its own far tighter, fail-closed policy below.
 //
 // `sessionMiddleware` deliberately nulls the user for `/api/auth/*`, so BetterAuth
-// traffic — including a signed-in user's session and organization queries — keys on
+// traffic, including a signed-in user's session and organization queries, keys on
 // the IP, not the user. Two signed-in users behind one NAT therefore share this
 // bucket for that traffic.
 export const GLOBAL_POLICY: PolicyConfig = {
@@ -68,7 +68,7 @@ export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
-// /send-verification-email: public POST taking an arbitrary email, no session — the
+// /send-verification-email: public POST taking an arbitrary email, no session, the
 // same "make the server email a stranger" primitive as request-password-reset and
 // sign-in/magic-link, and it gets the same ceiling. Without its own policy the global
 // burst window is its only bound, which is not a bound on abuse: that window exists to
@@ -135,7 +135,7 @@ export const AUTH_PASSKEY_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
-// Cookie consent POST — public guest endpoint, keyed by IP.
+// Cookie consent POST, public guest endpoint, keyed by IP.
 // fail-open: a store outage must not block consent recording (guest flow).
 // emitSecurityEvent=false: consent spam is not a security signal.
 // advertiseBudget=false: no RateLimit headers on consent routes.
@@ -150,7 +150,7 @@ export const CONSENT_POST_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
-// API token access — two separate policies mounted in sequence.
+// API token access, two separate policies mounted in sequence.
 // One policy per axis prevents an attacker with N tokens from bypassing the IP
 // ceiling by rotating tokens (a composite key would merge both counters).
 // failClosed=true: authenticated surface; a store outage must not disable the guard.
@@ -169,7 +169,7 @@ export const API_TOKEN_IP_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
-// GitHub Secret Scanning webhook — machine-to-machine, low frequency, public.
+// GitHub Secret Scanning webhook, machine-to-machine, low frequency, public.
 // fail-open: a store outage must not block revocation notifications.
 export const GITHUB_SCANNING_POLICY: PolicyConfig = {
   name: "github-scanning",
@@ -182,12 +182,12 @@ export const GITHUB_SCANNING_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
-// SCIM (RFC 7644) directory sync — bearer-token protocol surface with no session,
+// SCIM (RFC 7644) directory sync, bearer-token protocol surface with no session,
 // so it previously ran at the loose 300/min GLOBAL_POLICY (tuned for smoothing a
 // signed-in user's page navigation, not for bounding a machine client). Also the
 // surface the post-PR-review SCIM hardening closed (`auth.ts`: `hooks.before` reads
 // the bearer header before the plugin's own token verification to gate seat cap and
-// snapshot the deprovisioning actor) — a tight, fail-closed ceiling here is defense
+// snapshot the deprovisioning actor), a tight, fail-closed ceiling here is defense
 // in depth on top of that fix, not a substitute for it. Keyed by IP.
 export const SCIM_POLICY: PolicyConfig = {
   name: "scim",
@@ -200,7 +200,7 @@ export const SCIM_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
-// Browser-sent CSP violation reports — no user identity, keyed by IP.
+// Browser-sent CSP violation reports, no user identity, keyed by IP.
 // emitSecurityEvent=false: the violation itself is the signal (emitted unconditionally per report).
 // advertiseBudget=false: no RateLimit headers exposed to browsers.
 export const CSP_REPORT_POLICY: PolicyConfig = {

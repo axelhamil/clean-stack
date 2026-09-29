@@ -5,7 +5,7 @@ import { sweepSpans } from "../sweep-span";
 
 const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 
-// `lock` is required on `RunRetentionSweepOptions` — every route holds one, so a
+// `lock` is required on `RunRetentionSweepOptions`, every route holds one, so a
 // route that forgot it would no longer type-check. Tests that aren't exercising
 // lease behavior pass this always-acquires no-op instead.
 const noopLock = { acquire: async () => true, release: async () => {} };
@@ -77,7 +77,7 @@ const fakeClock = (stepMs: number) => {
   };
 };
 
-describe("runRetentionSweep — time budget", () => {
+describe("runRetentionSweep, time budget", () => {
   it("stops between batches once the budget is spent and reports truncated", async () => {
     let calls = 0;
 
@@ -216,7 +216,7 @@ describe("runRetentionSweep — time budget", () => {
   });
 });
 
-describe("runRetentionSweep — lease", () => {
+describe("runRetentionSweep, lease", () => {
   it("does no work and reports skipped when the lease is held", async () => {
     let purged = 0;
 
@@ -377,7 +377,7 @@ describe("runRetentionSweep instrumentation", () => {
     });
 
     // Unlike the pass-level attributes above, only the run span carries
-    // `sweep.truncated` — the field that makes a skipped and a completed run
+    // `sweep.truncated`, the field that makes a skipped and a completed run
     // distinguishable in the trace.
     expect(spy).toHaveBeenCalledWith({
       "sweep.skipped": false,
@@ -414,7 +414,7 @@ describe("runRetentionSweep instrumentation", () => {
     expect(spy).toHaveBeenCalledWith(boom, expect.anything());
   });
 
-  it("does not capture a rethrown batch error — onError already reports it", async () => {
+  it("does not capture a rethrown batch error, onError already reports it", async () => {
     const instrumentation = new NoOpInstrumentation();
     const spy = spyOn(instrumentation, "capture");
 

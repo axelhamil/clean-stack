@@ -1,7 +1,7 @@
 // The frequency preference is resolved inside one `INSERT ... SELECT`, and the
 // due filter inside one `SELECT ... FOR UPDATE SKIP LOCKED`. A mocked `tx`
 // evaluates neither, so a green `bun test` around them would prove only that a
-// method was called — which is exactly how the preference cascade shipped inert
+// method was called, which is exactly how the preference cascade shipped inert
 // in the first place. This runs both against a real Postgres and measures what
 // actually gets enqueued. See apps/api/src/shared/CLAUDE.md ("write an
 // executable check against a real database and wire it to a script") and
@@ -13,7 +13,7 @@
 //
 // WARNING: writes real notification, preference and email_message rows for the
 // seeded account, and takes the real `flush-notification-emails` lease. Local
-// database only — `requireLocalDatabase` enforces it.
+// database only, `requireLocalDatabase` enforces it.
 
 import { Option } from "@packages/ddd-kit";
 import { db, sql } from "@packages/drizzle";
@@ -93,7 +93,7 @@ const fanout = (e: OutboxRecord) => db.transaction(async (tx) => subscriber.hand
 
 // Read the due column back as text. It is a tz-naive `timestamp` holding UTC, and
 // letting the driver hydrate it into a JS `Date` would reinterpret it in the host's
-// local zone — the comparison would then be testing this machine's offset.
+// local zone, the comparison would then be testing this machine's offset.
 const dueDates = async () => {
   const result = await db.execute(sql`
     SELECT event_type, email_pending_at::text AS due, email_sent_at
@@ -220,7 +220,7 @@ await setFrequency("activity", "daily");
 await fanout(event(6));
 await makeEverythingDue();
 const [a, b] = await Promise.all([flush(), flush()]);
-// The invariant is "one window, one digest" — not *how* the loser lost. A run
+// The invariant is "one window, one digest", not *how* the loser lost. A run
 // that finds the lease held reports `skipped: true`; one that starts after the
 // winner released reports `skipped: false, flushed: 0`. Both are correct, and
 // which one happens is scheduling, not behaviour: asserting on `skipped` made
@@ -257,7 +257,7 @@ check(
 );
 const droppedRun = await flush();
 check(
-  "nothing was sent — the preference was flipped off after scheduling",
+  "nothing was sent, the preference was flipped off after scheduling",
   droppedRun.flushed === 0 && droppedRun.notifications === 0,
   droppedRun,
 );
@@ -277,7 +277,7 @@ await fanout(forcedEvent());
 await makeEverythingDue();
 const forcedRun = await flush();
 check(
-  "the forced digest went out — forced notifications join no preference at the flush either",
+  "the forced digest went out, forced notifications join no preference at the flush either",
   forcedRun.flushed === 1 && forcedRun.notifications === 1,
   forcedRun,
 );
@@ -303,7 +303,7 @@ const lastDigest = (await enqueued()).at(-1);
 check("the single digest carries all 5 items", lastDigest?.payload.itemCount === "5", lastDigest);
 const summaryTerms = (lastDigest?.payload.itemsSummary ?? "").split(", ").filter(Boolean);
 check(
-  "each of the 5 rows contributed exactly one item — no row seen twice across pages",
+  "each of the 5 rows contributed exactly one item, no row seen twice across pages",
   summaryTerms.length === 5,
   summaryTerms,
 );
@@ -315,7 +315,7 @@ check(
 );
 const pagedReplay = await flush({ batchSize: 2 });
 check(
-  "a replay of the same paged window sends nothing — no row was left re-selectable",
+  "a replay of the same paged window sends nothing, no row was left re-selectable",
   pagedReplay.flushed === 0 && pagedReplay.notifications === 0,
   pagedReplay,
 );

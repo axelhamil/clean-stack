@@ -58,15 +58,15 @@ export const SCIM_PATHS = {
 /**
  * The SCIM bearer token is base64 of `token:providerId[:organizationId]` (the shape
  * @better-auth/scim issues via `generate-token`). SCIM endpoints authenticate with
- * this token — `ctx.context.session` is empty — so the provider id has to be read
+ * this token, `ctx.context.session` is empty, so the provider id has to be read
  * back out of the `Authorization` header rather than the session.
  *
- * The decode is unauthenticated by construction — it reads whatever the caller
+ * The decode is unauthenticated by construction, it reads whatever the caller
  * claims, not a verified identity. `scimProviderIdFromToken` stays safe to call
  * only where the caller doesn't act on the result (an audit-log annotation on a
  * request that already passed the plugin's own bearer check, e.g. `hooks.after`).
  * A `hooks.before` branch that resolves an actor or a billing decision from the
- * token — before the plugin's own `authMiddleware` has run — must use
+ * token, before the plugin's own `authMiddleware` has run, must use
  * `verifiedScimConnectionOwner` (`auth-queries.ts`) instead, which hashes the
  * decoded token and compares it against the stored SCIM connection before trusting
  * the provider id it names.

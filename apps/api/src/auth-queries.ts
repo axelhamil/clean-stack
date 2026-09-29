@@ -1,7 +1,7 @@
 /**
  * Data-access helpers for the BetterAuth bridge (auth.ts).
  *
- * Plain functions, no DI, no repository class, no port interface — auth is
+ * Plain functions, no DI, no repository class, no port interface, auth is
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
 
@@ -23,7 +23,7 @@ import { constantTimeEqual } from "better-auth/crypto";
 import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
 import { scimTokenPartsFromHeader } from "./shared/auth/sso-paths";
 
-// ── #1 – ensurePersonalOrgFor queries ──────────────────────────────────────
+// ── #1: ensurePersonalOrgFor queries ──────────────────────────────────────
 
 export async function findActiveMemberOrgId(
   userId: string,
@@ -60,7 +60,7 @@ export async function insertPersonalOrgWithOwner(
   });
 }
 
-// ── #2 – sendChangeEmailConfirmation ──────────────────────────────────────
+// ── #2: sendChangeEmailConfirmation ──────────────────────────────────────
 
 export async function setPendingEmail(
   userId: string,
@@ -71,7 +71,7 @@ export async function setPendingEmail(
   await exec.update(schema.user).set({ pendingEmail: newEmail }).where(eq(schema.user.id, userId));
 }
 
-// ── #3 – afterRemoveMember: delete org when last member leaves ─────────────
+// ── #3: afterRemoveMember: delete org when last member leaves ─────────────
 
 export async function deleteOrgIfEmpty(organizationId: string, tx?: Transaction): Promise<boolean> {
   const exec = tx ?? db;
@@ -87,7 +87,7 @@ export async function deleteOrgIfEmpty(organizationId: string, tx?: Transaction)
   return deleted.length > 0;
 }
 
-// ── #4 – databaseHooks.user.update.after ──────────────────────────────────
+// ── #4: databaseHooks.user.update.after ──────────────────────────────────
 
 /** Clears `pendingEmail` when BetterAuth confirms the new address.
  *  Returns true if a row was actually updated (i.e. pendingEmail matched). */
@@ -105,7 +105,7 @@ export async function clearConfirmedPendingEmail(
   return cleared.length > 0;
 }
 
-// ── #5 – hooks.after /passkey/verify-registration ─────────────────────────
+// ── #5: hooks.after /passkey/verify-registration ─────────────────────────
 
 export async function findLatestPasskey(
   userId: string,
@@ -119,7 +119,7 @@ export async function findLatestPasskey(
   return row;
 }
 
-// ── #6 – hooks.after /link-social ─────────────────────────────────────────
+// ── #6: hooks.after /link-social ─────────────────────────────────────────
 
 export async function findLatestLinkedAccount(userId: string): Promise<
   | {
@@ -144,7 +144,7 @@ export async function findLatestLinkedAccount(userId: string): Promise<
   return row;
 }
 
-// ── #7 – customSession ────────────────────────────────────────────────────
+// ── #7: customSession ────────────────────────────────────────────────────
 
 export async function findActiveMemberRole(
   userId: string,
@@ -175,14 +175,14 @@ export async function countActiveMembers(organizationId: string): Promise<number
   return row?.count ?? 0;
 }
 
-// ── #8 – api-token middleware ──────────────────────────────────────────────
+// ── #8: api-token middleware ──────────────────────────────────────────────
 
 export async function findUserById(id: string) {
   const [row] = await db.select().from(schema.user).where(eq(schema.user.id, id)).limit(1);
   return row;
 }
 
-// ── #9 – public API v1 ────────────────────────────────────────────────────
+// ── #9: public API v1 ────────────────────────────────────────────────────
 
 export async function updateUserName(userId: string, name: string): Promise<void> {
   await db.update(schema.user).set({ name }).where(eq(schema.user.id, userId));
@@ -203,7 +203,7 @@ export async function findUserOrganizations(
     .where(eq(schema.member.userId, userId));
 }
 
-// ── #10 – hooks.after SSO bridge ────────────────────────────────────────────
+// ── #10: hooks.after SSO bridge ────────────────────────────────────────────
 
 export async function findSsoProviderByProviderId(
   providerId: string,
@@ -220,7 +220,7 @@ export async function findSsoProviderByProviderId(
   return row;
 }
 
-// ── #11 – hooks.after SCIM bridge ───────────────────────────────────────────
+// ── #11: hooks.after SCIM bridge ───────────────────────────────────────────
 
 export async function scimConnectionOwner(
   providerId: string,
@@ -237,7 +237,7 @@ export async function scimConnectionOwner(
 }
 
 /**
- * Mirrors `storeSCIMToken: "hashed"` — the fixed mode `scim()` is mounted with in
+ * Mirrors `storeSCIMToken: "hashed"`, the fixed mode `scim()` is mounted with in
  * `auth.ts`. @better-auth/scim doesn't export its own hasher, so this reimplements
  * the one deterministic algorithm that mount config actually uses: a SHA-256 digest,
  * base64url-encoded without padding. If that mount option ever changes to
@@ -254,7 +254,7 @@ async function hashScimToken(token: string): Promise<string> {
  * the token against the stored hash. `hooks.before` runs ahead of the SCIM plugin's
  * own bearer verification (`runBeforeHooks` executes before `endpoint(...)`, which is
  * where the plugin's `authMiddleware` lives), so a forged `Authorization` header with
- * a real (guessable — `providerId` is a deterministic slug of the org's domain)
+ * a real (guessable, `providerId` is a deterministic slug of the org's domain)
  * provider id let an unauthenticated caller: (a) plant a fabricated actor in the
  * SCIM-deprovisioning audit snapshot before the request 401s, later attributed to an
  * unrelated admin's ordinary member removal within the snapshot TTL; (b) probe seat
@@ -262,10 +262,10 @@ async function hashScimToken(token: string): Promise<string> {
  * gate ran on the same unverified resolution.
  *
  * Any `hooks.before` branch that needs the connection owner MUST use this instead of
- * `scimConnectionOwner` + `scimProviderIdFromToken` — it hashes the decoded token and
+ * `scimConnectionOwner` + `scimProviderIdFromToken`, it hashes the decoded token and
  * constant-time-compares it against the stored connection before returning anything.
  * Returns `null` on a missing/malformed header, an unknown provider, or a token that
- * doesn't match — the caller then must fall through to the endpoint's own 401 rather
+ * doesn't match, the caller then must fall through to the endpoint's own 401 rather
  * than act on unverified input, and the seat cap simply isn't checked here for that
  * request (it 401s before ever writing a member row, so there is nothing to gate).
  */
@@ -289,7 +289,7 @@ export async function verifiedScimConnectionOwner(
   return { userId: row.userId, organizationId: row.organizationId };
 }
 
-// ── #12 – SSO enforcement: session-creation guard (Task 9) ─────────────────
+// ── #12: SSO enforcement: session-creation guard (Task 9) ─────────────────
 
 export async function emailFor(userId: string): Promise<string | undefined> {
   const [row] = await db
@@ -300,7 +300,7 @@ export async function emailFor(userId: string): Promise<string | undefined> {
   return row?.email;
 }
 
-// ── #13 – SSO enforcement predicate lookup ─────────────────────────────────
+// ── #13: SSO enforcement predicate lookup ─────────────────────────────────
 
 export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
   const [row] = await db
@@ -326,7 +326,7 @@ export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
     : Option.none();
 };
 
-// ── #14 – SCIM provisioning: membership event bridge ───────────────────────
+// ── #14: SCIM provisioning: membership event bridge ───────────────────────
 
 /**
  * The member row `@better-auth/scim` writes with a raw `adapter.create` (no

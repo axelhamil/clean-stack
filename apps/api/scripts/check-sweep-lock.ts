@@ -1,14 +1,14 @@
 // WARNING: this script acquires leases under the real production route labels
 // (`sweep-audit-log`, `sweep-outbox`, …) for up to 60s each. Point it only at a local
-// database — running it against a shared or production database will contend with,
+// database, running it against a shared or production database will contend with,
 // and can starve, the real sweeps for that duration.
 //
-// A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE` — the whole point of
+// A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE`, the whole point of
 // `acquireSweepLease` is the conditional UPDATE the database performs, so this checks it
 // against a real Postgres instead. Wired to a script, not `bun:test`, because it needs a
 // live database: the unit suite runs without one. See apps/api/src/shared/CLAUDE.md ("write an executable check against a
 // real database and wire it to a script") and `check-fanout-preferences.ts` for the
-// reference shape. Run: `pnpm --filter api check:sweep-lock` — re-run after any change to
+// reference shape. Run: `pnpm --filter api check:sweep-lock`, re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
 import { db, eq, sql, sweepSchema } from "@packages/drizzle";
@@ -36,7 +36,7 @@ requireLocalDatabase("check-sweep-lock");
 const checks = checkRecorder();
 const { check } = checks;
 
-// A fresh façade per check, not one shared across the whole script — mirrors how
+// A fresh façade per check, not one shared across the whole script, mirrors how
 // production builds one `SweepSpans` per request instead of a module-level singleton.
 const freshSpans = () => sweepSpans(new NoOpInstrumentation());
 
@@ -68,7 +68,7 @@ const rowsAfterRelease = await db
   .where(eq(sweepSchema.sweepLock.label, label));
 check("release deletes the row", rowsAfterRelease.length === 0);
 
-// [4] a stale owner's release does not steal a successor's lease — the bug this
+// [4] a stale owner's release does not steal a successor's lease, the bug this
 // ownership token exists to close: an overrunning run must not delete the row a
 // legitimate successor now holds just because it shares the same label.
 const staleOwner = await acquireSweepLease(label, -60_000, freshSpans());
@@ -110,7 +110,7 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 
 // ── purgeBatchWithTimeout: the three SET LOCAL guards, checked against a real
 // transaction. A mocked `tx.execute` can only assert on the SQL text a builder
-// produced (banned — see apps/api/src/shared/CLAUDE.md), and that check is weak on
+// produced (banned, see apps/api/src/shared/CLAUDE.md), and that check is weak on
 // its own terms: it only proves the setting *names* were sent, not their values, so
 // '5s' silently becoming '5m' would still pass. `assertGuards` runs inside the same
 // transaction `purgeBatchWithTimeout` opens, right after the three `SET LOCAL`
@@ -121,7 +121,7 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
   await purgeBatchWithTimeout({
     table: sweepSchema.sweepLock,
     idColumn: sweepSchema.sweepLock.label,
-    // Matches no row — a real lease label never collides with this sentinel — so the
+    // Matches no row, a real lease label never collides with this sentinel, so the
     // guard check runs (and the delete executes as a harmless no-op) without touching
     // any lease another check or a real sweep might be holding.
     where: eq(sweepSchema.sweepLock.label, `check-sweep-guard-${crypto.randomUUID()}`),
@@ -156,13 +156,13 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 }
 
 // ── the six routes: each must pass its own label to sweepLockFor, not a shared or
-// wrong one — proven by holding that exact label's lease and expecting THIS route,
+// wrong one, proven by holding that exact label's lease and expecting THIS route,
 // and only this route, to log the skip for it. Deleting a route's `lock:` wiring, or
 // wiring it to the wrong label, makes this fail. Asserted off the log line rather than
 // the response body: sweep-audit-log's handler reshapes its response but still spreads
 // the full `result` (so `skipped` does survive there), and this way every route is
 // checked the same way rather than special-casing the one with an extra field. The
-// log line (`${label} skipped — another run holds the lease`, always emitted by
+// log line (`${label} skipped, another run holds the lease`, always emitted by
 // runRetentionSweep itself) is the one signal every route shares. ────────
 const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
   {
@@ -203,7 +203,7 @@ for (const { name, path, routes } of routeCases) {
   const res = await signedInternalRequest(internalApp(routes, lines), path, { dryRun: true });
   check(`${name} responds 200 while its lease is held`, res.status === 200);
   const captured = lines.join("");
-  const skipLine = captured.includes(`${name} skipped — another run holds the lease`);
+  const skipLine = captured.includes(`${name} skipped, another run holds the lease`);
   check(`${name} logs the skip for its own label ("${name}")`, skipLine);
   if (routeOwner) await releaseSweepLease(name, routeOwner, freshSpans());
 }

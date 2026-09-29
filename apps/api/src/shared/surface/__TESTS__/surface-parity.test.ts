@@ -27,7 +27,7 @@ describe("surface parity", () => {
   // Comparing the file and not just the route is the whole point of the map: a
   // route-only check degrades the `consumer` field to a boolean ("something,
   // somewhere, calls this"), so moving a call from one file to another leaves
-  // the declared path pointing at a file that no longer holds the call — green.
+  // the declared path pointing at a file that no longer holds the call, green.
   it("every declared consumer file still contains a call to its route", () => {
     const consumers = listFrontConsumers();
     const broken = Object.entries(ROUTE_MAP)
@@ -45,12 +45,12 @@ describe("surface parity", () => {
   });
 
   // Hono represents every `app.use(path, middleware)` mount as a method "ALL" entry, exactly
-  // like a genuine `app.all(path, handler)` route would be — there is no structural field that
+  // like a genuine `app.all(path, handler)` route would be, there is no structural field that
   // tells the two apart, only the path. `listBackRoutes` drops every ALL entry outright to keep
   // middleware mounts out of the map, which means a future *real* route deliberately declared
   // with `app.all(...)` would vanish through the same hole, silently: no test would fail, the
   // route would just never appear anywhere. This allowlist is today's exhaustive set of known
-  // middleware mount paths (rate-limit/CSRF/CORS guards) — any ALL entry outside it, and outside
+  // middleware mount paths (rate-limit/CSRF/CORS guards), any ALL entry outside it, and outside
   // the already-excluded BetterAuth mount, is either a new middleware mount (extend the list) or
   // the exact silent gap this test exists to catch (declare it in ROUTE_MAP instead).
   const KNOWN_MIDDLEWARE_ALL_PATHS = new Set([

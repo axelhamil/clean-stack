@@ -1,4 +1,4 @@
-// `/internal/flush-notification-emails` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
+// `/internal/flush-notification-emails`, gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import {
   alias,
@@ -87,7 +87,7 @@ const DEFAULT_BATCH_SIZE = 500;
 const LEASE_LABEL = "flush-notification-emails";
 
 // Forced notifications (security, payment failures, …) join no preference row
-// at the fan-out either — the flush must honour the exact same exemption, or a
+// at the fan-out either, the flush must honour the exact same exemption, or a
 // user who disabled email for `security` would silently start losing forced
 // digests it was never allowed to defer in the first place.
 const FORCED_EVENT_TYPES = Object.entries(NOTIFICATION_MAP)
@@ -102,7 +102,7 @@ const opMail = alias(p, "op_mail");
  * Same precedence the fan-out resolves at insertion (`notification-fanout-
  * subscriber.ts`): org-locked wins, then the user's own choice, then the
  * org's unlocked default, then `TRUE`. Re-evaluated here, at send time,
- * against the *current* row — a preference flipped after the notification
+ * against the *current* row, a preference flipped after the notification
  * was queued must be able to cancel a digest already scheduled.
  */
 const forcedCheck =
@@ -169,21 +169,21 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
           // `batchSize` bounds each round-trip to Postgres, not the run: the
           // lease already rules out a *concurrent* run splitting a window, but
           // capping a single run at one page reintroduced the same split
-          // sequentially — a backlog bigger than `batchSize` used to flush as
+          // sequentially, a backlog bigger than `batchSize` used to flush as
           // two digests for one promised window. This pages through every row
           // due *right now*, in the same transaction, and sends one digest per
           // (user, category) for the whole set.
           //
           // Every row leaving a page is resolved before the next page is read
-          // — dropped rows get `emailPendingAt = null`, kept rows get
-          // `emailSentAt = now` right here, not after the whole loop — so
+          // dropped rows get `emailPendingAt = null`, kept rows get
+          // `emailSentAt = now` right here, not after the whole loop, so
           // neither can still match the `WHERE` below on the next iteration.
           // `FOR UPDATE SKIP LOCKED` does not re-skip locks held by this same
           // transaction: a row left unresolved between pages would come back
           // on the next one. Marking it immediately, inside the same
           // transaction as the eventual send, keeps atomicity (a failed send
           // rolls every page's marks back together) without an accumulator
-          // that grows — and a bound query parameter list — with the size of
+          // that grows, and a bound query parameter list, with the size of
           // the backlog.
           const rows: PendingRow[] = [];
           let dropped = 0;
@@ -230,7 +230,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
             // turned off, or the category left the org) is honoured here, not
             // by rewriting the fan-out's decision. A dropped row is not
             // eligible forever: its `emailPendingAt` is cleared so it stops
-            // matching the due-window filter on the next run — the
+            // matching the due-window filter on the next run, the
             // notification itself, and its in-app read state, are untouched.
             const droppedIds = candidates.filter((r) => !r.emailStillWanted).map((r) => r.id);
             if (droppedIds.length > 0) {

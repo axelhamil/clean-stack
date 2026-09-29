@@ -17,7 +17,7 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
   if (policy.emitSecurityEvent && !deps.outbox) {
     logger.warn(
       { policy: policy.name },
-      "rate-limit: emitSecurityEvent=true but no outbox provided — security events silently disabled",
+      "rate-limit: emitSecurityEvent=true but no outbox provided, security events silently disabled",
     );
   }
 
@@ -34,7 +34,7 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
           message: "Service temporarily unavailable",
         });
       }
-      logger.warn({ policy: policy.name, key }, "rate limiter internal error — failing open");
+      logger.warn({ policy: policy.name, key }, "rate limiter internal error, failing open");
       return next();
     }
 
@@ -60,7 +60,7 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
       if (decision.firstBlock && policy.emitSecurityEvent && deps.outbox) {
         const rawIp = resolveClientIp(c);
         const user = c.get("user") as { id: string } | null | undefined;
-        // Truncate before building payload — Zod bounds on SecurityRateLimitExceededPayload
+        // Truncate before building payload, Zod bounds on SecurityRateLimitExceededPayload
         // would reject at enqueue and silently swallow the emit if not pre-clamped.
         const ip = rawIp.slice(0, 45);
         const path = c.req.path.slice(0, 512);
@@ -83,7 +83,7 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
         } catch (emitErr) {
           logger.warn(
             { err: emitErr, policy: policy.name },
-            "rate-limit event emit failed — still sending 429",
+            "rate-limit event emit failed, still sending 429",
           );
         }
       }

@@ -2,7 +2,7 @@ import type { RouteKey } from "./back-routes";
 
 /**
  * Why a live route has no front consumer. Each value is a claim someone can
- * check — "dormant" is not a synonym for "unused", it is a commitment that the
+ * check, "dormant" is not a synonym for "unused", it is a commitment that the
  * capability ships ready for its first consumer (spec D5).
  */
 export type UiLessReason =

@@ -32,7 +32,7 @@ const [seeded] = await db
   .limit(1);
 
 // Verifying the email in SQL skips the /verify-email hook that records the initial
-// policy acceptance — without this, every sign-in lands on the /legal/accept gate.
+// policy acceptance, without this, every sign-in lands on the /legal/accept gate.
 if (seeded) {
   const stale = await di.PolicyAcceptanceService.getStaleTypes(seeded.id);
   if (stale.isSuccess && stale.getValue().length > 0) {

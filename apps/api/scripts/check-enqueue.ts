@@ -1,17 +1,17 @@
 /**
  * Proves against a real Postgres that `DrizzleEmailQueue.enqueue`'s `onConflictDoNothing`
- * behaves the way the design assumes — behaviour a mocked `tx` can never exercise (see
+ * behaves the way the design assumes, behaviour a mocked `tx` can never exercise (see
  * `apps/api/src/shared/CLAUDE.md` on asserting call shape only against a mock, and on never
  * asserting on the SQL text a builder produced).
  *
  * The unit test suite (`drizzle-email-queue.service.test.ts`) mocks `onConflictDoNothing` as a
- * no-op passthrough and asserts on a return value the test itself controls (`insertReturns`) —
+ * no-op passthrough and asserts on a return value the test itself controls (`insertReturns`),
  * deleting `.onConflictDoNothing(...)` from the service leaves that suite green. Nothing there
  * proves:
  *   1. the conflict target is `idempotency_key`, not the primary key;
  *   2. a mixed batch of {an already-present key, a fresh key} inserts only the fresh row and
  *      reports `written: 1`;
- *   3. two rows with `idempotencyKey: Option.none()` (NULL) both insert — Postgres treats NULLs
+ *   3. two rows with `idempotencyKey: Option.none()` (NULL) both insert, Postgres treats NULLs
  *      as distinct under a UNIQUE index, which is the entire premise the "no idempotency key
  *      supplied" callers rely on.
  * This script is that proof.
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
       .from(em)
       .where(inArray(em.toAddress, [`${MARKER}-preexisting@example.test`]));
     check(
-      "the pre-existing row was not duplicated — still exactly the original row",
+      "the pre-existing row was not duplicated, still exactly the original row",
       preExistingRows.length === 1 && preExistingRows[0]?.id === preExistingId,
     );
 
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
     ]);
     check("re-enqueue against an existing key reports success", conflictOnKeyOnlyResult.isSuccess);
     check(
-      "re-enqueue against an existing key writes nothing — proves the conflict target is idempotency_key",
+      "re-enqueue against an existing key writes nothing, proves the conflict target is idempotency_key",
       conflictOnKeyOnlyResult.isSuccess && conflictOnKeyOnlyResult.getValue().written === 0,
     );
     const stillOneRow = await db
@@ -136,11 +136,11 @@ async function main(): Promise<void> {
       .from(em)
       .where(inArray(em.toAddress, [`${MARKER}-preexisting@example.test`]));
     check(
-      "still exactly one row for the colliding key — no duplicate slipped in by id",
+      "still exactly one row for the colliding key, no duplicate slipped in by id",
       stillOneRow.length === 1,
     );
 
-    // [3] Two rows with idempotencyKey: Option.none() (NULL) — Postgres treats NULLs as
+    // [3] Two rows with idempotencyKey: Option.none() (NULL), Postgres treats NULLs as
     // distinct under a UNIQUE index, so both must insert.
     const nullKeyResult = await queue.enqueue([
       row({ toAddress: nullKeyAddresses[0] as string, idempotencyKey: Option.none() }),
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
     );
     check("NULL-key batch enqueue reports success", nullKeyResult.isSuccess);
     check(
-      "both NULL-key rows insert — Postgres does not treat NULL = NULL as a conflict",
+      "both NULL-key rows insert, Postgres does not treat NULL = NULL as a conflict",
       nullKeyResult.isSuccess && nullKeyResult.getValue().written === 2,
     );
     const nullKeyRows = await db
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
       console.error(`\n${checks.failures} check(s) failed`);
       process.exit(1);
     }
-    console.log("\nAll assertions passed — enqueue's onConflictDoNothing is correct.");
+    console.log("\nAll assertions passed, enqueue's onConflictDoNothing is correct.");
     process.exit(0);
   } catch (err) {
     console.error("check-enqueue crashed:", err);

@@ -12,7 +12,7 @@ if (!signingKey || signingKey.length < 32) {
   throw new Error("INTERNAL_SIGNING_KEY is required (min 32 chars)");
 }
 
-// Kept in sync with `env.INTERNAL_FETCH_TIMEOUT_MS`'s schema default — this script is a
+// Kept in sync with `env.INTERNAL_FETCH_TIMEOUT_MS`'s schema default, this script is a
 // standalone process reading `process.env` directly and cannot import the API's `env`,
 // so it repeats its own defensive parsing rather than inheriting `shared/env.ts`'s
 // "" → undefined normalization: an empty string or a non-numeric value must fall back
@@ -22,10 +22,10 @@ const parsedTimeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : Number.NaN;
 const timeoutMsValid = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= 1000;
 if (rawTimeoutMs !== undefined && !timeoutMsValid) {
   // Silently falling back would let an operator believe they tightened the budget
-  // (e.g. "500") when they actually loosened it 300x back to the default — the API
+  // (e.g. "500") when they actually loosened it 300x back to the default, the API
   // itself refuses to boot on the same out-of-range value (`.min(1000)`).
   console.warn(
-    `[sweep] INTERNAL_FETCH_TIMEOUT_MS=${rawTimeoutMs} is invalid (must be a number >= 1000) — falling back to ${DEFAULT_INTERNAL_FETCH_TIMEOUT_MS}ms`,
+    `[sweep] INTERNAL_FETCH_TIMEOUT_MS=${rawTimeoutMs} is invalid (must be a number >= 1000), falling back to ${DEFAULT_INTERNAL_FETCH_TIMEOUT_MS}ms`,
   );
 }
 const timeoutMs = timeoutMsValid ? parsedTimeoutMs : DEFAULT_INTERNAL_FETCH_TIMEOUT_MS;
@@ -69,7 +69,7 @@ for (const path of sweeps) {
     body = await res.text();
   } catch (err) {
     // A body-read failure mid-transfer, unlike the fetch call itself throwing above,
-    // means the API answered and the socket dropped afterward — evidence of a flaky
+    // means the API answered and the socket dropped afterward, evidence of a flaky
     // transfer for this one route, not that the API is down. Accumulate and move on
     // so it cannot starve the routes after it either.
     console.error(
@@ -84,7 +84,7 @@ for (const path of sweeps) {
   if (!res.ok) {
     // A non-2xx response (most often the bare-`throw` default for a route with no
     // onBatchError, turned into a 500 by the error middleware) must not starve every
-    // sweep after it — that is exactly the failure mode this branch exists to remove.
+    // sweep after it, that is exactly the failure mode this branch exists to remove.
     console.error(
       `[sweep] FAIL ${path} → ${res.status} in ${Date.now() - started}ms: ${body.slice(0, 500)}`,
     );
@@ -112,11 +112,11 @@ for (const path of sweeps) {
     case "skipped":
       // Healthy under a slow drain, alarming if it never clears: another run holds the
       // lease, which after a crash lasts until the lease expires.
-      console.warn(`[sweep] SKIPPED ${path} in ${elapsed}ms — another run holds the lease`);
+      console.warn(`[sweep] SKIPPED ${path} in ${elapsed}ms, another run holds the lease`);
       break;
     case "batch-error":
       // A batch error recurs every tick until someone looks at the data. Never let it
-      // hide behind the truncation warning — but it must not starve every sweep after
+      // hide behind the truncation warning, but it must not starve every sweep after
       // it either, so accumulate and keep going; the process still exits non-zero.
       console.error(
         `[sweep] BATCH ERROR ${path} in ${elapsed}ms on ${classification.passes.join(", ")}: ${body}`,
@@ -125,7 +125,7 @@ for (const path of sweeps) {
       continue;
     case "truncated":
       // A healthy outcome for a backlog: the budget was spent and the next tick resumes.
-      // Truncating on *every* tick is not — it means the backlog outpaces the cadence.
+      // Truncating on *every* tick is not, it means the backlog outpaces the cadence.
       console.warn(`[sweep] TRUNCATED ${path} in ${elapsed}ms: ${body}`);
       break;
     case "ok":

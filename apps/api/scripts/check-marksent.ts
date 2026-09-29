@@ -1,7 +1,7 @@
 /**
  * Proves against a real Postgres that `DrizzleEmailQueue.markSent` correctly evaluates
  * the CASE expression it builds for `provider_message_id` and increments `attempts`
- * from its prior value — behaviour a mocked `tx` can never exercise (see
+ * from its prior value, behaviour a mocked `tx` can never exercise (see
  * `apps/api/src/shared/CLAUDE.md` on asserting call shape only against a mock).
  */
 
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
 
   // All-NULL branch: ids are present but the provider-message-id map is empty, so every
   // `WHEN id = ... THEN ...` arm of the CASE is absent and the expression degenerates to a
-  // bare `ELSE NULL` — the one shape Postgres can fail to resolve a type for. This is
+  // bare `ELSE NULL`, the one shape Postgres can fail to resolve a type for. This is
   // distinct from the `c` case above (map non-empty, one id absent from it).
   await db.insert(em).values(seedRows(allNullIds));
   const allNullResult = await db.transaction(async (tx) =>
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
     allNullRows.every((r) => r.providerMessageId === null),
   );
 
-  // Empty ids must be a no-op — no `WHERE id IN ()` should be emitted, and no row touched.
+  // Empty ids must be a no-op, no `WHERE id IN ()` should be emitted, and no row touched.
   const emptyResult = await db.transaction(async (tx) => queue.markSent([], sentAt, {}, tx));
   check("markSent([]) reports success", emptyResult.isSuccess);
 
@@ -146,7 +146,7 @@ async function main(): Promise<void> {
     console.error(`\n${checks.failures} check(s) failed`);
     process.exit(1);
   }
-  console.log("\nAll assertions passed — markSent's single-statement CASE is correct.");
+  console.log("\nAll assertions passed, markSent's single-statement CASE is correct.");
   process.exit(0);
 }
 

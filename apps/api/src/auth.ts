@@ -197,8 +197,8 @@ async function emitBestEffort<TPayload>(
 /**
  * The enterprise entitlement gate shared by `/sso/register` and
  * `/scim/generate-token`: both unlock the same paid capability, so both must refuse
- * the same way. Takes the org the REQUEST names — never one inferred from session
- * history — because that is the only org whose plan is actually being spent.
+ * the same way. Takes the org the REQUEST names, never one inferred from session
+ * history, because that is the only org whose plan is actually being spent.
  */
 async function assertSsoEntitlementFor(organizationId: string | undefined): Promise<void> {
   if (!organizationId) {
@@ -212,9 +212,9 @@ async function assertSsoEntitlementFor(organizationId: string | undefined): Prom
 
 /**
  * The seat cap itself: one question, one answer, for every surface that creates a
- * member. Callers differ only in how they refuse — the organization hooks throw
+ * member. Callers differ only in how they refuse, the organization hooks throw
  * `AppErrorException` through `assertSeat`, the SCIM branch has to throw a
- * BetterAuth `APIError` with a SCIM-shaped body — and that difference must never
+ * BetterAuth `APIError` with a SCIM-shaped body, and that difference must never
  * be allowed to become two different definitions of "is there a seat".
  * Centralised so the check is never duplicated across hooks (CLAUDE.md
  * reusability rule, §6 two-path trap).
@@ -250,13 +250,13 @@ const SNAPSHOT_TTL_MS = 30_000;
 
 /**
  * An RFC 7644 §3.12 error body. Every `/scim/v2/*` response an IdP parses has to
- * carry `schemas`/`status`/`detail` — Okta and Entra surface a generic "provider
+ * carry `schemas`/`status`/`detail`, Okta and Entra surface a generic "provider
  * error" for anything else, hiding the actual reason from the operator who has to
  * act on it. `@better-auth/scim` has its own `SCIMAPIError` for exactly this and
  * uses it throughout, but does not export it (the package exports `scim` and
  * `scimClient`, nothing else), so the shape is reproduced rather than imported.
  * `message` is carried alongside `detail` so the thrown error is not blank in logs
- * and telemetry — better-call reads `Error.message` from the body.
+ * and telemetry, better-call reads `Error.message` from the body.
  */
 const SCIM_ERROR_STATUS = { PAYMENT_REQUIRED: 402 } as const;
 
@@ -272,7 +272,7 @@ function scimError(status: keyof typeof SCIM_ERROR_STATUS, detail: string): APIE
 /**
  * Bridges `org.member.joined` for the SCIM provisioning path. `@better-auth/scim`
  * writes the member row with a raw `adapter.create({ model: "member" })`, so
- * `organizationHooks.afterAddMember` — where every other surface emits this event —
+ * `organizationHooks.afterAddMember`, where every other surface emits this event,
  * never fires: without this bridge an IdP-provisioned member leaves no audit row and
  * no webhook delivery (rule #6). Same aggregate and same payload shape as
  * `afterAddMember`; the provisioned user is the subject, the connection owner is the
@@ -280,7 +280,7 @@ function scimError(status: keyof typeof SCIM_ERROR_STATUS, detail: string): APIE
  *
  * The plugin's `createOrgMembership` silently no-ops when the user is already a member
  * (SCIM linking someone who joined by invitation), and an after-hook cannot tell the
- * two apart — `createdAt` can: a row this request wrote is seconds old. Without the
+ * two apart, `createdAt` can: a row this request wrote is seconds old. Without the
  * window, re-provisioning an existing member would emit a false "joined".
  */
 async function emitScimMemberJoined(
@@ -339,7 +339,7 @@ async function emitSubscriptionEvent(
 /**
  * Best-effort client IP from a BetterAuth hook's `ctx.headers` for audit-only
  * event payloads. NOT the trusted-proxy resolver (`resolveClientIp`, Hono layer,
- * unreachable from here) — acceptable because these emits are non-blocking audit.
+ * unreachable from here), acceptable because these emits are non-blocking audit.
  */
 function clientIpFromHeaders(headers?: Headers): string | null {
   return headers?.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 45) ?? null;
@@ -347,7 +347,7 @@ function clientIpFromHeaders(headers?: Headers): string | null {
 
 /**
  * `hooks.before` snapshots a provider's org/domain right before `/sso/delete-provider`
- * removes the row — the endpoint's response is `{ success: true }` with no provider
+ * removes the row, the endpoint's response is `{ success: true }` with no provider
  * data, and the row is already gone by the time `hooks.after` runs. Keyed on
  * `providerId` (unique per row) rather than the hook's `ctx.context`, since better-call
  * rebuilds parts of that object between `hooks.before` and `hooks.after` and reference
@@ -363,7 +363,7 @@ const ssoProviderDeleteSnapshots = new RequestSnapshots<{
  * Same read-before-delete snapshot as `ssoProviderDeleteSnapshots`, for
  * `/scim/delete-provider-connection`: the connection row (and its
  * `organizationId`) is gone by the time `hooks.after` runs. Keyed on
- * `providerId` and consumed only in that path's own after-branch — the key is
+ * `providerId` and consumed only in that path's own after-branch, the key is
  * unique per row and the consumer is the same request, so freshness is the only
  * guard it needs.
  */
@@ -379,10 +379,10 @@ const scimConnectionDeleteSnapshots = new RequestSnapshots<string>(SNAPSHOT_TTL_
  * checks it, because its key is the least trustworthy of the three: `userId`
  * comes straight off the request URL, the consumer fires on *every* member
  * removal in *every* org, and the SCIM endpoint has two paths that reach neither
- * `afterRemoveMember` nor any other consumer — a 404 for an unknown user, and a
+ * `afterRemoveMember` nor any other consumer, a 404 for an unknown user, and a
  * user who holds no member row. Without the org check, one 404-ing DELETE from
  * any valid SCIM token would strand an entry that then names that token's owner
- * as the actor of an unrelated admin's kick, in an unrelated org — fabricated
+ * as the actor of an unrelated admin's kick, in an unrelated org, fabricated
  * provenance on a compliance-retention event.
  */
 const scimDeprovisionActors = new RequestSnapshots<ScimDeprovisionActor>(SNAPSHOT_TTL_MS);
@@ -458,10 +458,10 @@ async function dispatchEmail<K extends keyof EmailTemplates>(
   if (result.isFailure) {
     const error = result.getError();
     if (error.code === "EMAIL_PROVIDER_FAILURE") {
-      // BetterAuth hook signature is `async () => void` — no Result propagation possible; throw is the only signal.
+      // BetterAuth hook signature is `async () => void`, no Result propagation possible; throw is the only signal.
       throw new Error(`email send failed (${template}): ${error.message}`);
     }
-    logger.warn({ template, to, code: error.code }, "email skipped — transport not configured");
+    logger.warn({ template, to, code: error.code }, "email skipped, transport not configured");
   }
 }
 
@@ -733,7 +733,7 @@ const authOptions = {
           // SCIM deprovisioning reaches this hook too (`@better-auth/scim` calls it
           // after its own transaction), but bearer-token requests have no session, so
           // the plugin can only pass the removed user. `hooks.before` snapshotted the
-          // connection owner — the real actor — under the deprovisioned user id.
+          // connection owner, the real actor, under the deprovisioned user id.
           // The org check is what makes that safe to trust: this hook fires for every
           // removal in every org, and a snapshot whose org is not this one belongs to
           // some other request (see `scimDeprovisionActors`).
@@ -811,7 +811,7 @@ const authOptions = {
           );
         },
         // `afterAddMember` only fires for direct adds (org-create creator, signup auto-personal-org).
-        // BetterAuth routes invitation acceptance through `afterAcceptInvitation` — without this,
+        // BetterAuth routes invitation acceptance through `afterAcceptInvitation`, without this,
         // every member who joins via invite would be invisible to the outbox.
         afterAcceptInvitation: async ({ member, organization: org }) => {
           await emit(
@@ -849,7 +849,7 @@ const authOptions = {
       domainVerification: { enabled: true },
       defaultOverrideUserInfo: false,
       organizationProvisioning: { disabled: false, defaultRole: "member" },
-      // `providersLimit` only ever receives `user` (no ctx, no request body — verified
+      // `providersLimit` only ever receives `user` (no ctx, no request body, verified
       // against the plugin's dist), so it cannot see which org a registration targets.
       // The business-tier gate lives in hooks.before on "/sso/register" instead, where
       // body.organizationId is available; this stays a flat anti-abuse ceiling per user.
@@ -876,7 +876,7 @@ const authOptions = {
 
       // SSO enforcement: an org whose domain is verified and enforced rejects every
       // non-SSO email-bearing sign-in/sign-up path. Placed before the rate-limit
-      // branch below — that branch `return`s for "/sign-in/email", so anything
+      // branch below, that branch `return`s for "/sign-in/email", so anything
       // added after it never runs for that path. Passkey (no email) is closed
       // separately in `databaseHooks.session.create.before`.
       const emailBearingPaths = ["/sign-in/email", "/sign-up/email", "/sign-in/magic-link"];
@@ -893,7 +893,7 @@ const authOptions = {
         }
       }
 
-      // Credential-stuffing: per-account rate-limit on sign-in (fail-closed — store error → 503)
+      // Credential-stuffing: per-account rate-limit on sign-in (fail-closed, store error → 503)
       if (path === "/sign-in/email") {
         const email = body?.email as string | undefined;
         if (!email) return;
@@ -925,7 +925,7 @@ const authOptions = {
 
       // D4 business-tier gate: `providersLimit` cannot see the target org (only `user`
       // is passed), so the gate lives here where `body.organizationId` is the one the
-      // request actually names — never inferred from session history.
+      // request actually names, never inferred from session history.
       // D8 SAML hardening runs after the gate: a request refused for lack of
       // entitlement need not have its body rewritten first.
       if (path === SSO_PATHS.register) {
@@ -935,21 +935,21 @@ const authOptions = {
       }
 
       // R26: /sso/update-provider also persists `domain` verbatim (plugin source,
-      // update-provider route) — same casing trap as /sso/register, same fix.
+      // update-provider route), same casing trap as /sso/register, same fix.
       //
       // Post-review hardening: the plugin's own update handler (`mergeSAMLConfig`)
       // merges every SAML field as `updates.X ?? current.X` and only re-validates
-      // `signatureAlgorithm`/`digestAlgorithm` when the caller sends them — an admin
+      // `signatureAlgorithm`/`digestAlgorithm` when the caller sends them, an admin
       // could PATCH `{ wantAssertionsSigned: false, signatureAlgorithm: "sha1" }` and
       // it would persist untouched, undoing the register-time hardening below. Run
       // the same `normalizeSamlConfig` here. It is deliberately safe for a *partial*
       // update because of how it's written: identity fields (entryPoint, issuer,
       // cert, …) pass through the `{ ...input }` spread only when the caller sent
-      // them — an update that never mentions `entryPoint` still merges to
+      // them, an update that never mentions `entryPoint` still merges to
       // `current.entryPoint` on the plugin side, unclobbered. Security fields
       // (`wantAssertionsSigned`, `authnRequestsSigned`, `signatureAlgorithm`,
       // `digestAlgorithm`) are unconditionally forced to their strong values every
-      // time `samlConfig` is touched at all, whether or not the caller sent them —
+      // time `samlConfig` is touched at all, whether or not the caller sent them,
       // that's intentional, not a bug: a partial update is exactly the vector this
       // finding used, so "untouched" security fields get re-affirmed, not skipped.
       if (path === SSO_PATHS.updateProvider) {
@@ -988,28 +988,28 @@ const authOptions = {
 
       // Seat cap for SCIM provisioning. `@better-auth/scim` writes the member row with
       // a raw `adapter.create({ model: "member" })`, so neither `beforeAddMember` nor
-      // `beforeAcceptInvitation` — the two authoritative seat gates — ever fires. An
+      // `beforeAcceptInvitation`, the two authoritative seat gates, ever fires. An
       // after-hook cannot cap anything (the row is already written), so the gate has to
-      // live here, before the endpoint runs. It asks `seatCapFor` — the same predicate
-      // the organization hooks ask through `assertSeatAvailableFor` — and only the
+      // live here, before the endpoint runs. It asks `seatCapFor`, the same predicate
+      // the organization hooks ask through `assertSeatAvailableFor`, and only the
       // refusal differs: this is a SCIM protocol endpoint, so it owes an RFC 7644 error
       // body rather than the app's own.
       //
       // Post-review hardening: this used to resolve the owner from the *decoded but
       // unverified* bearer header (`scimConnectionOwner(scimProviderIdFromToken(...))`)
-      // — `hooks.before` runs ahead of the plugin's own token verification, so a
+      // `hooks.before` runs ahead of the plugin's own token verification, so a
       // forged header naming a real, guessable `providerId` reached `seatCapFor` and
       // leaked seat capacity pre-auth, cross-tenant (402 with `maxMembers` when full,
-      // vs. 401 when not — an oracle). `verifiedScimConnectionOwner` hashes the token
+      // vs. 401 when not, an oracle). `verifiedScimConnectionOwner` hashes the token
       // and compares it to the stored connection before returning anything, so a
       // request that fails verification here simply skips the seat check and falls
-      // through to the endpoint's own 401 — it can't write a member row without a
+      // through to the endpoint's own 401, it can't write a member row without a
       // valid token, so there is nothing to gate.
       if (path === SCIM_PATHS.users && ctx.method === "POST") {
         const owner = await verifiedScimConnectionOwner(ctx.headers);
         // No org on the connection means no member row is written at all (the plugin's
         // `createOrgMembership` no-ops), and an unresolvable/unverified token is the
-        // endpoint's own 401 to raise — neither is a seat concern.
+        // endpoint's own 401 to raise, neither is a seat concern.
         if (owner?.organizationId) {
           const { available, maxMembers } = await seatCapFor(owner.organizationId);
           if (!available) {
@@ -1022,15 +1022,15 @@ const authOptions = {
       // `organizationHooks.afterRemoveMember` DOES fire on SCIM deprovisioning, but the
       // organization plugin passes the *removed* user as its `user` argument on every
       // path, so the emitted `org.member.removed` would name the deprovisioned user as
-      // its own actor. Snapshot the real actor — the connection owner — here, where the
+      // its own actor. Snapshot the real actor, the connection owner, here, where the
       // bearer token is still readable, and let the hook prefer it (rule #7: the subject
       // is not the actor). Read-and-delete, same pattern as the snapshots above.
       //
       // Post-review hardening: same unverified-token issue as the seat cap above, but
-      // worse here — an unauthenticated caller who merely guessed a real `providerId`
+      // worse here, an unauthenticated caller who merely guessed a real `providerId`
       // could plant a fabricated actor in `scimDeprovisionActors`, later attributed
       // (within the 30s TTL) to an unrelated admin's ordinary removal of that same
-      // user in the same org — audit-log forgery. `verifiedScimConnectionOwner`
+      // user in the same org, audit-log forgery. `verifiedScimConnectionOwner`
       // closes it the same way: no verified token, no snapshot.
       if (path === SCIM_PATHS.user && ctx.method === "DELETE") {
         const userId = (ctx.params as Record<string, string> | undefined)?.userId;
@@ -1054,11 +1054,11 @@ const authOptions = {
         actorEmail = body?.email as string;
         actorName = body?.name as string;
 
-        // Disposable email check (fail-open — DNS error → allow + warn)
+        // Disposable email check (fail-open, DNS error → allow + warn)
         if (env.DISPOSABLE_EMAIL_BLOCK_ENABLED && actorEmail) {
           const d = await di.IDisposableEmailService.isDisposable(actorEmail);
           if (d.isFailure) {
-            logger.warn({ err: d.getError() }, "disposable-email check failed — failing open");
+            logger.warn({ err: d.getError() }, "disposable-email check failed, failing open");
           } else if (d.getValue()) {
             await emitBestEffort(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
               actorUserId: null,
@@ -1076,7 +1076,7 @@ const authOptions = {
       } else if (path === "/change-password") {
         password = body?.newPassword as string;
         // `ctx.context.session` is not populated in a global before-hook (runs before
-        // the session middleware) — load it explicitly so the audit actor is the real user.
+        // the session middleware), load it explicitly so the audit actor is the real user.
         const session = ctx.headers ? await auth.api.getSession({ headers: ctx.headers }) : null;
         actorUserId = session?.user.id ?? null;
         actorEmail = session?.user.email;
@@ -1107,7 +1107,7 @@ const authOptions = {
       const body = ctx.body as Record<string, unknown> | undefined;
 
       // sso.login.failure is the one event this hook emits on a rejected call, so it
-      // must run before the early-return below — every other branch only sees success.
+      // must run before the early-return below, every other branch only sees success.
       if (ctx.context.returned instanceof APIError && isSsoCallbackPath(path)) {
         const providerId = (ctx.params as Record<string, string> | undefined)?.providerId ?? null;
         const provider = providerId ? await findSsoProviderByProviderId(providerId) : undefined;
@@ -1115,7 +1115,7 @@ const authOptions = {
         // drops every event whose organizationId is none before it even reads the
         // visibility map, so a public `sso.login.failure` without it is undeliverable
         // and invisible in the customer's audit view. The provider row loaded above
-        // already carries it — pass it, exactly like SSO_LOGIN_SUCCESS does.
+        // already carries it, pass it, exactly like SSO_LOGIN_SUCCESS does.
         await emit(
           EventTypes.SSO_LOGIN_FAILURE,
           "sso_provider",
@@ -1185,7 +1185,7 @@ const authOptions = {
         return;
       }
 
-      // SCIM endpoints authenticate with a bearer token — `ctx.context.session` is
+      // SCIM endpoints authenticate with a bearer token, `ctx.context.session` is
       // empty here, so this branch must run before the session-actor early-return
       // below, and the actor is resolved from the connection row instead.
       if (path.startsWith(SCIM_PATHS.users) && ctx.method !== "GET") {
@@ -1481,10 +1481,10 @@ const authOptions = {
           // ("does this user own an SSO account?") answers a different question: once
           // a user has signed in through the IdP once, they own an SSO `account` row
           // forever, so a later passkey ceremony for the same user would be waved
-          // through — which is exactly the deprovisioning guarantee enforcement sells.
+          // through, which is exactly the deprovisioning guarantee enforcement sells.
           // BetterAuth passes the endpoint context as the second argument
           // (`createWithHooks` → `getCurrentAuthContext()`, better-auth/dist/db/with-hooks.mjs),
-          // and its `path` is the endpoint's own registered path — so the SSO callback
+          // and its `path` is the endpoint's own registered path, so the SSO callback
           // is identifiable, and every other path is enforced.
           //
           // Impersonation is exempt because it is not the enforced user authenticating:

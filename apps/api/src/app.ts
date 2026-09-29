@@ -108,7 +108,7 @@ const AUTH_RATE_LIMITS: ReadonlyArray<readonly [path: string, policy: PolicyConf
 app.route("/", healthRoutes);
 
 // Mounted before the global middlewares: the endpoint is public, cross-origin (browser-posted),
-// and must not inherit the same-origin CORP that secureHeaders sets — that would block the report POST.
+// and must not inherit the same-origin CORP that secureHeaders sets, that would block the report POST.
 app.use("/csp-report", cspReportCors);
 app.use("/csp-report", securityRateLimit(CSP_REPORT_POLICY));
 app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
@@ -151,7 +151,7 @@ for (const [path, policy] of AUTH_RATE_LIMITS) {
   app.use(`/api/auth${path}`, securityRateLimit(policy));
 }
 
-// SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId — BetterAuth's
+// SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId, BetterAuth's
 // own router 404s any method/path it hasn't registered, so widening the verb list here
 // exposes no surface beyond what the mounted plugins already declare.
 app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));

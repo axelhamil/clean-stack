@@ -20,7 +20,7 @@ export type SweepBatchErrorDecision = "break" | "throw";
 /**
  * Why a sweep stopped. `budget` and `batch-cap` both mean "there is more work
  * left, come back next tick"; `batch-error` means a batch failed and will fail
- * again — collapsing the two into one flag makes a recurring data error read as
+ * again, collapsing the two into one flag makes a recurring data error read as
  * a healthy backlog.
  */
 export type SweepStopReason = "exhausted" | "budget" | "batch-cap" | "batch-error";
@@ -119,10 +119,7 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
     );
 
     if (!(await opts.lock.acquire())) {
-      opts.logger.warn(
-        { label: opts.label },
-        `${opts.label} skipped — another run holds the lease`,
-      );
+      opts.logger.warn({ label: opts.label }, `${opts.label} skipped, another run holds the lease`);
       // Written before returning: without it, a run refused the lease is
       // indistinguishable in the trace from a run that executed and found nothing.
       opts.spans.attributes({ "sweep.skipped": true });
@@ -182,7 +179,7 @@ export async function runRetentionSweep(opts: RunRetentionSweepOptions): Promise
               spans: opts.spans,
             });
             // Written as the span closes: a pass that ran 40s tells you nothing on its
-            // own — whether it finished or was cut by the budget is the whole signal.
+            // own, whether it finished or was cut by the budget is the whole signal.
             opts.spans.attributes({
               "sweep.deleted": result.deleted,
               "sweep.batch_count": result.batchCount,
@@ -252,14 +249,11 @@ export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<Swe
       // A pass reached with the budget already spent is never entered: no purgeBatch
       // call happened yet, so this reads as "skipped" rather than "stopped mid-run".
       if (batchCount === 0) {
-        opts.logger.warn(
-          { label: opts.label },
-          `${opts.label} skipped — time budget already spent`,
-        );
+        opts.logger.warn({ label: opts.label }, `${opts.label} skipped, time budget already spent`);
       } else {
         opts.logger.warn(
           { label: opts.label, deleted: totalDeleted, batchCount },
-          `${opts.label} hit the time budget — stopping early`,
+          `${opts.label} hit the time budget, stopping early`,
         );
       }
       break;
@@ -271,7 +265,7 @@ export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<Swe
     } catch (err) {
       const decision = opts.onBatchError?.(err) ?? "throw";
       // Only the swallowing branch reports: a rethrown error reaches `app.onError`,
-      // which already captures it — capturing here too would double-report it.
+      // which already captures it, capturing here too would double-report it.
       if (decision === "throw") throw err;
       opts.spans.capture(err, {
         label: opts.label,
@@ -301,7 +295,7 @@ export async function runBatchedSweep(opts: RunBatchedSweepOptions): Promise<Swe
     stopReason = "batch-cap";
     opts.logger.warn(
       { batchCount: MAX_BATCHES, label: opts.label },
-      `${opts.label} hit batch cap — stopping early`,
+      `${opts.label} hit batch cap, stopping early`,
     );
   }
 

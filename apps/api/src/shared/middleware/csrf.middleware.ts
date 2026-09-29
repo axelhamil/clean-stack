@@ -18,7 +18,7 @@ type CsrfRejectReason = "missing_origin" | "origin_mismatch";
 
 export function requireCsrf(deps: CsrfDeps) {
   if (!deps.outbox) {
-    logger.warn({}, "csrf: no outbox provided — security events silently disabled");
+    logger.warn({}, "csrf: no outbox provided, security events silently disabled");
   }
   return createMiddleware(async (c, next) => {
     if (SAFE_METHODS.has(c.req.method)) return next();
@@ -33,7 +33,7 @@ export function requireCsrf(deps: CsrfDeps) {
     const reason: CsrfRejectReason =
       origin === undefined || origin === "null" ? "missing_origin" : "origin_mismatch";
     if (deps.outbox) await emitCsrfRejected(deps.outbox, c, reason, origin);
-    // reason stays in the emitted audit event, not the client response — no security-decision leak.
+    // reason stays in the emitted audit event, not the client response, no security-decision leak.
     throw new AppErrorException({
       code: "SECURITY_CSRF_FORBIDDEN",
       message: "CSRF check failed",
@@ -59,6 +59,6 @@ async function emitCsrfRejected(
       reason,
     });
   } catch (emitErr) {
-    logger.warn({ err: emitErr }, "csrf event emit failed — still rejecting");
+    logger.warn({ err: emitErr }, "csrf event emit failed, still rejecting");
   }
 }

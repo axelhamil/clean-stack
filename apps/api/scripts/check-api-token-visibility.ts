@@ -1,5 +1,5 @@
 // `visibleTokensFilter` (drizzle-api-token.repository.ts) builds the
-// confinement WHERE clause with `and`/`or`/`eq`/`isNull` — a mocked `tx`
+// confinement WHERE clause with `and`/`or`/`eq`/`isNull`, a mocked `tx`
 // never evaluates a `WHERE`. The unit suite
 // (`drizzle-api-token.repository.test.ts`) replaces those Drizzle builders
 // with opaque stand-ins, so a green run there proves only that the method was
@@ -13,7 +13,7 @@
 // Re-run after any change to `visibleTokensFilter` or `TokenOwner`.
 //
 // WARNING: writes real user, organization and api_token rows (all prefixed
-// and cleaned up). Local database only — `requireLocalDatabase` enforces it.
+// and cleaned up). Local database only, `requireLocalDatabase` enforces it.
 
 import { apiTokenSchema, authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
 import type { TokenOwner } from "../src/modules/api-token/application/ports/api-token.port";
@@ -37,9 +37,9 @@ const ownPersonal = `${PROBE}-own-personal`; // owner, org-less
 const ownReachableOrg = `${PROBE}-own-reachable-org`; // owner, in orgReachable
 const ownUnreachableOrg = `${PROBE}-own-unreachable-org`; // owner, in orgUnreachable
 const otherPersonal = `${PROBE}-other-personal`; // other user, org-less
-const otherReachableOrg = `${PROBE}-other-reachable-org`; // other user, in orgReachable — same org as the owner
+const otherReachableOrg = `${PROBE}-other-reachable-org`; // other user, in orgReachable, same org as the owner
 
-// Clears every api_token the seeded account owns, not just the probe's own —
+// Clears every api_token the seeded account owns, not just the probe's own,
 // a stray token left over from another script or a manual session would
 // otherwise leak into the "exactly these ids" assertions below.
 const reset = async () => {

@@ -10,7 +10,7 @@ import type { IOutboxRepository } from "../ports/outbox.port";
 
 const BODY_LIMIT_BYTES = 64 * 1024;
 
-// Legacy application/csp-report — all fields are pre-truncated in the handler,
+// Legacy application/csp-report, all fields are pre-truncated in the handler,
 // so the schema uses generous max lengths to accept any syntactically valid report.
 const LegacyCspReportBodySchema = z.object({
   "document-uri": z.string(),
@@ -28,7 +28,7 @@ const LegacyCspReportSchema = z.object({
   "csp-report": LegacyCspReportBodySchema,
 });
 
-// application/reports+json — items may be of any type; we only care about csp-violation.
+// application/reports+json, items may be of any type; we only care about csp-violation.
 // body is loosely typed so unknown report types with missing csp fields don't fail validation.
 const ReportItemSchema = z.object({
   type: z.string(),
@@ -207,6 +207,6 @@ async function emitCspEvent(
       ...fields,
     });
   } catch (emitErr) {
-    logger.warn({ err: emitErr }, "csp-report event emit failed — still sending 204");
+    logger.warn({ err: emitErr }, "csp-report event emit failed, still sending 204");
   }
 }
