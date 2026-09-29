@@ -169,7 +169,7 @@ No code change. For a non-compatible provider, replace `SentryInstrumentation` w
 
 ## Privacy / EU residency
 
-- `sendDefaultPii: false` is hard-coded.
+- `dataCollection` opts out of every PII category (user info, cookies, IP/identity headers, HTTP bodies, query params; on the API also DB query data, queue args and stack-frame locals). The SDK collects all of them by default since v11, so removing a key turns that category back on.
 - `beforeSend` strips `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email`, `username`, `ip_address` before transmission. Whitelist-based (default = drop).
 - Fetch/XHR breadcrumbs record full request URLs and are **not** covered by the `beforeSend` request scrub — keep sensitive data out of query strings (repo convention: payloads travel in POST bodies, identifiers are opaque UUIDs).
 - For EU clients, use a `*.eu.sentry.io` DSN — Sentry stores all data in Frankfurt.

@@ -45,7 +45,7 @@
     "@packages/events": "workspace:*",
     "@packages/i18n": "workspace:*",
     "@packages/policies": "workspace:*",
-    "@sentry/bun": "^10.75.3",
+    "@sentry/bun": "^11.1.0",
     "@simplewebauthn/server": "^13.3.3",
     "better-auth": "1.6.30",
     "disposable-email-domains": "^1.0.62",
