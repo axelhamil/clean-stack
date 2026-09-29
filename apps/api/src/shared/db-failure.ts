@@ -6,7 +6,7 @@ import { logger } from "./logger";
  *
  * Pre-binds `code` so the returned function can be called inline in a `.catch()`
  * or `catch(e)` block: it logs the raw error, then wraps it in a `Result.fail`
- * with a consistent `{ code, message }` shape — no boilerplate per method.
+ * with a consistent `{ code, message }` shape, no boilerplate per method.
  */
 export function createDbFailure<TCode extends ErrorCode>(code: TCode) {
   return (

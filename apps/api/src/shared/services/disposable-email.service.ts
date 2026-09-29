@@ -1,18 +1,16 @@
 import { resolveMx } from "node:dns/promises";
 import { Result } from "@packages/ddd-kit";
-
-// disposable-email-domains exports an array of domain strings (CJS default, no @types)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const disposableDomains: string[] = require("disposable-email-domains") as string[];
-
 import { env } from "../env";
 import type { DisposableEmailError, IDisposableEmailService } from "../ports/disposable-email.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 
-// Build Set once at module load for O(1) lookups — ~90 k entries, <10 MB
+// disposable-email-domains is a CJS array of domains with no type declarations.
+const disposableDomains: string[] = require("disposable-email-domains") as string[];
+
+// Built once at module load: about 90 k entries, under 10 MB.
 const DISPOSABLE_SET = new Set<string>(disposableDomains);
 
-// DNS error codes that mean "no MX record" — treat the domain as suspicious (disposable)
+// DNS error codes that mean "no MX record": the domain is treated as disposable.
 const NO_MX_CODES = new Set(["ENOTFOUND", "ENODATA", "ENONAME"]);
 
 export class DisposableEmailService implements IDisposableEmailService {
@@ -28,10 +26,9 @@ export class DisposableEmailService implements IDisposableEmailService {
     const domain = email.split("@")[1]?.toLowerCase();
     if (!domain) return Result.ok(false);
 
-    // (a) Static list — O(1), no DNS needed
     if (DISPOSABLE_SET.has(domain)) return Result.ok(true);
 
-    // (b) MX check with timeout (resolveMx does not accept AbortSignal)
+    // resolveMx accepts no AbortSignal, so the timeout races it instead.
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(
@@ -49,14 +46,16 @@ export class DisposableEmailService implements IDisposableEmailService {
         () => Promise.race([resolveMx(domain), timeoutPromise]),
       );
       clearTimeout(timer);
-      // No MX records → domain has no mail infrastructure → treat as disposable
+
+      // A domain with no mail infrastructure cannot own a real inbox.
       return Result.ok(mxRecords.length === 0);
     } catch (err) {
       clearTimeout(timer);
+
       const code = (err as { code?: string }).code ?? "";
-      // Known "domain doesn't exist / no MX" errors → treat as disposable (fail-safe)
       if (NO_MX_CODES.has(code)) return Result.ok(true);
-      // Transient failure (timeout, network error) → capture + fail-open at call site
+
+      // A transient failure (timeout, network) is reported; the call site fails open.
       this.instrumentation.capture(err);
       return Result.fail({
         code: "DISPOSABLE_CHECK_FAILURE",

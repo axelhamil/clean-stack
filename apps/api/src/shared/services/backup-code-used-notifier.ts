@@ -19,7 +19,8 @@ export const backupCodeUsedNotifier: (deps: BackupCodeUsedNotifierDeps) => Event
       logger.warn({ eventType: event.eventType }, "backup-code-used notifier: invalid payload");
       return;
     }
-    const securityUrl = `${env.APP_URL ?? ""}/settings/account`;
+
+    const securityUrl = `${env.APP_URL}/settings/account`;
     const locale = await localeForUser(deps.IProfileStore, parsed.data.userId);
     const sent = await deps.IEmailService.sendTemplate(
       "backup_code_used",

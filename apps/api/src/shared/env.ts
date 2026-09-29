@@ -133,7 +133,7 @@ const rawEnv = Object.fromEntries(
 export const env = envSchema.parse(rawEnv);
 
 // Bootstrap ships these as long-enough placeholders so local dev and CI checks
-// (check:sweep-lock, check:fanout) work out of the box — but "long enough" also
+// (check:sweep-lock, check:fanout) work out of the box, but "long enough" also
 // satisfies `.min(32)`, so a deploy that copies `.env.example` verbatim and forgets
 // to replace them would otherwise boot with a published secret. Reject the literal
 // placeholder text, not just its length.
@@ -155,7 +155,7 @@ if (env.NODE_ENV === "production") {
   }
   if (!env.CORS_ORIGIN || env.CORS_ORIGIN.length === 0) {
     throw new Error(
-      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost — rejecting the real front and collapsing the CORS + CSRF allowlist.",
+      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost, rejecting the real front and collapsing the CORS + CSRF allowlist.",
     );
   }
   if (!env.INTERNAL_AUTH_LAYERS?.includes("signature")) {
@@ -180,7 +180,7 @@ if (env.NODE_ENV === "production") {
   }
   if (!env.API_TOKEN_PEPPER) {
     throw new Error(
-      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret — a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
+      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret: a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
     );
   }
 }
