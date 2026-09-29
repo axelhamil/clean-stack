@@ -6,8 +6,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { ListRow, ListRowContent } from "@packages/ui/components/ui/list-row";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { SUB_PROCESSOR_KEYS } from "../../../shared/sub-processor-labels";
@@ -26,15 +27,17 @@ export function DataSourcesCard() {
         <CardDescription>{t("privacy.dataSources.description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ul className="flex flex-col divide-y">
+        <ul className="flex flex-col gap-2">
           {activeProcessors.map((sp) => (
-            <li key={sp.id} className="flex flex-col gap-0.5 py-3">
-              <span className="text-sm font-medium">{sp.name}</span>
-              <TypographyMuted className="text-xs">
-                {tCommon(SUB_PROCESSOR_KEYS[sp.id].purpose)} ·{" "}
-                {tCommon(SUB_PROCESSOR_KEYS[sp.id].region)}
-              </TypographyMuted>
-            </li>
+            <ListRow key={sp.id}>
+              <ListRowContent>
+                <TypographySmall>{sp.name}</TypographySmall>
+                <TypographyMuted>
+                  {tCommon(SUB_PROCESSOR_KEYS[sp.id].purpose)} ·{" "}
+                  {tCommon(SUB_PROCESSOR_KEYS[sp.id].region)}
+                </TypographyMuted>
+              </ListRowContent>
+            </ListRow>
           ))}
         </ul>
       </CardContent>
