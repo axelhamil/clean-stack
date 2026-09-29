@@ -1,6 +1,7 @@
 /**
  * Proves against a real Postgres that `TransactionService.run` rolls back a transaction
- * whose callback resolves to a failed `Result`, and still commits one that succeeds.
+ * whose callback resolves to a failed `Result`, still commits one that succeeds, and
+ * rethrows a callback's exception without reporting it (the caller knows if it is expected).
  *
  * A mocked unit of work can only prove the service throws inside `db.transaction`; only
  * a real database can prove the write that happened before the failure is discarded,
@@ -90,6 +91,27 @@ async function main(): Promise<void> {
   check("run resolves to the successful Result", succeeded.isSuccess);
   check("the write of a successful run is committed", (await currentName()) === "Renamed");
   check("the event of a successful run is committed", (await outboxRows()) === 1);
+
+  let captures = 0;
+  const spy: IInstrumentation = Object.assign(Object.create(instrumentation), {
+    capture: () => {
+      captures += 1;
+    },
+  });
+  const expected = new Error("probe: an expected 4xx thrown to abort");
+  const thrown = await new TransactionService(spy)
+    .run(async (tx) => {
+      await tx
+        .update(authSchema.user)
+        .set({ name: "Thrown" })
+        .where(eq(authSchema.user.id, userId));
+      throw expected;
+    })
+    .catch((err: unknown) => err);
+  console.log("[3] run rejected with ->", thrown === expected ? "the callback's error" : thrown);
+  check("a thrown error reaches the caller unchanged", thrown === expected);
+  check("the write before the throw was rolled back", (await currentName()) === "Renamed");
+  check("the unit of work leaves reporting to the caller (no capture)", captures === 0);
 
   await cleanup();
 

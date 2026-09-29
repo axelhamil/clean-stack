@@ -9,7 +9,6 @@ export type FlushHandler = (events: IDomainEvent[], tx: Transaction) => Promise<
  */
 export interface UnitOfWorkInstrumentation {
   startSpan<T>(options: { name: string }, callback: () => Promise<T>): Promise<T>;
-  capture(error: unknown): void;
 }
 
 /** Carries a failed `Result` out of `db.transaction` so the driver issues ROLLBACK. */
@@ -26,16 +25,8 @@ export class TransactionService implements IUnitOfWork<Transaction> {
   ) {}
 
   public async startTransaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
-    return this.instrumentation.startSpan(
-      { name: "TransactionService > startTransaction" },
-      async () => {
-        try {
-          return await db.transaction(callback);
-        } catch (err) {
-          this.instrumentation.capture(err);
-          throw err;
-        }
-      },
+    return this.instrumentation.startSpan({ name: "TransactionService > startTransaction" }, () =>
+      db.transaction(callback),
     );
   }
 
@@ -68,7 +59,9 @@ export class TransactionService implements IUnitOfWork<Transaction> {
       } catch (err) {
         if (err instanceof FailedResultRollback) return err.result as T;
 
-        this.instrumentation.capture(err);
+        // No capture here: the error is rethrown to a caller that knows whether it is
+        // expected (a 4xx HTTPException thrown to abort) or not, and the central error
+        // handler reports the unexpected ones. Capturing here double-reports every 5xx.
         throw err;
       }
     });
