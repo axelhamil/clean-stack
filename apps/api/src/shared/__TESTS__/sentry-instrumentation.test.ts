@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import * as realSentry from "@sentry/bun";
 
 const startSpanMock = mock(async (_opts: unknown, cb: () => unknown) => cb());
 const withScopeMock = mock((cb: (scope: unknown) => void) => {
@@ -18,15 +19,11 @@ const scopeMock = {
 };
 
 mock.module("@sentry/bun", () => ({
+  ...realSentry,
   startSpan: startSpanMock,
   withScope: withScopeMock,
   captureException: captureExceptionMock,
   addBreadcrumb: addBreadcrumbMock,
-  init: mock(() => {}),
-  pinoIntegration: mock(() => ({})),
-  setTag: setTagMock,
-  setUser: setUserMock,
-  setContext: setContextMock,
   getActiveSpan: getActiveSpanMock,
 }));
 

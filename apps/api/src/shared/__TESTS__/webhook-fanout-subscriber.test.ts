@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
-// Query-chain factories — called fresh on each tx.select / tx.insert
+// Query-chain factories, called fresh on each tx.select / tx.insert
 // ---------------------------------------------------------------------------
 let fakeEndpoints: Array<{ id: string; eventTypes: string[] }> = [];
 const capturedInserts: unknown[][] = [];
@@ -42,106 +43,9 @@ const fakeTx = {
 };
 
 // ---------------------------------------------------------------------------
-// Drizzle mock — scoped to this file's module registry, invisible to other files.
+// Drizzle mock: scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
-mock.module("@packages/drizzle", () => ({
-  db: fakeTx,
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  isNotNull: () => ({}),
-  isNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  not: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  inArray: () => ({}),
-  like: () => ({}),
-  ilike: () => ({}),
-  ne: () => ({}),
-  between: () => ({}),
-  notInArray: () => ({}),
-  notExists: () => ({}),
-  exists: () => ({}),
-  count: () => ({}),
-  sum: () => ({}),
-  min: () => ({}),
-  max: () => ({}),
-  avg: () => ({}),
-  arrayContains: () => ({}),
-  getTableColumns: () => ({}),
-  alias: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  schema: {},
-  authSchema: {},
-  multiTenantSchema: { organization: { id: {} } },
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: "id",
-      eventTypes: "event_types",
-      organizationId: "organization_id",
-      enabled: "enabled",
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  uuidv7: () => "generated-uuid",
-}));
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeTx }));
 
 const { WebhookFanoutSubscriber } = await import("../services/webhook-fanout-subscriber");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");

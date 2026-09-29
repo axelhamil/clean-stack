@@ -1,16 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
+import * as realSentry from "@sentry/bun";
 
 mock.module("@sentry/bun", () => ({
+  ...realSentry,
   init: mock(() => {}),
   pinoIntegration: mock(() => ({})),
-  startSpan: mock(async (_opts: unknown, cb: () => unknown) => cb()),
-  withScope: mock((_cb: (scope: unknown) => void) => {}),
-  captureException: mock((_err: unknown) => {}),
-  addBreadcrumb: mock((_crumb: unknown) => {}),
-  setTag: mock((_key: string, _value: string) => {}),
-  setUser: mock((_user: unknown) => {}),
-  setContext: mock((_key: string, _ctx: unknown) => {}),
-  getActiveSpan: mock(() => undefined as unknown),
 }));
 
 const { scrubEvent } = await import("../services/sentry-init");
