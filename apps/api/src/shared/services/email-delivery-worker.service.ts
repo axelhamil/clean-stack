@@ -68,11 +68,9 @@ export class EmailDeliveryWorker {
 
   async start(): Promise<void> {
     this.stopping = false;
-    this.timer = setInterval(() => {
-      this.drainOnce().catch((err) => this.logger.error({ err }, "email drain failed"));
-    }, POLL_INTERVAL_MS);
+    this.timer = setInterval(() => this.drainInBackground(), POLL_INTERVAL_MS);
     this.logger.info("email delivery worker started");
-    void this.drainOnce();
+    this.drainInBackground();
   }
 
   async stop(): Promise<void> {
@@ -85,6 +83,18 @@ export class EmailDeliveryWorker {
       await new Promise((r) => setTimeout(r, 50));
     }
     this.logger.info("email delivery worker stopped");
+  }
+
+  /**
+   * Fire-and-forget entry point for every drain nobody awaits. A rejection left
+   * unhandled here would take the whole process down, and nothing inside
+   * `drainOnce` reports a transaction that fails to open.
+   */
+  private drainInBackground(): void {
+    this.drainOnce().catch((err) => {
+      this.instrumentation.capture(err);
+      this.logger.error({ err }, "email drain failed");
+    });
   }
 
   async drainOnce(): Promise<void> {

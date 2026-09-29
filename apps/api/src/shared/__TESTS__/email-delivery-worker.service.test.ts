@@ -242,6 +242,38 @@ describe("EmailDeliveryWorker.drainOnce", () => {
   });
 });
 
+describe("EmailDeliveryWorker.start", () => {
+  it("logs and reports a first drain that fails instead of crashing the process", async () => {
+    const h = harness([]);
+    const errors: string[] = [];
+    const captured: unknown[] = [];
+    const worker = new EmailDeliveryWorker(
+      {
+        ...h.queue,
+        claimPending: async () => {
+          throw new Error("connection refused");
+        },
+      } as never,
+      outboxStub as never,
+      { ...loggerStub, error: (_obj: unknown, msg: string) => errors.push(msg) } as never,
+      {
+        startSpan: <T>(_: unknown, fn: () => T) => fn(),
+        capture: (err: unknown) => captured.push(err),
+        addBreadcrumb() {},
+        setSpanAttributes() {},
+      },
+      { batchSend: h.batch },
+    );
+
+    await worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await worker.stop();
+
+    expect(errors).toEqual(["email drain failed"]);
+    expect(captured).toHaveLength(1);
+  });
+});
+
 describe("chunkIdempotencyKey", () => {
   const keyed = (key: string | null) =>
     row({ idempotencyKey: key === null ? Option.none<string>() : Option.some(key) });
