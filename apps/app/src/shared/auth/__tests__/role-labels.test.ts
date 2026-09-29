@@ -1,17 +1,6 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { isOrgRole, ROLE_LABEL_KEYS } from "../role-labels";
-
-function resolve(prefixedKey: string): string | undefined {
-  const [namespace, path] = prefixedKey.split(":");
-  if (namespace !== "common" || path === undefined) return undefined;
-  let cur: unknown = enCatalog.common;
-  for (const seg of path.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
 
 describe("ROLE_LABEL_KEYS", () => {
   // `satisfies Record<OrgRole, string>` only proves every role has AN entry:
@@ -27,9 +16,9 @@ describe("ROLE_LABEL_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(ROLE_LABEL_KEYS.owner)).toBe("Owner");
-    expect(resolve(ROLE_LABEL_KEYS.admin)).toBe("Admin");
-    expect(resolve(ROLE_LABEL_KEYS.member)).toBe("Member");
+    expect(enLabel(ROLE_LABEL_KEYS.owner, "common")).toBe("Owner");
+    expect(enLabel(ROLE_LABEL_KEYS.admin, "common")).toBe("Admin");
+    expect(enLabel(ROLE_LABEL_KEYS.member, "common")).toBe("Member");
   });
 });
 

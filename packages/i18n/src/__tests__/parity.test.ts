@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import enCatalog, { NAMESPACES } from "../catalogs/en";
 import frCatalog from "../catalogs/fr";
+import { lookupCatalogValue } from "../lookup";
 
 type Nested = { [key: string]: string | Nested };
 
@@ -137,20 +138,11 @@ describe("catalog parity", () => {
     "common.legal.subProcessors.table.dpa",
   ] as const;
 
-  const read = (root: Nested, path: string): string | undefined => {
-    let cur: string | Nested | undefined = root;
-    for (const seg of path.split(".")) {
-      if (typeof cur !== "object" || cur === null) return undefined;
-      cur = (cur as Nested)[seg];
-    }
-    return typeof cur === "string" ? cur : undefined;
-  };
-
   const valueAt = (catalog: unknown, full: string): string | undefined => {
     const [namespace, ...rest] = full.split(".");
     if (namespace === undefined) return undefined;
     const root = (catalog as Record<string, Nested>)[namespace];
-    return root === undefined ? undefined : read(root, rest.join("."));
+    return root === undefined ? undefined : lookupCatalogValue(root, rest.join("."));
   };
 
   it("no French value is left identical to its English source placeholder", () => {

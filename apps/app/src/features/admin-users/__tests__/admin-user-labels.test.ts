@@ -1,25 +1,11 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import {
   isPlatformRole,
   PLATFORM_ROLE_LABEL_KEYS,
   USER_STATUS_LABEL_KEYS,
   userStatusFromBanned,
 } from "../admin-user-labels";
-
-// Cross-namespace entries carry an explicit `ns:` prefix (`common:roles.admin`);
-// same-namespace entries stay bare and resolve against `admin`, matching how
-// the call sites read them.
-function resolve(key: string): string | undefined {
-  const [namespace, path] = key.includes(":") ? key.split(":") : ["admin", key];
-  if (namespace === undefined || path === undefined) return undefined;
-  let cur: unknown = (enCatalog as Record<string, unknown>)[namespace];
-  for (const seg of path.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
 
 describe("PLATFORM_ROLE_LABEL_KEYS", () => {
   // `satisfies Record<PlatformRole, string>` only proves every role has AN
@@ -34,8 +20,8 @@ describe("PLATFORM_ROLE_LABEL_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(PLATFORM_ROLE_LABEL_KEYS.admin)).toBe("Admin");
-    expect(resolve(PLATFORM_ROLE_LABEL_KEYS.user)).toBe("User");
+    expect(enLabel(PLATFORM_ROLE_LABEL_KEYS.admin, "admin")).toBe("Admin");
+    expect(enLabel(PLATFORM_ROLE_LABEL_KEYS.user, "admin")).toBe("User");
   });
 });
 
@@ -60,8 +46,8 @@ describe("USER_STATUS_LABEL_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(USER_STATUS_LABEL_KEYS.active)).toBe("Active");
-    expect(resolve(USER_STATUS_LABEL_KEYS.suspended)).toBe("Suspended");
+    expect(enLabel(USER_STATUS_LABEL_KEYS.active, "admin")).toBe("Active");
+    expect(enLabel(USER_STATUS_LABEL_KEYS.suspended, "admin")).toBe("Suspended");
   });
 });
 

@@ -1,15 +1,6 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { isSsoProviderType, SSO_PROVIDER_TYPE_KEYS } from "../sso-labels";
-
-function resolve(key: string): string | undefined {
-  let cur: unknown = enCatalog.settings;
-  for (const seg of key.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
 
 describe("SSO_PROVIDER_TYPE_KEYS", () => {
   // `satisfies Record<SsoProviderType, string>` only proves every type has AN
@@ -24,8 +15,8 @@ describe("SSO_PROVIDER_TYPE_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(SSO_PROVIDER_TYPE_KEYS.oidc)).toBe("OIDC");
-    expect(resolve(SSO_PROVIDER_TYPE_KEYS.saml)).toBe("SAML");
+    expect(enLabel(SSO_PROVIDER_TYPE_KEYS.oidc, "settings")).toBe("OIDC");
+    expect(enLabel(SSO_PROVIDER_TYPE_KEYS.saml, "settings")).toBe("SAML");
   });
 });
 

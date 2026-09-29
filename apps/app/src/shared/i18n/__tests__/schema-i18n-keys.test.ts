@@ -1,8 +1,7 @@
 import { globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { enCatalog } from "@packages/i18n";
+import { enCatalog, lookupCatalogValue } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
-import { catalogLookup } from "./catalog-t";
 
 const SRC = resolve(__dirname, "../../..");
 
@@ -13,7 +12,7 @@ const SRC = resolve(__dirname, "../../..");
  * `tsc` cannot see, so it gets a test instead.
  */
 function keyExists(path: string): boolean {
-  return catalogLookup(enCatalog.errors, path) !== undefined;
+  return lookupCatalogValue(enCatalog.errors, path) !== undefined;
 }
 
 function sourceFiles(): string[] {

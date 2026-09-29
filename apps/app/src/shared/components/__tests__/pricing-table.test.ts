@@ -1,15 +1,6 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { INTERVAL_KEYS, isPlanInterval } from "../pricing-table";
-
-function resolve(key: string): string | undefined {
-  let cur: unknown = enCatalog.common;
-  for (const seg of key.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
 
 describe("INTERVAL_KEYS", () => {
   // `satisfies Record<PlanInterval, string>` only proves every interval has
@@ -34,10 +25,10 @@ describe("INTERVAL_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(INTERVAL_KEYS.day)).toBe("day");
-    expect(resolve(INTERVAL_KEYS.week)).toBe("week");
-    expect(resolve(INTERVAL_KEYS.month)).toBe("month");
-    expect(resolve(INTERVAL_KEYS.year)).toBe("year");
+    expect(enLabel(INTERVAL_KEYS.day, "common")).toBe("day");
+    expect(enLabel(INTERVAL_KEYS.week, "common")).toBe("week");
+    expect(enLabel(INTERVAL_KEYS.month, "common")).toBe("month");
+    expect(enLabel(INTERVAL_KEYS.year, "common")).toBe("year");
   });
 });
 
