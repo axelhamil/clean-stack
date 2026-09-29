@@ -1,4 +1,5 @@
 import { COOKIE_CONSENT_VERSION, OPTIONAL_CATEGORIES } from "@packages/cookie-consent";
+import { BottomBanner } from "@packages/ui/components/ui/bottom-banner";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Dialog,
@@ -6,10 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -47,35 +46,23 @@ export function CookieBanner() {
 
   return (
     <>
-      <div
-        role="dialog"
-        aria-label={t("cookieBanner.ariaLabel")}
-        aria-modal="false"
-        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg"
-      >
-        <div
-          className={cn(
-            pageContainerVariants(),
-            "flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between md:py-6",
-          )}
-        >
-          <TypographyMuted className="flex-1">
-            {t("cookieBanner.message")}{" "}
-            <TextLink href="/legal/cookies">{t("cookieBanner.policyLink")}</TextLink>.
-          </TypographyMuted>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={handleRejectAll} disabled={record.isPending}>
-              {t("cookieBanner.rejectAll")}
-            </Button>
-            <Button variant="outline" onClick={() => setCustomizeOpen(true)}>
-              {t("cookieBanner.customize")}
-            </Button>
-            <Button variant="outline" onClick={handleAcceptAll} disabled={record.isPending}>
-              {t("cookieBanner.acceptAll")}
-            </Button>
-          </div>
+      <BottomBanner role="dialog" aria-label={t("cookieBanner.ariaLabel")} aria-modal="false">
+        <TypographyMuted className="flex-1">
+          {t("cookieBanner.message")}{" "}
+          <TextLink href="/legal/cookies">{t("cookieBanner.policyLink")}</TextLink>.
+        </TypographyMuted>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleRejectAll} disabled={record.isPending}>
+            {t("cookieBanner.rejectAll")}
+          </Button>
+          <Button variant="outline" onClick={() => setCustomizeOpen(true)}>
+            {t("cookieBanner.customize")}
+          </Button>
+          <Button variant="outline" onClick={handleAcceptAll} disabled={record.isPending}>
+            {t("cookieBanner.acceptAll")}
+          </Button>
         </div>
-      </div>
+      </BottomBanner>
       <Dialog open={customizeOpen} onOpenChange={setCustomizeOpen}>
         <DialogContent closeLabel={t("actions.close")} className="max-w-lg">
           <DialogHeader>
