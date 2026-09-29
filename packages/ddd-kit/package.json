@@ -61,9 +61,9 @@
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "@types/node": "^26.6.3",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.2",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.2"
   }
 }
