@@ -23,8 +23,8 @@ export type NotificationConfig = {
    *
    * Required, and empty is a valid answer: what crosses to the client is
    * chosen, never inherited. A notification stores the whole event payload,
-   * and event payloads legitimately carry internal handles — invitation
-   * tokens, storage keys, subscription and invoice ids. Without a list here,
+   * and event payloads legitimately carry internal handles (invitation
+   * tokens, storage keys, subscription and invoice ids). Without a list here,
    * every field added to a payload tomorrow would ship to the recipient's
    * browser by default, silently and forever.
    */
@@ -156,7 +156,7 @@ export function isNotifiable(eventType: string): boolean {
 
 /**
  * Narrows a stored notification payload to the fields its event declares as
- * client-visible. An unknown event type yields `{}` — a build that does not
+ * client-visible. An unknown event type yields `{}`: a build that does not
  * know what a payload contains has no basis for forwarding any of it.
  */
 export function publicNotificationPayload(
@@ -165,6 +165,7 @@ export function publicNotificationPayload(
 ): Record<string, unknown> {
   const config = notificationConfigOf(eventType);
   if (!config || typeof payload !== "object" || payload === null) return {};
+
   const source = payload as Record<string, unknown>;
   const visible: Record<string, unknown> = {};
   for (const field of config.payloadFields) {

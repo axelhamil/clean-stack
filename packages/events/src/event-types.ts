@@ -112,9 +112,8 @@ export function matchesSubscription(
 
 export function isSubscribableSelector(value: string): boolean {
   if (value === "*") return true;
-  if (value.endsWith(".*")) {
-    const group = value.slice(0, -2);
-    return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
-  }
-  return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+  if (!value.endsWith(".*")) return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+
+  const group = value.slice(0, -2);
+  return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
 }

@@ -100,7 +100,7 @@ export const UserProfileUpdatedPayload = UserRef.extend({
 export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
 
 export const UserEmailChangeRequestedPayload = UserRef.extend({
-  newEmail: z.email(),
+  newEmail: Email,
 });
 export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
 
@@ -268,7 +268,7 @@ export const UserPolicyAcceptedPayload = UserRef.extend({
 export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
 
 // userId is optional: guest consents have no userId, only subjectId (anonymous cookie-based id).
-// extractActor will fall back to system/anonymous for guests — accepted per §7 (no identified user).
+// extractActor falls back to system/anonymous for guests, accepted per §7 (no identified user).
 export const UserCookieConsentGrantedPayload = z.object({
   userId: z.string().optional(),
   subjectId: z.string(),
@@ -297,7 +297,7 @@ export const SecurityRateLimitExceededPayload = z.object({
 export type SecurityRateLimitExceededPayload = z.infer<typeof SecurityRateLimitExceededPayload>;
 
 export const SecurityCspViolationPayload = z.object({
-  // Always null: CSP reports are browser-sent before any authenticated session — no known actor.
+  // Always null: CSP reports are browser-sent before any authenticated session, so no actor is known.
   actorUserId: z.string().nullable(),
   ip: z.string().max(45),
   documentUri: z.string().max(2048),
@@ -395,7 +395,7 @@ export type BillingQuotaExceededPayload = z.infer<typeof BillingQuotaExceededPay
 
 const ActorRef = z.object({ actorUserId: z.string() });
 
-export const AdminImpersonationStartedPayload = ActorRef.merge(UserRef).extend({
+export const AdminImpersonationStartedPayload = ActorRef.extend(UserRef.shape).extend({
   reason: z.string().min(1),
   ticketRef: z.string().optional(),
   ip: z.string().nullable(),
@@ -403,30 +403,30 @@ export const AdminImpersonationStartedPayload = ActorRef.merge(UserRef).extend({
 });
 export type AdminImpersonationStartedPayload = z.infer<typeof AdminImpersonationStartedPayload>;
 
-export const AdminImpersonationStoppedPayload = ActorRef.merge(UserRef).extend({
+export const AdminImpersonationStoppedPayload = ActorRef.extend(UserRef.shape).extend({
   durationMs: z.number().int().nonnegative(),
 });
 export type AdminImpersonationStoppedPayload = z.infer<typeof AdminImpersonationStoppedPayload>;
 
-export const AdminUserBannedPayload = ActorRef.merge(UserRef).extend({
+export const AdminUserBannedPayload = ActorRef.extend(UserRef.shape).extend({
   reason: z.string().min(1),
   expiresAt: z.string().nullable(),
 });
 export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 
-export const AdminUserUnbannedPayload = ActorRef.merge(UserRef);
+export const AdminUserUnbannedPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
-export const AdminUserRoleChangedPayload = ActorRef.merge(UserRef).extend({
+export const AdminUserRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
   from: z.string().nullable(),
   to: z.string(),
 });
 export type AdminUserRoleChangedPayload = z.infer<typeof AdminUserRoleChangedPayload>;
 
-export const AdminUserPasswordResetPayload = ActorRef.merge(UserRef);
+export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserPasswordResetPayload = z.infer<typeof AdminUserPasswordResetPayload>;
 
-export const AdminUserSessionsRevokedPayload = ActorRef.merge(UserRef).extend({
+export const AdminUserSessionsRevokedPayload = ActorRef.extend(UserRef.shape).extend({
   count: z.number().int().nonnegative(),
 });
 export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
@@ -442,12 +442,14 @@ export const ApiTokenCreatedPayload = z.object({
 });
 export type ApiTokenCreatedPayload = z.infer<typeof ApiTokenCreatedPayload>;
 
+export const API_TOKEN_REVOKED_REASONS = ["user", "membership_lost", "leaked"] as const;
+
 export const ApiTokenRevokedPayload = z.object({
   userId: z.string(),
   actorUserId: z.string().nullable(),
   organizationId: z.string().nullable(),
   tokenId: z.string(),
-  reason: z.enum(["user", "membership_lost", "leaked"]),
+  reason: z.enum(API_TOKEN_REVOKED_REASONS),
 });
 export type ApiTokenRevokedPayload = z.infer<typeof ApiTokenRevokedPayload>;
 
@@ -484,7 +486,7 @@ export type NotificationOrgPreferenceUpdatedPayload = z.infer<
 
 // Subject and actor are the same person: both routes carry `denyImpersonated`
 // and the update is scoped to rows the caller owns, so no admin or system can
-// reach it on someone else's behalf. `userId` alone therefore satisfies §7 —
+// reach it on someone else's behalf. `userId` alone therefore satisfies §7:
 // there is no second party to name, and `actorUserId` would only restate it.
 //
 // `notificationIds` carries what actually changed for an explicit selection

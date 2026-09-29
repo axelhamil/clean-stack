@@ -1,8 +1,7 @@
+import type { API_TOKEN_REVOKED_REASONS } from "@packages/events";
 import { index, jsonb, pgTable, smallint, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { organization } from "./multi-tenant";
-
-export const API_TOKEN_REVOKED_REASONS = ["user", "membership_lost", "leaked"] as const;
 
 export type ApiTokenRevokedReason = (typeof API_TOKEN_REVOKED_REASONS)[number];
 
