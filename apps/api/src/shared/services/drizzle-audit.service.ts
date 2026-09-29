@@ -31,6 +31,25 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 const fail = createDbFailure("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
+const al = auditLogSchema.auditLog;
+
+function toRecord(row: typeof al.$inferSelect): AuditRecord {
+  return {
+    id: row.id,
+    actorId: Option.fromNullable(row.actorId),
+    actorType: row.actorType,
+    organizationId: Option.fromNullable(row.organizationId),
+    action: row.action,
+    targetType: row.targetType,
+    targetId: row.targetId,
+    metadata: row.metadata,
+    requestId: row.requestId ?? undefined,
+    retention: row.retention,
+    occurredAt: row.occurredAt,
+    prevHash: Option.fromNullable(row.prevHash),
+    hash: Option.fromNullable(row.hash),
+  };
+}
 
 export class DrizzleAuditRepository implements IAuditPort {
   constructor(private readonly instrumentation: IInstrumentation) {}
@@ -41,7 +60,7 @@ export class DrizzleAuditRepository implements IAuditPort {
       const id = uuidv7();
       const occurredAt = new Date();
       try {
-        const query = exec.insert(auditLogSchema.auditLog).values({
+        const query = exec.insert(al).values({
           id,
           actorId: entry.actorId.toNull(),
           actorType: entry.actorType,
@@ -76,7 +95,6 @@ export class DrizzleAuditRepository implements IAuditPort {
     const exec = tx ?? db;
     return this.instrumentation.startSpan({ name: "DrizzleAuditRepository > list" }, async () => {
       const limit = Math.min(filters.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-      const al = auditLogSchema.auditLog;
       const conds = [];
       if (filters.actorId) conds.push(eq(al.actorId, filters.actorId));
       if (filters.organizationId !== undefined) {
@@ -110,24 +128,10 @@ export class DrizzleAuditRepository implements IAuditPort {
         );
 
         const hasMore = rows.length > limit;
-        const items = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
-          id: r.id,
-          actorId: Option.fromNullable(r.actorId),
-          actorType: r.actorType,
-          organizationId: Option.fromNullable(r.organizationId),
-          action: r.action,
-          targetType: r.targetType,
-          targetId: r.targetId,
-          metadata: r.metadata,
-          requestId: r.requestId ?? undefined,
-          retention: r.retention,
-          occurredAt: r.occurredAt,
-          prevHash: Option.fromNullable(r.prevHash),
-          hash: Option.fromNullable(r.hash),
-        }));
-        const nextCursor = Option.fromNullable(
-          hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null,
-        );
+        const items = rows.slice(0, limit).map(toRecord);
+        const last = items.at(-1);
+        const nextCursor =
+          hasMore && last ? Option.some(last.occurredAt.toISOString()) : Option.none<string>();
         return Result.ok({ items, nextCursor });
       } catch (e) {
         this.instrumentation.capture(e);
@@ -142,7 +146,6 @@ export class DrizzleAuditRepository implements IAuditPort {
       { name: "DrizzleAuditRepository > verifyChain" },
       async () => {
         try {
-          const al = auditLogSchema.auditLog;
           const query = exec.select().from(al).where(isNotNull(al.hash)).orderBy(asc(al.sequence));
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
