@@ -4,11 +4,13 @@ Loaded when working inside `apps/app/src/shared/`. Auth client, API client, rout
 
 ## What lives here
 
-- `api/` — api-client, query-client, queries/, mutations/, errors/
-- `auth/` — auth-client, auth-broadcast, can, use-authorization, use-set-active-org, use-sign-out, schemas/
-- `components/` — cross-feature UI (app-shell, org-switcher, command-palette, …)
-- `notifications/` — bell + inbox item, preference matrix, grouping, labels, read-broadcast, SSE stream hook (D.3)
-- `i18n/` — i18next boot (`i18n.ts`), locale cookie, session reconciliation, `LocaleSync`, the global Zod error map, `useFormatDate`/`useFormatDateTime`
+- `api/` — api-client, query-client, queries/, mutations/, errors/ (`api-error`, `messages`, `toast`, `policy-refusal`). Refusals render as localized copy, never raw backend text: the error code resolves through the `errors` catalog (`byCode`, then `bySuffix`, then the caller's fallback), so a new backend code needs its copy in both `en` and `fr`. `policy-refusal.ts` invalidates the router on `POLICY_ACCEPTANCE_REQUIRED` so `_shell`'s existing redirect fires; never add a second redirect mechanism.
+- `auth/` — auth-client, auth-broadcast, `Can` + `useAuthorization`, gates (`ensure-org-permission`, `ensure-platform-admin`, `feature-gate`, `plan-gate`, `quota-gate`), `use-entitlements`, `use-active-org-id`, `use-set-active-org`, `use-sign-out`, `use-impersonation-guard`, role-labels, `*.schema.ts`, dev-only `authorization-devtool`
+- `components/` — cross-feature UI (app-shell, org-switcher, command-palette, cookie-banner, legal-footer, secret-reveal-dialog, pricing-table, impersonation-banner, …)
+- `hooks/` — `use-consent`, `use-broadcast-channel`
+- `legal/`, `legal-routes.ts`, `sub-processors.config.ts`, `sub-processor-labels.ts` — legal surface shared by the shell and the legal pages
+- `notifications/` — bell + inbox item, preference matrix, grouping, labels, `notification-broadcast`, SSE stream hook with a stall guard (no ping for 2x the 25 s interval + 5 s → reconnect)
+- `i18n/` — i18next boot (`i18n.ts`), locale cookie, session reconciliation, `LocaleSync`, the global Zod error map, `useFormatDate`/`useFormatDateTime`, `useSetLocaleMutation`, `getErrorsT` (see the i18n rule below)
 - `observability/` — sentry.ts (init + captureError/addBreadcrumb/setUser/ErrorBoundary/reactErrorHandler) + noop.ts mirror, error-classifier, query-error-handler (QueryCache/MutationCache onError), session-watcher (setUser sync)
 - `app-providers.tsx` — provider tree
 - `env.ts` — validated env
@@ -22,7 +24,7 @@ Single client lives in `shared/api/api-client.ts`: `hcWithType(baseUrl, { init: 
 
 ## CSP nonce
 
-Caddy injects the nonce via `{http.request.uuid}` into `<meta property="csp-nonce" nonce="...">` in `index.html` (see `apps/app/Caddyfile`). Vite propagates it through `html.cspNonce` in `vite.config.ts`. `app-providers.tsx` reads the nonce from the `<meta>` attribute (IDL `.nonce` is empty on meta — must use `.getAttribute("nonce")`) and passes it to `ThemeProvider`. Do **not** read via `.nonce` IDL; do **not** inline the nonce in JS.
+Vite's `html.cspNonce` (`vite.config.ts`) emits a `<meta property="csp-nonce">` and nonce attributes carrying a Caddy placeholder at build time; Caddy's `templates` resolves it to `{http.request.uuid}` per request and sends the matching CSP header (`apps/app/Caddyfile`). `index.html` itself holds no meta. `app-providers.tsx` reads the nonce from the `<meta>` attribute (IDL `.nonce` is empty on meta — must use `.getAttribute("nonce")`) and passes it to `ThemeProvider`. Do **not** read via `.nonce` IDL; do **not** inline the nonce in JS.
 
 ## Observability (front)
 
@@ -34,7 +36,7 @@ Caddy injects the nonce via `{http.request.uuid}` into `<meta property="csp-nonc
 
 ## i18n (front)
 
-- **Translation is read through the React tree; `getErrorsT()` is the exception, not the shortcut.** Components and hooks call `useTranslation` — that is what re-renders them when the language changes. `getErrorsT()` exists only for code that has no tree to read from: the global `QueryCache`/`MutationCache` handlers and `toast.ts` run outside React entirely. **Why it matters which one you reach for**: `getErrorsT()` resolves against whatever the instance holds *at call time* and returns the raw key before boot, so using it inside a component produces copy that silently stops following the language switch. **Test**: if the call site is inside a component or a hook, it must be `useTranslation`.
+- **Translation is read through the React tree; `getErrorsT()` is the exception, not the shortcut.** Components and hooks call `useTranslation` — that is what re-renders them when the language changes. `getErrorsT()` exists only for code that has no tree to read from: the global `QueryCache`/`MutationCache` handlers and `toast.ts` run outside React entirely. **One named exception**: the fallback string a hook, a query option or a route handler passes to `toastError`/`throwApiError` may come from `getErrorsT()("fallback.<key>")`, because it is resolved inside the failure callback, at event time, never during render. **Why it matters which one you reach for**: `getErrorsT()` resolves against whatever the instance holds *at call time* and returns the raw key before boot, so using it inside a component produces copy that silently stops following the language switch. **Test**: if the call site is inside a component or a hook and is evaluated during render, it must be `useTranslation`.
 - **`changeLocale` owns the cookie write.** No call site writes the locale cookie itself. **Why**: the cookie is the pre-render signal the next page load resolves from, so a path that changes the language without leaving that trace boots the next visit in the old one — and there is more than one such path (the settings switcher and the session reconciliation both change it).
 - **`LocaleSync` is mounted exactly once, in `app-providers`.** It is an effect over the session query with a `useRef` latch, not a pure view. **Why once**: two mounts race on the same reconciliation and each holds its own `alreadyPersisted` ref, so the "seed the empty user record" branch fires twice and issues two writes for one decision. The decision itself lives in `reconcileLocale`, a pure function, so "does a save bounce back?" is answerable in a unit test with no DOM.
 - **Schemas carry no inline `message:`.** Localised validation copy comes from the global Zod map (`i18n/zod-error-map.ts`), re-applied on every language change. A per-issue `message:` wins over the global map — that is Zod's own precedence — so an inline literal is a string that can never be translated. Custom checks pass `{ params: { i18nKey } }` instead, which is what routes them back through the catalog.
@@ -57,42 +59,40 @@ Auth state enforced by **layout routes with `id` (no path)** — `_guest`, `_pro
 
 **Per-route capability gates use `ensureOrgPermission(...)`, not nested pathless layouts.** One pathless `_org-scope` gates "active org required"; capabilities live per-route in `beforeLoad`. **Why**: stacking `_org-admin`/`_org-owner`/`_can-manage-billing` forces every tier into the directory tree. Customize via `ensureOrgPermission(perms, { redirectTo })`.
 
-**The route file's page component must stay internal, never exported** (`function <Name>Page() { ... }`, not `export function`) — route and page now share one module (`<name>.route.tsx`), and `autoCodeSplitting` only chunks a component it can see is local to that file. Exporting it re-attaches the page to the static import graph and the chunk silently merges back into the main bundle. Access route state through the `Route` binding directly (`Route.useSearch()`, `Route.useParams()`, `Route.useRouteContext()`), not `getRouteApi`.
+**The route file's page component stays internal, never exported**: the rule and its why live in `src/features/CLAUDE.md` (Routing).
 
 ## Authorization (capability-based, front)
 
 Defined once in `@packages/access-control` — same `OrgPermissions` shape, same roles as server. Three layers, one predicate:
+- **Server** `requireOrgPermission(permissions)` (see `apps/api/CLAUDE.md`)
 - **Route gate** `ensureOrgPermission(permissions)` in `beforeLoad`
 - **UI** `<Can requires={...} connector?="OR" fallback?={...}>` backed by `useAuthorization().can()`
 
-**Why**: defense in depth — server enforces, gate prevents access, UI hides unreachable controls. Children needing permission-aware behavior call `useAuthorization` themselves rather than receiving `canEdit: boolean` props. Dev-only `<AuthorizationDevTool>` (mounted in `__root.tsx`, tree-shaken in prod) renders live capability matrix.
+**Why**: defense in depth — server enforces, gate prevents access, UI hides unreachable controls. Children needing permission-aware behavior call `useAuthorization` themselves rather than receiving `canEdit: boolean` props. Dev-only `<AuthorizationDevTool>` (mounted in `shared/components/app-shell.tsx`, tree-shaken in prod) renders live capability matrix.
 
-## Cookie consent (Phase A.4)
+## Cookie consent
 
-Trois primitifs pour appliquer le consentement dans le code front :
+Three primitives apply consent in front code:
 
-1. **`useConsent(category: ConsentCategory): boolean`** (`shared/hooks/use-consent.ts`) — hook impératif. Usage : dans du code impératif (conditions, `useEffect`, etc.) où JSX n'est pas disponible.
+1. **`useConsent(category: ConsentCategory): boolean`** (`shared/hooks/use-consent.ts`): imperative hook, for conditions and `useEffect` where JSX is not available.
+2. **`<ConsentGate category="analytics">`** (`shared/components/consent-gate.tsx`): declarative wrapper that renders its children only when the category is consented. Default choice for declarative code.
+3. **`<AnalyticsScripts>`** (`shared/components/analytics-scripts.tsx`): reference application of the pattern. Loads `VITE_ANALYTICS_SRC` (optional env) through `<ConsentGate category="analytics">`, React cleanup on unmount/withdraw, mounted in `app-providers.tsx`. Empty env = no-op component, the boilerplate tracks nothing by default.
 
-2. **`<ConsentGate category="analytics">`** (`shared/components/consent-gate.tsx`) — primitif déclaratif. Usage : wrapper JSX qui rend ses enfants seulement si la catégorie est consentie. Recommandé par défaut pour le code déclaratif.
+**`<CookieBanner>`** (`shared/components/cookie-banner.tsx`) is auto-mounted in `app-providers.tsx`; never mount it again in a feature. It hides itself once `consentQueryOptions` returns a current state.
 
-3. **`<AnalyticsScripts>`** (`shared/components/analytics-scripts.tsx`) — **exemple d'application** du pattern. Charge le script `VITE_ANALYTICS_SRC` (env optionnel) via `<ConsentGate category="analytics">`, cleanup React au unmount/withdraw. Monté dans `app-providers.tsx`. Env vide = composant no-op, le boilerplate ne trace rien par défaut.
+**`<LegalFooter>`** (`shared/components/legal-footer.tsx`) is mounted in `AppShell` for signed-in users and reads `LEGAL_ROUTES` from `shared/legal-routes.ts`, the same const as `command-palette.tsx`. **Never duplicate the legal route list**: edit `LEGAL_ROUTES` and both surfaces follow.
 
-**`<CookieBanner>`** (`shared/components/cookie-banner.tsx`) est auto-monté dans `app-providers.tsx` — ne pas le remonter dans les features. Il se masque automatiquement quand `consentQueryOptions` retourne un état courant.
-
-**`<LegalFooter>`** (`shared/components/legal-footer.tsx`) est monté dans `AppShell` pour les users connectés. Il source `shared/legal-routes.ts` (`LEGAL_ROUTES`) — la même const que `command-palette.tsx` (DRY). **Ne pas dupliquer la liste des routes légales** : modifier `LEGAL_ROUTES` dans `shared/legal-routes.ts`, les deux surfaces se mettent à jour.
-
-**Pattern d'intégration analytics** (cloner un outil) :
+**Analytics integration pattern** (cloning a tool):
 ```tsx
-// shared/env.ts expose déjà VITE_ANALYTICS_SRC
-// Suffit de brancher le script dans <AnalyticsScripts> ou un composant similaire
+// shared/env.ts already exposes VITE_ANALYTICS_SRC
 <ConsentGate category="analytics">
   <script async src={env.VITE_ANALYTICS_SRC} data-website-id="..." />
 </ConsentGate>
 ```
 
-**Règle** : tout script ou pixel tiers (analytics, chat, support, publicité) doit être conditionnel à la catégorie appropriée via `<ConsentGate>` ou `useConsent`. Ne pas charger un script tiers directement dans `index.html` ou `app-providers.tsx` sans gate de consentement.
+**Rule**: every third-party script or pixel (analytics, chat, support, ads) is conditional on its category through `<ConsentGate>` or `useConsent`. Never load a third-party script directly in `index.html` or `app-providers.tsx` without a consent gate.
 
-## Billing entitlements (Phase B.1)
+## Billing entitlements
 
 Three primitives for gating features and plans in front code:
 
@@ -104,7 +104,7 @@ Three primitives for gating features and plans in front code:
 
 **`authClient.subscription`** is deliberately loosely typed (cast keeps the Stripe SERVER SDK out of the app workspace). Consume entitlements via the `GET /billing/subscription` typed endpoint, not `authClient.subscription` directly.
 
-## Quota gating (Phase B.2)
+## Quota gating
 
 Symmetric to feature/plan gating, over `ENTITLEMENTS[tier].quotas` (exposed on the same `GET /billing/subscription` view):
 
