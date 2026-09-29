@@ -10,34 +10,52 @@ import { zV } from "../../shared/validator";
 import { createEndpointBodySchema } from "./application/dto/create-endpoint.dto";
 import { listDeliveriesQuerySchema } from "./application/dto/list-deliveries.dto";
 import { updateEndpointBodySchema } from "./application/dto/update-endpoint.dto";
+import type { WebhookDeliveryRecord } from "./application/ports/webhook-delivery.port";
+import type { WebhookEndpointRecord } from "./application/ports/webhook-endpoint.port";
 
 type Vars = AuthVariables & { orgId: string };
+
+/**
+ * Both secret ciphers stay server-side: the previous one is still a live signing
+ * key for the whole grace window, so it is exactly as sensitive as the current one.
+ */
+function toEndpointJson({
+  secretCipher: _secretCipher,
+  previousSecretCipher: _previousSecretCipher,
+  previousSecretExpiresAt,
+  firstFailedAt,
+  disabledAt,
+  ...rest
+}: WebhookEndpointRecord) {
+  return {
+    ...rest,
+    previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
+    firstFailedAt: firstFailedAt.toNull(),
+    disabledAt: disabledAt.toNull(),
+  };
+}
+
+function toDeliveryJson({
+  payload: _payload,
+  nextAttemptAt,
+  lastError,
+  lastResponseStatus,
+  ...rest
+}: WebhookDeliveryRecord) {
+  return {
+    ...rest,
+    nextAttemptAt: nextAttemptAt.toNull(),
+    lastError: lastError.toNull(),
+    lastResponseStatus: lastResponseStatus.toNull(),
+  };
+}
 
 export const webhooksRoutes = new Hono<{ Variables: Vars }>()
   .get("/", requireAuth, requireOrg, requireOrgPermission({ webhooks: ["read"] }), async (c) => {
     const orgId = c.get("orgId");
     const result = await di.WebhooksService.listEndpoints(orgId);
     if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({
-      items: result
-        .getValue()
-        .map(
-          ({
-            secretCipher: _s,
-            previousSecretCipher,
-            previousSecretExpiresAt,
-            firstFailedAt,
-            disabledAt,
-            ...rest
-          }) => ({
-            ...rest,
-            previousSecretCipher: previousSecretCipher.toNull(),
-            previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
-            firstFailedAt: firstFailedAt.toNull(),
-            disabledAt: disabledAt.toNull(),
-          }),
-        ),
-    });
+    return c.json({ items: result.getValue().map(toEndpointJson) });
   })
   .post(
     "/",
@@ -59,25 +77,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       });
       if (result.isFailure) throw new AppErrorException(result.getError());
       const { endpoint, plaintextSecret } = result.getValue();
-      const {
-        secretCipher: _s,
-        previousSecretCipher,
-        previousSecretExpiresAt,
-        firstFailedAt,
-        disabledAt,
-        ...rest
-      } = endpoint;
-      return c.json(
-        {
-          ...rest,
-          previousSecretCipher: previousSecretCipher.toNull(),
-          previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
-          firstFailedAt: firstFailedAt.toNull(),
-          disabledAt: disabledAt.toNull(),
-          secret: plaintextSecret,
-        },
-        201,
-      );
+      return c.json({ ...toEndpointJson(endpoint), secret: plaintextSecret }, 201);
     },
   )
   .patch(
@@ -101,21 +101,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const {
-        secretCipher: _s,
-        previousSecretCipher,
-        previousSecretExpiresAt,
-        firstFailedAt,
-        disabledAt,
-        ...rest
-      } = opt.unwrap();
-      return c.json({
-        ...rest,
-        previousSecretCipher: previousSecretCipher.toNull(),
-        previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
-        firstFailedAt: firstFailedAt.toNull(),
-        disabledAt: disabledAt.toNull(),
-      });
+      return c.json(toEndpointJson(opt.unwrap()));
     },
   )
   .delete(
@@ -158,14 +144,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       const page = result.getValue();
       return c.json({
-        items: page.items.map(
-          ({ payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest }) => ({
-            ...rest,
-            nextAttemptAt: nextAttemptAt.toNull(),
-            lastError: lastError.toNull(),
-            lastResponseStatus: lastResponseStatus.toNull(),
-          }),
-        ),
+        items: page.items.map(toDeliveryJson),
         nextCursor: page.nextCursor.toNull(),
       });
     },
@@ -235,16 +214,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const { payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest } = opt.unwrap();
-      return c.json(
-        {
-          ...rest,
-          nextAttemptAt: nextAttemptAt.toNull(),
-          lastError: lastError.toNull(),
-          lastResponseStatus: lastResponseStatus.toNull(),
-        },
-        201,
-      );
+      return c.json(toDeliveryJson(opt.unwrap()), 201);
     },
   )
   .post(
@@ -266,21 +236,7 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const { endpoint, plaintextSecret } = opt.unwrap();
-      const {
-        secretCipher: _s,
-        previousSecretCipher: _p,
-        previousSecretExpiresAt,
-        firstFailedAt,
-        disabledAt,
-        ...rest
-      } = endpoint;
-      return c.json({
-        ...rest,
-        previousSecretExpiresAt: previousSecretExpiresAt.toNull(),
-        firstFailedAt: firstFailedAt.toNull(),
-        disabledAt: disabledAt.toNull(),
-        secret: plaintextSecret,
-      });
+      return c.json({ ...toEndpointJson(endpoint), secret: plaintextSecret });
     },
   )
   .post(
@@ -301,15 +257,6 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       const opt = result.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });
-      const { payload: _p, nextAttemptAt, lastError, lastResponseStatus, ...rest } = opt.unwrap();
-      return c.json(
-        {
-          ...rest,
-          nextAttemptAt: nextAttemptAt.toNull(),
-          lastError: lastError.toNull(),
-          lastResponseStatus: lastResponseStatus.toNull(),
-        },
-        201,
-      );
+      return c.json(toDeliveryJson(opt.unwrap()), 201);
     },
   );
