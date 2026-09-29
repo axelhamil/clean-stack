@@ -477,5 +477,33 @@ describe("WatchedList", () => {
       expect(list.getNewItems()).toEqual([4]);
       expect(list.getRemovedItems()).toEqual([2]);
     });
+
+    it("should track an item as new again after it was added, removed and re-added", () => {
+      const list = StringList.create(["a"]);
+      list.add("b");
+      list.remove("b");
+      list.add("b");
+
+      expect(list.getItems()).toEqual(["a", "b"]);
+      expect(list.getNewItems()).toEqual(["b"]);
+      expect(list.hasChanges()).toBe(true);
+    });
+
+    it("should not mutate the array it was created from", () => {
+      const initial = ["a"];
+      const list = StringList.create(initial);
+      list.add("b");
+
+      expect(initial).toEqual(["a"]);
+    });
+
+    it("should find a falsy item", () => {
+      const list = NumberList.create([0, 1]);
+
+      const found = list.find((n) => n === 0);
+
+      expect(found.isSome()).toBe(true);
+      expect(found.unwrap()).toBe(0);
+    });
   });
 });
