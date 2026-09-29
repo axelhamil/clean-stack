@@ -7,8 +7,7 @@ import {
   ownerAc,
 } from "better-auth/plugins/organization/access";
 
-const statement = {
-  ...defaultStatements,
+const appStatement = {
   organization: ["update", "delete", "leave"],
   billing: ["read", "manage"],
   auditLog: ["read"],
@@ -16,16 +15,11 @@ const statement = {
   apiToken: ["create", "read", "revoke"],
 } as const;
 
+const statement = { ...defaultStatements, ...appStatement } as const;
+
 const _ac = createAccessControl(statement);
 
-const _owner = _ac.newRole({
-  ...ownerAc.statements,
-  organization: ["update", "delete", "leave"],
-  billing: ["read", "manage"],
-  auditLog: ["read"],
-  webhooks: ["read", "write"],
-  apiToken: ["create", "read", "revoke"],
-});
+const _owner = _ac.newRole({ ...ownerAc.statements, ...appStatement });
 
 const _admin = _ac.newRole({
   ...adminAc.statements,
@@ -41,21 +35,18 @@ const _member = _ac.newRole({
   organization: ["leave"],
 });
 
-const _orgRoles = ["owner", "admin", "member"] as const;
-type _OrgRole = (typeof _orgRoles)[number];
-
-const _roles = { owner: _owner, admin: _admin, member: _member } as const satisfies Record<
-  _OrgRole,
-  unknown
->;
-
-export const ORG_ROLES = _orgRoles;
+export const ORG_ROLES = ["owner", "admin", "member"] as const;
 export const STATEMENTS = statement;
 
-export type OrgRole = _OrgRole;
+export type OrgRole = (typeof ORG_ROLES)[number];
 export type OrgPermissions = {
   [K in keyof typeof statement]?: readonly (typeof statement)[K][number][];
 };
+
+const _roles = { owner: _owner, admin: _admin, member: _member } as const satisfies Record<
+  OrgRole,
+  unknown
+>;
 
 export function authorizeRole(
   role: OrgRole | undefined,
@@ -63,6 +54,7 @@ export function authorizeRole(
   connector: "OR" | "AND" = "AND",
 ): boolean {
   if (!role) return false;
+
   const policy = _roles[role] as {
     authorize: (p: OrgPermissions, c?: "OR" | "AND") => { success: boolean };
   };
@@ -77,7 +69,7 @@ export const ac = _ac as unknown as AccessControl;
 export const roles = _roles;
 
 /**
- * The single allowed special-case from CLAUDE.md R5 (multi-tenant).
+ * The single allowed special case of the org-scoping rules (apps/api/CLAUDE.md).
  *
  * Personal orgs are auto-created on signup, tied 1:1 to a user account.
  * Encoded by slug pattern (`personal-${uuid}`); the *check* lives here so
