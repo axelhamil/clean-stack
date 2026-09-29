@@ -14,6 +14,19 @@ import { toast } from "sonner";
 
 const DOWNLOAD_FILENAME = "clean-stack-recovery-codes.txt";
 
+/**
+ * The confirmation waits for the clipboard write: a denied permission must not
+ * tell the user their only recovery codes were copied. A rejection stays
+ * unhandled on purpose so it reaches the global error handler.
+ */
+export async function copyRecoveryCodes(
+  codes: readonly string[],
+  onCopied: () => void,
+): Promise<void> {
+  await navigator.clipboard.writeText(codes.join("\n"));
+  onCopied();
+}
+
 interface BackupCodesPanelProps {
   codes: readonly string[];
 }
@@ -22,8 +35,7 @@ export function BackupCodesPanel({ codes }: BackupCodesPanelProps) {
   const { t } = useTranslation("settings");
 
   const copyCodes = () => {
-    void navigator.clipboard.writeText(codes.join("\n"));
-    toast.success(t("backupCodes.copiedToast"));
+    void copyRecoveryCodes(codes, () => toast.success(t("backupCodes.copiedToast")));
   };
 
   const downloadCodes = () => {
