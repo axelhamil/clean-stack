@@ -2,15 +2,17 @@ import { describe, expect, it } from "vitest";
 import { EventTypes } from "../event-types";
 import { PayloadByEventType } from "../payloads";
 
-describe("C.7 sso + scim events", () => {
-  const c7 = Object.values(EventTypes).filter((t) => t.startsWith("sso.") || t.startsWith("scim."));
+describe("sso and scim events", () => {
+  const ssoAndScim = Object.values(EventTypes).filter(
+    (t) => t.startsWith("sso.") || t.startsWith("scim."),
+  );
 
   it("declares thirteen types", () => {
-    expect(c7).toHaveLength(13);
+    expect(ssoAndScim).toHaveLength(13);
   });
 
   it("gives every type a payload schema", () => {
-    for (const t of c7) {
+    for (const t of ssoAndScim) {
       expect(PayloadByEventType[t as keyof typeof PayloadByEventType]).toBeDefined();
     }
   });

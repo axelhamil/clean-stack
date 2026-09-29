@@ -8,12 +8,12 @@ import {
 } from "../payloads";
 import { RETENTION_MAP } from "../retention-map";
 
-describe("webhook SOTA events", () => {
+describe("webhook events", () => {
   it("catalog contains exactly 82 event types", () => {
     expect(ALL_EVENT_TYPES).toHaveLength(82);
   });
 
-  it("declares the 4 new event constants", () => {
+  it("declares the delivery lifecycle event constants", () => {
     expect(EventTypes.WEBHOOK_TEST).toBe("webhook.test");
     expect(EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED).toBe("webhook.endpoint.secret_rotated");
     expect(EventTypes.WEBHOOK_ENDPOINT_DISABLED).toBe("webhook.endpoint.disabled");
