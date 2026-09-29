@@ -1,11 +1,22 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
+import * as realAead from "../../../shared/aead";
+import type { Logger } from "../../../shared/logger";
+import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
+import * as realSsrfGuard from "../../../shared/ssrf-guard";
+import type {
+  IWebhookDeliveryRepository,
+  WebhookDeliveryAttemptRecord,
+} from "../application/ports/webhook-delivery.port";
+import type { IWebhookEndpointRepository } from "../application/ports/webhook-endpoint.port";
 
 // ---------------------------------------------------------------------------
-// Drizzle mock — scoped to this file's module registry, invisible to other files.
+// Drizzle mock: scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
 let dbTransactionResult: unknown = [];
+let failNextTransaction = false;
 
 function makeQueryChain(result: () => unknown) {
   const leaf = {
@@ -27,6 +38,10 @@ const fakeDb = {
   update: () => makeQueryChain(() => []),
   delete: () => makeQueryChain(() => []),
   transaction: async (cb: (tx: unknown) => Promise<unknown>) => {
+    if (failNextTransaction) {
+      failNextTransaction = false;
+      throw new Error("connection refused");
+    }
     const fakeTx = {
       execute: async () => {},
       select: () => makeQueryChain(() => dbTransactionResult),
@@ -39,11 +54,12 @@ const fakeDb = {
 };
 
 // ---------------------------------------------------------------------------
-// SSRF guard mock — avoids real DNS in tests; checks literal private IPs
+// SSRF guard mock: avoids real DNS in tests; checks literal private IPs
 // ---------------------------------------------------------------------------
 mock.module("../../../shared/ssrf-guard", () => {
   const PRIVATE_HOSTS = ["127.0.0.1", "localhost", "0.0.0.0", "::1"];
   return {
+    ...realSsrfGuard,
     assertPublicUrl: async (rawUrl: string) => {
       try {
         const url = new URL(rawUrl);
@@ -61,106 +77,16 @@ mock.module("../../../shared/ssrf-guard", () => {
         return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: "invalid url" });
       }
     },
-    isPrivateOrReservedAddress: (_ip: string) => false,
   };
 });
 
-mock.module("@packages/drizzle", () => ({
-  db: fakeDb,
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  isNotNull: () => ({}),
-  isNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  not: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  inArray: () => ({}),
-  like: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  schema: {},
-  authSchema: {},
-  multiTenantSchema: { organization: { id: {} } },
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: "id",
-      url: "url",
-      organizationId: "organization_id",
-      secretCipher: "secret_cipher",
-      previousSecretCipher: "previous_secret_cipher",
-      previousSecretExpiresAt: "previous_secret_expires_at",
-      enabled: "enabled",
-      $inferSelect: {},
-      $inferInsert: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  uuidv7: () => "generated-uuid",
-}));
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeDb }));
 
 // ---------------------------------------------------------------------------
-// AEAD mock — returns predictable values so HMAC path is exercised
+// AEAD mock: returns predictable values so HMAC path is exercised
 // ---------------------------------------------------------------------------
 mock.module("../../../shared/aead", () => ({
+  ...realAead,
   deriveOrgSubKey: (_key: Uint8Array, _orgId: string) => new Uint8Array(32),
   decryptSecret: (_cipher: string, _key: Uint8Array) => "test-webhook-secret",
   masterKeyFromHex: (_hex: string) => new Uint8Array(32),
@@ -194,10 +120,7 @@ function makeDelivery() {
 
 function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [makeDelivery()]) {
   const updates: { id: string; update: unknown }[] = [];
-  const createAttempts: Omit<
-    import("../application/ports/webhook-delivery.port").WebhookDeliveryAttemptRecord,
-    "id" | "createdAt"
-  >[] = [];
+  const createAttempts: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">[] = [];
   let callCount = 0;
   return {
     updates,
@@ -205,26 +128,19 @@ function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [mak
     findPendingBatch: async (_limit: number, _tx: unknown) => {
       callCount++;
       return Result.ok(callCount === 1 ? deliveries : []) as unknown as ReturnType<
-        import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository["findPendingBatch"]
+        IWebhookDeliveryRepository["findPendingBatch"]
       >;
     },
     updateStatus: async (id: string, update: unknown, _tx: unknown) => {
       updates.push({ id, update });
-      return Result.ok() as unknown as ReturnType<
-        import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository["updateStatus"]
-      >;
+      return Result.ok() as unknown as ReturnType<IWebhookDeliveryRepository["updateStatus"]>;
     },
     createAttempt: async (
-      args: Omit<
-        import("../application/ports/webhook-delivery.port").WebhookDeliveryAttemptRecord,
-        "id" | "createdAt"
-      >,
+      args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
       _tx: unknown,
     ) => {
       createAttempts.push(args);
-      return Result.ok() as unknown as ReturnType<
-        import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository["createAttempt"]
-      >;
+      return Result.ok() as unknown as ReturnType<IWebhookDeliveryRepository["createAttempt"]>;
     },
     list: async () => Result.ok({ items: [], nextCursor: Option.none() }),
     findById: async () => Option.none(),
@@ -232,9 +148,7 @@ function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [mak
   };
 }
 
-type BumpFailureResult = ReturnType<
-  import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository["bumpFailure"]
->;
+type BumpFailureResult = ReturnType<IWebhookEndpointRepository["bumpFailure"]>;
 
 function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
   const calls = {
@@ -310,6 +224,28 @@ function makeLogger() {
   };
 }
 
+type WorkerDeps = {
+  deliveries: ReturnType<typeof makeFakeDeliveries>;
+  endpoints?: ReturnType<typeof makeFakeEndpoints>;
+  masterKey?: () => Option<Uint8Array>;
+  outbox?: IOutboxRepository;
+  logger?: ReturnType<typeof makeLogger>;
+  instrumentation?: IInstrumentation;
+  fetchImpl?: unknown;
+};
+
+function makeWorker(deps: WorkerDeps) {
+  return new WebhookDeliveryWorker(
+    deps.deliveries as unknown as IWebhookDeliveryRepository,
+    (deps.endpoints ?? makeFakeEndpoints()) as unknown as IWebhookEndpointRepository,
+    deps.masterKey ?? (() => Option.some(new Uint8Array(32))),
+    deps.outbox ?? noopOutbox,
+    (deps.logger ?? makeLogger()) as unknown as Logger,
+    deps.instrumentation ?? new NoOpInstrumentation(),
+    deps.fetchImpl as typeof fetch | undefined,
+  );
+}
+
 type WorkerWithPrivates = {
   drain: () => Promise<void>;
 };
@@ -321,44 +257,39 @@ async function runDrain(worker: InstanceType<typeof WebhookDeliveryWorker>) {
 describe("WebhookDeliveryWorker", () => {
   beforeEach(() => {
     dbTransactionResult = [FAKE_ENDPOINT];
+    failNextTransaction = false;
   });
 
-  // -------------------------------------------------------------------------
-  // start / stop
-  // -------------------------------------------------------------------------
-  it("start() puis stop() s'arrête proprement sans boucle bloquante", async () => {
+  it("start() then stop() shuts down cleanly without a blocking loop", async () => {
     const fakeDeliveries = makeFakeDeliveries([]);
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries });
 
     await worker.start();
     await new Promise((r) => setTimeout(r, 20));
     await worker.stop();
-    // test completes without hanging
   });
 
-  // -------------------------------------------------------------------------
-  // Happy path — 200 OK → status=success
-  // -------------------------------------------------------------------------
-  it("delivery 200 OK → updateStatus avec status=success", async () => {
+  it("reports a failing first drain instead of leaving an unhandled rejection", async () => {
+    failNextTransaction = true;
+    const logger = makeLogger();
+    const errorSpy = spyOn(logger, "error");
+    const instrumentation = new NoOpInstrumentation();
+    const captureSpy = spyOn(instrumentation, "capture");
+    const worker = makeWorker({ deliveries: makeFakeDeliveries([]), logger, instrumentation });
+
+    await worker.start();
+    await new Promise((r) => setTimeout(r, 20));
+    await worker.stop();
+
+    expect(captureSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(expect.anything(), "webhook delivery drain failed");
+  });
+
+  it("marks the delivery success on a 200 response", async () => {
     const fakeDeliveries = makeFakeDeliveries();
     const mockFetch = async () => new Response(null, { status: 200, statusText: "OK" });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -369,10 +300,7 @@ describe("WebhookDeliveryWorker", () => {
     expect((successUpdate.update as { attempts: number }).attempts).toBe(1);
   });
 
-  // -------------------------------------------------------------------------
-  // HMAC signature présente dans les headers
-  // -------------------------------------------------------------------------
-  it("HMAC signature présente dans le header x-webhook-signature", async () => {
+  it("sends the HMAC signature in the x-webhook-signature header", async () => {
     const fakeDeliveries = makeFakeDeliveries();
     let capturedHeaders: Record<string, string> | undefined;
 
@@ -381,15 +309,7 @@ describe("WebhookDeliveryWorker", () => {
       return new Response(null, { status: 200 });
     };
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -398,10 +318,7 @@ describe("WebhookDeliveryWorker", () => {
     expect(sig).toMatch(/^t=\d+,v1=[0-9a-f]+$/);
   });
 
-  // -------------------------------------------------------------------------
-  // Failure path — 500 → status failed + retry scheduled
-  // -------------------------------------------------------------------------
-  it("delivery 500 → status failed avec nextAttemptAt planifié", async () => {
+  it("marks the delivery failed with a scheduled retry on a 500 response", async () => {
     const fakeDeliveries = makeFakeDeliveries();
     const mockFetch = async () =>
       new Response(null, {
@@ -409,15 +326,7 @@ describe("WebhookDeliveryWorker", () => {
         statusText: "Internal Server Error",
       });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -435,10 +344,7 @@ describe("WebhookDeliveryWorker", () => {
     expect(update.lastError.unwrap()).toContain("HTTP 500");
   });
 
-  // -------------------------------------------------------------------------
-  // Timeout / abort → capture appelé + delivery marquée failed/dead_letter
-  // -------------------------------------------------------------------------
-  it("fetch abort (timeout) → capture appelé + delivery marquée failed", async () => {
+  it("captures a fetch abort and marks the delivery failed", async () => {
     const fakeDeliveries = makeFakeDeliveries();
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
@@ -447,15 +353,11 @@ describe("WebhookDeliveryWorker", () => {
       throw new DOMException("The operation was aborted", "AbortError");
     };
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
+    const worker = makeWorker({
+      deliveries: fakeDeliveries,
       instrumentation,
-      mockFetch as unknown as typeof fetch,
-    );
+      fetchImpl: mockFetch,
+    });
 
     await runDrain(worker);
 
@@ -467,21 +369,11 @@ describe("WebhookDeliveryWorker", () => {
     expect(badUpdate).toBeDefined();
   });
 
-  // -------------------------------------------------------------------------
-  // Endpoint inexistant / disabled → dead_letter
-  // -------------------------------------------------------------------------
-  it("endpoint introuvable → dead_letter", async () => {
+  it("dead-letters the delivery when the endpoint is missing", async () => {
     dbTransactionResult = [];
     const fakeDeliveries = makeFakeDeliveries();
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries });
 
     await runDrain(worker);
 
@@ -491,20 +383,10 @@ describe("WebhookDeliveryWorker", () => {
     expect(dlUpdate).toBeDefined();
   });
 
-  // -------------------------------------------------------------------------
-  // masterKey absent → delivery marquée failed/dead_letter
-  // -------------------------------------------------------------------------
-  it("masterKey absent → delivery marquée failed ou dead_letter", async () => {
+  it("marks the delivery failed when the master key is missing", async () => {
     const fakeDeliveries = makeFakeDeliveries();
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.none(),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, masterKey: () => Option.none() });
 
     await runDrain(worker);
 
@@ -514,9 +396,6 @@ describe("WebhookDeliveryWorker", () => {
     expect(failUpdate).toBeDefined();
   });
 
-  // -------------------------------------------------------------------------
-  // Dual-secret — two v1= entries when previous secret is within grace period
-  // -------------------------------------------------------------------------
   it("signs with both secrets while the previous secret is within grace", async () => {
     dbTransactionResult = [
       {
@@ -532,24 +411,13 @@ describe("WebhookDeliveryWorker", () => {
     };
 
     const fakeDeliveries = makeFakeDeliveries();
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
     expect(sig?.match(/v1=/g)?.length).toBe(2);
   });
 
-  // -------------------------------------------------------------------------
-  // SSRF — dead_letter without fetching for a private URL
-  // -------------------------------------------------------------------------
   it("marks dead_letter without fetching when the endpoint url is not publicly routable", async () => {
     dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://127.0.0.1/hook" }];
     let fetched = false;
@@ -559,15 +427,7 @@ describe("WebhookDeliveryWorker", () => {
     };
 
     const fakeDeliveries = makeFakeDeliveries();
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -577,23 +437,12 @@ describe("WebhookDeliveryWorker", () => {
     ).toBeDefined();
   });
 
-  // -------------------------------------------------------------------------
-  // Task 5 — per-attempt persistence
-  // -------------------------------------------------------------------------
-  it("200 OK → createAttempt appelé avec requestHeaders + responseStatus=200", async () => {
+  it("records an attempt with request headers and status 200 on success", async () => {
     const fakeDeliveries = makeFakeDeliveries();
 
     const mockFetch = async () => new Response(JSON.stringify({ ok: true }), { status: 200 });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -609,21 +458,13 @@ describe("WebhookDeliveryWorker", () => {
     expect(typeof attempt.durationMs.unwrap()).toBe("number");
   });
 
-  it("responseBody capé à WEBHOOK_RESPONSE_CAPTURE_BYTES (4096)", async () => {
+  it("caps the recorded response body at WEBHOOK_RESPONSE_CAPTURE_BYTES (4096)", async () => {
     const fakeDeliveries = makeFakeDeliveries();
     const largeBody = "x".repeat(8192);
 
     const mockFetch = async () => new Response(largeBody, { status: 200 });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -634,22 +475,14 @@ describe("WebhookDeliveryWorker", () => {
     expect(attempt0.responseBody.unwrap().length).toBeLessThanOrEqual(4096);
   });
 
-  it("transport-error (fetch throws) → createAttempt avec responseStatus=null et error non-null", async () => {
+  it("records an attempt with no status and an error when fetch throws", async () => {
     const fakeDeliveries = makeFakeDeliveries();
 
     const mockFetch = async () => {
       throw new DOMException("The operation was aborted", "AbortError");
     };
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
 
     await runDrain(worker);
 
@@ -660,18 +493,11 @@ describe("WebhookDeliveryWorker", () => {
     expect(attempt.error.isSome()).toBe(true);
   });
 
-  it("SSRF bloqué → createAttempt appelé avec error, champs réponse null", async () => {
+  it("records an attempt with an error and no response when SSRF blocks the url", async () => {
     dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://192.168.1.1/hook" }];
     const fakeDeliveries = makeFakeDeliveries();
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      makeFakeEndpoints() as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
-      noopOutbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-    );
+    const worker = makeWorker({ deliveries: fakeDeliveries });
 
     await runDrain(worker);
 
@@ -684,32 +510,26 @@ describe("WebhookDeliveryWorker", () => {
     expect(attempt.error.isSome()).toBe(true);
   });
 
-  // -------------------------------------------------------------------------
-  // Task 6 — endpoint failure lifecycle
-  // -------------------------------------------------------------------------
-  it("success → resetFailure appelé sur l'endpoint", async () => {
+  it("resets the endpoint failure counter on success", async () => {
     const fakeDeliveries = makeFakeDeliveries();
     const endpoints = makeFakeEndpoints();
     const { outbox } = makeOutbox();
 
     const mockFetch = async () => new Response(null, { status: 200 });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
+    const worker = makeWorker({
+      deliveries: fakeDeliveries,
+      endpoints,
       outbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+      fetchImpl: mockFetch,
+    });
 
     await runDrain(worker);
 
     expect(endpoints.calls.resetFailure).toEqual(["ep-1"]);
   });
 
-  it("dead_letter → WEBHOOK_DELIVERY_EXHAUSTED émis dans l'outbox", async () => {
+  it("emits WEBHOOK_DELIVERY_EXHAUSTED when the delivery is dead-lettered", async () => {
     const delivery = { ...makeDelivery(), attempts: 4 };
     const fakeDeliveries = makeFakeDeliveries([delivery]);
     const endpoints = makeFakeEndpoints();
@@ -717,15 +537,12 @@ describe("WebhookDeliveryWorker", () => {
 
     const mockFetch = async () => new Response(null, { status: 500 });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
+    const worker = makeWorker({
+      deliveries: fakeDeliveries,
+      endpoints,
       outbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+      fetchImpl: mockFetch,
+    });
 
     await runDrain(worker);
 
@@ -738,7 +555,7 @@ describe("WebhookDeliveryWorker", () => {
     expect(exhausted).toBeDefined();
   });
 
-  it("bumpFailure ancien + count élevé → markDisabled + WEBHOOK_ENDPOINT_DISABLED émis", async () => {
+  it("disables the endpoint and emits WEBHOOK_ENDPOINT_DISABLED after old repeated failures", async () => {
     const delivery = { ...makeDelivery(), attempts: 4 };
     const fakeDeliveries = makeFakeDeliveries([delivery]);
     const endpoints = makeFakeEndpoints({
@@ -755,15 +572,12 @@ describe("WebhookDeliveryWorker", () => {
 
     const mockFetch = async () => new Response(null, { status: 500 });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
+    const worker = makeWorker({
+      deliveries: fakeDeliveries,
+      endpoints,
       outbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+      fetchImpl: mockFetch,
+    });
 
     await runDrain(worker);
 
@@ -777,7 +591,7 @@ describe("WebhookDeliveryWorker", () => {
     expect(disabled).toBeDefined();
   });
 
-  it("bumpFailure récent/count bas → markDisabled NOT appelé", async () => {
+  it("keeps the endpoint enabled after recent or few failures", async () => {
     const delivery = { ...makeDelivery(), attempts: 4 };
     const fakeDeliveries = makeFakeDeliveries([delivery]);
     const endpoints = makeFakeEndpoints({
@@ -794,15 +608,12 @@ describe("WebhookDeliveryWorker", () => {
 
     const mockFetch = async () => new Response(null, { status: 500 });
 
-    const worker = new WebhookDeliveryWorker(
-      fakeDeliveries as unknown as import("../application/ports/webhook-delivery.port").IWebhookDeliveryRepository,
-      endpoints as unknown as import("../application/ports/webhook-endpoint.port").IWebhookEndpointRepository,
-      () => Option.some(new Uint8Array(32)),
+    const worker = makeWorker({
+      deliveries: fakeDeliveries,
+      endpoints,
       outbox,
-      makeLogger() as unknown as import("../../../shared/logger").Logger,
-      new NoOpInstrumentation(),
-      mockFetch as unknown as typeof fetch,
-    );
+      fetchImpl: mockFetch,
+    });
 
     await runDrain(worker);
 

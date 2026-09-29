@@ -85,13 +85,18 @@ export class WebhookDeliveryWorker {
       { name: "WebhookDeliveryWorker > start", op: "function" },
       async () => {
         this.stopping = false;
-        this.timer = setInterval(() => {
-          this.drain().catch((err) => this.logger.error({ err }, "webhook delivery drain failed"));
-        }, POLL_INTERVAL_MS);
+        this.timer = setInterval(() => this.drainSafely(), POLL_INTERVAL_MS);
         this.logger.info("webhook delivery worker started");
-        void this.drain();
+        this.drainSafely();
       },
     );
+  }
+
+  private drainSafely(): void {
+    this.drain().catch((err) => {
+      this.instrumentation.capture(err);
+      this.logger.error({ err }, "webhook delivery drain failed");
+    });
   }
 
   async stop(): Promise<void> {
@@ -184,6 +189,7 @@ export class WebhookDeliveryWorker {
       try {
         await this.processDelivery(delivery);
       } catch (err) {
+        this.instrumentation.capture(err);
         const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
         this.logger.error(
           { err, deliveryId: delivery.id, eventType: delivery.eventType },
@@ -191,9 +197,10 @@ export class WebhookDeliveryWorker {
         );
         await db
           .transaction(async (tx) => this.markFailed(delivery, errMsg, Option.none(), null, tx))
-          .catch((e) =>
-            this.logger.error({ err: e, deliveryId: delivery.id }, "markFailed failed"),
-          );
+          .catch((e) => {
+            this.instrumentation.capture(e);
+            this.logger.error({ err: e, deliveryId: delivery.id }, "markFailed failed");
+          });
       }
     }
     return claimed.length;
@@ -210,15 +217,16 @@ export class WebhookDeliveryWorker {
               .transaction(async (tx) =>
                 this.markFailed(delivery, "endpoint lookup db error", Option.none(), null, tx),
               )
-              .catch((e) =>
+              .catch((e) => {
+                this.instrumentation.capture(e);
                 this.logger.error(
                   { err: e, deliveryId: delivery.id },
                   "markFailed (db_error) failed",
-                ),
-              );
+                );
+              });
             return;
           }
-          // not_found or disabled — permanent dead-letter
+          // not_found or disabled: permanent dead-letter
           await db.transaction(async (tx) => {
             const upd = await this.deliveries.updateStatus(
               delivery.id,
