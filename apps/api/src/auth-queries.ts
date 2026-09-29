@@ -184,8 +184,13 @@ export async function findUserById(id: string) {
 
 // ── #9: public API v1 ────────────────────────────────────────────────────
 
-export async function updateUserName(userId: string, name: string): Promise<void> {
-  await db.update(schema.user).set({ name }).where(eq(schema.user.id, userId));
+export async function updateUserName(
+  userId: string,
+  name: string,
+  tx?: Transaction,
+): Promise<void> {
+  const exec = tx ?? db;
+  await exec.update(schema.user).set({ name }).where(eq(schema.user.id, userId));
 }
 
 export async function findUserOrganizations(

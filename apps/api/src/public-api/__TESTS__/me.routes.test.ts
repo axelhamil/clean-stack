@@ -5,13 +5,18 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import * as realAuthQueries from "../../auth-queries";
 
-const mockEnqueue = mock(async (_events: IDomainEvent[]) => {});
-const mockUpdateUserName = mock(async (_userId: string, _name: string) => {});
+const TX = { sentinel: "transaction" };
+
+const mockEnqueue = mock(async (_events: IDomainEvent[], _meta: unknown, _tx?: unknown) => {});
+const mockUpdateUserName = mock(async (_userId: string, _name: string, _tx?: unknown) => {});
 
 mock.module("../../container", () => ({
   di: {
     PolicyAcceptanceService: { hasAcceptedCurrent: mock(async () => Result.ok(true)) },
     IOutboxRepository: { enqueue: mockEnqueue },
+    ITransactionService: {
+      run: async (callback: (tx: unknown) => Promise<unknown>) => callback(TX),
+    },
   },
 }));
 
@@ -44,9 +49,10 @@ describe("PATCH /api/v1/me", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(mockUpdateUserName).toHaveBeenCalledWith("user-1", "New Name");
+    expect(mockUpdateUserName).toHaveBeenCalledWith("user-1", "New Name", TX);
 
-    const [events] = mockEnqueue.mock.calls[0] ?? [];
+    const [events, , tx] = mockEnqueue.mock.calls[0] ?? [];
+    expect(tx).toBe(TX);
     expect(events?.[0]?.eventType).toBe(EventTypes.USER_PROFILE_UPDATED);
     expect(events?.[0]?.payload).toEqual({ userId: "user-1", changes: { name: "New Name" } });
   });
