@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 
 const inserted: unknown[] = [];
-const execCalls: string[] = [];
 
 // Set by a test to make the insert report fewer written rows than requested.
 let insertReturns: ((rows: unknown[]) => unknown[]) | null = null;
@@ -13,6 +13,7 @@ mock.module("../logger", () => ({
 }));
 
 mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
   db: {
     insert: () => ({
       values: (rows: unknown[]) => {
@@ -20,103 +21,13 @@ mock.module("@packages/drizzle", () => ({
         const written = insertReturns ? insertReturns(rows) : rows.map(() => ({ id: "id" }));
         const chain = {
           onConflictDoNothing: () => chain,
-          returning: async () => written,
-          // biome-ignore lint/suspicious/noThenProperty: intentional thenable so the old `await ....values(...)` call shape still works
-          then: (resolve: (v: unknown) => unknown) => resolve(written),
+          returning: () => chain,
+          toSQL: () => ({ sql: "insert into email_message" }),
+          execute: async () => written,
         };
         return chain;
       },
     }),
-  },
-  emailSchema: { emailMessage: { id: "id", status: "status", attempts: "attempts" } },
-  and: (...a: unknown[]) => a,
-  eq: (...a: unknown[]) => a,
-  inArray: (...a: unknown[]) => a,
-  isNull: (...a: unknown[]) => a,
-  isNotNull: (...a: unknown[]) => a,
-  lte: (...a: unknown[]) => a,
-  or: (...a: unknown[]) => a,
-  lt: (...a: unknown[]) => a,
-  gt: (...a: unknown[]) => a,
-  gte: (...a: unknown[]) => a,
-  not: (...a: unknown[]) => a,
-  asc: (...a: unknown[]) => a,
-  desc: (...a: unknown[]) => a,
-  like: (...a: unknown[]) => a,
-  count: (...a: unknown[]) => a,
-  arrayContains: (...a: unknown[]) => a,
-  sql: Object.assign(
-    (s: TemplateStringsArray) => {
-      execCalls.push(s.join(""));
-      return s.join("");
-    },
-    {
-      raw: () => ({}),
-      identifier: () => ({}),
-      join: (chunks: unknown[]) => chunks,
-    },
-  ),
-  outboxSchema: {
-    outboxEvent: {
-      id: {},
-      eventType: {},
-      dispatchedAt: {},
-      nextAttemptAt: {},
-      occurredAt: {},
-      attempts: {},
-    },
-  },
-  auditLogSchema: {
-    auditLog: {
-      actorId: {},
-      actorType: {},
-      organizationId: {},
-      action: {},
-      targetType: {},
-      targetId: {},
-      occurredAt: {},
-      retention: {},
-      id: {},
-    },
-  },
-  webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
   },
 }));
 
@@ -137,7 +48,6 @@ describe("DrizzleEmailQueue.enqueue", () => {
   beforeEach(() => {
     insertReturns = null;
     inserted.length = 0;
-    execCalls.length = 0;
     warnSpy.mockClear();
   });
 
@@ -174,9 +84,12 @@ describe("DrizzleEmailQueue.enqueue", () => {
       insert: () => ({
         values: () => ({
           onConflictDoNothing: () => ({
-            returning: async () => {
-              throw new Error("db down");
-            },
+            returning: () => ({
+              toSQL: () => ({ sql: "insert into email_message" }),
+              execute: async () => {
+                throw new Error("db down");
+              },
+            }),
           }),
         }),
       }),
@@ -266,5 +179,55 @@ describe("DrizzleEmailQueue.markSent", () => {
 
     expect(result.isSuccess).toBe(true);
     expect(called).toBe(false);
+  });
+});
+
+describe("DrizzleEmailQueue.markFailed", () => {
+  function recordingTx() {
+    const sets: Array<{ status: string; nextAttemptAt: Date | null }> = [];
+    const tx = {
+      update: () => ({
+        set: (values: { status: string; nextAttemptAt: Date | null }) => {
+          sets.push(values);
+          return {
+            where: () => ({
+              toSQL: () => ({ sql: "update email_message" }),
+              execute: async () => undefined,
+            }),
+          };
+        },
+      }),
+    };
+    return { tx, sets };
+  }
+
+  it("parks the row as failed when no further attempt is scheduled", async () => {
+    const { tx, sets } = recordingTx();
+
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markFailed(
+      "m1",
+      "HTTP 422",
+      Option.none(),
+      tx as never,
+    );
+
+    expect(result.isSuccess).toBe(true);
+    expect(sets[0]?.status).toBe("failed");
+    expect(sets[0]?.nextAttemptAt).toBeNull();
+  });
+
+  it("keeps the row pending until the scheduled retry", async () => {
+    const { tx, sets } = recordingTx();
+    const retryAt = new Date("2026-08-04T00:05:00Z");
+
+    await new DrizzleEmailQueue(new NoOpInstrumentation()).markFailed(
+      "m1",
+      "HTTP 503",
+      Option.some(retryAt),
+      tx as never,
+    );
+
+    expect(sets[0]?.status).toBe("pending");
+    expect(sets[0]?.nextAttemptAt).toEqual(retryAt);
   });
 });
