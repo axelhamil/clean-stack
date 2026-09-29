@@ -5,8 +5,6 @@ import { api } from "../api-client";
 import { throwApiError } from "../errors/api-error";
 import type { EntitlementsView } from "./billing-types";
 
-export type { EntitlementsView } from "./billing-types";
-
 export const subscriptionQueryOptions = (organizationId: string | null) =>
   queryOptions({
     queryKey: ["billing", "subscription", organizationId] as const,

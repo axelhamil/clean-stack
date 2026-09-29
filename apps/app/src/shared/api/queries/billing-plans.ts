@@ -4,8 +4,6 @@ import { api } from "../api-client";
 import { throwApiError } from "../errors/api-error";
 import type { PlanCatalogItem } from "./billing-types";
 
-export type { PlanCatalogItem } from "./billing-types";
-
 export const plansQueryOptions = queryOptions({
   queryKey: ["billing", "plans"] as const,
   queryFn: async (): Promise<PlanCatalogItem[]> => {
