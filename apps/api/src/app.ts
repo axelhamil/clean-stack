@@ -53,6 +53,7 @@ import {
   CSP_REPORT_POLICY,
   GITHUB_SCANNING_POLICY,
   GLOBAL_POLICY,
+  type PolicyConfig,
   SCIM_POLICY,
 } from "./shared/middleware/rate-limit.policies";
 import { runWithRequestContext } from "./shared/request-context";
@@ -65,15 +66,51 @@ type AppEnv = {
 
 const app = new Hono<AppEnv>();
 
+const allowedOrigins = env.CORS_ORIGIN ?? ["http://localhost:5173"];
+const apiTokenPepper = env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use";
+
+/** A rate limit whose first block also lands on the security event rail. */
+const securityRateLimit = (policy: PolicyConfig) =>
+  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, policy);
+
+// Cookie-authenticated mutation surfaces: every one gets the Origin check.
+const CSRF_GUARDED_PATHS = [
+  "/me",
+  "/me/*",
+  "/uploads",
+  "/uploads/*",
+  "/settings/*",
+  "/admin/*",
+  "/consents",
+  "/consents/*",
+  "/billing/portal",
+] as const;
+
+// BetterAuth's credential and token-consuming endpoints, each on its own tight,
+// fail-closed policy. The two-factor policy is shared on purpose: the three verify
+// paths and backup-code regeneration draw from one budget per IP.
+const AUTH_RATE_LIMITS: ReadonlyArray<readonly [path: string, policy: PolicyConfig]> = [
+  ["/sign-in/email", AUTH_SIGN_IN_POLICY],
+  ["/request-password-reset", AUTH_FORGOT_PASSWORD_POLICY],
+  ["/sign-in/magic-link", AUTH_MAGIC_LINK_POLICY],
+  ["/sign-up/email", AUTH_SIGN_UP_POLICY],
+  ["/two-factor/verify-totp", AUTH_TWO_FACTOR_POLICY],
+  ["/two-factor/verify-otp", AUTH_TWO_FACTOR_POLICY],
+  ["/two-factor/verify-backup-code", AUTH_TWO_FACTOR_POLICY],
+  ["/two-factor/generate-backup-codes", AUTH_TWO_FACTOR_POLICY],
+  ["/send-verification-email", AUTH_SEND_VERIFICATION_POLICY],
+  ["/verify-email", AUTH_VERIFY_EMAIL_POLICY],
+  ["/reset-password", AUTH_RESET_PASSWORD_POLICY],
+  ["/passkey/verify-authentication", AUTH_PASSKEY_POLICY],
+  ["/scim/*", SCIM_POLICY],
+];
+
 app.route("/", healthRoutes);
 
 // Mounted before the global middlewares: the endpoint is public, cross-origin (browser-posted),
 // and must not inherit the same-origin CORP that secureHeaders sets — that would block the report POST.
 app.use("/csp-report", cspReportCors);
-app.use(
-  "/csp-report",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, CSP_REPORT_POLICY),
-);
+app.use("/csp-report", securityRateLimit(CSP_REPORT_POLICY));
 app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
 
 app.use("*", requestId());
@@ -92,7 +129,7 @@ app.use(
 app.use(
   "*",
   cors({
-    origin: env.CORS_ORIGIN ?? ["http://localhost:5173"],
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -101,102 +138,18 @@ app.use("*", sessionMiddleware);
 
 const globalRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY);
 app.use("*", (c, next) => (c.req.path.startsWith("/api/v1/") ? next() : globalRateLimit(c, next)));
-const csrf = requireCsrf({
-  outbox: di.IOutboxRepository,
-  allowedOrigins: env.CORS_ORIGIN ?? ["http://localhost:5173"],
-});
-app.use("/me", csrf);
-app.use("/me/*", csrf);
-app.use("/uploads", csrf);
-app.use("/uploads/*", csrf);
-app.use("/settings/*", csrf);
-app.use("/admin/*", csrf);
-app.use("/consents", csrf);
-app.use("/consents/*", csrf);
-app.use("/billing/portal", csrf);
+
+const csrf = requireCsrf({ outbox: di.IOutboxRepository, allowedOrigins });
+for (const path of CSRF_GUARDED_PATHS) app.use(path, csrf);
+
 const consentRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, CONSENT_POST_POLICY);
 app.use("/consents", (c, next) =>
   c.req.method === "POST" || c.req.method === "DELETE" ? consentRateLimit(c, next) : next(),
 );
-app.use(
-  "/api/auth/sign-in/email",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_IN_POLICY),
-);
-app.use(
-  "/api/auth/request-password-reset",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_FORGOT_PASSWORD_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/sign-in/magic-link",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_MAGIC_LINK_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/sign-up/email",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_UP_POLICY),
-);
-app.use(
-  "/api/auth/two-factor/verify-totp",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/two-factor/verify-otp",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/two-factor/verify-backup-code",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/two-factor/generate-backup-codes",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/send-verification-email",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_SEND_VERIFICATION_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/verify-email",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_VERIFY_EMAIL_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/reset-password",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_RESET_PASSWORD_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/passkey/verify-authentication",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
-);
-app.use(
-  "/api/auth/scim/*",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, SCIM_POLICY),
-);
+
+for (const [path, policy] of AUTH_RATE_LIMITS) {
+  app.use(`/api/auth${path}`, securityRateLimit(policy));
+}
 
 // SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId — BetterAuth's
 // own router 404s any method/path it hasn't registered, so widening the verb list here
@@ -219,7 +172,7 @@ app.route(
     repo: di.IApiTokenRepository,
     outbox: di.IOutboxRepository,
     prefix: env.API_TOKEN_PREFIX,
-    pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+    pepper: apiTokenPepper,
     pepperVersion: env.API_TOKEN_PEPPER_VERSION,
     pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
     bucketMin: env.API_TOKEN_LAST_USED_BUCKET_MIN,
@@ -244,7 +197,7 @@ app.route(
     instrumentation: di.IInstrumentation,
     findUserById,
     prefix: env.API_TOKEN_PREFIX,
-    pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+    pepper: apiTokenPepper,
     pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
   }),
 );
