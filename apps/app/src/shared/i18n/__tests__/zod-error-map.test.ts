@@ -1,23 +1,9 @@
-import type { Resources } from "@packages/i18n";
 import enCatalog from "@packages/i18n/src/catalogs/en";
 import frCatalog from "@packages/i18n/src/catalogs/fr";
 import { describe, expect, it } from "vitest";
 import { signInSchema } from "../../auth/auth.schema";
 import { applyZodErrorMap } from "../zod-error-map";
-
-function makeT(catalog: Resources) {
-  return ((key: string, opts?: { defaultValue?: string; [interpolation: string]: unknown }) => {
-    const path = key.replace(/^errors:/, "").split(".");
-    let node: unknown = catalog.errors;
-    for (const seg of path) {
-      if (typeof node !== "object" || node === null) return opts?.defaultValue ?? key;
-      node = (node as Record<string, unknown>)[seg];
-    }
-    if (typeof node !== "string") return opts?.defaultValue ?? key;
-    if (!opts) return node;
-    return node.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(opts[name] ?? ""));
-  }) as never;
-}
+import { catalogT } from "./catalog-t";
 
 function passwordIssueMessage() {
   const result = signInSchema.safeParse({
@@ -33,12 +19,12 @@ function passwordIssueMessage() {
 
 describe("applyZodErrorMap", () => {
   it("localizes a required-field failure to French under locale fr", () => {
-    applyZodErrorMap(makeT(frCatalog));
+    applyZodErrorMap(catalogT(frCatalog.errors));
     expect(passwordIssueMessage()).toBe(frCatalog.errors.validation.required);
   });
 
   it("localizes a required-field failure to English under locale en", () => {
-    applyZodErrorMap(makeT(enCatalog));
+    applyZodErrorMap(catalogT(enCatalog.errors));
     expect(passwordIssueMessage()).toBe(enCatalog.errors.validation.required);
   });
 

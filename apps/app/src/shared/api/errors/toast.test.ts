@@ -1,4 +1,3 @@
-import enCatalog from "@packages/i18n/src/catalogs/en";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner", () => ({
@@ -9,18 +8,11 @@ vi.mock("sonner", () => ({
   }),
 }));
 
-vi.mock("../../i18n/get-errors-t", () => ({
-  getErrorsT: () =>
-    ((key: string, opts?: { defaultValue?: string }) => {
-      const path = key.replace(/^errors:/, "").split(".");
-      let node: unknown = enCatalog.errors;
-      for (const seg of path) {
-        if (typeof node !== "object" || node === null) return opts?.defaultValue ?? key;
-        node = (node as Record<string, unknown>)[seg];
-      }
-      return typeof node === "string" ? node : (opts?.defaultValue ?? key);
-    }) as never,
-}));
+vi.mock("../../i18n/get-errors-t", async () => {
+  const { catalogT } = await import("../../i18n/__tests__/catalog-t");
+  const { default: enCatalog } = await import("@packages/i18n/src/catalogs/en");
+  return { getErrorsT: () => catalogT(enCatalog.errors) };
+});
 
 import { toast } from "sonner";
 import type { ApiError } from "./api-error";
@@ -31,7 +23,7 @@ beforeEach(() => {
 });
 
 describe("toastError", () => {
-  it("skips 429 — rate-limit is surfaced once by the global query-error-handler", () => {
+  it("skips 429, the rate limit is surfaced once by the global query-error-handler", () => {
     const err: ApiError = Object.assign(new Error("Too many"), {
       status: 429,
       metadata: { retryAfter: 30 },
