@@ -51,12 +51,15 @@ import {
 } from "./modules/billing/application/subscription-events";
 import { hasFeature, hasSeatAvailable } from "./modules/billing/config";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
+import { memberRemovalActor, type ScimDeprovisionActor } from "./shared/auth/member-removal-actor";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { isSsoEnforcedFor } from "./shared/auth/sso-enforcement";
 import {
   changedFieldsFrom,
   isDeactivation,
+  isSamlCallbackPath,
+  isSsoCallbackPath,
   SCIM_PATHS,
   SSO_PATHS,
   scimProviderIdFromToken,
@@ -102,17 +105,21 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
 
+    const emitUserCreated = async () => {
+      if (!signupUser) return;
+      await emit(
+        EventTypes.USER_CREATED,
+        "user",
+        userId,
+        { userId, email: signupUser.email, name: signupUser.name },
+        null,
+        tx,
+      );
+    };
+
     const existingOrgId = await findActiveMemberOrgId(userId, tx);
     if (existingOrgId) {
-      if (signupUser)
-        await emit(
-          EventTypes.USER_CREATED,
-          "user",
-          userId,
-          { userId, email: signupUser.email, name: signupUser.name },
-          null,
-          tx,
-        );
+      await emitUserCreated();
       return existingOrgId;
     }
 
@@ -140,15 +147,7 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
       orgId,
       tx,
     );
-    if (signupUser)
-      await emit(
-        EventTypes.USER_CREATED,
-        "user",
-        userId,
-        { userId, email: signupUser.email, name: signupUser.name },
-        null,
-        tx,
-      );
+    await emitUserCreated();
     return orgId;
   });
 }
@@ -175,6 +174,24 @@ async function emit<TPayload>(
     { organizationId },
     tx,
   );
+}
+
+/**
+ * `emit` for the security signals a before-hook raises on its way to refusing the
+ * request: the refusal is the enforcement, the event is telemetry, so a failed
+ * enqueue (already captured by the outbox) is logged and the refusal still happens.
+ */
+async function emitBestEffort<TPayload>(
+  eventType: EventType,
+  aggregateType: string,
+  aggregateId: string,
+  payload: TPayload,
+): Promise<void> {
+  try {
+    await emit(eventType, aggregateType, aggregateId, payload);
+  } catch (err) {
+    logger.warn({ err, eventType }, "security event emit failed, still refusing the request");
+  }
 }
 
 /**
@@ -288,6 +305,38 @@ async function emitScimMemberJoined(
 }
 
 /**
+ * `billing.subscription.*` for a Stripe subscription lifecycle callback. Stripe is the
+ * caller, so the actor is resolved as the org owner, the one member who can have
+ * started or changed the subscription.
+ */
+async function emitSubscriptionEvent(
+  eventType: EventType,
+  subscription: {
+    id: string;
+    referenceId: string;
+    status: string;
+    periodEnd?: Date | null;
+  },
+  tier: string,
+): Promise<void> {
+  const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+  await emit(
+    eventType,
+    "subscription",
+    subscription.id,
+    {
+      organizationId: subscription.referenceId,
+      subscriptionId: subscription.id,
+      tier,
+      status: subscription.status,
+      actorUserId,
+      currentPeriodEnd: subscription.periodEnd ?? null,
+    },
+    subscription.referenceId,
+  );
+}
+
+/**
  * Best-effort client IP from a BetterAuth hook's `ctx.headers` for audit-only
  * event payloads. NOT the trusted-proxy resolver (`resolveClientIp`, Hono layer,
  * unreachable from here) — acceptable because these emits are non-blocking audit.
@@ -336,10 +385,27 @@ const scimConnectionDeleteSnapshots = new RequestSnapshots<string>(SNAPSHOT_TTL_
  * as the actor of an unrelated admin's kick, in an unrelated org — fabricated
  * provenance on a compliance-retention event.
  */
-const scimDeprovisionActors = new RequestSnapshots<{
-  actorUserId: string;
-  organizationId: string;
-}>(SNAPSHOT_TTL_MS);
+const scimDeprovisionActors = new RequestSnapshots<ScimDeprovisionActor>(SNAPSHOT_TTL_MS);
+
+/**
+ * The two provider-writing SSO endpoints persist `domain` verbatim and merge SAML
+ * fields as sent, so both get the same treatment before the plugin sees the body:
+ * the domain lowercased (every lookup compares against a lowercased email domain)
+ * and the SAML config forced to its signed, sha256 form.
+ */
+function normalizeSsoProviderBody(body: Record<string, unknown> | undefined): void {
+  if (typeof body?.domain === "string") {
+    body.domain = body.domain.toLowerCase();
+  }
+
+  if (!body?.samlConfig || typeof body.samlConfig !== "object") return;
+
+  const normalized = normalizeSamlConfig(body.samlConfig as Record<string, unknown>);
+  if (normalized.isFailure) {
+    throw new APIError("BAD_REQUEST", { message: normalized.getError().message });
+  }
+  body.samlConfig = normalized.getValue();
+}
 
 function readCookieFromHeaders(headers: Headers | undefined, name: string): string | undefined {
   const raw = headers?.get("cookie");
@@ -352,17 +418,19 @@ function readCookieFromHeaders(headers: Headers | undefined, name: string): stri
 }
 
 /**
- * Sends a transactional email through `IEmailService` and surfaces failures
- * as a thrown `Error` — the only signal available inside BetterAuth's
- * `async () => void` hook signature. Transport-not-configured is downgraded
- * to a warning (dev/test without Resend configured should not crash).
- */
-/**
  * Resolves the locale to write a message in when the hook only hands over an
  * address. Magic-link sign-in is the one auth flow with no user object in
  * scope; an address with no account yet legitimately falls back to the
  * default rather than failing the send.
  */
+/**
+ * The locale BetterAuth hands over on its user objects. `locale` is an additional field
+ * the plugin types do not know about, hence the narrow read.
+ */
+function localeOf(user: object): Locale {
+  return toLocale((user as { locale?: unknown }).locale);
+}
+
 async function localeForEmail(email: string): Promise<Locale> {
   const found = await di.IProfileStore.findLocaleByEmail(email);
   if (found.isFailure) return DEFAULT_LOCALE;
@@ -370,6 +438,12 @@ async function localeForEmail(email: string): Promise<Locale> {
   return locale.isSome() ? locale.unwrap() : DEFAULT_LOCALE;
 }
 
+/**
+ * Sends a transactional email through `IEmailService` and surfaces failures
+ * as a thrown `Error`, the only signal available inside BetterAuth's
+ * `async () => void` hook signature. Transport-not-configured is downgraded
+ * to a warning (dev/test without Resend configured should not crash).
+ */
 async function dispatchEmail<K extends keyof EmailTemplates>(
   template: K,
   to: string,
@@ -410,18 +484,23 @@ const authOptions = {
     changeEmail: {
       enabled: true,
       sendChangeEmailConfirmation: async ({ user, newEmail, url, token }) => {
-        await setPendingEmail(user.id, newEmail);
-        await emit(EventTypes.USER_EMAIL_CHANGE_REQUESTED, "user", user.id, {
-          userId: user.id,
-          newEmail,
+        await db.transaction(async (tx) => {
+          await setPendingEmail(user.id, newEmail, tx);
+          await emit(
+            EventTypes.USER_EMAIL_CHANGE_REQUESTED,
+            "user",
+            user.id,
+            { userId: user.id, newEmail },
+            null,
+            tx,
+          );
         });
-        const userLocale = (user as { locale?: unknown }).locale;
         await dispatchEmail(
           "change_email",
           user.email,
           { name: user.name ?? "", newEmail, confirmUrl: url },
           tokenIdempotencyKey("change-email", token),
-          toLocale(userLocale),
+          localeOf(user),
         );
       },
     },
@@ -439,13 +518,12 @@ const authOptions = {
         userId: user.id,
         email: user.email,
       });
-      const userLocale = (user as { locale?: unknown }).locale;
       await dispatchEmail(
         "reset_password",
         user.email,
         { name: user.name ?? "", resetUrl },
         tokenIdempotencyKey("reset-password", token),
-        toLocale(userLocale),
+        localeOf(user),
       );
     },
     onPasswordReset: async ({ user }) => {
@@ -459,13 +537,12 @@ const authOptions = {
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, token }) => {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
-      const userLocale = (user as { locale?: unknown }).locale;
       await dispatchEmail(
         "verify_email",
         user.email,
         { name: user.name ?? "", verifyUrl },
         tokenIdempotencyKey("verify-email", token),
-        toLocale(userLocale),
+        localeOf(user),
       );
     },
   },
@@ -512,37 +589,17 @@ const authOptions = {
           return authorizeSubscriptionReference((role ?? undefined) as OrgRole | undefined);
         },
         onSubscriptionComplete: async ({ subscription, plan }) => {
-          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
-          await emit(
+          await emitSubscriptionEvent(
             EventTypes.BILLING_SUBSCRIPTION_CREATED,
-            "subscription",
-            subscription.id,
-            {
-              organizationId: subscription.referenceId,
-              subscriptionId: subscription.id,
-              tier: plan.name,
-              status: subscription.status,
-              actorUserId,
-              currentPeriodEnd: subscription.periodEnd ?? null,
-            },
-            subscription.referenceId,
+            subscription,
+            plan.name,
           );
         },
         onSubscriptionUpdate: async ({ subscription }) => {
-          const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
-          await emit(
+          await emitSubscriptionEvent(
             subscriptionEventType(subscription.status),
-            "subscription",
-            subscription.id,
-            {
-              organizationId: subscription.referenceId,
-              subscriptionId: subscription.id,
-              tier: subscription.plan,
-              status: subscription.status,
-              actorUserId,
-              currentPeriodEnd: subscription.periodEnd ?? null,
-            },
-            subscription.referenceId,
+            subscription,
+            subscription.plan,
           );
         },
       },
@@ -680,15 +737,20 @@ const authOptions = {
           // The org check is what makes that safe to trust: this hook fires for every
           // removal in every org, and a snapshot whose org is not this one belongs to
           // some other request (see `scimDeprovisionActors`).
-          const scimActor = scimDeprovisionActors.take(
-            member.userId,
-            (snapshot) => snapshot.organizationId === org.id,
-          )?.actorUserId;
+          //
+          // The same actor owns the auto-collapse below: a SCIM deprovisioning that
+          // empties the org deletes it on the connection owner's behalf, not the
+          // removed user's.
+          const actorUserId = memberRemovalActor(scimDeprovisionActors, {
+            removedUserId: member.userId,
+            organizationId: org.id,
+            sessionUserId: user.id,
+          });
           await emit(
             EventTypes.ORG_MEMBER_REMOVED,
             "member",
             member.id,
-            { organizationId: org.id, actorUserId: scimActor ?? user.id, userId: member.userId },
+            { organizationId: org.id, actorUserId, userId: member.userId },
             org.id,
           );
           if (isPersonalOrg(org.slug)) return;
@@ -699,7 +761,7 @@ const authOptions = {
               EventTypes.ORG_DELETED,
               "organization",
               org.id,
-              { organizationId: org.id, actorUserId: user.id },
+              { organizationId: org.id, actorUserId },
               org.id,
               tx,
             );
@@ -769,7 +831,6 @@ const authOptions = {
         const inviteUrl = `${env.APP_URL}/accept-invitation/${id}`;
         // Rendered in the inviter's locale, not the invitee's: an invitee with
         // no account yet has no locale of their own to read.
-        const inviterLocale = (inviter.user as { locale?: unknown }).locale;
         await dispatchEmail(
           "org_invitation",
           email,
@@ -780,7 +841,7 @@ const authOptions = {
             inviteUrl,
           },
           tokenIdempotencyKey("org-invitation", id),
-          toLocale(inviterLocale),
+          localeOf(inviter.user),
         );
       },
     }),
@@ -850,16 +911,12 @@ const authOptions = {
         const decision = rl.getValue();
         if (!decision.allowed) {
           if (decision.firstBlock) {
-            try {
-              await emit(
-                EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
-                "rate_limit",
-                `auth-sign-in-account:${email}`,
-                { actorUserId: null, ip, policyName: "auth-sign-in-account", path, method: "POST" },
-              );
-            } catch (emitErr) {
-              logger.warn({ err: emitErr }, "account rate-limit event emit failed");
-            }
+            await emitBestEffort(
+              EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
+              "rate_limit",
+              `auth-sign-in-account:${email}`,
+              { actorUserId: null, ip, policyName: "auth-sign-in-account", path, method: "POST" },
+            );
           }
           throw new APIError("TOO_MANY_REQUESTS", { message: "Too many login attempts" });
         }
@@ -873,21 +930,7 @@ const authOptions = {
       // entitlement need not have its body rewritten first.
       if (path === SSO_PATHS.register) {
         await assertSsoEntitlementFor(body?.organizationId as string | undefined);
-
-        // The plugin persists `domain` verbatim (no casing normalization on its side),
-        // and every domain-based lookup (enforcedProviderForDomain) compares against a
-        // lowercased email domain — normalize here so newly written rows are canonical.
-        if (typeof body?.domain === "string") {
-          body.domain = body.domain.toLowerCase();
-        }
-
-        if (body?.samlConfig && typeof body.samlConfig === "object") {
-          const normalized = normalizeSamlConfig(body.samlConfig as Record<string, unknown>);
-          if (normalized.isFailure) {
-            throw new APIError("BAD_REQUEST", { message: normalized.getError().message });
-          }
-          body.samlConfig = normalized.getValue();
-        }
+        normalizeSsoProviderBody(body);
         return;
       }
 
@@ -910,17 +953,7 @@ const authOptions = {
       // that's intentional, not a bug: a partial update is exactly the vector this
       // finding used, so "untouched" security fields get re-affirmed, not skipped.
       if (path === SSO_PATHS.updateProvider) {
-        if (typeof body?.domain === "string") {
-          body.domain = body.domain.toLowerCase();
-        }
-
-        if (body?.samlConfig && typeof body.samlConfig === "object") {
-          const normalized = normalizeSamlConfig(body.samlConfig as Record<string, unknown>);
-          if (normalized.isFailure) {
-            throw new APIError("BAD_REQUEST", { message: normalized.getError().message });
-          }
-          body.samlConfig = normalized.getValue();
-        }
+        normalizeSsoProviderBody(body);
         return;
       }
 
@@ -1027,16 +1060,12 @@ const authOptions = {
           if (d.isFailure) {
             logger.warn({ err: d.getError() }, "disposable-email check failed — failing open");
           } else if (d.getValue()) {
-            try {
-              await emit(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
-                actorUserId: null,
-                email: actorEmail,
-                ip: clientIpFromHeaders(ctx.headers),
-                reason: "disposable_email" as const,
-              });
-            } catch (emitErr) {
-              logger.warn({ err: emitErr }, "signup-rejected event emit failed");
-            }
+            await emitBestEffort(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
+              actorUserId: null,
+              email: actorEmail,
+              ip: clientIpFromHeaders(ctx.headers),
+              reason: "disposable_email" as const,
+            });
             throw new APIError("UNPROCESSABLE_ENTITY", {
               message: "This email address is not accepted.",
             });
@@ -1064,31 +1093,22 @@ const authOptions = {
         di.IPasswordBreachService,
       );
       if (result?.isBreach) {
-        try {
-          await emit(EventTypes.SECURITY_PASSWORD_BREACHED, "security", path, {
-            actorUserId,
-            email: actorEmail ?? null,
-            ip: clientIpFromHeaders(ctx.headers),
-            path,
-          });
-        } catch (emitErr) {
-          logger.warn({ err: emitErr }, "password-breached event emit failed");
-        }
+        await emitBestEffort(EventTypes.SECURITY_PASSWORD_BREACHED, "security", path, {
+          actorUserId,
+          email: actorEmail ?? null,
+          ip: clientIpFromHeaders(ctx.headers),
+          path,
+        });
       }
       if (result !== null) throw new APIError("UNPROCESSABLE_ENTITY", { message: result.message });
     }),
     after: createAuthMiddleware(async (ctx) => {
       const path = ctx.path;
+      const body = ctx.body as Record<string, unknown> | undefined;
 
       // sso.login.failure is the one event this hook emits on a rejected call, so it
       // must run before the early-return below — every other branch only sees success.
-      if (
-        ctx.context.returned instanceof APIError &&
-        (path === SSO_PATHS.callback ||
-          path === SSO_PATHS.callbackWithProvider ||
-          path === SSO_PATHS.samlCallback ||
-          path === SSO_PATHS.samlAcs)
-      ) {
+      if (ctx.context.returned instanceof APIError && isSsoCallbackPath(path)) {
         const providerId = (ctx.params as Record<string, string> | undefined)?.providerId ?? null;
         const provider = providerId ? await findSsoProviderByProviderId(providerId) : undefined;
         // `organizationId` is what makes a public event deliverable: WebhookFanoutSubscriber
@@ -1138,16 +1158,11 @@ const authOptions = {
         return;
       }
 
-      if (
-        path === SSO_PATHS.callback ||
-        path === SSO_PATHS.callbackWithProvider ||
-        path === SSO_PATHS.samlCallback ||
-        path === SSO_PATHS.samlAcs
-      ) {
+      if (isSsoCallbackPath(path)) {
         const session = ctx.context.newSession;
         if (session) {
           const params = ctx.params as Record<string, string> | undefined;
-          const isSaml = path === SSO_PATHS.samlCallback || path === SSO_PATHS.samlAcs;
+          const isSaml = isSamlCallbackPath(path);
           let providerId = params?.providerId;
           if (!providerId) {
             const latest = await findLatestLinkedAccount(session.user.id);
@@ -1174,7 +1189,6 @@ const authOptions = {
       // empty here, so this branch must run before the session-actor early-return
       // below, and the actor is resolved from the connection row instead.
       if (path.startsWith(SCIM_PATHS.users) && ctx.method !== "GET") {
-        const body = ctx.body as Record<string, unknown> | undefined;
         const providerId = scimProviderIdFromToken(ctx.headers);
         const owner = await scimConnectionOwner(providerId);
         const params = ctx.params as Record<string, string> | undefined;
@@ -1249,7 +1263,6 @@ const authOptions = {
         return;
       }
       if (path === "/passkey/delete-passkey") {
-        const body = ctx.body as Record<string, unknown> | undefined;
         const passkeyId = body?.id;
         if (typeof passkeyId === "string") {
           await emit(EventTypes.USER_PASSKEY_REMOVED, "user", userId, { userId, passkeyId });
@@ -1287,10 +1300,9 @@ const authOptions = {
         return;
       }
       if (path === "/update-user") {
-        const body = (ctx.body ?? {}) as Record<string, unknown>;
         const changes: Record<string, unknown> = {};
-        if (typeof body.name === "string") changes.name = body.name;
-        if (typeof body.image === "string") changes.image = body.image;
+        if (typeof body?.name === "string") changes.name = body.name;
+        if (typeof body?.image === "string") changes.image = body.image;
         await emit(EventTypes.USER_PROFILE_UPDATED, "user", userId, { userId, changes });
         return;
       }
@@ -1339,8 +1351,7 @@ const authOptions = {
           organizationId: string | null;
         };
         if (provider.organizationId) {
-          const body = (ctx.body as Record<string, unknown> | undefined) ?? {};
-          const changedFields = Object.keys(body).filter((key) => key !== "providerId");
+          const changedFields = Object.keys(body ?? {}).filter((key) => key !== "providerId");
           await emit(
             EventTypes.SSO_PROVIDER_UPDATED,
             "sso_provider",
@@ -1357,9 +1368,7 @@ const authOptions = {
         return;
       }
       if (path === SSO_PATHS.deleteProvider) {
-        const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
-          | string
-          | undefined;
+        const providerId = body?.providerId as string | undefined;
         const snapshot = providerId ? ssoProviderDeleteSnapshots.take(providerId) : undefined;
         if (providerId && snapshot?.organizationId) {
           await emit(
@@ -1377,9 +1386,7 @@ const authOptions = {
         return;
       }
       if (path === SSO_PATHS.verifyDomain) {
-        const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
-          | string
-          | undefined;
+        const providerId = body?.providerId as string | undefined;
         if (providerId) {
           const provider = await findSsoProviderByProviderId(providerId);
           if (provider?.organizationId) {
@@ -1402,7 +1409,6 @@ const authOptions = {
 
       // A SCIM token is an issued credential: its creation/revocation audits like a PAT.
       if (path === SCIM_PATHS.generateToken) {
-        const body = ctx.body as Record<string, unknown> | undefined;
         const providerId = body?.providerId as string | undefined;
         const organizationId = body?.organizationId as string | undefined;
         if (providerId && organizationId) {
@@ -1417,9 +1423,7 @@ const authOptions = {
         return;
       }
       if (path === SCIM_PATHS.deleteConnection) {
-        const providerId = (ctx.body as Record<string, unknown> | undefined)?.providerId as
-          | string
-          | undefined;
+        const providerId = body?.providerId as string | undefined;
         const organizationId = providerId
           ? scimConnectionDeleteSnapshots.take(providerId)
           : undefined;
@@ -1451,11 +1455,17 @@ const authOptions = {
       },
       update: {
         after: async (user) => {
-          const cleared = await clearConfirmedPendingEmail(user.id, user.email);
-          if (!cleared) return;
-          await emit(EventTypes.USER_PROFILE_UPDATED, "user", user.id, {
-            userId: user.id,
-            changes: { email: user.email },
+          await db.transaction(async (tx) => {
+            const cleared = await clearConfirmedPendingEmail(user.id, user.email, tx);
+            if (!cleared) return;
+            await emit(
+              EventTypes.USER_PROFILE_UPDATED,
+              "user",
+              user.id,
+              { userId: user.id, changes: { email: user.email } },
+              null,
+              tx,
+            );
           });
         },
       },
@@ -1481,11 +1491,7 @@ const authOptions = {
           // the session is minted for a platform admin who already passed the admin
           // gate, and blocking it would only remove a support capability.
           const createdBySso =
-            context?.path === SSO_PATHS.callback ||
-            context?.path === SSO_PATHS.callbackWithProvider ||
-            context?.path === SSO_PATHS.samlCallback ||
-            context?.path === SSO_PATHS.samlAcs ||
-            context?.path === IMPERSONATE_PATH;
+            isSsoCallbackPath(context?.path) || context?.path === IMPERSONATE_PATH;
           if (!createdBySso) {
             const email = await emailFor(session.userId);
             if (email) {

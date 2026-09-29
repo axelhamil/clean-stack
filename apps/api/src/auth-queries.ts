@@ -7,6 +7,7 @@
 
 import { base64Url } from "@better-auth/utils/base64";
 import { createHash } from "@better-auth/utils/hash";
+import { Option } from "@packages/ddd-kit";
 import {
   and,
   count,
@@ -61,8 +62,13 @@ export async function insertPersonalOrgWithOwner(
 
 // ── #2 – sendChangeEmailConfirmation ──────────────────────────────────────
 
-export async function setPendingEmail(userId: string, newEmail: string): Promise<void> {
-  await db.update(schema.user).set({ pendingEmail: newEmail }).where(eq(schema.user.id, userId));
+export async function setPendingEmail(
+  userId: string,
+  newEmail: string,
+  tx?: Transaction,
+): Promise<void> {
+  const exec = tx ?? db;
+  await exec.update(schema.user).set({ pendingEmail: newEmail }).where(eq(schema.user.id, userId));
 }
 
 // ── #3 – afterRemoveMember: delete org when last member leaves ─────────────
@@ -85,8 +91,13 @@ export async function deleteOrgIfEmpty(organizationId: string, tx?: Transaction)
 
 /** Clears `pendingEmail` when BetterAuth confirms the new address.
  *  Returns true if a row was actually updated (i.e. pendingEmail matched). */
-export async function clearConfirmedPendingEmail(userId: string, email: string): Promise<boolean> {
-  const cleared = await db
+export async function clearConfirmedPendingEmail(
+  userId: string,
+  email: string,
+  tx?: Transaction,
+): Promise<boolean> {
+  const exec = tx ?? db;
+  const cleared = await exec
     .update(schema.user)
     .set({ pendingEmail: null })
     .where(and(eq(schema.user.id, userId), eq(schema.user.pendingEmail, email)))
@@ -311,11 +322,11 @@ export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
     )
     .limit(1);
   return row?.organizationId
-    ? { providerId: row.providerId, organizationId: row.organizationId }
-    : null;
+    ? Option.some({ providerId: row.providerId, organizationId: row.organizationId })
+    : Option.none();
 };
 
-// ── #13 – SCIM provisioning: membership event bridge ───────────────────────
+// ── #14 – SCIM provisioning: membership event bridge ───────────────────────
 
 /**
  * The member row `@better-auth/scim` writes with a raw `adapter.create` (no

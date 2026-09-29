@@ -21,6 +21,26 @@ export const SSO_PATHS = {
   verifyDomain: "/sso/verify-domain",
 } as const;
 
+/**
+ * The endpoints that finish an SSO sign-in (OIDC and SAML, with or without a provider
+ * id in the path). Every branch that asks "did this request come back from the IdP?"
+ * reads this one list, so adding a callback shape is a one-line change.
+ */
+const SSO_CALLBACK_PATHS: readonly string[] = [
+  SSO_PATHS.callback,
+  SSO_PATHS.callbackWithProvider,
+  SSO_PATHS.samlCallback,
+  SSO_PATHS.samlAcs,
+];
+
+export function isSsoCallbackPath(path: string | undefined): boolean {
+  return path !== undefined && SSO_CALLBACK_PATHS.includes(path);
+}
+
+export function isSamlCallbackPath(path: string): boolean {
+  return path === SSO_PATHS.samlCallback || path === SSO_PATHS.samlAcs;
+}
+
 export const SCIM_PATHS = {
   generateToken: "/scim/generate-token",
   listConnections: "/scim/list-provider-connections",
