@@ -1,5 +1,6 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
+import { TypographyInline } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
@@ -80,8 +81,10 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                     onCheckedChange={(c) => toggle(type, c === true)}
                   />
                   <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                    <span className="break-all font-mono">{type}</span>
-                    <span className="text-muted-foreground">{descriptionFor(type)}</span>
+                    <TypographyInline font="mono" className="break-all">
+                      {type}
+                    </TypographyInline>
+                    <TypographyInline tone="muted">{descriptionFor(type)}</TypographyInline>
                   </span>
                 </label>
               ))}

@@ -14,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@packages/ui/components/ui/tooltip";
+import { TypographyInline } from "@packages/ui/components/ui/typography";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
@@ -55,7 +56,9 @@ export function EndpointRow({
 
   return (
     <TableRow>
-      <TableCell className="max-w-xs truncate font-mono text-sm">{endpoint.url}</TableCell>
+      <TableCell className="max-w-xs truncate">
+        <TypographyInline font="mono">{endpoint.url}</TypographyInline>
+      </TableCell>
       <TableCell>
         {status === "auto-disabled" ? (
           <TooltipProvider>

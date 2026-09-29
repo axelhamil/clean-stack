@@ -22,7 +22,11 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import {
+  TypographyH1,
+  TypographyInline,
+  TypographyMuted,
+} from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -266,7 +270,9 @@ function WebhooksPage() {
                     .flatMap((p) => p.items)
                     .map((d) => (
                       <TableRow key={d.id}>
-                        <TableCell className="font-mono text-sm">{d.eventType}</TableCell>
+                        <TableCell>
+                          <TypographyInline font="mono">{d.eventType}</TypographyInline>
+                        </TableCell>
                         <TableCell>
                           <Badge variant={DELIVERY_STATUS_BADGE_VARIANTS[d.status]}>
                             {isDeliveryStatus(d.status)

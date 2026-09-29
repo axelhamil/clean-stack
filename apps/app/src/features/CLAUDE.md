@@ -65,7 +65,7 @@ Raw `<a className="text-…">`, `<span className="…rounded-full bg-…">`, `<d
 - **Styled links/nav items**: `NavLink` from `@packages/ui` (`plain`/`pill`/`underline`, `active` flag). Compose via `asChild`. Never raw `<a className="text-…">`.
 - **List bullets**: lucide icons over custom spans.
 - **Boxed surfaces**: `Panel` (`asChild`, `tone`, `size`), not `rounded-md border p-3`. Not `Card`: Card is the page-level container.
-- **`<pre>` blocks**: `CodeBlock`. **Copy rows**: `CopyableValue` (toast and labels stay in the app). **Text fields**: `FormTextField`/`FormCheckboxField`. **Rows**: `ListRow`. **Destructive confirm**: `DestructiveActionDialog`. **Inline links**: `TextLink`.
+- **`<pre>` blocks**: `CodeBlock`. **Copy rows**: `CopyableValue` (toast and labels stay in the app). **Text fields**: `FormTextField`/`FormCheckboxField`. **Rows**: `ListRow`. **Destructive confirm**: `DestructiveActionDialog`. **Inline links**: `TextLink`. **Label and value pairs**: `DescriptionList` (`stacked`/`inline`). **Inline text** (muted, mono identifiers, inside a `summary` or a cell): `TypographyInline`. **Pasted machine text**: `CodeTextarea`. **Clickable row content**: `ListRowButton`. **Pinned bottom bar**: `BottomBanner`. **Entity initials**: `InitialsAvatar`.
 - **Enum to copy**: a `<noun>-labels.ts` map keyed by the enum and resolved through `t()` (feature root, or `shared/<domain>/` once shared), never an inline ternary in JSX.
 - **Impersonation freeze**: any control that mutates account, org or billing state disables itself under impersonation via `useImpersonationGuard()`; spread `guard.describeProps(otherwiseDisabled)` on it, passing whatever else holds it shut (`isPending`, cooldown) so the freeze is never named as the cause of an unrelated disable.
 

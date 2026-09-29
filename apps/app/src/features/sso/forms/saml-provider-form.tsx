@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
+import { CodeTextarea } from "@packages/ui/components/ui/code-textarea";
 import {
   Form,
   FormControl,
@@ -10,7 +11,6 @@ import {
   FormMessage,
 } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
-import { Textarea } from "@packages/ui/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { type SamlProviderInput, samlProviderSchema } from "../sso.schema";
@@ -62,7 +62,7 @@ export function SamlProviderForm({ isPending, onSubmit }: SamlProviderFormProps)
             <FormItem>
               <FormLabel>{t("sso.forms.saml.certLabel")}</FormLabel>
               <FormControl>
-                <Textarea rows={6} className="font-mono text-xs" {...field} />
+                <CodeTextarea rows={6} {...field} />
               </FormControl>
               <FormDescription>{t("sso.forms.saml.certDescription")}</FormDescription>
               <FormMessage />

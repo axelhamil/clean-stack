@@ -104,6 +104,46 @@ function TypographyMuted({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
+const typographyInlineVariants = cva("", {
+  variants: {
+    tone: {
+      default: "",
+      muted: "text-muted-foreground",
+      destructive: "text-destructive",
+    },
+    font: {
+      sans: "",
+      mono: "font-mono",
+    },
+    size: {
+      inherit: "",
+      sm: "text-sm",
+      xs: "text-xs",
+    },
+  },
+  defaultVariants: { tone: "default", font: "sans", size: "inherit" },
+});
+
+interface TypographyInlineProps
+  extends React.ComponentProps<"span">,
+    VariantProps<typeof typographyInlineVariants> {}
+
+/**
+ * Phrasing text where a block paragraph is not allowed or not wanted: inside a
+ * `summary`, a table cell, a title or next to other inline content. Size
+ * inherits from the parent unless set; `mono` is for identifiers (event
+ * types, token prefixes, URLs), without the inline code chip.
+ */
+function TypographyInline({ className, tone, font, size, ...props }: TypographyInlineProps) {
+  return (
+    <span
+      data-slot="typography-inline"
+      className={cn(typographyInlineVariants({ tone, font, size }), className)}
+      {...props}
+    />
+  );
+}
+
 function TypographyBlockquote({ className, ...props }: React.ComponentProps<"blockquote">) {
   return (
     <blockquote
@@ -143,6 +183,7 @@ export {
   TypographyH2,
   TypographyH3,
   TypographyH4,
+  TypographyInline,
   TypographyInlineCode,
   TypographyLarge,
   TypographyLead,

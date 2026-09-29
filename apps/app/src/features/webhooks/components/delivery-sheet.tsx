@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@packages/ui/components/ui/sheet";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyInline, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
@@ -46,8 +46,10 @@ function RequestResponse({ attempt }: RequestResponseProps) {
 
         return (
           <details key={key}>
-            <summary className="cursor-pointer text-xs text-muted-foreground">
-              {t(`webhooks.deliverySheet.${key}`)}
+            <summary className="cursor-pointer">
+              <TypographyInline tone="muted" size="xs">
+                {t(`webhooks.deliverySheet.${key}`)}
+              </TypographyInline>
             </summary>
             <CodeBlock size="sm" className="mt-1">
               {formatSection(value)}
@@ -88,7 +90,11 @@ export function DeliverySheet({
         {delivery && (
           <>
             <SheetHeader>
-              <SheetTitle className="font-mono text-sm">{delivery.eventType}</SheetTitle>
+              <SheetTitle>
+                <TypographyInline font="mono" size="sm">
+                  {delivery.eventType}
+                </TypographyInline>
+              </SheetTitle>
               <SheetDescription>
                 {t("webhooks.deliverySheet.statusLine", {
                   status: isDeliveryStatus(delivery.status)
@@ -132,11 +138,11 @@ export function DeliverySheet({
                         </Badge>
                       </div>
                       {a.durationMs !== null && (
-                        <p className="text-muted-foreground">
+                        <TypographyInline tone="muted">
                           {t("webhooks.deliverySheet.duration", { ms: a.durationMs })}
-                        </p>
+                        </TypographyInline>
                       )}
-                      {a.error && <p className="text-destructive">{a.error}</p>}
+                      {a.error && <TypographyInline tone="destructive">{a.error}</TypographyInline>}
                       <RequestResponse attempt={a} />
                     </li>
                   </Panel>
