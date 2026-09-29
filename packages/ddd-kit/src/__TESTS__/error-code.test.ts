@@ -17,4 +17,8 @@ describe("httpStatusFromCode", () => {
   it("resolves _NOT_FOUND to 404", () => {
     expect(httpStatusFromCode("X_NOT_FOUND")).toBe(404);
   });
+
+  it("resolves BILLING_QUOTA_EXCEEDED to 429", () => {
+    expect(httpStatusFromCode("BILLING_QUOTA_EXCEEDED")).toBe(429);
+  });
 });

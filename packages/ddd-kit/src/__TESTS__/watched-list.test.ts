@@ -135,7 +135,7 @@ describe("WatchedList", () => {
       list.add({ id: "2", name: "B" });
 
       expect(list.getNewItems()).toHaveLength(1);
-      expect(list.getNewItems()[0].id).toBe("2");
+      expect(list.getNewItems()[0]?.id).toBe("2");
     });
 
     it("should not add duplicate", () => {
@@ -192,7 +192,7 @@ describe("WatchedList", () => {
       list.remove({ id: "1", name: "A" });
 
       expect(list.getRemovedItems()).toHaveLength(1);
-      expect(list.getRemovedItems()[0].id).toBe("1");
+      expect(list.getRemovedItems()[0]?.id).toBe("1");
     });
 
     it("should not track removal of newly added items", () => {
@@ -449,8 +449,7 @@ describe("WatchedList", () => {
     });
 
     it("should track removal even for non-existing items", () => {
-      // Current behavior: removing a non-existing item still tracks it as removed
-      // This is by design - the WatchedList tracks intent, not validation
+      // The list records intent, not validation: removing an unknown item is still tracked.
       const list = ItemList.create([]);
       list.remove({ id: "1", name: "A" });
 
