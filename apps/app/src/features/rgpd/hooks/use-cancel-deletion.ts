@@ -7,8 +7,8 @@ import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 
 export function useCancelDeletion() {
-  const { t } = useTranslation("errors");
-  const { t: tSettings } = useTranslation("settings");
+  const { t } = useTranslation("settings");
+  const { t: tErrors } = useTranslation("errors");
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -16,8 +16,8 @@ export function useCancelDeletion() {
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
       broadcastAuthChange();
-      toast.success(tSettings("deletion.cancelledToast"));
+      toast.success(t("deletion.cancelledToast"));
     },
-    onError: (err) => toast.error(formatApiError(err, tSettings("deletion.cancelFailed"), t)),
+    onError: (err) => toast.error(formatApiError(err, t("deletion.cancelFailed"), tErrors)),
   });
 }

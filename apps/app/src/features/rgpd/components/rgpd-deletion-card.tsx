@@ -44,6 +44,7 @@ export function RgpdDeletionCard({
   if (pendingDeletionUntil) {
     return <PendingState until={new Date(pendingDeletionUntil)} />;
   }
+
   return <ActiveState twoFactorEnabled={twoFactorEnabled} />;
 }
 
@@ -57,6 +58,7 @@ function PendingState({ until }: PendingStateProps) {
   const formatDateTime = useFormatDateTime();
   const cancel = useCancelDeletion();
   const guard = useImpersonationGuard();
+
   return (
     <Card>
       <CardHeader>
@@ -94,7 +96,6 @@ interface ActiveStateProps {
 
 function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
   const { t } = useTranslation("settings");
-  const preflight = useQuery(preflightDeletionQueryOptions);
 
   return (
     <Card>
@@ -103,26 +104,42 @@ function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
         <CardDescription>{t("deletion.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {preflight.isPending ? (
-          <TypographyMuted>{t("deletion.checking")}</TypographyMuted>
-        ) : preflight.isError ? (
-          <Alert variant="destructive">
-            <AlertTriangleIcon />
-            <AlertDescription>{t("deletion.checkFailed")}</AlertDescription>
-          </Alert>
-        ) : preflight.data.blockingOrgs.length > 0 ? (
-          <BlockingOrgsList orgs={preflight.data.blockingOrgs} />
-        ) : (
-          <>
-            <Alert variant="destructive">
-              <AlertTriangleIcon />
-              <AlertDescription>{t("deletion.warning")}</AlertDescription>
-            </Alert>
-            <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
-          </>
-        )}
+        <DeletionPreflight twoFactorEnabled={twoFactorEnabled} />
       </CardContent>
     </Card>
+  );
+}
+
+interface DeletionPreflightProps {
+  twoFactorEnabled: boolean;
+}
+
+function DeletionPreflight({ twoFactorEnabled }: DeletionPreflightProps) {
+  const { t } = useTranslation("settings");
+  const preflight = useQuery(preflightDeletionQueryOptions);
+
+  if (preflight.isPending) return <TypographyMuted>{t("deletion.checking")}</TypographyMuted>;
+
+  if (preflight.isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertTriangleIcon />
+        <AlertDescription>{t("deletion.checkFailed")}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  const { blockingOrgs } = preflight.data;
+  if (blockingOrgs.length > 0) return <BlockingOrgsList orgs={blockingOrgs} />;
+
+  return (
+    <>
+      <Alert variant="destructive">
+        <AlertTriangleIcon />
+        <AlertDescription>{t("deletion.warning")}</AlertDescription>
+      </Alert>
+      <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
+    </>
   );
 }
 
@@ -181,6 +198,7 @@ interface DeleteDialogProps {
 function DeleteDialog({ twoFactorEnabled }: DeleteDialogProps) {
   const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
+
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>

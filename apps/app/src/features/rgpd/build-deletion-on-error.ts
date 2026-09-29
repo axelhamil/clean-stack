@@ -14,21 +14,20 @@ export function buildDeletionOnError(
   onClose: () => void,
   fieldErrorCode: string,
   reportFieldError: FieldErrorReporter,
-  t: TFunction<"errors">,
-  tSettings: TFunction<"settings">,
+  tErrors: TFunction<"errors">,
+  t: TFunction<"settings">,
 ) {
   return (err: unknown) => {
     const code = errorCode(err);
-    const fallback = tSettings("deletion.requestFailed");
-    if (code === "ACCOUNT_DELETION_BLOCKED") {
-      toast.error(formatApiError(err, fallback, t));
-      onClose();
-      return;
-    }
     if (code === fieldErrorCode) {
-      reportFieldError(tSettings("deletion.invalidCredential"));
+      reportFieldError(t("deletion.invalidCredential"));
       return;
     }
-    toast.error(formatApiError(err, fallback, t));
+
+    toast.error(formatApiError(err, t("deletion.requestFailed"), tErrors));
+
+    // A blocked deletion cannot be fixed from inside the dialog, so it closes
+    // and the toast says why.
+    if (code === "ACCOUNT_DELETION_BLOCKED") onClose();
   };
 }
