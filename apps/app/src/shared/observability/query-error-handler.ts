@@ -1,15 +1,14 @@
 import type { Mutation, Query } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { toast } from "sonner";
-import type { ApiError } from "../api/errors/api-error";
+import { apiErrorFields } from "../api/errors/api-error";
 import { rateLimitedMessage } from "../api/errors/messages";
 import { getErrorsT } from "../i18n/get-errors-t";
 import { isUnexpectedError, isUnexpectedMutationError } from "./error-classifier";
 import { captureError } from "./sentry";
 
 function errorContext(error: unknown): { status?: number; code?: string } {
-  if (typeof error !== "object" || error === null) return {};
-  const { status, code } = error as ApiError;
+  const { status, code } = apiErrorFields(error);
   return { status, code };
 }
 
@@ -27,8 +26,10 @@ function retryAfterMessage(seconds: number, t: TFunction<"errors">): string {
 }
 
 function notifyIfRateLimited(error: unknown): boolean {
-  if (errorContext(error).status !== 429) return false;
-  const retryAfter = (error as ApiError).metadata?.retryAfter;
+  const { status, metadata } = apiErrorFields(error);
+  if (status !== 429) return false;
+
+  const retryAfter = metadata?.retryAfter;
   const t = getErrorsT();
   toast.error(rateLimitedMessage(t), {
     id: "rate-limit",
