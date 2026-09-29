@@ -19,11 +19,9 @@ import {
 } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { SUB_PROCESSOR_KEYS } from "../../shared/sub-processor-labels";
-import type { SubProcessor } from "../../shared/sub-processors.config";
-import { SUB_PROCESSORS } from "../../shared/sub-processors.config";
+import { SUB_PROCESSORS, type SubProcessor } from "../../shared/sub-processors.config";
 import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 
 export const Route = createFileRoute("/legal/sub-processors")({
@@ -31,12 +29,13 @@ export const Route = createFileRoute("/legal/sub-processors")({
 });
 
 interface SubProcessorTableProps {
-  processors: SubProcessor[];
+  processors: readonly SubProcessor[];
   caption: string;
-  t: TFunction<"common">;
 }
 
-function SubProcessorTable({ processors, caption, t }: SubProcessorTableProps) {
+function SubProcessorTable({ processors, caption }: SubProcessorTableProps) {
+  const { t } = useTranslation("common");
+
   return (
     <Table>
       <TableCaption>{caption}</TableCaption>
@@ -70,7 +69,7 @@ function SubProcessorTable({ processors, caption, t }: SubProcessorTableProps) {
                   DPA
                 </TextLink>
               ) : (
-                "—"
+                "N/A"
               )}
             </TableCell>
           </TableRow>
@@ -118,7 +117,6 @@ function SubProcessorsPage() {
           <SubProcessorTable
             processors={active}
             caption="Third-party processors currently used to operate the service"
-            t={t}
           />
         </CardContent>
       </Card>
@@ -130,8 +128,7 @@ function SubProcessorsPage() {
         <CardContent>
           <SubProcessorTable
             processors={planned}
-            caption="Third-party processors intended for future use — not yet active"
-            t={t}
+            caption="Third-party processors intended for future use, not yet active"
           />
         </CardContent>
       </Card>

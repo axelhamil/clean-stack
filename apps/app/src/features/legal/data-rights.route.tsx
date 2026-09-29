@@ -93,7 +93,7 @@ function DataRightsPage() {
                 with the actor reference becoming a tombstone (no PII).
               </li>
               <li>
-                Organizations where you are a member but not the only owner remain intact —
+                Organizations where you are a member but not the only owner remain intact;
                 membership rows referencing you are removed.
               </li>
             </TypographyList>
@@ -103,7 +103,7 @@ function DataRightsPage() {
             <TypographyP className="my-0">
               If you are the sole owner of a non-personal organization that has other members, you
               must first transfer ownership or delete that organization. We do not auto-transfer
-              ownership — that decision belongs to you.
+              ownership: that decision belongs to you.
             </TypographyP>
           </section>
           <section className="flex flex-col gap-2">
@@ -123,8 +123,8 @@ function DataRightsPage() {
         </CardHeader>
         <CardContent>
           <TypographyP className="my-0">
-            For other rights guaranteed by RGPD Art. 15/16/18/21 — including correcting inaccurate
-            data, restricting processing, or objecting to specific uses — contact your data
+            For other rights guaranteed by RGPD Art. 15/16/18/21 (including correcting inaccurate
+            data, restricting processing, or objecting to specific uses), contact your data
             protection officer. (Replace this paragraph with your DPO contact details when forking
             this boilerplate.)
           </TypographyP>

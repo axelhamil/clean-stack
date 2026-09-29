@@ -11,7 +11,7 @@ import { PolicyDocView } from "../policy-doc-view";
 // `{ version: effectiveDate, date: version }` instead of `{ version, date:
 // effectiveDate }` at the call site would render a byte-identical string.
 // Mocking distinct fixture values (rather than editing production data) is
-// what actually pins the order — see the "kills the version/date swap"
+// what actually pins the order: see the "kills the version/date swap"
 // assertions further down, and the round-1 review report for the swap-and-
 // revert proof.
 vi.mock("../policies.config", () => ({
@@ -46,7 +46,7 @@ describe("isEnglishFallback", () => {
   });
 
   // `fr.tsx` re-exports `en.tsx` verbatim today (R3), so this is the honest,
-  // currently-true state of the world — not a hardcoded locale check.
+  // currently-true state of the world, not a hardcoded locale check.
   it("fires for a locale still on the English body", () => {
     expect(isEnglishFallback("fr", "privacy")).toBe(true);
     expect(isEnglishFallback("fr", "terms")).toBe(true);
@@ -54,7 +54,7 @@ describe("isEnglishFallback", () => {
   });
 });
 
-describe("PolicyDocView — French locale", () => {
+describe("PolicyDocView (French locale)", () => {
   it("shows the untranslated-language banner", async () => {
     const html = await renderPrivacyPage("fr");
     // `renderToStaticMarkup` HTML-escapes the apostrophe (`&#x27;`); this
@@ -70,17 +70,17 @@ describe("PolicyDocView — French locale", () => {
     expect(html).not.toContain("legal.policies.unavailableBanner");
   });
 
-  it("renders the translated chrome — title and the version/effective line, in the right order", async () => {
+  it("renders the translated chrome: title and the version/effective line, in the right order", async () => {
     const html = await renderPrivacyPage("fr");
     expect(html).toContain("Politique de confidentialité");
-    // Fixture: version "9.9.9", effectiveDate "1111-11-11" — distinct on
+    // Fixture: version "9.9.9", effectiveDate "1111-11-11", distinct on
     // purpose, so a `{ version, date }` argument swap renders a different,
     // wrong string instead of an indistinguishable one.
     expect(html).toContain("Version 9.9.9 — en vigueur le 1111-11-11");
   });
 });
 
-describe("PolicyDocView — English locale", () => {
+describe("PolicyDocView (English locale)", () => {
   it("never shows the banner", async () => {
     const html = await renderPrivacyPage("en");
     expect(html).not.toContain(

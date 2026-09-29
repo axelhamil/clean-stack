@@ -9,7 +9,7 @@ import {
 import type { ReactElement } from "react";
 
 // The canonical English body for each policy. `fr.tsx` re-exports these
-// verbatim today — see that file's comment and R3 in the extraction recipe
+// verbatim today; see that file's comment and R3 in the extraction recipe
 // for why the prose itself never enters the i18n catalog.
 export function PrivacyPolicyBody(): ReactElement {
   return (
@@ -36,7 +36,7 @@ export function PrivacyPolicyBody(): ReactElement {
           <li>To provide and improve the service.</li>
           <li>To authenticate you and maintain session security.</li>
           <li>To send transactional emails (account verification, password reset).</li>
-          <li>To comply with legal obligations (RGPD Art. 6 — legitimate interest / consent).</li>
+          <li>To comply with legal obligations (RGPD Art. 6: legitimate interest / consent).</li>
         </TypographyList>
       </section>
 
@@ -54,8 +54,8 @@ export function PrivacyPolicyBody(): ReactElement {
         <TypographyP className="my-0">
           You have the right to access, rectify, erase, restrict, and port your data. See the{" "}
           <TextLink href="/legal/data-rights">Data Rights</TextLink> page for procedures. Contact
-          your Data Protection Officer (DPO) for formal requests — replace this paragraph with
-          actual DPO contact details when forking this boilerplate.
+          your Data Protection Officer (DPO) for formal requests. Replace this paragraph with actual
+          DPO contact details when forking this boilerplate.
         </TypographyP>
       </section>
 

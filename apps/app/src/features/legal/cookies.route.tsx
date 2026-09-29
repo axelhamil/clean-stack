@@ -1,4 +1,4 @@
-import { CONSENT_CATEGORIES, type ConsentCategory } from "@packages/cookie-consent";
+import { CONSENT_CATEGORIES } from "@packages/cookie-consent";
 import { toLocale } from "@packages/i18n";
 import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
@@ -14,6 +14,7 @@ import {
 import {
   TypographyH1,
   TypographyH2,
+  TypographyInlineCode,
   TypographyMuted,
   TypographyP,
 } from "@packages/ui/components/ui/typography";
@@ -23,8 +24,7 @@ import { useTranslation } from "react-i18next";
 import { ConsentSettings } from "../../shared/components/consent-settings";
 import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 import { CATEGORY_LABEL_KEYS } from "./cookie-category-labels";
-import type { CookieInfo } from "./cookies.config";
-import { COOKIE_INVENTORY } from "./cookies.config";
+import { COOKIE_INVENTORY, type CookieInfo } from "./cookies.config";
 
 export const Route = createFileRoute("/legal/cookies")({
   component: CookiesPage,
@@ -50,7 +50,9 @@ function CookieTable({ cookies, caption }: CookieTableProps) {
       <TableBody>
         {cookies.map((cookie) => (
           <TableRow key={cookie.name}>
-            <TableCell className="font-mono text-xs">{cookie.name}</TableCell>
+            <TableCell>
+              <TypographyInlineCode>{cookie.name}</TypographyInlineCode>
+            </TableCell>
             <TableCell>{cookie.provider}</TableCell>
             <TableCell className="whitespace-normal">{cookie.purpose}</TableCell>
             <TableCell>{cookie.retention}</TableCell>
@@ -88,22 +90,19 @@ function CookiesPage() {
 
       <ConsentSettings />
 
-      {CONSENT_CATEGORIES.map((cat: ConsentCategory) => {
-        const cookies = COOKIE_INVENTORY[cat];
+      {CONSENT_CATEGORIES.map((cat) => {
+        const category = t(CATEGORY_LABEL_KEYS[cat]);
+
         return (
           <Card key={cat}>
             <CardHeader>
-              <TypographyH2>{t(CATEGORY_LABEL_KEYS[cat])}</TypographyH2>
+              <TypographyH2>{category}</TypographyH2>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <CookieTable
-                  cookies={cookies}
-                  caption={t("legal.cookies.tableCaption", {
-                    category: t(CATEGORY_LABEL_KEYS[cat]),
-                  })}
-                />
-              </div>
+              <CookieTable
+                cookies={COOKIE_INVENTORY[cat]}
+                caption={t("legal.cookies.tableCaption", { category })}
+              />
             </CardContent>
           </Card>
         );
