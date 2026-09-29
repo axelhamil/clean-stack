@@ -1,7 +1,7 @@
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError } from "../../../shared/api/errors/api-error";
+import { throwApiError, toAuthClientError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import { env } from "../../../shared/env";
 import { getErrorsT } from "../../../shared/i18n/get-errors-t";
@@ -39,11 +39,11 @@ export const registerOidcProviderMutationOptions = mutationOptions({
       oidcConfig: { clientId: values.clientId, clientSecret: values.clientSecret },
     });
     if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.registerOidcProvider", {
-            defaultValue: "Failed to register the OIDC provider",
-          }),
+      throw toAuthClientError(
+        error,
+        getErrorsT()("fallback.registerOidcProvider", {
+          defaultValue: "Failed to register the OIDC provider",
+        }),
       );
     return data;
   },
@@ -75,11 +75,11 @@ export const registerSamlProviderMutationOptions = mutationOptions({
       },
     });
     if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.registerSamlProvider", {
-            defaultValue: "Failed to register the SAML provider",
-          }),
+      throw toAuthClientError(
+        error,
+        getErrorsT()("fallback.registerSamlProvider", {
+          defaultValue: "Failed to register the SAML provider",
+        }),
       );
     return data;
   },
@@ -90,9 +90,9 @@ export const verifyDomainMutationOptions = mutationOptions({
   mutationFn: async (providerId: string) => {
     const { error } = await authClient.sso.verifyDomain({ providerId });
     if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.verifySsoDomain", { defaultValue: "Domain verification failed" }),
+      throw toAuthClientError(
+        error,
+        getErrorsT()("fallback.verifySsoDomain", { defaultValue: "Domain verification failed" }),
       );
   },
 });
@@ -108,11 +108,11 @@ export const generateScimTokenMutationOptions = mutationOptions({
   }) => {
     const { data, error } = await authClient.scim.generateToken({ providerId, organizationId });
     if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.generateScimToken", {
-            defaultValue: "Failed to generate the SCIM token",
-          }),
+      throw toAuthClientError(
+        error,
+        getErrorsT()("fallback.generateScimToken", {
+          defaultValue: "Failed to generate the SCIM token",
+        }),
       );
     if (!data?.scimToken)
       throw new Error(

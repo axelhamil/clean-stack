@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 
@@ -17,11 +18,11 @@ export const ssoProvidersQueryOptions = queryOptions({
   queryFn: async () => {
     const { data, error } = await authClient.sso.providers();
     if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.loadSsoProviders", {
-            defaultValue: "Failed to load SSO providers",
-          }),
+      throw toAuthClientError(
+        error,
+        getErrorsT()("fallback.loadSsoProviders", {
+          defaultValue: "Failed to load SSO providers",
+        }),
       );
     const providers = (data?.providers ?? []) as SsoProviderSummary[];
     // The endpoint returns no `createdAt` (or any other insertion-order field) to
@@ -57,11 +58,11 @@ export const domainVerificationTokenQueryOptions = (providerId: string) =>
     queryFn: async () => {
       const { data, error } = await authClient.sso.requestDomainVerification({ providerId });
       if (error)
-        throw new Error(
-          error.message ??
-            getErrorsT()("fallback.loadSsoVerificationToken", {
-              defaultValue: "Failed to load the verification token",
-            }),
+        throw toAuthClientError(
+          error,
+          getErrorsT()("fallback.loadSsoVerificationToken", {
+            defaultValue: "Failed to load the verification token",
+          }),
         );
       return data?.domainVerificationToken ?? null;
     },
