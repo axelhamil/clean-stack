@@ -4,7 +4,7 @@ import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import { DEFAULT_SWEEP_DEADLINE_MS } from "../../../../shared/internal-routes/sweep-runner";
 import { logger } from "../../../../shared/logger";
-import type { EmailError, IEmailService } from "../../../../shared/ports/email.port";
+import type { IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
@@ -272,10 +272,9 @@ export class RgpdService {
         const originalName = state.name;
         const originalLocale = state.locale;
 
-        let wipeOutput: ExecuteWipeOutput;
-        let notifyFailure: EmailError | null = null;
+        let inner: Result<ExecuteWipeOutput, RgpdError>;
         try {
-          const inner = await this.transactions.run(async (trx) => {
+          inner = await this.transactions.run(async (trx) => {
             const wipe = await this.rgpd.executeWipe(input.userId, trx);
             if (wipe.isFailure) return wipe;
             if (wipe.getValue().alreadyWiped) return wipe;
@@ -310,35 +309,18 @@ export class RgpdService {
               },
             );
             if (notified.isFailure) {
-              notifyFailure = notified.getError();
-              throw new Error("rollback");
+              logger.error(
+                { userId: input.userId, code: notified.getError().code },
+                "account wipe rolled back: deletion confirmation could not be enqueued",
+              );
+              return Result.fail<ExecuteWipeOutput, RgpdError>({
+                code: "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
+                message: "deletion confirmation enqueue failed, wipe rolled back",
+              });
             }
             return wipe;
           });
-          if (inner.isFailure) {
-            logger.error(
-              { userId: input.userId, code: inner.getError().code },
-              "account wipe transaction reported failure",
-            );
-            return Result.fail({
-              code: "ACCOUNT_WIPE_PROVIDER_FAILURE",
-              message: "wipe transaction failed",
-            });
-          }
-          wipeOutput = inner.getValue();
         } catch (e) {
-          const failure = notifyFailure as EmailError | null;
-          const isRollbackSentinel = e instanceof Error && e.message === "rollback";
-          if (isRollbackSentinel && failure) {
-            logger.error(
-              { userId: input.userId, code: failure.code },
-              "account wipe rolled back: deletion confirmation could not be enqueued",
-            );
-            return Result.fail({
-              code: "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
-              message: "deletion confirmation enqueue failed, wipe rolled back",
-            });
-          }
           this.instrumentation.capture(e);
           logger.error({ err: e, userId: input.userId }, "account wipe transaction failed");
           return Result.fail({
@@ -346,6 +328,21 @@ export class RgpdService {
             message: "wipe transaction failed",
           });
         }
+
+        if (inner.isFailure) {
+          const failure = inner.getError();
+          if (failure.code === "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE") return Result.fail(failure);
+
+          logger.error(
+            { userId: input.userId, code: failure.code },
+            "account wipe transaction reported failure",
+          );
+          return Result.fail({
+            code: "ACCOUNT_WIPE_PROVIDER_FAILURE",
+            message: "wipe transaction failed",
+          });
+        }
+        const wipeOutput = inner.getValue();
 
         const storageKeysDeleted = await this.purgeUserObjects(input.userId);
 

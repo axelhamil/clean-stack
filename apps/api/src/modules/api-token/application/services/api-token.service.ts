@@ -71,14 +71,11 @@ export class ApiTokenService {
         createdAt: new Date(),
       };
 
-      let failure: ApiTokenError | null = null;
       try {
-        await this.uow.run(async (tx) => {
+        const created = await this.uow.run(async (tx) => {
           const insertResult = await this.repo.insert(record, tx);
-          if (insertResult.isFailure) {
-            failure = insertResult.getError();
-            throw new Error("rollback");
-          }
+          if (insertResult.isFailure) return insertResult;
+
           await emitEvent(
             this.outbox,
             EventTypes.API_TOKEN_CREATED,
@@ -96,10 +93,13 @@ export class ApiTokenService {
             { organizationId: record.organizationId },
             tx,
           );
+
+          return insertResult;
         });
+        if (created.isFailure) return Result.fail(created.getError());
+
         return Result.ok({ record, raw });
       } catch (err) {
-        if (failure) return Result.fail(failure);
         this.instrumentation.capture(err);
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",
@@ -136,14 +136,11 @@ export class ApiTokenService {
         });
       }
 
-      let failure: ApiTokenError | null = null;
       try {
-        await this.uow.run(async (tx) => {
+        return await this.uow.run(async (tx) => {
           const revokeResult = await this.repo.revoke(id, "user", tx);
-          if (revokeResult.isFailure) {
-            failure = revokeResult.getError();
-            throw new Error("rollback");
-          }
+          if (revokeResult.isFailure) return revokeResult;
+
           await emitEvent(
             this.outbox,
             EventTypes.API_TOKEN_REVOKED,
@@ -159,10 +156,10 @@ export class ApiTokenService {
             { organizationId: record.organizationId },
             tx,
           );
+
+          return Result.ok<ApiTokenError>();
         });
-        return Result.ok();
       } catch (err) {
-        if (failure) return Result.fail(failure);
         this.instrumentation.capture(err);
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",

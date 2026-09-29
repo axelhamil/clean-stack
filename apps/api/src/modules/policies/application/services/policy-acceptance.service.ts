@@ -29,10 +29,8 @@ export class PolicyAcceptanceService {
   ): Promise<Result<void, PolicyError>> {
     if (types.length === 0) return Result.ok();
 
-    let storeFailure: PolicyError | null = null;
-
     try {
-      await this.uow.run(async (tx) => {
+      return await this.uow.run(async (tx) => {
         for (const policyType of types) {
           const policyVersion = POLICY_VERSIONS[policyType];
 
@@ -46,10 +44,7 @@ export class PolicyAcceptanceService {
             },
             tx,
           );
-          if (inserted.isFailure) {
-            storeFailure = inserted.getError();
-            throw new Error("rollback");
-          }
+          if (inserted.isFailure) return inserted;
 
           await emitEvent(
             this.outbox,
@@ -61,12 +56,10 @@ export class PolicyAcceptanceService {
             tx,
           );
         }
+
+        return Result.ok<PolicyError>();
       });
-
-      return Result.ok();
     } catch (err) {
-      if (storeFailure) return Result.fail(storeFailure);
-
       this.instrumentation.capture(err);
       return Result.fail({
         code: "POLICY_ACCEPTANCE_PROVIDER_FAILURE",

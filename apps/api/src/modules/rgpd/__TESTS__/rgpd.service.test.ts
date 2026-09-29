@@ -46,16 +46,20 @@ const stubExportPayload: UserExportPayload = {
 };
 
 let capturedTrx: unknown = null;
-let uowThrew = false;
+// Mirrors TransactionService: a callback that throws or resolves to a failed
+// Result is what makes the real unit of work issue ROLLBACK.
+let uowRolledBack = false;
 const tx: IUnitOfWork<never> = {
   startTransaction: async (cb) => cb({} as never),
   run: async (cb) => {
     const trx = {} as never;
     capturedTrx = trx;
     try {
-      return await cb(trx);
+      const out = await cb(trx);
+      if (out instanceof Result && out.isFailure) uowRolledBack = true;
+      return out;
     } catch (e) {
-      uowThrew = true;
+      uowRolledBack = true;
       throw e;
     }
   },
@@ -185,7 +189,7 @@ describe("RgpdService", () => {
   beforeEach(() => {
     email = makeEmail();
     capturedTrx = null;
-    uowThrew = false;
+    uowRolledBack = false;
   });
 
   describe("preflightAccountDeletion", () => {
@@ -433,7 +437,7 @@ describe("RgpdService", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE");
-      expect(uowThrew).toBe(true);
+      expect(uowRolledBack).toBe(true);
     });
 
     it("reports a generic provider failure and captures the error when the ROLLBACK itself throws", async () => {
@@ -451,8 +455,8 @@ describe("RgpdService", () => {
       const brokenTx: IUnitOfWork<never> = {
         startTransaction: async (cb) => cb({} as never),
         run: async () => {
-          // Simulates Postgres failing to ROLLBACK (e.g. connection loss) after the
-          // sentinel throw: a different error surfaces from `run`, not "rollback".
+          // Simulates Postgres failing to ROLLBACK (e.g. connection loss): the
+          // unit of work throws instead of resolving to the failed Result.
           throw new Error("connection terminated unexpectedly");
         },
       };

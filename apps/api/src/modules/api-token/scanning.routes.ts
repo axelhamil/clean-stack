@@ -1,4 +1,4 @@
-import type { Result } from "@packages/ddd-kit";
+import type { IUnitOfWork, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { type Locale, toLocale } from "@packages/i18n";
 import { Hono } from "hono";
@@ -14,7 +14,7 @@ import type { IApiTokenRepository } from "./application/ports/api-token.port";
 export interface ScanningDeps {
   githubKeyVerifier: { verify(keyId: string, sig: string, body: string): Promise<boolean> };
   apiTokenRepository: Pick<IApiTokenRepository, "findByHmac" | "revoke">;
-  transactionService: { run(cb: (tx: ITransaction) => Promise<void>): Promise<void> };
+  transactionService: Pick<IUnitOfWork<ITransaction>, "run">;
   outboxRepository: IOutboxRepository;
   emailService: {
     sendTemplate(
@@ -101,14 +101,10 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
         const record = opt.unwrap();
 
         if (record.revokedAt === null) {
-          let revokeFailure: Error | null = null;
-          try {
-            await deps.transactionService.run(async (tx) => {
+          const revoked = await deps.transactionService
+            .run(async (tx) => {
               const revokeResult = await deps.apiTokenRepository.revoke(record.id, "leaked", tx);
-              if (revokeResult.isFailure) {
-                revokeFailure = new Error(revokeResult.getError().message);
-                throw revokeFailure;
-              }
+              if (revokeResult.isFailure) return revokeResult;
 
               await emitEvent(
                 deps.outboxRepository,
@@ -125,11 +121,14 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
                 { organizationId: record.organizationId },
                 tx,
               );
+
+              return revokeResult;
+            })
+            .catch((err: unknown) => {
+              deps.instrumentation.capture(err);
+              throw new HTTPException(500, { message: "REVOKE_FAILED" });
             });
-          } catch (err) {
-            if (!revokeFailure) deps.instrumentation.capture(err);
-            throw new HTTPException(500, { message: "REVOKE_FAILED" });
-          }
+          if (revoked.isFailure) throw new HTTPException(500, { message: "REVOKE_FAILED" });
 
           const user = await deps.findUserById(record.userId);
           if (user) {

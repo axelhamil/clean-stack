@@ -131,15 +131,10 @@ export class ConsentService {
     payload: UserCookieConsentGrantedPayload | UserCookieConsentWithdrawnPayload,
     failureMessage: string,
   ): Promise<Result<void, ConsentError>> {
-    let storeFailure: ConsentError | null = null;
-
     try {
-      await this.uow.run(async (tx) => {
+      return await this.uow.run(async (tx) => {
         const inserted = await this.store.insert(row, tx);
-        if (inserted.isFailure) {
-          storeFailure = inserted.getError();
-          throw new Error("rollback");
-        }
+        if (inserted.isFailure) return inserted;
 
         await emitEvent(
           this.outbox,
@@ -150,12 +145,10 @@ export class ConsentService {
           {},
           tx,
         );
+
+        return inserted;
       });
-
-      return Result.ok();
     } catch (err) {
-      if (storeFailure) return Result.fail(storeFailure);
-
       this.instrumentation.capture(err);
       return Result.fail({
         code: "CONSENT_PROVIDER_FAILURE",
