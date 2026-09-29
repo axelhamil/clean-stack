@@ -3,7 +3,9 @@ import { Hono } from "hono";
 
 const getSessionSpy = mock(async () => null);
 
+const realAuth = await import("../../auth");
 mock.module("../../auth", () => ({
+  ...realAuth,
   auth: { api: { getSession: getSessionSpy } },
 }));
 

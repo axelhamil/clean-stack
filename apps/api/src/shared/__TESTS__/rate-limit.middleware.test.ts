@@ -6,12 +6,16 @@ import type { IOutboxRepository } from "../ports/outbox.port";
 
 let mockedAddress = "1.2.3.4";
 
+const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({
+  ...realHonoBun,
   getConnInfo: () => ({ remote: { address: mockedAddress } }),
 }));
 
 const warnSpy = mock(() => {});
+const realLogger = await import("../logger");
 mock.module("../logger", () => ({
+  ...realLogger,
   logger: { warn: warnSpy, info: () => {}, error: () => {}, debug: () => {} },
 }));
 
@@ -97,7 +101,7 @@ describe("requireRateLimit middleware", () => {
       expect(res.status).toBe(200);
       // RFC draft-11: quoted policy name; r=<remaining>;t=<reset>
       expect(res.headers.get("RateLimit")).toMatch(/^"global";r=\d+;t=\d+$/);
-      // GLOBAL_POLICY has 2 windows — both must appear in comma-joined RateLimit-Policy
+      // GLOBAL_POLICY has 2 windows, both must appear in comma-joined RateLimit-Policy
       expect(res.headers.get("RateLimit-Policy")).toMatch(
         /^"global";q=300;w=60, "global";q=1800;w=3600$/,
       );
@@ -224,7 +228,7 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
-  describe("policy isolation — sign-in vs magic-link", () => {
+  describe("policy isolation, sign-in vs magic-link", () => {
     it("a magic-link request consumes ONLY the magic-link policy, not sign-in", async () => {
       const consumedPolicies: string[] = [];
       const limiter: IRateLimiter = {
@@ -288,7 +292,7 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
-  describe("policy isolation — two-factor vs sign-in", () => {
+  describe("policy isolation, two-factor vs sign-in", () => {
     it("a two-factor/verify-totp request consumes ONLY the two-factor policy, not sign-in", async () => {
       const consumedPolicies: string[] = [];
       const limiter: IRateLimiter = {
@@ -321,7 +325,7 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
-  describe("AUTH_VERIFY_EMAIL_POLICY key — token-scoped", () => {
+  describe("AUTH_VERIFY_EMAIL_POLICY key, token-scoped", () => {
     it("two requests with different tokens consume different keys", async () => {
       const consumedKeys: string[] = [];
       const limiter: IRateLimiter = {

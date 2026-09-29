@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 
-// Mocks AVANT imports dynamiques
+// Replaced before the dynamic import below, so the subject sees the stand-ins.
 const mockedAddress = { address: "127.0.0.1" };
+const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({
+  ...realHonoBun,
   getConnInfo: () => ({ remote: mockedAddress }),
 }));
 
 const warnSpy = mock(() => {});
+const realLogger = await import("../logger");
 mock.module("../logger", () => ({
+  ...realLogger,
   logger: {
     warn: warnSpy,
     info: mock(() => {}),
@@ -16,7 +20,6 @@ mock.module("../logger", () => ({
   },
 }));
 
-// Imports dynamiques post-mock
 const { requireCsrf } = await import("../middleware/csrf.middleware");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
