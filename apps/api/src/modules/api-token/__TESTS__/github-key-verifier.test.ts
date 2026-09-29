@@ -186,12 +186,9 @@ const mockFindByHmac = mock(async (_hmac: string) =>
 const mockRevoke = mock(async () => Result.ok<ApiTokenError>());
 const mockEnqueue = mock(async () => {});
 const mockSendTemplate = mock(async () => Result.ok());
-const mockFindUserById = mock(async () => ({
-  id: "user-1",
-  email: "user@example.com",
-  name: "Alice",
-  locale: "fr",
-}));
+const mockFindUserById = mock(async () =>
+  Option.some({ id: "user-1", email: "user@example.com", name: "Alice", locale: "fr" }),
+);
 
 const { createApiTokenScanningRoutes } = await import("../scanning.routes");
 
@@ -243,12 +240,9 @@ describe("POST /api/token-scanning/github", () => {
     );
     mockRevoke.mockImplementation(async () => Result.ok());
     mockSendTemplate.mockImplementation(async () => Result.ok());
-    mockFindUserById.mockImplementation(async () => ({
-      id: "user-1",
-      email: "user@example.com",
-      name: "Alice",
-      locale: "fr",
-    }));
+    mockFindUserById.mockImplementation(async () =>
+      Option.some({ id: "user-1", email: "user@example.com", name: "Alice", locale: "fr" }),
+    );
   });
 
   it("returns 403 when signature headers are missing", async () => {
@@ -331,11 +325,9 @@ describe("POST /api/token-scanning/github", () => {
     const localRevoke = mock(async (): Promise<Result<void, ApiTokenError>> => Result.ok());
     const localEnqueue = mock(async () => {});
     const localSendTemplate = mock(async () => Result.ok());
-    const localFindUser = mock(async () => ({
-      id: "user-1",
-      email: "user@example.com",
-      name: "Alice",
-    }));
+    const localFindUser = mock(async () =>
+      Option.some({ id: "user-1", email: "user@example.com", name: "Alice" }),
+    );
 
     const appWithPrev = new Hono()
       .route(

@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
@@ -203,7 +204,7 @@ app.route(
     outboxRepository: di.IOutboxRepository,
     emailService: di.IEmailService,
     instrumentation: di.IInstrumentation,
-    findUserById,
+    findUserById: async (id) => Option.fromNullable(await findUserById(id)),
     prefix: env.API_TOKEN_PREFIX,
     pepper: apiTokenPepper,
     pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,

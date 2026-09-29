@@ -1,4 +1,4 @@
-import type { IUnitOfWork, Result } from "@packages/ddd-kit";
+import type { IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { type Locale, toLocale } from "@packages/i18n";
 import { Hono } from "hono";
@@ -27,7 +27,7 @@ export interface ScanningDeps {
   instrumentation: IInstrumentation;
   findUserById: (
     id: string,
-  ) => Promise<{ email: string; name?: string | null; locale?: string | null } | undefined>;
+  ) => Promise<Option<{ email: string; name?: string | null; locale?: string | null }>>;
   prefix: string;
   pepper: string;
   pepperPrevious?: string;
@@ -130,8 +130,9 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
             });
           if (revoked.isFailure) throw new HTTPException(500, { message: "REVOKE_FAILED" });
 
-          const user = await deps.findUserById(record.userId);
-          if (user) {
+          const found = await deps.findUserById(record.userId);
+          if (found.isSome()) {
+            const user = found.unwrap();
             const locale = toLocale(user.locale);
             const sent = await deps.emailService.sendTemplate(
               "api_token_leaked",
