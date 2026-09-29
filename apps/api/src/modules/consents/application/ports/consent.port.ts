@@ -13,8 +13,8 @@ export interface ConsentRecordRow {
   grantedAt: Date;
   withdrawnAt: Option<Date>;
   expiresAt: Date;
-  ipAddress?: string;
-  userAgent?: string;
+  ipAddress: Option<string>;
+  userAgent: Option<string>;
 }
 
 export interface IConsentStore {

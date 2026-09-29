@@ -34,7 +34,21 @@ const activeRow: ConsentRecordRow = {
   grantedAt: new Date(),
   withdrawnAt: Option.none(),
   expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+  ipAddress: Option.none(),
+  userAgent: Option.none(),
 };
+
+function recordingOutbox() {
+  const enqueued: Array<{ eventType: string; aggregateId: string; payload: unknown }> = [];
+  const outbox: IOutboxRepository = {
+    ...noopOutbox,
+    enqueue: async (events) => {
+      for (const e of events)
+        enqueued.push({ eventType: e.eventType, aggregateId: e.aggregateId, payload: e.payload });
+    },
+  };
+  return { outbox, enqueued };
+}
 
 function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
   return {
@@ -53,20 +67,7 @@ function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
 describe("ConsentService", () => {
   describe("record", () => {
     it("inserts row with 'necessary' always included and emits USER_COOKIE_CONSENT_GRANTED", async () => {
-      const enqueued: Array<{ eventType: string; aggregateId: string; payload: unknown }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events)
-            enqueued.push({
-              eventType: e.eventType,
-              aggregateId: e.aggregateId,
-              payload: e.payload,
-            });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const { outbox: spyOutbox, enqueued } = recordingOutbox();
       const store = makeStore();
       const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
 
@@ -83,6 +84,8 @@ describe("ConsentService", () => {
         .calls[0]?.[0] as ConsentRecordRow;
       expect(insertedRow.categories).toContain("necessary");
       expect(insertedRow.categories).toContain("analytics");
+      expect(insertedRow.ipAddress.unwrapOr("none")).toBe("1.2.3.4");
+      expect(insertedRow.userAgent.isNone()).toBe(true);
 
       const grantedEvents = enqueued.filter(
         (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_GRANTED,
@@ -99,12 +102,14 @@ describe("ConsentService", () => {
           }),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const { outbox, enqueued } = recordingOutbox();
+      const service = new ConsentService(store, outbox, noopUow, new NoOpInstrumentation());
 
       const result = await service.record({ subjectId: "subj-1", categories: [] });
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
+      expect(enqueued).toHaveLength(0);
     });
 
     it("always inserts a new record when a user updates preferences (append-only)", async () => {
@@ -132,15 +137,7 @@ describe("ConsentService", () => {
 
   describe("withdraw", () => {
     it("inserts a withdrawal row with empty categories + withdrawnAt set and emits USER_COOKIE_CONSENT_WITHDRAWN", async () => {
-      const enqueued: Array<{ eventType: string }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events) enqueued.push({ eventType: e.eventType });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const { outbox: spyOutbox, enqueued } = recordingOutbox();
       const store = makeStore();
       const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
 
@@ -169,12 +166,14 @@ describe("ConsentService", () => {
           }),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const { outbox, enqueued } = recordingOutbox();
+      const service = new ConsentService(store, outbox, noopUow, new NoOpInstrumentation());
 
       const result = await service.withdraw({ subjectId: "subj-1" });
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
+      expect(enqueued).toHaveLength(0);
     });
   });
 
