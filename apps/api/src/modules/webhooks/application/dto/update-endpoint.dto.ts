@@ -1,16 +1,10 @@
-import { isSubscribableSelector } from "@packages/events";
 import { z } from "zod";
+import { eventTypesSchema } from "./_event-types";
 
 export const updateEndpointBodySchema = z
   .object({
     url: z.url().optional(),
-    eventTypes: z
-      .array(z.string())
-      .min(1)
-      .refine((arr) => arr.every(isSubscribableSelector), {
-        message: "eventTypes contains unknown or non-subscribable selectors",
-      })
-      .optional(),
+    eventTypes: eventTypesSchema.optional(),
     enabled: z.boolean().optional(),
   })
   .refine((v) => v.url !== undefined || v.eventTypes !== undefined || v.enabled !== undefined, {
