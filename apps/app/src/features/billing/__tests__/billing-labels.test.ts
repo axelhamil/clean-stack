@@ -54,7 +54,7 @@ describe("STATUS_KEYS", () => {
     expect(resolve(STATUS_KEYS.canceled)).toBe("Canceled");
     expect(resolve(STATUS_KEYS.unpaid)).toBe("Unpaid");
     expect(resolve(STATUS_KEYS.incomplete)).toBe("Incomplete");
-    expect(resolve(STATUS_KEYS.incomplete_expired)).toBe("Incomplete — expired");
+    expect(resolve(STATUS_KEYS.incomplete_expired)).toBe("Incomplete (expired)");
     expect(resolve(STATUS_KEYS.paused)).toBe("Paused");
   });
 });
