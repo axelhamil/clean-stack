@@ -1,4 +1,4 @@
-import { type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { generateToken, hmacToken } from "../../../../shared/crypto/api-token";
 import { emitEvent } from "../../../../shared/event-emitter";
@@ -50,24 +50,23 @@ export class ApiTokenService {
       }
 
       const { raw, start } = generateToken(this.config.prefix);
-      const expiresAt =
-        input.expiresInDays != null
-          ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
-          : null;
+      const expiresAt = Option.fromNullable(input.expiresInDays).map(
+        (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      );
 
       const record: ApiTokenRecord = {
         id: crypto.randomUUID(),
         userId: input.userId,
-        organizationId: input.organizationId,
+        organizationId: Option.fromNullable(input.organizationId),
         name: input.name,
         scopes: input.scopes,
         tokenHmac: hmacToken(raw, this.config.pepper),
         pepperVersion: this.config.pepperVersion,
         tokenStart: start,
-        lastUsedAt: null,
+        lastUsedAt: Option.none(),
         expiresAt,
-        revokedAt: null,
-        revokedReason: null,
+        revokedAt: Option.none(),
+        revokedReason: Option.none(),
         createdAt: new Date(),
       };
 
@@ -84,13 +83,13 @@ export class ApiTokenService {
             {
               userId: record.userId,
               actorUserId: input.actorUserId,
-              organizationId: record.organizationId,
+              organizationId: record.organizationId.toNull(),
               tokenId: record.id,
               name: record.name,
               scopes: record.scopes,
-              expiresAt: record.expiresAt,
+              expiresAt: record.expiresAt.toNull(),
             },
-            { organizationId: record.organizationId },
+            { organizationId: record.organizationId.toNull() },
             tx,
           );
 
@@ -149,11 +148,11 @@ export class ApiTokenService {
             {
               userId: record.userId,
               actorUserId,
-              organizationId: record.organizationId,
+              organizationId: record.organizationId.toNull(),
               tokenId: id,
               reason: "user" as const,
             },
-            { organizationId: record.organizationId },
+            { organizationId: record.organizationId.toNull() },
             tx,
           );
 

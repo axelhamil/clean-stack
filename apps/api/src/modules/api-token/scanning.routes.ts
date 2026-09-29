@@ -100,7 +100,7 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
 
         const record = opt.unwrap();
 
-        if (record.revokedAt === null) {
+        if (record.revokedAt.isNone()) {
           const revoked = await deps.transactionService
             .run(async (tx) => {
               const revokeResult = await deps.apiTokenRepository.revoke(record.id, "leaked", tx);
@@ -114,11 +114,11 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
                 {
                   userId: record.userId,
                   actorUserId: null,
-                  organizationId: record.organizationId,
+                  organizationId: record.organizationId.toNull(),
                   tokenId: record.id,
                   reason: "leaked" as const,
                 },
-                { organizationId: record.organizationId },
+                { organizationId: record.organizationId.toNull() },
                 tx,
               );
 

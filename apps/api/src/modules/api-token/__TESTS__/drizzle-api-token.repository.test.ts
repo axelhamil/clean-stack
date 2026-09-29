@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
+import type { ApiTokenRecord } from "../application/ports/api-token.port";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -73,6 +75,15 @@ const fakeRow = {
   revokedAt: null as Date | null,
   revokedReason: null as "user" | "membership_lost" | "leaked" | null,
   createdAt: new Date("2024-01-01"),
+};
+
+const fakeRecord: ApiTokenRecord = {
+  ...fakeRow,
+  organizationId: Option.none(),
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
 };
 
 // ---------------------------------------------------------------------------
@@ -182,12 +193,12 @@ describe("DrizzleApiTokenRepository", () => {
 
       await repo.touchLastUsed(fakeRow.id, floor);
       const first = (await repo.findByHmac(fakeRow.tokenHmac)).getValue().unwrap().lastUsedAt;
-      expect(first).not.toBeNull();
+      expect(first.isSome()).toBe(true);
 
       await repo.touchLastUsed(fakeRow.id, floor);
       const second = (await repo.findByHmac(fakeRow.tokenHmac)).getValue().unwrap().lastUsedAt;
 
-      expect(second?.getTime()).toBe(first?.getTime());
+      expect(second.unwrap().getTime()).toBe(first.unwrap().getTime());
     });
   });
 
@@ -214,7 +225,7 @@ describe("DrizzleApiTokenRepository", () => {
       expect(revoked.getValue()).toEqual(["tok-a"]);
 
       const stillLive = (await repo.findByHmac("hmac-b")).getValue().unwrap();
-      expect(stillLive.revokedAt).toBeNull();
+      expect(stillLive.revokedAt.isNone()).toBe(true);
     });
 
     it("failure path: DB throws → Result.fail", async () => {
@@ -236,7 +247,7 @@ describe("DrizzleApiTokenRepository", () => {
     it("happy path: returns Result.ok", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.insert(fakeRow);
+      const result = await repo.insert(fakeRecord);
 
       expect(result.isSuccess).toBe(true);
     });
@@ -245,7 +256,7 @@ describe("DrizzleApiTokenRepository", () => {
       const boom = new Error("insert boom");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.insert(fakeRow);
+      const result = await repo.insert(fakeRecord);
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("API_TOKEN_PROVIDER_FAILURE");

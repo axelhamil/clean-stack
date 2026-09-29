@@ -17,16 +17,16 @@ function toRecord(row: typeof t.$inferSelect): ApiTokenRecord {
   return {
     id: row.id,
     userId: row.userId,
-    organizationId: row.organizationId,
+    organizationId: Option.fromNullable(row.organizationId),
     name: row.name,
     scopes: row.scopes,
     tokenHmac: row.tokenHmac,
     pepperVersion: row.pepperVersion,
     tokenStart: row.tokenStart,
-    lastUsedAt: row.lastUsedAt,
-    expiresAt: row.expiresAt,
-    revokedAt: row.revokedAt,
-    revokedReason: row.revokedReason,
+    lastUsedAt: Option.fromNullable(row.lastUsedAt),
+    expiresAt: Option.fromNullable(row.expiresAt),
+    revokedAt: Option.fromNullable(row.revokedAt),
+    revokedReason: Option.fromNullable(row.revokedReason),
     createdAt: row.createdAt,
   };
 }
@@ -74,16 +74,16 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           const query = exec.insert(t).values({
             id: row.id,
             userId: row.userId,
-            organizationId: row.organizationId,
+            organizationId: row.organizationId.toNull(),
             name: row.name,
             scopes: row.scopes,
             tokenHmac: row.tokenHmac,
             pepperVersion: row.pepperVersion,
             tokenStart: row.tokenStart,
-            lastUsedAt: row.lastUsedAt,
-            expiresAt: row.expiresAt,
-            revokedAt: row.revokedAt,
-            revokedReason: row.revokedReason,
+            lastUsedAt: row.lastUsedAt.toNull(),
+            expiresAt: row.expiresAt.toNull(),
+            revokedAt: row.revokedAt.toNull(),
+            revokedReason: row.revokedReason.toNull(),
             createdAt: row.createdAt,
           });
           await this.instrumentation.startSpan(

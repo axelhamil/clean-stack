@@ -10,23 +10,24 @@ export type ApiTokenError = {
 export type ApiTokenRecord = {
   id: string;
   userId: string;
-  organizationId: string | null;
+  organizationId: Option<string>;
   name: string;
   scopes: string[];
   tokenHmac: string;
   pepperVersion: number;
   tokenStart: string;
-  lastUsedAt: Date | null;
-  expiresAt: Date | null;
-  revokedAt: Date | null;
-  revokedReason: "user" | "membership_lost" | "leaked" | null;
+  lastUsedAt: Option<Date>;
+  expiresAt: Option<Date>;
+  revokedAt: Option<Date>;
+  revokedReason: Option<"user" | "membership_lost" | "leaked">;
   createdAt: Date;
 };
 
-// Derived rather than named first: the record type reaches the front through
+// Derived rather than named first: the token JSON reaches the front through
 // Hono RPC inference, which can only print a literal union, not an alias
 // declared inside the api package.
-export type ApiTokenRevokedReason = NonNullable<ApiTokenRecord["revokedReason"]>;
+export type ApiTokenRevokedReason =
+  ApiTokenRecord["revokedReason"] extends Option<infer R> ? R : never;
 
 /**
  * Which token rows an authenticated actor may see and revoke.
@@ -59,11 +60,11 @@ export type TokenOwner =
  */
 export function ownerReaches(
   owner: TokenOwner,
-  row: { userId: string; organizationId: string | null },
+  row: { userId: string; organizationId: Option<string> },
 ): boolean {
   if (row.userId !== owner.userId) return false;
-  if (row.organizationId === null) return true;
-  return owner.kind === "orgAndPersonal" && row.organizationId === owner.organizationId;
+  if (row.organizationId.isNone()) return true;
+  return owner.kind === "orgAndPersonal" && row.organizationId.unwrap() === owner.organizationId;
 }
 
 /** The visibility scope of a session. No active organization → personal rows only. */

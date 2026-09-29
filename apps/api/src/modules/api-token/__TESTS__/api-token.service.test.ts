@@ -90,29 +90,32 @@ function record(over: Partial<ApiTokenRecord>): ApiTokenRecord {
   return {
     id: "tok",
     userId: "user-1",
-    organizationId: null,
+    organizationId: Option.none(),
     name: "ci",
     scopes: ["read:profile"],
     tokenHmac: "hmac",
     pepperVersion: 1,
     tokenStart: "clean_ab",
-    lastUsedAt: null,
-    expiresAt: null,
-    revokedAt: null,
-    revokedReason: null,
+    lastUsedAt: Option.none(),
+    expiresAt: Option.none(),
+    revokedAt: Option.none(),
+    revokedReason: Option.none(),
     createdAt: new Date("2024-01-01"),
     ...over,
   };
 }
 
-const MINE_PERSONAL = record({ id: "mine-personal", organizationId: null });
-const MINE_ACTIVE_ORG = record({ id: "mine-active-org", organizationId: "org-active" });
-const MINE_OTHER_ORG = record({ id: "mine-other-org", organizationId: "org-other" });
+const MINE_PERSONAL = record({ id: "mine-personal", organizationId: Option.none() });
+const MINE_ACTIVE_ORG = record({
+  id: "mine-active-org",
+  organizationId: Option.some("org-active"),
+});
+const MINE_OTHER_ORG = record({ id: "mine-other-org", organizationId: Option.some("org-other") });
 const THEIRS_PERSONAL = record({ id: "theirs-personal", userId: "user-2" });
 const THEIRS_ACTIVE_ORG = record({
   id: "theirs-active-org",
   userId: "user-2",
-  organizationId: "org-active",
+  organizationId: Option.some("org-active"),
 });
 
 const LEAKY_REPO_ROWS = [

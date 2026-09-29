@@ -70,10 +70,10 @@ export function requireApiToken(
     const record = match.unwrap();
 
     const now = new Date();
-    if (record.revokedAt !== null) {
+    if (record.revokedAt.isSome()) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
-    if (record.expiresAt !== null && record.expiresAt < now) {
+    if (record.expiresAt.isSome() && record.expiresAt.unwrap() < now) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
@@ -107,7 +107,7 @@ export function requireApiToken(
     c.set("apiTokenId", record.id);
     c.set("user", user);
     c.set("tokenScopes", recordScopes);
-    c.set("orgId", record.organizationId);
+    c.set("orgId", record.organizationId.toNull());
 
     const bucketFloor = new Date(Date.now() - deps.bucketMin * 60_000);
     const touchResult = await deps.repo.touchLastUsed(record.id, bucketFloor);
@@ -120,11 +120,11 @@ export function requireApiToken(
         {
           userId: record.userId,
           actorUserId: record.userId,
-          organizationId: record.organizationId,
+          organizationId: record.organizationId.toNull(),
           tokenId: record.id,
           scopes: record.scopes,
         },
-        { organizationId: record.organizationId ?? undefined },
+        { organizationId: record.organizationId.toUndefined() },
       );
     }
 

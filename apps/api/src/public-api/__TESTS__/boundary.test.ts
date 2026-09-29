@@ -58,17 +58,17 @@ const { raw: profileOnlyRaw } = generateToken(PREFIX);
 const validHmac = hmacToken(validRaw, PEPPER);
 const profileOnlyHmac = hmacToken(profileOnlyRaw, PEPPER);
 
-const baseRecord = {
+const baseRecord: Omit<ApiTokenRecord, "id" | "scopes" | "tokenHmac" | "tokenStart"> = {
   userId: "u1",
-  organizationId: null,
+  organizationId: Option.none(),
   name: "test",
   pepperVersion: 1,
-  lastUsedAt: null,
-  expiresAt: null,
-  revokedAt: null,
-  revokedReason: null,
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
   createdAt: new Date(),
-} as const;
+};
 
 const validRecord: ApiTokenRecord = {
   ...baseRecord,

@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type {
   ApiTokenError,
   ApiTokenRecord,
@@ -9,16 +9,16 @@ import type {
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
   userId: "user-1",
-  organizationId: null,
+  organizationId: Option.none(),
   name: "ci",
   scopes: ["read:profile"],
   tokenHmac: "hmac-secret-must-not-leak",
   pepperVersion: 1,
   tokenStart: "clean_tok.....",
-  lastUsedAt: null,
-  expiresAt: null,
-  revokedAt: null,
-  revokedReason: null,
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
   createdAt: new Date("2024-01-01"),
 };
 

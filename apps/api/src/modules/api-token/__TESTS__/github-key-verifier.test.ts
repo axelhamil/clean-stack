@@ -166,16 +166,16 @@ const KNOWN_HMAC = hmacToken(KNOWN_RAW, TOKEN_PEPPER);
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
   userId: "user-1",
-  organizationId: null,
+  organizationId: Option.none(),
   name: "ci-token",
   scopes: ["read:profile"],
   tokenHmac: KNOWN_HMAC,
   pepperVersion: 1,
   tokenStart: KNOWN_RAW.slice(0, 14),
-  lastUsedAt: null,
-  expiresAt: null,
-  revokedAt: null,
-  revokedReason: null,
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
   createdAt: new Date("2024-01-01"),
 };
 
@@ -374,8 +374,8 @@ describe("POST /api/token-scanning/github", () => {
   it("returns true_positive and skips revoke for an already-revoked token", async () => {
     const revoked: ApiTokenRecord = {
       ...RECORD,
-      revokedAt: new Date("2024-06-01"),
-      revokedReason: "user",
+      revokedAt: Option.some(new Date("2024-06-01")),
+      revokedReason: Option.some("user"),
     };
     mockFindByHmac.mockImplementation(async (_hmac: string) =>
       Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.some(revoked)),
