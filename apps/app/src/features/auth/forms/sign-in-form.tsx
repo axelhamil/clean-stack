@@ -7,6 +7,7 @@ import { KeyRoundIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { type SignInInput, signInSchema } from "../../../shared/auth/auth.schema";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { usePasskeyAutofill } from "../hooks/use-passkey-autofill";
 import { usePasskeySupported } from "../hooks/use-passkey-supported";
 import { useSignIn } from "../hooks/use-sign-in";
@@ -18,6 +19,7 @@ interface SignInFormProps {
 
 export function SignInForm({ redirectTo }: SignInFormProps = {}) {
   const { t } = useTranslation("auth");
+  const revealLabels = usePasswordRevealLabels();
   const mutation = useSignIn(redirectTo);
   const passkey = useSignInPasskey(redirectTo);
   const support = usePasskeySupported();
@@ -49,6 +51,7 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
           name="password"
           label={t("signIn.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
           placeholder={t("signIn.passwordPlaceholder")}
         />

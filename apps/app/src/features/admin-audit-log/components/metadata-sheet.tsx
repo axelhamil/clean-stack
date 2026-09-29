@@ -25,6 +25,7 @@ interface MetadataSheetProps {
 
 export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
   const { t } = useTranslation("admin");
+  const { t: tCommon } = useTranslation("common");
   // Same reasoning as `audit-row.tsx`: an audit event's occurred-at needs
   // date+time precision, not the date-only `useFormatDate`.
   const formatDateTime = useFormatDateTime();
@@ -32,7 +33,7 @@ export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
 
   return (
     <Sheet open={row !== null} onOpenChange={() => onClose()}>
-      <SheetContent>
+      <SheetContent closeLabel={tCommon("actions.close")}>
         {row && (
           <>
             <SheetHeader>

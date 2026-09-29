@@ -166,7 +166,7 @@ function AdminUserDetailPage() {
                       {t("users.detail.changeRole")}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent closeLabel={t("common:actions.close")}>
                     <DialogHeader>
                       <DialogTitle>{t("users.detail.changeRoleTitle")}</DialogTitle>
                       <DialogDescription>
@@ -221,7 +221,7 @@ function AdminUserDetailPage() {
                       {t("users.detail.suspend")}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent closeLabel={t("common:actions.close")}>
                     <DialogHeader>
                       <DialogTitle>{t("users.suspendAccountTitle")}</DialogTitle>
                     </DialogHeader>
@@ -238,7 +238,7 @@ function AdminUserDetailPage() {
                     {t("users.detail.impersonate")}
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent closeLabel={t("common:actions.close")}>
                   <DialogHeader>
                     <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
                   </DialogHeader>

@@ -39,14 +39,22 @@ function DialogOverlay({
   );
 }
 
+/**
+ * The close button's accessible name comes from the caller, in the reader's
+ * language: a primitive holds no copy of its own. Required whenever the
+ * button renders, absent when it does not.
+ */
+type CloseButtonLabel =
+  | { showCloseButton?: true; closeLabel: string }
+  | { showCloseButton: false; closeLabel?: never };
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean;
-}) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & CloseButtonLabel) {
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -65,7 +73,7 @@ function DialogContent({
             className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -86,11 +94,14 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogFooter({
   className,
   showCloseButton = false,
+  closeLabel,
   children,
   ...props
-}: React.ComponentProps<"div"> & {
-  showCloseButton?: boolean;
-}) {
+}: React.ComponentProps<"div"> &
+  (
+    | { showCloseButton?: false; closeLabel?: never }
+    | { showCloseButton: true; closeLabel: string }
+  )) {
   return (
     <div
       data-slot="dialog-footer"
@@ -100,7 +111,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{closeLabel}</Button>
         </DialogPrimitive.Close>
       )}
     </div>
@@ -130,6 +141,7 @@ function DialogDescription({
   );
 }
 
+export type { CloseButtonLabel };
 export {
   Dialog,
   DialogClose,

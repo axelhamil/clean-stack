@@ -6,6 +6,7 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { BackupCodesPanel } from "../components/backup-codes-panel";
 import { useGenerateBackupCodes } from "../hooks/use-generate-backup-codes";
 import { type PasswordPromptInput, passwordPromptSchema } from "../security.schema";
@@ -38,6 +39,7 @@ interface PasswordStepProps {
 
 function PasswordStep({ onCodes }: PasswordStepProps) {
   const { t } = useTranslation("settings");
+  const revealLabels = usePasswordRevealLabels();
   const mutation = useGenerateBackupCodes();
   const form = useForm<PasswordPromptInput>({
     resolver: zodResolver(passwordPromptSchema),
@@ -57,6 +59,7 @@ function PasswordStep({ onCodes }: PasswordStepProps) {
           name="password"
           label={t("twoFactor.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
           placeholder={t("twoFactor.passwordPlaceholder")}
         />

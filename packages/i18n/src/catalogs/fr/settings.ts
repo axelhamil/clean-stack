@@ -276,6 +276,7 @@ export default {
       "Supprimez votre compte dans les <accountLink>paramètres du compte</accountLink> pour supprimer cette organisation.",
     deleteOrgAlertDescription:
       "Supprimer <orgName></orgName> supprimera définitivement tous les membres, invitations et données. Cette action est irréversible.",
+    deleteOrgConfirmLabel: "Saisissez <value>{{name}}</value> pour confirmer",
     deleteOrgDialogDescription:
       "Cette action est irréversible. Tous les membres, invitations et données rattachés à cette organisation seront supprimés définitivement.",
     saveDefaultsFailed: "Impossible d'enregistrer les valeurs par défaut de l'organisation",

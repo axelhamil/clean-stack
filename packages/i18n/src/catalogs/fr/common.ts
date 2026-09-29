@@ -3,6 +3,9 @@ export default {
   actions: {
     save: "Enregistrer",
     cancel: "Annuler",
+    close: "Fermer",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
     retry: "Réessayer",
     reload: "Recharger",
   },
@@ -27,6 +30,8 @@ export default {
     logoAlt: "Logo de l'application",
   },
   commandPalette: {
+    title: "Palette de commandes",
+    description: "Recherchez une page ou une action à exécuter.",
     searchPlaceholder: "Rechercher des pages, actions, organisations...",
     noResults: "Aucun résultat.",
     actionFailed: "L'action a échoué",

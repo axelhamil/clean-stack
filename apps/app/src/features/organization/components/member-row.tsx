@@ -113,6 +113,7 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
               />
             }
             actionLabel={t("organization.removeMemberDialogTitle")}
+            cancelLabel={t("common:actions.cancel")}
             isPending={remove.isPending}
             onConfirm={() => remove.mutate({ memberIdOrEmail: member.id, organizationId })}
           />

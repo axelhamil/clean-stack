@@ -265,6 +265,7 @@ export default {
       "Delete your account in <accountLink>Account settings</accountLink> to remove this organization.",
     deleteOrgAlertDescription:
       "Deleting <orgName></orgName> will permanently delete all members, invitations, and data. This action cannot be undone.",
+    deleteOrgConfirmLabel: "Type <value>{{name}}</value> to confirm",
     deleteOrgDialogDescription:
       "This action cannot be undone. All members, invitations, and data attached to this organization will be permanently removed.",
     saveDefaultsFailed: "Could not save the organization defaults",

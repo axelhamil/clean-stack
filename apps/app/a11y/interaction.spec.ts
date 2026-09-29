@@ -56,7 +56,7 @@ test.describe("signed in", () => {
     await expect(page.locator("main")).toBeVisible();
 
     await page.keyboard.press("ControlOrMeta+k");
-    const palette = page.getByRole("dialog", { name: "Command Palette" });
+    const palette = page.getByRole("dialog", { name: "Command palette" });
     await expect(palette).toBeVisible();
 
     for (let i = 0; i < 10; i++) {

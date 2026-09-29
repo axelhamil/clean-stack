@@ -31,6 +31,7 @@ interface ProfileCardProps {
 
 export function ProfileCard({ name, email, pendingEmail }: ProfileCardProps) {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const [open, setOpen] = useState(false);
   // `/update-user` and `/change-email` are both on the BetterAuth
   // impersonation blocklist (apps/api/src/shared/middleware/impersonation-blocklist.ts),
@@ -66,7 +67,7 @@ export function ProfileCard({ name, email, pendingEmail }: ProfileCardProps) {
                 {t("account.changeEmail")}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent closeLabel={tCommon("actions.close")}>
               <DialogHeader>
                 <DialogTitle>{t("account.changeEmailDialogTitle")}</DialogTitle>
                 <DialogDescription>{t("account.changeEmailDialogDescription")}</DialogDescription>

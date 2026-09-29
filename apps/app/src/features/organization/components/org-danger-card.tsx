@@ -10,7 +10,7 @@ import {
 } from "@packages/ui/components/ui/card";
 import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-action-dialog";
 import { navLinkVariants } from "@packages/ui/components/ui/nav-link";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyInlineCode, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon } from "lucide-react";
@@ -32,6 +32,7 @@ import { TransferLeaveDialog } from "./transfer-leave-dialog";
 
 export function OrgDangerCard() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: org } = useQuery(activeOrgQueryOptions);
@@ -138,6 +139,7 @@ export function OrgDangerCard() {
                     />
                   }
                   actionLabel={t("organization.leaveOrgLabel")}
+                  cancelLabel={tCommon("actions.cancel")}
                   isPending={leave.isPending}
                   onConfirm={() => leave.mutate({ organizationId: org.id })}
                 />
@@ -197,7 +199,16 @@ export function OrgDangerCard() {
                   title={t("organization.deleteOrgLabel")}
                   description={t("organization.deleteOrgDialogDescription")}
                   confirmText={org.name}
+                  confirmTextLabel={
+                    <Trans
+                      ns="settings"
+                      i18nKey="organization.deleteOrgConfirmLabel"
+                      values={{ name: org.name }}
+                      components={{ value: <TypographyInlineCode /> }}
+                    />
+                  }
                   actionLabel={t("organization.deleteOrgLabel")}
+                  cancelLabel={tCommon("actions.cancel")}
                   isPending={remove.isPending}
                   onConfirm={() => remove.mutate({ organizationId: org.id })}
                 />

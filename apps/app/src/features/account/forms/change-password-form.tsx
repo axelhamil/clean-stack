@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { type ChangePasswordInput, changePasswordSchema } from "../account.schema";
 import { resolveChangePasswordError } from "../change-password-error";
 import { useChangePassword } from "../hooks/use-change-password";
@@ -14,6 +15,7 @@ interface ChangePasswordFormProps {
 
 export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps = {}) {
   const { t } = useTranslation(["settings", "auth"]);
+  const revealLabels = usePasswordRevealLabels();
   const { t: tErrors } = useTranslation("errors");
   const mutation = useChangePassword();
   const form = useForm<ChangePasswordInput>({
@@ -48,6 +50,7 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps = {}) 
           name="currentPassword"
           label={t("account.currentPasswordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
           placeholder={t("auth:signIn.passwordPlaceholder")}
         />
@@ -56,6 +59,7 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps = {}) 
           name="newPassword"
           label={t("account.newPasswordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="new-password"
           placeholder={t("auth:signIn.passwordPlaceholder")}
           description={t("auth:passwordField.hint")}
@@ -65,6 +69,7 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps = {}) 
           name="confirmPassword"
           label={t("account.confirmNewPasswordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="new-password"
           placeholder={t("auth:signIn.passwordPlaceholder")}
         />

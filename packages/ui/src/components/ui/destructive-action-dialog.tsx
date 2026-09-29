@@ -15,24 +15,34 @@ import {
 import { Input } from "./input";
 import { Label } from "./label";
 
-interface DestructiveActionDialogProps {
+/**
+ * Typing `confirmText` to unlock the action needs a label that names it;
+ * the caller writes it in the reader's language, the primitive holds no copy.
+ */
+type TypedConfirmation =
+  | { confirmText: string; confirmTextLabel: ReactNode }
+  | { confirmText?: never; confirmTextLabel?: never };
+
+type DestructiveActionDialogProps = TypedConfirmation & {
   trigger: ReactNode;
   title: string;
   description: ReactNode;
   actionLabel: string;
+  cancelLabel: string;
   onConfirm: () => void;
   isPending?: boolean;
-  confirmText?: string;
-}
+};
 
 export function DestructiveActionDialog({
   trigger,
   title,
   description,
   actionLabel,
+  cancelLabel,
   onConfirm,
   isPending = false,
   confirmText,
+  confirmTextLabel,
 }: DestructiveActionDialogProps) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -63,9 +73,7 @@ export function DestructiveActionDialog({
         </AlertDialogHeader>
         {requiresTyping && (
           <div className="flex flex-col gap-2">
-            <Label htmlFor="destructive-confirm-input">
-              Type <span className="font-mono font-semibold">{confirmText}</span> to confirm
-            </Label>
+            <Label htmlFor="destructive-confirm-input">{confirmTextLabel}</Label>
             <Input
               id="destructive-confirm-input"
               autoComplete="off"
@@ -78,7 +86,7 @@ export function DestructiveActionDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isPending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={!matched || isPending}

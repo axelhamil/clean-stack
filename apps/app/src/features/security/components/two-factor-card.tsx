@@ -30,6 +30,7 @@ interface TwoFactorCardProps {
 
 export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const guard = useImpersonationGuard();
   const action = enabled ? t("twoFactor.disableAction") : t("twoFactor.enableAction");
@@ -57,7 +58,7 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
               {action}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent closeLabel={tCommon("actions.close")}>
             <DialogHeader>
               <DialogTitle>{action}</DialogTitle>
               <DialogDescription>

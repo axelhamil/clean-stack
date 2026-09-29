@@ -44,6 +44,7 @@ const DEFAULT_VALUES: TokenFormInput = {
 
 function ApiTokensPage() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const qc = useQueryClient();
   const guard = useImpersonationGuard();
   const [creating, setCreating] = useState(false);
@@ -125,7 +126,7 @@ function ApiTokensPage() {
       )}
 
       <Dialog open={creating} onOpenChange={(open) => !open && setCreating(false)}>
-        <DialogContent>
+        <DialogContent closeLabel={tCommon("actions.close")}>
           <DialogHeader>
             <DialogTitle>{t("apiTokens.createDialogTitle")}</DialogTitle>
           </DialogHeader>

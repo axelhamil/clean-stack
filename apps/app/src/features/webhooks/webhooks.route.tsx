@@ -310,7 +310,7 @@ function WebhooksPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent closeLabel={t("common:actions.close")} className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editing

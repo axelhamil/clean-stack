@@ -347,7 +347,13 @@ export function CommandPalette() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title={t("commandPalette.title")}
+      description={t("commandPalette.description")}
+      closeLabel={t("actions.close")}
+    >
       <CommandInput placeholder={t("commandPalette.searchPlaceholder")} />
       <CommandList>
         <CommandEmpty>{t("commandPalette.noResults")}</CommandEmpty>

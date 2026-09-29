@@ -77,7 +77,7 @@ export function CookieBanner() {
         </div>
       </div>
       <Dialog open={customizeOpen} onOpenChange={setCustomizeOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent closeLabel={t("actions.close")} className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("cookieBanner.preferencesTitle")}</DialogTitle>
           </DialogHeader>

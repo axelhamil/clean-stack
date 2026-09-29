@@ -3,6 +3,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { buildDeletionOnError } from "../build-deletion-on-error";
 import { DeletionConfirmFooter } from "../components/deletion-confirm-footer";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
@@ -17,6 +18,7 @@ interface RequestDeletionPasswordFormProps {
 
 export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPasswordFormProps) {
   const { t } = useTranslation("settings");
+  const revealLabels = usePasswordRevealLabels();
   const { t: tErrors } = useTranslation("errors");
   const mutation = useRequestDeletion({ onClose });
   const form = useForm<RequestDeletionWithPasswordInput>({
@@ -46,6 +48,7 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
           name="password"
           label={t("deletion.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
           placeholder={t("deletion.passwordPlaceholder")}
         />

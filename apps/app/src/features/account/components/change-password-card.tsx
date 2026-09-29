@@ -22,6 +22,7 @@ import { ChangePasswordForm } from "../forms/change-password-form";
 
 export function ChangePasswordCard() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const guard = useImpersonationGuard();
 
@@ -38,7 +39,7 @@ export function ChangePasswordCard() {
               {t("account.changePasswordButton")}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent closeLabel={tCommon("actions.close")}>
             <DialogHeader>
               <DialogTitle>{t("account.changePasswordDialogTitle")}</DialogTitle>
               <DialogDescription>{t("account.changePasswordDialogDescription")}</DialogDescription>

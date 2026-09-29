@@ -5,6 +5,7 @@ import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { type ResetPasswordInput, resetPasswordSchema } from "../../../shared/auth/auth.schema";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { useResetPassword } from "../hooks/use-reset-password";
 
 interface ResetPasswordFormProps {
@@ -13,6 +14,7 @@ interface ResetPasswordFormProps {
 
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const { t } = useTranslation("auth");
+  const revealLabels = usePasswordRevealLabels();
   const mutation = useResetPassword(token);
 
   const form = useForm<ResetPasswordInput>({
@@ -32,6 +34,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           name="password"
           label={t("resetPassword.newPasswordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="new-password"
           placeholder={t("signIn.passwordPlaceholder")}
           description={t("passwordField.hint")}
@@ -42,6 +45,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           name="confirmPassword"
           label={t("resetPassword.confirmPasswordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="new-password"
           placeholder={t("signIn.passwordPlaceholder")}
         />

@@ -14,10 +14,12 @@ import { useForm } from "react-hook-form";
 import { Trans, useTranslation } from "react-i18next";
 import { type SignUpInput, signUpSchema } from "../../../shared/auth/auth.schema";
 import { PolicyLink } from "../../../shared/components/policy-link";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { useSignUp } from "../hooks/use-sign-up";
 
 export function SignUpForm() {
   const { t } = useTranslation("auth");
+  const revealLabels = usePasswordRevealLabels();
   const mutation = useSignUp();
 
   const form = useForm<SignUpInput>({
@@ -54,6 +56,7 @@ export function SignUpForm() {
           name="password"
           label={t("signIn.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="new-password"
           placeholder={t("signIn.passwordPlaceholder")}
           description={t("passwordField.hint")}

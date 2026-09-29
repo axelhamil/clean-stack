@@ -5,15 +5,28 @@ import { Button } from "./button";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "./form";
 import { Input } from "./input";
 
-interface FormTextFieldProps<
+/**
+ * A password field renders a reveal toggle, whose accessible name comes from
+ * the caller in the reader's language: the primitive holds no copy of its own.
+ */
+type RevealToggleLabels =
+  | { type: "password"; showPasswordLabel: string; hidePasswordLabel: string }
+  | {
+      type?: "text" | "email" | "url" | "tel" | "search" | "number";
+      showPasswordLabel?: never;
+      hidePasswordLabel?: never;
+    };
+
+type FormTextFieldProps<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>,
-> extends Omit<ComponentProps<typeof Input>, "name" | "form"> {
-  control: Control<TFieldValues>;
-  name: TName;
-  label: string;
-  description?: string;
-}
+> = Omit<ComponentProps<typeof Input>, "name" | "form" | "type"> &
+  RevealToggleLabels & {
+    control: Control<TFieldValues>;
+    name: TName;
+    label: string;
+    description?: string;
+  };
 
 export function FormTextField<
   TFieldValues extends FieldValues,
@@ -24,6 +37,8 @@ export function FormTextField<
   label,
   description,
   type,
+  showPasswordLabel,
+  hidePasswordLabel,
   ...inputProps
 }: FormTextFieldProps<TFieldValues, TName>) {
   const [revealed, setRevealed] = useState(false);
@@ -60,7 +75,7 @@ export function FormTextField<
                   size="icon-sm"
                   className="absolute inset-y-0 right-1 my-auto"
                   onClick={() => setRevealed((value) => !value)}
-                  aria-label={revealed ? "Hide password" : "Show password"}
+                  aria-label={revealed ? hidePasswordLabel : showPasswordLabel}
                   tabIndex={-1}
                 >
                   {revealed ? <EyeOffIcon /> : <EyeIcon />}

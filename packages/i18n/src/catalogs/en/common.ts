@@ -3,6 +3,9 @@ export default {
   actions: {
     save: "Save",
     cancel: "Cancel",
+    close: "Close",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     retry: "Retry",
     reload: "Reload",
   },
@@ -27,6 +30,8 @@ export default {
     logoAlt: "App logo",
   },
   commandPalette: {
+    title: "Command palette",
+    description: "Search for a page or an action to run.",
     searchPlaceholder: "Search pages, actions, organizations...",
     noResults: "No results found.",
     actionFailed: "Action failed",
