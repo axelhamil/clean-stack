@@ -9,6 +9,12 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import {
+  DescriptionDetails,
+  DescriptionItem,
+  DescriptionList,
+  DescriptionTerm,
+} from "@packages/ui/components/ui/description-list";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -145,14 +151,14 @@ function AdminUserDetailPage() {
           <CardTitle>{t("users.detail.identityTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span>{t("users.table.email")}</span>
-              <span>{user.email}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("users.table.role")}</span>
-              <span className="flex items-center gap-2">
+          <DescriptionList layout="inline">
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.table.email")}</DescriptionTerm>
+              <DescriptionDetails>{user.email}</DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.table.role")}</DescriptionTerm>
+              <DescriptionDetails>
                 {user.role ? (
                   <Badge variant="secondary">
                     {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
@@ -180,21 +186,21 @@ function AdminUserDetailPage() {
                     />
                   </DialogContent>
                 </Dialog>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("users.detail.twoFactorLabel")}</span>
-              <span>
+              </DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.detail.twoFactorLabel")}</DescriptionTerm>
+              <DescriptionDetails>
                 {user.twoFactorEnabled
                   ? t("users.detail.twoFactorEnabled")
                   : t("users.detail.twoFactorDisabled")}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("users.detail.memberSinceLabel")}</span>
-              <span>{formatDate(user.createdAt)}</span>
-            </div>
-          </div>
+              </DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.detail.memberSinceLabel")}</DescriptionTerm>
+              <DescriptionDetails>{formatDate(user.createdAt)}</DescriptionDetails>
+            </DescriptionItem>
+          </DescriptionList>
         </CardContent>
       </Card>
 
@@ -252,36 +258,36 @@ function AdminUserDetailPage() {
           </CardAction>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span>{t("users.table.status")}</span>
-              <span>
+          <DescriptionList layout="inline">
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.table.status")}</DescriptionTerm>
+              <DescriptionDetails>
                 {user.banned ? (
                   <Badge variant="destructive">{t(USER_STATUS_LABEL_KEYS.suspended)}</Badge>
                 ) : (
                   <Badge variant="outline">{t(USER_STATUS_LABEL_KEYS.active)}</Badge>
                 )}
-              </span>
-            </div>
+              </DescriptionDetails>
+            </DescriptionItem>
             {user.banReason && (
-              <div className="flex items-center justify-between">
-                <span>{t("users.detail.reasonLabel")}</span>
-                <span>{user.banReason}</span>
-              </div>
+              <DescriptionItem>
+                <DescriptionTerm>{t("users.detail.reasonLabel")}</DescriptionTerm>
+                <DescriptionDetails>{user.banReason}</DescriptionDetails>
+              </DescriptionItem>
             )}
             {user.banExpires !== null && (
-              <div className="flex items-center justify-between">
-                <span>{t("users.detail.expiresLabel")}</span>
-                <span>{formatDate(user.banExpires)}</span>
-              </div>
+              <DescriptionItem>
+                <DescriptionTerm>{t("users.detail.expiresLabel")}</DescriptionTerm>
+                <DescriptionDetails>{formatDate(user.banExpires)}</DescriptionDetails>
+              </DescriptionItem>
             )}
             {user.banned && user.banExpires === null && (
-              <div className="flex items-center justify-between">
-                <span>{t("users.detail.expiresLabel")}</span>
-                <span>{t("users.durationPermanent")}</span>
-              </div>
+              <DescriptionItem>
+                <DescriptionTerm>{t("users.detail.expiresLabel")}</DescriptionTerm>
+                <DescriptionDetails>{t("users.durationPermanent")}</DescriptionDetails>
+              </DescriptionItem>
             )}
-          </div>
+          </DescriptionList>
         </CardContent>
         <CardFooter className="flex-wrap gap-2">
           <Button

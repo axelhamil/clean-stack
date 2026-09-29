@@ -1,5 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@packages/ui/components/ui/card";
 import {
+  DescriptionDetails,
+  DescriptionItem,
+  DescriptionList,
+  DescriptionTerm,
+} from "@packages/ui/components/ui/description-list";
+import {
   Table,
   TableBody,
   TableCell,
@@ -51,20 +57,20 @@ function AdminOrgDetailPage() {
           <CardTitle>{t("orgs.detail.detailsTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span>{t("orgs.detail.slugLabel")}</span>
-              <span>{org.slug}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("orgs.detail.planLabel")}</span>
-              <span>{org.plan ?? EMPTY_VALUE}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("orgs.detail.createdLabel")}</span>
-              <span>{formatDate(org.createdAt)}</span>
-            </div>
-          </div>
+          <DescriptionList layout="inline">
+            <DescriptionItem>
+              <DescriptionTerm>{t("orgs.detail.slugLabel")}</DescriptionTerm>
+              <DescriptionDetails>{org.slug}</DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("orgs.detail.planLabel")}</DescriptionTerm>
+              <DescriptionDetails>{org.plan ?? EMPTY_VALUE}</DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("orgs.detail.createdLabel")}</DescriptionTerm>
+              <DescriptionDetails>{formatDate(org.createdAt)}</DescriptionDetails>
+            </DescriptionItem>
+          </DescriptionList>
         </CardContent>
       </Card>
 

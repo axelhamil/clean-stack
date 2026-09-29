@@ -1,4 +1,10 @@
 import { CodeBlock } from "@packages/ui/components/ui/code-block";
+import {
+  DescriptionDetails,
+  DescriptionItem,
+  DescriptionList,
+  DescriptionTerm,
+} from "@packages/ui/components/ui/description-list";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@packages/ui/components/ui/sheet";
 import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
@@ -39,16 +45,16 @@ export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
             <SheetHeader>
               <SheetTitle>{row.action}</SheetTitle>
             </SheetHeader>
-            <dl className="flex flex-col gap-2">
-              <div>
-                <dt className="text-sm font-medium">{t("auditLog.metadata.actorLabel")}</dt>
-                <dd className="text-sm">{row.actorId ?? EMPTY_VALUE}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium">{t("auditLog.metadata.occurredAtLabel")}</dt>
-                <dd className="text-sm">{formatDateTime(row.occurredAt)}</dd>
-              </div>
-            </dl>
+            <DescriptionList>
+              <DescriptionItem>
+                <DescriptionTerm>{t("auditLog.metadata.actorLabel")}</DescriptionTerm>
+                <DescriptionDetails>{row.actorId ?? EMPTY_VALUE}</DescriptionDetails>
+              </DescriptionItem>
+              <DescriptionItem>
+                <DescriptionTerm>{t("auditLog.metadata.occurredAtLabel")}</DescriptionTerm>
+                <DescriptionDetails>{formatDateTime(row.occurredAt)}</DescriptionDetails>
+              </DescriptionItem>
+            </DescriptionList>
             {diff ? (
               <div className="flex gap-4 overflow-x-auto">
                 <div className="flex flex-col gap-1">
