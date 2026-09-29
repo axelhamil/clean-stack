@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import { Progress } from "@packages/ui/components/ui/progress";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyP } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -50,10 +50,12 @@ function BillingPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {ent.maxMembers === null ? (
-            <span>{t("billing.unlimitedMembers")}</span>
+            <TypographyP>{t("billing.unlimitedMembers")}</TypographyP>
           ) : (
             <>
-              <span>{t("billing.membersUsage", { count: memberCount, max: ent.maxMembers })}</span>
+              <TypographyP>
+                {t("billing.membersUsage", { count: memberCount, max: ent.maxMembers })}
+              </TypographyP>
               <Progress
                 value={(memberCount / ent.maxMembers) * 100}
                 aria-label={t("billing.membersUsageAriaLabel")}

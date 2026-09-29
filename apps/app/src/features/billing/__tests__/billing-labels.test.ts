@@ -12,7 +12,7 @@ function resolve(key: string): string | undefined {
 }
 
 describe("TIER_KEYS", () => {
-  // `satisfies Record<Tier, string>` only proves every tier has AN entry —
+  // `satisfies Record<Tier, string>` only proves every tier has AN entry;
   // it does not prove each one points at the RIGHT one. A swapped pair
   // (e.g. `free` reading `billing.tier.pro`) still type-checks, so this
   // asserts the mapping itself, not just its exhaustiveness.
