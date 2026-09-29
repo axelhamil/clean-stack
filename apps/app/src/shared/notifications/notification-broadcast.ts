@@ -6,7 +6,7 @@ import {
   type UnreadCountResponse,
   unreadCountQueryOptions,
 } from "../api/queries/notifications";
-import { createBroadcastChannel } from "../hooks/use-broadcast-channel";
+import { createBroadcastChannel } from "../broadcast-channel";
 
 export type NotificationReadMessage = { ids: string[] } | { all: true };
 

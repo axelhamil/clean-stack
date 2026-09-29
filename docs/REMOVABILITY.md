@@ -156,6 +156,6 @@ Reference cartography for removing the in-app notification center. Walk the 6-ax
 | 6. **Front + docs** | `trash apps/app/src/shared/notifications/` (bell, item, matrix, grouping, labels, broadcast, stream hook) and `apps/app/src/features/notifications/`. `apps/app/src/shared/components/app-shell.tsx` — remove `<NotificationBell />`. `apps/app/routes.ts` — remove the `route("/notifications", ...)` entry. `contextual-tabs.tsx` — remove the "Notifications" tab. `features/organization/organization.route.tsx` + `components/org-notification-defaults-card.tsx` — remove the card. `shared/api/{queries,mutations}/notifications.ts` — delete. Docs: `FEATURES.md` (D.3 section), `OVERVIEW.md` (notification bullet), `EVENTS.md` (third-projection section), `CRON.md` (2 rows), `ROADMAP.md` (D.3 spec), `README.md` (M4 note), this section. |
 
 **What you do NOT touch**:
-- `shared/hooks/use-broadcast-channel.ts` — promoted out of `auth-broadcast.ts` and still used by the auth flow. Removing notifications does not orphan it.
+- `shared/broadcast-channel.ts` — promoted out of `auth-broadcast.ts` and still used by the auth flow. Removing notifications does not orphan it.
 - `EVENT_DESCRIPTIONS` in `@packages/events` — the inbox reuses it for row labels, but `/developers/events` and the webhook picker own it.
 - The outbox dispatcher and its subscriber list — removing one subscriber must leave audit and webhook fan-out untouched. That is the whole point of the rail.

@@ -1,4 +1,4 @@
-import { createBroadcastChannel } from "../hooks/use-broadcast-channel";
+import { createBroadcastChannel } from "../broadcast-channel";
 import { resetChosenLocale } from "../i18n/locale-reconciliation";
 
 type AuthEvent = { type: "session-changed"; identityChanged: boolean };
