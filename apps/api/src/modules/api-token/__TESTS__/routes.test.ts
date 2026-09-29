@@ -86,7 +86,7 @@ function makeApp() {
   return app;
 }
 
-describe("POST /settings/tokens — create", () => {
+describe("POST /settings/tokens: create", () => {
   it("returns 201 with raw token and safe record (no tokenHmac, no pepperVersion)", async () => {
     currentSession = { activeOrganizationId: null };
     const app = makeApp();
@@ -128,7 +128,7 @@ describe("POST /settings/tokens — create", () => {
   });
 });
 
-describe("GET /settings/tokens — list", () => {
+describe("GET /settings/tokens: list", () => {
   it("never exposes tokenHmac or the raw token value", async () => {
     currentSession = { activeOrganizationId: null };
     const app = makeApp();
@@ -145,7 +145,7 @@ describe("GET /settings/tokens — list", () => {
   });
 });
 
-describe("DELETE /settings/tokens/:id — wrong owner returns 404", () => {
+describe("DELETE /settings/tokens/:id: wrong owner returns 404", () => {
   it("returns 404 when the service reports API_TOKEN_NOT_FOUND", async () => {
     currentSession = { activeOrganizationId: null };
     mockRevoke.mockImplementationOnce(async () =>

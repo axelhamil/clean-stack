@@ -39,9 +39,9 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
           throw new HTTPException(403, { message: "Organization mismatch" });
         }
         const noop = async () => {};
-        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path — conditional middleware composition
+        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path (conditional middleware composition)
         await requireOrg(c as any, noop);
-        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path — conditional middleware composition
+        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path (conditional middleware composition)
         await requireOrgPermission({ apiToken: ["create"] })(c as any, noop);
       }
 

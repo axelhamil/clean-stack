@@ -81,7 +81,7 @@ describe("ApiTokenService", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Visibility scope — the list must hold both scopes the create form offers,
+// Visibility scope: the list must hold both scopes the create form offers,
 // and nothing else. The repository is deliberately made leaky here: what is
 // under test is the rule, not the WHERE clause that also encodes it.
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ const LEAKY_REPO_ROWS = [
   THEIRS_ACTIVE_ORG,
 ];
 
-describe("ApiTokenService.list — visibility scope", () => {
+describe("ApiTokenService.list: visibility scope", () => {
   const leakyRepo = () =>
     makeRepo({
       listByOwner: mock(async () => Result.ok<ApiTokenRecord[], ApiTokenError>(LEAKY_REPO_ROWS)),
@@ -163,7 +163,7 @@ describe("ApiTokenService.list — visibility scope", () => {
   });
 });
 
-describe("ApiTokenService.revoke — visibility scope", () => {
+describe("ApiTokenService.revoke: visibility scope", () => {
   const repoReturning = (found: ApiTokenRecord) =>
     makeRepo({
       findByIdForOwner: mock(async () =>
