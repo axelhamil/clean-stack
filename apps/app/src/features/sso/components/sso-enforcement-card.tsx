@@ -20,7 +20,7 @@ import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 
 // `ssoEnforced` is a server-only additionalField on the organization schema
-// (apps/api/src/auth.ts) — the organization client isn't generated with knowledge
+// (apps/api/src/auth.ts): the organization client isn't generated with knowledge
 // of it, so it has to be read through a narrow, explicit cast.
 interface OrgWithSsoEnforcement {
   ssoEnforced?: boolean;

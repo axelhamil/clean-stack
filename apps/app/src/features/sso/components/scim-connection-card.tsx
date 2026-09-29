@@ -30,8 +30,8 @@ export function ScimConnectionCard() {
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
   const provider = primaryProviderFor(providers, org?.id);
-  // The `scim` plugin is configured with `requiredRole: ["owner"]` in apps/api/src/auth.ts
-  // — showing this to an admin would only ever end in a 403.
+  // The `scim` plugin is configured with `requiredRole: ["owner"]` in apps/api/src/auth.ts:
+  // showing this to an admin would only ever end in a 403.
   const canGenerate = role === "owner";
 
   const generate = useMutation({

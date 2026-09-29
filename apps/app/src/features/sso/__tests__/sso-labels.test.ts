@@ -1,4 +1,4 @@
-import enCatalog from "@packages/i18n/src/catalogs/en";
+import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
 import { isSsoProviderType, SSO_PROVIDER_TYPE_KEYS } from "../sso-labels";
 
@@ -13,7 +13,7 @@ function resolve(key: string): string | undefined {
 
 describe("SSO_PROVIDER_TYPE_KEYS", () => {
   // `satisfies Record<SsoProviderType, string>` only proves every type has AN
-  // entry — it does not prove each one points at the RIGHT one. A swapped
+  // entry, not that each one points at the RIGHT one. A swapped
   // pair (e.g. `oidc` reading the `saml` key) still type-checks, so this
   // asserts the mapping itself, not just its exhaustiveness.
   it("maps each provider type to its own catalog key, never a swapped one", () => {

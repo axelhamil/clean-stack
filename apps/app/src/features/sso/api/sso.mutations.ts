@@ -7,14 +7,14 @@ import { env } from "../../../shared/env";
 import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { OidcProviderInput, SamlProviderInput } from "../sso.schema";
 
-// Providers aren't given an id by the operator — the server just wants a stable
+// Providers aren't given an id by the operator: the server just wants a stable
 // string. Deriving it from the domain keeps re-registrations of the same domain
 // idempotent instead of piling up rows against `providersLimit`.
 //
 // Two distinct domains can collide here (e.g. "eu-acme.com" and "eu.acme.com" both
 // slugify to "eu-acme-com"). Left unhandled on purpose: `providerId` is globally
 // unique server-side, so a collision surfaces as a clear registration error to the
-// second registrant rather than silently overwriting the first — loud, not silent.
+// second registrant rather than silently overwriting the first (loud, not silent).
 // A collision-resistant scheme isn't worth it: this id format is already carried in
 // SCIM tokens and audit rows.
 function providerIdFromDomain(domain: string): string {
@@ -60,7 +60,7 @@ export const registerSamlProviderMutationOptions = mutationOptions({
   }) => {
     const providerId = providerIdFromDomain(values.domain);
     // The server forces SHA-256 + signed assertions on every SAML registration
-    // (D8 hardening in apps/api/src/auth.ts) — the client never sends
+    // (D8 hardening in apps/api/src/auth.ts): the client never sends
     // `signatureAlgorithm`, there is no weaker option to offer.
     const { data, error } = await authClient.sso.register({
       providerId,
