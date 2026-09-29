@@ -36,15 +36,17 @@ interface CookieTableProps {
 }
 
 function CookieTable({ cookies, caption }: CookieTableProps) {
+  const { t } = useTranslation("common");
+
   return (
     <Table>
       <TableCaption>{caption}</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Provider</TableHead>
-          <TableHead>Purpose</TableHead>
-          <TableHead>Retention</TableHead>
+          <TableHead>{t("legal.cookies.table.name")}</TableHead>
+          <TableHead>{t("legal.cookies.table.provider")}</TableHead>
+          <TableHead>{t("legal.cookies.table.purpose")}</TableHead>
+          <TableHead>{t("legal.cookies.table.retention")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

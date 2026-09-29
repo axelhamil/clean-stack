@@ -95,7 +95,7 @@ export default {
     signOutFailed: "Sign-out failed",
   },
   impersonation: {
-    activeSession: "Active impersonation session: acting as <name></name>",
+    activeSession: "Active impersonation session: acting as <name></name>. {{remaining}}",
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",
@@ -152,6 +152,12 @@ export default {
       title: "Cookie policy",
       subtitle: "CNIL compliant · Last updated: 2026-07-09",
       tableCaption: "Cookies in the {{category}} category used by this application",
+      table: {
+        name: "Name",
+        provider: "Provider",
+        purpose: "Purpose",
+        retention: "Retention",
+      },
     },
     dataRights: {
       title: "Your data rights",

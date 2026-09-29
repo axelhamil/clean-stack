@@ -132,7 +132,9 @@ export function DeliverySheet({
                         </Badge>
                       </div>
                       {a.durationMs !== null && (
-                        <p className="text-muted-foreground">{a.durationMs} ms</p>
+                        <p className="text-muted-foreground">
+                          {t("webhooks.deliverySheet.duration", { ms: a.durationMs })}
+                        </p>
                       )}
                       {a.error && <p className="text-destructive">{a.error}</p>}
                       <RequestResponse attempt={a} />

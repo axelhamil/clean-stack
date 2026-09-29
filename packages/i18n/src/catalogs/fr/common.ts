@@ -95,7 +95,8 @@ export default {
     signOutFailed: "Échec de la déconnexion",
   },
   impersonation: {
-    activeSession: "Session d'emprunt d'identité active : agit en tant que <name></name>",
+    activeSession:
+      "Session d'emprunt d'identité active : agit en tant que <name></name>. {{remaining}}",
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
@@ -155,6 +156,12 @@ export default {
       title: "Politique de cookies",
       subtitle: "Conforme CNIL · Dernière mise à jour : 2026-07-09",
       tableCaption: "Cookies de la catégorie {{category}} utilisés par cette application",
+      table: {
+        name: "Nom",
+        provider: "Fournisseur",
+        purpose: "Finalité",
+        retention: "Conservation",
+      },
     },
     dataRights: {
       title: "Vos droits sur vos données",

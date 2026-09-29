@@ -132,6 +132,7 @@ export default {
     copy: "Copy",
     download: "Download",
     copiedToast: "Backup codes copied",
+    copyFailed: "Couldn't copy the backup codes. Download them instead.",
   },
   deletion: {
     scheduledTitle: "Account deletion scheduled",
@@ -278,6 +279,7 @@ export default {
       description: "Your acceptance status for the current versions of our policies.",
       loading: "Loading…",
       neverAccepted: "Never accepted",
+      acceptedVersion: "Accepted v{{version}}",
       upToDate: "Up to date",
       updateRequired: "Update required",
       loadError: "Could not load policy status.",
@@ -375,6 +377,7 @@ export default {
       attemptNumber: "Attempt #{{number}}",
       noResponse: "no response",
       payload: "Payload",
+      duration: "{{ms}} ms",
     },
     verifySnippetHeading: "Verify signatures (Node.js)",
     eventTypePicker: {

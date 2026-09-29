@@ -138,6 +138,7 @@ export default {
     copy: "Copier",
     download: "Télécharger",
     copiedToast: "Codes de secours copiés",
+    copyFailed: "Impossible de copier les codes de secours. Téléchargez-les à la place.",
   },
   deletion: {
     scheduledTitle: "Suppression du compte programmée",
@@ -289,6 +290,7 @@ export default {
       description: "Votre statut d'acceptation des versions actuelles de nos politiques.",
       loading: "Chargement…",
       neverAccepted: "Aucune version acceptée",
+      acceptedVersion: "v{{version}} acceptée",
       upToDate: "À jour",
       updateRequired: "Mise à jour requise",
       loadError: "Impossible de charger le statut des politiques.",
@@ -389,6 +391,7 @@ export default {
       attemptNumber: "Tentative n° {{number}}",
       noResponse: "aucune réponse",
       payload: "Charge utile",
+      duration: "{{ms}} ms",
     },
     verifySnippetHeading: "Vérifier les signatures (Node.js)",
     eventTypePicker: {

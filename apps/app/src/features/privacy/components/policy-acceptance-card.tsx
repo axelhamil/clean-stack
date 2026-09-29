@@ -35,7 +35,9 @@ export function PolicyAcceptanceCard() {
                 <ListRowAction>
                   <TypographyMuted>
                     {status.acceptedVersion
-                      ? `v${status.acceptedVersion}`
+                      ? t("privacy.policyAcceptance.acceptedVersion", {
+                          version: status.acceptedVersion,
+                        })
                       : t("privacy.policyAcceptance.neverAccepted")}
                   </TypographyMuted>
                   {status.current ? (

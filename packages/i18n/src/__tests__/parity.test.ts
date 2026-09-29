@@ -136,6 +136,8 @@ describe("catalog parity", () => {
     // header. The DPA link text next to it (`sub-processors.route.tsx`) is
     // the same acronym for the same reason and isn't a catalog key.
     "common.legal.subProcessors.table.dpa",
+    // "ms" is the SI unit symbol, written the same way in French.
+    "settings.webhooks.deliverySheet.duration",
   ] as const;
 
   const valueAt = (catalog: unknown, full: string): string | undefined => {
