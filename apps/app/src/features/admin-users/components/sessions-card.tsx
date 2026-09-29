@@ -21,6 +21,7 @@ interface SessionsCardProps {
 export function SessionsCard({ sessions }: SessionsCardProps) {
   const formatDate = useFormatDate();
   const { t } = useTranslation("admin");
+
   return (
     <Card>
       <CardHeader>
@@ -43,9 +44,9 @@ export function SessionsCard({ sessions }: SessionsCardProps) {
             <TableBody>
               {sessions.map((session) => (
                 <TableRow key={session.id}>
-                  <TableCell>{session.ipAddress ?? "—"}</TableCell>
+                  <TableCell>{session.ipAddress ?? "-"}</TableCell>
                   <TableCell className="max-w-xs overflow-hidden">
-                    {session.userAgent ?? "—"}
+                    {session.userAgent ?? "-"}
                   </TableCell>
                   <TableCell>{formatDate(session.createdAt)}</TableCell>
                   <TableCell>{formatDate(session.expiresAt)}</TableCell>

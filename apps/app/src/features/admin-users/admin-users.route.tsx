@@ -22,7 +22,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UserFilters } from "./admin-user-filters";
-import { PLATFORM_ROLE_LABEL_KEYS, USER_STATUS_LABEL_KEYS } from "./admin-user-labels";
+import {
+  isPlatformRole,
+  PLATFORM_ROLE_LABEL_KEYS,
+  USER_STATUS_LABEL_KEYS,
+} from "./admin-user-labels";
 import { adminUsersInfiniteQueryOptions } from "./api/admin-users.queries";
 import { UserRow } from "./components/user-row";
 
@@ -59,7 +63,7 @@ function AdminUsersPage() {
           onValueChange={(v) =>
             setFilters((f) => ({
               ...f,
-              role: v === "" ? undefined : (v as "admin" | "user"),
+              role: isPlatformRole(v) ? v : undefined,
             }))
           }
         >

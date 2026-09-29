@@ -18,6 +18,7 @@ interface UserRowProps {
 export function UserRow({ item }: UserRowProps) {
   const formatDate = useFormatDate();
   const { t } = useTranslation(["admin", "common"]);
+
   return (
     <TableRow>
       <TableCell>
@@ -34,7 +35,7 @@ export function UserRow({ item }: UserRowProps) {
             {isPlatformRole(item.role) ? t(PLATFORM_ROLE_LABEL_KEYS[item.role]) : item.role}
           </Badge>
         ) : (
-          <span>—</span>
+          "-"
         )}
       </TableCell>
       <TableCell>

@@ -23,7 +23,7 @@ function resolve(key: string): string | undefined {
 
 describe("PLATFORM_ROLE_LABEL_KEYS", () => {
   // `satisfies Record<PlatformRole, string>` only proves every role has AN
-  // entry — it does not prove each entry points at the RIGHT one. A swapped
+  // entry, not that each entry points at the RIGHT one. A swapped
   // pair (e.g. `admin` reading `admin:users.roleUser`) still type-checks, so
   // this asserts the mapping itself, not just its exhaustiveness.
   it("maps each role to its own catalog key, never a swapped one", () => {

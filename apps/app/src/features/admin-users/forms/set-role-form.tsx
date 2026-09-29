@@ -13,8 +13,8 @@ import { useTranslation } from "react-i18next";
 import type { PlatformRole } from "../admin-user-labels";
 import { type SetRoleFormInput, setRoleFormSchema } from "../admin-users.schema";
 
-// Module-level values stay module-level (recipe shape 4) — only the labels
-// move into a hook, since `t` doesn't exist outside a component.
+// Values stay module-level; only the labels move into a hook, since `t` only
+// exists inside a component.
 function useRoleOptions() {
   const { t } = useTranslation("admin");
   return [
@@ -26,7 +26,7 @@ function useRoleOptions() {
 interface SetRoleFormProps {
   /**
    * `null` when the account carries no platform role, or one this build does
-   * not recognize — the `role` column is nullable with no SQL default, so
+   * not recognize: the `role` column is nullable with no SQL default, so
    * legacy and imported accounts reach this form with nothing to preselect.
    * The select falls back to the platform's own default role, while the
    * "nothing changed yet" test keeps comparing against the real current value,

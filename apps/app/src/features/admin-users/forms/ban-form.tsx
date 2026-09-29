@@ -20,8 +20,8 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { type BanFormInput, banFormSchema } from "../admin-users.schema";
 
-// Module-level values stay module-level (recipe shape 4) — only the labels
-// move into a hook, since `t` doesn't exist outside a component.
+// Values stay module-level; only the labels move into a hook, since `t` only
+// exists inside a component.
 function useDurationOptions() {
   const { t } = useTranslation("admin");
   return [

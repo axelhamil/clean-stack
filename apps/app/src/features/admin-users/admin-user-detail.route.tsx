@@ -192,7 +192,7 @@ function AdminUserDetailPage() {
                     {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
                   </Badge>
                 ) : (
-                  "—"
+                  "-"
                 )}
                 <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
                   <DialogTrigger asChild>
