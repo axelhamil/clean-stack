@@ -29,14 +29,8 @@ function OrganizationPage() {
   const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
-  const { data: members = [] } = useQuery(
-    org ? orgMembersQueryOptions(org.id) : { ...orgMembersQueryOptions(""), enabled: false },
-  );
-  const { data: invitations = [] } = useQuery(
-    org
-      ? orgInvitationsQueryOptions(org.id)
-      : { ...orgInvitationsQueryOptions(""), enabled: false },
-  );
+  const { data: members = [] } = useQuery(orgMembersQueryOptions(org?.id ?? null));
+  const { data: invitations = [] } = useQuery(orgInvitationsQueryOptions(org?.id ?? null));
 
   if (!org) return <TypographyMuted>{t("organization.noActiveOrg")}</TypographyMuted>;
 

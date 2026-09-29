@@ -38,9 +38,7 @@ export function OrgDangerCard() {
   const { role } = useAuthorization();
   const { switchOrg } = useSetActiveOrg();
   const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
-  const { data: members = [] } = useQuery(
-    org ? orgMembersQueryOptions(org.id) : { ...orgMembersQueryOptions(""), enabled: false },
-  );
+  const { data: members = [] } = useQuery(orgMembersQueryOptions(org?.id ?? null));
 
   const onLeaveSuccess = async () => {
     const orgs = await queryClient.fetchQuery(orgsListQueryOptions);

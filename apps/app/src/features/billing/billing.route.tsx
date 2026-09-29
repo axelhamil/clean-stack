@@ -29,10 +29,7 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/bil
 function BillingPage() {
   const { t } = useTranslation("settings");
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
-  const { data: members = [] } = useQuery({
-    ...orgMembersQueryOptions(activeOrg?.id ?? ""),
-    enabled: !!activeOrg?.id,
-  });
+  const { data: members = [] } = useQuery(orgMembersQueryOptions(activeOrg?.id ?? null));
   const ent = useEntitlements();
   const portal = useOpenPortal();
   const guard = useImpersonationGuard();
