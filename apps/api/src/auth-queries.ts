@@ -355,3 +355,17 @@ export async function findMemberOf(
     .limit(1);
   return row;
 }
+
+// ── #15: SSO enforcement toggle (AdminActionService) ─────────────────────
+
+export async function setOrgSsoEnforced(
+  organizationId: string,
+  enforced: boolean,
+  tx?: Transaction,
+): Promise<void> {
+  const exec = tx ?? db;
+  await exec
+    .update(schema.organization)
+    .set({ ssoEnforced: enforced })
+    .where(eq(schema.organization.id, organizationId));
+}

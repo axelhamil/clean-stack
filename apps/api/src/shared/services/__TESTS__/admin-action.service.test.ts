@@ -1,9 +1,13 @@
 import { describe, expect, it, mock } from "bun:test";
 import { EventTypes } from "@packages/events";
+import { passthroughUow } from "../../__TESTS__/outbox-fakes";
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
+const realEventEmitter = await import("../../event-emitter");
+
 mock.module("../../event-emitter", () => ({
+  ...realEventEmitter,
   emitEvent: mock(
     async (
       _o: unknown,
@@ -28,6 +32,12 @@ const authApi = {
 
 mock.module("../../../auth", () => ({ auth: { api: authApi } }));
 
+const setOrgSsoEnforced = mock(
+  async (_organizationId: string, _enforced: boolean, _tx?: unknown) => {},
+);
+const realAuthQueries = await import("../../../auth-queries");
+mock.module("../../../auth-queries", () => ({ ...realAuthQueries, setOrgSsoEnforced }));
+
 const { AdminActionService } = await import("../admin-action.service");
 
 const instrumentation = {
@@ -37,24 +47,10 @@ const instrumentation = {
   setSpanAttributes: mock(() => {}),
 };
 
-const fakeTx = {
-  update: () => ({
-    set: () => ({
-      where: () => ({
-        toSQL: () => ({ sql: "update organization" }),
-        execute: async () => undefined,
-      }),
-    }),
-  }),
-} as never;
-
-const noopUow = {
-  startTransaction: async (cb: (tx: unknown) => unknown) => cb(fakeTx),
-  run: async (cb: (tx: unknown) => unknown) => cb(fakeTx),
-};
+const fakeTx = { tx: "admin-action" } as never;
 
 function service() {
-  return new AdminActionService({} as never, noopUow as never, instrumentation as never);
+  return new AdminActionService({} as never, passthroughUow(fakeTx), instrumentation as never);
 }
 
 function makeHeaders(token = "tok-1") {
@@ -201,6 +197,19 @@ describe("AdminActionService", () => {
   });
 
   describe("setSsoEnforcement", () => {
+    it("writes the flag inside the unit of work that emits the event", async () => {
+      setOrgSsoEnforced.mockClear();
+      const result = await service().setSsoEnforcement({
+        organizationId: "org-1",
+        enforced: true,
+        actorUserId: "owner-1",
+        viaPlatformAdmin: false,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(setOrgSsoEnforced).toHaveBeenCalledWith("org-1", true, fakeTx);
+    });
+
     it("records the platform admin as actor when lifting sso enforcement", async () => {
       emitted.length = 0;
       const result = await service().setSsoEnforcement({

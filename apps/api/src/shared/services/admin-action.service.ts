@@ -1,7 +1,7 @@
 import { type AppError, type IUnitOfWork, Result } from "@packages/ddd-kit";
-import { eq, multiTenantSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
+import { setOrgSsoEnforced } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
@@ -125,18 +125,7 @@ export class AdminActionService {
   }): ActionResult {
     return this.run("setSsoEnforcement", async () => {
       await this.uow.run(async (tx) => {
-        const query = tx
-          .update(multiTenantSchema.organization)
-          .set({ ssoEnforced: input.enforced })
-          .where(eq(multiTenantSchema.organization.id, input.organizationId));
-        await this.instrumentation.startSpan(
-          {
-            name: query.toSQL().sql,
-            op: "db.query",
-            attributes: { "db.system.name": "postgresql" },
-          },
-          () => query.execute(),
-        );
+        await setOrgSsoEnforced(input.organizationId, input.enforced, tx);
 
         await emitEvent(
           this.outbox,
