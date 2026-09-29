@@ -38,18 +38,18 @@ export default {
       actions: "Actions",
     },
     nav: {
-      organization: "Paramètres — Organisation",
-      billing: "Paramètres — Facturation",
-      webhooks: "Paramètres — Webhooks",
-      account: "Paramètres — Compte",
-      privacy: "Paramètres — Confidentialité",
-      eventCatalog: "Développeurs — Catalogue d'événements",
+      organization: "Paramètres : organisation",
+      billing: "Paramètres : facturation",
+      webhooks: "Paramètres : webhooks",
+      account: "Paramètres : compte",
+      privacy: "Paramètres : confidentialité",
+      eventCatalog: "Développeurs : catalogue d'événements",
     },
     organizationActive: "actif",
     admin: {
-      auditLog: "Administration — Journal d'audit",
-      accounts: "Administration — Comptes",
-      organizations: "Administration — Organisations",
+      auditLog: "Administration : journal d'audit",
+      accounts: "Administration : comptes",
+      organizations: "Administration : organisations",
     },
     theme: {
       light: "Thème : clair",
@@ -95,7 +95,7 @@ export default {
     signOutFailed: "Échec de la déconnexion",
   },
   impersonation: {
-    activeSession: "Session d'emprunt d'identité active — agit en tant que <name></name>",
+    activeSession: "Session d'emprunt d'identité active : agit en tant que <name></name>",
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
@@ -143,17 +143,17 @@ export default {
     policies: {
       privacyTitle: "Politique de confidentialité",
       termsTitle: "Conditions d'utilisation",
-      versionLine: "Version {{version}} — en vigueur le {{date}}",
+      versionLine: "Version {{version}} (en vigueur le {{date}})",
       unavailableBanner:
         "Ce document n'est pas encore disponible dans votre langue. Vous consultez la version anglaise ci-dessous.",
     },
     accessibility: {
       title: "Déclaration d'accessibilité",
-      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Dernière relecture : 2026-07-09",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA · Dernière relecture : 2026-07-09",
     },
     cookies: {
       title: "Politique de cookies",
-      subtitle: "Conforme CNIL — Dernière mise à jour : 2026-07-09",
+      subtitle: "Conforme CNIL · Dernière mise à jour : 2026-07-09",
       tableCaption: "Cookies de la catégorie {{category}} utilisés par cette application",
     },
     dataRights: {
@@ -163,7 +163,7 @@ export default {
     },
     subProcessors: {
       title: "Registre des sous-traitants",
-      subtitle: "RGPD Art. 28 — Dernière mise à jour : 2026-07-09",
+      subtitle: "RGPD Art. 28 · Dernière mise à jour : 2026-07-09",
       table: {
         name: "Nom",
         purpose: "Finalité",
@@ -213,7 +213,7 @@ export default {
     },
   },
   policyAcceptance: {
-    acceptedToast: "Documents acceptés — bienvenue !",
+    acceptedToast: "Documents acceptés, bienvenue !",
     acceptFailed: "Impossible d'enregistrer votre acceptation. Veuillez réessayer.",
   },
   legalFooter: {
@@ -226,7 +226,7 @@ export default {
   secretReveal: {
     title: "Secret de signature",
     description:
-      "Copiez-le maintenant — il ne s'affiche qu'une seule fois et ne pourra plus être récupéré.",
+      "Copiez-le maintenant : il ne s'affiche qu'une seule fois et ne pourra plus être récupéré.",
     secretLabel: "Secret",
     confirm: "Je l'ai enregistré",
   },
@@ -262,7 +262,7 @@ export default {
       "Invitez vos collègues, configurez la facturation et lancez-vous. Tout se trouve dans les Paramètres.",
     activityTitle: "Activité",
     activityDescription: "Événements récents dans votre espace de travail.",
-    activityEmpty: "Rien pour l'instant — votre activité apparaîtra ici.",
+    activityEmpty: "Rien pour l'instant. Votre activité apparaîtra ici.",
     usageTitle: "Utilisation",
     usageDescription: "Quota et limites pour la période en cours.",
     usageEmpty: "Branchez la mesure d'usage dès qu'une ressource facturable existe.",

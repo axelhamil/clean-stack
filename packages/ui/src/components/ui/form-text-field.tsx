@@ -35,7 +35,7 @@ export function FormTextField<
       control={control}
       name={name}
       render={({ field }) => {
-        // FormControl forwards the generated id onto its single child — it has to wrap
+        // FormControl forwards the generated id onto its single child: it has to wrap
         // the input itself, never the reveal-button wrapper, or the label labels a div.
         const input = (
           <FormControl>

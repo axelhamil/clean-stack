@@ -10,7 +10,7 @@ export default {
     allOption: "Tous",
     roleUser: "Utilisateur",
     suspendAccountTitle: "Suspendre le compte",
-    // Genuine cognate — "permanent" is spelled identically in French.
+    // Genuine cognate: "permanent" is spelled identically in French.
     durationPermanent: "Permanent",
     status: {
       active: "Actif",
@@ -40,7 +40,7 @@ export default {
       expiresLabel: "Expiration",
       revokeSessions: "Révoquer les sessions",
       resetPassword: "Réinitialiser le mot de passe",
-      // "Compte" agrees masculine — these describe the account, never the
+      // "Compte" agrees masculine: these describe the account, never the
       // person, so no gender is imposed on someone whose gender is unknown.
       banSuccessToast: "Compte suspendu.",
       unbanSuccessToast: "Compte réactivé.",
@@ -68,7 +68,7 @@ export default {
       // "Webhooks" cognate exemptions already in the parity gate.
       typeHeader: "Type",
       typeImpersonation: "Emprunt d'identité",
-      // "Normal" is spelled identically in French too — a genuine cognate.
+      // "Normal" is spelled identically in French too (a genuine cognate).
       typeNormal: "Normal",
     },
     banForm: {
@@ -99,7 +99,7 @@ export default {
       "Désactiver l'imposition du SSO permet aux membres de cette organisation de se reconnecter avec un mot de passe.",
     table: {
       name: "Nom",
-      // Genuine cognate — see the English catalog's comment.
+      // Genuine cognate, see the English catalog's comment.
       slug: "Slug",
       members: "Membres",
       created: "Date de création",

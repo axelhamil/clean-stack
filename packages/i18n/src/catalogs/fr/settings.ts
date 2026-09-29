@@ -61,7 +61,7 @@ export default {
       canceled: "Annulé",
       unpaid: "Impayé",
       incomplete: "Incomplet",
-      incompleteExpired: "Incomplet — expiré",
+      incompleteExpired: "Incomplet (expiré)",
       paused: "En pause",
     },
   },
@@ -357,7 +357,7 @@ export default {
     },
     endpointRow: {
       autoDisabledTooltip:
-        "Désactivé après des échecs de livraison répétés — réactivez pour réinitialiser",
+        "Désactivé après des échecs de livraison répétés (réactivez pour réinitialiser)",
       openActions: "Ouvrir les actions",
       viewDeliveries: "Voir les livraisons",
       edit: "Modifier",
@@ -467,7 +467,7 @@ export default {
     domainCard: {
       title: "Vérification du domaine",
       description:
-        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif — les membres de ce domaine ne peuvent pas se connecter via ce fournisseur — jusqu'à ce que l'enregistrement soit résolu.",
+        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif (les membres de ce domaine ne peuvent pas se connecter via ce fournisseur) jusqu'à ce que l'enregistrement soit résolu.",
       verifiedToast: "Domaine vérifié",
       verifiedBadge: "Vérifié",
       unverifiedBadge: "Non vérifié",
@@ -476,18 +476,18 @@ export default {
       checkNowAction: "Vérifier maintenant",
       alreadyVerified: "Ce domaine est déjà vérifié.",
       verifyFailed:
-        "Échec de la vérification — l'enregistrement DNS est introuvable. La propagation des changements DNS peut prendre du temps.",
+        "Échec de la vérification : l'enregistrement DNS est introuvable. La propagation des changements DNS peut prendre du temps.",
     },
     enforcementCard: {
       title: "Imposer le SSO",
       description:
-        "Une fois cette option activée, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès — le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
+        "Une fois cette option activée, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès : le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
       updatedToast: "Imposition du SSO mise à jour",
       switchAriaLabel: "Imposer le SSO pour votre domaine",
       enforcedLabel: "Imposé",
       notEnforcedLabel: "Non imposé",
       verifyDomainFirst:
-        "Vérifiez votre domaine avant d'imposer le SSO — sinon, plus personne sur ce domaine ne pourra se connecter.",
+        "Vérifiez votre domaine avant d'imposer le SSO, sinon plus personne sur ce domaine ne pourra se connecter.",
     },
     scimCard: {
       title: "Provisionnement SCIM",
@@ -498,7 +498,7 @@ export default {
       generateAction: "Générer le jeton",
       secretDialogTitle: "Jeton SCIM",
       secretDialogDescription:
-        "Copiez ce jeton maintenant — il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité.",
+        "Copiez ce jeton maintenant : il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité.",
     },
     forms: {
       oidc: {
