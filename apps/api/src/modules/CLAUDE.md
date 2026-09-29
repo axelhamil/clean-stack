@@ -34,7 +34,7 @@ modules/<context>/
 
 | Primitive | Use when… |
 |---|---|
-| `Result<T, E>` | Domain failure (validation, not-found, business rule). `Result.ok()` with no argument is overloaded to `Result<void, E>` — a success carrying a real value must pass it, so `Result.ok<string>()` no longer compiles. |
+| `Result<T, E>` | Domain failure (validation, not-found, business rule). `Result.ok()` with no argument is overloaded to `Result<void, E>`, and its single type parameter is the error: `Result.ok<string>()` compiles, but as `Result<void, string>`. What the type system guarantees is that a no-argument success can never be assigned to `Result<string, E>` (pinned by a `@ts-expect-error` in `packages/ddd-kit`), so a success carrying a real value must pass it. |
 | `Option<T>` | Absence is a valid state. **A port never expresses absence as `T \| null`** — `Result<Option<T>, E>` for a lookup that may find nothing, `Option<T>` for a record field that may be unset. `null` exists only inside a store while mapping a driver row, and is converted with `Option.fromNullable` before it leaves. **Why**: `T \| null` forces every caller to remember a guard the type does not impose; `Option` makes the check structural. The whole API was back-filled to this in Aug 2026 after the convention was found applied only to recent code. |
 | `AppError<TCode>` | Typed error suffix auto-mapping to HTTP via `httpStatusFromCode` (`*_NOT_FOUND`→404, `*_FORBIDDEN`→403). |
 | `IUnitOfWork<TTx>` | ≥ 2 repo writes that must be atomic. |
