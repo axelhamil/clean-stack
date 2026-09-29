@@ -2,6 +2,7 @@ import { describe, expect, it, mock, spyOn } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { ITransaction } from "../../../shared/transaction";
@@ -86,13 +87,6 @@ const noMasterKey: MasterKeyProvider = masterKeyProvider(undefined);
 const tx: IUnitOfWork<ITransaction> = {
   startTransaction: async (cb) => cb({} as ITransaction),
   run: async (cb) => cb({} as ITransaction),
-};
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: mock(async () => {}),
-  findPendingBatch: mock(async () => []),
-  markDispatched: mock(async () => {}),
-  markFailed: mock(async () => {}),
 };
 
 function makeEndpoints(

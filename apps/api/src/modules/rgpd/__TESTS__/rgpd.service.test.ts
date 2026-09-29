@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { noopOutbox, recordingOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
@@ -65,30 +66,12 @@ const tx: IUnitOfWork<never> = {
   },
 };
 
-const noopOutbox: IOutboxRepository = {
-  enqueue: async () => {},
-  findPendingBatch: async () => [],
-  markDispatched: async () => {},
-  markFailed: async () => {},
-};
-
 function graceElapsedStateFor(userId: string): UserDeletionState {
   return {
     ...baseState,
     email: `${userId}@example.com`,
     pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
   };
-}
-
-function recordingOutbox() {
-  const enqueued: Array<{ eventType: string; aggregateId: string }> = [];
-  const outbox: IOutboxRepository = {
-    ...noopOutbox,
-    enqueue: async (events) => {
-      for (const e of events) enqueued.push({ eventType: e.eventType, aggregateId: e.aggregateId });
-    },
-  };
-  return { outbox, enqueued };
 }
 
 function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {

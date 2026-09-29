@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
+import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import * as realAead from "../../../shared/aead";
 import type { Logger } from "../../../shared/logger";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
@@ -191,13 +192,6 @@ function makeOutbox() {
   };
   return { outbox, enqueueCalls };
 }
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: mock(async () => {}),
-  findPendingBatch: mock(async () => []),
-  markDispatched: mock(async () => {}),
-  markFailed: mock(async () => {}),
-};
 
 const FAKE_ENDPOINT = {
   id: "ep-1",

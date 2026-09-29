@@ -90,7 +90,7 @@ See `docs/EVENTS.md` for full DX guide + retention map + BetterAuth bridge speci
 
 ## Testing
 
-BDD style. One test file per service, use case, store/repository, DTO or route file under `__TESTS__/` (services group `describe` per method). Mock at repository/port level. Test `Result`/`Option` state transitions.
+BDD style. One test file per service, use case, store/repository, DTO or route file under `__TESTS__/` (services group `describe` per method). Mock at repository/port level. Test `Result`/`Option` state transitions. Outbox and unit-of-work doubles (`noopOutbox`, `recordingOutbox`, `passthroughUow`) come from `shared/__TESTS__/outbox-fakes.ts`, never a local copy.
 
 **Substitute through the seam the code already has, before reaching for a module replacement.** A handler that takes its collaborators as arguments, a route factory that takes a `deps` object, a class that takes its repository in the constructor — pass a fake and the substitution is scoped by construction, typed against the real port, and visible in the test's first ten lines. Replacing the module is the fallback for the cases with no seam (a module-level singleton like `db`, a third-party SDK, a lib the code imports directly). **Why**: injection cannot reach past the object under test, so it cannot be the reason another test's verdict changed — and the day a collaborator gains a method, the compiler names every fake that must grow, which no module stand-in ever does. `github-key-verifier.test.ts` is the reference shape. The isolation rule in `../shared/CLAUDE.md` is what makes the fallback safe; it is not a reason to prefer it.
 

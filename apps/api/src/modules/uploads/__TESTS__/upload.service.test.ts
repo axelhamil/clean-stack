@@ -1,6 +1,6 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
+import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -33,13 +33,6 @@ const CDN_PREFIX = "https://cdn.example.com/";
 function publicUrlOf(key: string): string {
   return `${CDN_PREFIX}${key}`;
 }
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: mock(async () => {}),
-  findPendingBatch: mock(async () => []),
-  markDispatched: mock(async () => {}),
-  markFailed: mock(async () => {}),
-};
 
 function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService {
   return {

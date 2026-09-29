@@ -1,8 +1,11 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
+import {
+  noopOutbox,
+  passthroughUow,
+  recordingOutbox,
+} from "../../../shared/__TESTS__/outbox-fakes";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   ConsentError,
@@ -12,18 +15,6 @@ import type {
 import { ConsentService } from "../application/services/consent.service";
 
 const fakeTx = {} as never;
-
-const noopUow: IUnitOfWork<never> = {
-  startTransaction: async (cb) => cb(fakeTx),
-  run: async (cb) => cb(fakeTx),
-};
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: async () => {},
-  findPendingBatch: async () => [],
-  markDispatched: async () => {},
-  markFailed: async () => {},
-};
 
 const activeRow: ConsentRecordRow = {
   id: "row-1",
@@ -37,18 +28,6 @@ const activeRow: ConsentRecordRow = {
   ipAddress: Option.none(),
   userAgent: Option.none(),
 };
-
-function recordingOutbox() {
-  const enqueued: Array<{ eventType: string; aggregateId: string; payload: unknown }> = [];
-  const outbox: IOutboxRepository = {
-    ...noopOutbox,
-    enqueue: async (events) => {
-      for (const e of events)
-        enqueued.push({ eventType: e.eventType, aggregateId: e.aggregateId, payload: e.payload });
-    },
-  };
-  return { outbox, enqueued };
-}
 
 function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
   return {
@@ -69,7 +48,12 @@ describe("ConsentService", () => {
     it("inserts row with 'necessary' always included and emits USER_COOKIE_CONSENT_GRANTED", async () => {
       const { outbox: spyOutbox, enqueued } = recordingOutbox();
       const store = makeStore();
-      const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.record({
         subjectId: "subj-1",
@@ -103,7 +87,12 @@ describe("ConsentService", () => {
         ),
       });
       const { outbox, enqueued } = recordingOutbox();
-      const service = new ConsentService(store, outbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        outbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.record({ subjectId: "subj-1", categories: [] });
 
@@ -118,7 +107,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        noopOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.record({
         subjectId: "subj-1",
@@ -139,7 +133,12 @@ describe("ConsentService", () => {
     it("inserts a withdrawal row with empty categories + withdrawnAt set and emits USER_COOKIE_CONSENT_WITHDRAWN", async () => {
       const { outbox: spyOutbox, enqueued } = recordingOutbox();
       const store = makeStore();
-      const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.withdraw({ subjectId: "subj-1" });
 
@@ -167,7 +166,12 @@ describe("ConsentService", () => {
         ),
       });
       const { outbox, enqueued } = recordingOutbox();
-      const service = new ConsentService(store, outbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        outbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.withdraw({ subjectId: "subj-1" });
 
@@ -184,7 +188,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        noopOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.getActive("subj-1", "2026-07-09", "u1");
 
@@ -204,7 +213,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        noopOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.getActive("subj-1", "2026-07-09", "u1");
 
@@ -221,7 +235,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        noopOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.getActive("subj-1", "2026-07-09");
 
@@ -238,7 +257,12 @@ describe("ConsentService", () => {
       const store = makeStore({
         linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>(["c1", "c2"])),
       });
-      const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        passthroughUow(fakeTx),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.reconcile("subj-1", "u1");
 
@@ -258,7 +282,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         makeStore(),
         spyOutbox,
-        noopUow,
+        passthroughUow(fakeTx),
         new NoOpInstrumentation(),
       );
 
