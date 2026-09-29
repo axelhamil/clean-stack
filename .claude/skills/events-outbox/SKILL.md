@@ -9,16 +9,16 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 ## BetterAuth → outbox bridge (`auth.ts`)
 
-- **`databaseHooks` for core models** (user/session/account/verification) — TX-bound, all flows. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.
-- **`hooks.after` + `createAuthMiddleware` for plugin events** (twoFactor, passkey, email-verified, password-changed, link-social) — path-based. **Guard `if (ctx.context.returned instanceof APIError) return`** — otherwise events fire on 4xx.
-- **`hooks.before` + `createAuthMiddleware` for pre-rejection signals** (abuse-prevention: disposable-email, credential-stuffing, HIBP) — emits before `throw APIError`. **Trap**: `ctx.context.request`/`ctx.context.session` are `undefined` in before-hooks (runs before session middleware) — read IP from `ctx.headers`; load actor via `auth.api.getSession({ headers: ctx.headers })`. Wiring `ctx.context.*` throws before the emit → event silently lost + 500. Only end-to-end tests catch this (unit tests don't mount hooks).
+- **`databaseHooks` for core models** (user/session/account/verification), TX-bound, all flows. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.
+- **`hooks.after` + `createAuthMiddleware` for plugin events** (twoFactor, passkey, email-verified, password-changed, link-social): path-based. **Guard `if (ctx.context.returned instanceof APIError) return`**, otherwise events fire on 4xx.
+- **`hooks.before` + `createAuthMiddleware` for pre-rejection signals** (abuse-prevention: disposable-email, credential-stuffing, HIBP): emits before `throw APIError`. **Trap**: `ctx.context.request`/`ctx.context.session` are `undefined` in before-hooks (runs before session middleware), read IP from `ctx.headers`; load actor via `auth.api.getSession({ headers: ctx.headers })`. Wiring `ctx.context.*` throws before the emit → event silently lost + 500. Only end-to-end tests catch this (unit tests don't mount hooks).
 - **Native callbacks**: `emailAndPassword.{sendResetPassword,onPasswordReset}`, `magicLink.sendMagicLink`.
 
 `organizationHooks` covers all org/member/invitation events.
 
 ## Hard rules
 
-`uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints — guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
+`uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints, guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
 
 ## Retention
 

@@ -34,18 +34,18 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_stack
-      # The preview server, not the dev server — CORS, CSRF and BetterAuth all read this.
+      # The preview server, not the dev server: CORS, CSRF and BetterAuth all read this.
       CORS_ORIGIN: http://localhost:4173
       APP_URL: http://localhost:4173
       # The guard resolves MX records; leaving it on would make the seed depend on DNS.
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
       # Pinned explicitly so the CI log states which account the checks run
       # against. Both db:seed and check:fanout resolve it through
-      # apps/api/scripts/seed-account.ts, which holds the same default — so
+      # apps/api/scripts/seed-account.ts, which holds the same default, so
       # they stay aligned whether or not this var is set.
       SEED_EMAIL: dev@example.com
       # check:sweep-lock and check:fanout sign requests against the ephemeral CI
-      # Postgres above — this key never authenticates a real deployment, so it can
+      # Postgres above; this key never authenticates a real deployment, so it can
       # live in the workflow. apps/api/.env.example deliberately ships this var
       # empty (fail-closed on every /internal/* route, including rgpd-sweep) rather
       # than a shared placeholder that would ship a working key into every
@@ -96,12 +96,12 @@ jobs:
         run: pnpm --filter api check:fanout
 
       - name: Check the digest window against a real database
-        # Same reason as check:fanout — the frequency cascade and the due filter
+        # Same reason as check:fanout: the frequency cascade and the due filter
         # live inside SQL, which a mocked tx never evaluates. Needs the seed too.
         run: pnpm --filter api check:digest
 
       - name: Check api-token owner visibility against a real database
-        # Same reason as check:fanout — `visibleTokensFilter` builds a WHERE
+        # Same reason as check:fanout: `visibleTokensFilter` builds a WHERE
         # clause with and/or/eq/isNull, which a mocked tx never evaluates.
         # Needs the seed too.
         run: pnpm --filter api check:api-token-visibility
@@ -117,7 +117,7 @@ jobs:
         run: pnpm --filter api check:uow-rollback
 
       - name: Check the email-queue enqueue conflict against a real database
-        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape — a
+        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape; a
         # mocked tx asserts the call, never the outcome.
         run: pnpm --filter api check:enqueue
 
@@ -155,7 +155,7 @@ jobs:
         if: failure()
         # A failure before the API is started leaves no log; `cat` would then
         # fail too and bury the real error under a missing-file one.
-        run: cat /tmp/api.log || echo "no api log — the run failed before the API started" 
+        run: cat /tmp/api.log || echo "no api log, the run failed before the API started" 
 
       - uses: actions/upload-artifact@v4
         if: failure()
