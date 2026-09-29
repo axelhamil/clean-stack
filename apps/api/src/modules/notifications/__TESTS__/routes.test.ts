@@ -9,20 +9,19 @@ import { listQuerySchema, markReadSchema, preferenceSchema } from "../notificati
 
 // ── Schema tests ───────────────────────────────────────────────────────────
 
-describe("schemas de notification", () => {
-  it("limit par defaut a 20 et plafonne a 50", () => {
+describe("notification schemas", () => {
+  it("defaults limit to 20 and caps it at 50", () => {
     expect(listQuerySchema.parse({}).limit).toBe(20);
     expect(listQuerySchema.safeParse({ limit: 51 }).success).toBe(false);
   });
 
-  it("markRead refuse un tableau vide", () => {
+  it("markRead rejects an empty array", () => {
     expect(markReadSchema.safeParse({ ids: [] }).success).toBe(false);
   });
 
-  it("preference refuse une categorie inconnue", () => {
+  it("preference rejects an unknown category", () => {
     expect(
-      preferenceSchema.safeParse({ category: "inexistante", channel: "email", enabled: true })
-        .success,
+      preferenceSchema.safeParse({ category: "unknown", channel: "email", enabled: true }).success,
     ).toBe(false);
   });
 });
@@ -56,7 +55,12 @@ const mockList = mock(
 );
 const mockUnreadCount = mock(async (): Promise<Result<number, NotificationError>> => Result.ok(3));
 const mockMarkRead = mock(
-  async (): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
+  async (
+    _userId: string,
+    _ids: string[],
+    _now: Date,
+    _tx?: unknown,
+  ): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
 );
 const mockMarkAllRead = mock(
   async (): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
@@ -64,8 +68,8 @@ const mockMarkAllRead = mock(
 const mockListPreferences = mock(
   async (): Promise<Result<PreferenceRecord[], NotificationError>> => Result.ok([PREFERENCE]),
 );
-// Les parametres sont declares — sans eux `mock.calls` est type `[]` et les
-// assertions sur le handle de transaction ne compilent pas.
+// The parameters are declared: without them `mock.calls` is typed `[]` and
+// the assertions on the transaction handle do not compile.
 const mockUpsertPreference = mock(
   async (_input: unknown, _tx?: unknown): Promise<Result<void, NotificationError>> => Result.ok(),
 );
@@ -146,7 +150,7 @@ function makeApp() {
 }
 
 describe("GET /notifications - list", () => {
-  it("renvoie les items avec les Options serialises en null", async () => {
+  it("returns items with Options serialised as null", async () => {
     currentSession = {};
     const app = makeApp();
     const res = await app.request("/notifications");
@@ -161,7 +165,7 @@ describe("GET /notifications - list", () => {
 });
 
 describe("GET /notifications/unread-count", () => {
-  it("renvoie le compte des non lues", async () => {
+  it("returns the unread count", async () => {
     currentSession = {};
     const app = makeApp();
     const res = await app.request("/notifications/unread-count");
@@ -173,7 +177,7 @@ describe("GET /notifications/unread-count", () => {
 });
 
 describe("POST /notifications/read - mark-read", () => {
-  it("retourne ok quand les ids sont valides", async () => {
+  it("returns ok when the ids are valid", async () => {
     currentSession = {};
     mockMarkRead.mockClear();
     const app = makeApp();
@@ -186,7 +190,7 @@ describe("POST /notifications/read - mark-read", () => {
     expect(mockMarkRead).toHaveBeenCalledTimes(1);
   });
 
-  it("rejette une session impersonnifiee (403)", async () => {
+  it("rejects an impersonated session (403)", async () => {
     currentSession = { impersonatedBy: "admin-99" };
     mockMarkRead.mockClear();
     const app = makeApp();
@@ -199,7 +203,7 @@ describe("POST /notifications/read - mark-read", () => {
     expect(mockMarkRead).not.toHaveBeenCalled();
   });
 
-  it("rejette un tableau vide (400)", async () => {
+  it("rejects an empty array (400)", async () => {
     currentSession = {};
     const app = makeApp();
     const res = await app.request("/notifications/read", {
@@ -211,8 +215,8 @@ describe("POST /notifications/read - mark-read", () => {
   });
 });
 
-describe("POST /notifications/read - evenement de domaine", () => {
-  it("emet notification.read dans la meme transaction", async () => {
+describe("POST /notifications/read - domain event", () => {
+  it("emits notification.read in the same transaction", async () => {
     currentSession = {};
     mockMarkRead.mockClear();
     mockEnqueue.mockClear();
@@ -234,10 +238,11 @@ describe("POST /notifications/read - evenement de domaine", () => {
       count: 1,
       notificationIds: ["notif-1"],
     });
-    expect(tx).toBeDefined();
+    expect(tx).toBe(TX);
+    expect(mockMarkRead.mock.calls[0]?.[3]).toBe(TX);
   });
 
-  it("repond 404 et n'emet rien sur la notification d'autrui", async () => {
+  it("answers 404 and emits nothing for someone else's notification", async () => {
     currentSession = {};
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok([]));
@@ -245,14 +250,14 @@ describe("POST /notifications/read - evenement de domaine", () => {
     const res = await app.request("/notifications/read", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ids: ["notif-etranger"] }),
+      body: JSON.stringify({ ids: ["notif-foreign"] }),
     });
 
     expect(res.status).toBe(404);
     expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  it("refuse le lot entier quand un seul id est etranger", async () => {
+  it("refuses the whole batch when a single id is foreign", async () => {
     currentSession = {};
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok(["notif-1"]));
@@ -260,14 +265,14 @@ describe("POST /notifications/read - evenement de domaine", () => {
     const res = await app.request("/notifications/read", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ids: ["notif-1", "notif-etranger"] }),
+      body: JSON.stringify({ ids: ["notif-1", "notif-foreign"] }),
     });
 
     expect(res.status).toBe(404);
     expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  it("tolere un id repete dans le corps de la requete", async () => {
+  it("tolerates a repeated id in the request body", async () => {
     currentSession = {};
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok(["notif-1"]));
@@ -282,7 +287,7 @@ describe("POST /notifications/read - evenement de domaine", () => {
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
   });
 
-  it("read-all rapporte un compte sans recopier des ids non bornes", async () => {
+  it("read-all reports a count without copying unbounded ids", async () => {
     currentSession = {};
     mockEnqueue.mockClear();
     mockMarkAllRead.mockImplementationOnce(async () => Result.ok(["a", "b", "c"]));
@@ -302,7 +307,7 @@ describe("POST /notifications/read - evenement de domaine", () => {
 });
 
 describe("POST /notifications/read-all", () => {
-  it("rejette une session impersonnifiee (403)", async () => {
+  it("rejects an impersonated session (403)", async () => {
     currentSession = { impersonatedBy: "admin-99" };
     mockMarkAllRead.mockClear();
     const app = makeApp();
@@ -311,7 +316,7 @@ describe("POST /notifications/read-all", () => {
     expect(mockMarkAllRead).not.toHaveBeenCalled();
   });
 
-  it("retourne ok pour une session normale", async () => {
+  it("returns ok for a regular session", async () => {
     currentSession = {};
     const app = makeApp();
     const res = await app.request("/notifications/read-all", { method: "POST" });
@@ -320,7 +325,7 @@ describe("POST /notifications/read-all", () => {
 });
 
 describe("GET /notifications/preferences", () => {
-  it("renvoie les preferences utilisateur", async () => {
+  it("returns the user preferences", async () => {
     currentSession = {};
     const app = makeApp();
     const res = await app.request("/notifications/preferences");
@@ -332,7 +337,7 @@ describe("GET /notifications/preferences", () => {
 });
 
 describe("PUT /notifications/preferences", () => {
-  it("sauvegarde la preference et retourne ok", async () => {
+  it("saves the preference and returns ok", async () => {
     currentSession = {};
     mockUpsertPreference.mockClear();
     const app = makeApp();
@@ -345,7 +350,7 @@ describe("PUT /notifications/preferences", () => {
     expect(mockUpsertPreference).toHaveBeenCalledTimes(1);
   });
 
-  it("ecrit la preference et emet l'evenement dans la meme transaction", async () => {
+  it("writes the preference and emits the event in the same transaction", async () => {
     currentSession = {};
     mockUpsertPreference.mockClear();
     mockEnqueue.mockClear();
@@ -356,15 +361,15 @@ describe("PUT /notifications/preferences", () => {
       body: JSON.stringify({ category: "billing", channel: "email", enabled: false }),
     });
     expect(res.status).toBe(200);
-    // Le compte d'appels ne prouve rien : les deux ecritures peuvent tres bien
-    // avoir lieu hors transaction. Ce qui compte est qu'elles portent le MEME
-    // handle — un crash entre les deux laisserait sinon une preference changee
-    // sans evenement, donc sans trace d'audit.
+    // A call count proves nothing: both writes could just as well run outside
+    // the transaction. What matters is that they carry the SAME handle,
+    // otherwise a crash between them would leave a changed preference with no
+    // event, hence no audit trail.
     expect(mockUpsertPreference.mock.calls[0]?.[1]).toBe(TX);
     expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
   });
 
-  it("rejette une session impersonnifiee (403)", async () => {
+  it("rejects an impersonated session (403)", async () => {
     currentSession = { impersonatedBy: "admin-99" };
     const app = makeApp();
     const res = await app.request("/notifications/preferences", {
@@ -377,7 +382,7 @@ describe("PUT /notifications/preferences", () => {
 });
 
 describe("GET /notifications/org-preferences", () => {
-  it("exige un org actif (403 sans org)", async () => {
+  it("requires an active org (403 without one)", async () => {
     currentSession = {};
     allowOrgPermission = true;
     const app = makeApp();
@@ -385,7 +390,7 @@ describe("GET /notifications/org-preferences", () => {
     expect(res.status).toBe(403);
   });
 
-  it("rejette un membre sans la capability organization:update (403)", async () => {
+  it("rejects a member without the organization:update capability (403)", async () => {
     currentSession = { activeOrganizationId: "org-1" };
     allowOrgPermission = false;
     const app = makeApp();
@@ -394,7 +399,7 @@ describe("GET /notifications/org-preferences", () => {
     allowOrgPermission = true;
   });
 
-  it("renvoie les preferences org quand la capability est presente", async () => {
+  it("returns the org preferences when the capability is present", async () => {
     currentSession = { activeOrganizationId: "org-1" };
     allowOrgPermission = true;
     const app = makeApp();
@@ -407,7 +412,7 @@ describe("GET /notifications/org-preferences", () => {
 });
 
 describe("PUT /notifications/org-preferences", () => {
-  it("sauvegarde la preference org et retourne ok", async () => {
+  it("saves the org preference and returns ok", async () => {
     currentSession = { activeOrganizationId: "org-1" };
     mockUpsertPreference.mockClear();
     const app = makeApp();
@@ -425,7 +430,7 @@ describe("PUT /notifications/org-preferences", () => {
     expect(mockUpsertPreference).toHaveBeenCalledTimes(1);
   });
 
-  it("ecrit la preference org et emet l'evenement dans la meme transaction", async () => {
+  it("writes the org preference and emits the event in the same transaction", async () => {
     currentSession = { activeOrganizationId: "org-1" };
     mockUpsertPreference.mockClear();
     mockEnqueue.mockClear();
@@ -441,14 +446,14 @@ describe("PUT /notifications/org-preferences", () => {
       }),
     });
     expect(res.status).toBe(200);
-    // Meme raison que cote user : le verrouillage org est un evenement
-    // compliance, une preference verrouillee sans evenement est un trou
-    // d'audit que rien ne rattrape apres coup.
+    // Same reason as on the user side: an org lock is a compliance event, and
+    // a locked preference without an event is an audit gap nothing can
+    // recover afterwards.
     expect(mockUpsertPreference.mock.calls[0]?.[1]).toBe(TX);
     expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
   });
 
-  it("rejette une session impersonnifiee (403)", async () => {
+  it("rejects an impersonated session (403)", async () => {
     currentSession = { activeOrganizationId: "org-1", impersonatedBy: "admin-99" };
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences", {
