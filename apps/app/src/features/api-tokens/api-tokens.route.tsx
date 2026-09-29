@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -102,7 +102,7 @@ function ApiTokensPage() {
       ) : tokens.isError ? (
         <p>{t("apiTokens.loadFailed")}</p>
       ) : tokens.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">{t("apiTokens.empty")}</p>
+        <TypographyMuted>{t("apiTokens.empty")}</TypographyMuted>
       ) : (
         <Table>
           <TableHeader>

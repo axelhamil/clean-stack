@@ -43,7 +43,7 @@ export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: Toke
           ))}
         </div>
       </TableCell>
-      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : "—"}</TableCell>
+      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : "-"}</TableCell>
       <TableCell>
         {token.expiresAt ? formatDate(token.expiresAt) : t("apiTokens.neverExpires")}
       </TableCell>

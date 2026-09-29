@@ -10,6 +10,7 @@ import {
   FormMessage,
 } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
+import { Label } from "@packages/ui/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -23,12 +24,22 @@ import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
-import {
-  API_SCOPES,
-  type TokenFormInput,
-  tokenFormSchema,
-  useExpiryOptions,
-} from "../api-tokens.schema";
+import { API_SCOPES, type TokenFormInput, tokenFormSchema } from "../api-tokens.schema";
+
+// Values stay module-level; only the labels need `t`, which exists only inside a
+// component. The 365-day option goes through the year plural (`expiryYears`,
+// count: 1) rather than the day plural, so it renders "1 year", not "365 days".
+function useExpiryOptions() {
+  const { t } = useTranslation("settings");
+
+  return [
+    { label: t("apiTokens.expiryDays", { count: 30 }), value: 30 },
+    { label: t("apiTokens.expiryDays", { count: 60 }), value: 60 },
+    { label: t("apiTokens.expiryDays", { count: 90 }), value: 90 },
+    { label: t("apiTokens.expiryYears", { count: 1 }), value: 365 },
+    { label: t("apiTokens.expiryNever"), value: null },
+  ] as const;
+}
 
 interface TokenFormProps {
   defaultValues: TokenFormInput;
@@ -58,7 +69,7 @@ export function TokenForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
         <FormTextField
           control={form.control}
           name="name"
@@ -85,9 +96,7 @@ export function TokenForm({
                         field.onChange(next);
                       }}
                     />
-                    <label htmlFor={`scope-${scope}`} className="cursor-pointer font-mono text-sm">
-                      {scope}
-                    </label>
+                    <Label htmlFor={`scope-${scope}`}>{scope}</Label>
                   </div>
                 ))}
               </div>
