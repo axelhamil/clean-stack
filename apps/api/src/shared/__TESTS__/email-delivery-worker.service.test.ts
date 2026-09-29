@@ -1,94 +1,13 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 import type { Locale } from "@packages/i18n";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
 
 mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
   db: {
     transaction: async (cb: (tx: object) => unknown) => cb({}),
-  },
-  emailSchema: { emailMessage: {} },
-  and: (...a: unknown[]) => a,
-  eq: (...a: unknown[]) => a,
-  inArray: (...a: unknown[]) => a,
-  isNull: (...a: unknown[]) => a,
-  isNotNull: (...a: unknown[]) => a,
-  lte: (...a: unknown[]) => a,
-  or: (...a: unknown[]) => a,
-  lt: (...a: unknown[]) => a,
-  gt: (...a: unknown[]) => a,
-  gte: (...a: unknown[]) => a,
-  not: (...a: unknown[]) => a,
-  asc: (...a: unknown[]) => a,
-  desc: (...a: unknown[]) => a,
-  like: (...a: unknown[]) => a,
-  count: (...a: unknown[]) => a,
-  arrayContains: (...a: unknown[]) => a,
-  sql: Object.assign((s: TemplateStringsArray) => s.join(""), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: {
-    outboxEvent: {
-      id: {},
-      eventType: {},
-      dispatchedAt: {},
-      nextAttemptAt: {},
-      occurredAt: {},
-      attempts: {},
-    },
-  },
-  auditLogSchema: {
-    auditLog: {
-      actorId: {},
-      actorType: {},
-      organizationId: {},
-      action: {},
-      targetType: {},
-      targetId: {},
-      occurredAt: {},
-      retention: {},
-      id: {},
-    },
-  },
-  webhooksSchema: { webhookDelivery: {}, webhookEndpoint: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
   },
 }));
 
@@ -149,7 +68,7 @@ function harness(rows: EmailMessageRecord[]) {
     setBatch: (f: typeof batchImpl) => {
       batchImpl = f;
     },
-    batch: (p: unknown[], _key: string | null) => batchImpl(p),
+    batch: (p: unknown[], _key: Option<string>) => batchImpl(p),
   };
 }
 
@@ -279,7 +198,7 @@ describe("chunkIdempotencyKey", () => {
     row({ idempotencyKey: key === null ? Option.none<string>() : Option.some(key) });
 
   it("distinguishes key sets that differ only past 256 characters", async () => {
-    // Both sets join to `<prefix>-one|<prefix>-two` — identical for the first 256
+    // Both sets join to `<prefix>-one|<prefix>-two`, identical for the first 256
     // characters, differing only after them. 250 + 4 = 254 characters for the first key
     // alone, so the separator and the whole second key fall past the cut.
     const prefix = "a".repeat(250);
