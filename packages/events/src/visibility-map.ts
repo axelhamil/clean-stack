@@ -44,6 +44,7 @@ export const VISIBILITY = {
   "webhook.endpoint.secret_rotated": "internal",
   "webhook.endpoint.disabled": "internal",
   "webhook.delivery.exhausted": "internal",
+  "webhook.delivery.replayed": "internal",
   "api_token.created": "public",
   "api_token.revoked": "public",
   "api_token.used": "internal",

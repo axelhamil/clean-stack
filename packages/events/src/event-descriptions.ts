@@ -45,6 +45,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A webhook endpoint was auto-disabled after repeated delivery failures.",
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]:
     "A webhook delivery was abandoned after exhausting all retries.",
+  [EventTypes.WEBHOOK_DELIVERY_REPLAYED]: "A webhook delivery was queued again on request.",
   [EventTypes.USER_POLICY_ACCEPTED]: "A user accepted a legal policy version.",
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: "Cookie consent was granted.",
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: "Cookie consent was withdrawn.",

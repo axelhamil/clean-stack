@@ -48,7 +48,7 @@ const crossDelivery = {
 
 const mockFindEndpoint = mock(async () => Option.some(stubEndpointA));
 const mockFindDelivery = mock(async () => Option.some(crossDelivery));
-const mockReplayDelivery = mock(async () =>
+const mockReplayDelivery = mock(async (..._args: unknown[]) =>
   Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
 );
 const mockListEndpoints = mock(async () =>
@@ -141,6 +141,16 @@ describe("POST /webhooks/:id/deliveries/:deliveryId/replay: endpoint-scope guard
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: { message: string } };
     expect(body.error.message).toBe("Webhook delivery not found");
+  });
+
+  it("hands the signed-in user to the service as the replay actor", async () => {
+    mockReplayDelivery.mockClear();
+
+    await makeApp().request(`/webhooks/${ENDPOINT_A}/deliveries/${DELIVERY_OF_B}/replay`, {
+      method: "POST",
+    });
+
+    expect(mockReplayDelivery).toHaveBeenCalledWith(DELIVERY_OF_B, ENDPOINT_A, ORG_ID, "user-1");
   });
 });
 

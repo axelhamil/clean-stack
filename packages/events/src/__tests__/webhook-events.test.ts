@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ALL_EVENT_TYPES, EventTypes } from "../event-types";
 import {
   WebhookDeliveryExhaustedPayload,
+  WebhookDeliveryReplayedPayload,
   WebhookEndpointDisabledPayload,
   WebhookEndpointSecretRotatedPayload,
   WebhookTestPayload,
@@ -9,8 +10,8 @@ import {
 import { RETENTION_MAP } from "../retention-map";
 
 describe("webhook events", () => {
-  it("catalog contains exactly 82 event types", () => {
-    expect(ALL_EVENT_TYPES).toHaveLength(82);
+  it("catalog contains exactly 83 event types", () => {
+    expect(ALL_EVENT_TYPES).toHaveLength(83);
   });
 
   it("declares the delivery lifecycle event constants", () => {
@@ -18,6 +19,7 @@ describe("webhook events", () => {
     expect(EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED).toBe("webhook.endpoint.secret_rotated");
     expect(EventTypes.WEBHOOK_ENDPOINT_DISABLED).toBe("webhook.endpoint.disabled");
     expect(EventTypes.WEBHOOK_DELIVERY_EXHAUSTED).toBe("webhook.delivery.exhausted");
+    expect(EventTypes.WEBHOOK_DELIVERY_REPLAYED).toBe("webhook.delivery.replayed");
   });
 
   it("test payload requires org + endpoint + actor", () => {
@@ -42,6 +44,20 @@ describe("webhook events", () => {
       WebhookEndpointSecretRotatedPayload.safeParse({ organizationId: "o1", endpointId: "e1" })
         .success,
     ).toBe(false);
+  });
+
+  it("replayed payload requires the user who asked for the replay", () => {
+    const replay = {
+      organizationId: "o1",
+      endpointId: "e1",
+      deliveryId: "d1",
+      replayedDeliveryId: "d2",
+    };
+
+    expect(WebhookDeliveryReplayedPayload.safeParse({ ...replay, actorUserId: "u1" }).success).toBe(
+      true,
+    );
+    expect(WebhookDeliveryReplayedPayload.safeParse(replay).success).toBe(false);
   });
 
   it("disabled + exhausted payloads allow a null system actor", () => {
@@ -71,5 +87,6 @@ describe("webhook events", () => {
     expect(RETENTION_MAP[EventTypes.WEBHOOK_TEST]).toBe("operational");
     expect(RETENTION_MAP[EventTypes.WEBHOOK_ENDPOINT_DISABLED]).toBe("operational");
     expect(RETENTION_MAP[EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]).toBe("operational");
+    expect(RETENTION_MAP[EventTypes.WEBHOOK_DELIVERY_REPLAYED]).toBe("operational");
   });
 });

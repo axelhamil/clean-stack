@@ -44,6 +44,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED]: "compliance",
   [EventTypes.WEBHOOK_ENDPOINT_DISABLED]: "operational",
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]: "operational",
+  [EventTypes.WEBHOOK_DELIVERY_REPLAYED]: "operational",
   [EventTypes.USER_POLICY_ACCEPTED]: "compliance",
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: "compliance",
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: "compliance",

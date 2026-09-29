@@ -230,13 +230,39 @@ export class WebhooksService {
     deliveryId: string,
     endpointId: string,
     organizationId: string,
+    actorUserId: string,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookServiceError>> {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > replayDelivery", op: "function" },
       async () =>
-        this.uow.run(async (tx) =>
-          this.deliveries.enqueueReplay(deliveryId, endpointId, organizationId, tx),
-        ),
+        this.uow.run(async (tx) => {
+          const replayed = await this.deliveries.enqueueReplay(
+            deliveryId,
+            endpointId,
+            organizationId,
+            tx,
+          );
+          if (replayed.isFailure) return replayed;
+          const opt = replayed.getValue();
+          if (opt.isNone()) return replayed;
+
+          await emitEvent(
+            this.outbox,
+            EventTypes.WEBHOOK_DELIVERY_REPLAYED,
+            "webhook_delivery",
+            deliveryId,
+            {
+              organizationId,
+              endpointId,
+              deliveryId,
+              replayedDeliveryId: opt.unwrap().id,
+              actorUserId,
+            },
+            { organizationId },
+            tx,
+          );
+          return replayed;
+        }),
     );
   }
 
