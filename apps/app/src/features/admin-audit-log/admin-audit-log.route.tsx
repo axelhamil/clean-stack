@@ -54,10 +54,7 @@ function AdminAuditLogPage() {
             <SelectValue placeholder={t("auditLog.allActionsPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
-            {/* The prefix values below ("user.", "org.", …) are audit action
-                type names, not copy — the brief calls these out explicitly as
-                data, matching the "audit event type names … are data, not
-                copy" rule for this screen. */}
+            {/* The prefixes below are audit action type names: data, not copy. */}
             <SelectItem value="">{t("auditLog.allOption")}</SelectItem>
             <SelectItem value="user.">user.</SelectItem>
             <SelectItem value="org.">org.</SelectItem>
@@ -128,7 +125,7 @@ function AdminAuditLogPage() {
             <Button
               variant="outline"
               disabled={query.isFetchingNextPage}
-              onClick={() => query.fetchNextPage()}
+              onClick={() => void query.fetchNextPage()}
             >
               {t("auditLog.loadMore")}
             </Button>

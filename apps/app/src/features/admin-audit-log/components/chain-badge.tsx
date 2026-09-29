@@ -17,7 +17,7 @@ export function ChainBadge() {
 
   return (
     <Badge variant="destructive">
-      {t("auditLog.chain.broken", { sequence: data.brokenAtSequence ?? "—" })}
+      {t("auditLog.chain.broken", { sequence: data.brokenAtSequence ?? "?" })}
     </Badge>
   );
 }

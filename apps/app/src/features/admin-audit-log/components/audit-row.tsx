@@ -13,7 +13,7 @@ interface AuditRowProps {
 
 export function AuditTableRow({ row, onSelect }: AuditRowProps) {
   const { t } = useTranslation("admin");
-  // Occurred-at is the audit trail's ordering key — same-day events must stay
+  // Occurred-at is the audit trail's ordering key: same-day events must stay
   // distinguishable, so this uses date+time precision rather than the
   // date-only `useFormatDate`.
   const formatDateTime = useFormatDateTime();
@@ -30,7 +30,7 @@ export function AuditTableRow({ row, onSelect }: AuditRowProps) {
       <TableCell>
         {row.targetType} / {row.targetId}
       </TableCell>
-      <TableCell>{row.organizationId ?? "—"}</TableCell>
+      <TableCell>{row.organizationId ?? "-"}</TableCell>
       <TableCell>
         <Button variant="ghost" size="sm" onClick={() => onSelect(row)}>
           {t("auditLog.detailsAction")}

@@ -13,7 +13,7 @@ function resolve(key: string): string | undefined {
 
 describe("AUDIT_ACTOR_TYPE_LABEL_KEYS", () => {
   // `satisfies Record<AuditActorType, string>` only proves every actor type
-  // has AN entry — it does not prove each entry points at the RIGHT one. A
+  // has AN entry, not that each entry points at the RIGHT one. A
   // swapped pair (e.g. `admin` reading `auditLog.actorType.user`) still
   // type-checks, so this asserts the mapping itself, not just its
   // exhaustiveness.
