@@ -58,7 +58,7 @@ import { sessionQueryOptions } from "../api/queries/session";
 import { isPlatformAdmin } from "../auth/is-platform-admin";
 import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
-import { useSignOut } from "../auth/use-sign-out";
+import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
 import { LEGAL_ROUTES } from "../legal-routes";
 
 interface CommandShortcutBinding {
@@ -80,11 +80,6 @@ interface CommandGroupConfig {
   heading: string;
   items: CommandEntry[];
 }
-
-const SIGN_OUT_SHORTCUT: CommandShortcutBinding = {
-  display: "⇧⌘Q",
-  match: (e) => e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "q",
-};
 
 interface NavigationRoute extends NavigationRequirement {
   to: string;
