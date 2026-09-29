@@ -11,13 +11,9 @@
 // reference shape. Run: `pnpm --filter api check:sweep-lock` — re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
-import { Writable } from "node:stream";
 import { db, eq, sql, sweepSchema } from "@packages/drizzle";
-import { Hono } from "hono";
-import { pinoLogger } from "hono-pino";
-import { pino } from "pino";
+import type { Hono } from "hono";
 import { env } from "../src/shared/env";
-import { canonicalize, sign } from "../src/shared/internal-routes/internal-signature";
 import { sweepAuditLogRoutes } from "../src/shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "../src/shared/internal-routes/sweep-consents.route";
 import { sweepEmailMessagesRoutes } from "../src/shared/internal-routes/sweep-email-messages.route";
@@ -32,20 +28,17 @@ import { purgeBatchWithTimeout } from "../src/shared/internal-routes/sweep-purge
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
+import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-sweep-lock");
 
-let failed = false;
+const checks = checkRecorder();
+const { check } = checks;
 
 // A fresh façade per check, not one shared across the whole script — mirrors how
 // production builds one `SweepSpans` per request instead of a module-level singleton.
 const freshSpans = () => sweepSpans(new NoOpInstrumentation());
-
-function check(label: string, ok: boolean) {
-  console.log(`${ok ? "  OK" : "  FAIL"}: ${label}`);
-  if (!ok) failed = true;
-}
 
 // ── acquireSweepLease / releaseSweepLease, fenced by ownership token ────────────────
 const label = `check-sweep-${crypto.randomUUID()}`;
@@ -171,45 +164,6 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 // checked the same way rather than special-casing the one with an extra field. The
 // log line (`${label} skipped — another run holds the lease`, always emitted by
 // runRetentionSweep itself) is the one signal every route shares. ────────
-function makeApp(routes: Hono, lines: string[]) {
-  const sink = new Writable({
-    write(chunk: Buffer, _encoding, callback) {
-      lines.push(chunk.toString());
-      callback();
-    },
-  });
-  const testLogger = pino(sink);
-  const app = new Hono();
-  app.use("*", pinoLogger({ pino: testLogger }));
-  app.route("/internal", routes);
-  return app;
-}
-
-async function signedRequest(app: Hono, path: string, body: unknown) {
-  const key = env.INTERNAL_SIGNING_KEY;
-  if (!key) throw new Error("INTERNAL_SIGNING_KEY is not set — cannot sign a request");
-  const rawBody = JSON.stringify(body);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const message = canonicalize({
-    timestamp,
-    method: "POST",
-    path,
-    host: "localhost",
-    contentType: "application/json",
-    rawBody,
-  });
-  const signature = await sign(message, key);
-  return app.request(path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      host: "localhost",
-      "X-Internal-Signature": `t=${timestamp},v1=${signature}`,
-    },
-    body: rawBody,
-  });
-}
-
 const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
   {
     name: "sweep-email-messages",
@@ -246,7 +200,7 @@ const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
 for (const { name, path, routes } of routeCases) {
   const routeOwner = await acquireSweepLease(name, 60_000, freshSpans());
   const lines: string[] = [];
-  const res = await signedRequest(makeApp(routes, lines), path, { dryRun: true });
+  const res = await signedInternalRequest(internalApp(routes, lines), path, { dryRun: true });
   check(`${name} responds 200 while its lease is held`, res.status === 200);
   const captured = lines.join("");
   const skipLine = captured.includes(`${name} skipped — another run holds the lease`);
@@ -254,7 +208,7 @@ for (const { name, path, routes } of routeCases) {
   if (routeOwner) await releaseSweepLease(name, routeOwner, freshSpans());
 }
 
-if (failed) {
+if (checks.failures > 0) {
   console.error("check:sweep-lock FAILED");
   process.exit(1);
 }

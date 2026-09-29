@@ -15,43 +15,28 @@
 // seeded account, and takes the real `flush-notification-emails` lease. Local
 // database only — `requireLocalDatabase` enforces it.
 
-import { Writable } from "node:stream";
 import { Option } from "@packages/ddd-kit";
-import { authSchema, db, eq, sql } from "@packages/drizzle";
-import { Hono } from "hono";
-import { pinoLogger } from "hono-pino";
-import { pino } from "pino";
-import { env } from "../src/shared/env";
+import { db, sql } from "@packages/drizzle";
+import type { Hono } from "hono";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
-import { canonicalize, sign } from "../src/shared/internal-routes/internal-signature";
 import type { OutboxRecord } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";
+import {
+  checkRecorder,
+  findSeededUserId,
+  internalApp,
+  signedInternalRequest,
+} from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 import { seedEmail } from "./seed-account";
 
 requireLocalDatabase("check-digest-window");
 
-let failed = false;
-function check(label: string, ok: boolean, extra?: unknown) {
-  const suffix = extra === undefined ? "" : ` :: ${JSON.stringify(extra)}`;
-  console.log(`${ok ? "  OK" : "  FAIL"}: ${label}${suffix}`);
-  if (!ok) failed = true;
-}
-
+const checks = checkRecorder();
+const { check } = checks;
 const email = seedEmail();
-const [user] = await db
-  .select({ id: authSchema.user.id })
-  .from(authSchema.user)
-  .where(eq(authSchema.user.email, email))
-  .limit(1);
-if (!user) {
-  throw new Error(
-    `no user for ${email} — run \`pnpm --filter api db:seed\` first, ` +
-      "or point this check at another account with SEED_EMAIL.",
-  );
-}
-const userId = user.id;
+const userId = await findSeededUserId();
 
 const DIGEST_HOUR_UTC = 8;
 const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation(), DIGEST_HOUR_UTC);
@@ -135,50 +120,17 @@ const enqueued = async () => {
   }[];
 };
 
-function loggedApp() {
-  const sink = new Writable({
-    write(_chunk: Buffer, _encoding, callback) {
-      callback();
-    },
-  });
-  const app = new Hono();
-  app.use("*", pinoLogger({ pino: pino(sink) }));
-  app.route("/internal", flushNotificationEmailsRoutes as unknown as Hono);
-  return app;
-}
-
-const app = loggedApp();
+const app = internalApp(flushNotificationEmailsRoutes as unknown as Hono);
 const path = "/internal/flush-notification-emails";
 
 async function flush(
   options: { batchSize?: number } = {},
 ): Promise<{ flushed: number; notifications: number; skipped?: boolean }> {
-  const key = env.INTERNAL_SIGNING_KEY;
-  if (!key) throw new Error("INTERNAL_SIGNING_KEY is not set — cannot sign a request");
-  const rawBody = JSON.stringify(
+  const res = await signedInternalRequest(
+    app,
+    path,
     options.batchSize === undefined ? {} : { batchSize: options.batchSize },
   );
-  const timestamp = Math.floor(Date.now() / 1000);
-  const signature = await sign(
-    canonicalize({
-      timestamp,
-      method: "POST",
-      path,
-      host: "localhost",
-      contentType: "application/json",
-      rawBody,
-    }),
-    key,
-  );
-  const res = await app.request(path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      host: "localhost",
-      "X-Internal-Signature": `t=${timestamp},v1=${signature}`,
-    },
-    body: rawBody,
-  });
   const text = await res.text();
   if (!res.ok) throw new Error(`flush failed: ${res.status} ${text}`);
   return JSON.parse(text);
@@ -370,7 +322,7 @@ check(
 
 await reset();
 
-if (failed) {
+if (checks.failures > 0) {
   console.error("check:digest FAILED");
   process.exit(1);
 }

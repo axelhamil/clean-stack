@@ -22,6 +22,7 @@
  * caps the lock wait with `lock_timeout` so a stuck lock fails fast instead of hanging.
  */
 
+import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
@@ -42,16 +43,8 @@ const userId = `check-wipe-rollback-${crypto.randomUUID()}`;
 const probeEmail = `${PROBE_MARKER}-${userId}@example.com`;
 const CONSTRAINT_NAME = "check_wipe_rollback_probe";
 
-let failures = 0;
-
-function assert(condition: boolean, label: string): void {
-  if (condition) {
-    console.log(`  OK: ${label}`);
-  } else {
-    failures += 1;
-    console.log(`  ECHEC: ${label}`);
-  }
-}
+const checks = checkRecorder();
+const { check } = checks;
 
 async function seedUser(): Promise<void> {
   await db.insert(authSchema.user).values({
@@ -110,10 +103,10 @@ async function main(): Promise<void> {
   const result = await service.executeAccountWipe({ userId });
 
   console.log("[1] executeAccountWipe result ->", result.isFailure ? result.getError() : "success");
-  assert(result.isFailure, "the wipe reports failure when the confirmation enqueue fails");
-  assert(
-    result.isFailure && result.getError().code === "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
+  check("the wipe reports failure when the confirmation enqueue fails", result.isFailure);
+  check(
     "the failure code is ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
+    result.isFailure && result.getError().code === "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
   );
 
   const [row] = await db
@@ -127,9 +120,9 @@ async function main(): Promise<void> {
     .limit(1);
 
   console.log("[2] user row after failed wipe ->", row);
-  assert(row !== undefined, "the user row still exists");
-  assert(row?.deletedAt === null, "deleted_at is still NULL — the wipe did not persist");
-  assert(row?.email === probeEmail, "the email was not anonymized — the wipe did not persist");
+  check("the user row still exists", row !== undefined);
+  check("deleted_at is still NULL — the wipe did not persist", row?.deletedAt === null);
+  check("the email was not anonymized — the wipe did not persist", row?.email === probeEmail);
 
   const readyForWipe = await new DrizzleRgpdRepository(
     logger,
@@ -138,12 +131,12 @@ async function main(): Promise<void> {
   const stillPending =
     readyForWipe.isSuccess && readyForWipe.getValue().some((r) => r.userId === userId);
   console.log("[3] still returned by findUsersReadyForWipe ->", stillPending);
-  assert(stillPending, "the account is still picked up by the next sweep (not lost)");
+  check("the account is still picked up by the next sweep (not lost)", stillPending);
 
   await cleanup();
 
-  if (failures > 0) {
-    console.error(`\n${failures} assertion(s) failed`);
+  if (checks.failures > 0) {
+    console.error(`\n${checks.failures} check(s) failed`);
     process.exit(1);
   }
   console.log("\nAll assertions passed — the wipe transaction genuinely rolled back.");

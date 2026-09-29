@@ -17,6 +17,7 @@
  * This script is that proof.
  */
 
+import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-enqueue");
@@ -34,16 +35,8 @@ const preExistingKey = `${MARKER}-preexisting-key`;
 const freshKey = `${MARKER}-fresh-key`;
 const nullKeyAddresses = [`${MARKER}-null-a@example.test`, `${MARKER}-null-b@example.test`];
 
-let failures = 0;
-
-function assert(condition: boolean, label: string): void {
-  if (condition) {
-    console.log(`  OK: ${label}`);
-  } else {
-    failures += 1;
-    console.log(`  ECHEC: ${label}`);
-  }
-}
+const checks = checkRecorder();
+const { check } = checks;
 
 async function deleteByAddresses(addresses: string[]): Promise<void> {
   await db.delete(em).where(inArray(em.toAddress, addresses));
@@ -103,25 +96,25 @@ async function main(): Promise<void> {
       "[1] mixed batch enqueue result ->",
       mixedResult.isFailure ? mixedResult.getError() : mixedResult.getValue(),
     );
-    assert(mixedResult.isSuccess, "mixed batch enqueue reports success");
-    assert(
-      mixedResult.isSuccess && mixedResult.getValue().written === 1,
+    check("mixed batch enqueue reports success", mixedResult.isSuccess);
+    check(
       "mixed batch reports written: 1 (the duplicate was suppressed, not the fresh row)",
+      mixedResult.isSuccess && mixedResult.getValue().written === 1,
     );
 
     const freshRows = await db
       .select({ id: em.id, idempotencyKey: em.idempotencyKey })
       .from(em)
       .where(inArray(em.toAddress, [`${MARKER}-fresh@example.test`]));
-    assert(freshRows.length === 1, "the fresh-key row was actually inserted");
+    check("the fresh-key row was actually inserted", freshRows.length === 1);
 
     const preExistingRows = await db
       .select({ id: em.id })
       .from(em)
       .where(inArray(em.toAddress, [`${MARKER}-preexisting@example.test`]));
-    assert(
-      preExistingRows.length === 1 && preExistingRows[0]?.id === preExistingId,
+    check(
       "the pre-existing row was not duplicated — still exactly the original row",
+      preExistingRows.length === 1 && preExistingRows[0]?.id === preExistingId,
     );
 
     // [2] The conflict target is idempotency_key, not the primary key: re-enqueueing a batch
@@ -133,18 +126,18 @@ async function main(): Promise<void> {
         idempotencyKey: Option.some(preExistingKey),
       }),
     ]);
-    assert(conflictOnKeyOnlyResult.isSuccess, "re-enqueue against an existing key reports success");
-    assert(
-      conflictOnKeyOnlyResult.isSuccess && conflictOnKeyOnlyResult.getValue().written === 0,
+    check("re-enqueue against an existing key reports success", conflictOnKeyOnlyResult.isSuccess);
+    check(
       "re-enqueue against an existing key writes nothing — proves the conflict target is idempotency_key",
+      conflictOnKeyOnlyResult.isSuccess && conflictOnKeyOnlyResult.getValue().written === 0,
     );
     const stillOneRow = await db
       .select({ id: em.id })
       .from(em)
       .where(inArray(em.toAddress, [`${MARKER}-preexisting@example.test`]));
-    assert(
-      stillOneRow.length === 1,
+    check(
       "still exactly one row for the colliding key — no duplicate slipped in by id",
+      stillOneRow.length === 1,
     );
 
     // [3] Two rows with idempotencyKey: Option.none() (NULL) — Postgres treats NULLs as
@@ -157,25 +150,25 @@ async function main(): Promise<void> {
       "[3] NULL-key batch enqueue result ->",
       nullKeyResult.isFailure ? nullKeyResult.getError() : nullKeyResult.getValue(),
     );
-    assert(nullKeyResult.isSuccess, "NULL-key batch enqueue reports success");
-    assert(
-      nullKeyResult.isSuccess && nullKeyResult.getValue().written === 2,
+    check("NULL-key batch enqueue reports success", nullKeyResult.isSuccess);
+    check(
       "both NULL-key rows insert — Postgres does not treat NULL = NULL as a conflict",
+      nullKeyResult.isSuccess && nullKeyResult.getValue().written === 2,
     );
     const nullKeyRows = await db
       .select({ id: em.id, idempotencyKey: em.idempotencyKey })
       .from(em)
       .where(inArray(em.toAddress, nullKeyAddresses));
-    assert(nullKeyRows.length === 2, "both NULL-key rows are actually present");
-    assert(
-      nullKeyRows.every((r) => r.idempotencyKey === null),
+    check("both NULL-key rows are actually present", nullKeyRows.length === 2);
+    check(
       "both rows genuinely stored NULL, not an empty string or placeholder",
+      nullKeyRows.every((r) => r.idempotencyKey === null),
     );
 
     await deleteByAddresses(allAddresses);
 
-    if (failures > 0) {
-      console.error(`\n${failures} assertion(s) failed`);
+    if (checks.failures > 0) {
+      console.error(`\n${checks.failures} check(s) failed`);
       process.exit(1);
     }
     console.log("\nAll assertions passed — enqueue's onConflictDoNothing is correct.");

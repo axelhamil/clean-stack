@@ -5,6 +5,7 @@
  * `apps/api/src/shared/CLAUDE.md` on asserting call shape only against a mock).
  */
 
+import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-marksent");
@@ -17,16 +18,8 @@ const em = emailSchema.emailMessage;
 const ids = ["check-marksent-a", "check-marksent-b", "check-marksent-c"];
 const allNullIds = ["check-marksent-d", "check-marksent-e"];
 
-let failures = 0;
-
-function assert(condition: boolean, label: string): void {
-  if (condition) {
-    console.log(`  OK: ${label}`);
-  } else {
-    failures += 1;
-    console.log(`  ECHEC: ${label}`);
-  }
-}
+const checks = checkRecorder();
+const { check } = checks;
 
 async function cleanup(): Promise<void> {
   await db.delete(em).where(inArray(em.id, [...ids, ...allNullIds]));
@@ -65,7 +58,7 @@ async function main(): Promise<void> {
   );
 
   console.log("[1] markSent result ->", result.isFailure ? result.getError() : "success");
-  assert(result.isSuccess, "markSent reports success");
+  check("markSent reports success", result.isSuccess);
 
   const rows = await db
     .select({
@@ -87,29 +80,29 @@ async function main(): Promise<void> {
   const b = byId.get("check-marksent-b");
   const c = byId.get("check-marksent-c");
 
-  assert(rows.length === 3, "all three rows still exist");
-  assert(
-    rows.every((r) => r.status === "sent"),
+  check("all three rows still exist", rows.length === 3);
+  check(
     "all three rows are marked sent",
+    rows.every((r) => r.status === "sent"),
   );
-  assert(
-    rows.every((r) => r.sentAt?.getTime() === sentAt.getTime()),
+  check(
     "sentAt is the single timestamp passed by the caller, identical across the batch",
+    rows.every((r) => r.sentAt?.getTime() === sentAt.getTime()),
   );
-  assert(a?.providerMessageId === "p1", "id a resolves to provider message id p1");
-  assert(b?.providerMessageId === "p2", "id b resolves to provider message id p2");
-  assert(c?.providerMessageId === null, "id c absent from the map falls back to NULL");
-  assert(
-    rows.every((r) => r.attempts === 3),
+  check("id a resolves to provider message id p1", a?.providerMessageId === "p1");
+  check("id b resolves to provider message id p2", b?.providerMessageId === "p2");
+  check("id c absent from the map falls back to NULL", c?.providerMessageId === null);
+  check(
     "attempts incremented from 2 to 3, not reset to 1",
+    rows.every((r) => r.attempts === 3),
   );
-  assert(
-    rows.every((r) => r.nextAttemptAt === null),
+  check(
     "nextAttemptAt is cleared",
+    rows.every((r) => r.nextAttemptAt === null),
   );
-  assert(
-    rows.every((r) => r.lastError === null),
+  check(
     "lastError is cleared",
+    rows.every((r) => r.lastError === null),
   );
 
   // All-NULL branch: ids are present but the provider-message-id map is empty, so every
@@ -124,33 +117,33 @@ async function main(): Promise<void> {
     "[3] all-NULL markSent result ->",
     allNullResult.isFailure ? allNullResult.getError() : "success",
   );
-  assert(allNullResult.isSuccess, "markSent with an empty provider-message-id map reports success");
+  check("markSent with an empty provider-message-id map reports success", allNullResult.isSuccess);
 
   const allNullRows = await db
     .select({ id: em.id, status: em.status, providerMessageId: em.providerMessageId })
     .from(em)
     .where(inArray(em.id, allNullIds));
-  assert(allNullRows.length === 2, "both all-NULL rows still exist");
-  assert(
-    allNullRows.every((r) => r.status === "sent"),
+  check("both all-NULL rows still exist", allNullRows.length === 2);
+  check(
     "both all-NULL rows still land sent",
+    allNullRows.every((r) => r.status === "sent"),
   );
-  assert(
-    allNullRows.every((r) => r.providerMessageId === null),
+  check(
     "both all-NULL rows have provider_message_id IS NULL",
+    allNullRows.every((r) => r.providerMessageId === null),
   );
 
   // Empty ids must be a no-op — no `WHERE id IN ()` should be emitted, and no row touched.
   const emptyResult = await db.transaction(async (tx) => queue.markSent([], sentAt, {}, tx));
-  assert(emptyResult.isSuccess, "markSent([]) reports success");
+  check("markSent([]) reports success", emptyResult.isSuccess);
 
   const untouchedCount = await db.select({ id: em.id }).from(em).where(inArray(em.id, ids));
-  assert(untouchedCount.length === 3, "empty ids call left the rows untouched");
+  check("empty ids call left the rows untouched", untouchedCount.length === 3);
 
   await cleanup();
 
-  if (failures > 0) {
-    console.error(`\n${failures} assertion(s) failed`);
+  if (checks.failures > 0) {
+    console.error(`\n${checks.failures} check(s) failed`);
     process.exit(1);
   }
   console.log("\nAll assertions passed — markSent's single-statement CASE is correct.");
