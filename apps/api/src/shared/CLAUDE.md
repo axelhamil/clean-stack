@@ -21,7 +21,7 @@ Loaded when working inside `apps/api/src/shared/`. Cross-cutting infra placement
 - `entitlements.ts` — typed plan catalog (`ENTITLEMENTS`, `Tier`, `Feature`, `QuotaKey`) and its pure predicates, read by the billing module, the billing gates, `quota-reservation` and `auth.ts`.
 - `env.ts`, `logger.ts` — process-level singletons
 - `transaction.ts` — `type ITransaction = Transaction` (Drizzle alias). Type-only swap-point exception to "no infra in app layer" rule.
-- `event-emitter.ts` — `emitEvent(outbox, ...)` helper for code that emits events outside an aggregate flow (BetterAuth bridge, RGPD service, uploads). Use this instead of `outbox.enqueue` directly to keep the source/scope shape consistent.
+- `event-emitter.ts` — `emitEvent(outbox, ...)` helper for code that emits events outside an aggregate flow (BetterAuth bridge, RGPD service, uploads). Use this instead of `outbox.enqueue` directly to keep the source/scope shape consistent. `emitEventBestEffort(...)` is the variant for a request refused whatever happens to its event (CSRF, rate limit, CSP report, BetterAuth abuse checks): it logs a failed emit as a warning instead of turning the refusal into a 500.
 - `aead.ts` — XChaCha20-Poly1305 encrypt/decrypt + HKDF per-org sub-key for webhook secrets at rest.
 - `jitter.ts` — decorrelated jitter math (used by outbox dispatcher + webhook delivery worker for retry backoff).
 - `services/digest-schedule.ts` — `digestDueAt(occurredAt, frequency, anchorHourUtc?)`: pure function from an event's occurrence instant to its digest cutoff (`hourly`/`daily` wall-clock boundaries, never anchored on "now" or the last send). Consumed by `notification-fanout-subscriber.ts`.

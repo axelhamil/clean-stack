@@ -2,6 +2,7 @@ import type { IDomainEvent } from "@packages/ddd-kit";
 import { uuidv7 } from "@packages/ddd-kit";
 import type { Transaction } from "@packages/drizzle";
 import type { EventType } from "@packages/events";
+import { logger } from "./logger";
 import type { IOutboxRepository } from "./ports/outbox.port";
 
 const SOURCE = "app/api";
@@ -47,4 +48,25 @@ export async function emitEvent<TPayload>(
     tx,
   );
   return id;
+}
+
+/**
+ * `emitEvent` for a request that is refused whatever happens to its event (rate
+ * limit, CSRF, CSP report, abuse checks): a failing outbox is logged as `warning`,
+ * never allowed to turn the refusal into a 500.
+ */
+export async function emitEventBestEffort<TPayload>(
+  outbox: IOutboxRepository,
+  eventType: EventType,
+  aggregateType: string,
+  aggregateId: string,
+  payload: TPayload,
+  warning: string,
+  logContext: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await emitEvent(outbox, eventType, aggregateType, aggregateId, payload);
+  } catch (err) {
+    logger.warn({ err, ...logContext }, warning);
+  }
 }

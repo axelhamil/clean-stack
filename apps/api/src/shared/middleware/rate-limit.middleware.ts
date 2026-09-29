@@ -1,7 +1,7 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { createMiddleware } from "hono/factory";
-import { emitEvent } from "../event-emitter";
+import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import type { IRateLimiter } from "../ports/rate-limiter.port";
@@ -66,26 +66,15 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
         const path = c.req.path.slice(0, 512);
         const method = c.req.method.slice(0, 16);
         const policyName = decision.policyName.slice(0, 64);
-        try {
-          await emitEvent(
-            deps.outbox,
-            EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
-            "rate_limit",
-            `${policy.name}:${ip}`,
-            {
-              actorUserId: user?.id ?? null,
-              ip,
-              policyName,
-              path,
-              method,
-            },
-          );
-        } catch (emitErr) {
-          logger.warn(
-            { err: emitErr, policy: policy.name },
-            "rate-limit event emit failed, still sending 429",
-          );
-        }
+        await emitEventBestEffort(
+          deps.outbox,
+          EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
+          "rate_limit",
+          `${policy.name}:${ip}`,
+          { actorUserId: user?.id ?? null, ip, policyName, path, method },
+          "rate-limit event emit failed, still sending 429",
+          { policy: policy.name },
+        );
       }
 
       throw new AppErrorException({

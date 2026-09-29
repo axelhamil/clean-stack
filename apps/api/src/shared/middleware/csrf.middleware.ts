@@ -2,7 +2,7 @@ import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
-import { emitEvent } from "../event-emitter";
+import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { resolveClientIp } from "./rate-limit.ip";
@@ -49,16 +49,19 @@ async function emitCsrfRejected(
 ): Promise<void> {
   const user = c.get("user") as { id: string } | null | undefined;
   const ip = resolveClientIp(c).slice(0, 45);
-  try {
-    await emitEvent(outbox, EventTypes.SECURITY_CSRF_REJECTED, "csrf", ip, {
+  await emitEventBestEffort(
+    outbox,
+    EventTypes.SECURITY_CSRF_REJECTED,
+    "csrf",
+    ip,
+    {
       actorUserId: user?.id ?? null,
       ip,
       method: c.req.method.slice(0, 16),
       path: c.req.path.slice(0, 512),
       origin: origin === undefined || origin === "null" ? null : origin.slice(0, 2048),
       reason,
-    });
-  } catch (emitErr) {
-    logger.warn({ err: emitErr }, "csrf event emit failed, still rejecting");
-  }
+    },
+    "csrf event emit failed, still rejecting",
+  );
 }

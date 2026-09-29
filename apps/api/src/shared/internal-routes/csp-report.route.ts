@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { emitEvent } from "../event-emitter";
+import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import { resolveClientIp } from "../middleware/rate-limit.ip";
 import type { IOutboxRepository } from "../ports/outbox.port";
@@ -200,13 +200,12 @@ async function emitCspEvent(
   ip: string,
   fields: CspViolationFields,
 ): Promise<void> {
-  try {
-    await emitEvent(outbox, EventTypes.SECURITY_CSP_VIOLATION, "csp_report", ip, {
-      actorUserId: null,
-      ip,
-      ...fields,
-    });
-  } catch (emitErr) {
-    logger.warn({ err: emitErr }, "csp-report event emit failed, still sending 204");
-  }
+  await emitEventBestEffort(
+    outbox,
+    EventTypes.SECURITY_CSP_VIOLATION,
+    "csp_report",
+    ip,
+    { actorUserId: null, ip, ...fields },
+    "csp-report event emit failed, still sending 204",
+  );
 }

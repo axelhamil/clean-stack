@@ -65,7 +65,7 @@ import {
 } from "./shared/auth/sso-paths";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
-import { emitEvent } from "./shared/event-emitter";
+import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
 import {
@@ -188,11 +188,15 @@ async function emitBestEffort<TPayload>(
   aggregateId: string,
   payload: TPayload,
 ): Promise<void> {
-  try {
-    await emit(eventType, aggregateType, aggregateId, payload);
-  } catch (err) {
-    logger.warn({ err, eventType }, "security event emit failed, still refusing the request");
-  }
+  await emitEventBestEffort(
+    di.IOutboxRepository,
+    eventType,
+    aggregateType,
+    aggregateId,
+    payload,
+    "security event emit failed, still refusing the request",
+    { eventType },
+  );
 }
 
 /**
