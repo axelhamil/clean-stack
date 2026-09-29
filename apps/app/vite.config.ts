@@ -41,7 +41,7 @@ export default defineConfig({
   server: {
     port: 5173,
     headers: {
-      // HMR injects scripts/styles inline — enforce is impractical in dev; exercises the report endpoint
+      // HMR injects scripts/styles inline, so enforcing is impractical in dev; report-only exercises the report endpoint
       "Content-Security-Policy-Report-Only":
         "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' ws: wss: http://localhost:3000; report-uri http://localhost:3000/csp-report",
     },

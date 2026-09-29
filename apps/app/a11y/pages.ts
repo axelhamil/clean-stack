@@ -11,7 +11,7 @@ export const PUBLIC_PAGES: readonly AuditedPage[] = [
 ];
 
 /**
- * `/` is a pure redirect — auditing it audits whichever page it lands on, so the
+ * `/` is a pure redirect: auditing it audits whichever page it lands on, so the
  * signed-in destination is listed directly instead.
  */
 export const AUTHENTICATED_PAGES: readonly AuditedPage[] = [
