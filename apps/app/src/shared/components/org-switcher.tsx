@@ -16,11 +16,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { initialsOf } from "../../shared/utils";
 import { toastError } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
+import { initialsOf } from "../utils";
 
 export function OrgSwitcher() {
   const { t } = useTranslation("common");

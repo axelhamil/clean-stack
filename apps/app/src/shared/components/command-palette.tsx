@@ -228,7 +228,7 @@ function useLegalGroup(t: TFunction<"common">): CommandGroupConfig {
   };
 }
 
-function useThemeOptions(t: TFunction<"common">) {
+function themeOptionsFor(t: TFunction<"common">) {
   return [
     { value: "light", label: t("commandPalette.theme.light"), icon: Sun },
     { value: "dark", label: t("commandPalette.theme.dark"), icon: Moon },
@@ -240,7 +240,7 @@ function useActionsGroup(t: TFunction<"common">): CommandGroupConfig {
   const { setTheme, theme } = useTheme();
   const signOut = useSignOut();
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
-  const themeOptions = useThemeOptions(t);
+  const themeOptions = themeOptionsFor(t);
 
   const items: CommandEntry[] = themeOptions.map((option) => ({
     id: `theme:${option.value}`,

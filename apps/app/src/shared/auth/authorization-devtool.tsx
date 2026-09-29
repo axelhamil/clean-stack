@@ -23,7 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
-import { useAuthorization } from "../auth/use-authorization";
+import { useAuthorization } from "./use-authorization";
 
 const PERSONAL_BLOCKED: Record<string, ReadonlySet<string>> = {
   organization: new Set(["delete", "leave"]),

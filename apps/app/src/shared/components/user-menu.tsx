@@ -15,9 +15,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { LogOut, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { type DisplayUser, displayName, initialsOf } from "../../shared/utils";
 import { sessionQueryOptions } from "../api/queries/session";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
+import { type DisplayUser, displayName, initialsOf } from "../utils";
 
 interface UserMenuProps {
   user: DisplayUser;
