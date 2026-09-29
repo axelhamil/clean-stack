@@ -10,7 +10,7 @@ import { useSetLocaleMutation } from "./use-set-locale-mutation";
 /**
  * Reconciles the browser-resolved locale with the one on the user record.
  *
- * The decision itself is `reconcileLocale` — this component only supplies the
+ * The decision itself is `reconcileLocale`: this component only supplies the
  * inputs and runs the resulting effect.
  */
 export function LocaleSync() {

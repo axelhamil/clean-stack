@@ -33,7 +33,7 @@ describe("handlePolicyRefusal", () => {
     expect(refreshRouter).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores any other 409 — the generic conflict keeps its generic handling", async () => {
+  it("ignores any other 409, the generic conflict keeps its generic handling", async () => {
     const queryClient = clientWithStalePolicies();
     const refreshRouter = vi.fn();
 

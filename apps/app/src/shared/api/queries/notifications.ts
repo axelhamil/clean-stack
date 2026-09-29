@@ -19,7 +19,7 @@ export type NotificationPreference = NotificationPreferencesResponse["items"][nu
 
 export const notificationsListQueryKey = ["notifications", "list"] as const;
 
-// A single infinite query, not one query per cursor — the query key stays
+// A single infinite query, not one query per cursor: the query key stays
 // flat (["notifications", "list"]) with pages accumulating inside it, which
 // is what lets `notification-broadcast.ts` patch every loaded page in one
 // `setQueriesData` call and lets the SSE handler invalidate the whole
@@ -76,7 +76,7 @@ export const notificationPreferencesQueryOptions = queryOptions({
   },
 });
 
-// The route is `requireOrg`, so the response is the active organization's — the key
+// The route is `requireOrg`, so the response is the active organization's: the key
 // has to name it or one entry serves every organization the user switches between.
 export const orgNotificationPreferencesQueryOptions = (organizationId: string | null) =>
   queryOptions({

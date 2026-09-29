@@ -36,8 +36,8 @@ describe("reconcileLocale", () => {
   });
 
   // The regression this whole module exists for: saving "fr" flips the active
-  // language, which re-runs the reconciliation while the session query — served
-  // from BetterAuth's cookie cache — still reports the OLD "en". Re-asserting it
+  // language, which re-runs the reconciliation while the session query (served
+  // from BetterAuth's cookie cache) still reports the OLD "en". Re-asserting it
   // would revert both the UI and the locale cookie the save just wrote.
   it("does not bounce back to a stale server locale after a save and a refetch", () => {
     markLocaleChosen("fr");

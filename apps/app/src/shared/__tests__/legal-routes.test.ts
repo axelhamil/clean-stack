@@ -3,7 +3,7 @@ import { LEGAL_ROUTES } from "../legal-routes";
 
 describe("LEGAL_ROUTES", () => {
   // A swapped `labelKey` (e.g. cookies pointed at the accessibility label)
-  // type-checks and renders — only naming each pair catches it.
+  // type-checks and renders, only naming each pair catches it.
   it("points each route at its own label key", () => {
     expect(LEGAL_ROUTES.map((r) => ({ to: r.to, labelKey: r.labelKey }))).toStrictEqual([
       { to: "/legal/data-rights", labelKey: "legal.routes.dataRights" },

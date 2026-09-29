@@ -16,7 +16,7 @@ export function readLocaleCookie(): string | undefined {
 /**
  * `Secure` is skipped on plain-HTTP origins only: a browser silently drops a
  * `Secure` cookie set over `http://`, which would break the local dev server
- * while adding nothing — the attribute exists to keep the cookie off cleartext
+ * while adding nothing: the attribute exists to keep the cookie off cleartext
  * requests, and there is nothing else to protect it from there.
  */
 function secureAttribute(): string {
@@ -25,6 +25,6 @@ function secureAttribute(): string {
 
 export function writeLocaleCookie(locale: Locale): void {
   if (typeof document === "undefined") return;
-  // biome-ignore lint/suspicious/noDocumentCookie: no secret, must be readable pre-render — the Cookie Store API is async and unavailable in Safari/Firefox.
+  // biome-ignore lint/suspicious/noDocumentCookie: no secret, must be readable pre-render, the Cookie Store API is async and unavailable in Safari/Firefox.
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${ONE_YEAR_SECONDS}; SameSite=Lax${secureAttribute()}`;
 }

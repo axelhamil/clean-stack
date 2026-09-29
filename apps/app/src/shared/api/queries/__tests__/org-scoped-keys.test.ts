@@ -41,7 +41,7 @@ describe("appartenance courante", () => {
 
   test("l'absence d'organisation est `null`, jamais `undefined`", () => {
     // `undefined` dans une cle est efface a la serialisation : deux scopes
-    // distincts retomberaient sur la meme entree — exactement le bug corrige.
+    // distincts retomberaient sur la meme entree, exactement le bug corrige.
     const key = currentMembershipQueryOptions(null).queryKey;
     expect(key).not.toContain(undefined);
     expect(key).toContain(null);
