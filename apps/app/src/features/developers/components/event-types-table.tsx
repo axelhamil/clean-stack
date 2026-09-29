@@ -11,7 +11,7 @@ import { Panel } from "@packages/ui/components/ui/panel";
 
 export function EventTypesTable() {
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       {SUBSCRIBABLE_EVENT_TYPES.map((type) => (
         <Panel key={type} asChild>
           <details>
