@@ -17,17 +17,23 @@ const actionSvc = new AdminActionService(
   di.IInstrumentation,
 );
 
-const scimSvc = new ScimConnectionService(di.IOutboxRepository, di.IInstrumentation);
+const scimSvc = new ScimConnectionService(
+  di.IOutboxRepository,
+  di.ITransactionService,
+  di.IInstrumentation,
+);
 
-// The directory connection is the SCIM half of the enterprise SSO entitlement, and
-// only the owner manages it: a token that provisions members is a credential over
-// the organization's membership itself.
+// Only the owner manages the directory connection: a token that provisions members
+// is a credential over the organization's membership itself. Issuing one spends the
+// enterprise SSO entitlement, so only that route requires it. Reading the status and
+// disconnecting stay open after a downgrade: an owner must always be able to cut
+// off a directory, and provisioning itself is refused by the plugin callbacks once
+// the plan is gone.
 const scimConnectionGates = [
   requireAuth,
   requireCurrentPolicies,
   requireOrg,
   requireOrgPermission({ scim: ["manage"] }),
-  requireFeature("sso"),
 ] as const;
 
 export const organizationSettingsRoutes = new Hono<{ Variables: AuthVariables }>()
@@ -61,16 +67,22 @@ export const organizationSettingsRoutes = new Hono<{ Variables: AuthVariables }>
     }));
     return c.json({ connection: connection.toNull() });
   })
-  .post("/scim-connection", ...scimConnectionGates, denyImpersonated, async (c) => {
-    const result = await scimSvc.issueToken({
-      organizationId: c.get("orgId"),
-      actorUserId: c.get("user").id,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
+  .post(
+    "/scim-connection",
+    ...scimConnectionGates,
+    requireFeature("sso"),
+    denyImpersonated,
+    async (c) => {
+      const result = await scimSvc.issueToken({
+        organizationId: c.get("orgId"),
+        actorUserId: c.get("user").id,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
 
-    const { token, expiresAt } = result.getValue();
-    return c.json({ token, expiresAt: expiresAt.toISOString() });
-  })
+      const { token, expiresAt } = result.getValue();
+      return c.json({ token, expiresAt: expiresAt.toISOString() });
+    },
+  )
   .delete("/scim-connection", ...scimConnectionGates, denyImpersonated, async (c) => {
     const result = await scimSvc.disconnect({
       organizationId: c.get("orgId"),

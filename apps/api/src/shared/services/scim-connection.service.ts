@@ -1,11 +1,13 @@
 import type { SCIMManagedConnection, SCIMScope } from "@better-auth/scim";
-import { type AppError, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { sql } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
 import { findMemberOf, scimProvisionedMembers } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import type { ITransaction } from "../transaction";
 
 export type ScimConnectionError = AppError<
   "SCIM_CONNECTION_NOT_FOUND" | "SCIM_CONNECTION_PROVIDER_FAILURE"
@@ -49,13 +51,21 @@ const TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
  * registration would close an import cycle. The route instantiates it from built
  * `di` bindings.
  *
- * Every write emits its event after the plugin committed. The plugin's own
- * transaction cannot carry an outbox row, so this is the same post-commit
- * guarantee as the rest of the BetterAuth bridge.
+ * Writes for one organization are serialised by a lock held for their whole
+ * duration: a write spans several plugin transactions (list, then create or rotate,
+ * then revoke), so two concurrent first issues would each create a connection, and
+ * two concurrent rotations would each revoke the credential the other issued.
+ *
+ * Every write emits its events after the plugin committed; the plugin's own
+ * transaction cannot carry an outbox row. By then the change is real, and for a
+ * token the value returned is the only copy of the credential that now works: a
+ * failed emit is reported to telemetry and the result is still returned, because
+ * failing the request would leave the owner with a revoked token and no replacement.
  */
 export class ScimConnectionService {
   constructor(
     private readonly outbox: IOutboxRepository,
+    private readonly uow: IUnitOfWork<ITransaction>,
     private readonly instrumentation: IInstrumentation,
   ) {}
 
@@ -93,62 +103,70 @@ export class ScimConnectionService {
     organizationId: string;
     actorUserId: string;
   }): Promise<Result<IssuedScimToken, ScimConnectionError>> {
-    return this.run("issueToken", async () => {
-      const { organizationId, actorUserId } = input;
-      const expiresAt = new Date(Date.now() + TOKEN_LIFETIME_MS);
-      const connection = await this.activeConnection(organizationId);
+    return this.run("issueToken", () =>
+      this.serialized(input.organizationId, async (tx) => {
+        const { organizationId, actorUserId } = input;
+        const expiresAt = new Date(Date.now() + TOKEN_LIFETIME_MS);
+        const connection = await this.activeConnection(organizationId);
 
-      if (!connection) {
-        const created = await auth.api.createSCIMManagedConnection({
+        if (!connection) {
+          const created = await auth.api.createSCIMManagedConnection({
+            body: {
+              creationRequestId: uuidv7(),
+              provisioningDomainId: organizationId,
+              actorId: actorUserId,
+              scopes: SCIM_SCOPES,
+              expiresAt,
+            },
+          });
+          await this.emitConnectionEvent(
+            tx,
+            EventTypes.SCIM_CONNECTION_CREATED,
+            created.connection.connectionId,
+            input,
+          );
+          return Result.ok({ token: created.token, expiresAt: created.credential.expiresAt });
+        }
+
+        const { connectionId } = connection;
+        const rotated = await auth.api.rotateSCIMManagedCredential({
           body: {
-            creationRequestId: uuidv7(),
+            connectionId,
             provisioningDomainId: organizationId,
             actorId: actorUserId,
             scopes: SCIM_SCOPES,
             expiresAt,
           },
         });
+
+        const { credentials } = await auth.api.getSCIMManagedConnection({
+          body: { connectionId, provisioningDomainId: organizationId },
+        });
+        const superseded = credentials.filter(
+          (credential) =>
+            credential.status === "active" &&
+            credential.credentialId !== rotated.credential.credentialId,
+        );
+        for (const { credentialId } of superseded) {
+          await auth.api.revokeSCIMManagedCredential({
+            body: {
+              connectionId,
+              provisioningDomainId: organizationId,
+              credentialId,
+              actorId: actorUserId,
+            },
+          });
+        }
+
         await this.emitConnectionEvent(
-          EventTypes.SCIM_CONNECTION_CREATED,
-          created.connection.connectionId,
+          tx,
+          EventTypes.SCIM_CONNECTION_TOKEN_ROTATED,
+          connectionId,
           input,
         );
-        return Result.ok({ token: created.token, expiresAt: created.credential.expiresAt });
-      }
-
-      const { connectionId } = connection;
-      const rotated = await auth.api.rotateSCIMManagedCredential({
-        body: {
-          connectionId,
-          provisioningDomainId: organizationId,
-          actorId: actorUserId,
-          scopes: SCIM_SCOPES,
-          expiresAt,
-        },
-      });
-
-      const { credentials } = await auth.api.getSCIMManagedConnection({
-        body: { connectionId, provisioningDomainId: organizationId },
-      });
-      const superseded = credentials.filter(
-        (credential) =>
-          credential.status === "active" &&
-          credential.credentialId !== rotated.credential.credentialId,
-      );
-      for (const { credentialId } of superseded) {
-        await auth.api.revokeSCIMManagedCredential({
-          body: {
-            connectionId,
-            provisioningDomainId: organizationId,
-            credentialId,
-            actorId: actorUserId,
-          },
-        });
-      }
-
-      await this.emitConnectionEvent(EventTypes.SCIM_CONNECTION_TOKEN_ROTATED, connectionId, input);
-      return Result.ok({ token: rotated.token, expiresAt: rotated.credential.expiresAt });
-    });
+        return Result.ok({ token: rotated.token, expiresAt: rotated.credential.expiresAt });
+      }),
+    );
   }
 
   /**
@@ -161,37 +179,42 @@ export class ScimConnectionService {
     organizationId: string;
     actorUserId: string;
   }): Promise<Result<void, ScimConnectionError>> {
-    return this.run("disconnect", async () => {
-      const { organizationId, actorUserId } = input;
-      const connection = await this.activeConnection(organizationId);
-      if (!connection) {
-        return Result.fail({
-          code: "SCIM_CONNECTION_NOT_FOUND",
-          message: "This organization has no directory connection to disconnect.",
+    return this.run("disconnect", () =>
+      this.serialized(input.organizationId, async (tx) => {
+        const { organizationId, actorUserId } = input;
+        const connection = await this.activeConnection(organizationId);
+        if (!connection) {
+          return Result.fail({
+            code: "SCIM_CONNECTION_NOT_FOUND",
+            message: "This organization has no directory connection to disconnect.",
+          });
+        }
+
+        const { connectionId } = connection;
+        const provisioned = await scimProvisionedMembers(connectionId, organizationId);
+        await auth.api.decommissionSCIMManagedConnection({
+          body: { connectionId, provisioningDomainId: organizationId, actorId: actorUserId },
         });
-      }
 
-      const { connectionId } = connection;
-      const provisioned = await scimProvisionedMembers(connectionId, organizationId);
-      await auth.api.decommissionSCIMManagedConnection({
-        body: { connectionId, provisioningDomainId: organizationId, actorId: actorUserId },
-      });
+        for (const { memberId, userId } of provisioned) {
+          if (await findMemberOf(userId, organizationId)) continue;
+          await this.emitCommitted(tx, (savepoint) =>
+            emitEvent(
+              this.outbox,
+              EventTypes.ORG_MEMBER_REMOVED,
+              "member",
+              memberId,
+              { organizationId, actorUserId, userId },
+              { organizationId },
+              savepoint,
+            ),
+          );
+        }
 
-      for (const { memberId, userId } of provisioned) {
-        if (await findMemberOf(userId, organizationId)) continue;
-        await emitEvent(
-          this.outbox,
-          EventTypes.ORG_MEMBER_REMOVED,
-          "member",
-          memberId,
-          { organizationId, actorUserId, userId },
-          { organizationId },
-        );
-      }
-
-      await this.emitConnectionEvent(EventTypes.SCIM_CONNECTION_DELETED, connectionId, input);
-      return Result.ok();
-    });
+        await this.emitConnectionEvent(tx, EventTypes.SCIM_CONNECTION_DELETED, connectionId, input);
+        return Result.ok();
+      }),
+    );
   }
 
   private async activeConnection(
@@ -203,7 +226,35 @@ export class ScimConnectionService {
     return connections.find((connection) => connection.status === "active");
   }
 
+  private serialized<T>(
+    organizationId: string,
+    work: (tx: ITransaction) => Promise<Result<T, ScimConnectionError>>,
+  ): Promise<Result<T, ScimConnectionError>> {
+    return this.uow.run(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`scim-connection:${organizationId}`}, 0))`,
+      );
+      return work(tx);
+    });
+  }
+
+  /**
+   * Emits on a savepoint of the lock's transaction: a failed insert neither aborts
+   * that transaction nor fails a change the plugin already committed.
+   */
+  private async emitCommitted(
+    tx: ITransaction,
+    emit: (savepoint: ITransaction) => Promise<unknown>,
+  ): Promise<void> {
+    try {
+      await tx.transaction(emit);
+    } catch (err) {
+      this.instrumentation.capture(err);
+    }
+  }
+
   private async emitConnectionEvent(
+    tx: ITransaction,
     eventType:
       | typeof EventTypes.SCIM_CONNECTION_CREATED
       | typeof EventTypes.SCIM_CONNECTION_TOKEN_ROTATED
@@ -211,17 +262,20 @@ export class ScimConnectionService {
     connectionId: string,
     input: { organizationId: string; actorUserId: string },
   ): Promise<void> {
-    await emitEvent(
-      this.outbox,
-      eventType,
-      "scim_connection",
-      connectionId,
-      {
-        actorUserId: input.actorUserId,
-        organizationId: input.organizationId,
-        providerId: connectionId,
-      },
-      { organizationId: input.organizationId },
+    await this.emitCommitted(tx, (savepoint) =>
+      emitEvent(
+        this.outbox,
+        eventType,
+        "scim_connection",
+        connectionId,
+        {
+          actorUserId: input.actorUserId,
+          organizationId: input.organizationId,
+          providerId: connectionId,
+        },
+        { organizationId: input.organizationId },
+        savepoint,
+      ),
     );
   }
 
