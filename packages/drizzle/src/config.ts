@@ -5,11 +5,15 @@ import { Pool } from "pg";
 import { requireDatabaseUrl } from "./database-url";
 import * as auditLogSchema from "./schema/audit-log";
 import * as authSchema from "./schema/auth";
+import * as billingSchema from "./schema/billing";
 import * as multiTenantSchema from "./schema/multi-tenant";
 import * as outboxSchema from "./schema/outbox";
 import * as ssoSchema from "./schema/sso";
 import * as webhooksSchema from "./schema/webhooks";
 
+// BetterAuth's Drizzle adapter resolves every model its plugins write (the Stripe
+// plugin's `subscription` included) from this object, so a table a plugin owns
+// has to be listed here, not only exported from the package.
 const schema = {
   ...authSchema,
   ...multiTenantSchema,
@@ -17,6 +21,7 @@ const schema = {
   ...auditLogSchema,
   ...webhooksSchema,
   ...ssoSchema,
+  ...billingSchema,
 };
 
 export type DbClient = ReturnType<typeof drizzle<typeof schema>>;
