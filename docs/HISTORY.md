@@ -1266,6 +1266,14 @@ Auditing a finished surface finds what a plan written before the audit could not
 - **A latent billing bug surfaced**: 1.7 checks at boot that every model its plugins write is in the adapter schema, and `subscription` was not (it was exported by `@packages/drizzle` but missing from the schema `db` is built with), so every Stripe subscription write through the plugin would have failed at runtime. Fixed by adding the billing tables to that schema.
 - New event `scim.connection.token_rotated` (internal): catalog now 85 events, 35 public, 50 internal.
 
+**Review round (before merge)**, each fix proven by a check that failed first:
+
+- **First SSO sign-in of a new user failed.** The SSO plugin creates the user and its session in one transaction, and `session.create.before` bootstrapped the Personal org through `db`, on another connection: the `member` insert referenced a user not committed yet (foreign key violation). The adapter now receives `db` through `withPublishedTransactions`, which publishes each transaction it opens, and `ensurePersonalOrgFor`, `emit` and the other in-hook writes join it (`check:auth-transaction`).
+- **Concurrent SCIM provisionings passed the seat cap** (five at once on a 3-seat plan gave 6 members): the count ran on another connection without a lock. It now runs on the plugin transaction behind a per-organization advisory lock (`check:scim-seats`).
+- **Concurrent token issues created one connection each** (four at once gave four connections): `ScimConnectionService` writes are serialised per organization (`check:scim-connection`). A failed emit after the plugin committed no longer turns into an error, since the returned token is the only working copy.
+- **A downgraded organization could not disconnect its directory** (402 on `DELETE`): only issuing a token requires `sso`; provisioning refuses additions once the plan is gone, removals still go through.
+- **Any organization could reserve an address it does not own**: provisioning outside the organization's verified SSO domains is refused with a SCIM 403.
+
 **Live verification** (local API on Postgres 18, curl): sign-up, sign-in, TOTP enable, passkey option generation; SCIM `POST`/`GET`/`PATCH`/`PUT`/`DELETE` with the expected `member` rows and outbox events (actor = connection creator), seat cap refusal as a SCIM 402 with nothing persisted, 409 on an unverified email match, token rotation (old token 401, new 200), disconnect removing provisioned members but not the owner; SAML registration, SP metadata and ACS URL. Not covered: a full browser round trip against an IdP. SAML sign-in without an SP private key is refused by the plugin because this codebase forces `authnRequestsSigned` (already the case on 1.6.30, `docs/SSO-LOCAL.md` documents the key pair).
 
 **What stays pinned, and why**:
