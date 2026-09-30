@@ -61,13 +61,7 @@ function TypographyH4({ className, ...props }: React.ComponentProps<"h4">) {
 }
 
 function TypographyP({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="typography-p"
-      className={cn("leading-7 [&:not(:first-child)]:mt-6", className)}
-      {...props}
-    />
-  );
+  return <p data-slot="typography-p" className={cn("leading-7", className)} {...props} />;
 }
 
 function TypographyLead({ className, ...props }: React.ComponentProps<"p">) {
@@ -110,6 +104,46 @@ function TypographyMuted({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
+const typographyInlineVariants = cva("", {
+  variants: {
+    tone: {
+      default: "",
+      muted: "text-muted-foreground",
+      destructive: "text-destructive",
+    },
+    font: {
+      sans: "",
+      mono: "font-mono",
+    },
+    size: {
+      inherit: "",
+      sm: "text-sm",
+      xs: "text-xs",
+    },
+  },
+  defaultVariants: { tone: "default", font: "sans", size: "inherit" },
+});
+
+interface TypographyInlineProps
+  extends React.ComponentProps<"span">,
+    VariantProps<typeof typographyInlineVariants> {}
+
+/**
+ * Phrasing text where a block paragraph is not allowed or not wanted: inside a
+ * `summary`, a table cell, a title or next to other inline content. Size
+ * inherits from the parent unless set; `mono` is for identifiers (event
+ * types, token prefixes, URLs), without the inline code chip.
+ */
+function TypographyInline({ className, tone, font, size, ...props }: TypographyInlineProps) {
+  return (
+    <span
+      data-slot="typography-inline"
+      className={cn(typographyInlineVariants({ tone, font, size }), className)}
+      {...props}
+    />
+  );
+}
+
 function TypographyBlockquote({ className, ...props }: React.ComponentProps<"blockquote">) {
   return (
     <blockquote
@@ -137,7 +171,7 @@ function TypographyList({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
       data-slot="typography-list"
-      className={cn("my-6 ml-6 list-disc [&>li]:mt-2", className)}
+      className={cn("ml-6 list-disc [&>li]:mt-2", className)}
       {...props}
     />
   );
@@ -149,6 +183,7 @@ export {
   TypographyH2,
   TypographyH3,
   TypographyH4,
+  TypographyInline,
   TypographyInlineCode,
   TypographyLarge,
   TypographyLead,

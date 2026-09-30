@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { type OidcProviderInput, oidcProviderSchema } from "../sso.schema";
 
 const DEFAULT_VALUES: OidcProviderInput = {
@@ -20,6 +21,7 @@ interface OidcProviderFormProps {
 
 export function OidcProviderForm({ isPending, onSubmit }: OidcProviderFormProps) {
   const { t } = useTranslation("settings");
+  const revealLabels = usePasswordRevealLabels();
   const form = useForm<OidcProviderInput>({
     resolver: zodResolver(oidcProviderSchema),
     defaultValues: DEFAULT_VALUES,
@@ -50,6 +52,7 @@ export function OidcProviderForm({ isPending, onSubmit }: OidcProviderFormProps)
           name="clientSecret"
           label={t("sso.forms.oidc.clientSecretLabel")}
           type="password"
+          {...revealLabels}
         />
         <Button type="submit" disabled={isPending} className="w-fit">
           {t("sso.forms.oidc.submitAction")}

@@ -2,6 +2,9 @@ import type { ErrorEvent } from "@sentry/bun";
 import * as Sentry from "@sentry/bun";
 import { env } from "../env";
 
+// Headers that carry the client IP or identity; v10's sendDefaultPii: false stripped them.
+const IP_HEADERS = ["forwarded", "-ip", "remote-", "via", "-user"];
+
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
   if (event.request) {
     event.request.cookies = undefined;
@@ -31,7 +34,20 @@ if (env.SENTRY_DSN) {
     release: env.GIT_SHA,
     tracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
     integrations: [Sentry.pinoIntegration()],
-    sendDefaultPii: false,
+    // v11 collects user info, cookies, headers, bodies and query data by default.
+    // Opt out of every category that can carry PII; beforeSend stays as a second net.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: { deny: IP_HEADERS }, response: { deny: IP_HEADERS } },
+      httpBodies: [],
+      urlQueryParams: false,
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+      genAI: { inputs: false, outputs: false },
+      graphQL: { document: false, variables: false },
+    },
     beforeSend: scrubEvent,
   });
 }

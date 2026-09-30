@@ -24,12 +24,12 @@ test("reaches and operates the SSO entry with the keyboard", async ({ page }) =>
   await page.goto("/sign-in");
 
   // The passkey button only renders once `PublicKeyCredential` support resolves
-  // (async, conditional) — `tabTo` rather than a fixed Tab count skips past it
+  // (async, conditional); `tabTo` rather than a fixed Tab count skips past it
   // whether or not it showed up, same as every other control on this page.
   const ssoTrigger = page.getByRole("button", { name: "Sign in with SSO", exact: true });
   await tabTo(page, ssoTrigger);
 
-  // Space activates a focused button the same way a click does — this both proves
+  // Space activates a focused button the same way a click does: this both proves
   // the trigger is keyboard-operable and expands the collapsible for the next step.
   await page.keyboard.press(" ");
 
@@ -56,7 +56,7 @@ test.describe("signed in", () => {
     await expect(page.locator("main")).toBeVisible();
 
     await page.keyboard.press("ControlOrMeta+k");
-    const palette = page.getByRole("dialog", { name: "Command Palette" });
+    const palette = page.getByRole("dialog", { name: "Command palette" });
     await expect(palette).toBeVisible();
 
     for (let i = 0; i < 10; i++) {

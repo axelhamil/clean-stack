@@ -1,12 +1,12 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import { ENTITLEMENTS } from "../../../shared/entitlements";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IStripeCatalogSource,
   StripePriceLite,
 } from "../application/ports/stripe-catalog.port";
 import { BillingCatalogService } from "../application/services/billing-catalog.service";
-import { ENTITLEMENTS } from "../config";
 
 const proPrice: StripePriceLite = {
   priceId: "price_pro",

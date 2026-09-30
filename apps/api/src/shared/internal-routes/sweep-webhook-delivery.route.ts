@@ -1,57 +1,46 @@
-// `/internal/sweep-webhook-delivery` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
+// `/internal/sweep-webhook-delivery`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import type { SQL } from "@packages/drizzle";
 import { and, inArray, lt, webhooksSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
-import { di } from "../../container";
 import { env } from "../env";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
-import { countEligibleWithTimeout } from "./sweep-count";
-import { sweepLockFor } from "./sweep-lock";
-import { purgeBatchWithTimeout, requireFilter } from "./sweep-purge";
-import { runRetentionSweep, type SweepBody, sweepBodySchema } from "./sweep-runner";
-import { sweepSpans } from "./sweep-span";
+import { requireFilter } from "./sweep-purge";
+import { runSweepRequest, tableRetentionPass } from "./sweep-route";
+import { sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
 const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
+const LABEL = "sweep-webhook-delivery";
 
 const wd = webhooksSchema.webhookDelivery;
-const filterFor = (cutoff: Date): SQL =>
-  requireFilter(
-    and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)),
-    "sweep-webhook-delivery",
-  );
 
 export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
   .use("*", ...internalLayers)
   .post("/sweep-webhook-delivery", zV("json", sweepBodySchema), async (c) => {
-    const spans = sweepSpans(di.IInstrumentation);
-    const response = await runRetentionSweep({
-      body: c.req.valid("json") as SweepBody,
-      spans,
-      passes: [
-        {
-          label: "default",
-          retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
-          purgeBatch: (cutoff, size) =>
-            purgeBatchWithTimeout({
-              table: wd,
-              idColumn: wd.id,
-              where: filterFor(cutoff),
-              orderBy: wd.createdAt,
-              batchSize: size,
-              spans,
-            }),
-          countEligible: (cutoff) => countEligibleWithTimeout(wd, filterFor(cutoff), spans),
-        },
-      ],
+    const response = await runSweepRequest({
+      label: LABEL,
+      body: c.req.valid("json"),
       logger: c.var.logger,
-      label: "sweep-webhook-delivery",
-      deadlineMs: env.SWEEP_DEADLINE_MS,
-      lock: sweepLockFor("sweep-webhook-delivery", spans),
+      passes: (spans) => [
+        tableRetentionPass(
+          {
+            label: "default",
+            retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
+            table: wd,
+            idColumn: wd.id,
+            orderBy: wd.createdAt,
+            filterFor: (cutoff) =>
+              requireFilter(
+                and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)),
+                LABEL,
+              ),
+          },
+          spans,
+        ),
+      ],
     });
     return c.json(response);
   });

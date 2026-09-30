@@ -1,8 +1,8 @@
 import type { EventHandler } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
+import type { IApiTokenRepository } from "../../shared/ports/api-token.port";
 import { revokeTokensOnMembershipLost } from "./application/event-handlers/revoke-on-membership-lost";
-import type { IApiTokenRepository } from "./application/ports/api-token.port";
 import { ApiTokenService } from "./application/services/api-token.service";
 import { DrizzleApiTokenRepository } from "./infrastructure/repositories/drizzle-api-token.repository";
 import { GithubKeyVerifier } from "./infrastructure/services/github-key-verifier";

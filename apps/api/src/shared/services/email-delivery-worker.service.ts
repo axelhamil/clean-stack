@@ -6,12 +6,11 @@ import { DEFAULT_LOCALE } from "@packages/i18n";
 import { Resend } from "resend";
 import { env } from "../env";
 import { emitEvent } from "../event-emitter";
-import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../jitter";
+import { expectedDelayFromAttempts, nextAttemptAt } from "../jitter";
 import type { Logger } from "../logger";
 import type { EmailMessageRecord, IEmailQueue } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
-import type { ITransaction } from "../transaction";
 
 export const EMAIL_BATCH_CHUNK_SIZE = 100;
 const POLL_INTERVAL_MS = 2_000;
@@ -40,11 +39,7 @@ type BatchResult = {
   error: null | { statusCode?: number; message: string };
 };
 interface BatchSender {
-  batchSend(entries: BatchEntry[], idempotencyKey: string | null): Promise<BatchResult>;
-}
-
-function expectedDelayFromAttempts(currentAttempts: number): number {
-  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
+  batchSend(entries: BatchEntry[], idempotencyKey: Option<string>): Promise<BatchResult>;
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -72,11 +67,9 @@ export class EmailDeliveryWorker {
 
   async start(): Promise<void> {
     this.stopping = false;
-    this.timer = setInterval(() => {
-      this.drainOnce().catch((err) => this.logger.error({ err }, "email drain failed"));
-    }, POLL_INTERVAL_MS);
+    this.timer = setInterval(() => this.drainInBackground(), POLL_INTERVAL_MS);
     this.logger.info("email delivery worker started");
-    void this.drainOnce();
+    this.drainInBackground();
   }
 
   async stop(): Promise<void> {
@@ -89,6 +82,18 @@ export class EmailDeliveryWorker {
       await new Promise((r) => setTimeout(r, 50));
     }
     this.logger.info("email delivery worker stopped");
+  }
+
+  /**
+   * Fire-and-forget entry point for every drain nobody awaits. A rejection left
+   * unhandled here would take the whole process down, and nothing inside
+   * `drainOnce` reports a transaction that fails to open.
+   */
+  private drainInBackground(): void {
+    this.drainOnce().catch((err) => {
+      this.instrumentation.capture(err);
+      this.logger.error({ err }, "email drain failed");
+    });
   }
 
   async drainOnce(): Promise<void> {
@@ -120,8 +125,7 @@ export class EmailDeliveryWorker {
 
   private async sendChunk(chunk: EmailMessageRecord[]): Promise<void> {
     const entries = await Promise.all(chunk.map((r) => this.toEntry(r)));
-    const keyOpt = await chunkIdempotencyKey(chunk);
-    const result = await this.sender.batchSend(entries, keyOpt.isSome() ? keyOpt.unwrap() : null);
+    const result = await this.sender.batchSend(entries, await chunkIdempotencyKey(chunk));
 
     if (result.error !== null) {
       const status = result.error.statusCode ?? 500;
@@ -161,8 +165,11 @@ export class EmailDeliveryWorker {
 
   private async reschedule(rowRecord: EmailMessageRecord, error: string): Promise<void> {
     const attempts = rowRecord.attempts + 1;
-    const { date } = nextAttemptAt(attempts, expectedDelayFromAttempts(attempts));
-    return this.settle(rowRecord, error, Option.fromNullable(date));
+    return this.settle(
+      rowRecord,
+      error,
+      nextAttemptAt(attempts, expectedDelayFromAttempts(attempts)),
+    );
   }
 
   private async settle(
@@ -185,14 +192,14 @@ export class EmailDeliveryWorker {
         rowRecord.id,
         {
           messageId: rowRecord.id,
-          template: rowRecord.template.isSome() ? rowRecord.template.unwrap() : null,
+          template: rowRecord.template.toNull(),
           toHash: await sha256Hex(rowRecord.toAddress),
           attempts,
           lastError: error,
           actorUserId: null,
         },
         {},
-        tx as ITransaction,
+        tx,
       );
     });
   }
@@ -205,7 +212,7 @@ export class EmailDeliveryWorker {
       return { ...base, html: body.html ?? "", text: body.text };
     }
 
-    const templateName = rowRecord.template.isSome() ? rowRecord.template.unwrap() : null;
+    const templateName = rowRecord.template.toNull();
     const templateId = templateName ? TEMPLATE_IDS[templateName] : "";
     if (templateId) {
       return {
@@ -235,7 +242,7 @@ export async function chunkIdempotencyKey(chunk: EmailMessageRecord[]): Promise<
 export function groupRows(rows: EmailMessageRecord[]): EmailMessageRecord[][] {
   const groups = new Map<string, EmailMessageRecord[]>();
   for (const r of rows) {
-    const key = `${r.kind}:${r.template.isSome() ? r.template.unwrap() : ""}`;
+    const key = `${r.kind}:${r.template.unwrapOr("")}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(r);
     else groups.set(key, [r]);
@@ -246,12 +253,12 @@ export function groupRows(rows: EmailMessageRecord[]): EmailMessageRecord[][] {
 function makeResendSender(instrumentation: IInstrumentation, logger: Logger): BatchSender {
   const client = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
   return {
-    async batchSend(entries: BatchEntry[], idempotencyKey: string | null): Promise<BatchResult> {
+    async batchSend(entries: BatchEntry[], idempotencyKey: Option<string>): Promise<BatchResult> {
       if (!client) {
         for (const e of entries) {
           logger.info(
             { to: e.to, subject: e.subject },
-            "[email-dev] not delivered — no RESEND_API_KEY",
+            "[email-dev] not delivered: no RESEND_API_KEY",
           );
         }
         return { data: entries.map((_, i) => ({ id: `dev-${i}` })), error: null };
@@ -270,7 +277,7 @@ function makeResendSender(instrumentation: IInstrumentation, logger: Logger): Ba
           try {
             const res = await client.batch.send(entries as never, {
               batchValidation: "permissive",
-              ...(idempotencyKey ? { idempotencyKey } : {}),
+              ...(idempotencyKey.isSome() ? { idempotencyKey: idempotencyKey.unwrap() } : {}),
             });
             if (res.error) {
               const status = (res.error as { statusCode?: number }).statusCode ?? 500;

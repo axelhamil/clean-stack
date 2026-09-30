@@ -31,6 +31,26 @@ function ListRowContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/**
+ * The row's content as one click target (mark a notification read, open an
+ * item). It keeps the content's stacked text layout, which a `Button`, sized
+ * for a single-line label, cannot hold without overriding its height and
+ * padding.
+ */
+function ListRowButton({ className, type = "button", ...props }: React.ComponentProps<"button">) {
+  return (
+    <button
+      data-slot="list-row-button"
+      type={type}
+      className={cn(
+        "flex flex-col items-start gap-1 rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 function ListRowMeta({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -51,4 +71,4 @@ function ListRowAction({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-export { ListRow, ListRowAction, ListRowContent, ListRowMedia, ListRowMeta };
+export { ListRow, ListRowAction, ListRowButton, ListRowContent, ListRowMedia, ListRowMeta };

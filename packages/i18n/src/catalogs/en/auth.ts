@@ -31,7 +31,7 @@ export default {
     nameLabel: "Name",
     namePlaceholder: "Ada Lovelace",
     accept: "I accept the <privacy>Privacy Policy</privacy> and <terms>Terms of Service</terms>",
-    successToast: "Account created — check your email to verify",
+    successToast: "Account created, check your email to verify",
   },
   emailField: {
     label: "Email",
@@ -68,12 +68,12 @@ export default {
     confirmPasswordLabel: "Confirm password",
     submitPending: "Updating…",
     submit: "Update password",
-    successToast: "Password updated — sign in to continue",
+    successToast: "Password updated, sign in to continue",
   },
   forgotPassword: {
     failed: "Request failed",
     title: "Reset your password",
-    description: "Enter your email — we'll send you a reset link.",
+    description: "Enter your email and we'll send you a reset link.",
     rememberedIt: "Remembered it?",
     submit: "Send reset link",
     pending: "Sending…",
@@ -87,7 +87,7 @@ export default {
     invalidTitle: "Link invalid or expired",
     requestNewLink: "Request a new link",
     expiryNotice: "Magic links are single-use and expire after a few minutes.",
-    successToast: "Magic link sent — check your inbox",
+    successToast: "Magic link sent, check your inbox",
     invalidOrExpired: "Invalid or expired link",
   },
   passkey: {

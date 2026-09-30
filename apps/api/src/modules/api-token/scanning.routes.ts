@@ -1,19 +1,20 @@
-import type { Result } from "@packages/ddd-kit";
+import type { IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { type Locale, toLocale } from "@packages/i18n";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 import { hmacToken, parseToken } from "../../shared/crypto/api-token";
 import { emitEvent } from "../../shared/event-emitter";
+import type { IApiTokenRepository } from "../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../shared/ports/outbox.port";
 import type { ITransaction } from "../../shared/transaction";
-import type { IApiTokenRepository } from "./application/ports/api-token.port";
 
 export interface ScanningDeps {
   githubKeyVerifier: { verify(keyId: string, sig: string, body: string): Promise<boolean> };
   apiTokenRepository: Pick<IApiTokenRepository, "findByHmac" | "revoke">;
-  transactionService: { run(cb: (tx: ITransaction) => Promise<void>): Promise<void> };
+  transactionService: Pick<IUnitOfWork<ITransaction>, "run">;
   outboxRepository: IOutboxRepository;
   emailService: {
     sendTemplate(
@@ -26,13 +27,15 @@ export interface ScanningDeps {
   instrumentation: IInstrumentation;
   findUserById: (
     id: string,
-  ) => Promise<{ email: string; name?: string | null; locale?: string | null } | undefined>;
+  ) => Promise<Option<{ email: string; name?: string | null; locale?: string | null }>>;
   prefix: string;
   pepper: string;
   pepperPrevious?: string;
 }
 
-type ScanEntry = { token: string; type: string; url?: string };
+const scanPayloadSchema = z.array(
+  z.object({ token: z.string(), type: z.string(), url: z.string().optional() }),
+);
 
 export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
   return new Hono().post("/github", async (c) => {
@@ -48,12 +51,16 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
     const valid = await deps.githubKeyVerifier.verify(keyId, sigB64, rawBody);
     if (!valid) throw new HTTPException(403, { message: "INVALID_SIGNATURE" });
 
-    let entries: ScanEntry[];
+    let json: unknown;
     try {
-      entries = JSON.parse(rawBody) as ScanEntry[];
+      json = JSON.parse(rawBody);
     } catch {
       throw new HTTPException(400, { message: "INVALID_BODY" });
     }
+
+    const payload = scanPayloadSchema.safeParse(json);
+    if (!payload.success) throw new HTTPException(400, { message: "INVALID_BODY" });
+    const entries = payload.data;
 
     const results = await Promise.all(
       entries.map(async (entry) => {
@@ -93,15 +100,11 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
 
         const record = opt.unwrap();
 
-        if (record.revokedAt === null) {
-          let revokeFailure: Error | null = null;
-          try {
-            await deps.transactionService.run(async (tx) => {
+        if (record.revokedAt.isNone()) {
+          const revoked = await deps.transactionService
+            .run(async (tx) => {
               const revokeResult = await deps.apiTokenRepository.revoke(record.id, "leaked", tx);
-              if (revokeResult.isFailure) {
-                revokeFailure = new Error(revokeResult.getError().message);
-                throw revokeFailure;
-              }
+              if (revokeResult.isFailure) return revokeResult;
 
               await emitEvent(
                 deps.outboxRepository,
@@ -111,21 +114,25 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
                 {
                   userId: record.userId,
                   actorUserId: null,
-                  organizationId: record.organizationId,
+                  organizationId: record.organizationId.toNull(),
                   tokenId: record.id,
                   reason: "leaked" as const,
                 },
-                { organizationId: record.organizationId },
+                { organizationId: record.organizationId.toNull() },
                 tx,
               );
-            });
-          } catch (err) {
-            if (!revokeFailure) deps.instrumentation.capture(err);
-            throw new HTTPException(500, { message: "REVOKE_FAILED" });
-          }
 
-          const user = await deps.findUserById(record.userId);
-          if (user) {
+              return revokeResult;
+            })
+            .catch((err: unknown) => {
+              deps.instrumentation.capture(err);
+              throw new HTTPException(500, { message: "REVOKE_FAILED" });
+            });
+          if (revoked.isFailure) throw new HTTPException(500, { message: "REVOKE_FAILED" });
+
+          const found = await deps.findUserById(record.userId);
+          if (found.isSome()) {
+            const user = found.unwrap();
             const locale = toLocale(user.locale);
             const sent = await deps.emailService.sendTemplate(
               "api_token_leaked",

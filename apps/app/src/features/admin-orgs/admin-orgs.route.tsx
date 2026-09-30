@@ -1,7 +1,6 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { Switch } from "@packages/ui/components/ui/switch";
 import {
   Table,
@@ -12,7 +11,6 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -21,7 +19,7 @@ import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
@@ -45,17 +43,11 @@ function AdminOrgsPage() {
       toast.success(t("orgs.ssoEnforcementUpdatedToast"));
       void queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.updateAdminOrgSsoEnforcement", {
-          defaultValue: "Failed to update SSO enforcement",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("updateAdminOrgSsoEnforcement")),
   });
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <header>
         <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
       </header>
@@ -90,6 +82,7 @@ function AdminOrgsPage() {
                   const saving =
                     ssoEnforcementMutation.isPending &&
                     ssoEnforcementMutation.variables?.id === org.id;
+
                   return (
                     <TableRow key={org.id}>
                       <TableCell>

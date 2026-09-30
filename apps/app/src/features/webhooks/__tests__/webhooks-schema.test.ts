@@ -11,10 +11,12 @@ describe("webhookFormSchema", () => {
     });
     expect(r.success).toBe(true);
   });
+
   it("rejects an empty event list", () => {
     const r = webhookFormSchema.safeParse({ url: "https://a.b", eventTypes: [], enabled: true });
     expect(r.success).toBe(false);
   });
+
   it("rejects an internal (non-subscribable) event", () => {
     const r = webhookFormSchema.safeParse({
       url: "https://a.b",
@@ -23,6 +25,7 @@ describe("webhookFormSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
   it("rejects a non-url", () => {
     const r = webhookFormSchema.safeParse({
       url: "not-a-url",

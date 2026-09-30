@@ -9,6 +9,8 @@ import { zV } from "../../shared/validator";
 import { banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import { setRoleBodySchema } from "./application/dto/set-role.dto";
+import type { AdminUserRow } from "./application/ports/admin-user-store.port";
+import type { AdminUserDetail } from "./application/services/admin-query.service";
 
 const actionSvc = new AdminActionService(
   di.IOutboxRepository,
@@ -16,34 +18,40 @@ const actionSvc = new AdminActionService(
   di.IInstrumentation,
 );
 
+async function findUserOr404(userId: string): Promise<AdminUserDetail> {
+  const result = await di.AdminQueryService.getUser(userId);
+  if (result.isFailure) throw new AppErrorException(result.getError());
+
+  const found = result.getValue();
+  if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
+
+  return found.unwrap();
+}
+
+function serializeUser(u: AdminUserRow) {
+  return {
+    ...u,
+    role: u.role.toNull(),
+    banReason: u.banReason.toNull(),
+    banExpires: u.banExpires.map((d) => d.toISOString()).toNull(),
+    createdAt: u.createdAt.toISOString(),
+  };
+}
+
 export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
   .get("/", requireAuth, requirePlatformAdmin, zV("query", listUsersQuerySchema), async (c) => {
     const result = await di.AdminQueryService.listUsers(c.req.valid("query"));
     if (result.isFailure) throw new AppErrorException(result.getError());
     const page = result.getValue();
     return c.json({
-      items: page.items.map((u) => ({
-        ...u,
-        role: u.role.toNull(),
-        banReason: u.banReason.toNull(),
-        banExpires: u.banExpires.toNull()?.toISOString() ?? null,
-        createdAt: u.createdAt.toISOString(),
-      })),
+      items: page.items.map(serializeUser),
       nextCursor: page.nextCursor.toNull(),
     });
   })
   .get("/:id", requireAuth, requirePlatformAdmin, async (c) => {
-    const result = await di.AdminQueryService.getUser(c.req.param("id"));
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    const found = result.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
+    const u = await findUserOr404(c.req.param("id"));
     return c.json({
-      ...u,
-      role: u.role.toNull(),
-      banReason: u.banReason.toNull(),
-      banExpires: u.banExpires.toNull()?.toISOString() ?? null,
-      createdAt: u.createdAt.toISOString(),
+      ...serializeUser(u),
       sessions: u.sessions.map((s) => ({
         id: s.id,
         createdAt: s.createdAt.toISOString(),
@@ -52,6 +60,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
         userAgent: s.userAgent.toNull(),
         impersonatedBy: s.impersonatedBy.toNull(),
       })),
+      memberships: u.memberships,
     });
   })
   .post("/:id/ban", requireAuth, requirePlatformAdmin, zV("json", banUserBodySchema), async (c) => {
@@ -81,11 +90,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     const actor = c.get("user");
     const body = c.req.valid("json");
     const userId = c.req.param("id");
-    const userResult = await di.AdminQueryService.getUser(userId);
-    if (userResult.isFailure) throw new AppErrorException(userResult.getError());
-    const found = userResult.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
+    const u = await findUserOr404(userId);
     const result = await actionSvc.setRole({
       actorUserId: actor.id,
       userId,
@@ -99,11 +104,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
   .post("/:id/reset-password", requireAuth, requirePlatformAdmin, async (c) => {
     const actor = c.get("user");
     const userId = c.req.param("id");
-    const userResult = await di.AdminQueryService.getUser(userId);
-    if (userResult.isFailure) throw new AppErrorException(userResult.getError());
-    const found = userResult.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
+    const u = await findUserOr404(userId);
     const result = await actionSvc.resetPassword({
       actorUserId: actor.id,
       userId,
@@ -116,11 +117,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
   .delete("/:id/sessions", requireAuth, requirePlatformAdmin, async (c) => {
     const actor = c.get("user");
     const userId = c.req.param("id");
-    const userResult = await di.AdminQueryService.getUser(userId);
-    if (userResult.isFailure) throw new AppErrorException(userResult.getError());
-    const found = userResult.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
+    const u = await findUserOr404(userId);
     const result = await actionSvc.revokeSessions({
       actorUserId: actor.id,
       userId,

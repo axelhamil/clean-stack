@@ -23,11 +23,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
   .get("/", requireAuth, zV("query", listQuerySchema), async (c) => {
     const { cursor, limit } = c.req.valid("query");
     const userId = c.get("user").id;
-    const result = await di.INotificationStore.list(
-      userId,
-      Option.fromNullable(cursor ?? null),
-      limit,
-    );
+    const result = await di.INotificationStore.list(userId, Option.fromNullable(cursor), limit);
     if (result.isFailure) throw new AppErrorException(result.getError());
     const notifications = result.getValue();
     const lastItem = notifications.at(-1);
@@ -69,7 +65,7 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
         // nothing. Answering `200 {ok:true}` claims an action that never
         // happened, and the client decrements its badge by the ids it sent. A
         // 403 would leak the row's existence, so the whole batch is NOT_FOUND
-        // and the transaction rolls back — all of it applied, or none of it.
+        // and the transaction rolls back: all of it applied, or none of it.
         if (marked.length !== new Set(ids).size) {
           throw new HTTPException(404, { message: "NOTIFICATION_NOT_FOUND" });
         }

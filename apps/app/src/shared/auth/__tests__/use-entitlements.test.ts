@@ -42,7 +42,7 @@ describe("buildEntitlementsView", () => {
   });
 });
 
-describe("buildEntitlementsView — quotas", () => {
+describe("buildEntitlementsView: quotas", () => {
   it("exposes useQuota with remaining and exceeded", () => {
     const view = buildEntitlementsView({
       tier: "free",

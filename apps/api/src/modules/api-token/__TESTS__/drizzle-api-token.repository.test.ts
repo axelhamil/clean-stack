@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
+import type { ApiTokenRecord } from "../../../shared/ports/api-token.port";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -38,122 +41,13 @@ function makeDbQuery() {
 // Declared before the dynamic import below so the repository binds this `db` at
 // module-load time. The replacement stays inside this file's module registry.
 mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
   db: {
     select: () => makeDbQuery(),
     insert: () => makeDbQuery(),
     update: () => makeDbQuery(),
     delete: () => makeDbQuery(),
   },
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  inArray: () => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  not: () => ({}),
-  like: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  apiTokenSchema: {
-    apiToken: {
-      id: {},
-      userId: {},
-      organizationId: {},
-      name: {},
-      scopes: {},
-      tokenHmac: {},
-      pepperVersion: {},
-      tokenStart: {},
-      lastUsedAt: {},
-      expiresAt: {},
-      revokedAt: {},
-      revokedReason: {},
-      createdAt: {},
-    },
-  },
-  authSchema: { user: {}, session: {} },
-  multiTenantSchema: { organization: { id: {} }, member: {} },
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      url: {},
-      secretCipher: {},
-      eventTypes: {},
-      enabled: {},
-      createdAt: {},
-      updatedAt: {},
-      previousSecretCipher: {},
-      previousSecretExpiresAt: {},
-      consecutiveFailures: {},
-      firstFailedAt: {},
-      disabledAt: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  emailSchema: {},
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
 }));
 
 const { DrizzleApiTokenRepository } = await import(
@@ -181,6 +75,15 @@ const fakeRow = {
   revokedAt: null as Date | null,
   revokedReason: null as "user" | "membership_lost" | "leaked" | null,
   createdAt: new Date("2024-01-01"),
+};
+
+const fakeRecord: ApiTokenRecord = {
+  ...fakeRow,
+  organizationId: Option.none(),
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
 };
 
 // ---------------------------------------------------------------------------
@@ -241,7 +144,7 @@ describe("DrizzleApiTokenRepository", () => {
   });
 
   // -------------------------------------------------------------------------
-  // findByIdForOwner — wrong owner returns Option.none
+  // findByIdForOwner: wrong owner returns Option.none
   // -------------------------------------------------------------------------
 
   describe("findByIdForOwner", () => {
@@ -266,7 +169,7 @@ describe("DrizzleApiTokenRepository", () => {
   });
 
   // -------------------------------------------------------------------------
-  // touchLastUsed — bucket write once
+  // touchLastUsed: bucket write once
   // -------------------------------------------------------------------------
 
   describe("touchLastUsed", () => {
@@ -290,17 +193,17 @@ describe("DrizzleApiTokenRepository", () => {
 
       await repo.touchLastUsed(fakeRow.id, floor);
       const first = (await repo.findByHmac(fakeRow.tokenHmac)).getValue().unwrap().lastUsedAt;
-      expect(first).not.toBeNull();
+      expect(first.isSome()).toBe(true);
 
       await repo.touchLastUsed(fakeRow.id, floor);
       const second = (await repo.findByHmac(fakeRow.tokenHmac)).getValue().unwrap().lastUsedAt;
 
-      expect(second?.getTime()).toBe(first?.getTime());
+      expect(second.unwrap().getTime()).toBe(first.unwrap().getTime());
     });
   });
 
   // -------------------------------------------------------------------------
-  // revokeAllForMembership — limited to the target org
+  // revokeAllForMembership: limited to the target org
   // -------------------------------------------------------------------------
 
   describe("revokeAllForMembership", () => {
@@ -322,7 +225,7 @@ describe("DrizzleApiTokenRepository", () => {
       expect(revoked.getValue()).toEqual(["tok-a"]);
 
       const stillLive = (await repo.findByHmac("hmac-b")).getValue().unwrap();
-      expect(stillLive.revokedAt).toBeNull();
+      expect(stillLive.revokedAt.isNone()).toBe(true);
     });
 
     it("failure path: DB throws → Result.fail", async () => {
@@ -344,7 +247,7 @@ describe("DrizzleApiTokenRepository", () => {
     it("happy path: returns Result.ok", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.insert(fakeRow);
+      const result = await repo.insert(fakeRecord);
 
       expect(result.isSuccess).toBe(true);
     });
@@ -353,7 +256,7 @@ describe("DrizzleApiTokenRepository", () => {
       const boom = new Error("insert boom");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.insert(fakeRow);
+      const result = await repo.insert(fakeRecord);
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("API_TOKEN_PROVIDER_FAILURE");

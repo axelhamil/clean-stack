@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Select,
   SelectContent,
@@ -23,8 +22,11 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
+import {
+  TypographyH1,
+  TypographyInline,
+  TypographyMuted,
+} from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -38,7 +40,7 @@ import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   createEndpointMutationOptions,
@@ -58,7 +60,11 @@ import { EndpointRow } from "./components/endpoint-row";
 import { VerifySnippet } from "./components/verify-snippet";
 import { WebhookForm } from "./forms/webhook-form";
 import type { DeliveryFilters } from "./webhook-delivery-filters";
-import { DELIVERY_STATUS_KEYS, isDeliveryStatus } from "./webhook-labels";
+import {
+  DELIVERY_STATUS_BADGE_VARIANTS,
+  DELIVERY_STATUS_KEYS,
+  isDeliveryStatus,
+} from "./webhook-labels";
 
 export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/webhooks")({
   beforeLoad: ensureOrgPermission({ webhooks: ["read"] }),
@@ -101,13 +107,7 @@ function WebhooksPage() {
       });
       toast.success(t("settings:webhooks.createdToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.createWebhookEndpoint", {
-          defaultValue: "Failed to create webhook endpoint",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("createWebhookEndpoint")),
   });
 
   const update = useMutation({
@@ -119,13 +119,7 @@ function WebhooksPage() {
       });
       toast.success(t("settings:webhooks.updatedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.updateWebhookEndpoint", {
-          defaultValue: "Failed to update webhook endpoint",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("updateWebhookEndpoint")),
   });
 
   const del = useMutation({
@@ -136,13 +130,7 @@ function WebhooksPage() {
       });
       toast.success(t("settings:webhooks.deletedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.deleteWebhookEndpoint", {
-          defaultValue: "Failed to delete webhook endpoint",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("deleteWebhookEndpoint")),
   });
 
   const rotate = useMutation({
@@ -151,35 +139,19 @@ function WebhooksPage() {
       setRevealSecret(res.secret);
       toast.success(t("settings:webhooks.secretRotatedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.rotateWebhookSecret", { defaultValue: "Failed to rotate secret" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("rotateWebhookSecret")),
   });
 
   const sendTest = useMutation({
     ...sendTestMutationOptions,
     onSuccess: () => toast.success(t("settings:webhooks.testSentToast")),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.sendWebhookTestEvent", {
-          defaultValue: "Failed to send test event",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("sendWebhookTestEvent")),
   });
 
   const replay = useMutation({
     ...replayDeliveryMutationOptions,
     onSuccess: () => toast.success(t("settings:webhooks.deliveryReplayedToast")),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.replayWebhookDelivery", {
-          defaultValue: "Failed to replay delivery",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("replayWebhookDelivery")),
   });
 
   const dialogOpen = creating || editing !== null;
@@ -190,7 +162,7 @@ function WebhooksPage() {
   };
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <TypographyH1 variant="page">{t("settings:webhooks.pageTitle")}</TypographyH1>
@@ -215,7 +187,7 @@ function WebhooksPage() {
       ) : endpoints.isError ? (
         <p>{t("errors:fallback.loadWebhookEndpoints")}</p>
       ) : endpoints.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">{t("settings:webhooks.noEndpoints")}</p>
+        <TypographyMuted>{t("settings:webhooks.noEndpoints")}</TypographyMuted>
       ) : (
         <Table>
           <TableHeader>
@@ -256,7 +228,7 @@ function WebhooksPage() {
               onValueChange={(v) =>
                 setDeliveryFilters((f) => ({
                   ...f,
-                  status: (v as DeliveryFilters["status"]) || undefined,
+                  status: isDeliveryStatus(v) ? v : undefined,
                 }))
               }
             >
@@ -298,17 +270,11 @@ function WebhooksPage() {
                     .flatMap((p) => p.items)
                     .map((d) => (
                       <TableRow key={d.id}>
-                        <TableCell className="font-mono text-sm">{d.eventType}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              d.status === "success"
-                                ? "default"
-                                : d.status === "dead_letter" || d.status === "failed"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
+                          <TypographyInline font="mono">{d.eventType}</TypographyInline>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={DELIVERY_STATUS_BADGE_VARIANTS[d.status]}>
                             {isDeliveryStatus(d.status)
                               ? t(DELIVERY_STATUS_KEYS[d.status])
                               : d.status}
@@ -341,7 +307,7 @@ function WebhooksPage() {
           <DeliverySheet
             endpointId={selectedEndpointId}
             delivery={selectedDelivery}
-            canReplay={can({ webhooks: ["write"] })}
+            canReplay={canWrite}
             onReplay={(deliveryId) => replay.mutate({ endpointId: selectedEndpointId, deliveryId })}
             onClose={() => setSelectedDelivery(null)}
             guard={guard}
@@ -350,7 +316,7 @@ function WebhooksPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent closeLabel={t("common:actions.close")} className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editing

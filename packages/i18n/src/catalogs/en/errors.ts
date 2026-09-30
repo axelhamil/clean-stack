@@ -9,13 +9,13 @@ export default {
     TWO_FACTOR_INVALID: "Invalid authenticator code.",
     // `assertSsoEntitlementFor` (apps/api/src/auth.ts) puts the code directly in
     // the APIError's `message` rather than a separate `code` field, so the
-    // front reads it back off `error.message` (see provider-card.tsx) — the
+    // front reads it back off `error.message` (see provider-card.tsx); the
     // catalog lookup itself is keyed the same as every other code either way.
     SSO_PLAN_REQUIRED: "Your plan does not include SSO.",
     SSO_ORGANIZATION_REQUIRED: "No active organization.",
     // BetterAuth's own `BASE_ERROR_CODES`. They are keyed here rather than
     // read off `error.message` because the library ships one English string
-    // per code and no translation hook — the code is the only stable,
+    // per code and no translation hook: the code is the only stable,
     // localisable identifier the client receives.
     INVALID_EMAIL_OR_PASSWORD: "Invalid email or password.",
     INVALID_EMAIL: "Enter a valid email address.",
@@ -38,7 +38,7 @@ export default {
     SESSION_EXPIRED: "Your session has expired. Sign in again to continue.",
     SESSION_NOT_FRESH: "Sign in again to confirm this change.",
     CREDENTIAL_ACCOUNT_NOT_FOUND:
-      "This account has no password — use the sign-in method you set up.",
+      "This account has no password. Use the sign-in method you set up.",
     ACCOUNT_NOT_FOUND: "Account not found.",
     SOCIAL_ACCOUNT_ALREADY_LINKED: "That account is already linked to another user.",
     FAILED_TO_CREATE_USER: "We could not create your account. Please try again.",
@@ -59,7 +59,7 @@ export default {
     INVALID_CODE: "That code is not correct. Check your authenticator app and try again.",
     TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Too many attempts. Request a new code.",
     ACCOUNT_TEMPORARILY_LOCKED:
-      "Too many failed attempts. Your account is temporarily locked — try again later.",
+      "Too many failed attempts. Your account is temporarily locked. Try again later.",
     INVALID_TWO_FACTOR_COOKIE: "This verification step expired. Sign in again.",
     CHALLENGE_NOT_FOUND: "This passkey attempt expired. Try again.",
     YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY: "This passkey cannot be registered here.",
@@ -120,8 +120,8 @@ export default {
       "This action is unavailable while you are impersonating another user.",
     POLICY_ACCEPTANCE_REQUIRED: "Our terms have been updated. Accept the new version to continue.",
   },
-  // Covers `HTTP_<status>` codes — raised by `HTTPException` sites with no
-  // business code (`error.middleware.ts`) — for statuses the API actually
+  // Covers `HTTP_<status>` codes (raised by `HTTPException` sites with no
+  // business code, see `error.middleware.ts`) for statuses the API actually
   // sends. A status with no entry here falls through to `bySuffix`/the
   // server's own message, so this only ever adds coverage.
   byStatus: {
@@ -173,7 +173,7 @@ export default {
     invalidEventSelection: "Contains an unknown or non-subscribable event.",
   },
   fallback: {
-    // Shown only when a request fails with no JSON error body — `formatApiError`
+    // Shown only when a request fails with no JSON error body: `formatApiError`
     // prefers the catalog's `byCode`/`bySuffix` answer and then the server's own
     // 4xx message. These are the last resort, not the normal path.
     acceptPolicies: "Failed to accept policies",
@@ -209,7 +209,7 @@ export default {
     sendWebhookTestEvent: "Failed to send test event",
     // The JSX loading state (`webhooks.route.tsx`) and this fallback message
     // (`webhooks.queries.ts`, shown only when the API sends no JSON error
-    // body) render the exact same failure — one key, so they can never drift
+    // body) render the exact same failure: one key, so they can never drift
     // a trailing period apart the way the two literals did before extraction.
     loadWebhookEndpoints: "Failed to load webhook endpoints.",
     loadWebhookDeliveries: "Failed to load deliveries.",
@@ -233,7 +233,7 @@ export default {
     loadAdminOrgs: "Failed to load organizations",
     loadAdminOrg: "Failed to load organization",
     // Distinct from `updateSsoEnforcement` above (the org owner's own
-    // self-service toggle) — this is the platform admin overriding
+    // self-service toggle): this is the platform admin overriding
     // enforcement on an arbitrary organization, a different action from a
     // different source that happens to share the same English wording.
     updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
@@ -250,7 +250,13 @@ export default {
     regenerateBackupCodes: "Couldn't regenerate your recovery codes. Please try again.",
     revokeSession: "Failed to revoke session",
     // Distinct from `revokeUserSessions` above (an admin revoking someone
-    // else's sessions) — this is a user revoking their own other sessions.
+    // else's sessions): this is a user revoking their own other sessions.
     revokeOtherSessions: "Failed to revoke sessions",
+    setLocale: "Failed to update language",
+    preflightDeletion: "Failed to check whether the account can be deleted",
+    presignUpload: "Failed to prepare the upload",
+    confirmUpload: "Failed to confirm the upload",
+    deleteUpload: "Failed to delete the file",
+    upgradeSubscription: "Failed to start the upgrade",
   },
 } as const;

@@ -23,7 +23,7 @@ export interface SoleOwnedOrgWithMembers {
 
 // Wire-format DTO serialized to JSON in the user's data export archive (RGPD).
 // `null` is intentional here: this leaves the application boundary as raw JSON,
-// where `null` is the canonical representation of absence — `Option<T>` would
+// where `null` is the canonical representation of absence: `Option<T>` would
 // serialize to `{ _tag: "None" }` and break consumers reading the export file.
 export interface UserExportPayload {
   exportedAt: string;

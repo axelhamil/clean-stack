@@ -19,11 +19,9 @@ import {
 } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { SUB_PROCESSOR_KEYS } from "../../shared/sub-processor-labels";
-import type { SubProcessor } from "../../shared/sub-processors.config";
-import { SUB_PROCESSORS } from "../../shared/sub-processors.config";
+import { SUB_PROCESSORS, type SubProcessor } from "../../shared/sub-processors.config";
 import { UntranslatedBodyBanner } from "./components/untranslated-body-banner";
 
 export const Route = createFileRoute("/legal/sub-processors")({
@@ -31,12 +29,13 @@ export const Route = createFileRoute("/legal/sub-processors")({
 });
 
 interface SubProcessorTableProps {
-  processors: SubProcessor[];
+  processors: readonly SubProcessor[];
   caption: string;
-  t: TFunction<"common">;
 }
 
-function SubProcessorTable({ processors, caption, t }: SubProcessorTableProps) {
+function SubProcessorTable({ processors, caption }: SubProcessorTableProps) {
+  const { t } = useTranslation("common");
+
   return (
     <Table>
       <TableCaption>{caption}</TableCaption>
@@ -70,7 +69,7 @@ function SubProcessorTable({ processors, caption, t }: SubProcessorTableProps) {
                   DPA
                 </TextLink>
               ) : (
-                "—"
+                "N/A"
               )}
             </TableCell>
           </TableRow>
@@ -100,7 +99,7 @@ function SubProcessorsPage() {
           <TypographyH2>What is a sub-processor?</TypographyH2>
         </CardHeader>
         <CardContent>
-          <TypographyP className="my-0">
+          <TypographyP>
             A sub-processor is a third party engaged by the data controller (us) to process personal
             data on your behalf, as defined under RGPD Art. 28. These third parties receive access
             to personal data only to the extent necessary to operate the service. We ensure each
@@ -118,7 +117,6 @@ function SubProcessorsPage() {
           <SubProcessorTable
             processors={active}
             caption="Third-party processors currently used to operate the service"
-            t={t}
           />
         </CardContent>
       </Card>
@@ -130,8 +128,7 @@ function SubProcessorsPage() {
         <CardContent>
           <SubProcessorTable
             processors={planned}
-            caption="Third-party processors intended for future use — not yet active"
-            t={t}
+            caption="Third-party processors intended for future use, not yet active"
           />
         </CardContent>
       </Card>
@@ -141,7 +138,7 @@ function SubProcessorsPage() {
           <TypographyH2>Change notice</TypographyH2>
         </CardHeader>
         <CardContent>
-          <TypographyP className="my-0">
+          <TypographyP>
             In accordance with RGPD Art. 28§2, we will notify you at least 30 days before adding or
             replacing any sub-processor. If you object to a change, you may terminate the agreement
             before the change takes effect. Notifications are sent to the contact address on your

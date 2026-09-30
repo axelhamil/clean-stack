@@ -1,8 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import type { ApiTokenRecord } from "../../modules/api-token/application/ports/api-token.port";
 import { generateToken, hmacToken } from "../crypto/api-token";
+import type { ApiTokenRecord } from "../ports/api-token.port";
 
 const PREFIX = "clean_";
 const PEPPER = "a".repeat(32);
@@ -30,20 +30,10 @@ const findUserByIdSpy = mock(async (_id: string) => ({
   banExpires: null as Date | null,
 }));
 
+const realAuthQueries = await import("../../auth-queries");
 mock.module("../../auth-queries", () => ({
+  ...realAuthQueries,
   findUserById: findUserByIdSpy,
-  updateUserName: async () => {},
-  findUserOrganizations: async () => [],
-  findActiveMemberOrgId: async () => undefined,
-  insertPersonalOrgWithOwner: async () => {},
-  setPendingEmail: async () => {},
-  deleteOrgIfEmpty: async () => false,
-  clearConfirmedPendingEmail: async () => false,
-  findLatestPasskey: async () => undefined,
-  findLatestLinkedAccount: async () => undefined,
-  findActiveMemberRole: async () => null,
-  findOrgOwnerUserId: async () => null,
-  countActiveMembers: async () => 0,
 }));
 
 const { requireApiToken } = await import("../middleware/api-token.middleware");
@@ -53,16 +43,16 @@ function makeRecord(over: Partial<ApiTokenRecord> = {}): ApiTokenRecord {
   return {
     id: "tok-1",
     userId: "u1",
-    organizationId: null,
+    organizationId: Option.none(),
     name: "ci",
     scopes: ["read:profile"],
     tokenHmac: hmacToken(raw, PEPPER),
     pepperVersion: 1,
     tokenStart: raw.slice(0, PREFIX.length + 8),
-    lastUsedAt: null,
-    expiresAt: null,
-    revokedAt: null,
-    revokedReason: null,
+    lastUsedAt: Option.none(),
+    expiresAt: Option.none(),
+    revokedAt: Option.none(),
+    revokedReason: Option.none(),
     createdAt: new Date(),
     ...over,
   };
@@ -136,7 +126,10 @@ describe("requireApiToken", () => {
 
   it("returns 401 for a revoked token", async () => {
     const { raw } = generateToken(PREFIX);
-    const record = makeRecord({ tokenHmac: hmacToken(raw, PEPPER), revokedAt: new Date() });
+    const record = makeRecord({
+      tokenHmac: hmacToken(raw, PEPPER),
+      revokedAt: Option.some(new Date()),
+    });
     const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
 
     const deps = makeDeps(repo);
@@ -154,7 +147,7 @@ describe("requireApiToken", () => {
     const { raw } = generateToken(PREFIX);
     const record = makeRecord({
       tokenHmac: hmacToken(raw, PEPPER),
-      expiresAt: new Date(Date.now() - 1000),
+      expiresAt: Option.some(new Date(Date.now() - 1000)),
     });
     const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
 
@@ -289,7 +282,11 @@ describe("requireApiToken", () => {
   it("does not rehash a revoked token found via the previous pepper", async () => {
     const { raw } = generateToken(PREFIX);
     const prevHmac = hmacToken(raw, PREV_PEPPER);
-    const record = makeRecord({ tokenHmac: prevHmac, pepperVersion: 1, revokedAt: new Date() });
+    const record = makeRecord({
+      tokenHmac: prevHmac,
+      pepperVersion: 1,
+      revokedAt: Option.some(new Date()),
+    });
 
     const { repo } = makeRepo(async (hmac) => {
       if (hmac === prevHmac) return Result.ok(Option.some(record));

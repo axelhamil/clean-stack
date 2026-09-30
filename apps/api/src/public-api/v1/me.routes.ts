@@ -1,6 +1,9 @@
+import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { z } from "zod";
 import { updateUserName } from "../../auth-queries";
+import { di } from "../../container";
+import { emitEvent } from "../../shared/event-emitter";
 import type { ApiTokenVariables } from "../../shared/middleware/api-token.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { zV } from "../../shared/validator";
@@ -20,7 +23,21 @@ export const mePublicRoutes = new Hono<{ Variables: ApiTokenVariables }>()
     zV("json", patchMeSchema),
     async (c) => {
       const { name } = c.req.valid("json");
-      await updateUserName(c.get("user").id, name);
+      const userId = c.get("user").id;
+
+      await di.ITransactionService.run(async (tx) => {
+        await updateUserName(userId, name, tx);
+        await emitEvent(
+          di.IOutboxRepository,
+          EventTypes.USER_PROFILE_UPDATED,
+          "user",
+          userId,
+          { userId, changes: { name } },
+          {},
+          tx,
+        );
+      });
+
       return c.json({ ok: true });
     },
   );

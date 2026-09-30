@@ -2,6 +2,7 @@ import { describe, expect, it, mock, spyOn } from "bun:test";
 import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { ITransaction } from "../../../shared/transaction";
@@ -86,13 +87,6 @@ const noMasterKey: MasterKeyProvider = masterKeyProvider(undefined);
 const tx: IUnitOfWork<ITransaction> = {
   startTransaction: async (cb) => cb({} as ITransaction),
   run: async (cb) => cb({} as ITransaction),
-};
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: mock(async () => {}),
-  findPendingBatch: mock(async () => []),
-  markDispatched: mock(async () => {}),
-  markFailed: mock(async () => {}),
 };
 
 function makeEndpoints(
@@ -715,11 +709,70 @@ describe("WebhooksService", () => {
   describe("replayDelivery", () => {
     it("returns Some(delivery) when replay enqueued (happy path)", async () => {
       const service = makeService();
-      const result = await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
+      const result = await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isSome()).toBe(true);
       expect(result.getValue().unwrap()).toEqual(stubDelivery);
+    });
+
+    it("emits webhook.delivery.replayed with the requesting user inside the transaction", async () => {
+      const TX = {} as ITransaction;
+      const enqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+      const outbox = { ...noopOutbox, enqueue } as IOutboxRepository;
+      const deliveries = makeDeliveries({
+        enqueueReplay: mock(async () =>
+          Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(
+            Option.some({ ...stubDelivery, id: "del-replay" }),
+          ),
+        ),
+      });
+      const service = new WebhooksService(
+        makeEndpoints(),
+        deliveries,
+        { ...tx, run: async (cb) => cb(TX) },
+        outbox,
+        validMasterKey,
+        new NoOpInstrumentation(),
+      );
+
+      await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
+
+      const [events, , enqueueTx] = enqueue.mock.calls[0] ?? [];
+      expect(enqueueTx).toBe(TX);
+      expect(events).toEqual([
+        expect.objectContaining({
+          eventType: EventTypes.WEBHOOK_DELIVERY_REPLAYED,
+          payload: {
+            organizationId: ORG_ID,
+            endpointId: ENDPOINT_ID,
+            deliveryId: DELIVERY_ID,
+            replayedDeliveryId: "del-replay",
+            actorUserId: USER_ID,
+          },
+        }),
+      ]);
+    });
+
+    it("emits nothing when there is no delivery to replay", async () => {
+      const enqueue = mock(async () => {});
+      const deliveries = makeDeliveries({
+        enqueueReplay: mock(async () =>
+          Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
+        ),
+      });
+      const service = new WebhooksService(
+        makeEndpoints(),
+        deliveries,
+        tx,
+        { ...noopOutbox, enqueue } as IOutboxRepository,
+        validMasterKey,
+        new NoOpInstrumentation(),
+      );
+
+      await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID, USER_ID);
+
+      expect(enqueue).not.toHaveBeenCalled();
     });
 
     it("returns None when delivery not found in org scope", async () => {
@@ -729,7 +782,7 @@ describe("WebhooksService", () => {
         ),
       });
       const service = makeService({ deliveries });
-      const result = await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID);
+      const result = await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID, USER_ID);
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isNone()).toBe(true);
@@ -742,7 +795,7 @@ describe("WebhooksService", () => {
         ),
       });
       const service = makeService({ deliveries });
-      const result = await service.replayDelivery(DELIVERY_ID, "ep-other", ORG_ID);
+      const result = await service.replayDelivery(DELIVERY_ID, "ep-other", ORG_ID, USER_ID);
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().isNone()).toBe(true);
@@ -758,7 +811,7 @@ describe("WebhooksService", () => {
         ),
       });
       const service = makeService({ deliveries });
-      const result = await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
+      const result = await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -776,7 +829,7 @@ describe("WebhooksService", () => {
         instrumentation,
       );
 
-      await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
+      await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
 
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({ name: "WebhooksService > replayDelivery", op: "function" }),

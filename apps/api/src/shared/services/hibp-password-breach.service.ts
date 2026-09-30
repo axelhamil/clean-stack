@@ -5,14 +5,10 @@ import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IPasswordBreachService, PasswordBreachError } from "../ports/password-breach.port";
 
 export class HibpPasswordBreachService implements IPasswordBreachService {
-  private readonly fetchImpl: typeof fetch;
-
   constructor(
     private readonly instrumentation: IInstrumentation,
-    fetchImpl: typeof fetch = fetch,
-  ) {
-    this.fetchImpl = fetchImpl;
-  }
+    private readonly fetchImpl: typeof fetch = fetch,
+  ) {}
 
   async isBreached(password: string): Promise<Result<boolean, PasswordBreachError>> {
     return this.instrumentation.startSpan({ name: "HibpPasswordBreachService > isBreached" }, () =>

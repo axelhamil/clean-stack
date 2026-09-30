@@ -1,8 +1,9 @@
 /**
  * User-facing error message registry.
  *
- * Two layers — exact-code overrides win, suffix defaults catch the rest —
- * both sourced from the `errors` i18next namespace (`byCode`/`bySuffix`)
+ * Three layers (exact-code overrides win, then `HTTP_<status>` copy, then
+ * suffix defaults catch the rest), all sourced from the `errors` i18next
+ * namespace (`byCode`/`byStatus`/`bySuffix`)
  * rather than hardcoded literals, so the copy translates with the rest of
  * the app. Suffix defaults align with ddd-kit's STATUS_BY_SUFFIX, so any new
  * error code coming from the backend automatically lands on a sensible
@@ -16,7 +17,7 @@
 
 import { enCatalog } from "@packages/i18n";
 import type { TFunction } from "i18next";
-import type { ApiError } from "./api-error";
+import { apiErrorFields } from "./api-error";
 
 const SUFFIXES = [
   "RATE_LIMITED",
@@ -41,7 +42,7 @@ const STATUS_CODE = /^HTTP_(\d{3})$/;
  *
  * `getErrorsT()` degrades to "return the key" before i18next has booted, so a
  * lookup with no default renders the literal `bySuffix.INVALID` to the user.
- * The English catalog is a static import — it is in the bundle either way —
+ * The English catalog is a static import (it is in the bundle either way),
  * which makes the pre-boot answer a real sentence rather than a debug token.
  */
 function suffixMessage(suffix: (typeof SUFFIXES)[number], t: TFunction<"errors">): string {
@@ -60,21 +61,20 @@ export function rateLimitedMessage(t: TFunction<"errors">): string {
 export function messageFromCode(code: string, t: TFunction<"errors">): string | undefined {
   const exact = t(`byCode.${code}` as never, { defaultValue: "" });
   if (exact) return exact;
+
   const status = STATUS_CODE.exec(code)?.[1];
-  if (status !== undefined) {
-    const copy = t(`byStatus.${status}` as never, { defaultValue: "" });
-    if (copy) return copy;
-  }
-  for (const suffix of SUFFIXES) {
-    if (code.endsWith(`_${suffix}`)) return suffixMessage(suffix, t);
-  }
-  return undefined;
+  const statusCopy =
+    status === undefined ? "" : t(`byStatus.${status}` as never, { defaultValue: "" });
+  if (statusCopy) return statusCopy;
+
+  const suffix = SUFFIXES.find((candidate) => code.endsWith(`_${candidate}`));
+  return suffix === undefined ? undefined : suffixMessage(suffix, t);
 }
 
 /**
  * Last resort when the catalog has nothing for this rejection.
  *
- * The catalog wins whenever it has an answer — that is what keeps the app from
+ * The catalog wins whenever it has an answer: that is what keeps the app from
  * speaking two languages at once. But a 4xx the catalog does not cover is a
  * rejection the user could have acted on, and `isUnexpectedError` filters
  * sub-500 statuses out of telemetry, so falling back to generic copy makes it
@@ -83,19 +83,15 @@ export function messageFromCode(code: string, t: TFunction<"errors">): string | 
  * the caller's own localised fallback does not say better.
  */
 function serverMessage(err: unknown): string | undefined {
-  if (typeof err !== "object" || err === null) return undefined;
-  const { status, message } = err as ApiError;
+  const { status, message } = apiErrorFields(err);
   if (typeof status !== "number" || status < 400 || status >= 500) return undefined;
+
   return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
 export function formatApiError(err: unknown, fallback: string, t: TFunction<"errors">): string {
-  if (typeof err === "object" && err !== null) {
-    const code = (err as ApiError).code;
-    if (code) {
-      const message = messageFromCode(code, t);
-      if (message) return message;
-    }
-  }
-  return serverMessage(err) ?? fallback;
+  const { code } = apiErrorFields(err);
+  const catalogMessage = code ? messageFromCode(code, t) : undefined;
+
+  return catalogMessage || serverMessage(err) || fallback;
 }

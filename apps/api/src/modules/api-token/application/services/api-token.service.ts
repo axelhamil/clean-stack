@@ -1,17 +1,17 @@
-import { type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { generateToken, hmacToken } from "../../../../shared/crypto/api-token";
 import { emitEvent } from "../../../../shared/event-emitter";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import {
   type ApiTokenError,
   type ApiTokenRecord,
   type IApiTokenRepository,
   ownerReaches,
   type TokenOwner,
-} from "../ports/api-token.port";
+} from "../../../../shared/ports/api-token.port";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import type { ITransaction } from "../../../../shared/transaction";
 
 export type CreateTokenServiceInput = {
   userId: string;
@@ -50,35 +50,31 @@ export class ApiTokenService {
       }
 
       const { raw, start } = generateToken(this.config.prefix);
-      const expiresAt =
-        input.expiresInDays != null
-          ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
-          : null;
+      const expiresAt = Option.fromNullable(input.expiresInDays).map(
+        (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      );
 
       const record: ApiTokenRecord = {
         id: crypto.randomUUID(),
         userId: input.userId,
-        organizationId: input.organizationId,
+        organizationId: Option.fromNullable(input.organizationId),
         name: input.name,
         scopes: input.scopes,
         tokenHmac: hmacToken(raw, this.config.pepper),
         pepperVersion: this.config.pepperVersion,
         tokenStart: start,
-        lastUsedAt: null,
+        lastUsedAt: Option.none(),
         expiresAt,
-        revokedAt: null,
-        revokedReason: null,
+        revokedAt: Option.none(),
+        revokedReason: Option.none(),
         createdAt: new Date(),
       };
 
-      let failure: ApiTokenError | null = null;
       try {
-        await this.uow.run(async (tx) => {
+        const created = await this.uow.run(async (tx) => {
           const insertResult = await this.repo.insert(record, tx);
-          if (insertResult.isFailure) {
-            failure = insertResult.getError();
-            throw new Error("rollback");
-          }
+          if (insertResult.isFailure) return insertResult;
+
           await emitEvent(
             this.outbox,
             EventTypes.API_TOKEN_CREATED,
@@ -87,19 +83,22 @@ export class ApiTokenService {
             {
               userId: record.userId,
               actorUserId: input.actorUserId,
-              organizationId: record.organizationId,
+              organizationId: record.organizationId.toNull(),
               tokenId: record.id,
               name: record.name,
               scopes: record.scopes,
-              expiresAt: record.expiresAt,
+              expiresAt: record.expiresAt.toNull(),
             },
-            { organizationId: record.organizationId },
+            { organizationId: record.organizationId.toNull() },
             tx,
           );
+
+          return insertResult;
         });
+        if (created.isFailure) return Result.fail(created.getError());
+
         return Result.ok({ record, raw });
       } catch (err) {
-        if (failure) return Result.fail(failure);
         this.instrumentation.capture(err);
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",
@@ -136,14 +135,11 @@ export class ApiTokenService {
         });
       }
 
-      let failure: ApiTokenError | null = null;
       try {
-        await this.uow.run(async (tx) => {
+        return await this.uow.run(async (tx) => {
           const revokeResult = await this.repo.revoke(id, "user", tx);
-          if (revokeResult.isFailure) {
-            failure = revokeResult.getError();
-            throw new Error("rollback");
-          }
+          if (revokeResult.isFailure) return revokeResult;
+
           await emitEvent(
             this.outbox,
             EventTypes.API_TOKEN_REVOKED,
@@ -152,17 +148,17 @@ export class ApiTokenService {
             {
               userId: record.userId,
               actorUserId,
-              organizationId: record.organizationId,
+              organizationId: record.organizationId.toNull(),
               tokenId: id,
               reason: "user" as const,
             },
-            { organizationId: record.organizationId },
+            { organizationId: record.organizationId.toNull() },
             tx,
           );
+
+          return Result.ok<ApiTokenError>();
         });
-        return Result.ok();
       } catch (err) {
-        if (failure) return Result.fail(failure);
         this.instrumentation.capture(err);
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",

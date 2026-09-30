@@ -1,4 +1,4 @@
-import { type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { POLICY_TYPES, POLICY_VERSIONS, type PolicyType } from "@packages/policies";
 import { emitEvent } from "../../../../shared/event-emitter";
@@ -29,33 +29,37 @@ export class PolicyAcceptanceService {
   ): Promise<Result<void, PolicyError>> {
     if (types.length === 0) return Result.ok();
 
-    let storeFailure: PolicyError | null = null;
     try {
-      await this.uow.run(async (tx) => {
-        for (const t of types) {
-          const v = POLICY_VERSIONS[t];
-          const r = await this.store.insert(
-            { id: crypto.randomUUID(), userId, policyType: t, policyVersion: v, ipAddress },
+      return await this.uow.run(async (tx) => {
+        for (const policyType of types) {
+          const policyVersion = POLICY_VERSIONS[policyType];
+
+          const inserted = await this.store.insert(
+            {
+              id: crypto.randomUUID(),
+              userId,
+              policyType,
+              policyVersion,
+              ipAddress: Option.fromNullable(ipAddress),
+            },
             tx,
           );
-          if (r.isFailure) {
-            storeFailure = r.getError();
-            throw new Error("rollback");
-          }
+          if (inserted.isFailure) return inserted;
+
           await emitEvent(
             this.outbox,
             EventTypes.USER_POLICY_ACCEPTED,
             "user",
             userId,
-            { userId, policyType: t, policyVersion: v, ipAddress },
+            { userId, policyType, policyVersion, ipAddress },
             {},
             tx,
           );
         }
+
+        return Result.ok<PolicyError>();
       });
-      return Result.ok();
     } catch (err) {
-      if (storeFailure) return Result.fail(storeFailure);
       this.instrumentation.capture(err);
       return Result.fail({
         code: "POLICY_ACCEPTANCE_PROVIDER_FAILURE",
@@ -68,28 +72,30 @@ export class PolicyAcceptanceService {
   async getStatus(userId: string): Promise<Result<PolicyAcceptanceStatus, PolicyError>> {
     const r = await this.store.findLatestVersions(userId);
     if (r.isFailure) return Result.fail(r.getError());
+
     const latest = r.getValue();
     const status = {} as PolicyAcceptanceStatus;
     for (const t of POLICY_TYPES) {
       const acceptedVersion = latest[t] ?? null;
-      status[t] = {
-        current: acceptedVersion === POLICY_VERSIONS[t],
-        acceptedVersion,
-      };
+      status[t] = { current: acceptedVersion === POLICY_VERSIONS[t], acceptedVersion };
     }
+
     return Result.ok(status);
   }
 
   async getStaleTypes(userId: string): Promise<Result<PolicyType[], PolicyError>> {
     const r = await this.getStatus(userId);
     if (r.isFailure) return Result.fail(r.getError());
-    const stale = POLICY_TYPES.filter((t) => !r.getValue()[t].current);
-    return Result.ok(stale);
+
+    const status = r.getValue();
+
+    return Result.ok(POLICY_TYPES.filter((t) => !status[t].current));
   }
 
   async hasAcceptedCurrent(userId: string): Promise<Result<boolean, PolicyError>> {
     const r = await this.getStaleTypes(userId);
     if (r.isFailure) return Result.fail(r.getError());
+
     return Result.ok(r.getValue().length === 0);
   }
 }

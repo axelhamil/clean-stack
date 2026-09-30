@@ -1,6 +1,14 @@
+import {
+  type EntitlementsView,
+  entitlementsForTier,
+  isTier,
+} from "../../../../shared/entitlements";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import { type EntitlementsView, entitlementsForTier, isTier } from "../../config";
 import type { ISubscriptionReadStore } from "../ports/subscription-read.port";
+
+function freeView(): EntitlementsView {
+  return { tier: "free", status: "free", ...entitlementsForTier("free") };
+}
 
 export class EntitlementsService {
   constructor(
@@ -15,12 +23,15 @@ export class EntitlementsService {
         const result = await this.store.findActiveByReference(orgId);
         if (result.isFailure) {
           this.instrumentation.capture(new Error(result.getError().message));
-          return { tier: "free", status: "free", ...entitlementsForTier("free") };
+          return freeView();
         }
+
         const row = result.getValue();
-        if (row.isNone()) return { tier: "free", status: "free", ...entitlementsForTier("free") };
+        if (row.isNone()) return freeView();
+
         const { tier: rawTier, status } = row.unwrap();
         const tier = isTier(rawTier) ? rawTier : "free";
+
         return { tier, status, ...entitlementsForTier(tier) };
       },
     );

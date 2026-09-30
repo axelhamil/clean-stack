@@ -31,7 +31,7 @@ export function SecretRevealDialog({
 
   return (
     <Dialog open={secret !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent closeLabel={t("actions.close")}>
         <DialogHeader>
           <DialogTitle>{resolvedTitle}</DialogTitle>
           <DialogDescription>{resolvedDescription}</DialogDescription>

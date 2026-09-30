@@ -12,9 +12,10 @@ interface CopyableValueProps extends Omit<React.ComponentProps<"div">, "onCopy">
 }
 
 function CopyableValue({ value, copyLabel, onCopied, className, ...props }: CopyableValueProps) {
+  // `onCopied` waits for the write: a denied clipboard permission must not
+  // confirm a copy that never happened.
   const copy = () => {
-    void navigator.clipboard.writeText(value);
-    onCopied?.();
+    void navigator.clipboard.writeText(value).then(() => onCopied?.());
   };
 
   return (

@@ -27,8 +27,8 @@ export interface IInstrumentation {
   addBreadcrumb(crumb: Breadcrumb): void;
   /**
    * Writes attributes onto the span currently open around the caller. `SpanOptions`
-   * is open-time only, and the facts worth recording about a span — how many rows a
-   * pass deleted, why it stopped — are known only as it closes. The write is silently
+   * is open-time only, and the facts worth recording about a span (how many rows a
+   * pass deleted, why it stopped) are known only as it closes. The write is silently
    * dropped when no span is active: always for `NoOpInstrumentation`, and for
    * `SentryInstrumentation` whenever the caller runs outside a `startSpan` callback.
    */

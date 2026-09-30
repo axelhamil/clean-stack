@@ -39,9 +39,10 @@ import { useDeletePasskey } from "../hooks/use-delete-passkey";
 
 export function PasskeysCard() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const { data, isLoading } = useQuery(passkeysQueryOptions);
   const [open, setOpen] = useState(false);
-  // `/passkey` is on the BetterAuth impersonation blocklist — both registering
+  // `/passkey` is on the BetterAuth impersonation blocklist: both registering
   // and deleting a passkey 403 while impersonating. One guard for the whole
   // card so the list rows share a single description node.
   const guard = useImpersonationGuard();
@@ -85,7 +86,7 @@ export function PasskeysCard() {
               {t("passkeys.add")}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent closeLabel={tCommon("actions.close")}>
             <DialogHeader>
               <DialogTitle>{t("passkeys.add")}</DialogTitle>
               <DialogDescription>{t("passkeys.addDialogDescription")}</DialogDescription>

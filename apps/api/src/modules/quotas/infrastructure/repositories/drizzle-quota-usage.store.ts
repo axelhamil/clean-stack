@@ -1,5 +1,6 @@
 import { Result, uuidv7 } from "@packages/ddd-kit";
 import { and, db, eq, quotaUsageSchema, sql } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type {
@@ -8,10 +9,17 @@ import type {
   QuotaPeriod,
 } from "../../application/ports/quota-usage.port";
 
+const qu = quotaUsageSchema.quotaUsage;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function failure(err: unknown, op: string): QuotaError {
-  return { code: "QUOTA_PROVIDER_FAILURE", message: `quota_usage ${op} failed: ${String(err)}` };
+const failure = dbOperationFailure("QUOTA_PROVIDER_FAILURE");
+
+function usageRowOf(orgId: string, resource: string, period: QuotaPeriod) {
+  return and(
+    eq(qu.organizationId, orgId),
+    eq(qu.resource, resource),
+    eq(qu.periodStart, period.start),
+  );
 }
 
 export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
@@ -24,13 +32,14 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
     period: QuotaPeriod,
     tx?: ITransaction,
   ): Promise<Result<number, QuotaError>> {
-    const invoker = tx ?? db;
+    const exec = tx ?? db;
+
     return this.instrumentation.startSpan(
       { name: "DrizzleQuotaUsageStore > increment" },
       async () => {
         try {
-          const query = invoker
-            .insert(quotaUsageSchema.quotaUsage)
+          const query = exec
+            .insert(qu)
             .values({
               id: uuidv7(),
               organizationId: orgId,
@@ -40,22 +49,17 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
               periodEnd: period.end,
             })
             .onConflictDoUpdate({
-              target: [
-                quotaUsageSchema.quotaUsage.organizationId,
-                quotaUsageSchema.quotaUsage.resource,
-                quotaUsageSchema.quotaUsage.periodStart,
-              ],
-              set: {
-                used: sql`${quotaUsageSchema.quotaUsage.used} + ${by}`,
-                updatedAt: new Date(),
-              },
+              target: [qu.organizationId, qu.resource, qu.periodStart],
+              set: { used: sql`${qu.used} + ${by}`, updatedAt: new Date() },
             })
-            .returning({ used: quotaUsageSchema.quotaUsage.used });
-          const rows = await this.instrumentation.startSpan(
+            .returning({ used: qu.used });
+
+          const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(rows[0]?.used ?? 0);
+
+          return Result.ok(row?.used ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(failure(err, "increment"));
@@ -70,26 +74,23 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
     period: QuotaPeriod,
     tx?: ITransaction,
   ): Promise<Result<number, QuotaError>> {
-    const invoker = tx ?? db;
+    const exec = tx ?? db;
+
     return this.instrumentation.startSpan(
       { name: "DrizzleQuotaUsageStore > current" },
       async () => {
         try {
-          const query = invoker
-            .select({ used: quotaUsageSchema.quotaUsage.used })
-            .from(quotaUsageSchema.quotaUsage)
-            .where(
-              and(
-                eq(quotaUsageSchema.quotaUsage.organizationId, orgId),
-                eq(quotaUsageSchema.quotaUsage.resource, resource),
-                eq(quotaUsageSchema.quotaUsage.periodStart, period.start),
-              ),
-            );
-          const rows = await this.instrumentation.startSpan(
+          const query = exec
+            .select({ used: qu.used })
+            .from(qu)
+            .where(usageRowOf(orgId, resource, period));
+
+          const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(rows[0]?.used ?? 0);
+
+          return Result.ok(row?.used ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(failure(err, "current"));
@@ -104,23 +105,20 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
     period: QuotaPeriod,
     tx?: ITransaction,
   ): Promise<Result<void, QuotaError>> {
-    const invoker = tx ?? db;
+    const exec = tx ?? db;
+
     return this.instrumentation.startSpan({ name: "DrizzleQuotaUsageStore > reset" }, async () => {
       try {
-        const query = invoker
-          .update(quotaUsageSchema.quotaUsage)
+        const query = exec
+          .update(qu)
           .set({ used: 0, updatedAt: new Date() })
-          .where(
-            and(
-              eq(quotaUsageSchema.quotaUsage.organizationId, orgId),
-              eq(quotaUsageSchema.quotaUsage.resource, resource),
-              eq(quotaUsageSchema.quotaUsage.periodStart, period.start),
-            ),
-          );
+          .where(usageRowOf(orgId, resource, period));
+
         await this.instrumentation.startSpan(
           { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
           () => query.execute(),
         );
+
         return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);

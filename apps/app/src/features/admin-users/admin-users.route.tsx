@@ -1,6 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import {
   Select,
   SelectContent,
@@ -16,13 +15,16 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UserFilters } from "./admin-user-filters";
-import { PLATFORM_ROLE_LABEL_KEYS, USER_STATUS_LABEL_KEYS } from "./admin-user-labels";
+import {
+  isPlatformRole,
+  PLATFORM_ROLE_LABEL_KEYS,
+  USER_STATUS_LABEL_KEYS,
+} from "./admin-user-labels";
 import { adminUsersInfiniteQueryOptions } from "./api/admin-users.queries";
 import { UserRow } from "./components/user-row";
 
@@ -41,7 +43,7 @@ function AdminUsersPage() {
   const query = useInfiniteQuery(adminUsersInfiniteQueryOptions(filters));
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <header>
         <TypographyH1 variant="page">{t("users.pageTitle")}</TypographyH1>
       </header>
@@ -59,7 +61,7 @@ function AdminUsersPage() {
           onValueChange={(v) =>
             setFilters((f) => ({
               ...f,
-              role: v === "" ? undefined : (v as "admin" | "user"),
+              role: isPlatformRole(v) ? v : undefined,
             }))
           }
         >

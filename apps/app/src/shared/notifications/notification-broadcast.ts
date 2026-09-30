@@ -4,14 +4,13 @@ import {
   type NotificationsResponse,
   notificationsListQueryKey,
   type UnreadCountResponse,
+  unreadCountQueryOptions,
 } from "../api/queries/notifications";
-import { createBroadcastChannel } from "../hooks/use-broadcast-channel";
+import { createBroadcastChannel } from "../broadcast-channel";
 
 export type NotificationReadMessage = { ids: string[] } | { all: true };
 
 type NotificationsListCache = InfiniteData<NotificationsResponse, string | undefined>;
-
-const UNREAD_COUNT_QUERY_KEY = ["notifications", "unread-count"] as const;
 
 export const notificationReadChannel =
   createBroadcastChannel<NotificationReadMessage>("notifications-read");
@@ -28,7 +27,7 @@ export function applyRead(
   let newlyRead = 0;
 
   // The list is one infinite query (all loaded pages under one cache entry),
-  // so patching it in place — instead of invalidating — keeps every page the
+  // so patching it in place (instead of invalidating) keeps every page the
   // user already scrolled to "load more" through, rather than dropping them
   // back to a single page on the next refetch.
   queryClient.setQueriesData<NotificationsListCache>(
@@ -55,7 +54,7 @@ export function applyRead(
     },
   );
 
-  queryClient.setQueryData<UnreadCountResponse>(UNREAD_COUNT_QUERY_KEY, (data) => {
+  queryClient.setQueryData<UnreadCountResponse>(unreadCountQueryOptions.queryKey, (data) => {
     if (!data) return data;
     if ("all" in message) return { ...data, count: 0 };
     const delta = cachedLists.length > 0 ? newlyRead : message.ids.length;

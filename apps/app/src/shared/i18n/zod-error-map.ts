@@ -9,7 +9,7 @@ import { z } from "zod";
  * after the UI switched.
  *
  * A per-issue `message:` literal on a check (`z.string().min(1, { message })`,
- * `.refine(fn, { message })`) always wins over this global map — that is Zod's
+ * `.refine(fn, { message })`) always wins over this global map: that is Zod's
  * own precedence, not a bug here. Schemas must therefore stay message-free for
  * their built-in checks, and use `.refine(fn, { params: { i18nKey } })` instead
  * of `{ message }` for custom checks so `code === "custom"` below can still
@@ -23,7 +23,7 @@ export function applyZodErrorMap(t: TFunction<"errors">): void {
       }
       if (issue.code === "too_small") {
         // A string constrained to a minimum of 1 character is semantically
-        // "required", not "must be at least 1 character" — matches how a
+        // "required", not "must be at least 1 character", which matches how a
         // non-empty-string password/name field actually reads to a user.
         if (issue.origin === "string" && Number(issue.minimum) === 1) {
           return t("validation.required");

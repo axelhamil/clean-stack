@@ -15,7 +15,7 @@ import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { generateScimTokenMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 import { CopyRow } from "./copy-row";
@@ -30,20 +30,14 @@ export function ScimConnectionCard() {
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
   const provider = primaryProviderFor(providers, org?.id);
-  // The `scim` plugin is configured with `requiredRole: ["owner"]` in apps/api/src/auth.ts
-  // — showing this to an admin would only ever end in a 403.
+  // The `scim` plugin is configured with `requiredRole: ["owner"]` in apps/api/src/auth.ts:
+  // showing this to an admin would only ever end in a 403.
   const canGenerate = role === "owner";
 
   const generate = useMutation({
     ...generateScimTokenMutationOptions,
     onSuccess: (token) => setRevealToken(token),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.generateScimToken", {
-          defaultValue: "Failed to generate the SCIM token",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("generateScimToken")),
   });
 
   return (

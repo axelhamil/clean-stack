@@ -32,7 +32,7 @@ export default {
     namePlaceholder: "Ada Lovelace",
     accept:
       "J'accepte la <privacy>politique de confidentialité</privacy> et les <terms>conditions d'utilisation</terms>",
-    successToast: "Compte créé — vérifiez votre e-mail pour le confirmer",
+    successToast: "Compte créé, vérifiez votre e-mail pour le confirmer",
   },
   emailField: {
     label: "E-mail",
@@ -69,12 +69,12 @@ export default {
     confirmPasswordLabel: "Confirmer le mot de passe",
     submitPending: "Mise à jour…",
     submit: "Mettre à jour le mot de passe",
-    successToast: "Mot de passe mis à jour — connectez-vous pour continuer",
+    successToast: "Mot de passe mis à jour, connectez-vous pour continuer",
   },
   forgotPassword: {
     failed: "La demande a échoué",
     title: "Réinitialisez votre mot de passe",
-    description: "Entrez votre e-mail — nous vous enverrons un lien de réinitialisation.",
+    description: "Entrez votre e-mail et nous vous enverrons un lien de réinitialisation.",
     rememberedIt: "Vous vous en souvenez ?",
     submit: "Envoyer le lien de réinitialisation",
     pending: "Envoi…",
@@ -88,7 +88,7 @@ export default {
     invalidTitle: "Lien invalide ou expiré",
     requestNewLink: "Demander un nouveau lien",
     expiryNotice: "Les liens magiques sont à usage unique et expirent après quelques minutes.",
-    successToast: "Lien magique envoyé — consultez votre boîte de réception",
+    successToast: "Lien magique envoyé, consultez votre boîte de réception",
     invalidOrExpired: "Lien invalide ou expiré",
   },
   passkey: {

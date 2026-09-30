@@ -9,11 +9,11 @@ export default {
     allStatusesPlaceholder: "All statuses",
     allOption: "All",
     roleUser: "User",
-    // Shared by the ban dialog's title and the ban form's own submit button —
+    // Shared by the ban dialog's title and the ban form's own submit button:
     // both name the exact same action in the exact same flow.
     suspendAccountTitle: "Suspend account",
     // Shared by the ban form's duration options and the detail page's static
-    // display of an existing permanent ban — same concept (no expiry), same
+    // display of an existing permanent ban: same concept (no expiry), same
     // source (the ban's expiry state).
     durationPermanent: "Permanent",
     status: {
@@ -81,7 +81,7 @@ export default {
       reasonLabel: "Reason",
       reasonPlaceholder: "Describe the reason for impersonation…",
       ticketRefLabel: "Ticket reference (optional)",
-      // Format example for the admin, not copy — kept identical in both
+      // Format example for the admin, not copy, kept identical in both
       // locales and listed in ALLOWED_IDENTICAL.
       ticketRefPlaceholder: "SUP-42",
       submit: "Start impersonation",
@@ -99,7 +99,7 @@ export default {
       "Turning SSO enforcement off lets members of that organization sign in with a password again.",
     table: {
       name: "Name",
-      // "Slug" has no established French translation in SaaS products — kept
+      // "Slug" has no established French translation in SaaS products, kept
       // identical in both locales and listed in ALLOWED_IDENTICAL.
       slug: "Slug",
       members: "Members",
@@ -110,10 +110,10 @@ export default {
       loading: "Loading…",
       loadFailed: "Failed to load organization.",
       detailsTitle: "Details",
-      // Same cognate as `table.slug` above, own key — this section has its
+      // Same cognate as `table.slug` above, own key: this section has its
       // own copy so a translator can word it differently later if needed.
       slugLabel: "Slug",
-      // "Plan" is spelled identically in French — a genuine cognate.
+      // "Plan" is spelled identically in French (a genuine cognate).
       planLabel: "Plan",
       createdLabel: "Created",
       membersTitle: "Members",

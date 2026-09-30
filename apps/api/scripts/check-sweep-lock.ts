@@ -1,23 +1,19 @@
 // WARNING: this script acquires leases under the real production route labels
 // (`sweep-audit-log`, `sweep-outbox`, …) for up to 60s each. Point it only at a local
-// database — running it against a shared or production database will contend with,
+// database, running it against a shared or production database will contend with,
 // and can starve, the real sweeps for that duration.
 //
-// A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE` — the whole point of
+// A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE`, the whole point of
 // `acquireSweepLease` is the conditional UPDATE the database performs, so this checks it
 // against a real Postgres instead. Wired to a script, not `bun:test`, because it needs a
 // live database: the unit suite runs without one. See apps/api/src/shared/CLAUDE.md ("write an executable check against a
 // real database and wire it to a script") and `check-fanout-preferences.ts` for the
-// reference shape. Run: `pnpm --filter api check:sweep-lock` — re-run after any change to
+// reference shape. Run: `pnpm --filter api check:sweep-lock`, re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
-import { Writable } from "node:stream";
 import { db, eq, sql, sweepSchema } from "@packages/drizzle";
-import { Hono } from "hono";
-import { pinoLogger } from "hono-pino";
-import { pino } from "pino";
+import type { Hono } from "hono";
 import { env } from "../src/shared/env";
-import { canonicalize, sign } from "../src/shared/internal-routes/internal-signature";
 import { sweepAuditLogRoutes } from "../src/shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "../src/shared/internal-routes/sweep-consents.route";
 import { sweepEmailMessagesRoutes } from "../src/shared/internal-routes/sweep-email-messages.route";
@@ -32,20 +28,17 @@ import { purgeBatchWithTimeout } from "../src/shared/internal-routes/sweep-purge
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
+import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-sweep-lock");
 
-let failed = false;
+const checks = checkRecorder();
+const { check } = checks;
 
-// A fresh façade per check, not one shared across the whole script — mirrors how
+// A fresh façade per check, not one shared across the whole script, mirrors how
 // production builds one `SweepSpans` per request instead of a module-level singleton.
 const freshSpans = () => sweepSpans(new NoOpInstrumentation());
-
-function check(label: string, ok: boolean) {
-  console.log(`${ok ? "  OK" : "  FAIL"}: ${label}`);
-  if (!ok) failed = true;
-}
 
 // ── acquireSweepLease / releaseSweepLease, fenced by ownership token ────────────────
 const label = `check-sweep-${crypto.randomUUID()}`;
@@ -75,7 +68,7 @@ const rowsAfterRelease = await db
   .where(eq(sweepSchema.sweepLock.label, label));
 check("release deletes the row", rowsAfterRelease.length === 0);
 
-// [4] a stale owner's release does not steal a successor's lease — the bug this
+// [4] a stale owner's release does not steal a successor's lease, the bug this
 // ownership token exists to close: an overrunning run must not delete the row a
 // legitimate successor now holds just because it shares the same label.
 const staleOwner = await acquireSweepLease(label, -60_000, freshSpans());
@@ -117,7 +110,7 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 
 // ── purgeBatchWithTimeout: the three SET LOCAL guards, checked against a real
 // transaction. A mocked `tx.execute` can only assert on the SQL text a builder
-// produced (banned — see apps/api/src/shared/CLAUDE.md), and that check is weak on
+// produced (banned, see apps/api/src/shared/CLAUDE.md), and that check is weak on
 // its own terms: it only proves the setting *names* were sent, not their values, so
 // '5s' silently becoming '5m' would still pass. `assertGuards` runs inside the same
 // transaction `purgeBatchWithTimeout` opens, right after the three `SET LOCAL`
@@ -128,7 +121,7 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
   await purgeBatchWithTimeout({
     table: sweepSchema.sweepLock,
     idColumn: sweepSchema.sweepLock.label,
-    // Matches no row — a real lease label never collides with this sentinel — so the
+    // Matches no row, a real lease label never collides with this sentinel, so the
     // guard check runs (and the delete executes as a harmless no-op) without touching
     // any lease another check or a real sweep might be holding.
     where: eq(sweepSchema.sweepLock.label, `check-sweep-guard-${crypto.randomUUID()}`),
@@ -163,53 +156,14 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 }
 
 // ── the six routes: each must pass its own label to sweepLockFor, not a shared or
-// wrong one — proven by holding that exact label's lease and expecting THIS route,
+// wrong one, proven by holding that exact label's lease and expecting THIS route,
 // and only this route, to log the skip for it. Deleting a route's `lock:` wiring, or
 // wiring it to the wrong label, makes this fail. Asserted off the log line rather than
 // the response body: sweep-audit-log's handler reshapes its response but still spreads
 // the full `result` (so `skipped` does survive there), and this way every route is
 // checked the same way rather than special-casing the one with an extra field. The
-// log line (`${label} skipped — another run holds the lease`, always emitted by
+// log line (`${label} skipped, another run holds the lease`, always emitted by
 // runRetentionSweep itself) is the one signal every route shares. ────────
-function makeApp(routes: Hono, lines: string[]) {
-  const sink = new Writable({
-    write(chunk: Buffer, _encoding, callback) {
-      lines.push(chunk.toString());
-      callback();
-    },
-  });
-  const testLogger = pino(sink);
-  const app = new Hono();
-  app.use("*", pinoLogger({ pino: testLogger }));
-  app.route("/internal", routes);
-  return app;
-}
-
-async function signedRequest(app: Hono, path: string, body: unknown) {
-  const key = env.INTERNAL_SIGNING_KEY;
-  if (!key) throw new Error("INTERNAL_SIGNING_KEY is not set — cannot sign a request");
-  const rawBody = JSON.stringify(body);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const message = canonicalize({
-    timestamp,
-    method: "POST",
-    path,
-    host: "localhost",
-    contentType: "application/json",
-    rawBody,
-  });
-  const signature = await sign(message, key);
-  return app.request(path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      host: "localhost",
-      "X-Internal-Signature": `t=${timestamp},v1=${signature}`,
-    },
-    body: rawBody,
-  });
-}
-
 const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
   {
     name: "sweep-email-messages",
@@ -246,15 +200,15 @@ const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
 for (const { name, path, routes } of routeCases) {
   const routeOwner = await acquireSweepLease(name, 60_000, freshSpans());
   const lines: string[] = [];
-  const res = await signedRequest(makeApp(routes, lines), path, { dryRun: true });
+  const res = await signedInternalRequest(internalApp(routes, lines), path, { dryRun: true });
   check(`${name} responds 200 while its lease is held`, res.status === 200);
   const captured = lines.join("");
-  const skipLine = captured.includes(`${name} skipped — another run holds the lease`);
+  const skipLine = captured.includes(`${name} skipped, another run holds the lease`);
   check(`${name} logs the skip for its own label ("${name}")`, skipLine);
   if (routeOwner) await releaseSweepLease(name, routeOwner, freshSpans());
 }
 
-if (failed) {
+if (checks.failures > 0) {
   console.error("check:sweep-lock FAILED");
   process.exit(1);
 }

@@ -19,7 +19,7 @@ describe("throwApiError", () => {
       { error: { code: "SECURITY_RATE_LIMITED", message: "rate limited", metadata: {} } },
       { "Retry-After": "42" },
     );
-    const err = await throwApiError(res, "fallback").catch((e) => e);
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBe(42);
   });
@@ -36,7 +36,7 @@ describe("throwApiError", () => {
       },
       { "Retry-After": "42" },
     );
-    const err = await throwApiError(res, "fallback").catch((e) => e);
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.metadata?.retryAfter).toBe(99);
   });
 
@@ -44,7 +44,7 @@ describe("throwApiError", () => {
     const res = makeResponse(429, {
       error: { code: "SECURITY_RATE_LIMITED", message: "rate limited" },
     });
-    const err = await throwApiError(res, "fallback").catch((e) => e);
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBeUndefined();
   });
@@ -53,7 +53,7 @@ describe("throwApiError", () => {
     const res = makeResponse(400, {
       error: { code: "SOME_INVALID", message: "bad input", metadata: { foo: "bar" } },
     });
-    const err = await throwApiError(res, "fallback").catch((e) => e);
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(400);
     expect(err.metadata?.retryAfter).toBeUndefined();
     expect(err.metadata?.foo).toBe("bar");
@@ -64,8 +64,8 @@ describe("throwApiError", () => {
       status: 429,
       headers: { "Retry-After": "10" },
     });
-    const err = await throwApiError(res, "fallback message").catch((e) => e);
-    expect(err.message).toBe("fallback message");
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
+    expect(err.message).toBe("Failed to load policies");
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBe(10);
   });
@@ -78,7 +78,7 @@ describe("throwApiError", () => {
       { error: { code: "SECURITY_RATE_LIMITED", message: "rate limited", metadata: {} } },
       { "Retry-After": httpDate },
     );
-    const err = await throwApiError(res, "fallback").catch((e) => e);
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBeGreaterThanOrEqual(118);
     expect(err.metadata?.retryAfter).toBeLessThanOrEqual(122);
@@ -90,7 +90,7 @@ describe("throwApiError", () => {
       { error: { code: "SECURITY_RATE_LIMITED", message: "rate limited", metadata: {} } },
       { "Retry-After": "not-a-date-or-number" },
     );
-    const err = await throwApiError(res, "fallback").catch((e) => e);
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBeUndefined();
   });

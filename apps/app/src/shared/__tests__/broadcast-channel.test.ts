@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createBroadcastChannel } from "../use-broadcast-channel";
+import { createBroadcastChannel } from "../broadcast-channel";
 
 describe("createBroadcastChannel", () => {
   test("livre le message aux abonnes", async () => {

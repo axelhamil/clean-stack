@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -24,7 +24,7 @@ import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { createTokenMutationOptions, deleteTokenMutationOptions } from "./api/api-tokens.mutations";
 import { apiTokensQueryOptions } from "./api/api-tokens.queries";
 import type { TokenFormInput } from "./api-tokens.schema";
@@ -44,6 +44,7 @@ const DEFAULT_VALUES: TokenFormInput = {
 
 function ApiTokensPage() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const qc = useQueryClient();
   const guard = useImpersonationGuard();
   const [creating, setCreating] = useState(false);
@@ -63,11 +64,7 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.createdToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.createApiToken", { defaultValue: "Failed to create API token" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("createApiToken")),
   });
 
   const revoke = useMutation({
@@ -76,11 +73,7 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.revokedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.revokeApiToken", { defaultValue: "Failed to revoke API token" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("revokeApiToken")),
   });
 
   return (
@@ -102,7 +95,7 @@ function ApiTokensPage() {
       ) : tokens.isError ? (
         <p>{t("apiTokens.loadFailed")}</p>
       ) : tokens.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">{t("apiTokens.empty")}</p>
+        <TypographyMuted>{t("apiTokens.empty")}</TypographyMuted>
       ) : (
         <Table>
           <TableHeader>
@@ -133,7 +126,7 @@ function ApiTokensPage() {
       )}
 
       <Dialog open={creating} onOpenChange={(open) => !open && setCreating(false)}>
-        <DialogContent>
+        <DialogContent closeLabel={tCommon("actions.close")}>
           <DialogHeader>
             <DialogTitle>{t("apiTokens.createDialogTitle")}</DialogTitle>
           </DialogHeader>

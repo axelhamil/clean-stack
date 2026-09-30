@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import * as realS3 from "@aws-sdk/client-s3";
+import * as realPresigner from "@aws-sdk/s3-request-presigner";
 
 let nextSendOutcome: () => Promise<unknown> = () => Promise.resolve({});
 let listPages: Array<{
@@ -20,6 +22,7 @@ function commandFactory(name: string) {
 }
 
 mock.module("@aws-sdk/client-s3", () => ({
+  ...realS3,
   S3Client: class {
     async send(command: { name: string }) {
       lastSendCount++;
@@ -40,6 +43,7 @@ mock.module("@aws-sdk/client-s3", () => ({
 }));
 
 mock.module("@aws-sdk/s3-request-presigner", () => ({
+  ...realPresigner,
   getSignedUrl: async () => "https://signed.example/url",
 }));
 
@@ -112,6 +116,7 @@ describe("S3StorageService (custom logic only)", () => {
     nextSendOutcome = () => Promise.reject(new Error("signer error"));
     // getSignedUrl will throw; we override the mock inline
     mock.module("@aws-sdk/s3-request-presigner", () => ({
+      ...realPresigner,
       getSignedUrl: async () => {
         throw new Error("signer error");
       },
@@ -128,6 +133,7 @@ describe("S3StorageService (custom logic only)", () => {
     expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
     // Restore
     mock.module("@aws-sdk/s3-request-presigner", () => ({
+      ...realPresigner,
       getSignedUrl: async () => "https://signed.example/url",
     }));
   });
@@ -146,6 +152,7 @@ describe("S3StorageService (custom logic only)", () => {
 
   it("presignDownload failure → STORAGE_PROVIDER_FAILURE", async () => {
     mock.module("@aws-sdk/s3-request-presigner", () => ({
+      ...realPresigner,
       getSignedUrl: async () => {
         throw new Error("presign download error");
       },
@@ -158,6 +165,7 @@ describe("S3StorageService (custom logic only)", () => {
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("STORAGE_PROVIDER_FAILURE");
     mock.module("@aws-sdk/s3-request-presigner", () => ({
+      ...realPresigner,
       getSignedUrl: async () => "https://signed.example/url",
     }));
   });

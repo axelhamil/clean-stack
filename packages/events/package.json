@@ -18,13 +18,13 @@
   "dependencies": {
     "@packages/access-control": "workspace:*",
     "@packages/i18n": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.3",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.2"
   }
 }

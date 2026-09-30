@@ -1,24 +1,24 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type {
   ApiTokenError,
   ApiTokenRecord,
   TokenOwner,
-} from "../application/ports/api-token.port";
+} from "../../../shared/ports/api-token.port";
 
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
   userId: "user-1",
-  organizationId: null,
+  organizationId: Option.none(),
   name: "ci",
   scopes: ["read:profile"],
   tokenHmac: "hmac-secret-must-not-leak",
   pepperVersion: 1,
   tokenStart: "clean_tok.....",
-  lastUsedAt: null,
-  expiresAt: null,
-  revokedAt: null,
-  revokedReason: null,
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
   createdAt: new Date("2024-01-01"),
 };
 
@@ -49,14 +49,15 @@ mock.module("../../../container", () => ({
 
 let currentSession: Record<string, unknown> = { activeOrganizationId: null };
 
+const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
 mock.module("../../../shared/middleware/auth.middleware", () => ({
+  ...realAuthMiddleware,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   requireAuth: async (c: any, next: () => Promise<void>) => {
     c.set("user", { id: "user-1" });
     c.set("session", currentSession);
     await next();
   },
-  AuthVariables: {},
 }));
 
 mock.module("../../../shared/middleware/org.middleware", () => ({
@@ -86,7 +87,7 @@ function makeApp() {
   return app;
 }
 
-describe("POST /settings/tokens — create", () => {
+describe("POST /settings/tokens: create", () => {
   it("returns 201 with raw token and safe record (no tokenHmac, no pepperVersion)", async () => {
     currentSession = { activeOrganizationId: null };
     const app = makeApp();
@@ -128,7 +129,7 @@ describe("POST /settings/tokens — create", () => {
   });
 });
 
-describe("GET /settings/tokens — list", () => {
+describe("GET /settings/tokens: list", () => {
   it("never exposes tokenHmac or the raw token value", async () => {
     currentSession = { activeOrganizationId: null };
     const app = makeApp();
@@ -145,7 +146,7 @@ describe("GET /settings/tokens — list", () => {
   });
 });
 
-describe("DELETE /settings/tokens/:id — wrong owner returns 404", () => {
+describe("DELETE /settings/tokens/:id: wrong owner returns 404", () => {
   it("returns 404 when the service reports API_TOKEN_NOT_FOUND", async () => {
     currentSession = { activeOrganizationId: null };
     mockRevoke.mockImplementationOnce(async () =>

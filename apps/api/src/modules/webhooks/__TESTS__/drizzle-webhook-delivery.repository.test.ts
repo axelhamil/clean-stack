@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -38,111 +39,12 @@ function makeDbQuery() {
 // Only what this file's subject actually touches: test files do not share a module
 // registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
   db: {
     select: () => makeDbQuery(),
     insert: () => makeDbQuery(),
     update: () => makeDbQuery(),
     delete: () => makeDbQuery(),
-  },
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  inArray: () => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  not: () => ({}),
-  like: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      $inferSelect: {},
-      $inferInsert: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-      $inferSelect: {},
-      $inferInsert: {},
-    },
-    webhookDeliveryAttempt: {
-      id: {},
-      deliveryId: {},
-      attemptNumber: {},
-      requestHeaders: {},
-      requestBody: {},
-      responseStatus: {},
-      responseHeaders: {},
-      responseBody: {},
-      durationMs: {},
-      error: {},
-      createdAt: {},
-      $inferSelect: {},
-      $inferInsert: {},
-    },
-  },
-  authSchema: {},
-  multiTenantSchema: { organization: { id: {} } },
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
   },
 }));
 
@@ -169,7 +71,7 @@ const fakeDelivery = {
 };
 
 // ---------------------------------------------------------------------------
-// Fake transaction — same chainable shape as db mock
+// Fake transaction: same chainable shape as db mock
 // ---------------------------------------------------------------------------
 function makeTx() {
   return {
@@ -182,7 +84,7 @@ function makeTx() {
 
 // ---------------------------------------------------------------------------
 // Helper: inject DB error via startSpan spy
-// Follows the drizzle-audit.service.test.ts pattern — throw on the Nth span call.
+// Follows the drizzle-audit.service.test.ts pattern: throw on the Nth span call.
 // ---------------------------------------------------------------------------
 function injectDbError(
   instr: InstanceType<typeof NoOpInstrumentation>,

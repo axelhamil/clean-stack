@@ -6,7 +6,7 @@ const SNIPPET = `import crypto from "node:crypto";
 
 // Header: x-webhook-signature: t=<ts>,v1=<sig>[,v1=<sig>]
 // Signed string: "\${ts}.\${rawBody}" where rawBody is the raw POST body string.
-// During secret rotation two v1= signatures are present — accept if ANY matches.
+// During secret rotation two v1= signatures are present: accept if ANY matches.
 const TOLERANCE_SECONDS = 300;
 
 export function verify(rawBody: string, header: string, secret: string): boolean {

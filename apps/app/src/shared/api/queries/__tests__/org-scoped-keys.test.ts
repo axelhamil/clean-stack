@@ -3,6 +3,8 @@ import {
   CURRENT_MEMBERSHIP_QUERY_PREFIX,
   currentMembershipQueryOptions,
 } from "../current-membership";
+import { orgInvitationsQueryOptions } from "../org-invitations";
+import { orgMembersQueryOptions } from "../org-members";
 import { subscriptionQueryOptions } from "../subscription";
 
 const ORG_A = "a1c087a7-9e0d-4f94-a509-6545adfcebdb";
@@ -41,7 +43,7 @@ describe("appartenance courante", () => {
 
   test("l'absence d'organisation est `null`, jamais `undefined`", () => {
     // `undefined` dans une cle est efface a la serialisation : deux scopes
-    // distincts retomberaient sur la meme entree — exactement le bug corrige.
+    // distincts retomberaient sur la meme entree, exactement le bug corrige.
     const key = currentMembershipQueryOptions(null).queryKey;
     expect(key).not.toContain(undefined);
     expect(key).toContain(null);
@@ -62,5 +64,20 @@ describe("appartenance courante", () => {
         ...CURRENT_MEMBERSHIP_QUERY_PREFIX,
       ]);
     }
+  });
+});
+
+describe.each([
+  ["org members", orgMembersQueryOptions],
+  ["org invitations", orgInvitationsQueryOptions],
+])("%s", (_, factory) => {
+  test("keeps one cache entry per organization", () => {
+    expect(factory(ORG_A).queryKey).not.toEqual(factory(ORG_B).queryKey);
+  });
+
+  test("stays idle without an active organization instead of asking for an empty id", () => {
+    expect(factory(null).enabled).toBe(false);
+    expect(factory(null).queryKey).toContain(null);
+    expect(factory(ORG_A).enabled).toBe(true);
   });
 });

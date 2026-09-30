@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { Option } from "@packages/ddd-kit";
 import { domainOf, isSsoEnforcedFor } from "../sso-enforcement";
 
 const enforced = { providerId: "acme-oidc", organizationId: "org-1" };
-const lookupFound = async () => enforced;
-const lookupEmpty = async () => null;
+const lookupFound = async () => Option.some(enforced);
+const lookupEmpty = async () => Option.none<typeof enforced>();
 
 describe("domainOf", () => {
   it("lowercases the domain", () => {
@@ -33,7 +34,7 @@ describe("isSsoEnforcedFor", () => {
     let called = false;
     const spy = async () => {
       called = true;
-      return enforced;
+      return Option.some(enforced);
     };
     const result = await isSsoEnforcedFor("garbage", spy);
     expect(result.isNone()).toBe(true);

@@ -82,7 +82,7 @@ The TOMs in effect at the date of this DPA are described in **Annex I: Security 
 
 ## 8. Data Subject Rights Assistance
 
-When the Controller receives a request from a data subject exercising rights under Articles 15–22 GDPR, it shall promptly notify the Processor. The Processor shall respond to such requests and provide reasonable technical assistance within **5 business days** of notification, at no additional charge. The Processor shall not respond directly to data subjects on the Controller's behalf unless explicitly authorised to do so in writing.
+When the Controller receives a request from a data subject exercising rights under Articles 15 to 22 GDPR, it shall promptly notify the Processor. The Processor shall respond to such requests and provide reasonable technical assistance within **5 business days** of notification, at no additional charge. The Processor shall not respond directly to data subjects on the Controller's behalf unless explicitly authorised to do so in writing.
 
 ---
 
@@ -90,7 +90,7 @@ When the Controller receives a request from a data subject exercising rights und
 
 Personal data is stored and processed in **[DATA_LOCATION]**. The Processor shall not transfer personal data to a third country or international organisation outside the EEA without the prior written consent of the Controller, except where required by Union or Member State law.
 
-Where transfers outside the EEA are authorised or necessary, the following transfer mechanism applies: **Standard Contractual Clauses (SCCs)** adopted by the European Commission pursuant to Article 46(2)(c) GDPR, or, where applicable, reliance on an adequacy decision or the EU–US Data Privacy Framework. The applicable mechanism shall be documented in an addendum to this DPA.
+Where transfers outside the EEA are authorised or necessary, the following transfer mechanism applies: **Standard Contractual Clauses (SCCs)** adopted by the European Commission pursuant to Article 46(2)(c) GDPR, or, where applicable, reliance on an adequacy decision or the EU-US Data Privacy Framework. The applicable mechanism shall be documented in an addendum to this DPA.
 
 ---
 

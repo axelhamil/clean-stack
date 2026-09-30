@@ -10,6 +10,7 @@ import {
 } from "@packages/ui/components/ui/table";
 import { useTranslation } from "react-i18next";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import type { AdminUserDetail } from "../api/admin-users.queries";
 
 type Session = AdminUserDetail["sessions"][number];
@@ -21,6 +22,7 @@ interface SessionsCardProps {
 export function SessionsCard({ sessions }: SessionsCardProps) {
   const formatDate = useFormatDate();
   const { t } = useTranslation("admin");
+
   return (
     <Card>
       <CardHeader>
@@ -43,9 +45,9 @@ export function SessionsCard({ sessions }: SessionsCardProps) {
             <TableBody>
               {sessions.map((session) => (
                 <TableRow key={session.id}>
-                  <TableCell>{session.ipAddress ?? "—"}</TableCell>
+                  <TableCell>{session.ipAddress ?? EMPTY_VALUE}</TableCell>
                   <TableCell className="max-w-xs overflow-hidden">
-                    {session.userAgent ?? "—"}
+                    {session.userAgent ?? EMPTY_VALUE}
                   </TableCell>
                   <TableCell>{formatDate(session.createdAt)}</TableCell>
                   <TableCell>{formatDate(session.expiresAt)}</TableCell>

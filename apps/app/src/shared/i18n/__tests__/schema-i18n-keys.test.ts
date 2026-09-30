@@ -1,6 +1,6 @@
 import { globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { enCatalog } from "@packages/i18n";
+import { enCatalog, lookupCatalogValue } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
 
 const SRC = resolve(__dirname, "../../..");
@@ -12,12 +12,7 @@ const SRC = resolve(__dirname, "../../..");
  * `tsc` cannot see, so it gets a test instead.
  */
 function keyExists(path: string): boolean {
-  let cur: unknown = enCatalog.errors;
-  for (const seg of path.split(".")) {
-    if (typeof cur !== "object" || cur === null) return false;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string";
+  return lookupCatalogValue(enCatalog.errors, path) !== undefined;
 }
 
 function sourceFiles(): string[] {

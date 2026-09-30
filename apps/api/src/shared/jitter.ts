@@ -1,5 +1,7 @@
+import { Option } from "@packages/ddd-kit";
+
 /**
- * Decorrelated jitter retry math — AWS "Exponential Backoff and Jitter" pattern.
+ * Decorrelated jitter retry math, after the AWS "Exponential Backoff and Jitter" pattern.
  *
  * Each delay is sampled uniformly in `[BASE, max(BASE, lastDelay × MULTIPLIER)]`
  * rather than `[0, cap]`, which avoids the thundering-herd that pure random
@@ -17,21 +19,26 @@ export function nextDelayMs(lastDelayMs: number): number {
   return Math.min(JITTER_CAP_MS, Math.floor(delay));
 }
 
+/**
+ * The delay the previous retry would have waited after `currentAttempts` failures,
+ * fed back into `nextDelayMs` as its `lastDelayMs`. Workers only persist the attempt
+ * count, never the delay they actually slept, so the growth curve is rebuilt from it.
+ */
+export function expectedDelayFromAttempts(currentAttempts: number): number {
+  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
+}
+
 /** Returns true when the event has exhausted all retry attempts and should be parked. */
 export function isDeadLetter(attempt: number): boolean {
   return attempt >= JITTER_MAX_ATTEMPTS;
 }
 
 /**
- * Returns the absolute `Date` for the next retry and the computed delay, or
- * `{ date: null, delayMs: -1 }` when the next attempt would exceed the dead-letter
- * threshold. Callers store `date` directly in `next_attempt_at`.
+ * The absolute instant of the next retry, or none when the next attempt would
+ * exceed the dead-letter threshold. Callers store it in `next_attempt_at`.
  */
-export function nextAttemptAt(
-  currentAttempts: number,
-  lastDelayMs: number,
-): { date: Date | null; delayMs: number } {
-  if (isDeadLetter(currentAttempts + 1)) return { date: null, delayMs: -1 };
-  const delayMs = nextDelayMs(lastDelayMs);
-  return { date: new Date(Date.now() + delayMs), delayMs };
+export function nextAttemptAt(currentAttempts: number, lastDelayMs: number): Option<Date> {
+  if (isDeadLetter(currentAttempts + 1)) return Option.none();
+
+  return Option.some(new Date(Date.now() + nextDelayMs(lastDelayMs)));
 }

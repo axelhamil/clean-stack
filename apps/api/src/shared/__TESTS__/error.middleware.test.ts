@@ -1,18 +1,14 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { createErrorHandler } from "../middleware/error.middleware";
 import type { IInstrumentation } from "../ports/instrumentation.port";
+import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
 function makeSpy() {
-  const captureSpy = mock(() => {});
-  const instrumentation: IInstrumentation = {
-    capture: captureSpy,
-    startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  };
+  const instrumentation = new NoOpInstrumentation();
+  const captureSpy = spyOn(instrumentation, "capture");
   return { captureSpy, instrumentation };
 }
 
@@ -73,7 +69,7 @@ describe("errorHandler", () => {
     expect(typeof body.error.stack).toBe("string");
   });
 
-  describe("capture spy — 500 errors", () => {
+  describe("capture spy, 500 errors", () => {
     it("calls capture on AppErrorException with _PROVIDER_FAILURE suffix (5xx)", async () => {
       const { captureSpy, instrumentation } = makeSpy();
       const err = new AppErrorException({
@@ -135,7 +131,7 @@ describe("errorHandler", () => {
     });
   });
 
-  describe("capture spy — 4xx errors (no capture)", () => {
+  describe("capture spy, 4xx errors (no capture)", () => {
     it("does NOT call capture on HTTPException 400", async () => {
       const { captureSpy, instrumentation } = makeSpy();
       const app = makeApp(instrumentation).get("/", () => {

@@ -3,6 +3,9 @@ export default {
   actions: {
     save: "Save",
     cancel: "Cancel",
+    close: "Close",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     retry: "Retry",
     reload: "Reload",
   },
@@ -27,6 +30,8 @@ export default {
     logoAlt: "App logo",
   },
   commandPalette: {
+    title: "Command palette",
+    description: "Search for a page or an action to run.",
     searchPlaceholder: "Search pages, actions, organizations...",
     noResults: "No results found.",
     actionFailed: "Action failed",
@@ -38,18 +43,18 @@ export default {
       actions: "Actions",
     },
     nav: {
-      organization: "Settings — Organization",
-      billing: "Settings — Billing",
-      webhooks: "Settings — Webhooks",
-      account: "Settings — Account",
-      privacy: "Settings — Privacy",
-      eventCatalog: "Developers — Event catalog",
+      organization: "Settings: Organization",
+      billing: "Settings: Billing",
+      webhooks: "Settings: Webhooks",
+      account: "Settings: Account",
+      privacy: "Settings: Privacy",
+      eventCatalog: "Developers: Event catalog",
     },
     organizationActive: "active",
     admin: {
-      auditLog: "Admin — Audit log",
-      accounts: "Admin — Accounts",
-      organizations: "Admin — Organizations",
+      auditLog: "Admin: Audit log",
+      accounts: "Admin: Accounts",
+      organizations: "Admin: Organizations",
     },
     theme: {
       light: "Theme: Light",
@@ -95,7 +100,7 @@ export default {
     signOutFailed: "Sign-out failed",
   },
   impersonation: {
-    activeSession: "Active impersonation session — acting as <name></name>",
+    activeSession: "Active impersonation session: acting as <name></name>. {{remaining}}",
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",
@@ -140,18 +145,24 @@ export default {
     policies: {
       privacyTitle: "Privacy Policy",
       termsTitle: "Terms of Service",
-      versionLine: "Version {{version}} — effective {{date}}",
+      versionLine: "Version {{version}} (effective {{date}})",
       unavailableBanner:
         "This document is not yet available in your language. You are reading the English version below.",
     },
     accessibility: {
       title: "Accessibility statement",
-      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Last reviewed: 2026-07-09",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA · Last reviewed: 2026-07-09",
     },
     cookies: {
       title: "Cookie policy",
-      subtitle: "CNIL compliant — Last updated: 2026-07-09",
+      subtitle: "CNIL compliant · Last updated: 2026-07-09",
       tableCaption: "Cookies in the {{category}} category used by this application",
+      table: {
+        name: "Name",
+        provider: "Provider",
+        purpose: "Purpose",
+        retention: "Retention",
+      },
     },
     dataRights: {
       title: "Your data rights",
@@ -160,7 +171,7 @@ export default {
     },
     subProcessors: {
       title: "Sub-processor disclosure",
-      subtitle: "RGPD Art. 28 — Last updated: 2026-07-09",
+      subtitle: "RGPD Art. 28 · Last updated: 2026-07-09",
       table: {
         name: "Name",
         purpose: "Purpose",
@@ -209,7 +220,7 @@ export default {
     },
   },
   policyAcceptance: {
-    acceptedToast: "Policies accepted — welcome!",
+    acceptedToast: "Policies accepted, welcome!",
     acceptFailed: "Could not record your acceptance. Please try again.",
   },
   legalFooter: {
@@ -221,7 +232,7 @@ export default {
   },
   secretReveal: {
     title: "Signing secret",
-    description: "Copy this now — it is shown only once and cannot be retrieved later.",
+    description: "Copy this now: it is shown only once and cannot be retrieved later.",
     secretLabel: "Secret",
     confirm: "I saved it",
   },
@@ -257,7 +268,7 @@ export default {
       "Invite teammates, configure billing, and start shipping. Everything lives under Settings.",
     activityTitle: "Activity",
     activityDescription: "Recent events in your workspace.",
-    activityEmpty: "Nothing yet — your activity will surface here.",
+    activityEmpty: "Nothing yet. Your activity will surface here.",
     usageTitle: "Usage",
     usageDescription: "Quota and limits for the current period.",
     usageEmpty: "Hook up metering once a billable resource exists.",

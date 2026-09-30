@@ -1,7 +1,28 @@
+import { CodeBlock } from "@packages/ui/components/ui/code-block";
+import {
+  DescriptionDetails,
+  DescriptionItem,
+  DescriptionList,
+  DescriptionTerm,
+} from "@packages/ui/components/ui/description-list";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@packages/ui/components/ui/sheet";
+import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import type { AuditRow } from "../api/audit-log.queries";
+
+interface MetadataDiff {
+  before: unknown;
+  after: unknown;
+}
+
+function diffOf(metadata: unknown): MetadataDiff | null {
+  if (typeof metadata !== "object" || metadata === null) return null;
+  if (!("before" in metadata) || !("after" in metadata)) return null;
+
+  return { before: metadata.before, after: metadata.after };
+}
 
 interface MetadataSheetProps {
   row: AuditRow | null;
@@ -10,52 +31,43 @@ interface MetadataSheetProps {
 
 export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
   const { t } = useTranslation("admin");
+  const { t: tCommon } = useTranslation("common");
   // Same reasoning as `audit-row.tsx`: an audit event's occurred-at needs
   // date+time precision, not the date-only `useFormatDate`.
   const formatDateTime = useFormatDateTime();
-  const hasDiff =
-    row?.metadata !== null &&
-    typeof row?.metadata === "object" &&
-    "before" in (row.metadata as object) &&
-    "after" in (row.metadata as object);
+  const diff = diffOf(row?.metadata);
 
   return (
     <Sheet open={row !== null} onOpenChange={() => onClose()}>
-      <SheetContent>
+      <SheetContent closeLabel={tCommon("actions.close")}>
         {row && (
           <>
             <SheetHeader>
               <SheetTitle>{row.action}</SheetTitle>
             </SheetHeader>
-            <dl className="flex flex-col gap-2">
-              <div>
-                <dt className="text-sm font-medium">{t("auditLog.metadata.actorLabel")}</dt>
-                <dd className="text-sm">{row.actorId ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium">{t("auditLog.metadata.occurredAtLabel")}</dt>
-                <dd className="text-sm">{formatDateTime(row.occurredAt)}</dd>
-              </div>
-            </dl>
-            {hasDiff ? (
+            <DescriptionList>
+              <DescriptionItem>
+                <DescriptionTerm>{t("auditLog.metadata.actorLabel")}</DescriptionTerm>
+                <DescriptionDetails>{row.actorId ?? EMPTY_VALUE}</DescriptionDetails>
+              </DescriptionItem>
+              <DescriptionItem>
+                <DescriptionTerm>{t("auditLog.metadata.occurredAtLabel")}</DescriptionTerm>
+                <DescriptionDetails>{formatDateTime(row.occurredAt)}</DescriptionDetails>
+              </DescriptionItem>
+            </DescriptionList>
+            {diff ? (
               <div className="flex gap-4 overflow-x-auto">
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium">{t("auditLog.metadata.beforeLabel")}</span>
-                  <pre className="text-xs">
-                    {JSON.stringify((row.metadata as { before: unknown }).before, null, 2)}
-                  </pre>
+                  <TypographySmall>{t("auditLog.metadata.beforeLabel")}</TypographySmall>
+                  <CodeBlock>{JSON.stringify(diff.before, null, 2)}</CodeBlock>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium">{t("auditLog.metadata.afterLabel")}</span>
-                  <pre className="text-xs">
-                    {JSON.stringify((row.metadata as { after: unknown }).after, null, 2)}
-                  </pre>
+                  <TypographySmall>{t("auditLog.metadata.afterLabel")}</TypographySmall>
+                  <CodeBlock>{JSON.stringify(diff.after, null, 2)}</CodeBlock>
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <pre className="text-xs">{JSON.stringify(row.metadata, null, 2)}</pre>
-              </div>
+              <CodeBlock>{JSON.stringify(row.metadata, null, 2)}</CodeBlock>
             )}
           </>
         )}

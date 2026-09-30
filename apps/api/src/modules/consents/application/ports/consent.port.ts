@@ -13,8 +13,8 @@ export interface ConsentRecordRow {
   grantedAt: Date;
   withdrawnAt: Option<Date>;
   expiresAt: Date;
-  ipAddress?: string;
-  userAgent?: string;
+  ipAddress: Option<string>;
+  userAgent: Option<string>;
 }
 
 export interface IConsentStore {
@@ -29,9 +29,10 @@ export interface IConsentStore {
     policyVersion: string,
     tx?: ITransaction,
   ): Promise<Result<Option<ConsentRecordRow>, ConsentError>>;
+  /** Resolves to the ids of the records it attached, empty when none was orphaned. */
   linkSubjectToUser(
     subjectId: string,
     userId: string,
     tx?: ITransaction,
-  ): Promise<Result<void, ConsentError>>;
+  ): Promise<Result<string[], ConsentError>>;
 }

@@ -9,8 +9,6 @@ interface BetterAuthError {
   providerId?: string;
 }
 
-export const SSO_REDIRECT_IN_PROGRESS = "sso-redirect-in-progress";
-
 /**
  * BetterAuth errors stop surfacing the raw server string and go through the
  * same code-keyed `errors` catalog as the API errors, so there is one
@@ -31,12 +29,12 @@ export function resolveAuthError(
 }
 
 /**
- * The user did nothing wrong — their organization enforces SSO for this domain.
+ * The user did nothing wrong: their organization enforces SSO for this domain.
  * Every email-bearing sign-in/sign-up path can reject with the same `SSO_REQUIRED`
- * shape (Task 9), so redirecting into the SSO flow instead of showing an error is
+ * shape, so redirecting into the SSO flow instead of showing an error is
  * shared here rather than duplicated per call site. `providerId` comes straight off
  * the server's rejection (confirmed to survive serialization), never re-derived
- * from the email. Returns `true` once the SSO redirect has been kicked off — the
+ * from the email. Returns `true` once the SSO redirect has been kicked off; the
  * caller should throw `SSO_REDIRECT_IN_PROGRESS` and swallow it in `onError` so no
  * error toast flashes before the browser navigates away.
  */

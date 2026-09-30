@@ -3,8 +3,8 @@ export type SubProcessorId = "resend" | "r2" | "betterAuth" | "stripe" | "umami"
 export interface SubProcessor {
   /**
    * Stable catalog key for the vendor's purpose and region. The register itself
-   * stays English — it restates what the signed DPA says, and the DPA is not
-   * translated — but the two fields a user reads on screen are copy, so they
+   * stays English (it restates what the signed DPA says, and the DPA is not
+   * translated), but the two fields a user reads on screen are copy, so they
    * live in the catalog like every other rendered string.
    */
   id: SubProcessorId;

@@ -43,7 +43,7 @@ function AcceptPoliciesPage() {
   const { data: policies } = useQuery(policiesQueryOptions);
 
   const staleTypes = policies
-    ? (Object.entries(policies) as [string, { current: boolean; acceptedVersion: string | null }][])
+    ? Object.entries(policies)
         .filter(([, status]) => !status.current)
         .map(([type]) => type)
         .filter(isPolicyType)

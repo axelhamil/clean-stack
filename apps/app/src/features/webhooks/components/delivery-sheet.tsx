@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@packages/ui/components/ui/sheet";
+import { TypographyInline, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
@@ -16,6 +17,19 @@ import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-
 import type { DeliveryAttempt, DeliveryListItem } from "../api/webhooks.queries";
 import { webhookDeliveryDetailQueryOptions } from "../api/webhooks.queries";
 import { DELIVERY_STATUS_KEYS, isDeliveryStatus } from "../webhook-labels";
+
+type AttemptSectionKey = "requestHeaders" | "requestBody" | "responseHeaders" | "responseBody";
+
+const ATTEMPT_SECTIONS: readonly AttemptSectionKey[] = [
+  "requestHeaders",
+  "requestBody",
+  "responseHeaders",
+  "responseBody",
+];
+
+function formatSection(value: DeliveryAttempt[AttemptSectionKey]): string {
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
 
 interface RequestResponseProps {
   attempt: DeliveryAttempt;
@@ -26,46 +40,23 @@ function RequestResponse({ attempt }: RequestResponseProps) {
 
   return (
     <div className="mt-2 flex flex-col gap-1">
-      {attempt.requestHeaders !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.requestHeaders")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {JSON.stringify(attempt.requestHeaders, null, 2)}
-          </CodeBlock>
-        </details>
-      )}
-      {attempt.requestBody !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.requestBody")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {attempt.requestBody}
-          </CodeBlock>
-        </details>
-      )}
-      {attempt.responseHeaders !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.responseHeaders")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {JSON.stringify(attempt.responseHeaders, null, 2)}
-          </CodeBlock>
-        </details>
-      )}
-      {attempt.responseBody !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.responseBody")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {attempt.responseBody}
-          </CodeBlock>
-        </details>
-      )}
+      {ATTEMPT_SECTIONS.map((key) => {
+        const value = attempt[key];
+        if (value === null) return null;
+
+        return (
+          <details key={key}>
+            <summary className="cursor-pointer">
+              <TypographyInline tone="muted" size="xs">
+                {t(`webhooks.deliverySheet.${key}`)}
+              </TypographyInline>
+            </summary>
+            <CodeBlock size="sm" className="mt-1">
+              {formatSection(value)}
+            </CodeBlock>
+          </details>
+        );
+      })}
     </div>
   );
 }
@@ -95,11 +86,15 @@ export function DeliverySheet({
 
   return (
     <Sheet open={delivery !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl">
+      <SheetContent closeLabel={t("common:actions.close")} className="w-full sm:max-w-xl">
         {delivery && (
           <>
             <SheetHeader>
-              <SheetTitle className="font-mono text-sm">{delivery.eventType}</SheetTitle>
+              <SheetTitle>
+                <TypographyInline font="mono" size="sm">
+                  {delivery.eventType}
+                </TypographyInline>
+              </SheetTitle>
               <SheetDescription>
                 {t("webhooks.deliverySheet.statusLine", {
                   status: isDeliveryStatus(delivery.status)
@@ -121,12 +116,10 @@ export function DeliverySheet({
               </Button>
             )}
             {detail.isLoading && (
-              <p className="text-sm text-muted-foreground">
-                {t("webhooks.deliverySheet.loadingAttempts")}
-              </p>
+              <TypographyMuted>{t("webhooks.deliverySheet.loadingAttempts")}</TypographyMuted>
             )}
             {detail.data && (
-              <ol className="space-y-4">
+              <ol className="flex flex-col gap-4">
                 {detail.data.attemptHistory.map((a) => (
                   <Panel key={a.id} asChild className="text-xs">
                     <li>
@@ -145,9 +138,11 @@ export function DeliverySheet({
                         </Badge>
                       </div>
                       {a.durationMs !== null && (
-                        <p className="text-muted-foreground">{a.durationMs} ms</p>
+                        <TypographyInline tone="muted">
+                          {t("webhooks.deliverySheet.duration", { ms: a.durationMs })}
+                        </TypographyInline>
                       )}
-                      {a.error && <p className="text-destructive">{a.error}</p>}
+                      {a.error && <TypographyInline tone="destructive">{a.error}</TypographyInline>}
                       <RequestResponse attempt={a} />
                     </li>
                   </Panel>

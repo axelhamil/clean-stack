@@ -14,6 +14,15 @@ async function hashKey(key: string): Promise<string> {
     .slice(0, 16);
 }
 
+const NOT_OWNED: StorageError = {
+  code: "STORAGE_FORBIDDEN",
+  message: "key does not belong to the requesting owner",
+};
+
+function isOwnedBy(key: string, ownerId: string): boolean {
+  return key.startsWith(`${ownerId}/`);
+}
+
 export interface CreateUploadUrlInput {
   ownerId: string;
   filename: string;
@@ -110,11 +119,7 @@ export class UploadService {
     return this.instrumentation.startSpan(
       { name: "UploadService > confirmUpload", op: "function" },
       async () => {
-        if (!input.key.startsWith(`${input.ownerId}/`))
-          return Result.fail({
-            code: "STORAGE_FORBIDDEN",
-            message: "key does not belong to the requesting owner",
-          });
+        if (!isOwnedBy(input.key, input.ownerId)) return Result.fail(NOT_OWNED);
 
         const head = await this.storage.headObject(input.key);
         if (head.isFailure) return Result.fail(head.getError());
@@ -163,12 +168,7 @@ export class UploadService {
         if (resolved.isNone()) return Result.ok({ deleted: false });
         const key = resolved.unwrap();
 
-        if (!key.startsWith(`${input.ownerId}/`)) {
-          return Result.fail({
-            code: "STORAGE_FORBIDDEN",
-            message: "key does not belong to the requesting owner",
-          });
-        }
+        if (!isOwnedBy(key, input.ownerId)) return Result.fail(NOT_OWNED);
 
         const deleted = await this.storage.deleteObject(key);
         if (deleted.isFailure) return Result.fail(deleted.getError());
@@ -190,12 +190,7 @@ export class UploadService {
     return this.instrumentation.startSpan(
       { name: "UploadService > createDownloadUrl", op: "function" },
       async () => {
-        if (!input.key.startsWith(`${input.ownerId}/`)) {
-          return Result.fail({
-            code: "STORAGE_FORBIDDEN",
-            message: "key does not belong to the requesting owner",
-          });
-        }
+        if (!isOwnedBy(input.key, input.ownerId)) return Result.fail(NOT_OWNED);
 
         const presigned = await this.storage.presignDownload({
           key: input.key,
@@ -211,7 +206,7 @@ export class UploadService {
 
 function clampTtl(seconds: number): number {
   return Math.min(
-    Math.max(seconds, env.STORAGE_PRESIGN_TTL_MIN_SECONDS ?? 60),
-    env.STORAGE_PRESIGN_TTL_MAX_SECONDS ?? 3600,
+    Math.max(seconds, env.STORAGE_PRESIGN_TTL_MIN_SECONDS),
+    env.STORAGE_PRESIGN_TTL_MAX_SECONDS,
   );
 }

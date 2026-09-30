@@ -1,12 +1,9 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
 import { redirectToSsoIfRequired } from "../auth-error";
+import { useCompleteSignIn } from "./use-complete-sign-in";
 
 interface UsePasskeyAutofillOptions {
   enabled: boolean;
@@ -22,8 +19,7 @@ export function usePasskeyAutofill({
   redirectTo,
 }: UsePasskeyAutofillOptions): PasskeyAutofillHandle {
   const { t } = useTranslation("auth");
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const completeSignIn = useCompleteSignIn();
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -39,6 +35,7 @@ export function usePasskeyAutofill({
           fetchOptions: { signal: controller.signal },
         });
         if (controller.signal.aborted) return;
+
         if (result?.error) {
           // Conditional UI stays silent on every expected failure, but an SSO-enforced
           // domain is not a failure to hide: send the user to their IdP instead of
@@ -46,12 +43,11 @@ export function usePasskeyAutofill({
           await redirectToSsoIfRequired(result.error);
           return;
         }
+
         toast.success(t("signIn.success"));
-        await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-        broadcastAuthChange();
-        void navigate({ to: redirectTo ?? "/" });
+        await completeSignIn(redirectTo);
       } catch {
-        // passive conditional passkey UI — cancel / abort / no-credential are expected, never surfaced
+        // Passive conditional passkey UI: cancel, abort and no-credential are expected, never surfaced.
       }
     })();
 
@@ -59,7 +55,7 @@ export function usePasskeyAutofill({
       controller.abort();
       abortRef.current = null;
     };
-  }, [enabled, redirectTo, queryClient, navigate, t]);
+  }, [enabled, redirectTo, completeSignIn, t]);
 
   return {
     abort: () => abortRef.current?.abort(),

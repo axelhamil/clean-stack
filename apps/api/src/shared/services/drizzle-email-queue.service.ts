@@ -11,6 +11,27 @@ import type {
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { ITransaction } from "../transaction";
 
+const em = emailSchema.emailMessage;
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+
+function fail(err: unknown, fallback: string): Result<never, EmailQueueError> {
+  return Result.fail({
+    code: "EMAIL_QUEUE_WRITE_FAILED",
+    message: err instanceof Error ? err.message : fallback,
+  });
+}
+
+function toRecord(row: typeof em.$inferSelect): EmailMessageRecord {
+  return {
+    ...row,
+    template: Option.fromNullable(row.template),
+    locale: Option.fromNullable(isLocale(row.locale) ? row.locale : null),
+    nextAttemptAt: Option.fromNullable(row.nextAttemptAt),
+    lastError: Option.fromNullable(row.lastError),
+    idempotencyKey: Option.fromNullable(row.idempotencyKey),
+  };
+}
+
 export class DrizzleEmailQueue implements IEmailQueue {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
@@ -20,12 +41,13 @@ export class DrizzleEmailQueue implements IEmailQueue {
   ): Promise<Result<{ written: number }, EmailQueueError>> {
     const exec = tx ?? db;
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > enqueue" }, async () => {
-      if (rows.length === 0) return Result.ok<{ written: number }, EmailQueueError>({ written: 0 });
+      if (rows.length === 0) return Result.ok({ written: 0 });
+
       try {
         const values = rows.map((r) => ({
           id: uuidv7(),
           kind: r.kind,
-          template: r.template.isSome() ? r.template.unwrap() : null,
+          template: r.template.toNull(),
           toAddress: r.toAddress,
           subject: r.subject,
           locale: r.locale,
@@ -33,34 +55,28 @@ export class DrizzleEmailQueue implements IEmailQueue {
           status: "pending" as const,
           attempts: 0,
           nextAttemptAt: null,
-          idempotencyKey: r.idempotencyKey.isSome() ? r.idempotencyKey.unwrap() : null,
+          idempotencyKey: r.idempotencyKey.toNull(),
         }));
         const query = exec
-          .insert(emailSchema.emailMessage)
+          .insert(em)
           .values(values)
-          .onConflictDoNothing({ target: emailSchema.emailMessage.idempotencyKey })
-          .returning({ id: emailSchema.emailMessage.id });
+          .onConflictDoNothing({ target: em.idempotencyKey })
+          .returning({ id: em.id });
         const written = await this.instrumentation.startSpan(
-          {
-            name: "insert into email_message",
-            op: "db.query",
-            attributes: { "db.system.name": "postgresql" },
-          },
-          () => query,
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
         );
+
         if (written.length < values.length) {
           logger.warn(
             { requested: values.length, written: written.length },
-            "email enqueue suppressed duplicate rows — idempotency keys already present",
+            "email enqueue suppressed duplicate rows: idempotency keys already present",
           );
         }
-        return Result.ok<{ written: number }, EmailQueueError>({ written: written.length });
+        return Result.ok({ written: written.length });
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail({
-          code: "EMAIL_QUEUE_WRITE_FAILED",
-          message: err instanceof Error ? err.message : "enqueue failed",
-        });
+        return fail(err, "enqueue failed");
       }
     });
   }
@@ -73,7 +89,6 @@ export class DrizzleEmailQueue implements IEmailQueue {
     return this.instrumentation.startSpan(
       { name: "DrizzleEmailQueue > claimPending" },
       async () => {
-        const em = emailSchema.emailMessage;
         try {
           const subq = tx
             .select({ id: em.id })
@@ -95,29 +110,13 @@ export class DrizzleEmailQueue implements IEmailQueue {
             .returning();
 
           const rows = await this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok<EmailMessageRecord[], EmailQueueError>(
-            rows.map((r) => ({
-              ...r,
-              template: Option.fromNullable(r.template),
-              locale: Option.fromNullable(isLocale(r.locale) ? r.locale : null),
-              nextAttemptAt: Option.fromNullable(r.nextAttemptAt),
-              lastError: Option.fromNullable(r.lastError),
-              idempotencyKey: Option.fromNullable(r.idempotencyKey),
-            })),
-          );
+          return Result.ok(rows.map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail({
-            code: "EMAIL_QUEUE_WRITE_FAILED",
-            message: err instanceof Error ? err.message : "claim failed",
-          });
+          return fail(err, "claim failed");
         }
       },
     );
@@ -130,9 +129,8 @@ export class DrizzleEmailQueue implements IEmailQueue {
     tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markSent" }, async () => {
-      if (ids.length === 0) return Result.ok<void, EmailQueueError>(undefined);
+      if (ids.length === 0) return Result.ok();
 
-      const em = emailSchema.emailMessage;
       try {
         const cases = ids.map(
           (id) => sql`WHEN ${em.id} = ${id} THEN ${providerMessageIds[id] ?? null}`,
@@ -152,21 +150,13 @@ export class DrizzleEmailQueue implements IEmailQueue {
           .where(inArray(em.id, ids));
 
         await this.instrumentation.startSpan(
-          {
-            name: query.toSQL().sql,
-            op: "db.query",
-            attributes: { "db.system.name": "postgresql" },
-          },
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
           () => query.execute(),
         );
-
-        return Result.ok<void, EmailQueueError>(undefined);
+        return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail({
-          code: "EMAIL_QUEUE_WRITE_FAILED",
-          message: err instanceof Error ? err.message : "markSent failed",
-        });
+        return fail(err, "markSent failed");
       }
     });
   }
@@ -178,25 +168,24 @@ export class DrizzleEmailQueue implements IEmailQueue {
     tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markFailed" }, async () => {
-      const em = emailSchema.emailMessage;
       try {
         const query = tx
           .update(em)
           .set({
             status: nextAttempt.isNone() ? "failed" : "pending",
-            nextAttemptAt: nextAttempt.isSome() ? nextAttempt.unwrap() : null,
+            nextAttemptAt: nextAttempt.toNull(),
             lastError: error.slice(0, 2000),
             attempts: sql`${em.attempts} + 1`,
           })
           .where(eq(em.id, id));
-        await query.execute();
-        return Result.ok<void, EmailQueueError>(undefined);
+        await this.instrumentation.startSpan(
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
+        );
+        return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail({
-          code: "EMAIL_QUEUE_WRITE_FAILED",
-          message: err instanceof Error ? err.message : "markFailed failed",
-        });
+        return fail(err, "markFailed failed");
       }
     });
   }

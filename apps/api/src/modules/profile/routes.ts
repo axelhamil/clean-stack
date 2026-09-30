@@ -22,7 +22,6 @@ export const profileRoutes = new Hono<{ Variables: AuthVariables }>().put(
     await di.ITransactionService.run(async (tx) => {
       const previous = await di.IProfileStore.findLocale(userId, tx);
       if (previous.isFailure) throw new AppErrorException(previous.getError());
-      const previousLocale = previous.getValue();
 
       const written = await di.IProfileStore.setLocale(userId, locale, tx);
       if (written.isFailure) throw new AppErrorException(written.getError());
@@ -35,7 +34,7 @@ export const profileRoutes = new Hono<{ Variables: AuthVariables }>().put(
         {
           userId,
           locale,
-          previousLocale: previousLocale.isSome() ? previousLocale.unwrap() : null,
+          previousLocale: previous.getValue().toNull(),
         },
         {},
         tx,

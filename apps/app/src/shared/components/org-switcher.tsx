@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback } from "@packages/ui/components/ui/avatar";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Command,
@@ -9,6 +8,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@packages/ui/components/ui/command";
+import { InitialsAvatar } from "@packages/ui/components/ui/initials-avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components/ui/popover";
 import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
@@ -16,11 +16,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { initialsOf } from "../../shared/utils";
 import { toastError } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
+import { initialsOf } from "../utils";
 
 export function OrgSwitcher() {
   const { t } = useTranslation("common");
@@ -46,11 +46,7 @@ export function OrgSwitcher() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-9 gap-2 px-2">
-          <Avatar className="size-6 rounded-md">
-            <AvatarFallback className="rounded-md text-[10px] font-medium">
-              {activeOrg ? initialsOf(activeOrg.name) : "—"}
-            </AvatarFallback>
-          </Avatar>
+          <InitialsAvatar initials={activeOrg ? initialsOf(activeOrg.name) : "?"} />
           <TypographySmall className="max-w-32 truncate">
             {activeOrg?.name ?? t("orgSwitcher.selectPlaceholder")}
           </TypographySmall>
@@ -70,11 +66,7 @@ export function OrgSwitcher() {
                   onSelect={() => void handleSwitch(org.id)}
                   disabled={isPending}
                 >
-                  <Avatar className="size-5 rounded">
-                    <AvatarFallback className="rounded text-[9px]">
-                      {initialsOf(org.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <InitialsAvatar size="xs" initials={initialsOf(org.name)} />
                   <span className="flex-1 truncate">{org.name}</span>
                   {org.id === activeOrg?.id && <Check className="size-4 opacity-60" />}
                 </CommandItem>

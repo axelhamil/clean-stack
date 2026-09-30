@@ -21,7 +21,7 @@ import {
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 import { OidcProviderForm } from "../forms/oidc-provider-form";
 import { SamlProviderForm } from "../forms/saml-provider-form";
-import { isSsoProviderType, SSO_PROVIDER_TYPE_KEYS } from "../sso-labels";
+import { isSsoProviderType, SSO_PROVIDER_TYPE_KEYS, type SsoProviderType } from "../sso-labels";
 import { CopyRow } from "./copy-row";
 
 export function ProviderCard() {
@@ -30,7 +30,7 @@ export function ProviderCard() {
   const { t: tErrors } = useTranslation("errors");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
-  const [kind, setKind] = useState<"oidc" | "saml">("oidc");
+  const [kind, setKind] = useState<SsoProviderType>("oidc");
 
   const existing = primaryProviderFor(providers, org?.id);
 
@@ -41,10 +41,9 @@ export function ProviderCard() {
 
   // `sso.register`'s error carries the API's business code inside `.message`
   // rather than a separate `.code` field (`assertSsoEntitlementFor` in
-  // apps/api/src/auth.ts) — `{ code: err.message }` feeds that same string
-  // into `formatApiError`'s `errors.byCode` lookup. Passing `err.message` as
-  // the fallback too means an unrecognized code still surfaces the server's
-  // own text unchanged, exactly as before this went through the catalog.
+  // apps/api/src/auth.ts), so `{ code: err.message }` feeds that string into
+  // `formatApiError`'s `errors.byCode` lookup. Passing `err.message` as the
+  // fallback too means an unrecognized code still surfaces the server's own text.
   const onRegisterError = (err: Error) =>
     toast.error(formatApiError({ code: err.message }, err.message, tErrors));
 
@@ -59,11 +58,8 @@ export function ProviderCard() {
     onError: onRegisterError,
   });
 
-  const existingTypeLabel = existing
-    ? isSsoProviderType(existing.type)
-      ? t(SSO_PROVIDER_TYPE_KEYS[existing.type])
-      : existing.type
-    : "";
+  const typeLabel = (type: string) =>
+    isSsoProviderType(type) ? t(SSO_PROVIDER_TYPE_KEYS[type]) : type;
 
   return (
     <Card>
@@ -77,7 +73,7 @@ export function ProviderCard() {
             <div className="flex items-center justify-between">
               <TypographySmall>
                 {t("sso.providerCard.typeAndDomain", {
-                  type: existingTypeLabel,
+                  type: typeLabel(existing.type),
                   domain: existing.domain,
                 })}
               </TypographySmall>
@@ -90,7 +86,7 @@ export function ProviderCard() {
             <TypographyMuted>{t("sso.providerCard.singleProviderNotice")}</TypographyMuted>
           </Panel>
         ) : (
-          <Tabs value={kind} onValueChange={(v) => setKind(v as "oidc" | "saml")}>
+          <Tabs value={kind} onValueChange={(v) => isSsoProviderType(v) && setKind(v)}>
             <TabsList>
               <TabsTrigger value="oidc">{t(SSO_PROVIDER_TYPE_KEYS.oidc)}</TabsTrigger>
               <TabsTrigger value="saml">{t(SSO_PROVIDER_TYPE_KEYS.saml)}</TabsTrigger>

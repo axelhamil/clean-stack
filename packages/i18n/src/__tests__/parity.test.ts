@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import enCatalog, { NAMESPACES } from "../catalogs/en";
 import frCatalog from "../catalogs/fr";
+import { lookupCatalogValue } from "../lookup";
 
 type Nested = { [key: string]: string | Nested };
 
@@ -43,7 +44,7 @@ describe("catalog parity", () => {
     // Same word again, this time as the sr-only page heading on
     // /settings/notifications.
     "settings.notifications.title",
-    // "Secret" is spelled identically in French — a genuine cognate, not an
+    // "Secret" is spelled identically in French: a genuine cognate, not an
     // untranslated placeholder.
     "common.secretReveal.secretLabel",
     // Platform names, not words: "Mac", "Windows" and "Linux" are proper nouns
@@ -66,14 +67,14 @@ describe("catalog parity", () => {
     "settings.twoFactor.codePlaceholder",
     "settings.deletion.passwordPlaceholder",
     "settings.deletion.totpPlaceholder",
-    // Example organization name — a fictional proper noun, not sentence copy.
+    // Example organization name: a fictional proper noun, not sentence copy.
     "common.orgNew.namePlaceholder",
-    // "Pro" is used as-is in French SaaS pricing too — a short brand-like
+    // "Pro" is used as-is in French SaaS pricing too: a short brand-like
     // cognate, not a sentence that was left untranslated (mirrors the
     // "Actions"/"Webhooks"/"Notifications" exemptions above).
     "settings.billing.tier.pro",
     // A bare `{{amount}}/{{interval}}` slash-separated template, not sentence
-    // copy — it carries no words of its own, French included ("12 €/mois"
+    // copy: it carries no words of its own, French included ("12 €/mois"
     // uses the same slash). The translation happens in the interpolated
     // `interval` value (`common.pricing.interval.*`), not in this template.
     "common.pricing.perInterval",
@@ -88,40 +89,40 @@ describe("catalog parity", () => {
     "common.states.delivery.deadLetter",
     // "URL" is the same acronym in both languages, not an untranslated word.
     "settings.webhooks.endpointsTable.urlHeader",
-    // Example webhook URL — a non-linguistic placeholder, not sentence copy
+    // Example webhook URL: a non-linguistic placeholder, not sentence copy
     // (mirrors the auth/account placeholder exemptions above).
     "settings.webhooks.form.urlPlaceholder",
-    // Protocol acronyms, not sentence copy — a French SSO screen names OIDC
+    // Protocol acronyms, not sentence copy: a French SSO screen names OIDC
     // and SAML exactly as an English one does. Shared between the
     // registration Tabs triggers and the interpolated "{{type}} provider for
     // {{domain}}" line (see sso-labels.ts).
     "settings.sso.providerCard.type.oidc",
     "settings.sso.providerCard.type.saml",
     // Example domain, one placeholder per registration form (OIDC and SAML
-    // are two distinct forms/keys, not a shared one) — a non-linguistic
+    // are two distinct forms/keys, not a shared one): a non-linguistic
     // placeholder, not sentence copy (mirrors the webhook URL exemption
     // above).
     "settings.sso.forms.oidc.domainPlaceholder",
     "settings.sso.forms.saml.domainPlaceholder",
-    // Example issuer URL for the OIDC form — a non-linguistic placeholder.
+    // Example issuer URL for the OIDC form: a non-linguistic placeholder.
     "settings.sso.forms.oidc.issuerPlaceholder",
-    // Example SAML entity ID — a fictional identifier, not sentence copy.
+    // Example SAML entity ID: a fictional identifier, not sentence copy.
     "settings.sso.forms.saml.issuerPlaceholder",
-    // Example SAML entry-point URL — a non-linguistic placeholder.
+    // Example SAML entry-point URL: a non-linguistic placeholder.
     "settings.sso.forms.saml.entryPointPlaceholder",
     // Format example ticket reference for the admin impersonation form, not
-    // copy — kept identical in both locales per the task brief.
+    // copy, kept identical in both locales.
     "admin.users.impersonateForm.ticketRefPlaceholder",
-    // Genuine cognate — "permanent" is spelled identically in French.
+    // Genuine cognate: "permanent" is spelled identically in French.
     "admin.users.durationPermanent",
     // Acronym, identical in both languages.
     "admin.users.sessions.ipHeader",
     // "Type" is the same word in French too, matching the existing
     // "Actions" / "Webhooks" cognate exemptions above.
     "admin.users.sessions.typeHeader",
-    // "Normal" is spelled identically in French too — a genuine cognate.
+    // "Normal" is spelled identically in French too (a genuine cognate).
     "admin.users.sessions.typeNormal",
-    // "Slug" has no established French translation in SaaS products — a
+    // "Slug" has no established French translation in SaaS products: a
     // genuine cognate, not an untranslated placeholder. Two separate keys
     // (list table header, detail page label) so a translator can still word
     // them differently later.
@@ -131,26 +132,19 @@ describe("catalog parity", () => {
     // cognate exemptions above.
     "admin.auditLog.table.action",
     // "DPA" (Data Processing Agreement) is the acronym used as-is in French
-    // RGPD practice too — a genuine cognate, not an untranslated column
+    // RGPD practice too: a genuine cognate, not an untranslated column
     // header. The DPA link text next to it (`sub-processors.route.tsx`) is
     // the same acronym for the same reason and isn't a catalog key.
     "common.legal.subProcessors.table.dpa",
+    // "ms" is the SI unit symbol, written the same way in French.
+    "settings.webhooks.deliverySheet.duration",
   ] as const;
-
-  const read = (root: Nested, path: string): string | undefined => {
-    let cur: string | Nested | undefined = root;
-    for (const seg of path.split(".")) {
-      if (typeof cur !== "object" || cur === null) return undefined;
-      cur = (cur as Nested)[seg];
-    }
-    return typeof cur === "string" ? cur : undefined;
-  };
 
   const valueAt = (catalog: unknown, full: string): string | undefined => {
     const [namespace, ...rest] = full.split(".");
     if (namespace === undefined) return undefined;
     const root = (catalog as Record<string, Nested>)[namespace];
-    return root === undefined ? undefined : read(root, rest.join("."));
+    return root === undefined ? undefined : lookupCatalogValue(root, rest.join("."));
   };
 
   it("no French value is left identical to its English source placeholder", () => {
@@ -186,13 +180,13 @@ describe("catalog parity", () => {
 
   // Why this test exists: the en/fr gate above compares the two locales against
   // each other and is structurally blind to a catalog that is wrong *within* one
-  // locale. A French `_one` collapsed onto its `_other` renders "1 jours" — a
+  // locale. A French `_one` collapsed onto its `_other` renders "1 jours", a
   // grammar error no assertion in this repo caught until a human read the
   // output. English is deliberately not checked: its `_one` and `_other` are
   // legitimately identical wherever the noun does not inflect around `{{count}}`
   // (`common.notifications.unreadLabel_*` is exactly that). French always
   // inflects, so an identical pair there is a defect unless the noun itself is
-  // invariable — those go on the list below, with their reason, like every other
+  // invariable; those go on the list below, with their reason, like every other
   // exemption in this file.
   const ALLOWED_SAME_PLURAL_FORM: readonly string[] = [];
 

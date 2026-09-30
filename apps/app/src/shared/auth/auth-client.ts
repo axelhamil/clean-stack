@@ -9,7 +9,7 @@ import { createAuthClient } from "better-auth/react";
 import { env } from "../env";
 
 // Cast erases the $InferServerPlugin field that transitively references stripe SDK
-// types through apps/api/node_modules — preventing TS2883 without a stripe devDep.
+// types through apps/api/node_modules, preventing TS2883 without a stripe devDep.
 const _stripeClientPlugin = stripeClient({ subscription: true }) as unknown as {
   id: "stripe-client";
   version: string;
@@ -37,7 +37,7 @@ export const authClient = createAuthClient({
     }),
     _stripeClientPlugin,
     // `domainVerification: { enabled: true }` must mirror the server's `sso()` config
-    // in apps/api/src/auth.ts — it gates whether the client's inferred types include
+    // in apps/api/src/auth.ts: it gates whether the client's inferred types include
     // requestDomainVerification/verifyDomain at all.
     ssoClient({ domainVerification: { enabled: true } }),
     scimClient(),

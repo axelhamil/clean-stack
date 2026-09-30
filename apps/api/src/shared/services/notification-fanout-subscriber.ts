@@ -48,7 +48,7 @@ function preferenceJoin(
 
 /**
  * Org-locked value wins, then the user's own, then the org's unlocked default,
- * then the fallback — the same precedence for whichever preference column is
+ * then the fallback: the same precedence for whichever preference column is
  * being resolved, so `enabled` and `frequency` can never drift apart.
  */
 const resolve = (orgAlias: string, userAlias: string, columnName: string, fallback: SQL) =>
@@ -61,7 +61,7 @@ const resolve = (orgAlias: string, userAlias: string, columnName: string, fallba
 
 function deliveryRules(category: string, organizationId: string | null, forced: boolean) {
   // A forced notification joins no preference row at all, so there is nothing to
-  // read a frequency from — and nothing that may defer it. Every forced event in
+  // read a frequency from, and nothing that may defer it. Every forced event in
   // the catalogue is one the recipient must see while it still matters (password
   // changed, MFA toggled, passkey added, deletion requested, payment failed):
   // holding those back until tomorrow's digest turns a security alert into a
@@ -87,12 +87,12 @@ function deliveryRules(category: string, organizationId: string | null, forced: 
 
 /**
  * The instant the row becomes eligible for a digest e-mail, branching on the
- * frequency the join resolved — or the instant it occurred, when there is no
+ * frequency the join resolved, or the instant it occurred, when there is no
  * join to branch on (`frequency: null`, i.e. a forced notification).
  *
  * The candidate timestamps are computed in TypeScript and bound as parameters;
- * only the choice between them happens in SQL. The alternative — `date_trunc`
- * arithmetic inside the statement — would put the window rule in the one place
+ * only the choice between them happens in SQL. The alternative (`date_trunc`
+ * arithmetic inside the statement) would put the window rule in the one place
  * no unit test can reach.
  */
 function emailDueAt(occurredAt: Date, frequency: SQL | null, anchorHourUtc: number) {
@@ -122,14 +122,14 @@ export class NotificationFanoutSubscriber implements OutboxSubscriber {
           const config = notificationConfigOf(event.eventType);
           if (!config) return;
 
-          const target = resolveAudience(config.audience, event);
-          if (!target) return;
+          const audience = resolveAudience(config.audience, event);
+          if (audience.isNone()) return;
+
+          const target = audience.unwrap();
 
           const n = notificationSchema.notification;
           const m = multiTenantSchema.member;
-          const organizationId = event.organizationId.isSome()
-            ? event.organizationId.unwrap()
-            : null;
+          const organizationId = event.organizationId.toNull();
 
           const recipients =
             target.kind === "user"

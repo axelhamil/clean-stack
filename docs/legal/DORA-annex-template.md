@@ -1,4 +1,4 @@
-# ICT Service Provider Contractual Annex — DORA Article 30
+# ICT Service Provider Contractual Annex, DORA Article 30
 
 This annex ("DORA Annex") is entered into between **[CLIENT_NAME]** ("Financial Entity") and **[COMPANY_NAME]** ("ICT Third-Party Service Provider") and forms a mandatory supplement to the ICT service agreement ("Principal Agreement") dated **[EFFECTIVE_DATE]**. It is issued pursuant to Article 30 of Regulation (EU) 2022/2554 on digital operational resilience for the financial sector ("DORA"), applicable from 17 January 2025.
 
@@ -8,7 +8,7 @@ This annex ("DORA Annex") is entered into between **[CLIENT_NAME]** ("Financial 
 
 The ICT Third-Party Service Provider delivers the following services and ICT functions to the Financial Entity:
 
-**[SERVICE_DESCRIPTION]** — a SaaS platform providing [describe core functions, e.g., "multi-tenant application infrastructure, identity management, and data processing APIs"].
+**[SERVICE_DESCRIPTION]**: a SaaS platform providing [describe core functions, e.g., "multi-tenant application infrastructure, identity management, and data processing APIs"].
 
 **Classification:** The services described herein are classified as **[critical / important / other]** ICT functions within the meaning of Article 3(22) DORA, as assessed by the Financial Entity pursuant to its ICT risk management framework under Article 6 DORA.
 
@@ -47,8 +47,8 @@ The ICT Third-Party Service Provider shall notify the Financial Entity in writin
 **Availability target:** **[SLA_AVAILABILITY]** (e.g., 99.9%) measured on a monthly calendar basis, excluding planned maintenance windows notified at least 72 hours in advance.
 
 **Recovery objectives:**
-- Recovery Point Objective (RPO): **[RPO]** — aligned with `docs/DISASTER-RECOVERY.md` Phase 0.3.
-- Recovery Time Objective (RTO): **[RTO]** — aligned with `docs/DISASTER-RECOVERY.md` Phase 0.3.
+- Recovery Point Objective (RPO): **[RPO]**: aligned with `docs/DISASTER-RECOVERY.md` Phase 0.3.
+- Recovery Time Objective (RTO): **[RTO]**: aligned with `docs/DISASTER-RECOVERY.md` Phase 0.3.
 
 **Degradation thresholds:** Service is considered degraded when response latency exceeds **[LATENCY_THRESHOLD]** ms (p99) or error rate exceeds **[ERROR_RATE_THRESHOLD]**% over a rolling 5-minute window.
 
@@ -70,7 +70,7 @@ c. The ICT Third-Party Service Provider shall share, upon request: (i) results o
 
 d. Audits are limited to **once per calendar year** unless a competent authority requires more frequent assessment, or a substantiated incident or breach warrants additional review.
 
-e. Supervisory authority inspections under Article 38–44 DORA are not subject to frequency limits and override any contractual restrictions.
+e. Supervisory authority inspections under Article 38 to 44 DORA are not subject to frequency limits and override any contractual restrictions.
 
 ---
 

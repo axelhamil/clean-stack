@@ -1,4 +1,4 @@
-# Event pipeline — how it works
+# Event pipeline, how it works
 
 A visual walkthrough of the transactional outbox + LISTEN/NOTIFY pipeline. For
 the DX guide (how to declare events, register handlers, retention map), see
@@ -7,7 +7,7 @@ the DX guide (how to declare events, register handlers, retention map), see
 ## The problem this solves
 
 You write business code that changes state in Postgres, and you also want
-*something else* to happen as a consequence — an audit row, a webhook to a
+*something else* to happen as a consequence, an audit row, a webhook to a
 customer, an email, a search-index sync. The naive "save then send" has a
 hidden flaw: the two writes belong to different systems, and any failure
 between them leaves you inconsistent.
@@ -105,18 +105,18 @@ As long as that connection exists, Postgres holds a reference. When *any* other
 session executes `pg_notify('outbox_event', '<id>')`, Postgres walks its
 listener list and writes a `NotificationResponse` packet into each socket. The
 Node `pg` driver receives it and fires the `"notification"` event. No polling,
-no webhooks, no inbound port — just a socket that was already there.
+no webhooks, no inbound port, just a socket that was already there.
 
 Two practical details:
 
 - `pg_notify` is **buffered until COMMIT**. If the originating TX rolls back,
   no notification escapes. This is what makes the rail safe without explicit
-  coordination — listeners cannot see ghost events.
+  coordination, listeners cannot see ghost events.
 - The dispatcher uses a **dedicated `pg.Client`**, not the main pool. A
   connection in `LISTEN` mode is considered busy by Postgres and can't be
   reused for queries. The cost is one fixed connection per process.
 
-A polling fallback (every 30 s) catches anything missed during reconnects —
+A polling fallback (every 30 s) catches anything missed during reconnects:
 this is what makes the pipeline **at-least-once** rather than "best-case fast".
 
 ## Two-tier delivery
@@ -127,7 +127,7 @@ purpose:
 | Tier | Runs | Guarantees | Use for |
 |---|---|---|---|
 | **Built-in subscribers** | Inside the drain TX | Atomic with `markDispatched`. A failure retries the whole event. | Audit log, webhook fan-out, notification fan-out, anything where dropping a row is a compliance bug. |
-| **User handlers** | After the drain commits | Isolated; a throw is logged but the event stays marked dispatched. | Emails, push notifications, search-index updates — side effects that have their own retry logic. |
+| **User handlers** | After the drain commits | Isolated; a throw is logged but the event stays marked dispatched. | Emails, push notifications, search-index updates, side effects that have their own retry logic. |
 
 If a future handler *cannot* tolerate at-most-once semantics, promote it to a
 built-in subscriber. The split is intentional, not a limitation.
@@ -136,7 +136,7 @@ built-in subscriber. The split is intentional, not a limitation.
 
 | What fails | What you observe | Recovery |
 |---|---|---|
-| Business TX rolls back | No outbox row, no notify, no event. | Nothing to do — atomicity. |
+| Business TX rolls back | No outbox row, no notify, no event. | Nothing to do, atomicity. |
 | Built-in subscriber throws | Event row gets `attempts++`, `last_error` set, `next_attempt_at` pushed out. | Automatic retry on next drain. Investigate via the `last_error` column. |
 | User handler throws | Event stays dispatched, error logged. | Add observability on the handler; it owns its retry policy. |
 | Dispatcher process dies | Outbox rows accumulate (`dispatched_at IS NULL`). | Restart the process. On boot, the dispatcher drains the backlog before going idle. |
@@ -155,7 +155,7 @@ BEGIN                              BEGIN
 SELECT ... LIMIT 50                SELECT ... LIMIT 50
   FOR UPDATE SKIP LOCKED             FOR UPDATE SKIP LOCKED
   ──► rows [1..50]                   ──► rows [51..100]
-                                         (skipped 1..50 — locked)
+                                         (skipped 1..50, locked)
   │                                  │
   ▼                                  ▼
 work                               work
@@ -173,32 +173,32 @@ Names are stable in the repo; the pattern is what matters.
 
 - **Producer surface**: `aggregate.addEvent(...)` (DDD code) and
   `emitEvent(outbox, ..., tx)` (service-level or external-lib bridges).
-- **Collector**: an `AsyncLocalStorage` opened by `IUnitOfWork.run(...)` —
+- **Collector**: an `AsyncLocalStorage` opened by `IUnitOfWork.run(...)`:
   pulls events off aggregates inside the TX and hands them to the outbox.
 - **Outbox repository**: `enqueue`, `findPendingBatch`, `markDispatched`,
   `markFailed`. The SQL trigger that fires `pg_notify` is created idempotently
   at dispatcher boot.
 - **Dispatcher**: started once at process boot (`.start()`), stopped on
-  shutdown (`.stop()`). The constructor is passive — nothing happens until
+  shutdown (`.stop()`). The constructor is passive, nothing happens until
   `.start()` opens the LISTEN socket and ensures the trigger.
 
 ## What guarantees you get
 
-1. **Atomicity** between state change and event publication — same TX.
-2. **At-least-once** delivery to built-in subscribers — retried until they
+1. **Atomicity** between state change and event publication, same TX.
+2. **At-least-once** delivery to built-in subscribers, retried until they
    succeed or you give up manually.
-3. **At-most-once** delivery to user handlers — they may run twice if
+3. **At-most-once** delivery to user handlers, they may run twice if
    something restarts mid-fanout, so make them idempotent or accept loss.
 4. **Ordering**: events are dispatched in `occurred_at` order *within a
    single drain batch*. Across batches and across parallel dispatchers,
    ordering is not guaranteed. Design handlers accordingly.
 
-## Event visibility — public vs internal
+## Event visibility, public vs internal
 
 Not every event in `@packages/events` is a public contract. An event used only
 for internal coordination (audit trail, delivery telemetry, rate-limit
 tracking) must never reach a customer webhook endpoint or appear in the
-developer-facing catalog — changing its payload would then be a breaking
+developer-facing catalog, changing its payload would then be a breaking
 change.
 
 `packages/events/src/visibility-map.ts` is the single SSOT that declares every
@@ -208,18 +208,18 @@ code review, not a configuration change an operator can make by clicking.
 
 Three consumers enforce it:
 
-1. **`WebhookFanoutSubscriber`** (`apps/api/src/shared/services/webhook-fanout-subscriber.ts`)
-   — calls `isPublicEvent(event.type)` before fan-out; internal events flow to
+1. **`WebhookFanoutSubscriber`** (`apps/api/src/shared/services/webhook-fanout-subscriber.ts`):
+   calls `isPublicEvent(event.type)` before fan-out; internal events flow to
    `audit_log` and in-process handlers but are never delivered to customer
    endpoints.
 
-2. **`/developers/events` catalog** (`apps/app/src/features/developers/`) —
+2. **`/developers/events` catalog** (`apps/app/src/features/developers/`):
    the public event reference page filters the catalog to `public` events only.
    Internal events remain invisible to API consumers and cannot accumulate
    subscribers who depend on a payload that may change.
 
-3. **Webhook subscription picker** (`EventTypePicker` in the webhooks feature)
-   — the same filter gates what event types an endpoint can subscribe to. A
+3. **Webhook subscription picker** (`EventTypePicker` in the webhooks feature):
+   the same filter gates what event types an endpoint can subscribe to. A
    customer cannot subscribe to `api_token.used` or `security.csrf.rejected`
    regardless of what they type in the form.
 
@@ -230,7 +230,7 @@ requires a deprecation notice. Mark `"internal"` by default; graduate to
 
 ## Going further
 
-- [EVENTS.md](./EVENTS.md) — how to declare event types, register handlers,
+- [EVENTS.md](./EVENTS.md): how to declare event types, register handlers,
   set retention, deploy serverless variants.
 - The pattern in general: "Pattern: Transactional Outbox" by Chris Richardson
   (microservices.io) is the canonical write-up.

@@ -1,9 +1,11 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
+import { TypographyInline } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import type { ApiToken } from "../api/api-tokens.queries";
 import { tokenScopeDisplay } from "../token-scope";
 
@@ -26,7 +28,9 @@ export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: Toke
   return (
     <TableRow>
       <TableCell className="font-medium">{token.name}</TableCell>
-      <TableCell className="font-mono text-sm">{token.tokenStart}…</TableCell>
+      <TableCell>
+        <TypographyInline font="mono">{token.tokenStart}…</TypographyInline>
+      </TableCell>
       <TableCell>
         {tokenScope.kind === "personal" ? (
           <Badge variant="outline">{t("apiTokens.scopePersonal")}</Badge>
@@ -43,7 +47,7 @@ export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: Toke
           ))}
         </div>
       </TableCell>
-      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : "—"}</TableCell>
+      <TableCell>{token.lastUsedAt ? formatDate(token.lastUsedAt) : EMPTY_VALUE}</TableCell>
       <TableCell>
         {token.expiresAt ? formatDate(token.expiresAt) : t("apiTokens.neverExpires")}
       </TableCell>

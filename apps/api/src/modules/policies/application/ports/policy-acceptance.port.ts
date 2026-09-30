@@ -1,4 +1,4 @@
-import type { AppError, Result } from "@packages/ddd-kit";
+import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { PolicyType } from "@packages/policies";
 import type { ITransaction } from "../../../../shared/transaction";
 
@@ -9,7 +9,7 @@ export interface PolicyAcceptanceRecord {
   userId: string;
   policyType: PolicyType;
   policyVersion: string;
-  ipAddress?: string;
+  ipAddress: Option<string>;
 }
 
 export interface IPolicyAcceptanceStore {

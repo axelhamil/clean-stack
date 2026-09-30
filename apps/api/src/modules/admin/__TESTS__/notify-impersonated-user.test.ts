@@ -1,5 +1,5 @@
-import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { notifyImpersonatedUser } from "../application/event-handlers/notify-impersonated-user";
 
@@ -13,13 +13,7 @@ const instrumentation = {
   setSpanAttributes: mock(() => {}),
 };
 
-const profileStore = (locale?: string) => ({
-  findLocale: mock(async () => ({
-    isSuccess: true,
-    isFailure: false,
-    getValue: () => ({ toUndefined: () => locale }),
-  })),
-});
+const profileStore = { findLocale: mock(async () => Result.ok(Option.some("fr"))) };
 
 const BASE_EVENT = {
   eventType: EventTypes.ADMIN_IMPERSONATION_STARTED,
@@ -34,24 +28,26 @@ const BASE_EVENT = {
   },
 };
 
+function handlerWith(getUser: () => Promise<unknown>) {
+  return notifyImpersonatedUser({
+    IEmailService: { sendTemplate },
+    AdminQueryService: { getUser: mock(getUser) },
+    IProfileStore: profileStore,
+    IInstrumentation: instrumentation,
+    supportUrl: "https://example.com/support",
+  } as never);
+}
+
 describe("notifyImpersonatedUser", () => {
-  it("envoie l'e-mail à l'utilisateur impersonné avec la raison et l'échéance", async () => {
-    const handler = notifyImpersonatedUser({
-      IEmailService: { sendTemplate },
-      AdminQueryService: {
-        getUser: mock(async () => ({
-          isSuccess: true,
-          isFailure: false,
-          getValue: () => ({
-            isNone: () => false,
-            unwrap: () => ({ email: "target@example.com", name: "Ada" }),
-          }),
-        })),
-      },
-      IProfileStore: profileStore("fr"),
-      IInstrumentation: instrumentation,
-      supportUrl: "https://example.com/support",
-    } as never);
+  beforeEach(() => {
+    capture.mockClear();
+    sendTemplate.mockClear();
+  });
+
+  it("emails the impersonated user with the reason and the expiry", async () => {
+    const handler = handlerWith(async () =>
+      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
+    );
 
     await handler.handle(BASE_EVENT);
 
@@ -71,27 +67,8 @@ describe("notifyImpersonatedUser", () => {
     expect(capture).not.toHaveBeenCalled();
   });
 
-  it("ne tente pas d'envoyer l'e-mail si l'utilisateur est introuvable", async () => {
-    sendTemplate.mockClear();
-
-    const handler = notifyImpersonatedUser({
-      IEmailService: { sendTemplate },
-      AdminQueryService: {
-        getUser: mock(async () => ({
-          isSuccess: true,
-          isFailure: false,
-          getValue: () => ({
-            isNone: () => true,
-            unwrap: () => {
-              throw new Error("none");
-            },
-          }),
-        })),
-      },
-      IProfileStore: profileStore("fr"),
-      IInstrumentation: instrumentation,
-      supportUrl: "https://example.com/support",
-    } as never);
+  it("sends nothing when the user cannot be found", async () => {
+    const handler = handlerWith(async () => Result.ok(Option.none()));
 
     await handler.handle({
       ...BASE_EVENT,
@@ -102,22 +79,10 @@ describe("notifyImpersonatedUser", () => {
     expect(sendTemplate).not.toHaveBeenCalled();
   });
 
-  it("ne tente pas d'envoyer l'e-mail si la lecture du compte échoue", async () => {
-    sendTemplate.mockClear();
-
-    const handler = notifyImpersonatedUser({
-      IEmailService: { sendTemplate },
-      AdminQueryService: {
-        getUser: mock(async () => ({
-          isSuccess: false,
-          isFailure: true,
-          getError: () => ({ code: "ADMIN_QUERY_PROVIDER_FAILURE", message: "db error" }),
-        })),
-      },
-      IProfileStore: profileStore("fr"),
-      IInstrumentation: instrumentation,
-      supportUrl: "https://example.com/support",
-    } as never);
+  it("sends nothing when the account lookup fails", async () => {
+    const handler = handlerWith(async () =>
+      Result.fail({ code: "ADMIN_QUERY_PROVIDER_FAILURE", message: "db error" }),
+    );
 
     await handler.handle(BASE_EVENT);
 

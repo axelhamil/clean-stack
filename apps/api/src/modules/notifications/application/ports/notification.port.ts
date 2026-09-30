@@ -44,7 +44,7 @@ export interface INotificationStore {
     limit: number,
   ): Promise<Result<NotificationRecord[], NotificationError>>;
   unreadCount(userId: string): Promise<Result<number, NotificationError>>;
-  /** Resolves with the ids actually written — a foreign or missing id is simply absent. */
+  /** Resolves with the ids actually written: a foreign or missing id is simply absent. */
   markRead(
     userId: string,
     ids: string[],

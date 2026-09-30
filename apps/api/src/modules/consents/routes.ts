@@ -50,11 +50,11 @@ export const consentRoutes = new Hono<{ Variables: AuthVariables }>()
     const r = await di.ConsentService.getActive(subjectId, COOKIE_CONSENT_VERSION, userId);
     if (r.isFailure) throw new AppErrorException(r.getError());
 
-    const opt = r.getValue();
-    const row = opt.isSome() ? opt.unwrap() : null;
+    const active = r.getValue();
+
     return c.json({
-      categories: row?.categories ?? null,
-      policyVersion: row?.policyVersion ?? null,
+      categories: active.map((row) => row.categories).toNull(),
+      policyVersion: active.map((row) => row.policyVersion).toNull(),
     });
   })
   .delete("/", async (c) => {

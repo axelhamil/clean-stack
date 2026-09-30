@@ -16,6 +16,7 @@ export const transferAndLeaveMutationOptions = mutationOptions({
       organizationId,
     });
     if (transfer.error) throw transfer.error;
+
     const leave = await authClient.organization.leave({ organizationId });
     if (leave.error) throw leave.error;
   },

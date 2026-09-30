@@ -28,6 +28,7 @@ import {
   inviteMemberSchema,
 } from "../../../shared/auth/organization.schema";
 import { ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
+import { ASSIGNABLE_ROLES } from "../assignable-roles";
 
 export interface InviteMemberFormProps {
   organizationId: string;
@@ -85,9 +86,11 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="member">{t(ROLE_LABEL_KEYS.member)}</SelectItem>
-                  <SelectItem value="admin">{t(ROLE_LABEL_KEYS.admin)}</SelectItem>
-                  <SelectItem value="owner">{t(ROLE_LABEL_KEYS.owner)}</SelectItem>
+                  {ASSIGNABLE_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {t(ROLE_LABEL_KEYS[role])}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />

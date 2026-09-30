@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@packages/ui/components/ui/alert-dialog";
+import { Label } from "@packages/ui/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,9 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import type { ReactElement } from "react";
-import { useState } from "react";
+import { type ReactElement, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { isOrgRole, ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 
@@ -44,8 +43,9 @@ export function TransferLeaveDialog({
   trigger,
 }: TransferLeaveDialogProps) {
   const { t } = useTranslation(["settings", "common"]);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | undefined>(undefined);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>();
   const [open, setOpen] = useState(false);
+  const selectId = useId();
 
   const candidates = members.filter((m) => m.user.id !== currentUserId);
 
@@ -69,9 +69,9 @@ export function TransferLeaveDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col gap-2">
-          <TypographyMuted>{t("organization.newOwnerLabel")}</TypographyMuted>
+          <Label htmlFor={selectId}>{t("organization.newOwnerLabel")}</Label>
           <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger id={selectId} className="w-full">
               <SelectValue placeholder={t("organization.selectMemberPlaceholder")} />
             </SelectTrigger>
             <SelectContent>

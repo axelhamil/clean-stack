@@ -3,7 +3,7 @@
  *
  * Each group is built by its own `useXxxGroup()` hook returning a
  * `CommandGroupConfig` (or `null` to hide it conditionally). All hooks are
- * composed in `useCommandGroups()` — the rendering loop is data-driven.
+ * composed in `useCommandGroups()`: the rendering loop is data-driven.
  *
  * Extend:
  *  - new entry in an existing group → push into the relevant array
@@ -17,7 +17,6 @@
  *    (suppressed while typing in inputs/textareas/contenteditable)
  */
 
-import type { OrgPermissions } from "@packages/access-control";
 import {
   CommandDialog,
   CommandEmpty,
@@ -28,6 +27,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@packages/ui/components/ui/command";
+import { CommandHint } from "@packages/ui/components/ui/command-hint";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -57,9 +57,9 @@ import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { sessionQueryOptions } from "../api/queries/session";
 import { isPlatformAdmin } from "../auth/is-platform-admin";
-import { useAuthorization } from "../auth/use-authorization";
+import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
-import { useSignOut } from "../auth/use-sign-out";
+import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
 import { LEGAL_ROUTES } from "../legal-routes";
 
 interface CommandShortcutBinding {
@@ -82,12 +82,7 @@ interface CommandGroupConfig {
   items: CommandEntry[];
 }
 
-const SIGN_OUT_SHORTCUT: CommandShortcutBinding = {
-  display: "⇧⌘Q",
-  match: (e) => e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "q",
-};
-
-interface NavigationRoute {
+interface NavigationRoute extends NavigationRequirement {
   to: string;
   labelKey:
     | "nav.dashboard"
@@ -98,8 +93,6 @@ interface NavigationRoute {
     | "commandPalette.nav.privacy"
     | "commandPalette.nav.eventCatalog";
   icon: LucideIcon;
-  requires?: OrgPermissions;
-  requiresOrg?: boolean;
 }
 
 const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
@@ -131,12 +124,9 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
 
 function useNavigationGroup(t: TFunction<"common">): CommandGroupConfig {
   const navigate = useNavigate();
-  const { can, hasMembership } = useAuthorization();
-  const visible = NAVIGATION_ROUTES.filter((route) => {
-    if (route.requiresOrg && !hasMembership) return false;
-    if (route.requires) return can(route.requires);
-    return true;
-  });
+  const { canReach } = useAuthorization();
+  const visible = NAVIGATION_ROUTES.filter(canReach);
+
   return {
     heading: t("commandPalette.groups.navigate"),
     items: visible.map((route) => ({
@@ -239,7 +229,7 @@ function useLegalGroup(t: TFunction<"common">): CommandGroupConfig {
   };
 }
 
-function useThemeOptions(t: TFunction<"common">) {
+function themeOptionsFor(t: TFunction<"common">) {
   return [
     { value: "light", label: t("commandPalette.theme.light"), icon: Sun },
     { value: "dark", label: t("commandPalette.theme.dark"), icon: Moon },
@@ -251,7 +241,7 @@ function useActionsGroup(t: TFunction<"common">): CommandGroupConfig {
   const { setTheme, theme } = useTheme();
   const signOut = useSignOut();
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
-  const themeOptions = useThemeOptions(t);
+  const themeOptions = themeOptionsFor(t);
 
   const items: CommandEntry[] = themeOptions.map((option) => ({
     id: `theme:${option.value}`,
@@ -358,7 +348,13 @@ export function CommandPalette() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title={t("commandPalette.title")}
+      description={t("commandPalette.description")}
+      closeLabel={t("actions.close")}
+    >
       <CommandInput placeholder={t("commandPalette.searchPlaceholder")} />
       <CommandList>
         <CommandEmpty>{t("commandPalette.noResults")}</CommandEmpty>
@@ -376,9 +372,7 @@ export function CommandPalette() {
                   >
                     <Icon />
                     <span className="flex-1 truncate">{entry.label}</span>
-                    {entry.hint && (
-                      <span className="text-xs text-muted-foreground">{entry.hint}</span>
-                    )}
+                    {entry.hint && <CommandHint>{entry.hint}</CommandHint>}
                     {entry.shortcut && <CommandShortcut>{entry.shortcut.display}</CommandShortcut>}
                   </CommandItem>
                 );

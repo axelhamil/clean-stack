@@ -8,18 +8,18 @@ export type OrgRole = z.infer<typeof memberRoleSchema>;
  * copy (member-row, invite-member-form, transfer-leave-dialog, and the
  * platform admin's org-detail member table) so the copies of
  * "Owner"/"Admin"/"Member" collapse into one `common.roles` entry each.
- * `satisfies Record<OrgRole, string>` only proves every role is present — it
+ * `satisfies Record<OrgRole, string>` only proves every role is present: it
  * cannot catch a swapped pair (e.g. `owner` pointing at `roles.admin`), which
  * is why `__tests__/role-labels.test.ts` asserts the mapping directly.
  *
  * Lives in `shared/auth/` rather than `features/organization/` because a
  * second route-owning feature (`admin-orgs`) now renders the same concept
- * from the same source (an org membership role) — the import-direction rule
+ * from the same source (an org membership role): the import-direction rule
  * forbids one route-owning feature reaching into another, so the 2nd
  * occurrence promotes this here instead of duplicating it.
  *
  * Keys carry their own `common:` namespace prefix so call sites can write
- * `t(ROLE_LABEL_KEYS[role])` directly — matching the repo's existing literal
+ * `t(ROLE_LABEL_KEYS[role])` directly, matching the repo's existing literal
  * cross-namespace pattern (`t("common:actions.cancel")`) instead of building
  * the prefixed string at the call site with a template literal.
  */

@@ -15,12 +15,12 @@ import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 
 // `ssoEnforced` is a server-only additionalField on the organization schema
-// (apps/api/src/auth.ts) — the organization client isn't generated with knowledge
+// (apps/api/src/auth.ts): the organization client isn't generated with knowledge
 // of it, so it has to be read through a narrow, explicit cast.
 interface OrgWithSsoEnforcement {
   ssoEnforced?: boolean;
@@ -42,13 +42,7 @@ export function SsoEnforcementCard() {
       void qc.invalidateQueries({ queryKey: activeOrgQueryOptions.queryKey });
       toast.success(t("sso.enforcementCard.updatedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.updateSsoEnforcement", {
-          defaultValue: "Failed to update SSO enforcement",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("updateSsoEnforcement")),
   });
 
   // A verified-domain gap already freezes the switch on its own; `describeProps`

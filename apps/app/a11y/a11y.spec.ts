@@ -14,20 +14,20 @@ const DEFAULT_LOCALE_UNDER_TEST: Locale = DEFAULT_LOCALE;
 
 function formatViolation(violation: Violation): string {
   const targets = violation.nodes.map((node) => node.target.join(" ")).join(", ");
-  return `${violation.id} (${violation.impact}) — ${violation.help} → ${targets}`;
+  return `${violation.id} (${violation.impact}): ${violation.help} → ${targets}`;
 }
 
 async function audit(page: Page, target: AuditedPage, expectedLocale: Locale): Promise<void> {
   await page.goto(target.path);
 
   // A gate redirect (missing session, stale policies) renders a page that satisfies
-  // every assertion below — without this the suite would audit it and report green.
+  // every assertion below; without this the suite would audit it and report green.
   await expect(page).toHaveURL(new RegExp(`${target.path}$`));
   await expect(page.locator("main")).toHaveCount(1);
   await expect(page.locator("h1")).toHaveCount(1);
   await expect(page.locator("[data-slot=skeleton]")).toHaveCount(0);
 
-  // axe cannot tell that French content is served under lang="en" — html-has-lang
+  // axe cannot tell that French content is served under lang="en": html-has-lang
   // passes either way. Asserting equality against the locale this run actually seeded
   // (rather than membership in ["en","fr"]) is what makes a stale, never-synced
   // lang="en" fail: a membership check would pass on that bug trivially.
@@ -62,7 +62,7 @@ for (const colorScheme of SCHEMES) {
 }
 
 // The runs above never set a locale cookie, so `resolveLocale` falls through to the
-// browser's default language (Chromium's "en-US") every time — the fr branch of the
+// browser's default language (Chromium's "en-US") every time, so the fr branch of the
 // resolver, and of the languageChanged -> <html lang> sync, is never exercised. One
 // unauthenticated page is forced to fr here to close that gap without doubling every
 // page/scheme combination against the suite's tight per-minute request budget

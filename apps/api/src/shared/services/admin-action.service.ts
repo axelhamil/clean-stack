@@ -1,7 +1,7 @@
 import { type AppError, type IUnitOfWork, Result } from "@packages/ddd-kit";
-import { eq, multiTenantSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
+import { setOrgSsoEnforced } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
@@ -17,7 +17,7 @@ type ActionResult = Promise<Result<void, AdminActionError>>;
  * routes (`modules/admin/admin-orgs.routes.ts`) and the org-owner settings
  * routes (`modules/organization/routes.ts`) both call `setSsoEnforcement`.
  * It also imports the BetterAuth singleton (`auth.ts`) directly, which
- * itself depends on the DI container — registering this class inside a
+ * itself depends on the DI container: registering this class inside a
  * module's `defineModule()` would create an import cycle
  * (`module.ts` → this file → `auth.ts` → `container.ts` → `module.ts`).
  * Route files instantiate it ad hoc from already-built `di` bindings
@@ -125,10 +125,7 @@ export class AdminActionService {
   }): ActionResult {
     return this.run("setSsoEnforcement", async () => {
       await this.uow.run(async (tx) => {
-        await tx
-          .update(multiTenantSchema.organization)
-          .set({ ssoEnforced: input.enforced })
-          .where(eq(multiTenantSchema.organization.id, input.organizationId));
+        await setOrgSsoEnforced(input.organizationId, input.enforced, tx);
 
         await emitEvent(
           this.outbox,

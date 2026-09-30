@@ -5,7 +5,8 @@ import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { toastError } from "../../../shared/api/errors/toast";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../../shared/i18n/get-errors-t";
+import { PASSKEY_CANCELLED } from "../../../shared/observability/error-classifier";
 import type { AddPasskeyInput } from "../security.schema";
 
 export function useAddPasskey() {
@@ -16,11 +17,13 @@ export function useAddPasskey() {
     mutationKey: ["passkeys", "add"],
     mutationFn: async (input: AddPasskeyInput) => {
       const result = await authClient.passkey.addPasskey({ name: input.name });
-      if (result?.error) {
-        if (result.error.message?.toLowerCase().includes("not allowed"))
-          throw new Error("Cancelled");
-        throw toAuthClientError(result.error, t("passkeys.addFailed"));
+      if (!result?.error) return;
+
+      if (result.error.message?.toLowerCase().includes("not allowed")) {
+        throw new Error(PASSKEY_CANCELLED);
       }
+
+      throw toAuthClientError(result.error, t("passkeys.addFailed"));
     },
     onSuccess: async () => {
       toast.success(t("passkeys.addedToast"));
@@ -29,13 +32,9 @@ export function useAddPasskey() {
       });
     },
     onError: (err) => {
-      if (err.message !== "Cancelled")
-        toastError(
-          err,
-          getErrorsT()("fallback.addPasskey", {
-            defaultValue: "Couldn't add that passkey. Please try again.",
-          }),
-        );
+      if (err.message === PASSKEY_CANCELLED) return;
+
+      toastError(err, errorFallback("addPasskey"));
     },
   });
 }

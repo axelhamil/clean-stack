@@ -1,19 +1,10 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { FORCED_NOTE_KEYS, FREQUENCY_KEYS } from "../preference-matrix";
-
-function resolve(key: string): string | undefined {
-  let cur: unknown = enCatalog.settings;
-  for (const seg of key.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
 
 describe("FREQUENCY_KEYS", () => {
   // `satisfies Record<NotificationFrequency, string>` only proves every
-  // frequency has AN entry — it does not prove each entry points at the RIGHT
+  // frequency has AN entry: it does not prove each entry points at the RIGHT
   // one. A swapped pair (e.g. `hourly` reading `frequency.daily`) still
   // type-checks, so this asserts the mapping itself.
   it("maps each frequency to its own catalog key, never a swapped one", () => {
@@ -25,9 +16,9 @@ describe("FREQUENCY_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(FREQUENCY_KEYS.immediate)).toBe("Immediately");
-    expect(resolve(FREQUENCY_KEYS.hourly)).toBe("Hourly digest");
-    expect(resolve(FREQUENCY_KEYS.daily)).toBe("Daily digest");
+    expect(enLabel(FREQUENCY_KEYS.immediate, "settings")).toBe("Immediately");
+    expect(enLabel(FREQUENCY_KEYS.hourly, "settings")).toBe("Hourly digest");
+    expect(enLabel(FREQUENCY_KEYS.daily, "settings")).toBe("Daily digest");
   });
 });
 
@@ -41,10 +32,10 @@ describe("FORCED_NOTE_KEYS", () => {
   });
 
   it("every non-null key resolves to the matching English note", () => {
-    expect(resolve(FORCED_NOTE_KEYS.all)).toBe(
+    expect(enLabel(FORCED_NOTE_KEYS.all, "settings")).toBe(
       "Always sent. Critical account alerts cannot be turned off.",
     );
-    expect(resolve(FORCED_NOTE_KEYS.some)).toBe(
+    expect(enLabel(FORCED_NOTE_KEYS.some, "settings")).toBe(
       "Some critical alerts in this category are always sent.",
     );
     expect(FORCED_NOTE_KEYS.none).toBeNull();

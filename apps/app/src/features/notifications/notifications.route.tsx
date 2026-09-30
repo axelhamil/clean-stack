@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { toastError } from "../../shared/api/errors/toast";
 import { updatePreferenceMutationOptions } from "../../shared/api/mutations/notifications";
 import { notificationPreferencesQueryOptions } from "../../shared/api/queries/notifications";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
@@ -36,7 +36,7 @@ function NotificationsPage() {
     ...updatePreferenceMutationOptions,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: notificationPreferencesQueryOptions.queryKey }),
-    onError: () => toast.error(t("notifications.saveFailedToast")),
+    onError: (err) => toastError(err, t("notifications.saveFailedToast")),
   });
 
   const handleChange = ({ category, channel, enabled, frequency }: PreferenceChange) =>

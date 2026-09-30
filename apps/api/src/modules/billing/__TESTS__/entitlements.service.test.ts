@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { ENTITLEMENTS } from "../../../shared/entitlements";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   BillingError,
@@ -7,7 +8,6 @@ import type {
   SubscriptionRow,
 } from "../application/ports/subscription-read.port";
 import { EntitlementsService } from "../application/services/entitlements.service";
-import { ENTITLEMENTS } from "../config";
 
 function makeStore(row: SubscriptionRow | null, fail = false): ISubscriptionReadStore {
   return {

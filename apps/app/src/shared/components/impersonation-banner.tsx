@@ -51,9 +51,9 @@ export function ImpersonationBanner() {
           <Trans
             ns="common"
             i18nKey="impersonation.activeSession"
+            values={{ remaining }}
             components={{ name: <strong>{name}</strong> }}
           />
-          {`. ${remaining}`}
         </span>
         <Button
           variant="secondary"

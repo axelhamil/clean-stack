@@ -8,4 +8,5 @@ export { default as enCatalog, NAMESPACES, type Namespace } from "./catalogs/en"
 export { type CreateI18nOptions, createI18n } from "./create-instance";
 export { loadCatalog, type Resources } from "./load-catalog";
 export { DEFAULT_LOCALE, isLocale, LOCALES, type Locale, toLocale } from "./locales";
+export { lookupCatalogValue } from "./lookup";
 export { resolveLocale } from "./resolve";

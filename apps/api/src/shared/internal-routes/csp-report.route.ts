@@ -3,14 +3,14 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { emitEvent } from "../event-emitter";
+import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import { resolveClientIp } from "../middleware/rate-limit.ip";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 const BODY_LIMIT_BYTES = 64 * 1024;
 
-// Legacy application/csp-report — all fields are pre-truncated in the handler,
+// Legacy application/csp-report, all fields are pre-truncated in the handler,
 // so the schema uses generous max lengths to accept any syntactically valid report.
 const LegacyCspReportBodySchema = z.object({
   "document-uri": z.string(),
@@ -28,7 +28,7 @@ const LegacyCspReportSchema = z.object({
   "csp-report": LegacyCspReportBodySchema,
 });
 
-// application/reports+json — items may be of any type; we only care about csp-violation.
+// application/reports+json, items may be of any type; we only care about csp-violation.
 // body is loosely typed so unknown report types with missing csp fields don't fail validation.
 const ReportItemSchema = z.object({
   type: z.string(),
@@ -65,8 +65,8 @@ function isFromOurApp(documentUri: string, appUrl: string | undefined): boolean 
 
 // Permissive CORS: browsers send reports with Origin: null (sandboxed iframes)
 // and application/reports+json triggers a preflight (non-simple content-type).
-// Credentials are not relevant for report-only endpoints. Exported so index.ts
-// can register it BEFORE the global restrictive cors — hono/cors terminates
+// Credentials are not relevant for report-only endpoints. Exported so app.ts
+// can register it BEFORE the global restrictive cors: hono/cors terminates
 // OPTIONS, so whichever cors sees the preflight first wins.
 export const cspReportCors = cors({
   origin: "*",
@@ -200,13 +200,12 @@ async function emitCspEvent(
   ip: string,
   fields: CspViolationFields,
 ): Promise<void> {
-  try {
-    await emitEvent(outbox, EventTypes.SECURITY_CSP_VIOLATION, "csp_report", ip, {
-      actorUserId: null,
-      ip,
-      ...fields,
-    });
-  } catch (emitErr) {
-    logger.warn({ err: emitErr }, "csp-report event emit failed — still sending 204");
-  }
+  await emitEventBestEffort(
+    outbox,
+    EventTypes.SECURITY_CSP_VIOLATION,
+    "csp_report",
+    ip,
+    { actorUserId: null, ip, ...fields },
+    "csp-report event emit failed, still sending 204",
+  );
 }

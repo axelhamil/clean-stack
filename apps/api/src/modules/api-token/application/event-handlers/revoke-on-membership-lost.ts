@@ -1,10 +1,10 @@
 import { type EventHandler, type IDomainEvent, type IUnitOfWork, onEvent } from "@packages/ddd-kit";
 import { EventTypes, OrgMemberRemovedPayload } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
+import type { IApiTokenRepository } from "../../../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ITransaction } from "../../../../shared/transaction";
-import type { IApiTokenRepository } from "../ports/api-token.port";
 
 interface Deps {
   IApiTokenRepository: IApiTokenRepository;

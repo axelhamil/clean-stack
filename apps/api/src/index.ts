@@ -33,7 +33,7 @@ async function stopWithTimeout(label: string, stop: () => Promise<void>): Promis
     },
   );
   if (timer) clearTimeout(timer);
-  if (result === "timeout") logger.warn({ label }, "shutdown step timeout — proceeding");
+  if (result === "timeout") logger.warn({ label }, "shutdown step timeout, proceeding");
 }
 
 const shutdown = async (signal: string) => {
@@ -55,7 +55,7 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 
 if (env.NODE_ENV === "production" && !env.TRUSTED_PROXIES) {
   logger.warn(
-    "TRUSTED_PROXIES is not set in production — behind a load-balancer all requests share the LB socket address as rate-limit key (collective lockout). Set it to `private` (trusts platform private ranges — the right value on Railway/Fly/most PaaS), a comma-separated CIDR list, or exact proxy IPs.",
+    "TRUSTED_PROXIES is not set in production, behind a load-balancer all requests share the LB socket address as rate-limit key (collective lockout). Set it to `private` (trusts platform private ranges, the right value on Railway/Fly/most PaaS), a comma-separated CIDR list, or exact proxy IPs.",
   );
 }
 

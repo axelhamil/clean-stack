@@ -204,7 +204,6 @@ describe("ValueObject", () => {
     it("should freeze primitive value", () => {
       const email = Email.create("test@example.com").getValue();
 
-      // Value cannot be mutated
       expect(email.value).toBe("test@example.com");
     });
 
@@ -216,8 +215,6 @@ describe("ValueObject", () => {
       }).getValue();
 
       expect(Object.isFrozen(address.value)).toBe(true);
-
-      // Attempting to mutate should have no effect (in strict mode would throw)
       expect(() => {
         (address.value as AddressValue).city = "Boston";
       }).toThrow();

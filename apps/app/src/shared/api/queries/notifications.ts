@@ -1,6 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
-import { getErrorsT } from "../../i18n/get-errors-t";
 import { api } from "../api-client";
 import { throwApiError } from "../errors/api-error";
 
@@ -19,7 +18,7 @@ export type NotificationPreference = NotificationPreferencesResponse["items"][nu
 
 export const notificationsListQueryKey = ["notifications", "list"] as const;
 
-// A single infinite query, not one query per cursor — the query key stays
+// A single infinite query, not one query per cursor: the query key stays
 // flat (["notifications", "list"]) with pages accumulating inside it, which
 // is what lets `notification-broadcast.ts` patch every loaded page in one
 // `setQueriesData` call and lets the SSE handler invalidate the whole
@@ -33,12 +32,7 @@ export const notificationsInfiniteQueryOptions = () =>
         { init: { signal } },
       );
       if (!res.ok) {
-        await throwApiError(
-          res,
-          getErrorsT()("fallback.loadNotifications", {
-            defaultValue: "Failed to load notifications",
-          }),
-        );
+        await throwApiError(res, "loadNotifications");
       }
       return (await res.json()) as NotificationsResponse;
     },
@@ -51,10 +45,7 @@ export const unreadCountQueryOptions = queryOptions({
   queryFn: async ({ signal }) => {
     const res = await $unreadCount({}, { init: { signal } });
     if (!res.ok) {
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.loadUnreadCount", { defaultValue: "Failed to load unread count" }),
-      );
+      await throwApiError(res, "loadUnreadCount");
     }
     return (await res.json()) as UnreadCountResponse;
   },
@@ -65,18 +56,13 @@ export const notificationPreferencesQueryOptions = queryOptions({
   queryFn: async ({ signal }) => {
     const res = await $preferences({}, { init: { signal } });
     if (!res.ok) {
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.loadNotificationPreferences", {
-          defaultValue: "Failed to load notification preferences",
-        }),
-      );
+      await throwApiError(res, "loadNotificationPreferences");
     }
     return (await res.json()) as NotificationPreferencesResponse;
   },
 });
 
-// The route is `requireOrg`, so the response is the active organization's — the key
+// The route is `requireOrg`, so the response is the active organization's: the key
 // has to name it or one entry serves every organization the user switches between.
 export const orgNotificationPreferencesQueryOptions = (organizationId: string | null) =>
   queryOptions({
@@ -84,12 +70,7 @@ export const orgNotificationPreferencesQueryOptions = (organizationId: string | 
     queryFn: async ({ signal }) => {
       const res = await $orgPreferences({}, { init: { signal } });
       if (!res.ok) {
-        await throwApiError(
-          res,
-          getErrorsT()("fallback.loadOrgNotificationPreferences", {
-            defaultValue: "Failed to load org notification preferences",
-          }),
-        );
+        await throwApiError(res, "loadOrgNotificationPreferences");
       }
       return (await res.json()) as NotificationPreferencesResponse;
     },

@@ -5,12 +5,19 @@ import {
   type ConsentCategory,
 } from "@packages/cookie-consent";
 import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
-import { EventTypes } from "@packages/events";
+import {
+  type EventType,
+  EventTypes,
+  type UserCookieConsentGrantedPayload,
+  type UserCookieConsentWithdrawnPayload,
+} from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ITransaction } from "../../../../shared/transaction";
 import type { ConsentError, ConsentRecordRow, IConsentStore } from "../ports/consent.port";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface RecordConsentInput {
   subjectId: string;
@@ -23,6 +30,10 @@ export interface RecordConsentInput {
 export interface WithdrawConsentInput {
   subjectId: string;
   userId?: string;
+}
+
+function daysAfter(from: Date, days: number): Date {
+  return new Date(from.getTime() + days * DAY_MS);
 }
 
 export class ConsentService {
@@ -41,7 +52,6 @@ export class ConsentService {
       : ["necessary", ...categories];
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + CONSENT_GRANT_TTL_DAYS * 24 * 60 * 60 * 1000);
     const row: ConsentRecordRow = {
       id: crypto.randomUUID(),
       subjectId,
@@ -50,53 +60,33 @@ export class ConsentService {
       policyVersion: COOKIE_CONSENT_VERSION,
       grantedAt: now,
       withdrawnAt: Option.none(),
-      expiresAt,
-      ipAddress: ip,
-      userAgent: ua,
+      expiresAt: daysAfter(now, CONSENT_GRANT_TTL_DAYS),
+      ipAddress: Option.fromNullable(ip),
+      userAgent: Option.fromNullable(ua),
     };
 
-    let storeFailure: ConsentError | null = null;
-    try {
-      await this.uow.run(async (tx) => {
-        const r = await this.store.insert(row, tx);
-        if (r.isFailure) {
-          storeFailure = r.getError();
-          throw new Error("rollback");
-        }
-        await emitEvent(
-          this.outbox,
-          EventTypes.USER_COOKIE_CONSENT_GRANTED,
-          "user",
-          userId ?? subjectId,
-          {
-            userId,
-            subjectId,
-            categories: allCategories,
-            policyVersion: COOKIE_CONSENT_VERSION,
-            ipAddress: ip,
-            userAgent: ua,
-          },
-          {},
-          tx,
-        );
-      });
-      return Result.ok(row);
-    } catch (err) {
-      if (storeFailure) return Result.fail(storeFailure);
-      this.instrumentation.capture(err);
-      return Result.fail({
-        code: "CONSENT_PROVIDER_FAILURE",
-        message: "consent record failed",
-        metadata: { cause: err instanceof Error ? err.message : String(err) },
-      });
-    }
+    const appended = await this.append(
+      row,
+      EventTypes.USER_COOKIE_CONSENT_GRANTED,
+      {
+        userId,
+        subjectId,
+        categories: allCategories,
+        policyVersion: COOKIE_CONSENT_VERSION,
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      "consent record failed",
+    );
+    if (appended.isFailure) return Result.fail(appended.getError());
+
+    return Result.ok(row);
   }
 
   async withdraw(input: WithdrawConsentInput): Promise<Result<void, ConsentError>> {
     const { subjectId, userId } = input;
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + CONSENT_REFUSAL_TTL_DAYS * 24 * 60 * 60 * 1000);
     const row: ConsentRecordRow = {
       id: crypto.randomUUID(),
       subjectId,
@@ -105,42 +95,17 @@ export class ConsentService {
       policyVersion: COOKIE_CONSENT_VERSION,
       grantedAt: now,
       withdrawnAt: Option.some(now),
-      expiresAt,
+      expiresAt: daysAfter(now, CONSENT_REFUSAL_TTL_DAYS),
+      ipAddress: Option.none(),
+      userAgent: Option.none(),
     };
 
-    let storeFailure: ConsentError | null = null;
-    try {
-      await this.uow.run(async (tx) => {
-        const r = await this.store.insert(row, tx);
-        if (r.isFailure) {
-          storeFailure = r.getError();
-          throw new Error("rollback");
-        }
-        await emitEvent(
-          this.outbox,
-          EventTypes.USER_COOKIE_CONSENT_WITHDRAWN,
-          "user",
-          userId ?? subjectId,
-          {
-            userId,
-            subjectId,
-            categories: [],
-            policyVersion: COOKIE_CONSENT_VERSION,
-          },
-          {},
-          tx,
-        );
-      });
-      return Result.ok();
-    } catch (err) {
-      if (storeFailure) return Result.fail(storeFailure);
-      this.instrumentation.capture(err);
-      return Result.fail({
-        code: "CONSENT_PROVIDER_FAILURE",
-        message: "consent withdraw failed",
-        metadata: { cause: err instanceof Error ? err.message : String(err) },
-      });
-    }
+    return this.append(
+      row,
+      EventTypes.USER_COOKIE_CONSENT_WITHDRAWN,
+      { userId, subjectId, categories: [], policyVersion: COOKIE_CONSENT_VERSION },
+      "consent withdraw failed",
+    );
   }
 
   async getActive(
@@ -152,10 +117,75 @@ export class ConsentService {
       const byUser = await this.store.findActiveByUser(userId, policyVersion);
       if (byUser.isFailure || byUser.getValue().isSome()) return byUser;
     }
+
     return this.store.findActiveBySubject(subjectId, policyVersion);
   }
 
+  /**
+   * Attaches the consent a browser gave before sign-in to the account. Runs at every
+   * login carrying the consent cookie, so the event is emitted only when a record
+   * actually changed owner.
+   */
   async reconcile(subjectId: string, userId: string): Promise<Result<void, ConsentError>> {
-    return this.store.linkSubjectToUser(subjectId, userId);
+    try {
+      return await this.uow.run(async (tx) => {
+        const linked = await this.store.linkSubjectToUser(subjectId, userId, tx);
+        if (linked.isFailure) return Result.fail<void, ConsentError>(linked.getError());
+
+        const consentRecordIds = linked.getValue();
+        if (consentRecordIds.length === 0) return Result.ok<ConsentError>();
+
+        await emitEvent(
+          this.outbox,
+          EventTypes.USER_COOKIE_CONSENT_LINKED,
+          "user",
+          userId,
+          { userId, subjectId, consentRecordIds },
+          {},
+          tx,
+        );
+        return Result.ok<ConsentError>();
+      });
+    } catch (err) {
+      this.instrumentation.capture(err);
+      return Result.fail({
+        code: "CONSENT_PROVIDER_FAILURE",
+        message: "cookie consent reconcile failed",
+        metadata: { cause: err instanceof Error ? err.message : String(err) },
+      });
+    }
+  }
+
+  private async append(
+    row: ConsentRecordRow,
+    eventType: EventType,
+    payload: UserCookieConsentGrantedPayload | UserCookieConsentWithdrawnPayload,
+    failureMessage: string,
+  ): Promise<Result<void, ConsentError>> {
+    try {
+      return await this.uow.run(async (tx) => {
+        const inserted = await this.store.insert(row, tx);
+        if (inserted.isFailure) return inserted;
+
+        await emitEvent(
+          this.outbox,
+          eventType,
+          "user",
+          payload.userId ?? payload.subjectId,
+          payload,
+          {},
+          tx,
+        );
+
+        return inserted;
+      });
+    } catch (err) {
+      this.instrumentation.capture(err);
+      return Result.fail({
+        code: "CONSENT_PROVIDER_FAILURE",
+        message: failureMessage,
+        metadata: { cause: err instanceof Error ? err.message : String(err) },
+      });
+    }
   }
 }

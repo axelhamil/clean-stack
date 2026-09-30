@@ -1,15 +1,6 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { INVITATION_STATUS_LABEL_KEYS, isInvitationStatus } from "../invitation-status-labels";
-
-function resolve(path: string): string | undefined {
-  let cur: unknown = enCatalog.settings;
-  for (const seg of path.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
 
 describe("INVITATION_STATUS_LABEL_KEYS", () => {
   // Same rationale as ROLE_LABEL_KEYS: `satisfies Record<InvitationStatus, string>`
@@ -24,10 +15,10 @@ describe("INVITATION_STATUS_LABEL_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(INVITATION_STATUS_LABEL_KEYS.pending)).toBe("Pending");
-    expect(resolve(INVITATION_STATUS_LABEL_KEYS.accepted)).toBe("Accepted");
-    expect(resolve(INVITATION_STATUS_LABEL_KEYS.rejected)).toBe("Rejected");
-    expect(resolve(INVITATION_STATUS_LABEL_KEYS.canceled)).toBe("Canceled");
+    expect(enLabel(INVITATION_STATUS_LABEL_KEYS.pending, "settings")).toBe("Pending");
+    expect(enLabel(INVITATION_STATUS_LABEL_KEYS.accepted, "settings")).toBe("Accepted");
+    expect(enLabel(INVITATION_STATUS_LABEL_KEYS.rejected, "settings")).toBe("Rejected");
+    expect(enLabel(INVITATION_STATUS_LABEL_KEYS.canceled, "settings")).toBe("Canceled");
   });
 });
 

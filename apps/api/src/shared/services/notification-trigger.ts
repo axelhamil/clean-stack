@@ -7,7 +7,7 @@ export const NOTIFICATION_NOTIFY_CHANNEL = "notification_changed";
  *
  * Two triggers, one function. Birth (`INSERT`) and the read transition
  * (`UPDATE OF read_at`) both change what the unread badge should show, so both
- * must reach every open tab — a device that marks a notification read
+ * must reach every open tab: a device that marks a notification read
  * elsewhere otherwise leaves the badge stale indefinitely, because polling is
  * disabled while the stream is up. They are separate triggers because a
  * combined `INSERT OR UPDATE` trigger cannot carry a `WHEN` clause referencing

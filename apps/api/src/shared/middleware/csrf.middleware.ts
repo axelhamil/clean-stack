@@ -2,7 +2,7 @@ import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
-import { emitEvent } from "../event-emitter";
+import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { resolveClientIp } from "./rate-limit.ip";
@@ -18,7 +18,7 @@ type CsrfRejectReason = "missing_origin" | "origin_mismatch";
 
 export function requireCsrf(deps: CsrfDeps) {
   if (!deps.outbox) {
-    logger.warn({}, "csrf: no outbox provided — security events silently disabled");
+    logger.warn({}, "csrf: no outbox provided, security events silently disabled");
   }
   return createMiddleware(async (c, next) => {
     if (SAFE_METHODS.has(c.req.method)) return next();
@@ -33,7 +33,7 @@ export function requireCsrf(deps: CsrfDeps) {
     const reason: CsrfRejectReason =
       origin === undefined || origin === "null" ? "missing_origin" : "origin_mismatch";
     if (deps.outbox) await emitCsrfRejected(deps.outbox, c, reason, origin);
-    // reason stays in the emitted audit event, not the client response — no security-decision leak.
+    // reason stays in the emitted audit event, not the client response, no security-decision leak.
     throw new AppErrorException({
       code: "SECURITY_CSRF_FORBIDDEN",
       message: "CSRF check failed",
@@ -49,16 +49,19 @@ async function emitCsrfRejected(
 ): Promise<void> {
   const user = c.get("user") as { id: string } | null | undefined;
   const ip = resolveClientIp(c).slice(0, 45);
-  try {
-    await emitEvent(outbox, EventTypes.SECURITY_CSRF_REJECTED, "csrf", ip, {
+  await emitEventBestEffort(
+    outbox,
+    EventTypes.SECURITY_CSRF_REJECTED,
+    "csrf",
+    ip,
+    {
       actorUserId: user?.id ?? null,
       ip,
       method: c.req.method.slice(0, 16),
       path: c.req.path.slice(0, 512),
       origin: origin === undefined || origin === "null" ? null : origin.slice(0, 2048),
       reason,
-    });
-  } catch (emitErr) {
-    logger.warn({ err: emitErr }, "csrf event emit failed — still rejecting");
-  }
+    },
+    "csrf event emit failed, still rejecting",
+  );
 }

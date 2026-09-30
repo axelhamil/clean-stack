@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateEnvBounds } from "./env-bounds";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -50,8 +51,8 @@ const envSchema = z
       .transform((v) => v === "true"),
     S3_PUBLIC_URL: z.url().optional(),
     STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().optional(),
-    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().optional(),
-    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
+    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().default(60),
+    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().default(3600),
     WEBHOOK_MASTER_KEY: z
       .string()
       .regex(/^[0-9a-f]{64}$/i, "WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)")
@@ -125,42 +126,6 @@ const envSchema = z
   })
   .superRefine(validateEnvBounds);
 
-/**
- * The three sweep-timeout bounds only work nested: the sweep must be able to finish
- * and answer before the socket closes, and the socket must close before the client
- * gives up. A `.env` that inverts them silently reproduces the bug this configuration
- * exists to prevent, so it fails the boot instead.
- *
- * Exported (rather than inlined in the `superRefine` call) so tests can exercise the
- * comparisons directly against plain literals — `env.ts` parses `process.env` at
- * import time and throws on missing required vars, so importing `env` from a test
- * would require a full `.env`.
- */
-export function validateEnvBounds(
-  value: {
-    SERVER_IDLE_TIMEOUT_SECONDS: number;
-    SWEEP_DEADLINE_MS: number;
-    INTERNAL_FETCH_TIMEOUT_MS: number;
-  },
-  ctx: z.RefinementCtx,
-): void {
-  const idleMs = value.SERVER_IDLE_TIMEOUT_SECONDS * 1000;
-  if (value.SWEEP_DEADLINE_MS >= idleMs) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["SWEEP_DEADLINE_MS"],
-      message: `SWEEP_DEADLINE_MS (${value.SWEEP_DEADLINE_MS}) must be below SERVER_IDLE_TIMEOUT_SECONDS (${value.SERVER_IDLE_TIMEOUT_SECONDS}s = ${idleMs}ms), or the socket closes before the sweep can answer.`,
-    });
-  }
-  if (value.INTERNAL_FETCH_TIMEOUT_MS <= idleMs) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["INTERNAL_FETCH_TIMEOUT_MS"],
-      message: `INTERNAL_FETCH_TIMEOUT_MS (${value.INTERNAL_FETCH_TIMEOUT_MS}) must exceed SERVER_IDLE_TIMEOUT_SECONDS (${value.SERVER_IDLE_TIMEOUT_SECONDS}s = ${idleMs}ms), or the client gives up before the server answers.`,
-    });
-  }
-}
-
 const rawEnv = Object.fromEntries(
   Object.entries(process.env).map(([k, v]) => [k, v === "" ? undefined : v]),
 );
@@ -168,7 +133,7 @@ const rawEnv = Object.fromEntries(
 export const env = envSchema.parse(rawEnv);
 
 // Bootstrap ships these as long-enough placeholders so local dev and CI checks
-// (check:sweep-lock, check:fanout) work out of the box — but "long enough" also
+// (check:sweep-lock, check:fanout) work out of the box, but "long enough" also
 // satisfies `.min(32)`, so a deploy that copies `.env.example` verbatim and forgets
 // to replace them would otherwise boot with a published secret. Reject the literal
 // placeholder text, not just its length.
@@ -190,7 +155,7 @@ if (env.NODE_ENV === "production") {
   }
   if (!env.CORS_ORIGIN || env.CORS_ORIGIN.length === 0) {
     throw new Error(
-      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost — rejecting the real front and collapsing the CORS + CSRF allowlist.",
+      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost, rejecting the real front and collapsing the CORS + CSRF allowlist.",
     );
   }
   if (!env.INTERNAL_AUTH_LAYERS?.includes("signature")) {
@@ -215,7 +180,7 @@ if (env.NODE_ENV === "production") {
   }
   if (!env.API_TOKEN_PEPPER) {
     throw new Error(
-      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret — a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
+      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret: a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
     );
   }
 }

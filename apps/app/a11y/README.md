@@ -6,16 +6,16 @@ interaction checks a rule engine cannot see. Runs on every PR
 
 ## What blocks a merge
 
-- **axe** — zero `serious` / `critical` WCAG 2.1 A/AA violations on the seven
+- **axe**: zero `serious` / `critical` WCAG 2.1 A/AA violations on the seven
   pages in [`pages.ts`](./pages.ts), **in light and dark**. Dark is not
   decoration: `--primary` failed there while light passed.
-- **Landmarks** — exactly one `<main>` and one `<h1>` per page. Already a
+- **Landmarks**: exactly one `<main>` and one `<h1>` per page. Already a
   CLAUDE.md rule; this is what makes it enforceable.
-- **Keyboard** — every `/sign-in` control is reachable in DOM order, and the
+- **Keyboard**: every `/sign-in` control is reachable in DOM order, and the
   setup itself signs in without a mouse.
-- **Focus trap** — the command palette keeps focus for ten Tab presses and
+- **Focus trap**: the command palette keeps focus for ten Tab presses and
   releases it on Escape.
-- **Reduced motion** — `prefers-reduced-motion: reduce` skips the theme view
+- **Reduced motion**: `prefers-reduced-motion: reduce` skips the theme view
   transition entirely (asserted through a `MutationObserver`, since the
   transition leaves no trace once it ends).
 
@@ -31,7 +31,7 @@ The gate audits the **preview build** on port 4173, against a live API:
 docker compose up postgres -d
 pnpm db:push && pnpm --filter api db:seed   # seeds dev@example.com
 pnpm --filter api dev                        # API on :3000
-pnpm --filter app check:a11y                 # builds nothing — run `pnpm --filter app build` first
+pnpm --filter app check:a11y                 # builds nothing, run `pnpm --filter app build` first
 ```
 
 Playwright starts the preview server itself and reuses one already listening.
@@ -41,7 +41,7 @@ Two things bite when running repeatedly:
 - **`/sign-in` is capped at 5 attempts per 15 min per IP.** One run costs one
   sign-in, which is why the setup doubles as the keyboard test rather than
   spending a second one. The block is also held in the API process
-  (`inMemoryBlockDuration`), so clearing the `rate_limit` table is not enough —
+  (`inMemoryBlockDuration`), so clearing the `rate_limit` table is not enough:
   restart the API.
 - **A page audited after a gate redirect still looks green.** `audit()` asserts
   the final URL for that reason; if a session or policy gate fires, the failure
@@ -52,23 +52,23 @@ Two things bite when running repeatedly:
   `/api/auth/*` (`sessionMiddleware`), so a signed-in page's session and
   organization queries are counted against the IP, next to every
   unauthenticated page load. Measured over a full sweep: 61 requests in
-  `global:60:global:::1` against a then-60/min ceiling — one over, twice in a
-  row — while the per-user bucket sat at 39. Worker count bounds neither: the
+  `global:60:global:::1` against a then-60/min ceiling, one over, twice in a
+  row, while the per-user bucket sat at 39. Worker count bounds neither: the
   ceiling is per minute across the whole run and the IP is identical from every
   worker. What fixed it was tuning the API's burst window to what a page view
-  actually costs — a signed-in view fires up to 8 API calls, so 60/min allowed
+  actually costs, a signed-in view fires up to 8 API calls, so 60/min allowed
   ~7 navigations per minute (`GLOBAL_POLICY` in
   `apps/api/src/shared/middleware/rate-limit.policies.ts`, now 300/min burst
   with the 1800/hour sustained ceiling unchanged). The pin to `4` stays as a
   courtesy cap on host load.
 - **Resetting the limiter takes two steps.** `DELETE FROM rate_limit` on the
-  dev database *and* a restart of the API process — `inMemoryBlockOnConsumed`
+  dev database *and* a restart of the API process, `inMemoryBlockOnConsumed`
   caches the block in-process, so clearing the table alone leaves it in place.
 
 ## Adding a page
 
 Append it to `PUBLIC_PAGES` or `AUTHENTICATED_PAGES` in [`pages.ts`](./pages.ts).
-Nothing else — the spec iterates both lists across both colour schemes.
+Nothing else, the spec iterates both lists across both colour schemes.
 
 ## Changing a colour token
 

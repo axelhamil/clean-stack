@@ -6,11 +6,11 @@ Three endpoints, K8s 2026 convention (`*z` suffix), [IETF `draft-inadarei-api-he
 
 | Endpoint | Purpose | Hits dependencies? | Status codes |
 |---|---|---|---|
-| `GET /livez` | Liveness — "is the process alive" | **No** (a DB outage must NOT restart pods — thundering-herd) | always `200` while the process runs |
-| `GET /readyz` | Readiness — "can this pod serve traffic" | Yes — runs every registered check | `200` on `pass`/`warn`, `503` on `fail` or during shutdown grace |
-| `GET /startupz` | Startup — "is initial bootstrap done" (K8s 1.16+) | No (in-memory latch) | `200` once `lifecycleState.markStarted()` fires, `503` before |
+| `GET /livez` | Liveness, "is the process alive" | **No** (a DB outage must NOT restart pods, thundering-herd) | always `200` while the process runs |
+| `GET /readyz` | Readiness, "can this pod serve traffic" | Yes, runs every registered check | `200` on `pass`/`warn`, `503` on `fail` or during shutdown grace |
+| `GET /startupz` | Startup, "is initial bootstrap done" (K8s 1.16+) | No (in-memory latch) | `200` once `lifecycleState.markStarted()` fires, `503` before |
 
-Mounted **outside** the middleware chain (`requestId` / `httpLogger` / `sessionMiddleware` / `cors`) — probes don't carry sessions, and a probe every 5 s would drown prod logs (~17 280/day per pod). They are also outside any future rate-limit gate.
+Mounted **outside** the middleware chain (`requestId` / `httpLogger` / `sessionMiddleware` / `cors`): probes don't carry sessions, and a probe every 5 s would drown prod logs (~17 280/day per pod). They are also outside any future rate-limit gate.
 
 ## Response shape
 
@@ -36,21 +36,21 @@ Mounted **outside** the middleware chain (`requestId` / `httpLogger` / `sessionM
 }
 ```
 
-**Tri-state aggregation** (`pass`/`warn`/`fail`) — non-binary by design:
+**Tri-state aggregation** (`pass`/`warn`/`fail`): non-binary by design:
 
 | Per-check outcome | Aggregated | HTTP |
 |---|---|---|
 | All `pass` | `pass` | `200` |
 | Any non-critical `fail` or `warn` | `warn` | `200` (degraded but functional) |
-| Any **critical** `fail` | `fail` | `503` (truly unhealthy — LB stops routing) |
+| Any **critical** `fail` | `fail` | `503` (truly unhealthy, LB stops routing) |
 
 DB down (critical) = `fail` + 503. Resend / storage hiccup (non-critical) = `warn` + 200. This avoids the "everything red because one dep flickered" trap.
 
-**Prod payload minimal** — outside `NODE_ENV !== "production"`, only the top-level `status` + each check's `status` are returned (no `observedValue`, no `output`, no `durationMs`). Prevents leaking infra timings/error messages publicly.
+**Prod payload minimal**: outside `NODE_ENV !== "production"`, only the top-level `status` + each check's `status` are returned (no `observedValue`, no `output`, no `durationMs`). Prevents leaking infra timings/error messages publicly.
 
 ## Registering a probe (from a new module)
 
-Each module **owner of an external dependency** ships its own `XxxHealthProbe` class implementing `OnInit`. inwire's `preload()` (called once after `.build()`) fires `onInit()` and the probe self-registers — no manual wiring list to keep in sync.
+Each module **owner of an external dependency** ships its own `XxxHealthProbe` class implementing `OnInit`. inwire's `preload()` (called once after `.build()`) fires `onInit()` and the probe self-registers, no manual wiring list to keep in sync.
 
 ```ts
 // modules/billing/infrastructure/stripe-health-probe.ts
@@ -95,28 +95,28 @@ export const billingModule = defineModule()((b) =>
 );
 ```
 
-That's it. `trash modules/billing` removes both the binding and the probe — no orphan check, no stale registration.
+That's it. `trash modules/billing` removes both the binding and the probe, no orphan check, no stale registration.
 
-**Decisor `critical: true` vs `false`** — flip to `true` only if the dep being down makes the api unable to serve **any** request meaningfully. DB = `true` (no business logic without it). Storage, email, billing = `false` (most routes work without them; let the LB keep traffic flowing, alerting handles the degraded state).
+**Decisor `critical: true` vs `false`**: flip to `true` only if the dep being down makes the api unable to serve **any** request meaningfully. DB = `true` (no business logic without it). Storage, email, billing = `false` (most routes work without them; let the LB keep traffic flowing, alerting handles the degraded state).
 
-## Robustness — what's wired in
+## Robustness, what's wired in
 
-- **Self-cancelling timeout 5 s per check** (`runWithTimeout`) — a hanging probe can't block rolling deploys.
-- **Asymmetric cache** — `pass` cached 30 s (don't hammer Resend at ~6 req/sec on PaaS probes), `fail` cached only 5 s (re-check fast, restore quickly). Industry-standard pattern.
-- **No PII in fail payloads** — checks return generic `output` (`"bucket unreachable"`, `"timeout >5000ms"`), never stack traces or hostnames.
+- **Self-cancelling timeout 5 s per check** (`runWithTimeout`): a hanging probe can't block rolling deploys.
+- **Asymmetric cache**: `pass` cached 30 s (don't hammer Resend at ~6 req/sec on PaaS probes), `fail` cached only 5 s (re-check fast, restore quickly). Industry-standard pattern.
+- **No PII in fail payloads**: checks return generic `output` (`"bucket unreachable"`, `"timeout >5000ms"`), never stack traces or hostnames.
 
-## Graceful shutdown — `/readyz` flips before workers stop
+## Graceful shutdown, `/readyz` flips before workers stop
 
 On `SIGTERM` / `SIGINT`:
 
-1. `lifecycleState.signalShutdown()` — `/readyz` immediately returns `503` (status `"fail"`, output `"shutting down"`). The LB stops routing new requests within one probe interval (~5 s).
+1. `lifecycleState.signalShutdown()`: `/readyz` immediately returns `503` (status `"fail"`, output `"shutting down"`). The LB stops routing new requests within one probe interval (~5 s).
 2. Wait `SHUTDOWN_GRACE_PERIOD_MS` (default `15000`, env-tunable) for in-flight requests to drain.
-3. Stop the four background runners in parallel — webhook delivery worker, email delivery worker, outbox dispatcher, notification stream hub (each with its own 25 s timeout, and a step that throws or times out never blocks the others).
+3. Stop the four background runners in parallel, webhook delivery worker, email delivery worker, outbox dispatcher, notification stream hub (each with its own 25 s timeout, and a step that throws or times out never blocks the others).
 4. `process.exit(0)`.
 
 **Without this flip**, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
 
-The flag lives in `apps/api/src/shared/shutdown.ts` as a process-level singleton (same pattern as `env.ts` / `logger.ts` — it's lifecycle state, not business state). `lifecycleState.markStarted()` is fired after workers have booted, gating `/startupz`.
+The flag lives in `apps/api/src/shared/shutdown.ts` as a process-level singleton (same pattern as `env.ts` / `logger.ts`: it's lifecycle state, not business state). `lifecycleState.markStarted()` is fired after workers have booted, gating `/startupz`.
 
 ## Env vars
 
@@ -180,14 +180,14 @@ startupProbe:
 
 ### Cloud Run / App Runner
 
-Use `/readyz` as the startup probe and pin `min_instances ≥ 1` (the api holds a Postgres `LISTEN` connection — scale-to-zero kills the outbox dispatcher; see [`docs/EVENTS.md`](EVENTS.md)).
+Use `/readyz` as the startup probe and pin `min_instances ≥ 1` (the api holds a Postgres `LISTEN` connection, scale-to-zero kills the outbox dispatcher; see [`docs/EVENTS.md`](EVENTS.md)).
 
 ### Vercel / Netlify / Lambda
 
-Not applicable — the api is **not deployable on serverless functions** (same reason as the outbox dispatcher). See README "Deployment" + [`docs/EVENTS.md`](EVENTS.md#deployment-requirements).
+Not applicable, the api is **not deployable on serverless functions** (same reason as the outbox dispatcher). See README "Deployment" + [`docs/EVENTS.md`](EVENTS.md#deployment-requirements).
 
 ## Monitoring integration
 
-- **Datadog / New Relic** — point a synthetic monitor at `/readyz`. The draft-inadarei envelope is parsed natively; check-level latencies become metrics automatically.
-- **Grafana** — Phase 0.4 (observability module) will expose `up{check="db:postgres"}` + `health_check_duration_ms{check}` from the same registry via `/metrics`. No registry rework needed.
-- **Sentry** — register no probe; let `/readyz 503` trigger PagerDuty / Opsgenie / Slack via your alerting pipeline.
+- **Datadog / New Relic**: point a synthetic monitor at `/readyz`. The draft-inadarei envelope is parsed natively; check-level latencies become metrics automatically.
+- **Grafana**: Phase 0.4 (observability module) will expose `up{check="db:postgres"}` + `health_check_duration_ms{check}` from the same registry via `/metrics`. No registry rework needed.
+- **Sentry**: register no probe; let `/readyz 503` trigger PagerDuty / Opsgenie / Slack via your alerting pipeline.

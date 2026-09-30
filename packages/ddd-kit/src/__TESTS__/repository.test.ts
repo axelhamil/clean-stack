@@ -465,14 +465,14 @@ class MockScopedNoteRepository implements ScopedRepository<Note, ScopeOf<"user">
     return Result.ok(entity);
   }
 
-  async delete(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<UUID<string>>> {
+  async delete(id: Note["_id"], scope: ScopeOf<"user">): Promise<Result<Note["_id"]>> {
     const i = this.notes.findIndex((n) => n._id.equals(id) && this.isOwner(n, scope));
     if (i === -1) return Result.fail("Note not found");
     this.notes.splice(i, 1);
     return Result.ok(id);
   }
 
-  async findById(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<Option<Note>>> {
+  async findById(id: Note["_id"], scope: ScopeOf<"user">): Promise<Result<Option<Note>>> {
     const n = this.notes.find((x) => x._id.equals(id) && this.isOwner(x, scope));
     return Result.ok(Option.fromNullable(n));
   }
@@ -515,7 +515,7 @@ class MockScopedNoteRepository implements ScopedRepository<Note, ScopeOf<"user">
     return Result.ok(Option.fromNullable(n));
   }
 
-  async exists(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<boolean>> {
+  async exists(id: Note["_id"], scope: ScopeOf<"user">): Promise<Result<boolean>> {
     return Result.ok(this.notes.some((n) => n._id.equals(id) && this.isOwner(n, scope)));
   }
 

@@ -7,7 +7,7 @@ describe("createI18n fallback", () => {
   it("falls back to the English string when a key is missing from the target locale", async () => {
     const frResources = await loadCatalog("fr");
     const resourcesWithGap = structuredClone(frResources);
-    // Simulate a key present in `en` but not yet translated in `fr` — the
+    // Simulate a key present in `en` but not yet translated in `fr`, the
     // exact partial-translation state E.1a is meant to support.
     delete (resourcesWithGap.common as { actions: { retry?: string } }).actions.retry;
 

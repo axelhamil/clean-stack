@@ -1,21 +1,15 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
-import { DELIVERY_STATUS_KEYS, ENDPOINT_STATUS_KEYS, isDeliveryStatus } from "../webhook-labels";
-
-function resolve(prefixedKey: string): string | undefined {
-  const [namespace, path] = prefixedKey.split(":");
-  if (namespace !== "common" || path === undefined) return undefined;
-  let cur: unknown = enCatalog.common;
-  for (const seg of path.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
+import {
+  DELIVERY_STATUS_BADGE_VARIANTS,
+  DELIVERY_STATUS_KEYS,
+  ENDPOINT_STATUS_KEYS,
+  isDeliveryStatus,
+} from "../webhook-labels";
 
 describe("ENDPOINT_STATUS_KEYS", () => {
   // `satisfies Record<EndpointStatus, string>` only proves every status has AN
-  // entry — it does not prove each one points at the RIGHT one. A swapped pair
+  // entry, not that each one points at the RIGHT one. A swapped pair
   // (e.g. `active` reading `common:states.endpoint.paused`) still type-checks,
   // so this asserts the mapping itself, not just its exhaustiveness.
   it("maps each endpoint status to its own catalog key, never a swapped one", () => {
@@ -27,9 +21,9 @@ describe("ENDPOINT_STATUS_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(ENDPOINT_STATUS_KEYS.active)).toBe("Active");
-    expect(resolve(ENDPOINT_STATUS_KEYS.paused)).toBe("Paused");
-    expect(resolve(ENDPOINT_STATUS_KEYS["auto-disabled"])).toBe("Auto-disabled");
+    expect(enLabel(ENDPOINT_STATUS_KEYS.active, "common")).toBe("Active");
+    expect(enLabel(ENDPOINT_STATUS_KEYS.paused, "common")).toBe("Paused");
+    expect(enLabel(ENDPOINT_STATUS_KEYS["auto-disabled"], "common")).toBe("Auto-disabled");
   });
 });
 
@@ -44,10 +38,10 @@ describe("DELIVERY_STATUS_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(DELIVERY_STATUS_KEYS.pending)).toBe("Pending");
-    expect(resolve(DELIVERY_STATUS_KEYS.success)).toBe("Success");
-    expect(resolve(DELIVERY_STATUS_KEYS.failed)).toBe("Failed");
-    expect(resolve(DELIVERY_STATUS_KEYS.dead_letter)).toBe("Dead letter");
+    expect(enLabel(DELIVERY_STATUS_KEYS.pending, "common")).toBe("Pending");
+    expect(enLabel(DELIVERY_STATUS_KEYS.success, "common")).toBe("Success");
+    expect(enLabel(DELIVERY_STATUS_KEYS.failed, "common")).toBe("Failed");
+    expect(enLabel(DELIVERY_STATUS_KEYS.dead_letter, "common")).toBe("Dead letter");
   });
 });
 
@@ -62,5 +56,16 @@ describe("isDeliveryStatus", () => {
   it("rejects anything else", () => {
     expect(isDeliveryStatus("dead-letter")).toBe(false);
     expect(isDeliveryStatus("")).toBe(false);
+  });
+});
+
+describe("DELIVERY_STATUS_BADGE_VARIANTS", () => {
+  it("flags failed and dead-letter deliveries as destructive, success as default", () => {
+    expect(DELIVERY_STATUS_BADGE_VARIANTS).toStrictEqual({
+      pending: "secondary",
+      success: "default",
+      failed: "destructive",
+      dead_letter: "destructive",
+    });
   });
 });

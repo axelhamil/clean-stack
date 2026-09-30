@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -54,105 +55,12 @@ const fakeRow = {
 // Only what this file's subject actually touches: test files do not share a module
 // registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
   db: {
     select: () => makeDbQuery(),
     insert: () => makeDbQuery(),
     update: () => makeDbQuery(),
     delete: () => makeDbQuery(),
-  },
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  inArray: () => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  not: () => ({}),
-  like: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      url: {},
-      secretCipher: {},
-      eventTypes: {},
-      enabled: {},
-      createdAt: {},
-      updatedAt: {},
-      previousSecretCipher: {},
-      previousSecretExpiresAt: {},
-      consecutiveFailures: {},
-      firstFailedAt: {},
-      disabledAt: {},
-      $inferSelect: {},
-      $inferInsert: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  authSchema: {},
-  multiTenantSchema: { organization: { id: {} } },
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
   },
 }));
 
@@ -163,7 +71,7 @@ const { NoOpInstrumentation } = await import("../../../shared/services/noop-inst
 
 type InstrType = InstanceType<typeof NoOpInstrumentation>;
 
-// Fake transaction — exposes the same query methods as db so tx ?? db resolves uniformly.
+// Fake transaction: exposes the same query methods as db so tx ?? db resolves uniformly.
 const tx = {
   select: () => makeDbQuery(),
   insert: () => makeDbQuery(),
@@ -184,7 +92,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
 
   // -------------------------------------------------------------------------
   // Helper: inject DB error via startSpan spy
-  // Follows the drizzle-audit.service.test.ts pattern — throw on the 2nd span call
+  // Follows the drizzle-audit.service.test.ts pattern: throw on the 2nd span call
   // (inner db.query span) to trigger the repo's catch block.
   // -------------------------------------------------------------------------
   function injectDbError(instr: InstrType, boom: Error) {
@@ -626,7 +534,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
   });
 
   // -------------------------------------------------------------------------
-  // update — enabled:true clears failure state
+  // update: enabled:true clears failure state
   // -------------------------------------------------------------------------
 
   describe("update (re-enable clears failure state)", () => {

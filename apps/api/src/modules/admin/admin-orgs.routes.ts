@@ -1,16 +1,14 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
+import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
 import { zV } from "../../shared/validator";
 import { listOrgsQuerySchema } from "./application/dto/list-orgs.dto";
-
-const ssoEnforcementBodySchema = z.object({ enforced: z.boolean() });
 
 const actionSvc = new AdminActionService(
   di.IOutboxRepository,
@@ -48,7 +46,7 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
     requireAuth,
     requirePlatformAdmin,
     denyImpersonated,
-    zV("json", ssoEnforcementBodySchema),
+    zV("json", setSsoEnforcementBodySchema),
     async (c) => {
       const result = await actionSvc.setSsoEnforcement({
         organizationId: c.req.param("id"),

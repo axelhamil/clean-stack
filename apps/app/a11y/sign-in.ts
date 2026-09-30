@@ -1,11 +1,11 @@
 import type { Locator, Page } from "@playwright/test";
 
-/** Defaults mirror `apps/api/scripts/seed-dev-user.ts` — change both together. */
+/** Defaults mirror `apps/api/scripts/seed-dev-user.ts`: change both together. */
 export const SEED_EMAIL = process.env.SEED_EMAIL ?? "dev@example.com";
 export const SEED_PASSWORD = process.env.SEED_PASSWORD ?? "Nimbus-Harbor-42-Quartz";
 
 /**
- * `/sign-in` renders two forms whose email field carries the same label — the
+ * `/sign-in` renders two forms whose email field carries the same label: the
  * credentials form and the magic-link one. Scoping by the submit button is what
  * keeps the locators unambiguous.
  */

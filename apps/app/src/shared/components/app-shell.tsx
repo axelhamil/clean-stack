@@ -9,17 +9,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { sessionQueryOptions } from "../../shared/api/queries/session";
-import { LogoMark } from "../../shared/components/logo-mark";
-import { ThemeToggle } from "../../shared/components/theme-toggle";
-import { NotificationBell } from "../../shared/notifications/notification-bell";
+import { sessionQueryOptions } from "../api/queries/session";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
 import { canAccessPlatformAdmin } from "../auth/can-access-platform-admin";
+import { NotificationBell } from "../notifications/notification-bell";
 import { CommandPalette } from "./command-palette";
 import { ContextualTabs } from "./contextual-tabs";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { LegalFooter } from "./legal-footer";
+import { LogoMark } from "./logo-mark";
 import { OrgSwitcher } from "./org-switcher";
+import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 
 interface AppShellProps {

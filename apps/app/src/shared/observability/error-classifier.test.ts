@@ -62,6 +62,10 @@ describe("isUnexpectedMutationError", () => {
     expect(isUnexpectedMutationError(new Error("email-not-verified-redirect"))).toBe(false);
   });
 
+  it("skips the sso redirect a sign-in flow throws while the browser navigates away", () => {
+    expect(isUnexpectedMutationError(new Error("sso-redirect-in-progress"))).toBe(false);
+  });
+
   it("captures plain Errors wrapping server failures (better-auth hooks)", () => {
     expect(isUnexpectedMutationError(new Error("Sign-in failed"))).toBe(true);
   });

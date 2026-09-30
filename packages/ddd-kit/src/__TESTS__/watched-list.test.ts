@@ -135,7 +135,7 @@ describe("WatchedList", () => {
       list.add({ id: "2", name: "B" });
 
       expect(list.getNewItems()).toHaveLength(1);
-      expect(list.getNewItems()[0].id).toBe("2");
+      expect(list.getNewItems()[0]?.id).toBe("2");
     });
 
     it("should not add duplicate", () => {
@@ -192,7 +192,7 @@ describe("WatchedList", () => {
       list.remove({ id: "1", name: "A" });
 
       expect(list.getRemovedItems()).toHaveLength(1);
-      expect(list.getRemovedItems()[0].id).toBe("1");
+      expect(list.getRemovedItems()[0]?.id).toBe("1");
     });
 
     it("should not track removal of newly added items", () => {
@@ -449,8 +449,7 @@ describe("WatchedList", () => {
     });
 
     it("should track removal even for non-existing items", () => {
-      // Current behavior: removing a non-existing item still tracks it as removed
-      // This is by design - the WatchedList tracks intent, not validation
+      // The list records intent, not validation: removing an unknown item is still tracked.
       const list = ItemList.create([]);
       list.remove({ id: "1", name: "A" });
 
@@ -476,6 +475,34 @@ describe("WatchedList", () => {
       expect(list.getItems()).toEqual([1, 3, 4]);
       expect(list.getNewItems()).toEqual([4]);
       expect(list.getRemovedItems()).toEqual([2]);
+    });
+
+    it("should track an item as new again after it was added, removed and re-added", () => {
+      const list = StringList.create(["a"]);
+      list.add("b");
+      list.remove("b");
+      list.add("b");
+
+      expect(list.getItems()).toEqual(["a", "b"]);
+      expect(list.getNewItems()).toEqual(["b"]);
+      expect(list.hasChanges()).toBe(true);
+    });
+
+    it("should not mutate the array it was created from", () => {
+      const initial = ["a"];
+      const list = StringList.create(initial);
+      list.add("b");
+
+      expect(initial).toEqual(["a"]);
+    });
+
+    it("should find a falsy item", () => {
+      const list = NumberList.create([0, 1]);
+
+      const found = list.find((n) => n === 0);
+
+      expect(found.isSome()).toBe(true);
+      expect(found.unwrap()).toBe(0);
     });
   });
 });

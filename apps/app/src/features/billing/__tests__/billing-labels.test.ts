@@ -1,18 +1,9 @@
-import { enCatalog } from "@packages/i18n";
 import { describe, expect, it } from "vitest";
+import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { isSubscriptionStatus, STATUS_KEYS, TIER_KEYS } from "../billing-labels";
 
-function resolve(key: string): string | undefined {
-  let cur: unknown = enCatalog.settings;
-  for (const seg of key.split(".")) {
-    if (typeof cur !== "object" || cur === null) return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return typeof cur === "string" ? cur : undefined;
-}
-
 describe("TIER_KEYS", () => {
-  // `satisfies Record<Tier, string>` only proves every tier has AN entry —
+  // `satisfies Record<Tier, string>` only proves every tier has AN entry;
   // it does not prove each one points at the RIGHT one. A swapped pair
   // (e.g. `free` reading `billing.tier.pro`) still type-checks, so this
   // asserts the mapping itself, not just its exhaustiveness.
@@ -25,9 +16,9 @@ describe("TIER_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(TIER_KEYS.free)).toBe("Free");
-    expect(resolve(TIER_KEYS.pro)).toBe("Pro");
-    expect(resolve(TIER_KEYS.business)).toBe("Business");
+    expect(enLabel(TIER_KEYS.free, "settings")).toBe("Free");
+    expect(enLabel(TIER_KEYS.pro, "settings")).toBe("Pro");
+    expect(enLabel(TIER_KEYS.business, "settings")).toBe("Business");
   });
 });
 
@@ -47,15 +38,15 @@ describe("STATUS_KEYS", () => {
   });
 
   it("every key resolves to the matching English label", () => {
-    expect(resolve(STATUS_KEYS.free)).toBe("Free");
-    expect(resolve(STATUS_KEYS.active)).toBe("Active");
-    expect(resolve(STATUS_KEYS.trialing)).toBe("Trial");
-    expect(resolve(STATUS_KEYS.past_due)).toBe("Past due");
-    expect(resolve(STATUS_KEYS.canceled)).toBe("Canceled");
-    expect(resolve(STATUS_KEYS.unpaid)).toBe("Unpaid");
-    expect(resolve(STATUS_KEYS.incomplete)).toBe("Incomplete");
-    expect(resolve(STATUS_KEYS.incomplete_expired)).toBe("Incomplete — expired");
-    expect(resolve(STATUS_KEYS.paused)).toBe("Paused");
+    expect(enLabel(STATUS_KEYS.free, "settings")).toBe("Free");
+    expect(enLabel(STATUS_KEYS.active, "settings")).toBe("Active");
+    expect(enLabel(STATUS_KEYS.trialing, "settings")).toBe("Trial");
+    expect(enLabel(STATUS_KEYS.past_due, "settings")).toBe("Past due");
+    expect(enLabel(STATUS_KEYS.canceled, "settings")).toBe("Canceled");
+    expect(enLabel(STATUS_KEYS.unpaid, "settings")).toBe("Unpaid");
+    expect(enLabel(STATUS_KEYS.incomplete, "settings")).toBe("Incomplete");
+    expect(enLabel(STATUS_KEYS.incomplete_expired, "settings")).toBe("Incomplete (expired)");
+    expect(enLabel(STATUS_KEYS.paused, "settings")).toBe("Paused");
   });
 });
 

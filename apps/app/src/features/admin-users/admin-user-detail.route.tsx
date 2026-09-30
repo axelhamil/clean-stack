@@ -9,6 +9,12 @@ import {
   CardTitle,
 } from "@packages/ui/components/ui/card";
 import {
+  DescriptionDetails,
+  DescriptionItem,
+  DescriptionList,
+  DescriptionTerm,
+} from "@packages/ui/components/ui/description-list";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,9 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
-import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
-import { cn } from "@packages/ui/libs/utils.js";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -27,8 +31,9 @@ import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
+import { errorFallback } from "../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../shared/utils";
 import {
   isPlatformRole,
   PLATFORM_ROLE_LABEL_KEYS,
@@ -73,11 +78,7 @@ function AdminUserDetailPage() {
       setBanOpen(false);
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.banUser", { defaultValue: "Failed to suspend account" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("banUser")),
   });
 
   const unbanMutation = useMutation({
@@ -86,11 +87,7 @@ function AdminUserDetailPage() {
       toast.success(t("users.detail.unbanSuccessToast"));
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.unbanUser", { defaultValue: "Failed to reactivate account" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("unbanUser")),
   });
 
   const impersonateMutation = useMutation({
@@ -102,13 +99,7 @@ function AdminUserDetailPage() {
       broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/dashboard" });
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.startImpersonation", {
-          defaultValue: "Failed to start impersonation",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("startImpersonation")),
   });
 
   const revokeSessionsMutation = useMutation({
@@ -117,23 +108,13 @@ function AdminUserDetailPage() {
       toast.success(t("users.detail.revokeSessionsSuccessToast"));
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.revokeUserSessions", { defaultValue: "Failed to revoke sessions" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("revokeUserSessions")),
   });
 
   const resetPasswordMutation = useMutation({
     ...resetPasswordMutationOptions,
     onSuccess: () => toast.success(t("users.detail.resetPasswordSuccessToast")),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.resetUserPassword", {
-          defaultValue: "Failed to send password reset",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("resetUserPassword")),
   });
 
   const setRoleMutation = useMutation({
@@ -143,25 +124,16 @@ function AdminUserDetailPage() {
       setRoleOpen(false);
       void invalidateUser();
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.setUserRole", { defaultValue: "Failed to change role" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("setUserRole")),
   });
 
-  if (query.isLoading) {
+  if (query.isLoading || query.isError || !query.data) {
     return (
-      <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
-        <p>{t("users.detail.loading")}</p>
-      </main>
-    );
-  }
-
-  if (query.isError || !query.data) {
-    return (
-      <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
-        <p>{t("users.detail.loadFailed")}</p>
+      <main className="flex flex-col gap-6">
+        <header>
+          <TypographyH1 variant="page">{t("users.pageTitle")}</TypographyH1>
+        </header>
+        <p>{query.isLoading ? t("users.detail.loading") : t("users.detail.loadFailed")}</p>
       </main>
     );
   }
@@ -169,7 +141,7 @@ function AdminUserDetailPage() {
   const user = query.data;
 
   return (
-    <main className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <main className="flex flex-col gap-6">
       <header>
         <TypographyH1 variant="page">{user.name}</TypographyH1>
       </header>
@@ -179,20 +151,20 @@ function AdminUserDetailPage() {
           <CardTitle>{t("users.detail.identityTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span>{t("users.table.email")}</span>
-              <span>{user.email}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("users.table.role")}</span>
-              <span className="flex items-center gap-2">
+          <DescriptionList layout="inline">
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.table.email")}</DescriptionTerm>
+              <DescriptionDetails>{user.email}</DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.table.role")}</DescriptionTerm>
+              <DescriptionDetails>
                 {user.role ? (
                   <Badge variant="secondary">
                     {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
                   </Badge>
                 ) : (
-                  "—"
+                  EMPTY_VALUE
                 )}
                 <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
                   <DialogTrigger asChild>
@@ -200,7 +172,7 @@ function AdminUserDetailPage() {
                       {t("users.detail.changeRole")}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent closeLabel={t("common:actions.close")}>
                     <DialogHeader>
                       <DialogTitle>{t("users.detail.changeRoleTitle")}</DialogTitle>
                       <DialogDescription>
@@ -214,21 +186,21 @@ function AdminUserDetailPage() {
                     />
                   </DialogContent>
                 </Dialog>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("users.detail.twoFactorLabel")}</span>
-              <span>
+              </DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.detail.twoFactorLabel")}</DescriptionTerm>
+              <DescriptionDetails>
                 {user.twoFactorEnabled
                   ? t("users.detail.twoFactorEnabled")
                   : t("users.detail.twoFactorDisabled")}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("users.detail.memberSinceLabel")}</span>
-              <span>{formatDate(user.createdAt)}</span>
-            </div>
-          </div>
+              </DescriptionDetails>
+            </DescriptionItem>
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.detail.memberSinceLabel")}</DescriptionTerm>
+              <DescriptionDetails>{formatDate(user.createdAt)}</DescriptionDetails>
+            </DescriptionItem>
+          </DescriptionList>
         </CardContent>
       </Card>
 
@@ -255,7 +227,7 @@ function AdminUserDetailPage() {
                       {t("users.detail.suspend")}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent closeLabel={t("common:actions.close")}>
                     <DialogHeader>
                       <DialogTitle>{t("users.suspendAccountTitle")}</DialogTitle>
                     </DialogHeader>
@@ -272,7 +244,7 @@ function AdminUserDetailPage() {
                     {t("users.detail.impersonate")}
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent closeLabel={t("common:actions.close")}>
                   <DialogHeader>
                     <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
                   </DialogHeader>
@@ -286,36 +258,36 @@ function AdminUserDetailPage() {
           </CardAction>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span>{t("users.table.status")}</span>
-              <span>
+          <DescriptionList layout="inline">
+            <DescriptionItem>
+              <DescriptionTerm>{t("users.table.status")}</DescriptionTerm>
+              <DescriptionDetails>
                 {user.banned ? (
                   <Badge variant="destructive">{t(USER_STATUS_LABEL_KEYS.suspended)}</Badge>
                 ) : (
                   <Badge variant="outline">{t(USER_STATUS_LABEL_KEYS.active)}</Badge>
                 )}
-              </span>
-            </div>
+              </DescriptionDetails>
+            </DescriptionItem>
             {user.banReason && (
-              <div className="flex items-center justify-between">
-                <span>{t("users.detail.reasonLabel")}</span>
-                <span>{user.banReason}</span>
-              </div>
+              <DescriptionItem>
+                <DescriptionTerm>{t("users.detail.reasonLabel")}</DescriptionTerm>
+                <DescriptionDetails>{user.banReason}</DescriptionDetails>
+              </DescriptionItem>
             )}
             {user.banExpires !== null && (
-              <div className="flex items-center justify-between">
-                <span>{t("users.detail.expiresLabel")}</span>
-                <span>{formatDate(user.banExpires)}</span>
-              </div>
+              <DescriptionItem>
+                <DescriptionTerm>{t("users.detail.expiresLabel")}</DescriptionTerm>
+                <DescriptionDetails>{formatDate(user.banExpires)}</DescriptionDetails>
+              </DescriptionItem>
             )}
             {user.banned && user.banExpires === null && (
-              <div className="flex items-center justify-between">
-                <span>{t("users.detail.expiresLabel")}</span>
-                <span>{t("users.durationPermanent")}</span>
-              </div>
+              <DescriptionItem>
+                <DescriptionTerm>{t("users.detail.expiresLabel")}</DescriptionTerm>
+                <DescriptionDetails>{t("users.durationPermanent")}</DescriptionDetails>
+              </DescriptionItem>
             )}
-          </div>
+          </DescriptionList>
         </CardContent>
         <CardFooter className="flex-wrap gap-2">
           <Button

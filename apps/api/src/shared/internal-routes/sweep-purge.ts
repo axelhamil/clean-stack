@@ -16,7 +16,7 @@ export type PurgeBatchOptions = {
    * the delete. No production call site sets it, so it never changes the delete SQL
    * any route emits. Exists so `apps/api/scripts/check-sweep-lock.ts` can assert
    * `current_setting(...)` against a real Postgres transaction instead of mocking
-   * `tx.execute` and asserting on SQL text (banned — see `shared/CLAUDE.md`).
+   * `tx.execute` and asserting on SQL text (banned, see `shared/CLAUDE.md`).
    */
   assertGuards?: (tx: Transaction) => Promise<void>;
 };
@@ -24,7 +24,7 @@ export type PurgeBatchOptions = {
 /**
  * Asserts a sweep filter was actually built.
  *
- * `and()` returns `undefined` when every argument is — a predicate that would make
+ * `and()` returns `undefined` when every argument is, a predicate that would make
  * `purgeBatchWithTimeout` delete the oldest N rows of the whole table, retention window
  * ignored. Each call site knows its own arguments are unconditional, but that is a fact
  * about today's code, not a guarantee: this turns seven unchecked `as SQL` assertions
@@ -44,12 +44,12 @@ export function requireFilter(filter: SQL | undefined, label: string): SQL {
  * they are the reason a batch cannot outlive the sweep budget between deadline checks.
  *
  * One span, not four: the transaction is multi-statement, and rule #8's trap (b) is
- * exactly this — N sibling inner spans are noise. The span wraps the delete and
+ * exactly this, N sibling inner spans are noise. The span wraps the delete and
  * carries its SQL; the lock-timeout guards and the FOR UPDATE subquery ride inside it.
  */
 export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<number> {
   // `and()` returns `undefined` when given no arguments or all-undefined conditions,
-  // and Drizzle's `where(undefined)` is a no-op — a caller that lets its predicate
+  // and Drizzle's `where(undefined)` is a no-op, a caller that lets its predicate
   // collapse to `undefined` would otherwise delete the oldest N rows of the whole
   // table. Fail closed rather than let that type-check.
   if (!opts.where) {

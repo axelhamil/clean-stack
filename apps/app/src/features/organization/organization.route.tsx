@@ -29,14 +29,8 @@ function OrganizationPage() {
   const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
-  const { data: members = [] } = useQuery(
-    org ? orgMembersQueryOptions(org.id) : { ...orgMembersQueryOptions(""), enabled: false },
-  );
-  const { data: invitations = [] } = useQuery(
-    org
-      ? orgInvitationsQueryOptions(org.id)
-      : { ...orgInvitationsQueryOptions(""), enabled: false },
-  );
+  const { data: members = [] } = useQuery(orgMembersQueryOptions(org?.id ?? null));
+  const { data: invitations = [] } = useQuery(orgInvitationsQueryOptions(org?.id ?? null));
 
   if (!org) return <TypographyMuted>{t("organization.noActiveOrg")}</TypographyMuted>;
 
@@ -82,11 +76,7 @@ function OrganizationPage() {
             {members.map((m) => (
               <MemberRow
                 key={m.id}
-                member={{
-                  id: m.id,
-                  role: m.role as "owner" | "admin" | "member",
-                  user: { id: m.user.id, email: m.user.email, name: m.user.name },
-                }}
+                member={m}
                 organizationId={org.id}
                 isCurrentUser={m.user.id === membership?.userId}
               />
@@ -106,17 +96,7 @@ function OrganizationPage() {
           <CardContent>
             <ul className="flex flex-col divide-y">
               {pendingInvitations.map((inv) => (
-                <InvitationRow
-                  key={inv.id}
-                  invitation={{
-                    id: inv.id,
-                    email: inv.email,
-                    role: inv.role,
-                    status: inv.status,
-                    expiresAt: inv.expiresAt,
-                  }}
-                  organizationId={org.id}
-                />
+                <InvitationRow key={inv.id} invitation={inv} organizationId={org.id} />
               ))}
             </ul>
           </CardContent>

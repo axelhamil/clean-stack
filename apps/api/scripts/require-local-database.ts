@@ -16,7 +16,7 @@ export function requireLocalDatabase(scriptName: string): void {
   if (!isLocalDatabase) {
     console.error(
       `${scriptName} refuses to run: DATABASE_URL does not point at localhost/127.0.0.1. ` +
-        "This script writes real rows through the real code path — never point it at a shared database.",
+        "This script writes real rows through the real code path, never point it at a shared database.",
     );
     process.exit(1);
   }

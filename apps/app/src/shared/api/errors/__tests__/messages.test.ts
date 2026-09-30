@@ -1,16 +1,9 @@
 import enCatalog from "@packages/i18n/src/catalogs/en";
 import { describe, expect, it } from "vitest";
+import { catalogT } from "../../../i18n/__tests__/catalog-t";
 import { formatApiError } from "../messages";
 
-const t = ((key: string, opts?: { defaultValue?: string }) => {
-  const path = key.replace(/^errors:/, "").split(".");
-  let node: unknown = enCatalog.errors;
-  for (const seg of path) {
-    if (typeof node !== "object" || node === null) return opts?.defaultValue ?? key;
-    node = (node as Record<string, unknown>)[seg];
-  }
-  return typeof node === "string" ? node : (opts?.defaultValue ?? key);
-}) as never;
+const t = catalogT(enCatalog.errors);
 
 describe("formatApiError", () => {
   it("prefers an exact code over a suffix", () => {

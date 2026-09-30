@@ -27,7 +27,7 @@ watchSession(queryClient);
 
 const cspNonce = (() => {
   if (typeof document === "undefined") return undefined;
-  // <meta> is not a nonceable element, so the IDL .nonce property stays empty — read the attribute.
+  // <meta> is not a nonceable element, so the IDL .nonce property stays empty: read the attribute.
   return (
     document.querySelector<HTMLMetaElement>('meta[property="csp-nonce"]')?.getAttribute("nonce") ??
     undefined
@@ -83,14 +83,17 @@ export function AppProviders({ i18n }: AppProvidersProps) {
 
 function ZodLocale() {
   const { t } = useTranslation("errors");
+
   useEffect(() => {
     applyZodErrorMap(t);
   }, [t]);
+
   return null;
 }
 
 function AppErrorFallback() {
   const { t } = useTranslation();
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
       <TypographyH1>{t("errorBoundary.title")}</TypographyH1>

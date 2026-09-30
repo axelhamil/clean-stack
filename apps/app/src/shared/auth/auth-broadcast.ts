@@ -1,4 +1,4 @@
-import { createBroadcastChannel } from "../hooks/use-broadcast-channel";
+import { createBroadcastChannel } from "../broadcast-channel";
 import { resetChosenLocale } from "../i18n/locale-reconciliation";
 
 type AuthEvent = { type: "session-changed"; identityChanged: boolean };
@@ -7,7 +7,7 @@ const channel = createBroadcastChannel<AuthEvent>("clean-stack-auth");
 
 export interface BroadcastAuthChangeOptions {
   /**
-   * Set only when the *person* behind the session changed — sign-out,
+   * Set only when the *person* behind the session changed: sign-out,
    * impersonation start, impersonation stop. Most callers of this function
    * (profile save, avatar upload, org switch, session revoke, ...) refresh
    * the same person's session and must leave this false.
@@ -23,7 +23,7 @@ export interface BroadcastAuthChangeOptions {
  * person: left standing across a sign-out, it makes the next user of the same
  * tab read the UI in the previous user's language until a hard reload.
  * Gating it on `identityChanged` (rather than firing on every broadcast) is
- * what keeps a same-person refresh — a profile save, an avatar upload — from
+ * what keeps a same-person refresh (a profile save, an avatar upload) from
  * reverting the language the person just picked before that save.
  */
 export function broadcastAuthChange(options: BroadcastAuthChangeOptions = {}): void {

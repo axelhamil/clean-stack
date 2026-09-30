@@ -8,7 +8,7 @@ import {
 // Non-prose metadata only. The rendered bodies live in `policies/en.tsx` and
 // `policies/fr.tsx` (per-locale, R3); `policy-labels.ts` owns the translated
 // title lookup. Neither belongs on this record: the body is chosen per
-// locale at render time (`policies/index.ts`), and a hardcoded English title
+// locale at render time (`policies/bodies.ts`), and a hardcoded English title
 // field would be a second, driftable source of truth next to the catalog.
 export interface PolicyDoc {
   type: PolicyType;
@@ -17,24 +17,21 @@ export interface PolicyDoc {
   summary: string;
 }
 
-const privacyChangelog = POLICY_CHANGELOG.privacy;
-const termsChangelog = POLICY_CHANGELOG.terms;
+function currentDoc(type: PolicyType): PolicyDoc {
+  const version = POLICY_VERSIONS[type];
+  const latest = POLICY_CHANGELOG[type].at(-1);
+
+  return {
+    type,
+    version,
+    effectiveDate: latest?.effectiveDate ?? version,
+    summary: latest?.summary ?? "",
+  };
+}
 
 export const POLICY_DOCS: Record<PolicyType, PolicyDoc> = {
-  privacy: {
-    type: "privacy",
-    version: POLICY_VERSIONS.privacy,
-    effectiveDate:
-      privacyChangelog[privacyChangelog.length - 1]?.effectiveDate ?? POLICY_VERSIONS.privacy,
-    summary: privacyChangelog[privacyChangelog.length - 1]?.summary ?? "",
-  },
-  terms: {
-    type: "terms",
-    version: POLICY_VERSIONS.terms,
-    effectiveDate:
-      termsChangelog[termsChangelog.length - 1]?.effectiveDate ?? POLICY_VERSIONS.terms,
-    summary: termsChangelog[termsChangelog.length - 1]?.summary ?? "",
-  },
+  privacy: currentDoc("privacy"),
+  terms: currentDoc("terms"),
 };
 
 export function getChangesSince(

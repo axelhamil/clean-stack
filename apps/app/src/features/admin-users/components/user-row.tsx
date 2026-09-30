@@ -4,6 +4,7 @@ import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
+import { EMPTY_VALUE } from "../../../shared/utils";
 import {
   isPlatformRole,
   PLATFORM_ROLE_LABEL_KEYS,
@@ -18,6 +19,7 @@ interface UserRowProps {
 export function UserRow({ item }: UserRowProps) {
   const formatDate = useFormatDate();
   const { t } = useTranslation(["admin", "common"]);
+
   return (
     <TableRow>
       <TableCell>
@@ -34,7 +36,7 @@ export function UserRow({ item }: UserRowProps) {
             {isPlatformRole(item.role) ? t(PLATFORM_ROLE_LABEL_KEYS[item.role]) : item.role}
           </Badge>
         ) : (
-          <span>—</span>
+          EMPTY_VALUE
         )}
       </TableCell>
       <TableCell>

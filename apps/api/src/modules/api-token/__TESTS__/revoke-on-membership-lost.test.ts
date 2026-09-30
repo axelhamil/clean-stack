@@ -1,10 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { ApiTokenError, IApiTokenRepository } from "../../../shared/ports/api-token.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { revokeTokensOnMembershipLost } from "../application/event-handlers/revoke-on-membership-lost";
-import type { ApiTokenError, IApiTokenRepository } from "../application/ports/api-token.port";
 
 function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository {
   return {

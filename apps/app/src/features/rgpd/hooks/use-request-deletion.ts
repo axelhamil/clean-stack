@@ -1,9 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { requestAccountDeletionMutationOptions } from "../../../shared/api/mutations/request-account-deletion";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
+import { useRefreshSession } from "../../../shared/auth/use-refresh-session";
 
 interface UseRequestDeletionOptions {
   onClose: () => void;
@@ -11,13 +10,12 @@ interface UseRequestDeletionOptions {
 
 export function useRequestDeletion({ onClose }: UseRequestDeletionOptions) {
   const { t } = useTranslation("settings");
-  const queryClient = useQueryClient();
+  const refreshSession = useRefreshSession();
 
   return useMutation({
     ...requestAccountDeletionMutationOptions,
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
-      broadcastAuthChange();
+      await refreshSession();
       onClose();
       toast.success(t("deletion.requestedToast"));
     },

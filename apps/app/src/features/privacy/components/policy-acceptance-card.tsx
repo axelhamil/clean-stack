@@ -6,7 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { ListRow, ListRowAction } from "@packages/ui/components/ui/list-row";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { policiesQueryOptions } from "../../../shared/api/queries/policies";
@@ -27,14 +28,16 @@ export function PolicyAcceptanceCard() {
         {isLoading ? (
           <TypographyMuted>{t("privacy.policyAcceptance.loading")}</TypographyMuted>
         ) : data ? (
-          <ul className="flex flex-col divide-y">
+          <ul className="flex flex-col gap-2">
             {Object.entries(data).map(([type, status]) => (
-              <li key={type} className="flex items-center justify-between gap-4 py-3">
-                <span className="text-sm font-medium">{policyLabelFor(type, tCommon)}</span>
-                <div className="flex items-center gap-3">
-                  <TypographyMuted className="text-xs">
+              <ListRow key={type}>
+                <TypographySmall>{policyLabelFor(type, tCommon)}</TypographySmall>
+                <ListRowAction>
+                  <TypographyMuted>
                     {status.acceptedVersion
-                      ? `v${status.acceptedVersion}`
+                      ? t("privacy.policyAcceptance.acceptedVersion", {
+                          version: status.acceptedVersion,
+                        })
                       : t("privacy.policyAcceptance.neverAccepted")}
                   </TypographyMuted>
                   {status.current ? (
@@ -44,8 +47,8 @@ export function PolicyAcceptanceCard() {
                       {t("privacy.policyAcceptance.updateRequired")}
                     </Badge>
                   )}
-                </div>
-              </li>
+                </ListRowAction>
+              </ListRow>
             ))}
           </ul>
         ) : (

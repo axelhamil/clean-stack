@@ -52,7 +52,7 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
   const revokeOthers = useRevokeOtherSessions();
   const { t } = useTranslation("settings");
   // `/revoke-session` and `/revoke-other-sessions` are on the BetterAuth
-  // impersonation blocklist — an admin borrowing this account cannot end its
+  // impersonation blocklist: an admin borrowing this account cannot end its
   // sessions.
   const guard = useImpersonationGuard();
 
@@ -118,7 +118,7 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt, guard }
   const mutation = useRevokeSession();
   const { t } = useTranslation("settings");
   const expires = formatDate(expiresAt);
-  const ua = userAgent
+  const deviceLabel = userAgent
     ? t(DEVICE_KEYS[summarizeUserAgent(userAgent)])
     : t("sessions.unknownDevice");
 
@@ -128,7 +128,7 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt, guard }
         <MonitorIcon />
         <ListRowContent>
           <ListRowMeta>
-            <TypographySmall>{ua}</TypographySmall>
+            <TypographySmall>{deviceLabel}</TypographySmall>
             {isCurrent && <Badge variant="secondary">{t("sessions.current")}</Badge>}
           </ListRowMeta>
           <TypographyMuted>

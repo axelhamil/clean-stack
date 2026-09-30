@@ -31,7 +31,7 @@ export default {
     SESSION_EXPIRED: "Votre session a expiré. Reconnectez-vous pour continuer.",
     SESSION_NOT_FRESH: "Reconnectez-vous pour confirmer cette modification.",
     CREDENTIAL_ACCOUNT_NOT_FOUND:
-      "Ce compte n'a pas de mot de passe — utilisez la méthode de connexion que vous avez configurée.",
+      "Ce compte n'a pas de mot de passe. Utilisez la méthode de connexion que vous avez configurée.",
     ACCOUNT_NOT_FOUND: "Compte introuvable.",
     SOCIAL_ACCOUNT_ALREADY_LINKED: "Ce compte est déjà lié à un autre utilisateur.",
     FAILED_TO_CREATE_USER: "Nous n'avons pas pu créer votre compte. Veuillez réessayer.",
@@ -48,7 +48,7 @@ export default {
       "Ce code est incorrect. Vérifiez votre application d'authentification et réessayez.",
     TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Trop de tentatives. Demandez un nouveau code.",
     ACCOUNT_TEMPORARILY_LOCKED:
-      "Trop de tentatives échouées. Votre compte est temporairement verrouillé — réessayez plus tard.",
+      "Trop de tentatives échouées. Votre compte est temporairement verrouillé. Réessayez plus tard.",
     INVALID_TWO_FACTOR_COOKIE: "Cette étape de vérification a expiré. Reconnectez-vous.",
     CHALLENGE_NOT_FOUND: "Cette tentative de clé d'accès a expiré. Réessayez.",
     YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY:
@@ -233,5 +233,11 @@ export default {
     regenerateBackupCodes: "Impossible de régénérer vos codes de récupération. Veuillez réessayer.",
     revokeSession: "Échec de la révocation de la session",
     revokeOtherSessions: "Échec de la révocation des sessions",
+    setLocale: "Échec de la mise à jour de la langue",
+    preflightDeletion: "Impossible de vérifier si le compte peut être supprimé",
+    presignUpload: "Échec de la préparation de l'envoi",
+    confirmUpload: "Échec de la confirmation de l'envoi",
+    deleteUpload: "Échec de la suppression du fichier",
+    upgradeSubscription: "Échec du lancement de la mise à niveau",
   },
 } as const;

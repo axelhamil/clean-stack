@@ -1,4 +1,4 @@
-// `/internal/*` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
+// `/internal/*`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";

@@ -15,7 +15,7 @@ describe("cles de query notifications", () => {
 
   test("la liste reste une seule cle stable, quel que soit l'appel", () => {
     // Une infinite query n'a qu'une seule entree de cache pour toutes ses
-    // pages — c'est ce qui permet a `applyRead` de patcher toutes les pages
+    // pages : c'est ce qui permet a `applyRead` de patcher toutes les pages
     // deja chargees en un seul `setQueriesData`, et au flux SSE de marquer
     // toute la liste perimee sans savoir combien de curseurs ont ete charges.
     expect(notificationsInfiniteQueryOptions().queryKey).toEqual(

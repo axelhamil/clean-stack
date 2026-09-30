@@ -11,5 +11,6 @@ export function serializeFilters(filters: AuditLogFilters): Record<string, strin
   for (const [k, v] of Object.entries(filters)) {
     if (typeof v === "string" && v.length > 0) out[k] = v;
   }
+
   return out;
 }

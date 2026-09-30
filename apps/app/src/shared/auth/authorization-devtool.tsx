@@ -1,5 +1,5 @@
 /**
- * Authorization DevTool — dev-only floating panel.
+ * Authorization DevTool: dev-only floating panel.
  *
  * Visualises the active session's role and the full capability matrix derived
  * from `STATEMENTS` × `roles` in `@packages/access-control`. Use it to verify
@@ -23,7 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
-import { useAuthorization } from "../auth/use-authorization";
+import { useAuthorization } from "./use-authorization";
 
 const PERSONAL_BLOCKED: Record<string, ReadonlySet<string>> = {
   organization: new Set(["delete", "leave"]),
@@ -47,7 +47,7 @@ export function AuthorizationDevTool() {
               Authorization
             </CardTitle>
             <CardDescription>
-              Role: <Badge variant="secondary">{role ?? "none"}</Badge> · Org: {org?.name ?? "—"}
+              Role: <Badge variant="secondary">{role ?? "none"}</Badge> · Org: {org?.name ?? "none"}
             </CardDescription>
             <CardAction>
               <Button variant="ghost" size="icon" className="size-7" onClick={() => setOpen(false)}>

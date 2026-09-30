@@ -14,7 +14,7 @@ export const DEFAULT_DIGEST_HOUR_UTC = 8;
  * A non-immediate frequency does not suppress the e-mail, it postpones it: the
  * flush groups everything that came due into a single message per user and
  * category. This is the whole of that decision, and it is a pure function of
- * the instant the event occurred — never of "now", never of when the last
+ * the instant the event occurred, never of "now", never of when the last
  * digest went out. That matters: a window anchored on the previous send drifts
  * a little further every cycle (a run that fires 40 s late pushes the next one
  * 40 s later still), and nothing about it is reproducible in a test. Anchoring

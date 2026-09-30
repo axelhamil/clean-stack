@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
-// Expose full export surface to avoid cross-file export-not-found errors under parallel bun test.
 const insertExecute = mock(async () => {});
 const selectExecute = mock(async () => [] as unknown[]);
 
@@ -31,82 +31,7 @@ const fakeTx = {
   select: () => makeQueryChain(selectExecute),
 };
 
-mock.module("@packages/drizzle", () => ({
-  db: fakeDb,
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  not: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  like: () => ({}),
-  inArray: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: {
-    auditLog: {
-      actorId: {},
-      actorType: {},
-      organizationId: {},
-      action: {},
-      targetType: {},
-      targetId: {},
-      occurredAt: {},
-      retention: {},
-      id: {},
-    },
-  },
-  webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-}));
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeDb }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
 const { DrizzleAuditRepository } = await import("../services/drizzle-audit.service");

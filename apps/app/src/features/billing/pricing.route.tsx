@@ -4,21 +4,21 @@ import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { subscriptionQueryOptions } from "../../shared/api/queries/subscription";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { PricingTable } from "../../shared/components/pricing-table";
 
 export const Route = createFileRoute("/pricing")({
-  validateSearch: (s: Record<string, unknown>) => ({ plan: (s.plan as string) ?? undefined }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    plan: typeof s.plan === "string" ? s.plan : undefined,
+  }),
   component: PricingPage,
 });
 
 function PricingPage() {
   const { t } = useTranslation("common");
   const { data: session } = useQuery(sessionQueryOptions);
-  const { data: activeOrg } = useQuery({ ...activeOrgQueryOptions, enabled: Boolean(session) });
   const organizationId = useActiveOrgId();
   const { data: sub } = useQuery({
     ...subscriptionQueryOptions(organizationId),
@@ -34,7 +34,7 @@ function PricingPage() {
       <PricingTable
         isAuthenticated={Boolean(session)}
         currentTier={sub?.tier ?? null}
-        activeOrgId={activeOrg?.id ?? null}
+        activeOrgId={organizationId}
       />
     </main>
   );

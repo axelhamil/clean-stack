@@ -23,6 +23,7 @@ import { RegenerateBackupCodesForm } from "../forms/regenerate-backup-codes-form
 
 export function RecoveryCodesCard() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const guard = useImpersonationGuard();
 
@@ -40,7 +41,7 @@ export function RecoveryCodesCard() {
               {t("recoveryCodes.regenerate")}
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent closeLabel={tCommon("actions.close")}>
             <DialogHeader>
               <DialogTitle>{t("recoveryCodes.regenerateDialogTitle")}</DialogTitle>
               <DialogDescription>

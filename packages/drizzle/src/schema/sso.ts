@@ -2,9 +2,8 @@ import { boolean, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-c
 import { user } from "./auth";
 import { organization } from "./multi-tenant";
 
-// Schema imposed by @better-auth/sso (unconfigured mount, Task 1). `domainVerified`
-// is only written by the plugin once `domainVerification.enabled` is set (Task 4+),
-// but the column is created now to avoid a second migration.
+// Schema imposed by @better-auth/sso. `domainVerified` is only written once the plugin's
+// `domainVerification.enabled` is set, but the column exists now to avoid a later migration.
 export const ssoProvider = pgTable(
   "sso_provider",
   {
@@ -29,9 +28,8 @@ export const ssoProvider = pgTable(
 );
 
 // Schema imposed by @better-auth/scim. `userId` is only populated once `providerOwnership`
-// is enabled (Task 4) but the nullable column is created now — see spec §4 / D10.
-// `storeSCIMToken: "hashed"` is also a Task 4 concern (D11); the column stores whatever
-// the plugin writes (plaintext for now, hash once configured).
+// is enabled, and `scimToken` stores whatever the plugin writes (plaintext until
+// `storeSCIMToken: "hashed"` is configured). Both columns exist now to avoid a later migration.
 export const scimProvider = pgTable(
   "scim_provider",
   {

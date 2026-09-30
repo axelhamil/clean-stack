@@ -61,7 +61,7 @@ export default {
       canceled: "Canceled",
       unpaid: "Unpaid",
       incomplete: "Incomplete",
-      incompleteExpired: "Incomplete — expired",
+      incompleteExpired: "Incomplete (expired)",
       paused: "Paused",
     },
   },
@@ -132,6 +132,7 @@ export default {
     copy: "Copy",
     download: "Download",
     copiedToast: "Backup codes copied",
+    copyFailed: "Couldn't copy the backup codes. Download them instead.",
   },
   deletion: {
     scheduledTitle: "Account deletion scheduled",
@@ -264,6 +265,7 @@ export default {
       "Delete your account in <accountLink>Account settings</accountLink> to remove this organization.",
     deleteOrgAlertDescription:
       "Deleting <orgName></orgName> will permanently delete all members, invitations, and data. This action cannot be undone.",
+    deleteOrgConfirmLabel: "Type <value>{{name}}</value> to confirm",
     deleteOrgDialogDescription:
       "This action cannot be undone. All members, invitations, and data attached to this organization will be permanently removed.",
     saveDefaultsFailed: "Could not save the organization defaults",
@@ -278,6 +280,7 @@ export default {
       description: "Your acceptance status for the current versions of our policies.",
       loading: "Loading…",
       neverAccepted: "Never accepted",
+      acceptedVersion: "Accepted v{{version}}",
       upToDate: "Up to date",
       updateRequired: "Update required",
       loadError: "Could not load policy status.",
@@ -343,7 +346,7 @@ export default {
       createdHeader: "Created",
     },
     endpointRow: {
-      autoDisabledTooltip: "Disabled after repeated delivery failures — re-enable to reset",
+      autoDisabledTooltip: "Disabled after repeated delivery failures (re-enable to reset)",
       openActions: "Open actions",
       viewDeliveries: "View deliveries",
       edit: "Edit",
@@ -375,6 +378,7 @@ export default {
       attemptNumber: "Attempt #{{number}}",
       noResponse: "no response",
       payload: "Payload",
+      duration: "{{ms}} ms",
     },
     verifySnippetHeading: "Verify signatures (Node.js)",
     eventTypePicker: {
@@ -441,7 +445,7 @@ export default {
         "Let members sign in through your identity provider (OIDC or SAML), provision accounts via SCIM, and enforce SSO across a verified domain.",
       upgradeAction: "Upgrade to the Business plan",
     },
-    // Shared between `domainCard` and `scimCard` — both gate on the same
+    // Shared between `domainCard` and `scimCard`: both gate on the same
     // "no provider registered yet" condition for the same org.
     registerProviderFirst: "Register an identity provider first.",
     providerCard: {
@@ -449,7 +453,7 @@ export default {
       description:
         "Connect the OIDC or SAML application your identity provider issues so members on your domain can sign in through it.",
       registeredToast: "SSO provider registered",
-      // Also read by the registration Tabs triggers — same protocol names,
+      // Also read by the registration Tabs triggers: same protocol names,
       // same source, one key each (see `sso-labels.ts`).
       type: {
         oidc: "OIDC",
@@ -463,7 +467,7 @@ export default {
     domainCard: {
       title: "Domain verification",
       description:
-        "Prove you control the domain by publishing a TXT record. The provider stays inactive — members on that domain cannot sign in through it — until the record resolves.",
+        "Prove you control the domain by publishing a TXT record. The provider stays inactive (members on that domain cannot sign in through it) until the record resolves.",
       verifiedToast: "Domain verified",
       verifiedBadge: "Verified",
       unverifiedBadge: "Unverified",
@@ -472,18 +476,18 @@ export default {
       checkNowAction: "Check now",
       alreadyVerified: "This domain is already verified.",
       verifyFailed:
-        "Verification failed — the DNS record was not found. DNS changes can take a while to propagate.",
+        "Verification failed: the DNS record was not found. DNS changes can take a while to propagate.",
     },
     enforcementCard: {
       title: "Enforce SSO",
       description:
-        "When enabled, members on your verified domain can no longer sign in with a password, a magic link, or a passkey — SSO through your identity provider becomes the only way in.",
+        "When enabled, members on your verified domain can no longer sign in with a password, a magic link, or a passkey: SSO through your identity provider becomes the only way in.",
       updatedToast: "SSO enforcement updated",
       switchAriaLabel: "Enforce SSO for your domain",
       enforcedLabel: "Enforced",
       notEnforcedLabel: "Not enforced",
       verifyDomainFirst:
-        "Verify your domain before enforcing SSO — otherwise nobody on it will be able to sign in at all.",
+        "Verify your domain before enforcing SSO, otherwise nobody on it will be able to sign in at all.",
     },
     scimCard: {
       title: "SCIM provisioning",
@@ -494,7 +498,7 @@ export default {
       generateAction: "Generate token",
       secretDialogTitle: "SCIM token",
       secretDialogDescription:
-        "Copy this token now — it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector.",
+        "Copy this token now: it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector.",
     },
     forms: {
       oidc: {

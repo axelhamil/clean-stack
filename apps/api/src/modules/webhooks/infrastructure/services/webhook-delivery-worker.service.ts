@@ -4,7 +4,7 @@ import { EventTypes } from "@packages/events";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
-import { JITTER_BASE_MS, JITTER_MULTIPLIER, nextAttemptAt } from "../../../../shared/jitter";
+import { expectedDelayFromAttempts, nextAttemptAt } from "../../../../shared/jitter";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
@@ -21,10 +21,6 @@ const POLL_INTERVAL_MS = 5_000;
 const BATCH_SIZE = 10;
 const FETCH_TIMEOUT_MS = 30_000;
 const CLAIM_WINDOW_MS = BATCH_SIZE * FETCH_TIMEOUT_MS + 30_000;
-
-function expectedDelayFromAttempts(currentAttempts: number): number {
-  return JITTER_BASE_MS * JITTER_MULTIPLIER ** Math.max(0, currentAttempts);
-}
 
 function shouldAutoDisable(
   { consecutiveFailures, firstFailedAt }: { consecutiveFailures: number; firstFailedAt: Date },
@@ -85,13 +81,18 @@ export class WebhookDeliveryWorker {
       { name: "WebhookDeliveryWorker > start", op: "function" },
       async () => {
         this.stopping = false;
-        this.timer = setInterval(() => {
-          this.drain().catch((err) => this.logger.error({ err }, "webhook delivery drain failed"));
-        }, POLL_INTERVAL_MS);
+        this.timer = setInterval(() => this.drainSafely(), POLL_INTERVAL_MS);
         this.logger.info("webhook delivery worker started");
-        void this.drain();
+        this.drainSafely();
       },
     );
+  }
+
+  private drainSafely(): void {
+    this.drain().catch((err) => {
+      this.instrumentation.capture(err);
+      this.logger.error({ err }, "webhook delivery drain failed");
+    });
   }
 
   async stop(): Promise<void> {
@@ -184,6 +185,7 @@ export class WebhookDeliveryWorker {
       try {
         await this.processDelivery(delivery);
       } catch (err) {
+        this.instrumentation.capture(err);
         const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
         this.logger.error(
           { err, deliveryId: delivery.id, eventType: delivery.eventType },
@@ -191,9 +193,10 @@ export class WebhookDeliveryWorker {
         );
         await db
           .transaction(async (tx) => this.markFailed(delivery, errMsg, Option.none(), null, tx))
-          .catch((e) =>
-            this.logger.error({ err: e, deliveryId: delivery.id }, "markFailed failed"),
-          );
+          .catch((e) => {
+            this.instrumentation.capture(e);
+            this.logger.error({ err: e, deliveryId: delivery.id }, "markFailed failed");
+          });
       }
     }
     return claimed.length;
@@ -210,15 +213,16 @@ export class WebhookDeliveryWorker {
               .transaction(async (tx) =>
                 this.markFailed(delivery, "endpoint lookup db error", Option.none(), null, tx),
               )
-              .catch((e) =>
+              .catch((e) => {
+                this.instrumentation.capture(e);
                 this.logger.error(
                   { err: e, deliveryId: delivery.id },
                   "markFailed (db_error) failed",
-                ),
-              );
+                );
+              });
             return;
           }
-          // not_found or disabled — permanent dead-letter
+          // not_found or disabled: permanent dead-letter
           await db.transaction(async (tx) => {
             const upd = await this.deliveries.updateStatus(
               delivery.id,
@@ -468,14 +472,14 @@ export class WebhookDeliveryWorker {
     tx: Parameters<IWebhookDeliveryRepository["updateStatus"]>[2],
   ): Promise<void> {
     const newAttempts = delivery.attempts + 1;
-    const { date } = nextAttemptAt(newAttempts, expectedDelayFromAttempts(newAttempts));
-    const status: "failed" | "dead_letter" = date === null ? "dead_letter" : "failed";
+    const retryAt = nextAttemptAt(newAttempts, expectedDelayFromAttempts(newAttempts));
+    const status: "failed" | "dead_letter" = retryAt.isNone() ? "dead_letter" : "failed";
     const upd = await this.deliveries.updateStatus(
       delivery.id,
       {
         status,
         attempts: newAttempts,
-        nextAttemptAt: Option.fromNullable(date),
+        nextAttemptAt: retryAt,
         lastError: Option.some(error),
         lastResponseStatus: responseStatus,
       },

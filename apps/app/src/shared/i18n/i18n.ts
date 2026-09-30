@@ -23,7 +23,7 @@ let activeInstance: I18nInstance | undefined;
 
 /**
  * Read-only access to the booted i18next instance for code that cannot use
- * `useTranslation` — the global `QueryCache`/`MutationCache` error handlers
+ * `useTranslation`: the global `QueryCache`/`MutationCache` error handlers
  * (`observability/query-error-handler.ts`) and `toast.ts` run outside the
  * React tree entirely. `undefined` before `initI18n()` resolves (tests,
  * SSR); callers fall back to an untranslated default in that case.
@@ -49,8 +49,8 @@ async function bootInstance(locale: Locale): Promise<I18nInstance> {
  * A rejected dynamic catalog import (bad network mid-boot) must not leave the
  * app on a blank screen: the failure is reported to telemetry and the boot
  * retries once against `DEFAULT_LOCALE`, whose catalog is a static import and
- * therefore not subject to the same network failure. Only a second failure —
- * meaning the bundle itself is broken, not the network — propagates.
+ * therefore not subject to the same network failure. Only a second failure
+ * (meaning the bundle itself is broken, not the network) propagates.
  */
 export async function initI18n(): Promise<I18nInstance> {
   try {
@@ -71,8 +71,8 @@ export async function initI18n(): Promise<I18nInstance> {
  * Switches the active language, loading its catalog on demand.
  *
  * The cookie is written here rather than at the call site so every path that
- * changes the language — the settings switcher and the session reconciliation
- * alike — leaves the same trace for the next page load to read.
+ * changes the language (the settings switcher and the session reconciliation
+ * alike) leaves the same trace for the next page load to read.
  */
 export async function changeLocale(instance: I18nInstance, locale: Locale): Promise<void> {
   if (instance.language === locale) return;

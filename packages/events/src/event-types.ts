@@ -42,12 +42,14 @@ export const EventTypes = {
   WEBHOOK_ENDPOINT_SECRET_ROTATED: "webhook.endpoint.secret_rotated",
   WEBHOOK_ENDPOINT_DISABLED: "webhook.endpoint.disabled",
   WEBHOOK_DELIVERY_EXHAUSTED: "webhook.delivery.exhausted",
+  WEBHOOK_DELIVERY_REPLAYED: "webhook.delivery.replayed",
   API_TOKEN_CREATED: "api_token.created",
   API_TOKEN_REVOKED: "api_token.revoked",
   API_TOKEN_USED: "api_token.used",
   USER_POLICY_ACCEPTED: "user.policy.accepted",
   USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
   USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
+  USER_COOKIE_CONSENT_LINKED: "user.cookie_consent.linked",
   SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
   SECURITY_CSP_VIOLATION: "security.csp.violation",
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",
@@ -112,9 +114,8 @@ export function matchesSubscription(
 
 export function isSubscribableSelector(value: string): boolean {
   if (value === "*") return true;
-  if (value.endsWith(".*")) {
-    const group = value.slice(0, -2);
-    return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
-  }
-  return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+  if (!value.endsWith(".*")) return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+
+  const group = value.slice(0, -2);
+  return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
 }
