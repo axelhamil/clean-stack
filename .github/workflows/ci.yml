@@ -126,6 +126,22 @@ jobs:
         # evaluated by Postgres.
         run: pnpm --filter api check:marksent
 
+      - name: Check BetterAuth hooks write on the plugin's own transaction
+        # A user and its session created in one BetterAuth transaction (first SSO
+        # sign-in) must get their Personal organization on that same connection;
+        # only two real connections show the foreign key failure.
+        run: pnpm --filter api check:auth-transaction
+
+      - name: Check concurrent SCIM provisionings against the seat cap
+        # The seat lock and count run inside the plugin's transaction; a mocked
+        # adapter serialises concurrent transactions by construction.
+        run: pnpm --filter api check:scim-seats
+
+      - name: Check concurrent writes on a SCIM connection are serialised
+        # Issue and rotate span several plugin transactions; only concurrent calls
+        # against the real tables show a duplicate connection or a lost token.
+        run: pnpm --filter api check:scim-connection
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

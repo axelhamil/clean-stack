@@ -21,6 +21,9 @@
     "check:enqueue": "bun scripts/check-enqueue.ts",
     "check:sweep-lock": "bun scripts/check-sweep-lock.ts",
     "check:uow-rollback": "bun scripts/check-uow-rollback.ts",
+    "check:auth-transaction": "bun scripts/check-auth-transaction.ts",
+    "check:scim-seats": "bun scripts/check-scim-seats.ts",
+    "check:scim-connection": "bun scripts/check-scim-connection.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --isolate --parallel --pass-with-no-tests",
@@ -61,6 +64,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@better-auth/core": "1.7.6",
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "@types/bun": "^1.4.2",

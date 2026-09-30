@@ -42,6 +42,7 @@ import {
   findSsoProviderByProviderId,
   insertPersonalOrgWithOwner,
   isVerifiedSsoDomainOf,
+  lockSeatsOf,
   type ScimUserSnapshot,
   scimConnectionCreator,
   setPendingEmail,
@@ -53,6 +54,11 @@ import {
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
+import {
+  currentAuthTransaction,
+  inAuthTransaction,
+  withPublishedTransactions,
+} from "./shared/auth/auth-transaction";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { scimIdentityResolver, scimMembershipProjection } from "./shared/auth/scim-membership";
@@ -102,10 +108,12 @@ interface SignupUser {
  * every sign-in (`databaseHooks.session.create.before`) to back-fill users who
  * pre-date the org model. A Postgres advisory lock on `userId` prevents the
  * double-insert race that would arise if two concurrent sessions trigger this
- * for the same new user.
+ * for the same new user. Inside a BetterAuth transaction (SSO sign-in creates the
+ * user and its session in one) it runs on that transaction: on another connection
+ * the `member` insert would reference a user that is not committed yet.
  */
 async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Promise<string> {
-  return db.transaction(async (tx) => {
+  return inAuthTransaction(db, async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
 
     const emitUserCreated = async () => {
@@ -158,7 +166,9 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
 /**
  * Thin adapter that binds the module-level `di.IOutboxRepository` to
  * `emitEvent` so BetterAuth hooks don't need to import the DI container
- * directly. Keeps all hook bodies concise and the DI reference local.
+ * directly. Keeps all hook bodies concise and the DI reference local. Without an
+ * explicit `tx`, an event raised inside a BetterAuth transaction joins it, so it is
+ * committed or rolled back with the change it describes.
  */
 async function emit<TPayload>(
   eventType: EventType,
@@ -175,7 +185,7 @@ async function emit<TPayload>(
     aggregateId,
     payload,
     { organizationId },
-    tx,
+    tx ?? currentAuthTransaction(),
   );
 }
 
@@ -205,8 +215,10 @@ async function emitBestEffort<TPayload>(
  * The enterprise entitlement gate on `/sso/register`. Takes the org the REQUEST
  * names, never one inferred from session history, because that is the only org
  * whose plan is actually being spent. The SCIM half of the same paid capability is
- * gated where its connection is created, `requireFeature("sso")` on the
- * `/settings/organization/scim-connection` routes.
+ * gated where its connection is issued (`requireFeature("sso")` on
+ * `/settings/organization/scim-connection`) and again on every provisioning, through
+ * `hasSsoEntitlement`: an organization that lost the plan keeps its directory's
+ * removals, never its additions.
  */
 async function assertSsoEntitlementFor(organizationId: string | undefined): Promise<void> {
   if (!organizationId) {
@@ -218,6 +230,11 @@ async function assertSsoEntitlementFor(organizationId: string | undefined): Prom
   }
 }
 
+async function hasSsoEntitlement(organizationId: string): Promise<boolean> {
+  const entitlements = await di.EntitlementsService.getEntitlements(organizationId);
+  return hasFeature(entitlements, "sso");
+}
+
 /**
  * The seat cap itself: one question, one answer, for every surface that creates a
  * member. Callers differ only in how they refuse, the organization hooks throw
@@ -226,12 +243,18 @@ async function assertSsoEntitlementFor(organizationId: string | undefined): Prom
  * be allowed to become two different definitions of "is there a seat".
  * Centralised so the check is never duplicated across hooks (CLAUDE.md
  * reusability rule, §6 two-path trap).
+ *
+ * Inside a BetterAuth transaction (SCIM provisioning, SSO sign-in) the count runs on
+ * that transaction behind a per-organization lock held until it commits, so two
+ * concurrent provisionings cannot both take the last seat.
  */
 async function seatCapFor(
   orgId: string,
 ): Promise<{ available: boolean; activeMembers: number; maxMembers: number | null }> {
   const view = await di.EntitlementsService.getEntitlements(orgId);
-  const activeMembers = await countActiveMembers(orgId);
+  const tx = currentAuthTransaction();
+  if (tx) await lockSeatsOf(orgId, tx);
+  const activeMembers = await countActiveMembers(orgId, tx);
   return {
     available: hasSeatAvailable(activeMembers, view.maxMembers),
     activeMembers,
@@ -507,6 +530,10 @@ type ScimPluginWithoutDiscoveryTypes = Omit<SCIMPlugin, "endpoints"> & {
   endpoints: Omit<SCIMEndpoints, "getSCIMSchemas" | "getSCIMSchema">;
 };
 
+// Exported for `scripts/check-scim-seats.ts`, which runs the real seat check against
+// Postgres under concurrent provisioning.
+export const scimMembershipDeps = { seatCapFor, isVerifiedSsoDomainOf, hasSsoEntitlement };
+
 // Plugin-managed connections: one per organization, created, rotated and
 // decommissioned by `ScimConnectionService` behind the owner-only
 // `/settings/organization/scim-connection` routes. The organization id is the
@@ -518,8 +545,8 @@ const scimPlugin: ScimPluginWithoutDiscoveryTypes = scim({
     credentialHashSecret:
       env.SCIM_CREDENTIAL_HASH_SECRET ?? "dev-only-scim-credential-secret-not-for-production-use",
   },
-  identity: scimIdentityResolver({ seatCapFor, isVerifiedSsoDomainOf }),
-  projection: scimMembershipProjection({ seatCapFor, isVerifiedSsoDomainOf }),
+  identity: scimIdentityResolver(scimMembershipDeps),
+  projection: scimMembershipProjection(scimMembershipDeps),
 });
 
 const authOptions = {
@@ -531,7 +558,9 @@ const authOptions = {
   // `transaction: true` is required by `@better-auth/scim`, which refuses to start
   // without native transactions: a directory change and the membership it
   // projects must commit or roll back together.
-  database: drizzleAdapter(db, { provider: "pg", transaction: true }),
+  // The adapter gets `db` wrapped so the transactions it opens are visible to the
+  // hooks it runs inside them (`shared/auth/auth-transaction.ts`).
+  database: drizzleAdapter(withPublishedTransactions(db), { provider: "pg", transaction: true }),
 
   user: {
     additionalFields: {
@@ -544,7 +573,7 @@ const authOptions = {
     changeEmail: {
       enabled: true,
       sendChangeEmailConfirmation: async ({ user, newEmail, url, token }) => {
-        await db.transaction(async (tx) => {
+        await inAuthTransaction(db, async (tx) => {
           await setPendingEmail(user.id, newEmail, tx);
           await emit(
             EventTypes.USER_EMAIL_CHANGE_REQUESTED,
@@ -802,7 +831,7 @@ const authOptions = {
             org.id,
           );
           if (isPersonalOrg(org.slug)) return;
-          await db.transaction(async (tx) => {
+          await inAuthTransaction(db, async (tx) => {
             const deleted = await deleteOrgIfEmpty(org.id, tx);
             if (!deleted) return;
             await emit(

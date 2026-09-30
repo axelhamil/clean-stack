@@ -163,12 +163,27 @@ export async function findOrgOwnerUserId(organizationId: string): Promise<string
   return row?.userId ?? null;
 }
 
-export async function countActiveMembers(organizationId: string): Promise<number> {
-  const [row] = await db
+export async function countActiveMembers(
+  organizationId: string,
+  tx?: Transaction,
+): Promise<number> {
+  const [row] = await (tx ?? db)
     .select({ count: count() })
     .from(schema.member)
     .where(eq(schema.member.organizationId, organizationId));
   return row?.count ?? 0;
+}
+
+/**
+ * Serialises seat checks for one organization until `tx` ends: a second
+ * transaction adding a member waits here, then counts the rows the first one
+ * committed. Without it, two concurrent provisionings both count the same free
+ * seat and both take it.
+ */
+export async function lockSeatsOf(organizationId: string, tx: Transaction): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`seats:${organizationId}`}, 0))`,
+  );
 }
 
 // ── #8: api-token middleware ──────────────────────────────────────────────

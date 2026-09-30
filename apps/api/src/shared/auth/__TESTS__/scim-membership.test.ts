@@ -49,8 +49,17 @@ function deps(overrides: Partial<ScimMembershipDeps> = {}): ScimMembershipDeps {
   return {
     seatCapFor: async () => ({ available: true, maxMembers: null }),
     isVerifiedSsoDomainOf: async () => true,
+    hasSsoEntitlement: async () => true,
     ...overrides,
   };
+}
+
+async function rejectionOf(run: () => unknown): Promise<APIError> {
+  const error = await Promise.resolve()
+    .then(run)
+    .catch((err: unknown) => err);
+  expect(error).toBeInstanceOf(APIError);
+  return error as APIError;
 }
 
 const state = (active: boolean) => ({
@@ -90,16 +99,39 @@ describe("scimMembershipProjection", () => {
     const db = fakeDatabase({});
     const full = deps({ seatCapFor: async () => ({ available: false, maxMembers: 5 }) });
 
-    const error = await Promise.resolve(
+    const error = await rejectionOf(() =>
       scimMembershipProjection(full).reconcileUser(state(true), db.context),
-    ).catch((err: unknown) => err);
+    );
 
-    expect(error).toBeInstanceOf(APIError);
-    expect((error as APIError).body).toMatchObject({
+    expect(error.body).toMatchObject({
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status: "402",
+      code: "SCIM_SEAT_LIMIT_REACHED",
     });
     expect(db.created).toHaveLength(0);
+  });
+
+  it("refuses a new member once the plan no longer includes SSO", async () => {
+    const db = fakeDatabase({});
+    const downgraded = deps({ hasSsoEntitlement: async () => false });
+
+    const error = await rejectionOf(() =>
+      scimMembershipProjection(downgraded).reconcileUser(state(true), db.context),
+    );
+
+    expect(error.body).toMatchObject({ status: "403", code: "SCIM_PLAN_REQUIRED" });
+    expect(db.created).toHaveLength(0);
+  });
+
+  it("still removes members after the plan lost SSO", async () => {
+    const db = fakeDatabase({
+      member: [{ id: "m-1", organizationId: "org-1", userId: "user-1", role: "member" }],
+    });
+    const downgraded = deps({ hasSsoEntitlement: async () => false });
+
+    await scimMembershipProjection(downgraded).reconcileUser(state(false), db.context);
+
+    expect(db.deleted).toEqual([{ model: "member", id: "m-1" }]);
   });
 
   it("removes the membership of a user who is no longer active", async () => {
@@ -150,14 +182,38 @@ describe("scimIdentityResolver", () => {
     expect(decision).toEqual({ action: "create" });
   });
 
-  it("creates when the organization does not own the domain", async () => {
+  it("refuses an address on a domain the organization has not verified", async () => {
     const untrusted = deps({ isVerifiedSsoDomainOf: async () => false });
-    const decision = await scimIdentityResolver(untrusted).resolveUser?.(
-      input("jane@acme.com"),
-      existing(true).context,
+
+    const error = await rejectionOf(() =>
+      scimIdentityResolver(untrusted).resolveUser?.(
+        input("ceo@competitor.com"),
+        fakeDatabase({}).context,
+      ),
     );
 
-    expect(decision).toEqual({ action: "create" });
+    expect(error.body).toMatchObject({ status: "403", code: "SCIM_DOMAIN_NOT_VERIFIED" });
+  });
+
+  it("refuses a malformed address", async () => {
+    const error = await rejectionOf(() =>
+      scimIdentityResolver(deps()).resolveUser?.(input("not-an-email"), fakeDatabase({}).context),
+    );
+
+    expect(error.body).toMatchObject({ code: "SCIM_DOMAIN_NOT_VERIFIED" });
+  });
+
+  it("refuses a new identity once the plan no longer includes SSO", async () => {
+    const downgraded = deps({ hasSsoEntitlement: async () => false });
+
+    const error = await rejectionOf(() =>
+      scimIdentityResolver(downgraded).resolveUser?.(
+        input("new@acme.com"),
+        fakeDatabase({}).context,
+      ),
+    );
+
+    expect(error.body).toMatchObject({ status: "403", code: "SCIM_PLAN_REQUIRED" });
   });
 
   it("creates when no account holds the address", async () => {
