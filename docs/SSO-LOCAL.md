@@ -56,7 +56,7 @@ SAML is stricter and has two easy-to-miss traps:
    - `samlConfig.idpMetadata.entityID`: the **IdP's** real issuer (`http://localhost:8080/realms/clean-stack`). Without this, the plugin falls back to `issuer` for the IdP side too, and every assertion fails signature/issuer validation with `ERR_UNMATCH_ISSUER`.
    - `samlConfig.entryPoint`: `http://localhost:8080/realms/clean-stack/protocol/saml`
    - `samlConfig.privateKey` + a matching self-signed `samlConfig.cert`: required because this codebase forces `authnRequestsSigned: true` on every SAML registration (D8 hardening): generate a throwaway pair with `openssl req -x509 -newkey rsa:2048 -keyout sp_key.pem -out sp_cert.pem -days 365 -nodes -subj "/CN=clean-stack-sp"`.
-   - `samlConfig.callbackUrl`: `http://localhost:3000/api/auth/sso/saml2/sp/acs/<your-provider-id>`
+   - The ACS URL to configure in Keycloak is fixed by the plugin: `http://localhost:3000/api/auth/sso/saml2/sp/acs/<your-provider-id>` (`samlConfig.callbackUrl` is no longer the ACS setting since `@better-auth/sso` 1.7).
 
 ## Domain verification
 
@@ -91,12 +91,11 @@ returns `{ "url": "...", "redirect": true }`: the authorization/AuthnRequest URL
 
 ## SCIM
 
-Generate a token (`providerId` must be distinct from any SSO provider's `providerId`: the plugin rejects a collision):
+With a session cookie for the org owner (active org set, policies accepted, `business` tier as above), issue the directory token:
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/scim/generate-token \
-  -H "Content-Type: application/json" -H "Origin: http://localhost:5173" \
-  -d '{"providerId":"<scim-provider-id>","organizationId":"<organizationId>"}'
+curl -X POST http://localhost:3000/settings/organization/scim-connection \
+  -H "Origin: http://localhost:5173" -b cookies.txt
 ```
 
-The returned `scimToken` is a bearer token for `/api/auth/scim/v2/Users` (standard SCIM 2.0 `POST`/`GET`/`PUT`/`PATCH`/`DELETE`). `DELETE` is an **org departure**, not a soft-delete: it removes the `member` row for that org only, the global `user` row (and any other org membership) survives untouched.
+The returned `token` (shown once, the plugin stores only an HMAC of it) is the bearer token for `/api/auth/scim/v2/Users` (standard SCIM 2.0 `POST`/`GET`/`PUT`/`PATCH`/`DELETE`). Calling the same route again rotates it and revokes the previous one; `DELETE` on it decommissions the connection and removes every member the directory provisioned (owners excepted). A SCIM `DELETE` on a user is an **org departure**, not a soft-delete: it removes the `member` row for that org only, the global `user` row (and any other org membership) survives untouched.

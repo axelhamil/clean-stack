@@ -10,6 +10,10 @@ describe("rolesWith", () => {
     expect(rolesWith({ billing: ["manage"] })).toEqual(["owner"]);
   });
 
+  test("grants scim:manage to owner only", () => {
+    expect(rolesWith({ scim: ["manage"] })).toEqual(["owner"]);
+  });
+
   test("withholds organization:update from member", () => {
     expect(rolesWith({ organization: ["update"] })).not.toContain("member");
   });

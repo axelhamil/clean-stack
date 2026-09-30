@@ -22,6 +22,9 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   },
   "DELETE /consents": { consumer: "apps/app/src/shared/api/mutations/withdraw-consent.ts" },
   "DELETE /me/delete": { consumer: "apps/app/src/shared/api/mutations/cancel-account-deletion.ts" },
+  "DELETE /settings/organization/scim-connection": {
+    consumer: "apps/app/src/features/sso/api/sso.mutations.ts",
+  },
   "DELETE /settings/tokens/:id": {
     consumer: "apps/app/src/features/api-tokens/api/api-tokens.mutations.ts",
   },
@@ -66,6 +69,9 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
     consumer: "apps/app/src/shared/api/queries/notifications.ts",
   },
   "GET /readyz": { uiLess: "infra-probe" },
+  "GET /settings/organization/scim-connection": {
+    consumer: "apps/app/src/features/sso/api/sso.queries.ts",
+  },
   "GET /settings/tokens": {
     consumer: "apps/app/src/features/api-tokens/api/api-tokens.queries.ts",
   },
@@ -117,6 +123,9 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /notifications/read": { consumer: "apps/app/src/shared/api/mutations/notifications.ts" },
   "POST /notifications/read-all": {
     consumer: "apps/app/src/shared/api/mutations/notifications.ts",
+  },
+  "POST /settings/organization/scim-connection": {
+    consumer: "apps/app/src/features/sso/api/sso.mutations.ts",
   },
   "POST /settings/organization/sso-enforcement": {
     consumer: "apps/app/src/features/sso/api/sso.mutations.ts",

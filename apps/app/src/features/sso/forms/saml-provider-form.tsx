@@ -18,7 +18,7 @@ import { type SamlProviderInput, samlProviderSchema } from "../sso.schema";
 const DEFAULT_VALUES: SamlProviderInput = {
   domain: "",
   entryPoint: "",
-  issuer: "",
+  idpEntityId: "",
   cert: "",
 };
 
@@ -45,9 +45,9 @@ export function SamlProviderForm({ isPending, onSubmit }: SamlProviderFormProps)
         />
         <FormTextField
           control={form.control}
-          name="issuer"
-          label={t("sso.forms.saml.issuerLabel")}
-          placeholder={t("sso.forms.saml.issuerPlaceholder")}
+          name="idpEntityId"
+          label={t("sso.forms.saml.idpEntityIdLabel")}
+          placeholder={t("sso.forms.saml.idpEntityIdPlaceholder")}
         />
         <FormTextField
           control={form.control}

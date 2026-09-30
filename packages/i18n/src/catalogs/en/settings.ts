@@ -495,10 +495,18 @@ export default {
         "Let your identity provider create, update, and deactivate members automatically.",
       onlyOwnerCanGenerate: "Only the organization owner can generate a SCIM token.",
       baseUrlLabel: "SCIM base URL",
+      notConnected: "No directory is connected yet.",
+      connectedUntil: "Directory connected. Its token expires on {{date}}.",
       generateAction: "Generate token",
+      rotateAction: "Replace token",
       secretDialogTitle: "SCIM token",
       secretDialogDescription:
-        "Copy this token now: it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector.",
+        "Copy this token now: it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector. It is valid for one year, and any previous token stops working.",
+      disconnectAction: "Disconnect directory",
+      disconnectDialogTitle: "Disconnect the directory?",
+      disconnectDialogDescription:
+        "Its token stops working, and the members your identity provider provisioned lose access to this organization. Owners keep theirs.",
+      disconnectedToast: "Directory disconnected",
     },
     forms: {
       oidc: {
@@ -513,8 +521,8 @@ export default {
       saml: {
         domainLabel: "Domain",
         domainPlaceholder: "acme.com",
-        issuerLabel: "Issuer / entity ID",
-        issuerPlaceholder: "acme-saml",
+        idpEntityIdLabel: "IdP entity ID",
+        idpEntityIdPlaceholder: "https://idp.acme.com/metadata",
         entryPointLabel: "Entry point",
         entryPointPlaceholder: "https://idp.acme.com/sso/saml",
         certLabel: "Signing certificate",

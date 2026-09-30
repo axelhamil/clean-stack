@@ -95,6 +95,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.SCIM_CONNECTION_CREATED]:
     "A SCIM provisioning connection was created and its token issued.",
   [EventTypes.SCIM_CONNECTION_DELETED]: "A SCIM provisioning connection was deleted.",
+  [EventTypes.SCIM_CONNECTION_TOKEN_ROTATED]:
+    "A SCIM provisioning connection's token was replaced and the previous one revoked.",
   [EventTypes.SCIM_USER_CREATED]: "A user was provisioned into an organization through SCIM.",
   [EventTypes.SCIM_USER_UPDATED]: "A user's attributes were updated through SCIM.",
   [EventTypes.SCIM_USER_DEACTIVATED]: "A user was deactivated through SCIM.",

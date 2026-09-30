@@ -5,8 +5,6 @@
  * infra config, not domain. See CLAUDE.md §DDD scope.
  */
 
-import { base64Url } from "@better-auth/utils/base64";
-import { createHash } from "@better-auth/utils/hash";
 import { Option } from "@packages/ddd-kit";
 import {
   and,
@@ -19,9 +17,7 @@ import {
   ssoSchema,
   type Transaction,
 } from "@packages/drizzle";
-import { constantTimeEqual } from "better-auth/crypto";
 import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
-import { scimTokenPartsFromHeader } from "./shared/auth/sso-paths";
 
 // ── #1: ensurePersonalOrgFor queries ──────────────────────────────────────
 
@@ -167,12 +163,27 @@ export async function findOrgOwnerUserId(organizationId: string): Promise<string
   return row?.userId ?? null;
 }
 
-export async function countActiveMembers(organizationId: string): Promise<number> {
-  const [row] = await db
+export async function countActiveMembers(
+  organizationId: string,
+  tx?: Transaction,
+): Promise<number> {
+  const [row] = await (tx ?? db)
     .select({ count: count() })
     .from(schema.member)
     .where(eq(schema.member.organizationId, organizationId));
   return row?.count ?? 0;
+}
+
+/**
+ * Serialises seat checks for one organization until `tx` ends: a second
+ * transaction adding a member waits here, then counts the rows the first one
+ * committed. Without it, two concurrent provisionings both count the same free
+ * seat and both take it.
+ */
+export async function lockSeatsOf(organizationId: string, tx: Transaction): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`seats:${organizationId}`}, 0))`,
+  );
 }
 
 // ── #8: api-token middleware ──────────────────────────────────────────────
@@ -225,73 +236,98 @@ export async function findSsoProviderByProviderId(
   return row;
 }
 
-// ── #11: hooks.after SCIM bridge ───────────────────────────────────────────
+// ── #11: SCIM bridge (hooks, identity resolution, connection service) ────
 
-export async function scimConnectionOwner(
-  providerId: string,
-): Promise<{ userId: string | null; organizationId: string | null }> {
-  const [row] = await db
-    .select({
-      userId: ssoSchema.scimProvider.userId,
-      organizationId: ssoSchema.scimProvider.organizationId,
-    })
-    .from(ssoSchema.scimProvider)
-    .where(eq(ssoSchema.scimProvider.providerId, providerId))
-    .limit(1);
-  return { userId: row?.userId ?? null, organizationId: row?.organizationId ?? null };
+export interface ScimUserSnapshot {
+  userId: string;
+  connectionId: string;
+  organizationId: string;
+  externalId: string | null;
+  active: boolean;
 }
 
 /**
- * Mirrors `storeSCIMToken: "hashed"`, the fixed mode `scim()` is mounted with in
- * `auth.ts`. @better-auth/scim doesn't export its own hasher, so this reimplements
- * the one deterministic algorithm that mount config actually uses: a SHA-256 digest,
- * base64url-encoded without padding. If that mount option ever changes to
- * "encrypted" or a custom hasher, this must change with it.
+ * A provisioned SCIM User as `@better-auth/scim` stores it. The SCIM resource id
+ * the directory sees is this row's id, not the Better Auth user id, and the
+ * provisioning domain is always the organization id (see `ScimConnectionService`).
  */
-async function hashScimToken(token: string): Promise<string> {
-  const digest = await createHash("SHA-256").digest(new TextEncoder().encode(token));
-  return base64Url.encode(new Uint8Array(digest), { padding: false });
+export async function findScimUser(scimUserId: string): Promise<ScimUserSnapshot | undefined> {
+  const [row] = await db
+    .select({
+      userId: ssoSchema.scimUser.userId,
+      connectionId: ssoSchema.scimUser.connectionId,
+      organizationId: ssoSchema.scimUser.provisioningDomainId,
+      externalId: ssoSchema.scimUser.externalId,
+      active: ssoSchema.scimUser.active,
+    })
+    .from(ssoSchema.scimUser)
+    .where(eq(ssoSchema.scimUser.id, scimUserId))
+    .limit(1);
+  return row;
 }
 
 /**
- * Post-review hardening: `scimConnectionOwner(scimProviderIdFromToken(...))` resolves
- * an actor/org from the bearer header's *claimed* provider id without ever checking
- * the token against the stored hash. `hooks.before` runs ahead of the SCIM plugin's
- * own bearer verification (`runBeforeHooks` executes before `endpoint(...)`, which is
- * where the plugin's `authMiddleware` lives), so a forged `Authorization` header with
- * a real (guessable, `providerId` is a deterministic slug of the org's domain)
- * provider id let an unauthenticated caller: (a) plant a fabricated actor in the
- * SCIM-deprovisioning audit snapshot before the request 401s, later attributed to an
- * unrelated admin's ordinary member removal within the snapshot TTL; (b) probe seat
- * capacity pre-auth cross-tenant (402 leaking `maxMembers` vs 401), since the seat
- * gate ran on the same unverified resolution.
- *
- * Any `hooks.before` branch that needs the connection owner MUST use this instead of
- * `scimConnectionOwner` + `scimProviderIdFromToken`, it hashes the decoded token and
- * constant-time-compares it against the stored connection before returning anything.
- * Returns `null` on a missing/malformed header, an unknown provider, or a token that
- * doesn't match, the caller then must fall through to the endpoint's own 401 rather
- * than act on unverified input, and the seat cap simply isn't checked here for that
- * request (it 401s before ever writing a member row, so there is nothing to gate).
+ * The user who created a managed SCIM connection: the actor of every SCIM event,
+ * since a directory request authenticates with a bearer token and carries no
+ * session of its own.
  */
-export async function verifiedScimConnectionOwner(
-  headers: Headers | undefined,
-): Promise<{ userId: string | null; organizationId: string | null } | null> {
-  const parts = scimTokenPartsFromHeader(headers);
-  if (!parts) return null;
+export async function scimConnectionCreator(connectionId: string): Promise<string | null> {
   const [row] = await db
-    .select({
-      userId: ssoSchema.scimProvider.userId,
-      organizationId: ssoSchema.scimProvider.organizationId,
-      scimToken: ssoSchema.scimProvider.scimToken,
-    })
-    .from(ssoSchema.scimProvider)
-    .where(eq(ssoSchema.scimProvider.providerId, parts.providerId))
+    .select({ createdBy: ssoSchema.scimManagedConnection.createdBy })
+    .from(ssoSchema.scimManagedConnection)
+    .where(eq(ssoSchema.scimManagedConnection.connectionId, connectionId))
     .limit(1);
-  if (!row) return null;
-  const hashed = await hashScimToken(parts.token);
-  if (!constantTimeEqual(hashed, row.scimToken)) return null;
-  return { userId: row.userId, organizationId: row.organizationId };
+  return row?.createdBy ?? null;
+}
+
+/**
+ * The organization members a SCIM connection currently provisions, read before
+ * the connection is decommissioned so the members it removes can be reported.
+ */
+export async function scimProvisionedMembers(
+  connectionId: string,
+  organizationId: string,
+): Promise<{ memberId: string; userId: string }[]> {
+  return db
+    .select({ memberId: schema.member.id, userId: schema.member.userId })
+    .from(ssoSchema.scimUser)
+    .innerJoin(
+      schema.member,
+      and(
+        eq(schema.member.userId, ssoSchema.scimUser.userId),
+        eq(schema.member.organizationId, ssoSchema.scimUser.provisioningDomainId),
+      ),
+    )
+    .where(
+      and(
+        eq(ssoSchema.scimUser.connectionId, connectionId),
+        eq(ssoSchema.scimUser.provisioningDomainId, organizationId),
+      ),
+    );
+}
+
+/**
+ * Whether `domain` is an SSO domain this organization proved it controls. It is
+ * the condition under which the organization's directory may take over an account
+ * that already exists: the same proof `@better-auth/sso` asks for before it assigns
+ * an SSO user to an organization.
+ */
+export async function isVerifiedSsoDomainOf(
+  organizationId: string,
+  domain: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: ssoSchema.ssoProvider.id })
+    .from(ssoSchema.ssoProvider)
+    .where(
+      and(
+        eq(ssoSchema.ssoProvider.organizationId, organizationId),
+        eq(sql`lower(${ssoSchema.ssoProvider.domain})`, domain),
+        eq(ssoSchema.ssoProvider.domainVerified, true),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 // ── #12: SSO enforcement: session-creation guard (Task 9) ─────────────────
@@ -334,8 +370,9 @@ export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
 // ── #14: SCIM provisioning: membership event bridge ───────────────────────
 
 /**
- * The member row `@better-auth/scim` writes with a raw `adapter.create` (no
- * organization-plugin hook fires), so the SCIM after-hook has to read it back
+ * The member row the SCIM membership projection writes through the plugin's
+ * transaction adapter (no organization-plugin hook fires), so the SCIM after-hook
+ * and `ScimConnectionService` have to read it back
  * to emit `org.member.joined` with the same shape `afterAddMember` produces:
  * the aggregate id is the member id, and `createdAt` is what tells a row this
  * request created apart from one that already existed.

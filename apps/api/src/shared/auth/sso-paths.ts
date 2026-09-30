@@ -12,7 +12,6 @@ export const SSO_PATHS = {
   signIn: "/sign-in/sso",
   callback: "/sso/callback",
   callbackWithProvider: "/sso/callback/:providerId",
-  samlCallback: "/sso/saml2/callback/:providerId",
   samlAcs: "/sso/saml2/sp/acs/:providerId",
   samlSlo: "/sso/saml2/sp/slo/:providerId",
   samlInitiateSlo: "/sso/saml2/logout/:providerId",
@@ -29,7 +28,6 @@ export const SSO_PATHS = {
 const SSO_CALLBACK_PATHS: readonly string[] = [
   SSO_PATHS.callback,
   SSO_PATHS.callbackWithProvider,
-  SSO_PATHS.samlCallback,
   SSO_PATHS.samlAcs,
 ];
 
@@ -38,66 +36,33 @@ export function isSsoCallbackPath(path: string | undefined): boolean {
 }
 
 export function isSamlCallbackPath(path: string): boolean {
-  return path === SSO_PATHS.samlCallback || path === SSO_PATHS.samlAcs;
+  return path === SSO_PATHS.samlAcs;
 }
 
 export const SCIM_PATHS = {
-  generateToken: "/scim/generate-token",
-  listConnections: "/scim/list-provider-connections",
-  getConnection: "/scim/get-provider-connection",
-  deleteConnection: "/scim/delete-provider-connection",
   users: "/scim/v2/Users",
   user: "/scim/v2/Users/:userId",
-  serviceProviderConfig: "/scim/v2/ServiceProviderConfig",
-  schemas: "/scim/v2/Schemas",
-  schema: "/scim/v2/Schemas/:schemaId",
-  resourceTypes: "/scim/v2/ResourceTypes",
-  resourceType: "/scim/v2/ResourceTypes/:resourceTypeId",
 } as const;
 
-/**
- * The SCIM bearer token is base64 of `token:providerId[:organizationId]` (the shape
- * @better-auth/scim issues via `generate-token`). SCIM endpoints authenticate with
- * this token, `ctx.context.session` is empty, so the provider id has to be read
- * back out of the `Authorization` header rather than the session.
- *
- * The decode is unauthenticated by construction, it reads whatever the caller
- * claims, not a verified identity. `scimProviderIdFromToken` stays safe to call
- * only where the caller doesn't act on the result (an audit-log annotation on a
- * request that already passed the plugin's own bearer check, e.g. `hooks.after`).
- * A `hooks.before` branch that resolves an actor or a billing decision from the
- * token, before the plugin's own `authMiddleware` has run, must use
- * `verifiedScimConnectionOwner` (`auth-queries.ts`) instead, which hashes the
- * decoded token and compares it against the stored SCIM connection before trusting
- * the provider id it names.
- */
-export function scimTokenPartsFromHeader(
-  headers: Headers | undefined,
-): { token: string; providerId: string } | null {
-  const raw = headers?.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!raw) return null;
-  try {
-    const [token, providerId] = atob(raw).split(":");
-    return token && providerId ? { token, providerId } : null;
-  } catch {
-    return null;
-  }
-}
-
-export function scimProviderIdFromToken(headers: Headers | undefined): string {
-  return scimTokenPartsFromHeader(headers)?.providerId ?? "unknown";
-}
+export type ScimUserChange = "created" | "updated" | "deactivated" | "deprovisioned";
 
 /**
- * Detects a deactivation across both shapes SCIM clients send: Entra ID issues a
- * `PATCH` with an `Operations` array (`{ op: "replace", path: "active", value: false }`),
- * while a plain `PUT` (Okta and others) carries `active` at the top level. Missing
- * either shape silently drops that IdP's deactivations from the audit trail.
+ * What a successful `/scim/v2/Users` write did to the user, read from the stored
+ * state rather than from the request body: SCIM clients express a deactivation in
+ * several shapes (Entra's `PATCH` operations, a top-level `active` on a `PUT`, a
+ * filtered path), and only the stored before/after `active` flag is shape-proof.
+ * A reactivation, like any other attribute change, is an update.
  */
-export function isDeactivation(body: Record<string, unknown> | undefined): boolean {
-  if (body?.active === false) return true;
-  const operations = body?.Operations as Array<{ path?: string; value?: unknown }> | undefined;
-  return operations?.some((op) => op.path === "active" && op.value === false) ?? false;
+export function scimUserChange(
+  method: string,
+  before: { active: boolean } | undefined,
+  after: { active: boolean } | undefined,
+): ScimUserChange | null {
+  if (method === "POST") return "created";
+  if (method === "DELETE") return "deprovisioned";
+  if (method !== "PUT" && method !== "PATCH") return null;
+  if (before?.active && after?.active === false) return "deactivated";
+  return "updated";
 }
 
 /**

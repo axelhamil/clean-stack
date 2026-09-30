@@ -13,6 +13,7 @@ const appStatement = {
   auditLog: ["read"],
   webhooks: ["read", "write"],
   apiToken: ["create", "read", "revoke"],
+  scim: ["manage"],
 } as const;
 
 const statement = { ...defaultStatements, ...appStatement } as const;

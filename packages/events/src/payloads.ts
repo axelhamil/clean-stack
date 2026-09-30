@@ -564,6 +564,9 @@ export const SsoLoginFailurePayload = z.object({
 });
 export type SsoLoginFailurePayload = z.infer<typeof SsoLoginFailurePayload>;
 
+// `providerId` names the SCIM connection (`ba_scim_connection_…`). It used to be the
+// SSO provider id when a SCIM connection hung off one; the key is kept so the
+// payload shape does not change under consumers.
 const ScimConnectionRef = z.object({
   actorUserId: z.string(),
   organizationId: z.string(),
@@ -576,6 +579,11 @@ export type ScimConnectionCreatedPayload = z.infer<typeof ScimConnectionCreatedP
 export const ScimConnectionDeletedPayload = ScimConnectionRef;
 export type ScimConnectionDeletedPayload = z.infer<typeof ScimConnectionDeletedPayload>;
 
+export const ScimConnectionTokenRotatedPayload = ScimConnectionRef;
+export type ScimConnectionTokenRotatedPayload = z.infer<typeof ScimConnectionTokenRotatedPayload>;
+
+// `scimProviderId` names the SCIM connection the change came through, see
+// `ScimConnectionRef`.
 const ScimUserRef = z.object({
   userId: z.string(),
   actorUserId: z.string().nullable(),
@@ -679,6 +687,7 @@ export const PayloadByEventType = {
   [EventTypes.SSO_LOGIN_FAILURE]: SsoLoginFailurePayload,
   [EventTypes.SCIM_CONNECTION_CREATED]: ScimConnectionCreatedPayload,
   [EventTypes.SCIM_CONNECTION_DELETED]: ScimConnectionDeletedPayload,
+  [EventTypes.SCIM_CONNECTION_TOKEN_ROTATED]: ScimConnectionTokenRotatedPayload,
   [EventTypes.SCIM_USER_CREATED]: ScimUserCreatedPayload,
   [EventTypes.SCIM_USER_UPDATED]: ScimUserUpdatedPayload,
   [EventTypes.SCIM_USER_DEACTIVATED]: ScimUserDeactivatedPayload,

@@ -6,8 +6,3 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   sharp: true
-peerDependencyRules:
-  allowedVersions:
-    # Optional peer for better-auth's own test helpers, which the repo doesn't use.
-    # 1.7 already allows ^5; drop this once the 1.6.30 pin goes.
-    better-auth>vitest: "5"

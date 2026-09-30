@@ -325,7 +325,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **84 events** (35 public + 49 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3: 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **13 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 6 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **85 events** (35 public + 50 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3: 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
@@ -428,7 +428,7 @@ Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quo
 
 ### Via `auth.ts` `hooks.after` (Phase C.7: `@better-auth/sso` / `@better-auth/scim`)
 
-All 13 events emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth.ts`'s `hooks.after`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). SCIM endpoints authenticate with a bearer token, not a session: the actor is resolved from the connection row (`scimConnectionOwner`), not `ctx.context.session`.
+The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth.ts`'s `hooks.after`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). The SCIM connection events come from `ScimConnectionService` (`apps/api/src/shared/services/scim-connection.service.ts`), the only caller of the plugin's managed-connection server APIs. SCIM user endpoints authenticate with a bearer token, not a session: the actor is the owner who created the connection (`scimConnectionCreator`), not `ctx.context.session`. `scimProviderId`/`providerId` in the SCIM payloads carry the managed connection id; the key names are kept for payload stability.
 
 - `SSO_PROVIDER_REGISTERED` (`sso.provider.registered`): `path === SSO_PATHS.register`. Payload: `{ actorUserId, organizationId, providerId, protocol: "oidc" | "saml", domain }`, retention `internal`.
 - `SSO_PROVIDER_UPDATED` (`sso.provider.updated`): `path === SSO_PATHS.updateProvider`. Payload includes `changedFields: string[]`.
@@ -437,12 +437,15 @@ All 13 events emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth.ts`'s `
 - `SSO_ENFORCEMENT_CHANGED` (`sso.enforcement.changed`): emitted by `AdminActionService.setSsoEnforcement` (`POST /settings/organization/sso-enforcement`, `organization:["update"]`), not a `hooks.after` path: the only one of the 13 not routed through the SSO/SCIM plugin's own endpoints.
 - `SSO_LOGIN_SUCCESS` (`sso.login.success`): public. Payload: `{ userId, providerId, organizationId, protocol, jitProvisioned: boolean }`. `jitProvisioned` is a heuristic (`user.createdAt` within the last 10s of the login), not a plugin-native flag.
 - `SSO_LOGIN_FAILURE` (`sso.login.failure`): public. Emitted from the plugin's own error redirect path; `providerId` may be `"unknown"` when the failure happens before a provider is resolved.
-- `SCIM_CONNECTION_CREATED` (`scim.connection.created`): `path === SCIM_PATHS.generateToken`.
-- `SCIM_CONNECTION_DELETED` (`scim.connection.deleted`): `path === SCIM_PATHS.deleteConnection`. Same pre-delete-snapshot pattern as `SSO_PROVIDER_DELETED` (`scimConnectionDeleteSnapshots`).
-- `SCIM_USER_CREATED` (`scim.user.created`): public. `path.startsWith(SCIM_PATHS.users) && method === "POST"`.
-- `SCIM_USER_UPDATED` (`scim.user.updated`): public. `PUT`/`PATCH` that is not a deactivation (`isDeactivation(body)` false). Payload carries `changedFields` (`changedFieldsFrom(body)`: PATCH `Operations[].path`, or top-level PUT keys minus `schemas`).
-- `SCIM_USER_DEACTIVATED` (`scim.user.deactivated`): public. `PUT`/`PATCH` where `isDeactivation(body)` is true (`active: false`, either as a top-level PUT field or a PATCH `replace` operation on `path: "active"`: both shapes IdPs actually send, per `sso-paths.ts`).
+- `SCIM_CONNECTION_CREATED` (`scim.connection.created`): `POST /settings/organization/scim-connection` on an organization with no active connection.
+- `SCIM_CONNECTION_TOKEN_ROTATED` (`scim.connection.token_rotated`): internal. The same route on an organization that already has one: a new credential is issued and every other active one is revoked.
+- `SCIM_CONNECTION_DELETED` (`scim.connection.deleted`): `DELETE /settings/organization/scim-connection`. The plugin decommissions the connection, the membership projection removes every member the directory provisioned (owners excepted), and each removal is reported as an `org.member.removed` by the owner who disconnected.
+- `SCIM_USER_CREATED` (`scim.user.created`): public. `POST /scim/v2/Users`.
+- `SCIM_USER_UPDATED` (`scim.user.updated`): public. `PUT`/`PATCH` that does not turn an active user inactive. Payload carries `changedFields` (`changedFieldsFrom(body)`: PATCH `Operations[].path`, or top-level PUT keys minus `schemas`).
+- `SCIM_USER_DEACTIVATED` (`scim.user.deactivated`): public. `PUT`/`PATCH` after which a user who was active is not (`scimUserChange`, comparing the `scim_user` row snapshotted in `hooks.before` with the one read back after).
 - `SCIM_USER_DEPROVISIONED` (`scim.user.deprovisioned`): public. `DELETE`. **This removes only the `member` row for the owning org**: the global `user` row (and any other org membership) is untouched. A SCIM deprovision is an org departure, not an account deletion; it does not route through the RGPD grace-period wipe.
+
+Membership itself is written by the SCIM membership projection (`apps/api/src/shared/auth/scim-membership.ts`) inside the plugin's transaction, so no organization hook fires: the SCIM after-hook reads the member row back and emits `org.member.joined` or `org.member.removed` itself.
 
 ## Payload validation guarantee
 
@@ -475,7 +478,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (84 events: 35 public + 49 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (85 events: 35 public + 50 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
