@@ -1,7 +1,7 @@
-# Public API — `/api/v1`
+# Public API, `/api/v1`
 
 Reference for third parties calling this deployment with a Personal Access Token. Everything below
-is the behaviour of `apps/api/src/public-api/` and the middleware it mounts — no generated spec
+is the behaviour of `apps/api/src/public-api/` and the middleware it mounts, no generated spec
 exists, and none is planned (`ROADMAP.md`), so this page is the contract.
 
 The surface is deliberately small: three routes. What is *not* in it is documented at the bottom and
@@ -9,7 +9,7 @@ is part of the contract too.
 
 ## Base URL
 
-`/api/v1` is mounted on the API origin. There is no hosted instance — substitute your deployment's
+`/api/v1` is mounted on the API origin. There is no hosted instance, substitute your deployment's
 API origin. In this repo's local dev setup that origin is `http://localhost:3000` (`BETTER_AUTH_URL`
 in `apps/api/.env`, `VITE_API_URL` in `apps/app/.env`).
 
@@ -25,7 +25,7 @@ Every example below uses those two variables.
 
 ## Authentication
 
-One mechanism: a bearer token in the `Authorization` header. Cookies are ignored — the session
+One mechanism: a bearer token in the `Authorization` header. Cookies are ignored, the session
 middleware skips `/api/v1/*` entirely, so a browser session sent to these routes is a `401`.
 
 ```
@@ -34,14 +34,14 @@ Authorization: Bearer clean_…
 
 The `Bearer ` prefix is required; the header value alone is a `401`.
 
-**Token format.** A configurable prefix (`clean_` by default — a deployment may set its own via
+**Token format.** A configurable prefix (`clean_` by default, a deployment may set its own via
 `API_TOKEN_PREFIX`), 44 base58 characters, then a 6-character CRC32 checksum: 56 characters total
 with the default prefix. Treat it as opaque; the checksum exists so the server can reject a mistyped
 or truncated token without a database lookup, not for you to recompute.
 
 **Getting a token.** A user creates one in the application at `/settings/tokens`, picking a name, a
 scope subset and an optional expiry (capped at `API_TOKEN_MAX_EXPIRY_DAYS`, 365 days by default).
-The raw token is shown exactly once, at creation. There is no API to create one — see
+The raw token is shown exactly once, at creation. There is no API to create one, see
 [Outside the public API](#outside-the-public-api).
 
 **Lifecycle.** A token stays valid until one of:
@@ -54,7 +54,7 @@ The raw token is shown exactly once, at creation. There is no API to create one 
 | The user's account is banned | `401` while the ban is in force |
 | The token is committed to a public GitHub repository | Revoked automatically via GitHub Secret Scanning; the owner is emailed |
 
-All of these are the same `401` on the wire — the API does not tell a caller *why* a token stopped
+All of these are the same `401` on the wire, the API does not tell a caller *why* a token stopped
 working. Ask the user who issued it.
 
 **Store the token server-side.** These are server-to-server credentials. Browser callers are also
@@ -63,7 +63,7 @@ subject to the API's CORS allowlist, which does not include arbitrary third-part
 ## Scopes
 
 A token carries a subset of three scopes, chosen at creation. There is no wildcard and no `admin`
-scope. A route whose scope the token lacks returns `403` — the token is authenticated, it just
+scope. A route whose scope the token lacks returns `403`: the token is authenticated, it just
 isn't permitted.
 
 | Method | Path | Required scope |
@@ -122,10 +122,10 @@ curl -s -X PATCH "$API_BASE/api/v1/me" \
 { "ok": true }
 ```
 
-Body: `{ "name": string }`, 1–100 characters, required. No other field is accepted; unknown keys are
+Body: `{ "name": string }`, 1 to 100 characters, required. No other field is accepted; unknown keys are
 ignored. A rejected body returns `400 REQUEST_INVALID` with the offending fields in `metadata`.
 
-**This route can return `409 POLICY_ACCEPTANCE_REQUIRED`** — see below. Reads never do.
+**This route can return `409 POLICY_ACCEPTANCE_REQUIRED`**: see below. Reads never do.
 
 ### `GET /api/v1/organizations`
 
@@ -165,7 +165,7 @@ Every error the sub-app produces is JSON in one shape:
 }
 ```
 
-`code` is the stable field — branch on it, not on `message`, which is English prose and may change.
+`code` is the stable field, branch on it, not on `message`, which is English prose and may change.
 `metadata` is present only when the code carries structured detail. `requestId` is on every error
 and is the identifier to quote in a support request.
 
@@ -175,7 +175,7 @@ framework's own handler and returns `404` with the plain-text body `404 Not Foun
 | Status | `code` | When | What to do |
 |---|---|---|---|
 | `400` | `REQUEST_INVALID` | Request body failed validation. `metadata.fields[]` names each `path` and `message` | Fix the body; do not retry as-is |
-| `401` | `HTTP_401` | No `Authorization` header, no `Bearer ` prefix, bad checksum, unknown, revoked or expired token, banned owner | Do not retry. The credential is dead — get a new token from the user |
+| `401` | `HTTP_401` | No `Authorization` header, no `Bearer ` prefix, bad checksum, unknown, revoked or expired token, banned owner | Do not retry. The credential is dead, get a new token from the user |
 | `403` | `HTTP_403` | The token lacks the scope the route requires | Do not retry. The user must issue a token with the scope |
 | `409` | `POLICY_ACCEPTANCE_REQUIRED` | `PATCH /api/v1/me` only, when the owner has not accepted the current terms/privacy version | See below |
 | `429` | `SECURITY_RATE_LIMITED` | A rate-limit window was exhausted. `metadata.retryAfter` mirrors the `Retry-After` header, in seconds | Wait, then retry |
@@ -188,14 +188,14 @@ framework's own handler and returns `404` with the plain-text body `404 Not Foun
 
 **Your token is not the problem, and retrying will not clear it.** The user who owns the token has
 not accepted the current version of the terms of service or privacy policy. Until they do, every
-mutating call on their behalf is refused — today that is `PATCH /api/v1/me`; reads keep working.
+mutating call on their behalf is refused, today that is `PATCH /api/v1/me`; reads keep working.
 
 The acceptance can only happen in the application: the user signs in and accepts the new version at
-`/legal/accept`. There is no API to accept on their behalf, by design — consent has to come from the
+`/legal/accept`. There is no API to accept on their behalf, by design, consent has to come from the
 person.
 
 So: surface it to the user as "action needed in <the application>", stop retrying that call, and
-resume once the call stops returning `409`. Treat it as a durable state, not a transient failure —
+resume once the call stops returning `409`. Treat it as a durable state, not a transient failure:
 an exponential backoff here will simply fail for as long as the user takes to read the terms.
 
 ## Rate limits
@@ -243,10 +243,10 @@ The boundary is as much a part of the contract as the routes:
   a check that could be forgotten.
 - **There is no `admin` scope.** The platform-operator surface is not token-reachable at all, and
   `GET /api/v1/me` does not disclose whether the owner holds any operator role.
-- **Everything else the product does** — billing, uploads, organization management, webhooks,
-  notifications, RGPD data rights, authentication itself — is session-only. It is absent from
+- **Everything else the product does**: billing, uploads, organization management, webhooks,
+  notifications, RGPD data rights, authentication itself, is session-only. It is absent from
   `/api/v1` rather than gated inside it, so no new route can accidentally become token-reachable.
 - **Sensitive user fields are absent, not filtered.** See `GET /api/v1/me` above.
 
-If you need a capability that isn't here, it needs a route added to `/api/v1` — ask the deployment's
+If you need a capability that isn't here, it needs a route added to `/api/v1`: ask the deployment's
 maintainer rather than looking for an undocumented path.
