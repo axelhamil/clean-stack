@@ -83,6 +83,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.SSO_LOGIN_FAILURE]: "compliance",
   [EventTypes.SCIM_CONNECTION_CREATED]: "compliance",
   [EventTypes.SCIM_CONNECTION_DELETED]: "compliance",
+  [EventTypes.SCIM_CONNECTION_TOKEN_ROTATED]: "compliance",
   [EventTypes.SCIM_USER_CREATED]: "compliance",
   [EventTypes.SCIM_USER_UPDATED]: "compliance",
   [EventTypes.SCIM_USER_DEACTIVATED]: "compliance",

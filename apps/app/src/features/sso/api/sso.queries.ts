@@ -1,5 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
+import type { InferResponseType } from "hono/client";
+import { api } from "../../../shared/api/api-client";
+import { throwApiError, toAuthClientError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import { errorFallback } from "../../../shared/i18n/get-errors-t";
 
@@ -55,3 +57,15 @@ export const domainVerificationTokenQueryOptions = (providerId: string) =>
       return data?.domainVerificationToken ?? null;
     },
   });
+
+const $scimConnection = api.settings.organization["scim-connection"].$get;
+
+export const scimConnectionQueryOptions = queryOptions({
+  queryKey: ["settings", "sso", "scim-connection"] as const,
+  queryFn: async ({ signal }) => {
+    const res = await $scimConnection({}, { init: { signal } });
+    if (!res.ok) await throwApiError(res, "loadScimConnection");
+    const body = (await res.json()) as InferResponseType<typeof $scimConnection, 200>;
+    return body.connection;
+  },
+});

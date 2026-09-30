@@ -107,7 +107,7 @@ describe("catalog parity", () => {
     // Example issuer URL for the OIDC form: a non-linguistic placeholder.
     "settings.sso.forms.oidc.issuerPlaceholder",
     // Example SAML entity ID: a fictional identifier, not sentence copy.
-    "settings.sso.forms.saml.issuerPlaceholder",
+    "settings.sso.forms.saml.idpEntityIdPlaceholder",
     // Example SAML entry-point URL: a non-linguistic placeholder.
     "settings.sso.forms.saml.entryPointPlaceholder",
     // Format example ticket reference for the admin impersonation form, not

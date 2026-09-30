@@ -13,7 +13,7 @@ The non-obvious failure modes that crash a fresh deploy. Every one below was hit
 **Boot is fail-hard on these (prod): the API refuses to start without them:**
 
 - `NODE_ENV=production` (see the trap below)
-- `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
+- `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), `SCIM_CREDENTIAL_HASH_SECRET` (≥ 32 chars), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
 - `APP_URL` (public app URL, e.g. `https://app.example.com`): Zod-required in `env.ts` at any `NODE_ENV`; the API refuses to boot if the value is absent or not a valid URL. Auth email links, the CSP-report origin filter, and the impersonation notification email all derive from it. The `.env.example` provides `http://localhost:5173` as the dev default.
 
 **Boot degrades gracefully on these, the API starts, the feature stays inert until configured:**
@@ -105,6 +105,7 @@ Set these **once at project level**, then reference from each service:
 | `INTERNAL_SIGNING_KEY`  | `openssl rand -hex 32` (min 32 chars) | api + cron      |
 | `WEBHOOK_MASTER_KEY`    | `openssl rand -hex 32` (64 hex chars) | api             |
 | `API_TOKEN_PEPPER`      | `openssl rand -hex 32` (min 32 chars) | api             |
+| `SCIM_CREDENTIAL_HASH_SECRET` | `openssl rand -hex 32` (min 32 chars) | api       |
 | `RESEND_API_KEY`        | Resend dashboard (live key)           | api             |
 | `RESEND_FROM`           | `onboarding@<your-verified-domain>`   | api             |
 | `S3_ENDPOINT`           | `https://<account>.r2.cloudflarestorage.com` | api      |
@@ -139,6 +140,7 @@ WEBHOOK_MASTER_KEY=${{shared.WEBHOOK_MASTER_KEY}}
 API_TOKEN_PEPPER=${{shared.API_TOKEN_PEPPER}}    # required, HMAC key for token storage
 API_TOKEN_PEPPER_PREVIOUS=                       # set during pepper rotation (see below)
 API_TOKEN_PEPPER_VERSION=1                       # increment when rotating
+SCIM_CREDENTIAL_HASH_SECRET=${{shared.SCIM_CREDENTIAL_HASH_SECRET}}   # required, HMAC key for SCIM directory tokens (rotating it invalidates every issued token)
 API_TOKEN_PREFIX=clean_                          # prefix every clone should change
 S3_ENDPOINT=${{shared.S3_ENDPOINT}}
 S3_REGION=${{shared.S3_REGION}}

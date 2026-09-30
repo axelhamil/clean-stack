@@ -13,6 +13,9 @@ export default {
     // catalog lookup itself is keyed the same as every other code either way.
     SSO_PLAN_REQUIRED: "Your plan does not include SSO.",
     SSO_ORGANIZATION_REQUIRED: "No active organization.",
+    SCIM_CONNECTION_NOT_FOUND: "This organization has no directory connection to disconnect.",
+    SCIM_CONNECTION_PROVIDER_FAILURE:
+      "The directory connection could not be updated. Try again in a moment.",
     // BetterAuth's own `BASE_ERROR_CODES`. They are keyed here rather than
     // read off `error.message` because the library ships one English string
     // per code and no translation hook: the code is the only stable,
@@ -218,6 +221,8 @@ export default {
     registerSamlProvider: "Failed to register the SAML provider",
     verifySsoDomain: "Domain verification failed",
     generateScimToken: "Failed to generate the SCIM token",
+    loadScimConnection: "Failed to load the directory connection",
+    disconnectScim: "Failed to disconnect the directory",
     invalidServerResponse: "Invalid response from server",
     updateSsoEnforcement: "Failed to update SSO enforcement",
     loadSsoProviders: "Failed to load SSO providers",

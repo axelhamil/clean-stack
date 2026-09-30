@@ -89,7 +89,7 @@ describe("sso schemas route their copy through the catalog", () => {
     const issues = issuesFor(samlProviderSchema, {
       domain: "acme.com",
       entryPoint: "http://idp.acme.com/sso/saml",
-      issuer: "acme-saml",
+      idpEntityId: "https://idp.acme.com/metadata",
       cert: "PEM",
     });
     const entryIssue = issues.find((i) => i.path[0] === "entryPoint");
@@ -103,7 +103,7 @@ describe("sso schemas route their copy through the catalog", () => {
     const issues = issuesFor(samlProviderSchema, {
       domain: "acme.com",
       entryPoint: "https://idp.acme.com/sso/saml",
-      issuer: "acme-saml",
+      idpEntityId: "https://idp.acme.com/metadata",
       cert: "",
     });
     const certIssue = issues.find((i) => i.path[0] === "cert");

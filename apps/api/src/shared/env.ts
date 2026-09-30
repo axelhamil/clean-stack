@@ -123,6 +123,7 @@ const envSchema = z
     API_TOKEN_MAX_EXPIRY_DAYS: z.coerce.number().int().positive().default(365),
     API_TOKEN_LAST_USED_BUCKET_MIN: z.coerce.number().int().positive().default(15),
     API_TOKEN_PEPPER_VERSION: z.coerce.number().int().positive().default(1),
+    SCIM_CREDENTIAL_HASH_SECRET: z.string().min(32).optional(),
   })
   .superRefine(validateEnvBounds);
 
@@ -181,6 +182,11 @@ if (env.NODE_ENV === "production") {
   if (!env.API_TOKEN_PEPPER) {
     throw new Error(
       "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret: a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
+    );
+  }
+  if (!env.SCIM_CREDENTIAL_HASH_SECRET) {
+    throw new Error(
+      "SCIM_CREDENTIAL_HASH_SECRET is required in production (min 32 chars). It keys the digest of every SCIM bearer token: without a real one, a DB dump becomes a set of usable directory credentials. Generate: openssl rand -hex 32",
     );
   }
 }

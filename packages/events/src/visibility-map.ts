@@ -83,6 +83,7 @@ export const VISIBILITY = {
   "sso.login.failure": "public",
   "scim.connection.created": "internal",
   "scim.connection.deleted": "internal",
+  "scim.connection.token_rotated": "internal",
   "scim.user.created": "public",
   "scim.user.updated": "public",
   "scim.user.deactivated": "public",

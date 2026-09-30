@@ -22,7 +22,7 @@ export type OidcProviderInput = z.infer<typeof oidcProviderSchema>;
 export const samlProviderSchema = z.object({
   domain,
   entryPoint: z.url().refine(isHttpsUrl, { params: { i18nKey: "validation.httpsUrl" } }),
-  issuer: z.string().min(1),
+  idpEntityId: z.string().min(1),
   cert: z.string().min(1),
 });
 export type SamlProviderInput = z.infer<typeof samlProviderSchema>;

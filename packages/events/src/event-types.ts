@@ -81,6 +81,7 @@ export const EventTypes = {
   SSO_LOGIN_FAILURE: "sso.login.failure",
   SCIM_CONNECTION_CREATED: "scim.connection.created",
   SCIM_CONNECTION_DELETED: "scim.connection.deleted",
+  SCIM_CONNECTION_TOKEN_ROTATED: "scim.connection.token_rotated",
   SCIM_USER_CREATED: "scim.user.created",
   SCIM_USER_UPDATED: "scim.user.updated",
   SCIM_USER_DEACTIVATED: "scim.user.deactivated",

@@ -10,6 +10,9 @@ export default {
     TWO_FACTOR_INVALID: "Code d'authentification invalide.",
     SSO_PLAN_REQUIRED: "Votre forfait n'inclut pas le SSO.",
     SSO_ORGANIZATION_REQUIRED: "Aucune organisation active.",
+    SCIM_CONNECTION_NOT_FOUND: "Cette organisation n'a aucune connexion d'annuaire à déconnecter.",
+    SCIM_CONNECTION_PROVIDER_FAILURE:
+      "La connexion à l'annuaire n'a pas pu être mise à jour. Réessayez dans un instant.",
     INVALID_EMAIL_OR_PASSWORD: "Adresse e-mail ou mot de passe invalide.",
     INVALID_EMAIL: "Saisissez une adresse e-mail valide.",
     INVALID_PASSWORD: "Mot de passe invalide.",
@@ -205,6 +208,8 @@ export default {
     registerSamlProvider: "Échec de l'enregistrement du fournisseur SAML",
     verifySsoDomain: "Échec de la vérification du domaine",
     generateScimToken: "Échec de la génération du jeton SCIM",
+    loadScimConnection: "Échec du chargement de la connexion à l'annuaire",
+    disconnectScim: "Échec de la déconnexion de l'annuaire",
     invalidServerResponse: "Réponse invalide du serveur",
     updateSsoEnforcement: "Échec de la mise à jour de l'imposition du SSO",
     loadSsoProviders: "Échec du chargement des fournisseurs SSO",

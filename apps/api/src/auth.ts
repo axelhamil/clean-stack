@@ -1,10 +1,11 @@
 // Type-only anchors: the inferred `auth` type references these packages' types, and TS
 // can only name them portably from a direct dependency. @simplewebauthn/server must
-// therefore stay on the major @better-auth/passkey depends on (13, up to passkey 1.7).
+// therefore stay on the exact major @better-auth/passkey depends on (13 as of passkey
+// 1.7.6): a direct 14 resolves to a second copy and brings TS2883 back.
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
-import { scim } from "@better-auth/scim";
+import { type SCIMEndpoints, type SCIMPlugin, scim } from "@better-auth/scim";
 import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
@@ -37,11 +38,13 @@ import {
   findLatestPasskey,
   findMemberOf,
   findOrgOwnerUserId,
+  findScimUser,
   findSsoProviderByProviderId,
   insertPersonalOrgWithOwner,
-  scimConnectionOwner,
+  isVerifiedSsoDomainOf,
+  type ScimUserSnapshot,
+  scimConnectionCreator,
   setPendingEmail,
-  verifiedScimConnectionOwner,
 } from "./auth-queries";
 import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
@@ -50,18 +53,17 @@ import {
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
-import { memberRemovalActor, type ScimDeprovisionActor } from "./shared/auth/member-removal-actor";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
+import { scimIdentityResolver, scimMembershipProjection } from "./shared/auth/scim-membership";
 import { isSsoEnforcedFor } from "./shared/auth/sso-enforcement";
 import {
   changedFieldsFrom,
-  isDeactivation,
   isSamlCallbackPath,
   isSsoCallbackPath,
   SCIM_PATHS,
   SSO_PATHS,
-  scimProviderIdFromToken,
+  scimUserChange,
 } from "./shared/auth/sso-paths";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
@@ -200,10 +202,11 @@ async function emitBestEffort<TPayload>(
 }
 
 /**
- * The enterprise entitlement gate shared by `/sso/register` and
- * `/scim/generate-token`: both unlock the same paid capability, so both must refuse
- * the same way. Takes the org the REQUEST names, never one inferred from session
- * history, because that is the only org whose plan is actually being spent.
+ * The enterprise entitlement gate on `/sso/register`. Takes the org the REQUEST
+ * names, never one inferred from session history, because that is the only org
+ * whose plan is actually being spent. The SCIM half of the same paid capability is
+ * gated where its connection is created, `requireFeature("sso")` on the
+ * `/settings/organization/scim-connection` routes.
  */
 async function assertSsoEntitlementFor(organizationId: string | undefined): Promise<void> {
   if (!organizationId) {
@@ -218,7 +221,7 @@ async function assertSsoEntitlementFor(organizationId: string | undefined): Prom
 /**
  * The seat cap itself: one question, one answer, for every surface that creates a
  * member. Callers differ only in how they refuse, the organization hooks throw
- * `AppErrorException` through `assertSeat`, the SCIM branch has to throw a
+ * `AppErrorException` through `assertSeat`, the SCIM projection has to throw a
  * BetterAuth `APIError` with a SCIM-shaped body, and that difference must never
  * be allowed to become two different definitions of "is there a seat".
  * Centralised so the check is never duplicated across hooks (CLAUDE.md
@@ -254,39 +257,18 @@ async function assertSeatAvailableFor(orgId: string): Promise<void> {
 const SNAPSHOT_TTL_MS = 30_000;
 
 /**
- * An RFC 7644 §3.12 error body. Every `/scim/v2/*` response an IdP parses has to
- * carry `schemas`/`status`/`detail`, Okta and Entra surface a generic "provider
- * error" for anything else, hiding the actual reason from the operator who has to
- * act on it. `@better-auth/scim` has its own `SCIMAPIError` for exactly this and
- * uses it throughout, but does not export it (the package exports `scim` and
- * `scimClient`, nothing else), so the shape is reproduced rather than imported.
- * `message` is carried alongside `detail` so the thrown error is not blank in logs
- * and telemetry, better-call reads `Error.message` from the body.
- */
-const SCIM_ERROR_STATUS = { PAYMENT_REQUIRED: 402 } as const;
-
-function scimError(status: keyof typeof SCIM_ERROR_STATUS, detail: string): APIError {
-  return new APIError(status, {
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-    status: String(SCIM_ERROR_STATUS[status]),
-    detail,
-    message: detail,
-  });
-}
-
-/**
- * Bridges `org.member.joined` for the SCIM provisioning path. `@better-auth/scim`
- * writes the member row with a raw `adapter.create({ model: "member" })`, so
- * `organizationHooks.afterAddMember`, where every other surface emits this event,
- * never fires: without this bridge an IdP-provisioned member leaves no audit row and
- * no webhook delivery (rule #6). Same aggregate and same payload shape as
+ * Bridges `org.member.joined` for the SCIM provisioning path. The member row is
+ * written by `scimMembershipProjection` through the plugin's transaction adapter,
+ * so `organizationHooks.afterAddMember`, where every other surface emits this
+ * event, never fires: without this bridge an IdP-provisioned member leaves no audit
+ * row and no webhook delivery (rule #6). Same aggregate and same payload shape as
  * `afterAddMember`; the provisioned user is the subject, the connection owner is the
  * actor (rule #7).
  *
- * The plugin's `createOrgMembership` silently no-ops when the user is already a member
- * (SCIM linking someone who joined by invitation), and an after-hook cannot tell the
- * two apart, `createdAt` can: a row this request wrote is seconds old. Without the
- * window, re-provisioning an existing member would emit a false "joined".
+ * The projection leaves an existing membership alone (SCIM linking someone who
+ * joined by invitation), and an after-hook cannot tell the two apart, `createdAt`
+ * can: a row this request wrote is seconds old. Without the window,
+ * re-provisioning an existing member would emit a false "joined".
  */
 async function emitScimMemberJoined(
   userId: string,
@@ -305,6 +287,64 @@ async function emitScimMemberJoined(
       role: member.role,
       actorUserId: actorUserId ?? undefined,
     },
+    organizationId,
+  );
+}
+
+/**
+ * The events of a successful `/scim/v2/Users` write: the SCIM lifecycle event, and
+ * the membership change the projection made in the same transaction. Runs only
+ * after the plugin committed, so a refused or rolled-back request emits nothing.
+ *
+ * The subject is the Better Auth user, never the SCIM resource id the directory
+ * sees; the actor is the connection's creator (rule #7), a bearer request having
+ * no session. A creation reads the stored row back through the id the response
+ * carries; every other write reads the snapshot `hooks.before` took, the only
+ * record of a deleted user and the only "before" a deactivation can be told from.
+ */
+async function emitScimUserEvents(
+  method: string | undefined,
+  returned: unknown,
+  params: unknown,
+  body: Record<string, unknown> | undefined,
+): Promise<void> {
+  if (!method || returned instanceof APIError) return;
+
+  const scimUserId =
+    method === "POST"
+      ? (returned as { id?: string } | undefined)?.id
+      : (params as Record<string, string> | undefined)?.userId;
+  if (!scimUserId) return;
+
+  const before = method === "POST" ? undefined : scimUserSnapshots.take(scimUserId);
+  const after = method === "DELETE" ? undefined : await findScimUser(scimUserId);
+  const subject = after ?? before;
+  if (!subject) return;
+
+  const change = scimUserChange(method, before, after);
+  if (!change) return;
+
+  const { userId, organizationId, connectionId, externalId } = subject;
+  const actorUserId = await scimConnectionCreator(connectionId);
+  const base = { userId, actorUserId, organizationId, scimProviderId: connectionId, externalId };
+  const eventType = {
+    created: EventTypes.SCIM_USER_CREATED,
+    updated: EventTypes.SCIM_USER_UPDATED,
+    deactivated: EventTypes.SCIM_USER_DEACTIVATED,
+    deprovisioned: EventTypes.SCIM_USER_DEPROVISIONED,
+  }[change];
+  const payload = change === "updated" ? { ...base, changedFields: changedFieldsFrom(body) } : base;
+  await emit(eventType, "user", userId, payload, organizationId);
+
+  await emitScimMemberJoined(userId, organizationId, actorUserId);
+
+  const removedMemberId = before?.memberId;
+  if (!removedMemberId || (await findMemberOf(userId, organizationId))) return;
+  await emit(
+    EventTypes.ORG_MEMBER_REMOVED,
+    "member",
+    removedMemberId,
+    { organizationId, actorUserId, userId },
     organizationId,
   );
 }
@@ -366,32 +406,17 @@ const ssoProviderDeleteSnapshots = new RequestSnapshots<{
 }>(SNAPSHOT_TTL_MS);
 
 /**
- * Same read-before-delete snapshot as `ssoProviderDeleteSnapshots`, for
- * `/scim/delete-provider-connection`: the connection row (and its
- * `organizationId`) is gone by the time `hooks.after` runs. Keyed on
- * `providerId` and consumed only in that path's own after-branch, the key is
- * unique per row and the consumer is the same request, so freshness is the only
- * guard it needs.
+ * The stored SCIM User a `PUT`, `PATCH` or `DELETE /scim/v2/Users/:userId` is about
+ * to change, read in `hooks.before`: a deletion leaves nothing to read afterwards,
+ * and a deactivation is only visible as the difference between the two states.
+ * Keyed on the SCIM user id from the path, and only ever consumed by the after-hook
+ * of a request that succeeded, which proves the plugin found that user inside the
+ * caller's own connection. The snapshot is a database read, never request input,
+ * so a stranded entry cannot carry anything a caller chose.
  */
-const scimConnectionDeleteSnapshots = new RequestSnapshots<string>(SNAPSHOT_TTL_MS);
-
-/**
- * `DELETE /scim/v2/Users/:userId` is authenticated by a bearer token, so the real
- * actor (the connection owner) is only resolvable from `hooks.before`, while the
- * `org.member.removed` emit happens inside `organizationHooks.afterRemoveMember`,
- * which the organization plugin calls with the *removed* user as `user`.
- *
- * This one carries the organization id as well as the actor, and the consumer
- * checks it, because its key is the least trustworthy of the three: `userId`
- * comes straight off the request URL, the consumer fires on *every* member
- * removal in *every* org, and the SCIM endpoint has two paths that reach neither
- * `afterRemoveMember` nor any other consumer, a 404 for an unknown user, and a
- * user who holds no member row. Without the org check, one 404-ing DELETE from
- * any valid SCIM token would strand an entry that then names that token's owner
- * as the actor of an unrelated admin's kick, in an unrelated org, fabricated
- * provenance on a compliance-retention event.
- */
-const scimDeprovisionActors = new RequestSnapshots<ScimDeprovisionActor>(SNAPSHOT_TTL_MS);
+const scimUserSnapshots = new RequestSnapshots<ScimUserSnapshot & { memberId: string | undefined }>(
+  SNAPSHOT_TTL_MS,
+);
 
 /**
  * The two provider-writing SSO endpoints persist `domain` verbatim and merge SAML
@@ -471,13 +496,42 @@ async function dispatchEmail<K extends keyof EmailTemplates>(
   }
 }
 
+/**
+ * `@better-auth/scim` leaks an unexported interface (`SCIMDiscoveryAttribute`)
+ * through the response types of its two schema-discovery endpoints, and the
+ * exported `auth` type then cannot be named (TS4023). Both endpoints are served to
+ * directories over HTTP and never called through `auth.api`, so the plugin is typed
+ * without them: an annotation that only drops keys, the runtime object is untouched.
+ */
+type ScimPluginWithoutDiscoveryTypes = Omit<SCIMPlugin, "endpoints"> & {
+  endpoints: Omit<SCIMEndpoints, "getSCIMSchemas" | "getSCIMSchema">;
+};
+
+// Plugin-managed connections: one per organization, created, rotated and
+// decommissioned by `ScimConnectionService` behind the owner-only
+// `/settings/organization/scim-connection` routes. The organization id is the
+// provisioning domain, and the projection is what turns a directory's users into
+// members of it (the plugin itself knows nothing of organizations).
+const scimPlugin: ScimPluginWithoutDiscoveryTypes = scim({
+  connections: [],
+  managedConnections: {
+    credentialHashSecret:
+      env.SCIM_CREDENTIAL_HASH_SECRET ?? "dev-only-scim-credential-secret-not-for-production-use",
+  },
+  identity: scimIdentityResolver({ seatCapFor, isVerifiedSsoDomainOf }),
+  projection: scimMembershipProjection({ seatCapFor, isVerifiedSsoDomainOf }),
+});
+
 const authOptions = {
   appName: "clean-stack",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   rateLimit: { enabled: false },
 
-  database: drizzleAdapter(db, { provider: "pg" }),
+  // `transaction: true` is required by `@better-auth/scim`, which refuses to start
+  // without native transactions: a directory change and the membership it
+  // projects must commit or roll back together.
+  database: drizzleAdapter(db, { provider: "pg", transaction: true }),
 
   user: {
     additionalFields: {
@@ -736,22 +790,10 @@ const authOptions = {
           );
         },
         afterRemoveMember: async ({ member, user, organization: org }) => {
-          // SCIM deprovisioning reaches this hook too (`@better-auth/scim` calls it
-          // after its own transaction), but bearer-token requests have no session, so
-          // the plugin can only pass the removed user. `hooks.before` snapshotted the
-          // connection owner, the real actor, under the deprovisioned user id.
-          // The org check is what makes that safe to trust: this hook fires for every
-          // removal in every org, and a snapshot whose org is not this one belongs to
-          // some other request (see `scimDeprovisionActors`).
-          //
-          // The same actor owns the auto-collapse below: a SCIM deprovisioning that
-          // empties the org deletes it on the connection owner's behalf, not the
-          // removed user's.
-          const actorUserId = memberRemovalActor(scimDeprovisionActors, {
-            removedUserId: member.userId,
-            organizationId: org.id,
-            sessionUserId: user.id,
-          });
+          // SCIM deprovisioning never reaches this hook: the SCIM projection removes
+          // the member row itself and `hooks.after` emits for it, with the
+          // connection owner as the actor.
+          const actorUserId = user.id;
           await emit(
             EventTypes.ORG_MEMBER_REMOVED,
             "member",
@@ -861,11 +903,7 @@ const authOptions = {
       // body.organizationId is available; this stays a flat anti-abuse ceiling per user.
       providersLimit: 10,
     }),
-    scim({
-      requiredRole: ["owner"],
-      providerOwnership: { enabled: true },
-      storeSCIMToken: "hashed",
-    }),
+    scimPlugin,
   ],
 
   hooks: {
@@ -972,80 +1010,12 @@ const authOptions = {
         return;
       }
 
-      if (path === SCIM_PATHS.deleteConnection) {
-        const providerId = body?.providerId as string | undefined;
-        if (providerId) {
-          const owner = await scimConnectionOwner(providerId);
-          if (owner.organizationId)
-            scimConnectionDeleteSnapshots.set(providerId, owner.organizationId);
-        }
-        return;
-      }
-
-      // SCIM directory sync is part of the same enterprise entitlement as SSO, and
-      // the token minted here is what unlocks `/scim/v2/*` for an IdP. Gated on the
-      // same feature and in the same place as `/sso/register`: without this, a
-      // Free-tier owner mints a token and provisions members through a surface that
-      // never passes any billing gate.
-      if (path === SCIM_PATHS.generateToken) {
-        await assertSsoEntitlementFor(body?.organizationId as string | undefined);
-        return;
-      }
-
-      // Seat cap for SCIM provisioning. `@better-auth/scim` writes the member row with
-      // a raw `adapter.create({ model: "member" })`, so neither `beforeAddMember` nor
-      // `beforeAcceptInvitation`, the two authoritative seat gates, ever fires. An
-      // after-hook cannot cap anything (the row is already written), so the gate has to
-      // live here, before the endpoint runs. It asks `seatCapFor`, the same predicate
-      // the organization hooks ask through `assertSeatAvailableFor`, and only the
-      // refusal differs: this is a SCIM protocol endpoint, so it owes an RFC 7644 error
-      // body rather than the app's own.
-      //
-      // Post-review hardening: this used to resolve the owner from the *decoded but
-      // unverified* bearer header (`scimConnectionOwner(scimProviderIdFromToken(...))`)
-      // `hooks.before` runs ahead of the plugin's own token verification, so a
-      // forged header naming a real, guessable `providerId` reached `seatCapFor` and
-      // leaked seat capacity pre-auth, cross-tenant (402 with `maxMembers` when full,
-      // vs. 401 when not, an oracle). `verifiedScimConnectionOwner` hashes the token
-      // and compares it to the stored connection before returning anything, so a
-      // request that fails verification here simply skips the seat check and falls
-      // through to the endpoint's own 401, it can't write a member row without a
-      // valid token, so there is nothing to gate.
-      if (path === SCIM_PATHS.users && ctx.method === "POST") {
-        const owner = await verifiedScimConnectionOwner(ctx.headers);
-        // No org on the connection means no member row is written at all (the plugin's
-        // `createOrgMembership` no-ops), and an unresolvable/unverified token is the
-        // endpoint's own 401 to raise, neither is a seat concern.
-        if (owner?.organizationId) {
-          const { available, maxMembers } = await seatCapFor(owner.organizationId);
-          if (!available) {
-            throw scimError("PAYMENT_REQUIRED", `Seat limit reached (${maxMembers ?? "∞"}).`);
-          }
-        }
-        return;
-      }
-
-      // `organizationHooks.afterRemoveMember` DOES fire on SCIM deprovisioning, but the
-      // organization plugin passes the *removed* user as its `user` argument on every
-      // path, so the emitted `org.member.removed` would name the deprovisioned user as
-      // its own actor. Snapshot the real actor, the connection owner, here, where the
-      // bearer token is still readable, and let the hook prefer it (rule #7: the subject
-      // is not the actor). Read-and-delete, same pattern as the snapshots above.
-      //
-      // Post-review hardening: same unverified-token issue as the seat cap above, but
-      // worse here, an unauthenticated caller who merely guessed a real `providerId`
-      // could plant a fabricated actor in `scimDeprovisionActors`, later attributed
-      // (within the 30s TTL) to an unrelated admin's ordinary removal of that same
-      // user in the same org, audit-log forgery. `verifiedScimConnectionOwner`
-      // closes it the same way: no verified token, no snapshot.
-      if (path === SCIM_PATHS.user && ctx.method === "DELETE") {
-        const userId = (ctx.params as Record<string, string> | undefined)?.userId;
-        const owner = await verifiedScimConnectionOwner(ctx.headers);
-        if (userId && owner?.userId && owner.organizationId) {
-          scimDeprovisionActors.set(userId, {
-            actorUserId: owner.userId,
-            organizationId: owner.organizationId,
-          });
+      if (path === SCIM_PATHS.user && ctx.method !== "GET") {
+        const scimUserId = (ctx.params as Record<string, string> | undefined)?.userId;
+        const scimUser = scimUserId ? await findScimUser(scimUserId) : undefined;
+        if (scimUserId && scimUser) {
+          const member = await findMemberOf(scimUser.userId, scimUser.organizationId);
+          scimUserSnapshots.set(scimUserId, { ...scimUser, memberId: member?.id });
         }
         return;
       }
@@ -1196,52 +1166,9 @@ const authOptions = {
 
       // SCIM endpoints authenticate with a bearer token, `ctx.context.session` is
       // empty here, so this branch must run before the session-actor early-return
-      // below, and the actor is resolved from the connection row instead.
+      // below, and the actor is resolved from the connection instead.
       if (path.startsWith(SCIM_PATHS.users) && ctx.method !== "GET") {
-        const providerId = scimProviderIdFromToken(ctx.headers);
-        const owner = await scimConnectionOwner(providerId);
-        const params = ctx.params as Record<string, string> | undefined;
-        // POST/PUT return the SCIM user resource (`{ id, externalId }`); PATCH/DELETE
-        // reply 204 with no body, so the subject id has to come from the route param.
-        const returned = ctx.context.returned as { id: string; externalId?: string } | undefined;
-        const subjectId = returned?.id ?? params?.userId;
-        if (subjectId && owner.organizationId) {
-          const base = {
-            userId: subjectId,
-            actorUserId: owner.userId,
-            organizationId: owner.organizationId,
-            scimProviderId: providerId,
-            externalId: returned?.externalId ?? null,
-          };
-          if (ctx.method === "POST") {
-            await emit(EventTypes.SCIM_USER_CREATED, "user", subjectId, base, owner.organizationId);
-            await emitScimMemberJoined(subjectId, owner.organizationId, owner.userId);
-          } else if (ctx.method === "DELETE") {
-            await emit(
-              EventTypes.SCIM_USER_DEPROVISIONED,
-              "user",
-              subjectId,
-              base,
-              owner.organizationId,
-            );
-          } else if (isDeactivation(body)) {
-            await emit(
-              EventTypes.SCIM_USER_DEACTIVATED,
-              "user",
-              subjectId,
-              base,
-              owner.organizationId,
-            );
-          } else {
-            await emit(
-              EventTypes.SCIM_USER_UPDATED,
-              "user",
-              subjectId,
-              { ...base, changedFields: changedFieldsFrom(body) },
-              owner.organizationId,
-            );
-          }
-        }
+        await emitScimUserEvents(ctx.method, ctx.context.returned, ctx.params, body);
         return;
       }
 
@@ -1409,38 +1336,6 @@ const authOptions = {
               provider.organizationId,
             );
           }
-        }
-        return;
-      }
-
-      // A SCIM token is an issued credential: its creation/revocation audits like a PAT.
-      if (path === SCIM_PATHS.generateToken) {
-        const providerId = body?.providerId as string | undefined;
-        const organizationId = body?.organizationId as string | undefined;
-        if (providerId && organizationId) {
-          await emit(
-            EventTypes.SCIM_CONNECTION_CREATED,
-            "scim_provider",
-            providerId,
-            { actorUserId: userId, organizationId, providerId },
-            organizationId,
-          );
-        }
-        return;
-      }
-      if (path === SCIM_PATHS.deleteConnection) {
-        const providerId = body?.providerId as string | undefined;
-        const organizationId = providerId
-          ? scimConnectionDeleteSnapshots.take(providerId)
-          : undefined;
-        if (providerId && organizationId) {
-          await emit(
-            EventTypes.SCIM_CONNECTION_DELETED,
-            "scim_provider",
-            providerId,
-            { actorUserId: userId, organizationId, providerId },
-            organizationId,
-          );
         }
         return;
       }

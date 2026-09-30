@@ -21,9 +21,13 @@ export function useEnableTwoFactor() {
     mutationFn: async (input: PasswordPromptInput): Promise<EnableTwoFactorResult> => {
       const { data, error } = await authClient.twoFactor.enable({
         password: input.password,
+        method: "totp",
       });
       if (error) throw toAuthClientError(error, t("twoFactor.enableFailed"));
-      if (!data?.totpURI || !data.backupCodes) throw new Error(t("twoFactor.unexpectedResponse"));
+      if (data?.method !== "totp" || !data.totpURI || !data.backupCodes) {
+        throw new Error(t("twoFactor.unexpectedResponse"));
+      }
+
       return { totpURI: data.totpURI, backupCodes: data.backupCodes };
     },
     onSuccess: async () => {

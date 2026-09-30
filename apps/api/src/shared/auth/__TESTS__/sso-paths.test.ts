@@ -1,22 +1,24 @@
 import { describe, expect, it } from "bun:test";
-import { changedFieldsFrom, isDeactivation, scimProviderIdFromToken } from "../sso-paths";
+import { changedFieldsFrom, isSamlCallbackPath, scimUserChange } from "../sso-paths";
 
-describe("isDeactivation", () => {
-  it("detects the entra id patch shape", () => {
-    expect(isDeactivation({ Operations: [{ op: "replace", path: "active", value: false }] })).toBe(
-      true,
-    );
+describe("scimUserChange", () => {
+  it("names a creation and a deletion by their method alone", () => {
+    expect(scimUserChange("POST", undefined, { active: true })).toBe("created");
+    expect(scimUserChange("DELETE", { active: true }, undefined)).toBe("deprovisioned");
   });
 
-  it("detects the top-level put shape", () => {
-    expect(isDeactivation({ active: false })).toBe(true);
+  it("detects a deactivation from the stored state, whatever the body shape", () => {
+    expect(scimUserChange("PATCH", { active: true }, { active: false })).toBe("deactivated");
+    expect(scimUserChange("PUT", { active: true }, { active: false })).toBe("deactivated");
   });
 
-  it("does not fire on reactivation", () => {
-    expect(isDeactivation({ active: true })).toBe(false);
-    expect(isDeactivation({ Operations: [{ op: "replace", path: "active", value: true }] })).toBe(
-      false,
-    );
+  it("treats a reactivation and an attribute change as updates", () => {
+    expect(scimUserChange("PATCH", { active: false }, { active: true })).toBe("updated");
+    expect(scimUserChange("PUT", { active: true }, { active: true })).toBe("updated");
+  });
+
+  it("ignores reads", () => {
+    expect(scimUserChange("GET", { active: true }, { active: true })).toBeNull();
   });
 });
 
@@ -32,14 +34,9 @@ describe("changedFieldsFrom", () => {
   });
 });
 
-describe("scimProviderIdFromToken", () => {
-  it("reads the provider id out of the encoded token", () => {
-    const token = btoa("secret:acme-scim:org-1");
-    const headers = new Headers({ authorization: `Bearer ${token}` });
-    expect(scimProviderIdFromToken(headers)).toBe("acme-scim");
-  });
-
-  it("degrades to unknown on garbage", () => {
-    expect(scimProviderIdFromToken(new Headers({ authorization: "Bearer !!!" }))).toBe("unknown");
+describe("isSamlCallbackPath", () => {
+  it("recognizes the SAML assertion consumer service", () => {
+    expect(isSamlCallbackPath("/sso/saml2/sp/acs/:providerId")).toBe(true);
+    expect(isSamlCallbackPath("/sso/callback/:providerId")).toBe(false);
   });
 });

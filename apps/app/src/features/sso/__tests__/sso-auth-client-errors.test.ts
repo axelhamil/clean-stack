@@ -10,14 +10,12 @@ vi.mock("../../../shared/auth/auth-client", () => ({
       providers: vi.fn(),
       requestDomainVerification: vi.fn(),
     },
-    scim: { generateToken: vi.fn() },
   },
 }));
 
 import { authClient } from "../../../shared/auth/auth-client";
 import { isUnexpectedMutationError } from "../../../shared/observability/error-classifier";
 import {
-  generateScimTokenMutationOptions,
   registerOidcProviderMutationOptions,
   verifyDomainMutationOptions,
 } from "../api/sso.mutations";
@@ -26,12 +24,9 @@ import { domainVerificationTokenQueryOptions, ssoProvidersQueryOptions } from ".
 type Rejecting = ReturnType<typeof vi.fn>;
 
 function rejectEveryAuthClientCall() {
-  const { sso, scim } = authClient as unknown as {
-    sso: Record<string, Rejecting>;
-    scim: Record<string, Rejecting>;
-  };
+  const { sso } = authClient as unknown as { sso: Record<string, Rejecting> };
 
-  for (const fn of [...Object.values(sso), ...Object.values(scim)]) {
+  for (const fn of Object.values(sso)) {
     fn.mockResolvedValue({ data: null, error: REJECTION });
   }
 }
@@ -72,14 +67,6 @@ describe("sso auth-client failures keep their status and code", () => {
     [
       "verify domain",
       () => verifyDomainMutationOptions.mutationFn?.("acme-com", {} as never) ?? Promise.resolve(),
-    ],
-    [
-      "generate SCIM token",
-      () =>
-        generateScimTokenMutationOptions.mutationFn?.(
-          { providerId: "acme-com", organizationId: "org-1" },
-          {} as never,
-        ) ?? Promise.resolve(),
     ],
     ["list providers", () => (ssoProvidersQueryOptions.queryFn as () => Promise<unknown>)()],
     [

@@ -7,8 +7,8 @@ describe("sso and scim events", () => {
     (t) => t.startsWith("sso.") || t.startsWith("scim."),
   );
 
-  it("declares thirteen types", () => {
-    expect(ssoAndScim).toHaveLength(13);
+  it("declares fourteen types", () => {
+    expect(ssoAndScim).toHaveLength(14);
   });
 
   it("gives every type a payload schema", () => {

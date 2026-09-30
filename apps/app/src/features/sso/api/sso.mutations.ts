@@ -56,16 +56,22 @@ export const registerSamlProviderMutationOptions = mutationOptions({
     // The server forces SHA-256 + signed assertions on every SAML registration
     // (D8 hardening in apps/api/src/auth.ts): the client never sends
     // `signatureAlgorithm`, there is no weaker option to offer.
+    //
+    // A SAML registration names two entities. The top-level `issuer` is this
+    // app's own (service provider) entity ID, which the plugin puts in the SP
+    // metadata it publishes: it is set to that metadata's URL, the address the
+    // operator hands their IdP. The IdP's entity ID is the one the operator types,
+    // and it is what every incoming assertion is checked against. The plugin
+    // derives the assertion consumer URL itself.
     const { data, error } = await authClient.sso.register({
       providerId,
-      issuer: values.issuer,
+      issuer: `${env.VITE_API_URL}/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(providerId)}`,
       domain: values.domain,
       organizationId,
       samlConfig: {
         entryPoint: values.entryPoint,
         cert: values.cert,
-        callbackUrl: `${env.VITE_API_URL}/api/auth/sso/saml2/sp/acs/${providerId}`,
-        spMetadata: {},
+        idpMetadata: { entityID: values.idpEntityId },
       },
     });
     if (error) throw toAuthClientError(error, errorFallback("registerSamlProvider"));
@@ -81,19 +87,23 @@ export const verifyDomainMutationOptions = mutationOptions({
   },
 });
 
-export const generateScimTokenMutationOptions = mutationOptions({
-  mutationKey: ["settings", "sso", "generate-scim-token"] as const,
-  mutationFn: async ({
-    providerId,
-    organizationId,
-  }: {
-    providerId: string;
-    organizationId: string;
-  }) => {
-    const { data, error } = await authClient.scim.generateToken({ providerId, organizationId });
-    if (error) throw toAuthClientError(error, errorFallback("generateScimToken"));
-    if (!data?.scimToken) throw new Error(errorFallback("invalidServerResponse"));
-    return data.scimToken;
+const $issueScimToken = api.settings.organization["scim-connection"].$post;
+const $disconnectScim = api.settings.organization["scim-connection"].$delete;
+
+export const issueScimTokenMutationOptions = mutationOptions({
+  mutationKey: ["settings", "sso", "scim-connection", "token"] as const,
+  mutationFn: async () => {
+    const res = await $issueScimToken();
+    if (!res.ok) await throwApiError(res, "generateScimToken");
+    return (await res.json()) as InferResponseType<typeof $issueScimToken, 200>;
+  },
+});
+
+export const disconnectScimMutationOptions = mutationOptions({
+  mutationKey: ["settings", "sso", "scim-connection", "disconnect"] as const,
+  mutationFn: async () => {
+    const res = await $disconnectScim();
+    if (!res.ok) await throwApiError(res, "disconnectScim");
   },
 });
 

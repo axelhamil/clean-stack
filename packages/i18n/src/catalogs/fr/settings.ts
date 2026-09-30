@@ -499,10 +499,18 @@ export default {
         "Laissez votre fournisseur d'identité créer, mettre à jour et désactiver les membres automatiquement.",
       onlyOwnerCanGenerate: "Seul le propriétaire de l'organisation peut générer un jeton SCIM.",
       baseUrlLabel: "URL de base SCIM",
+      notConnected: "Aucun annuaire n'est encore connecté.",
+      connectedUntil: "Annuaire connecté. Son jeton expire le {{date}}.",
       generateAction: "Générer le jeton",
+      rotateAction: "Remplacer le jeton",
       secretDialogTitle: "Jeton SCIM",
       secretDialogDescription:
-        "Copiez ce jeton maintenant : il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité.",
+        "Copiez ce jeton maintenant : il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité. Il est valable un an, et tout jeton précédent cesse de fonctionner.",
+      disconnectAction: "Déconnecter l'annuaire",
+      disconnectDialogTitle: "Déconnecter l'annuaire ?",
+      disconnectDialogDescription:
+        "Son jeton cesse de fonctionner, et les membres provisionnés par votre fournisseur d'identité perdent l'accès à cette organisation. Les propriétaires gardent le leur.",
+      disconnectedToast: "Annuaire déconnecté",
     },
     forms: {
       oidc: {
@@ -517,8 +525,8 @@ export default {
       saml: {
         domainLabel: "Domaine",
         domainPlaceholder: "acme.com",
-        issuerLabel: "Émetteur / ID d'entité",
-        issuerPlaceholder: "acme-saml",
+        idpEntityIdLabel: "ID d'entité du fournisseur d'identité",
+        idpEntityIdPlaceholder: "https://idp.acme.com/metadata",
         entryPointLabel: "Point d'entrée",
         entryPointPlaceholder: "https://idp.acme.com/sso/saml",
         certLabel: "Certificat de signature",
