@@ -20,7 +20,7 @@
     "./components/ui/*": "./src/components/ui/*.tsx"
   },
   "peerDependencies": {
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^6.0.1",
     "react": "^19",
     "react-dom": "^19",
     "react-hook-form": "^7.86.0",

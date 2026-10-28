@@ -15,7 +15,7 @@
     "@better-auth/passkey": "1.7.14",
     "@better-auth/sso": "1.7.14",
     "@better-auth/stripe": "1.7.14",
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^6.0.1",
     "@packages/access-control": "workspace:*",
     "@packages/cookie-consent": "workspace:*",
     "@packages/events": "workspace:*",
