@@ -23,13 +23,13 @@
     "@packages/ddd-kit": "workspace:*",
     "@packages/events": "workspace:*",
     "@packages/policies": "workspace:*",
-    "dotenv": "^18.0.4",
-    "drizzle-orm": "^0.45.3",
-    "pg": "^8.23.0"
+    "dotenv": "^18.0.9",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2"

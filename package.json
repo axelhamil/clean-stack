@@ -24,19 +24,19 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.14",
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
+    "@biomejs/biome": "^2.6.3",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@packages/typescript-config": "workspace:*",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "husky": "^9.1.7",
-    "jscpd": "^5.3.3",
-    "knip": "^6.38.0",
+    "jscpd": "^5.4.2",
+    "knip": "^6.43.0",
     "lint-staged": "^17.6.0",
     "semantic-release": "^25.0.9",
-    "turbo": "^2.11.5"
+    "turbo": "^2.11.10"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

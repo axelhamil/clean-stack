@@ -1,7 +1,7 @@
 // Type-only anchors: the inferred `auth` type references these packages' types, and TS
 // can only name them portably from a direct dependency. @simplewebauthn/server must
 // therefore stay on the exact major @better-auth/passkey depends on (13 as of passkey
-// 1.7.6): a direct 14 resolves to a second copy and brings TS2883 back.
+// 1.7.14): a direct 14 resolves to a second copy and brings TS2883 back.
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
