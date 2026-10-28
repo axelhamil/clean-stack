@@ -1,3 +1,4 @@
+import { base32 } from "@better-auth/utils/base32";
 import { createOTP } from "@better-auth/utils/otp";
 import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
@@ -24,6 +25,15 @@ const ANONYMIZED_DOMAIN = "anonymized.local";
 const ANONYMIZED_NAME = "[deleted]";
 
 const repositoryFailure = dbOperationFailure("RGPD_REPOSITORY_PROVIDER_FAILURE");
+
+const IMPORTED_TOTP_SECRET_PREFIX = "base32:";
+
+async function decryptTotpSecret(encrypted: string): Promise<string | Uint8Array> {
+  const secret = await symmetricDecrypt({ key: env.BETTER_AUTH_SECRET, data: encrypted });
+  if (!secret.startsWith(IMPORTED_TOTP_SECRET_PREFIX)) return secret;
+
+  return base32.decode(secret.slice(IMPORTED_TOTP_SECRET_PREFIX.length).toUpperCase());
+}
 
 export class DrizzleRgpdRepository implements IRgpdRepository {
   constructor(
@@ -429,10 +439,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           );
           if (!tf?.secret) return Result.ok(false);
           try {
-            const decrypted = await symmetricDecrypt({
-              key: env.BETTER_AUTH_SECRET,
-              data: tf.secret,
-            });
+            const decrypted = await decryptTotpSecret(tf.secret);
             const ok = await createOTP(decrypted, { period: 30, digits: 6 }).verify(code);
             return Result.ok(ok);
           } catch (err) {
