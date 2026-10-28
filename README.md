@@ -21,7 +21,7 @@ Two ways to run it. Pick one.
 
 ### Option A: Native (fastest hot reload)
 
-**Prerequisites**: [Bun 1.4+](https://bun.com/docs/installation), [Node 24.20+](https://nodejs.org), [pnpm 11](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
+**Prerequisites**: [Bun 1.4+](https://bun.com/docs/installation), [Node 26.13+](https://nodejs.org), [pnpm 12](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
 git clone https://github.com/axelhamil/clean-stack my-saas
@@ -308,7 +308,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 | Layer | Choice |
 |---|---|
-| **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
+| **Runtime** | Bun 1.4+ (api, scripts, tests) · Node 26+ for tooling |
 | **API** | Hono 4 on native `Bun.serve()` |
 | **App** | Vite 8 · React 19 · TanStack Router/Query · Tailwind 4 · shadcn/ui |
 | **Auth** | BetterAuth + `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
@@ -318,7 +318,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **API ↔ App** | Hono RPC (`hcWithType`): end-to-end types |
 | **i18n** | `i18next` + `react-i18next`: typed `.ts` catalogs (`@packages/i18n`), locale outside the URL |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
-| **Tooling** | pnpm 11 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 12 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
 ---
 
