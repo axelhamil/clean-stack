@@ -18,8 +18,9 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 |---|---|---|---|---|
 | 0 | **Dependency refresh Oct 2026** | In progress | Node 26 LTS, Bun 1.4.4, pnpm 12 | The version floor is a feature the cloner inherits; Phase I is cut on top of it |
 | 1 | **Phase I** | Next | Resync on the OpenUp foundations in five lots (I.1 to I.5) | Closes the gaps in kit, guardrails, telemetry hygiene, transactions and outbox delivery |
-| 2 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
-| 3 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
+| 2 | **Phase J** | Open | Front redesign from scratch on shadcn/ui, one design system in `@packages/ui` | The cloner's first impression is the app shell; today it is a generic default with known mobile defects |
+| 3 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
+| 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -86,10 +87,22 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ---
 
+## Front redesign from scratch: **Phase J**
+
+- **Status**: open.
+- **Date**: after Phase I, before the review pass (the review reads the redesigned surface, not the one being replaced).
+- **Why**: every screen still wears the shadcn defaults it was scaffolded with, so a clone looks like every other shadcn app until someone spends a week on it. The shell also carries measured defects: at 390 px and 768 px the top-nav header overflows the viewport by 33 px (the user menu is pushed off screen on `/settings`), and the theme provider renders an inline `<script>` that React reports as an error on every navigation.
+- **Scope**: a design direction chosen once (typography, color tokens light and dark, radius, density, motion) and expressed only as tokens in the global theme of `@packages/ui`; shadcn/ui components reinstalled from the current registry and left unmodified where possible; every screen of `apps/app` rebuilt on them (auth, onboarding, dashboard, settings tabs, admin, legal, command palette, emails if their templates share the tokens). Built with the repo's frontend skills: `frontend-design` for the direction, `lean-ui` on every touched file, `polish-interface-details` and `animate-interface` for states and motion, `stress-test-ui` for empty, long and error data, `review-animations` before closing.
+- **Out of scope**: new features, copy rewrites beyond what a layout change forces, a marketing site (E.2 stays cut).
+- **Done when**: no screen overflows at 390, 768 and 1440 px (measured, not eyeballed); the browser console is clean on every route; the accessibility gate stays green with no new allowlist entry; no inline style and no color or spacing value outside the theme tokens (grep); `docs/SURFACE.md` parity test unchanged; screenshots of each screen in both themes attached to the PR.
+- **References**: `packages/ui/CLAUDE.md`, `apps/app/CLAUDE.md`, `apps/app/a11y/README.md`.
+
+---
+
 ## Review pass
 
 - **Status**: open, not a code task.
-- **Date**: after Phase I.
+- **Date**: after Phase J.
 - **Why**: the shipped surface has been audited by phase and by tooling, never read end to end by its owner.
 - **Scope**: full manual review of the shipped surface, owned by @axelhamil.
 - **References**: [`docs/SURFACE.md`](docs/SURFACE.md), [`docs/FEATURES.md`](docs/FEATURES.md).
