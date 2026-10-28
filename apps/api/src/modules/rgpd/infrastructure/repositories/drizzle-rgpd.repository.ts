@@ -5,6 +5,7 @@ import { Option, Result } from "@packages/ddd-kit";
 import { and, db, eq, gt, inArray, isNull, like, lte, not, or, schema } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
 import { symmetricDecrypt, verifyPassword as verifyHash } from "better-auth/crypto";
+import { TOTP_OPTIONS } from "../../../../shared/auth/totp-options";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
 import type { Logger } from "../../../../shared/logger";
@@ -440,7 +441,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           if (!tf?.secret) return Result.ok(false);
           try {
             const decrypted = await decryptTotpSecret(tf.secret);
-            const ok = await createOTP(decrypted, { period: 30, digits: 6 }).verify(code);
+            const ok = await createOTP(decrypted, TOTP_OPTIONS).verify(code);
             return Result.ok(ok);
           } catch (err) {
             this.instrumentation.capture(err);

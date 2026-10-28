@@ -71,6 +71,7 @@ import {
   SSO_PATHS,
   scimUserChange,
 } from "./shared/auth/sso-paths";
+import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
 import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
@@ -715,7 +716,7 @@ const authOptions = {
       },
     }),
     bearer(),
-    twoFactor(),
+    twoFactor({ totpOptions: TOTP_OPTIONS }),
     magicLink({
       sendMagicLink: async ({ email, token }) => {
         const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;
