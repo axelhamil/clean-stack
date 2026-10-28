@@ -1,7 +1,8 @@
 FROM node:26.13.0-alpine AS pruner
 WORKDIR /repo
 COPY . .
-RUN npx -y turbo@2.9.6 prune app --docker
+RUN TURBO_VERSION="$(node -p "require('./package.json').devDependencies.turbo.replace(/^\D+/, '')")" \
+  && npx -y "turbo@${TURBO_VERSION}" prune app --docker
 
 FROM node:26.13.0-alpine AS builder
 RUN npm install -g pnpm@12.16.1
