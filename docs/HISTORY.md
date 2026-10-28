@@ -1303,6 +1303,9 @@ Auditing a finished surface finds what a plan written before the audit could not
 
 - **Every Docker build was red on the base.** The images pruned with `npx turbo@2.9.6`, which rejects the `agentGuidance` key of `turbo.json` (the repo resolves a newer turbo). The Dockerfiles now read the version from the root `turbo` devDependency and run that exact version, so the pruner follows each bump.
 - **Account deletion rejected valid TOTP codes for imported secrets.** better-auth 1.7.14 decodes a stored `base32:<secret>` (a secret imported from another provider) into bytes before computing the code; `drizzle-rgpd.repository.ts` used the raw string, so the deletion step-up would have refused a code `twoFactor` accepts. It now applies the same decoding. The new test, built on frozen bytes, fails on the old repository code (2 pass, 1 fail) and passes with the fix.
+- **TOTP settings in one place.** `shared/auth/totp-options.ts` is passed to `twoFactor` and read by the deletion step-up, which kept its own copy of the plugin defaults.
+- **Account deletion failed under secret rotation** (predates the refresh). better-auth encrypts the TOTP secret with the config built from `BETTER_AUTH_SECRETS`; the step-up decrypted with `BETTER_AUTH_SECRET` alone. `env.ts` validates `BETTER_AUTH_SECRETS`, `auth.ts` passes it to `betterAuth`, and `authSecretKey` builds the key the repository decrypts with.
+- **An unconfirmed TOTP enrolment confirmed an account deletion** (predates the refresh). better-auth refuses a `verified = false` row at sign-in; the step-up did not. The `WHERE` now keeps confirmed rows and legacy `NULL` ones, as better-auth does, proven on a real database by `check:totp-enrolment` (wired in CI).
 
 **Majors**, one commit each:
 
@@ -1318,7 +1321,7 @@ Auditing a finished surface finds what a plan written before the audit could not
 - `conventional-changelog-conventionalcommits` stays on `9`: semantic-release 25.0.9's stable analyzer and notes generator still bundle `conventional-changelog-writer` 8. On 10.4.1 the analyzer answers but `generateNotes` throws "requires conventional-changelog-writer@9"; on 9.3.1 a footer `BREAKING CHANGE:` is a major and a wrapped prose "BREAKING" stays a minor.
 - drizzle-orm stays on `0.45` and Postgres on `18`: 1.0 and 19 are not stable yet.
 
-**Checks** on the final series: `ci:check` 1006 files clean; `turbo run build type-check test` 21 tasks green, 1652 tests (api 922, app 364, ddd-kit 287, events 50, i18n 21, access-control 5, emails 3); jscpd 0.57 %; knip exit 0 (4 configuration hints, none new); the eleven real-database `check:*` scripts green; every commit of the series type-checks on its own. The four images build (api and app, dev and prod) on the published `node:26.12.1-alpine`, pulled fresh.
+**Checks** on the final series: `ci:check` 1006 files clean; `turbo run build type-check test` 21 tasks green, 1652 tests (api 922, app 364, ddd-kit 287, events 50, i18n 21, access-control 5, emails 3); jscpd 0.57 %; knip exit 0 (4 configuration hints, none new); the twelve real-database `check:*` scripts green; every commit of the series type-checks on its own. The four images build (api and app, dev and prod) on the published `node:26.12.1-alpine`, pulled fresh.
 
 **Live verification** (local API on Postgres 18, curl): `/readyz` 200 (database pass, storage non-critical fail with the storage profile off); email sign-up 200, sign-in refused with `EMAIL_NOT_VERIFIED` until the link from the queued `verify_email` message is followed, then sign-in 200 and a valid session; the outbox holds `org.created`, `org.member.joined`, `user.created` and `user.signed_in`, all dispatched.
 

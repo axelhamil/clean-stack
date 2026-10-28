@@ -441,7 +441,12 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           const tfQuery = exec
             .select({ secret: schema.twoFactor.secret })
             .from(schema.twoFactor)
-            .where(eq(schema.twoFactor.userId, userId))
+            .where(
+              and(
+                eq(schema.twoFactor.userId, userId),
+                or(eq(schema.twoFactor.verified, true), isNull(schema.twoFactor.verified)),
+              ),
+            )
             .limit(1);
           const [tf] = await this.instrumentation.startSpan(
             { name: tfQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
