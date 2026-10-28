@@ -2,7 +2,6 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  '@sentry/cli': true
   '@swc/core': true
   esbuild: true
   sharp: true
