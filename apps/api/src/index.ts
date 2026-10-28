@@ -13,7 +13,7 @@ export type { AppType } from "./app";
 EventCollector.setOutOfContextLogger((msg, meta) => logger.warn(meta ?? {}, msg));
 
 await di.preload();
-await di.OutboxDispatcher.start(di as unknown as Record<string, unknown>);
+await di.OutboxDispatcher.start(di);
 await di.WebhookDeliveryWorker.start();
 await di.EmailDeliveryWorker.start();
 await di.NotificationStreamHub.start();
