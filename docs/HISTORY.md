@@ -79,6 +79,7 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 - Native push (mobile / browser): Phase F, needs a device-token registry.
 - ~~Frequency-driven digest windows: the column and the UI exist, the flush cron still treats every pending row the same.~~ **Closed.** The window is resolved at fan-out and stamped into `email_pending_at`, which turned out to need no cron change at all: the flush already selected on that column. See `docs/CRON.md` § Digest windows.
 - Generalized real-time bus. The stream is notification-shaped on purpose; a generic bus is a different product.
+- Resend Broadcasts and Audiences: rejected, they are marketing one-to-many and orthogonal to event-driven one-to-one. Resend Topics (vendor-side email preferences) also rejected: it would hand a product decision to the vendor and covers only the email channel, when D.3 exists to arbitrate between channels. Revisit Broadcasts only if a clone ships a newsletter.
 
 ---
 
@@ -107,6 +108,8 @@ Each section preserves the **why** and the **non-obvious decisions** baked into 
 2. **`api_token.used` is internal**: sampled at ~1 event per 15-min bucket per token. Making it public would create a contract on a high-volume, lossy signal: customers could never build a reliable audit trail from it anyway, and subscribing would flood their endpoints. `audit_log` is the reliable trail.
 3. **All `webhook.*` events reclassified to internal during C.5 curation**: `webhook.endpoint.created/updated/deleted` are operational plumbing, not customer-observable state. This means the subscription picker and `/developers/events` show no "webhook" group. Test `webhooks-schema.test.ts` documents this decision assertively.
 4. **`visibility-map.ts` as the gate, not a naming convention**: a `webhook.` prefix doesn't make an event internal; only an explicit `"internal"` entry in the map does. New events default to nothing: they must be added to the map (TypeScript `satisfies Record<EventType, Visibility>` enforces this).
+
+5. **The public API surface is opt-in, route by route.** A PAT is never accepted by `requireAuth`: only a route that explicitly mounts `requireApiToken({ scopes })` is reachable by token, and every other route stays session-only by construction rather than by config. "Authenticated" is not "public API": a token that inherits the whole session surface turns every internal route (admin, billing mutations, impersonation) into a public endpoint the day it ships, and the blast radius of a leaked token becomes the entire app. The opt-in registry also serves as the source for the API documentation: only token-reachable routes are documented. Design decisions were taken on 2026-08-06 (org-scoped, HMAC-SHA256 plus server pepper, CRC32 checksum).
 
 **Out of scope** (explicit):
 - OAuth app flow (next natural step after PATs, requires a separate spec).
@@ -762,6 +765,16 @@ La réconciliation guest→user se fait **entièrement côté serveur**, sans ro
 2. **`@packages/emails` introduced**: the original ROADMAP spec did not include an in-repo template package. Added to remove the "requires Resend dashboard setup before first email" friction on a fresh clone.
 3. **`sendRaw` / `sendRawBatch` on `IEmailService`**: not in the original spec. Added to support future transactional emails needing full HTML control without a named template. No call sites exist today; public port surface.
 
+
+### Sweep rail bounds (closeout review, Aug 2026)
+
+The sweep routes and the cron client had no explicit timeout (`internalLayers` set none, `Bun.serve` had no `idleTimeout`, `signedInternalFetch` issued a bare `fetch`), which doubling the sweep passes made more likely to matter. Closed as follows.
+
+- **The internal sweep rail is bounded in time and against itself.** Three nested deadlines (`SWEEP_DEADLINE_MS` 90 s < `SERVER_IDLE_TIMEOUT_SECONDS` 120 s < `INTERNAL_FETCH_TIMEOUT_MS` 150 s), with env parsing refusing a configuration that inverts them, plus a time-boxed lease in `sweep_lock` that makes each label single-flight. Timeouts alone were never enough: bounding a run does not stop the next tick from starting a second one, and two concurrent sweeps just split the `SKIP LOCKED` rows at double the pool cost. The lease expires on its own, so a crashed run does not wedge the label the way a pooled advisory lock would. It is fenced by an owner token, not just the label, because the deadline is only checked between batches: a run can outlive its own TTL, and without the token its late `release()` could steal back a lease a legitimate successor had already acquired.
+- **Two live bugs found by measuring**: `Bun.serve` defaults `idleTimeout` to 10 s and applies it while the handler runs, so every sweep past 10 s had its socket closed under it while the work continued server-side, and `GET /notifications/stream`, whose heartbeat is 25 s, was being dropped and reconnected every 10 s in production. A third was found by reading: `sweep-notifications` was mounted but missing from the bundled cron, so read notifications were never purged.
+- **Truncation is reported, not hidden.** A sweep out of budget answers `truncated: true` (derived per pass from a `stopReasons` map: `exhausted`, `budget`, `batch-cap`, `batch-error`) and resumes next tick. `stopReasons` keeps a recurring `batch-error` from hiding behind that, since one is a healthy backlog and the other is data that will fail identically forever, and the bundled cron exits non-zero on it.
+- **`rgpd-sweep` gets the budget between account wipes, never inside one**: a half-erased account is the one Art. 17 outcome that must not happen. It deliberately has no lease and no `SKIP LOCKED` on selection, so two overlapping runs can select the same account. The anonymizing update is guarded by `deletedAt IS NULL`, which makes the wipe itself idempotent and lets the losing run short-circuit before emitting `USER_DELETED` again. Its `processed` field now reports accounts actually attempted rather than the batch size.
+
 ---
 
 ## Admin & impersonation: BetterAuth `admin` plugin ✅ Phase C.3 · Aug 2026
@@ -1097,6 +1110,9 @@ That separate step landed in the following commit: `autoCodeSplitting: true` onl
 
 **`knip.json` gained `src/features/**/*.route.tsx`** as an `apps/app` entry point, alongside `routes.ts` and `src/router/*.tsx`. Necessary because `routeTree.gen.ts` (gitignored) is the only file that imports each `Route` export, and the `vite.config.ts` → `routes.ts` link goes through a string (`virtualRouteConfig`) knip can't follow statically, without the entry, every route file reads as dead code. **The cost, worth stating plainly for whoever next touches routing**: this is symmetric. A future route file created but never added to `routes.ts` is now itself an entry point, so knip no longer flags it as unreferenced dead code: the string-based indirection that made the entry necessary also makes the failure mode of "wrote a route, forgot to wire it" invisible to the dead-code gate.
 
+
+**Smaller consequences of the dependency floor (G.1d)**: Biome 2.5.10's stricter `noUnsafeOptionalChaining` caught three pre-existing unsafe casts in test files, fixed with explicit narrowing. The Postgres 18 notification fan-out `EXPLAIN` comparison is non-conclusive, because the two runs used different data volumes: it is recorded as such, neither a pass nor a regression.
+
 ---
 
 ## i18n foundation: typed catalogs, locale outside the URL ✅ Phase E.1a · Aug 2026
@@ -1281,3 +1297,20 @@ Auditing a finished surface finds what a plan written before the audit could not
 - `@better-auth/utils` stays at `0.4.2`: `better-auth` 1.7.6 depends on exactly that version and every plugin peers on it. `0.5.0` would install a second copy next to the one the TOTP verifier uses, and `drizzle-rgpd.repository.ts` must compute the same TOTP as `twoFactor`.
 - `@simplewebauthn/server` stays on `13`: it is a type-only anchor for TS2883 (the inferred `auth` type names its types), and `@better-auth/passkey` 1.7.6 depends on `^13.3.1`, no passkey release (beta included) moves to 14. Measured: removing the anchor or moving it to `14.0.3` both bring TS2883 back on `auth`.
 - `conventional-changelog-conventionalcommits` stays on `9`: `10.x` (latest `10.4.0`) only renders with `conventional-changelog-writer@9`, while `semantic-release` 25.0.9's stable `commit-analyzer` 13.0.1 and `release-notes-generator` 14.1.1 still bundle writer 8 (only the `15.0.0-beta` generator moved). Measured by running both plugins with `.releaserc.json`'s own options: on 10.4.0 the analyzer still answers but `generateNotes` throws "requires conventional-changelog-writer@9"; on 9.3.1 notes render, a wrapped prose line starting with "BREAKING" stays a minor, and a real `BREAKING CHANGE:` footer is a major.
+
+---
+
+## Rules review pass ✅ Sep 2026
+
+**Why**: after the feature phases, every file was reviewed against the house rules (Option for absence, typed errors, one shared helper per repeated shape, no casts, spans on every I/O method) and the guides were refreshed. Delivered as PR #70 into `dev`: 149 commits, 626 files, mostly mechanical. This entry is reconstructed from that PR's commit log.
+
+**Behaviour fixes the pass surfaced** (the rest was refactoring with no observable change):
+
+- **Units of work return failed results instead of throwing**, and a callback that returns a failed `Result` now rolls the transaction back. Aborted transactions, rejected SSO calls, SSO redirects and 4xx API failures stopped being reported to Sentry as unexpected errors.
+- **A failing first drain no longer crashes the API**: the outbox dispatcher, the email worker and the webhook worker report it and keep running.
+- **Webhook responses stopped exposing the previous secret cipher.**
+- **Client IP**: policy acceptance (sign-up included) and new sessions record the trusted-proxy client IP instead of the proxy address.
+- **Audit gaps closed**: profile name changes made through an API token are audited and committed with their event; an organization auto-deleted by SCIM deprovisioning is attributed to its owner; webhook delivery replays record who replayed (`webhook.delivery.replayed`); pre-login cookie consent attached to an account is recorded (`user.cookie_consent.linked`). Catalog 82 to 84 (85 with `scim.connection.token_rotated` from the better-auth 1.7 move).
+- **Smaller defects**: plan tiers no longer accept prototype names such as `constructor`; a failed lease release no longer fails a committed digest flush; a scan payload that is not a list answers 400; a stored API token expiry parses back into a date; TOTP secret decryption failures reach telemetry; copied recovery codes are confirmed only after the clipboard write succeeds.
+
+Em and en dashes were removed from every guide, inventory and the roadmap in the same pass.
