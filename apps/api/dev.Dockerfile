@@ -1,10 +1,10 @@
-FROM node:26.13.0-alpine AS pruner
+FROM node:26.12.1-alpine AS pruner
 WORKDIR /repo
 COPY . .
 RUN TURBO_VERSION="$(node -p "require('./package.json').devDependencies.turbo.replace(/^\D+/, '')")" \
   && npx -y "turbo@${TURBO_VERSION}" prune api --docker
 
-FROM node:26.13.0-alpine
+FROM node:26.12.1-alpine
 COPY --from=oven/bun:1.4.4-alpine /usr/local/bin/bun /usr/local/bin/bun
 RUN npm install -g pnpm@12.16.1
 WORKDIR /repo

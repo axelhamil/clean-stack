@@ -1,4 +1,4 @@
-FROM node:26.13.0-alpine AS pruner
+FROM node:26.12.1-alpine AS pruner
 WORKDIR /repo
 COPY . .
 RUN TURBO_VERSION="$(node -p "require('./package.json').devDependencies.turbo.replace(/^\D+/, '')")" \

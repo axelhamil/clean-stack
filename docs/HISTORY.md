@@ -1288,9 +1288,10 @@ Auditing a finished surface finds what a plan written before the audit could not
 
 **Runtimes**:
 
-- **Node 26.13.0 LTS** (`.nvmrc`, `mise.toml`, `engines.node`, the four Dockerfiles), **Bun 1.4.4** (also pinned in `ci.yml`, which ran `latest`), **pnpm 12.16.1** (`packageManager`).
+- **Node 26.13.0 LTS** (`.nvmrc`, `mise.toml`, `engines.node`), **Bun 1.4.4** (also pinned in `ci.yml`, which ran `latest`), **pnpm 12.16.1** (`packageManager`).
 - **Node 25+ ships without corepack**, so `corepack enable && corepack prepare` would fail in a `node:26` image. The api dev, app dev and app prod images now install pnpm with `npm install -g pnpm@<version>`, as the api prod image already did. npm 11 warns that the global install has its scripts blocked; pnpm runs correctly in every image (checked).
 - **pnpm 12 lockfile**: regenerated without a single resolution change. The only diff is a new leading document (`packageManagerDependencies`, the pinned pnpm and its platform binaries). Unknown workspace settings are now an error; `pnpm-workspace.yaml` has none.
+- **The four Dockerfiles build on `node:26.12.1-alpine`** until the `26.13.0-alpine` tag is published: Docker Hub answered 404 for it on 28/10 (Node 26.13.0 shipped that day). 26.12.1 is the latest published Node 26 image, the same LTS line; move the `FROM` lines to 26.13.0 once the tag exists.
 - Keycloak (SSO profile) `26.0` → `26.8.1`, the latest 26.x on quay.io.
 
 **Minors and patches** (one commit): better-auth and every `@better-auth/*` plugin 1.7.6 → 1.7.14 (exact pins kept), hono, zod, drizzle-orm 0.45.4, the AWS and Sentry SDKs, React 19.3.1, TanStack, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Turbo 2.11.10, knip, jscpd and the rest of the outdated list. Two things came with it:
@@ -1317,12 +1318,11 @@ Auditing a finished surface finds what a plan written before the audit could not
 - `conventional-changelog-conventionalcommits` stays on `9`: semantic-release 25.0.9's stable analyzer and notes generator still bundle `conventional-changelog-writer` 8. On 10.4.1 the analyzer answers but `generateNotes` throws "requires conventional-changelog-writer@9"; on 9.3.1 a footer `BREAKING CHANGE:` is a major and a wrapped prose "BREAKING" stays a minor.
 - drizzle-orm stays on `0.45` and Postgres on `18`: 1.0 and 19 are not stable yet.
 
-**Checks** on the final series: `ci:check` 1006 files clean; `turbo run build type-check test` 21 tasks green, 1652 tests (api 922, app 364, ddd-kit 287, events 50, i18n 21, access-control 5, emails 3); jscpd 0.57 %; knip exit 0 (4 configuration hints, none new); the eleven real-database `check:*` scripts green; every commit of the series type-checks on its own. The four images build (api and app, dev and prod; base image caveat below).
+**Checks** on the final series: `ci:check` 1006 files clean; `turbo run build type-check test` 21 tasks green, 1652 tests (api 922, app 364, ddd-kit 287, events 50, i18n 21, access-control 5, emails 3); jscpd 0.57 %; knip exit 0 (4 configuration hints, none new); the eleven real-database `check:*` scripts green; every commit of the series type-checks on its own. The four images build (api and app, dev and prod) on the published `node:26.12.1-alpine`, pulled fresh.
 
 **Live verification** (local API on Postgres 18, curl): `/readyz` 200 (database pass, storage non-critical fail with the storage profile off); email sign-up 200, sign-in refused with `EMAIL_NOT_VERIFIED` until the link from the queued `verify_email` message is followed, then sign-in 200 and a valid session; the outbox holds `org.created`, `org.member.joined`, `user.created` and `user.signed_in`, all dispatched.
 
 **Not covered**:
 
-- `node:26.13.0-alpine` is not on Docker Hub yet (28/10, Node 26.13.0 shipped the same day; 26.12.1 is the latest tag). The images were proven on `26.12.1` retagged locally; a clean-cache build fails until the tag lands. Recheck before the `dev` → `main` PR, fallback `26.12.1`.
 - No real Stripe call: the `2026-09-30.endive` API version has to be checked against the webhook endpoint in the Stripe dashboard, whose API version is set there.
 - Source map upload to a real Sentry project: proven only against a mock, never with a real auth token.
