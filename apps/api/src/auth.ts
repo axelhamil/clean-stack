@@ -554,6 +554,7 @@ const authOptions = {
   appName: "clean-stack",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
+  secrets: env.BETTER_AUTH_SECRETS,
   rateLimit: { enabled: false },
 
   // `transaction: true` is required by `@better-auth/scim`, which refuses to start

@@ -4,7 +4,12 @@ import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { and, db, eq, gt, inArray, isNull, like, lte, not, or, schema } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
-import { symmetricDecrypt, verifyPassword as verifyHash } from "better-auth/crypto";
+import {
+  type SecretConfig,
+  symmetricDecrypt,
+  verifyPassword as verifyHash,
+} from "better-auth/crypto";
+import { authSecretKey } from "../../../../shared/auth/auth-secrets";
 import { TOTP_OPTIONS } from "../../../../shared/auth/totp-options";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
@@ -29,8 +34,11 @@ const repositoryFailure = dbOperationFailure("RGPD_REPOSITORY_PROVIDER_FAILURE")
 
 const IMPORTED_TOTP_SECRET_PREFIX = "base32:";
 
-async function decryptTotpSecret(encrypted: string): Promise<string | Uint8Array> {
-  const secret = await symmetricDecrypt({ key: env.BETTER_AUTH_SECRET, data: encrypted });
+async function decryptTotpSecret(
+  key: string | SecretConfig,
+  encrypted: string,
+): Promise<string | Uint8Array> {
+  const secret = await symmetricDecrypt({ key, data: encrypted });
   if (!secret.startsWith(IMPORTED_TOTP_SECRET_PREFIX)) return secret;
 
   return base32.decode(secret.slice(IMPORTED_TOTP_SECRET_PREFIX.length).toUpperCase());
@@ -40,6 +48,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
   constructor(
     private readonly logger: Logger,
     private readonly instrumentation: IInstrumentation,
+    private readonly authSecret: string | SecretConfig = authSecretKey(env),
   ) {}
 
   async findSoleOwnedNonPersonalOrgsWithMembers(
@@ -440,7 +449,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           );
           if (!tf?.secret) return Result.ok(false);
           try {
-            const decrypted = await decryptTotpSecret(tf.secret);
+            const decrypted = await decryptTotpSecret(this.authSecret, tf.secret);
             const ok = await createOTP(decrypted, TOTP_OPTIONS).verify(code);
             return Result.ok(ok);
           } catch (err) {

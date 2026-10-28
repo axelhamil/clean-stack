@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createOTP } from "@better-auth/utils/otp";
-import { symmetricEncrypt } from "better-auth/crypto";
+import { type SecretConfig, symmetricEncrypt } from "better-auth/crypto";
 import { env } from "../../../shared/env";
 import type { Logger } from "../../../shared/logger";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
@@ -48,6 +48,35 @@ describe("DrizzleRgpdRepository.verifyTotp", () => {
       code,
       selectReturning([{ secret: await storedSecret("base32:jbswy3dpehpk3pxp") }]),
     );
+
+    expect(result.getValue()).toBe(true);
+  });
+
+  it("accepts the code of a secret enrolled before the auth secrets were rotated", async () => {
+    const previousKey = "previous-auth-secret-0123456789abcdef";
+    const rotatedKey = "rotated-auth-secret-0123456789abcdef0";
+    const beforeRotation: SecretConfig = {
+      keys: new Map([[1, previousKey]]),
+      currentVersion: 1,
+    };
+    const afterRotation: SecretConfig = {
+      keys: new Map([
+        [2, rotatedKey],
+        [1, previousKey],
+      ]),
+      currentVersion: 2,
+      legacySecret: env.BETTER_AUTH_SECRET,
+    };
+    const secret = "secret-enrolled-before-the-rotation-01";
+    const code = await createOTP(secret, { period: 30, digits: 6 }).totp();
+    const stored = await symmetricEncrypt({ key: beforeRotation, data: secret });
+    const repo = new DrizzleRgpdRepository(
+      { error: () => {} } as unknown as Logger,
+      new NoOpInstrumentation(),
+      afterRotation,
+    );
+
+    const result = await repo.verifyTotp("u1", code, selectReturning([{ secret: stored }]));
 
     expect(result.getValue()).toBe(true);
   });
