@@ -224,11 +224,11 @@ Resend is **optional everywhere**: without `RESEND_API_KEY` (or with unconfigure
 
 ### Billing: Stripe (opt-in)
 
-Billing is wired via `@better-auth/stripe` (plugin v1.6+, SDK `stripe@22+`). **Off until you add the two required env vars.** Without them the billing routes return `402` for all subscription calls; the rest of the app is unaffected.
+Billing is wired via `@better-auth/stripe` (plugin v1.7+, SDK `stripe@23+`, API version `2026-09-30.endive`). **Off until you add the two required env vars.** Without them the billing routes return `402` for all subscription calls; the rest of the app is unaffected.
 
 | | |
 |---|---|
-| **Packages** | `stripe@22.3.0` + `@better-auth/stripe@1.6.23` |
+| **Packages** | `stripe@23.0.1` + `@better-auth/stripe@1.7.14` |
 | **Webhook endpoint** | auto-mounted at `/api/auth/stripe/webhook` by the plugin |
 | **Subscription SSOT** | plugin-managed `subscription` table (webhook-synced), not `organization.metadata` |
 | **Entitlements** | typed `ENTITLEMENTS[tier]` in `apps/api/src/modules/billing/config.ts`: edit + deploy to change gates |
