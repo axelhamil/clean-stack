@@ -42,7 +42,7 @@ function makeDbQuery() {
 }
 
 // Only what this file's subject actually touches: test files do not share a module
-// registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
+// registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
   db: {
     select: () => makeDbQuery(),

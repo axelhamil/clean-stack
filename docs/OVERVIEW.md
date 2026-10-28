@@ -111,7 +111,7 @@ Most boilerplates hand you an app and leave "make it deployable" as an exercise.
 - **No lock-in, by design**: every external dependency sits behind a port with a swap path: storage provider by env var, email/observability provider by config, rate-limit store by enum, even the event dispatcher for a serverless target. Nothing external is welded to your business code.
 - **DDD scoped to your actual business domain**: never billing, auth, gating, or quotas, which stay as plain typed config plus middleware. That single rule cut roughly 70% of the code a naive all-DDD approach writes for the plumbing.
 - **Domain rules with teeth**: no exceptions thrown in the domain (a `Result` type instead), no `null` for absence (an `Option` type), value objects validated at the boundary, and a typed error system that maps to HTTP status codes in one place.
-- **Rules live next to the code**: a `CLAUDE.md` at the root and one per layer, auto-loaded, so an AI pair-programmer and your teammates work from the same guardrails instead of tribal knowledge.
+- **Rules live next to the code**: a `CLAUDE.md` at the root and one per app and per package, auto-loaded, so an AI pair-programmer and your teammates work from the same guardrails instead of tribal knowledge.
 
 ## Per-organization billing, without a billing backoffice
 

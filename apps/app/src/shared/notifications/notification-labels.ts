@@ -53,7 +53,7 @@ export function labelOf(notification: Notification): string {
 
 // Takes the caller's own `t` rather than calling `useTranslation` itself: this
 // is a plain helper, not a component or a hook, so it cannot own a translation
-// subscription (shared/CLAUDE.md:37): the re-render on locale change comes
+// subscription (apps/app/CLAUDE.md, i18n): the re-render on locale change comes
 // from the component's own `useTranslation` call instead.
 //
 // Zero unread gets its own key (`unreadNone`) rather than falling through to

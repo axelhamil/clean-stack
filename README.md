@@ -79,7 +79,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1 to 43 KB) + `defaultPreload: "intent"`: perceived latency near zero. |
-| **AI-pair ready** | `CLAUDE.md` at the root + per-layer sub-`CLAUDE.md`. Your agent already knows the rules: Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
+| **AI-pair ready** | `CLAUDE.md` at the root + one per app and per package. Your agent already knows the rules: Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
 | **Zero-warning pipeline** | Husky + lint-staged + commitlint + pre-push CI (Biome, knip, jscpd, type-check). Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
 
 ---
@@ -129,7 +129,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - **8 cross-cutting rules**, each tied to an architectural property with its *why*: every state change emits a typed event (audit + webhooks opt-out, not opt-in) · every I/O method spans + captures (no silent prod failure) · every event payload names its actor (RGPD forensic trail) · internal packages ship source not artifacts · ORM-first, raw SQL only where the ORM can't model it
 - **DDD scoped to the business domain only**: never billing / auth / gating / quotas (config + middleware suffices); the discipline that cut ~70% of code vs full-DDD plumbing (lesson learned the hard way)
 - **Domain & repo rules**: no `throw` in domain/application (`Result`), no `null` for absence (`Option`), value objects validated via zod, aggregates expose only `get id()`; ownership enforced at the port (`ScopedRepository` scopes `organizationId`/`userId` across HTTP, cron, queue, events: wrong owner leaks nothing)
-- **Rules live next to the code**: root + per-layer `CLAUDE.md`, recursively auto-loaded; conventions are executable guardrails for AI agents and humans, not tribal knowledge
+- **Rules live next to the code**: a root `CLAUDE.md` plus one per app and per package, recursively auto-loaded; conventions are executable guardrails for AI agents and humans, not tribal knowledge
 
 **Building blocks**
 - DDD-kit (`@packages/ddd-kit`): `Result` / `Option`, `Entity` / `Aggregate` / `ValueObject` (zod-validated) / `UUID` / `DomainEvent`, `BaseRepository` / `ScopedRepository` / `IUnitOfWork`
@@ -330,7 +330,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md): what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md): file-level inventory |
 | **What's next** | [`ROADMAP.md`](ROADMAP.md): plumbing shipped; left: dependency refresh, Phase I (OpenUp resync), review pass, C.1 abuse signals |
-| **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
+| **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-app and per-package `CLAUDE.md` files |
 | **Back ↔ front surface map** | [`docs/SURFACE.md`](docs/SURFACE.md): every live route, its front consumer or the reason it has none, enforced by a parity test |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md): DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md): visual walkthrough |

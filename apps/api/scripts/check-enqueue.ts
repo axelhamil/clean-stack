@@ -1,7 +1,7 @@
 /**
  * Proves against a real Postgres that `DrizzleEmailQueue.enqueue`'s `onConflictDoNothing`
  * behaves the way the design assumes, behaviour a mocked `tx` can never exercise (see
- * `apps/api/src/shared/CLAUDE.md` on asserting call shape only against a mock, and on never
+ * `apps/api/CLAUDE.md` on asserting call shape only against a mock, and on never
  * asserting on the SQL text a builder produced).
  *
  * The unit test suite (`drizzle-email-queue.service.test.ts`) mocks `onConflictDoNothing` as a

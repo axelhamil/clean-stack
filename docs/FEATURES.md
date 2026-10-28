@@ -177,8 +177,8 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 
 - Postgres on `localhost:5433` (dedicated port) via `docker compose up postgres -d`.
 - Schemas: `packages/drizzle/src/schema/*.ts`: auth, multi-tenant, policies, consent, billing, webhooks, audit-log, outbox, email, quota-usage, rate-limit.
-- `withOrg(table, orgId)` helper: org-scoped tables NEVER queried without it (rule enforced in sub-CLAUDE.md).
-- `TransactionService`: controllers manage transactions and pass to use cases.
+- Org-scoped tables are NEVER queried without the owner in the `WHERE`: a `RepoScope` through `ScopedRepository`, or an explicit `organizationId` in a store (rule in `apps/api/CLAUDE.md`).
+- `TransactionService`: the use case or service opens `uow.run(...)` and passes `tx` to the stores (rule in `packages/drizzle/CLAUDE.md`).
 
 ---
 
@@ -439,7 +439,7 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 
 **Frontend**: `<I18nextProvider>` mounts in `app-providers.tsx` outside `ThemeProvider`, so even the top-level error fallback can translate. `apps/app/src/shared/i18n/locale-cookie.ts`: `LOCALE_COOKIE = "locale"`, non-`httpOnly` (read pre-render, no secret), `path=/`, `max-age=31536000` (1 year), `SameSite=Lax`. Language switcher at `/settings/account` (`features/account/components/language-card.tsx`) writes the cookie, calls `PUT /me/locale` when signed in, and reinitializes the running i18next instance. `formatDate`/`formatDateTime` (`apps/app/src/shared/utils.ts`) take an explicit `locale` argument and go through `Intl.DateTimeFormat`: no date library. `<html lang>` is kept in sync and asserted by the a11y gate below.
 
-**Fully translated, except three permanent exclusions.** E.1b extracted the rest of the app: `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, every `/legal/*` page (536 strings over 97 files). `apps/app/src/features/CLAUDE.md`'s carve-out is retired: no user-visible text is a literal at its call site, anywhere, except (1) the legal prose itself, (2) `EVENT_DESCRIPTIONS`, and (3) the sub-processor register's non-display fields: see below. As-built in [`docs/HISTORY.md`](HISTORY.md).
+**Fully translated, except three permanent exclusions.** E.1b extracted the rest of the app: `admin`, `webhooks`, `sso`, `billing`, `organization`, the rest of `settings`, every `/legal/*` page (536 strings over 97 files). `apps/app/CLAUDE.md`'s carve-out is retired: no user-visible text is a literal at its call site, anywhere, except (1) the legal prose itself, (2) `EVENT_DESCRIPTIONS`, and (3) the sub-processor register's non-display fields: see below. As-built in [`docs/HISTORY.md`](HISTORY.md).
 
 **Legal pages** `apps/app/src/features/legal/policies/`: `en.tsx` holds the real (placeholder) legal bodies, `fr.tsx` re-exports them verbatim: a clone-owner replaces `fr.tsx` with real French legal text, not a dev task this repo can do for them. `policies/bodies.ts` selects the locale module (`policyBodyFor`) and tells `policy-doc-view.tsx` when the body is an English fallback (`isEnglishFallback`); `policies.config.tsx` holds the version and changelog metadata. All six legal routes (`privacy`, `terms`, `accessibility`, `cookies`, `data-rights`, `sub-processors`) render translated chrome around that body, and every one of them mounts the shared `<UntranslatedBodyBanner>` (`features/legal/components/untranslated-body-banner.tsx`) so a French reader is told, in French, that the prose below is not translated: a French title over a silent English body was a real defect on four of these pages before this component existed.
 

@@ -3,7 +3,7 @@
 // evaluates neither, so a green `bun test` around them would prove only that a
 // method was called, which is exactly how the preference cascade shipped inert
 // in the first place. This runs both against a real Postgres and measures what
-// actually gets enqueued. See apps/api/src/shared/CLAUDE.md ("write an
+// actually gets enqueued. See apps/api/CLAUDE.md ("write an
 // executable check against a real database and wire it to a script") and
 // `check-fanout-preferences.ts` for the reference shape.
 //
