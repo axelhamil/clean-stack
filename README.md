@@ -75,7 +75,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Legal / compliance** | Day-one EU-legal across the GDPR surface: **Art. 7** privacy/terms versioning (re-acceptance gate when a version bumps, `user.policy.accepted` evidence), **Art. 16** rectification (profile + email-change + password), **Art. 17** erasure (`POST /me/delete`: 2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in, cron wipe + ref anonymization), **Art. 20** portability (`POST /me/export`: signed 7-day R2 URL, 1/24h throttle). Passwords follow **NIST SP 800-63B** (min 15, HIBP k-anonymity breach check, contextual ban-list, no forced complexity). Without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris: provider swap = one env var. |
 | **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
-| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **82 typed events** auto-emitted on every state change (35 public + 47 internal), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter), operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context: one key joins an audit entry to its logs and Sentry event. |
+| **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **85 typed events** auto-emitted on every state change (35 public + 50 internal), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter), operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context: one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1 to 43 KB) + `defaultPreload: "intent"`: perceived latency near zero. |
@@ -120,7 +120,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 **Event-driven core & transactions**: *the hard distributed-systems part, already solved*
 - Transactional outbox: domain events persisted in the **same DB transaction** as the state change (`IUnitOfWork.run()` + `EventCollector` AsyncLocalStorage) → no event ever lost, none emitted for a rolled-back write (the dual-write problem, solved)
 - Post-commit dispatch: Postgres `LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED` drain (multi-instance safe); built-in subscribers run inside the dispatch TX (audit + webhook fanout + notification fanout), user `onEvent(...)` handlers isolated post-commit
-- **82 typed events** (35 public + 47 internal), append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay, SSRF guard, dual-secret rotation), `X-Request-Id` correlation
+- **85 typed events** (35 public + 50 internal), append-only `audit_log` (operational 90d / compliance 7y), HMAC-signed webhooks (AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter, replay, SSRF guard, dual-secret rotation), `X-Request-Id` correlation
 - **Zero plumbing post-clone**: declare the event in `@packages/events` → `addEvent()` in the aggregate → run via `uow.run()`; the audit row, webhook fanout, and in-process handlers (auto-discovered via inwire) come for free
 - Internal `/internal/*` endpoints: HMAC-signed, optional private-network layer
 
@@ -155,11 +155,12 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 
 ### Roadmap
 
-The SaaS plumbing is shipped: auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 82-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
+The SaaS plumbing is shipped: auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 85-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
+- **Dependency refresh Oct 2026** (Node 26 LTS, Bun 1.4.4, pnpm 12), in progress.
+- **Phase I, OpenUp resync**: kit, architecture guardrails, telemetry hygiene, ambient unit of work and a leased outbox, in five lots.
 - **A manual review pass** over the shipped surface: the last step before this is genuinely clone-ready.
 - **C.1 S5b/S6**: impossible-travel, ASN deny-list, captcha hook. Deferred for calibration: these need real traffic to tune.
-- **D.5 known debts**: three, including a duplicate deletion email if the worker crashes mid-batch.
 
 Cut and not returning: marketing site, status page + SLO dashboards, SOC2 checklist, OpenAPI docs, Capacitor shell, feature flags, GPC. Each was a per-clone decision, a third-party service to wire, or an ambition with nothing to exercise it. The specs live in git history.
 
@@ -328,7 +329,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 |---|---|
 | **Guided tour** | [`docs/OVERVIEW.md`](docs/OVERVIEW.md): what you get, in plain terms |
 | **What ships today** | [`docs/FEATURES.md`](docs/FEATURES.md): file-level inventory |
-| **What's next** | [`ROADMAP.md`](ROADMAP.md): plumbing shipped; left: review pass, abuse signals, D.5 debts |
+| **What's next** | [`ROADMAP.md`](ROADMAP.md): plumbing shipped; left: dependency refresh, Phase I (OpenUp resync), review pass, C.1 abuse signals |
 | **Architecture rules** | [`CLAUDE.md`](CLAUDE.md) (root) and the per-layer sub-`CLAUDE.md` |
 | **Back ↔ front surface map** | [`docs/SURFACE.md`](docs/SURFACE.md): every live route, its front consumer or the reason it has none, enforced by a parity test |
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): BetterAuth, Stripe, Resend, R2, email DNS |

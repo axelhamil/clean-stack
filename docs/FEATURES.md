@@ -352,7 +352,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 **Event visibility** `packages/events/src/visibility-map.ts`: 85-event catalog with explicit `public` / `internal` classification (35 public / 50 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
-**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket) → **82 total / 35 public / 47 internal**.
+**Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket).
 
 **Email** `packages/emails/src/components/api-token-leaked.tsx`: template sent to the token owner when GitHub Secret Scanning reports a match.
 
@@ -463,7 +463,7 @@ Two exact locales, `["en", "fr"]`, `DEFAULT_LOCALE = "en"`. **Locale is not in t
 
 **`requireCurrentPolicies` is mounted on business routes**, reversing Phase A.2 decision 5 ("composable, not mounted globally"): see the corrected line above and [`docs/HISTORY.md`](HISTORY.md)'s Phase H.1 entry. It stays an allowlist: what is gated is enumerated, and what is not is enumerated with its reason, rather than described as "everything minus a few exclusions".
 
-No new event type: the catalog is unchanged at **82 total / 35 public / 47 internal**.
+No new event type: the catalog is consumed, not extended.
 
 ---
 
@@ -483,6 +483,7 @@ No new event type: the catalog is unchanged at **82 total / 35 public / 47 inter
 
 See [`../ROADMAP.md`](../ROADMAP.md): the list is short by design; anything not on it was cut rather than deferred.
 
+- Dependency refresh Oct 2026 (Node 26 LTS, Bun 1.4.4, pnpm 12), in progress.
+- Phase I: resync on the OpenUp foundations (kit, guardrails, telemetry hygiene, ambient unit of work, leased outbox).
 - Manual review pass over the shipped surface.
 - C.1 S5b/S6: abuse signals + captcha hook, pending real traffic to calibrate.
-- D.5 known debts: `failed` rows never purged, per-row `markSent`, lost idempotency key on `delete_completed`.
