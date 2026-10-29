@@ -40,4 +40,8 @@ export class SentryInstrumentation implements IInstrumentation {
     // legitimate state (a sweep triggered with Sentry disabled), never an error.
     Sentry.getActiveSpan()?.setAttributes(attributes);
   }
+
+  flush(timeoutMs: number): Promise<boolean> {
+    return Sentry.flush(timeoutMs);
+  }
 }

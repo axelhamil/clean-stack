@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { notifyImpersonatedUser } from "../application/event-handlers/notify-impersonated-user";
 
-const capture = mock(() => {});
 const sendTemplate = mock(async () => Result.ok());
 
-const instrumentation = {
-  capture,
-  startSpan: mock(() => {}),
-  addBreadcrumb: mock(() => {}),
-  setSpanAttributes: mock(() => {}),
-};
+const instrumentation = mockInstrumentation();
 
 const profileStore = { findLocale: mock(async () => Result.ok(Option.some("fr"))) };
 
@@ -40,7 +35,7 @@ function handlerWith(getUser: () => Promise<unknown>) {
 
 describe("notifyImpersonatedUser", () => {
   beforeEach(() => {
-    capture.mockClear();
+    instrumentation.capture.mockClear();
     sendTemplate.mockClear();
   });
 
@@ -64,7 +59,7 @@ describe("notifyImpersonatedUser", () => {
       }),
       { locale: "fr" },
     );
-    expect(capture).not.toHaveBeenCalled();
+    expect(instrumentation.capture).not.toHaveBeenCalled();
   });
 
   it("sends nothing when the user cannot be found", async () => {

@@ -18,7 +18,7 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 
 ```
 apps/api/src/shared/
-  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes }
+  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes, flush }
   services/
     noop-instrumentation.ts            Always-bound default, silent passthrough
     sentry-instrumentation.ts          Wraps Sentry.startSpan + captureException + addBreadcrumb

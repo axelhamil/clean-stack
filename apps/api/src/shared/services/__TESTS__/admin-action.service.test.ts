@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { EventTypes } from "@packages/events";
+import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { passthroughUow } from "../../__TESTS__/outbox-fakes";
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
@@ -40,17 +41,12 @@ mock.module("../../../auth-queries", () => ({ ...realAuthQueries, setOrgSsoEnfor
 
 const { AdminActionService } = await import("../admin-action.service");
 
-const instrumentation = {
-  startSpan: <T>(_o: unknown, fn: () => T) => fn(),
-  capture: mock(() => {}),
-  addBreadcrumb: mock(() => {}),
-  setSpanAttributes: mock(() => {}),
-};
+const instrumentation = mockInstrumentation();
 
 const fakeTx = { tx: "admin-action" } as never;
 
 function service() {
-  return new AdminActionService({} as never, passthroughUow(fakeTx), instrumentation as never);
+  return new AdminActionService({} as never, passthroughUow(fakeTx), instrumentation);
 }
 
 function makeHeaders(token = "tok-1") {

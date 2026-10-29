@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 import type { Locale } from "@packages/i18n";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
 
 mock.module("@packages/drizzle", () => ({
@@ -165,7 +166,7 @@ describe("EmailDeliveryWorker.start", () => {
   it("logs and reports a first drain that fails instead of crashing the process", async () => {
     const h = harness([]);
     const errors: string[] = [];
-    const captured: unknown[] = [];
+    const instrumentation = mockInstrumentation();
     const worker = new EmailDeliveryWorker(
       {
         ...h.queue,
@@ -175,12 +176,7 @@ describe("EmailDeliveryWorker.start", () => {
       } as never,
       outboxStub as never,
       { ...loggerStub, error: (_obj: unknown, msg: string) => errors.push(msg) } as never,
-      {
-        startSpan: <T>(_: unknown, fn: () => T) => fn(),
-        capture: (err: unknown) => captured.push(err),
-        addBreadcrumb() {},
-        setSpanAttributes() {},
-      },
+      instrumentation,
       { batchSend: h.batch },
     );
 
@@ -189,7 +185,7 @@ describe("EmailDeliveryWorker.start", () => {
     await worker.stop();
 
     expect(errors).toEqual(["email drain failed"]);
-    expect(captured).toHaveLength(1);
+    expect(instrumentation.capture).toHaveBeenCalledTimes(1);
   });
 });
 

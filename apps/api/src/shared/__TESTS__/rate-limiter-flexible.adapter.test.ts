@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { rateLimitSchema } from "@packages/drizzle";
 // Import the real lib before mock.module (the mock.module callback is synchronous).
 import * as realRateLimiterFlexible from "rate-limiter-flexible";
-import type { IInstrumentation } from "../ports/instrumentation.port";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { WindowConfig } from "../ports/rate-limiter.port";
 
 // The Postgres factory only hands the client through, so a bare object stands in
@@ -48,17 +48,8 @@ mock.module("rate-limiter-flexible", () => ({
 const { RateLimiterFlexibleAdapter, memoryFactory, makeDrizzleFactory, storeFactoryFor } =
   await import("../services/rate-limiter-flexible.adapter");
 
-function makeNoopInstrumentation(): IInstrumentation {
-  return {
-    startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-    capture: () => {},
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  };
-}
-
 function makeAdapter() {
-  return new RateLimiterFlexibleAdapter(makeNoopInstrumentation(), memoryFactory);
+  return new RateLimiterFlexibleAdapter(mockInstrumentation(), memoryFactory);
 }
 
 const WINDOW_1S: WindowConfig = { policyName: "test", windowSec: 1, maxRequests: 3 };
@@ -163,13 +154,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
   describe("instrumentation.capture on internal error", () => {
     it("calls instrumentation.capture and returns isFailure on unexpected error", async () => {
-      const captureSpy = mock(() => {});
-      const instrumentation: IInstrumentation = {
-        startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-        capture: captureSpy,
-        addBreadcrumb: () => {},
-        setSpanAttributes: () => {},
-      };
+      const instrumentation = mockInstrumentation();
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);
 
@@ -183,7 +168,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("RATE_LIMITER_INTERNAL_ERROR");
-      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(instrumentation.capture).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -223,10 +208,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
         },
       });
 
-      const adapter = new RateLimiterFlexibleAdapter(
-        makeNoopInstrumentation(),
-        stubFactory as never,
-      );
+      const adapter = new RateLimiterFlexibleAdapter(mockInstrumentation(), stubFactory as never);
       const w: WindowConfig = { policyName: "p", windowSec: 60, maxRequests: 1 };
       const result = await adapter.consume("key", [w]);
       expect(result.isSuccess).toBe(true);
@@ -277,20 +259,15 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
   describe("span name", () => {
     it("outer span is hardcoded to RateLimiterFlexibleAdapter > consume", async () => {
-      const startSpanSpy = mock((_opts: unknown, cb: () => unknown) => cb());
-      const instrumentation: IInstrumentation = {
-        startSpan: startSpanSpy as unknown as IInstrumentation["startSpan"],
-        capture: () => {},
-        addBreadcrumb: () => {},
-        setSpanAttributes: () => {},
-      };
+      const instrumentation = mockInstrumentation();
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);
       await adapter.consume("ip-span", [WINDOW_1S]);
 
-      expect(startSpanSpy).toHaveBeenCalledTimes(1);
-      const callArg = startSpanSpy.mock.calls[0]?.[0] as { name: string };
-      expect(callArg.name).toBe("RateLimiterFlexibleAdapter > consume");
+      expect(instrumentation.startSpan).toHaveBeenCalledTimes(1);
+      expect(instrumentation.startSpan.mock.calls[0]?.[0].name).toBe(
+        "RateLimiterFlexibleAdapter > consume",
+      );
     });
   });
 });

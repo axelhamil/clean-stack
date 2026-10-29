@@ -33,4 +33,5 @@ export interface IInstrumentation {
    * `SentryInstrumentation` whenever the caller runs outside a `startSpan` callback.
    */
   setSpanAttributes(attributes: Record<string, string | number | boolean>): void;
+  flush(timeoutMs: number): Promise<boolean>;
 }

@@ -60,4 +60,8 @@ describe("NoOpInstrumentation", () => {
     const instrumentation = new NoOpInstrumentation();
     expect(() => instrumentation.setSpanAttributes({ deleted: 3 })).not.toThrow();
   });
+
+  it("noop flush resolves true", async () => {
+    expect(await new NoOpInstrumentation().flush(1000)).toBe(true);
+  });
 });

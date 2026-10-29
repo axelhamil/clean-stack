@@ -24,17 +24,8 @@ const { requireCsrf } = await import("../middleware/csrf.middleware");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
 import { Hono } from "hono";
-import type { IInstrumentation } from "../ports/instrumentation.port";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { IOutboxRepository } from "../ports/outbox.port";
-
-function makeNoop(): IInstrumentation {
-  return {
-    startSpan: (_opts: unknown, cb: () => unknown) => cb(),
-    capture: () => {},
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  } as unknown as IInstrumentation;
-}
 
 const ALLOWED_ORIGINS = ["http://localhost:5173", "https://app.example.com"];
 
@@ -67,7 +58,7 @@ type TestVars = { user: { id: string } | null };
 
 function makeApp(opts: { withUser?: boolean; outbox?: IOutboxRepository } = {}) {
   const app = new Hono<{ Variables: TestVars }>();
-  app.onError(createErrorHandler(makeNoop()));
+  app.onError(createErrorHandler(mockInstrumentation()));
   if (opts.withUser) {
     app.use("*", async (c, next) => {
       c.set("user", { id: "u1" });
@@ -197,7 +188,7 @@ describe("csrf middleware", () => {
   it("outbox absent → pas de crash, warn factory-time", async () => {
     warnSpy.mockClear();
     const app = new Hono();
-    app.onError(createErrorHandler(makeNoop()));
+    app.onError(createErrorHandler(mockInstrumentation()));
     app.use("*", requireCsrf({ allowedOrigins: ALLOWED_ORIGINS }));
     app.post("/test", (c) => c.json({ ok: true }));
     expect(warnSpy.mock.calls.length).toBeGreaterThan(0);
