@@ -40,7 +40,7 @@ describe("samlProviderSchema", () => {
   });
 });
 
-// A per-issue `message:` wins over the global Zod map (shared/CLAUDE.md:40), so a
+// A per-issue `message:` wins over the global Zod map (apps/app/CLAUDE.md, i18n), so a
 // schema that carries one is permanently English. Asserting on `code`/`params`
 // rather than on rendered text is what makes this a rule check and not a copy test.
 function issuesFor(schema: z.ZodType, input: unknown) {

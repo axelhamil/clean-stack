@@ -2,7 +2,7 @@
  * Proves against a real Postgres that `DrizzleEmailQueue.markSent` correctly evaluates
  * the CASE expression it builds for `provider_message_id` and increments `attempts`
  * from its prior value, behaviour a mocked `tx` can never exercise (see
- * `apps/api/src/shared/CLAUDE.md` on asserting call shape only against a mock).
+ * `apps/api/CLAUDE.md` on asserting call shape only against a mock).
  */
 
 import { checkRecorder } from "./check-harness";

@@ -6,7 +6,7 @@
 // A mocked `tx` never evaluates a real `WHERE` or `SET ... WHERE`, the whole point of
 // `acquireSweepLease` is the conditional UPDATE the database performs, so this checks it
 // against a real Postgres instead. Wired to a script, not `bun:test`, because it needs a
-// live database: the unit suite runs without one. See apps/api/src/shared/CLAUDE.md ("write an executable check against a
+// live database: the unit suite runs without one. See apps/api/CLAUDE.md ("write an executable check against a
 // real database and wire it to a script") and `check-fanout-preferences.ts` for the
 // reference shape. Run: `pnpm --filter api check:sweep-lock`, re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
@@ -110,7 +110,7 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
 
 // ── purgeBatchWithTimeout: the three SET LOCAL guards, checked against a real
 // transaction. A mocked `tx.execute` can only assert on the SQL text a builder
-// produced (banned, see apps/api/src/shared/CLAUDE.md), and that check is weak on
+// produced (banned, see apps/api/CLAUDE.md), and that check is weak on
 // its own terms: it only proves the setting *names* were sent, not their values, so
 // '5s' silently becoming '5m' would still pass. `assertGuards` runs inside the same
 // transaction `purgeBatchWithTimeout` opens, right after the three `SET LOCAL`

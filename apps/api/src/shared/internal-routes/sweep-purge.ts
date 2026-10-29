@@ -16,7 +16,7 @@ export type PurgeBatchOptions = {
    * the delete. No production call site sets it, so it never changes the delete SQL
    * any route emits. Exists so `apps/api/scripts/check-sweep-lock.ts` can assert
    * `current_setting(...)` against a real Postgres transaction instead of mocking
-   * `tx.execute` and asserting on SQL text (banned, see `shared/CLAUDE.md`).
+   * `tx.execute` and asserting on SQL text (banned, see `apps/api/CLAUDE.md`).
    */
   assertGuards?: (tx: Transaction) => Promise<void>;
 };

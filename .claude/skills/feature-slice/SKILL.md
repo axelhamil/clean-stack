@@ -22,13 +22,13 @@ Run roles sequentially with the Agent tool. Each role's final message is a raw h
 
 **1. Explorer** (`Explore` agent), map what exists: target module, the closest precedent to imitate (aggregate/route/feature), schema impact. Returns: files to imitate, files to touch, gotchas.
 
-**2. Architect** (`Plan` agent), the prompt MUST require event storming first: enumerate the story's domain events, they ARE the business, then derive the aggregate/VOs (or a `<Noun>Service` when no aggregate; decide by aggregate, not I/O count). Then the slice plan: files per layer (domain → use case → Hono route → query/mutation factory in `features/<x>/api/` → hooks → components → 2-file route) and the DoD obligations the implementers must honor: event emits with actor (`actorUserId` when actor ≠ subject), `IInstrumentation` spans on new I/O methods, `ScopedRepository` if the aggregate is owned, migration if schema changes.
+**2. Architect** (`Plan` agent), the prompt MUST require event storming first: enumerate the story's domain events, they ARE the business, then derive the aggregate/VOs (or a `<Noun>Service` when no aggregate; decide by aggregate, not I/O count). Then the slice plan: files per layer (domain → use case → Hono route → query/mutation factory in `features/<x>/api/` → hooks → components → route file) and the DoD obligations the implementers must honor: event emits with actor (`actorUserId` when actor ≠ subject), `IInstrumentation` spans on new I/O methods, `ScopedRepository` if the aggregate is owned, migration if schema changes.
 
 → **GATE 1: present the plan to the user, wait for explicit approval.**
 
-**3. Back implementer** (`general-purpose`), receives the plan's back section + explorer brief. Strict TDD (superpowers:test-driven-development): domain → application → route. Layer rules auto-load via `apps/api/src/modules/CLAUDE.md` the moment it touches module files, its prompt carries the acceptance criteria, not a re-derivation of the rules.
+**3. Back implementer** (`general-purpose`), receives the plan's back section + explorer brief. Strict TDD (superpowers:test-driven-development): domain → application → route. Layer rules auto-load via `apps/api/CLAUDE.md` the moment it touches API files, its prompt carries the acceptance criteria, not a re-derivation of the rules.
 
-**4. Front implementer** (`general-purpose`), receives the plan's front section + mockup file paths. First action: `Read` every mockup. Then factory → hooks → components → 2-file route. Rules auto-load via `apps/app/src/features/CLAUDE.md`.
+**4. Front implementer** (`general-purpose`), receives the plan's front section + mockup file paths. First action: `Read` every mockup. Then factory → hooks → components → route file. Rules auto-load via `apps/app/CLAUDE.md`.
 
 **5. Adversarial reviewer** (`feature-dev:code-reviewer`), attacks the full diff against the acceptance criteria and the 8 cross-cutting rules in the root `CLAUDE.md` (silent state change, missing actor, missing span, scope leak…), then the orchestrator runs the gates:
 

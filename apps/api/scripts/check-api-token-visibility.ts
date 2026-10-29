@@ -5,7 +5,7 @@
 // with opaque stand-ins, so a green run there proves only that the method was
 // called, never that the predicate excludes/includes the right rows. This
 // runs the real repository against a real Postgres and checks exactly which
-// rows each owner scope returns. See `apps/api/src/shared/CLAUDE.md` ("write
+// rows each owner scope returns. See `apps/api/CLAUDE.md` ("write
 // an executable check against a real database and wire it to a script") and
 // `check-fanout-preferences.ts` for the reference shape.
 //
