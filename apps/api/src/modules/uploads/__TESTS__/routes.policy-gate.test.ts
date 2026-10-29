@@ -1,15 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
+import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
-import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 
-const noopInstrumentation: IInstrumentation = {
-  capture: () => {},
-  startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-  addBreadcrumb: () => {},
-  setSpanAttributes: () => {},
-};
+const instrumentation = mockInstrumentation();
 
 let stale = false;
 
@@ -40,7 +35,7 @@ const { uploadsRoutes } = await import("../routes");
 
 function app() {
   const instance = new Hono().route("/uploads", uploadsRoutes);
-  instance.onError(createErrorHandler(noopInstrumentation));
+  instance.onError(createErrorHandler(instrumentation));
   return instance;
 }
 

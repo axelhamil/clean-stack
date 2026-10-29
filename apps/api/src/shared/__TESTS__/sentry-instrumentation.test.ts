@@ -11,6 +11,7 @@ const setTagMock = mock((_key: string, _value: string) => {});
 const setUserMock = mock((_user: unknown) => {});
 const setContextMock = mock((_key: string, _ctx: unknown) => {});
 const getActiveSpanMock = mock(() => undefined as unknown);
+const flushMock = mock(async (_timeout?: number) => true);
 
 const scopeMock = {
   setTag: setTagMock,
@@ -25,6 +26,7 @@ mock.module("@sentry/bun", () => ({
   captureException: captureExceptionMock,
   addBreadcrumb: addBreadcrumbMock,
   getActiveSpan: getActiveSpanMock,
+  flush: flushMock,
 }));
 
 const { SentryInstrumentation } = await import("../services/sentry-instrumentation");
@@ -136,6 +138,17 @@ describe("SentryInstrumentation", () => {
       getActiveSpanMock.mockReturnValue(undefined);
 
       expect(() => new SentryInstrumentation().setSpanAttributes({ deleted: 0 })).not.toThrow();
+    });
+  });
+
+  describe("flush", () => {
+    it("flush delegates to the Sentry client with the given timeout", async () => {
+      flushMock.mockResolvedValueOnce(false);
+
+      const flushed = await new SentryInstrumentation().flush(1500);
+
+      expect(flushMock).toHaveBeenCalledWith(1500);
+      expect(flushed).toBe(false);
     });
   });
 });

@@ -8,12 +8,12 @@ The database package: Drizzle client, schema, migrations and the transaction ser
 drizzle.config.ts              drizzle-kit config (schema "./src/schema/*", out "./migrations")
 migrations/                    generated SQL, committed
 src/
-  config.ts                    `db`, `DbClient`, `Transaction`
+  config.ts                    `db`, `DbClient`, `Transaction`, `closeDb()` (ends the pool, called by the api shutdown)
   schema/<topic>.ts            one file per topic (auth, multi-tenant, outbox, audit-log, webhooks, billing, ...), re-exported as `<topic>Schema` from `index.ts`
   repositories/track-events.ts `trackEventsOnSuccess`
   services/                    `TransactionService` (the `IUnitOfWork` impl)
   seeds/                       dev seeds
-  rate-limit-client.ts         dedicated pool for the rate-limiter store
+  rate-limit-client.ts         dedicated pool for the rate-limiter store, `closeRateLimitDb()`
 ```
 
 ## Rules

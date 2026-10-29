@@ -31,7 +31,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Resync on the OpenUp foundations: **Phase I**
 
-- **Status**: in progress, I.1 and I.2 shipped, I.3 next.
+- **Status**: in progress, I.1, I.2 and I.3 shipped, I.4 next.
 - **Date**: Oct 2026.
 - **Why**: OpenUp, a sister project on the same stack, hardened five foundations after clean-stack diverged from the shared Afterlive lineage. Today clean-stack has a thinner kit, layering enforced only by convention, telemetry that can carry PII, a transaction parameter threaded through every port, and an outbox that holds locks during handlers and loses user handlers on a throw. Each lot below buys one architectural property.
 - **Scope**: five ordered lots, each its own branch off `dev` (`refactor/phase-i-1-kit` to `refactor/phase-i-5-outbox`) and its own PR merged as a merge commit. Not ported because they are OpenUp-specific: a per-module outbox, `RouteGuards`, `HttpResponse`, `PgSingleFlight`, `packages/audit`, `dist` builds, typed entity ids, the `DomainEventHandler` class, admin replay of dead events.
@@ -52,7 +52,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 - **Depends on**: I.1 (`source-scan` lives beside the new test helpers).
 - **Done when**: `pnpm check:boundaries` exits 0 with `0 dependency violations` locally and in CI; two deliberate violations (a cross-module import, a `@packages/drizzle` import in `application/`) each make it exit 1 naming the rule, shown in the PR text; the 4 layering tests and 2 parity tests pass; every allowlist entry carries a reason; `no-circular` is an error, or the remaining cycles are listed here.
 
-### I.3: Telemetry hygiene and ordered shutdown
+### I.3: Telemetry hygiene and ordered shutdown ✅ Oct 2026
 
 - **Why**: a Drizzle failure message embeds the query parameters, so a swallowed email address can reach Sentry through the exception text; and a process killed mid-drain loses in-flight work and the last telemetry batch.
 - **Scope**: scrub exception text, messages and breadcrumbs (cut after `params:`, strip query strings, mask emails, drop console breadcrumbs); `flush(timeoutMs)` on `IInstrumentation`; `runShutdown` running ordered steps (grace, HTTP stop, webhook delivery, email delivery, outbox dispatcher, notification hub, database pool, telemetry flush) under a global deadline, with an explicit `Bun.serve` handle; an `HttpHeartbeat` pinging `<url>/start`, `<url>` and `<url>/fail` around the cron sweep.

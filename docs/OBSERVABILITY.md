@@ -7,8 +7,8 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 - **Error capture** on every `>= 500` HTTP response (api), every uncaught React render error (app), and every unexpected TanStack Query/mutation failure (app): global `QueryCache`/`MutationCache` `onError` handlers capture 5xx and network errors (no `status`); expected 4xx (validation, 401/403/404, 429 rate-limit), `CancelledError` and `AbortError` are filtered out by `error-classifier.ts`. Mutations additionally skip an explicit allowlist of flow-control messages (`FLOW_CONTROL_MESSAGES` in `error-classifier.ts`: passkey cancel, verify-email redirect) that auth hooks throw on purpose; everything else, including plain `Error`s wrapping server failures, is captured.
 - **User identification (app)**: `Sentry.setUser({ id })` synced automatically from the `["session"]` query cache (`session-watcher.ts`): set on sign-in (any flow, password, magic link, passkey, session restore), cleared on sign-out. Id only; `beforeSend` scrubs the rest.
 - **Tags** auto-populated on every event: `requestId`, `userId`, `orgId`, `path`, `method`.
-- **Payload scrubbing** RGPD-clean by default, `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address` are stripped before transmission.
-- **Pino integration**: every `logger.warn` / `logger.error` becomes a Sentry breadcrumb attached to the next captured event. Single source of truth for logs.
+- **Payload scrubbing** RGPD-clean by default, `Cookie`, `Authorization`, request body, query string, `email`, `username`, `ip_address` are stripped before transmission, and so are failed-query parameters, URL query strings and emails inside error text, contexts, extra, breadcrumbs and Sentry log lines, plus console breadcrumbs.
+- **Pino integration**: every `logger.warn` / `logger.error` becomes a Sentry breadcrumb attached to the next captured event, and log lines ship as Sentry logs through `beforeSendLog`. Single source of truth for logs.
 - **Repository / service spans**: every Drizzle repo, S3, Resend method is wrapped with a Sentry span (`startSpan`) for distributed tracing. `tracesSampleRate=0` by default keeps overhead near zero; flip > 0 once a tracing backend consumes them.
 - **Request correlation across the stack**: each request's `X-Request-Id` (Hono `requestId()`) flows through an `AsyncLocalStorage` context (`shared/request-context.ts`) and is stamped onto every emitted event (`outbox_event.metadata.requestId`) → copied into `audit_log.request_id`. The same id tags the pino logs and the Sentry event, so an audit entry, its logs, and its error all join on one key, even for events emitted deep inside a BetterAuth hook where the Hono `c` isn't in scope.
 - **Release tracking** ties to `GIT_SHA` injected at CI build (shared with the `/livez` payload from Phase 0.2).
@@ -18,11 +18,13 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 
 ```
 apps/api/src/shared/
-  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes }
+  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes, flush }
   services/
     noop-instrumentation.ts            Always-bound default, silent passthrough
     sentry-instrumentation.ts          Wraps Sentry.startSpan + captureException + addBreadcrumb
     sentry-init.ts                     Side-effect Sentry.init() at module load if SENTRY_DSN
+
+packages/sentry-scrub/src/scrub-event.ts  scrubEvent + scrubBreadcrumb + scrubLog + IP_HEADERS, pure, shared by api and app
 
 apps/api/src/container.ts              Conditional binding: SentryInstrumentation if DSN, else NoOpInstrumentation
 ```
@@ -170,11 +172,12 @@ No code change. For a non-compatible provider, replace `SentryInstrumentation` w
 ## Privacy / EU residency
 
 - `dataCollection` opts out of every PII category (user info, cookies, IP/identity headers, HTTP bodies, query params; on the API also DB query data, queue args and stack-frame locals). The SDK collects all of them by default since v11, so removing a key turns that category back on.
-- `beforeSend` strips `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email`, `username`, `ip_address` before transmission. Whitelist-based (default = drop).
-- Fetch/XHR breadcrumbs record full request URLs and are **not** covered by the `beforeSend` request scrub, keep sensitive data out of query strings (repo convention: payloads travel in POST bodies, identifiers are opaque UUIDs).
+- `beforeSend: scrubEvent` (`@packages/sentry-scrub`, same function on api and app) strips cookies, `Cookie`, `Authorization`, `x-csrf-token`, request body, query string, user `email`, `username`, `ip_address` before transmission. It also cleans the text of `message`, every `exception.values[].value` and every string nested in `contexts` and `extra` (a TanStack `queryKey` lands in `contexts.metadata`): everything after a failed query's `\nparams:` is cut, a query string or fragment is dropped when it follows a path or carries `key=value`, emails become `[email]`. The patterns anchor on token starts, so the cost stays linear in the text length.
+- `beforeBreadcrumb: scrubBreadcrumb` drops `console` breadcrumbs (they echo logged payloads), strips query and fragment from `data.url`, `data.from`, `data.to` of fetch/XHR and navigation breadcrumbs, and applies the same text cleaner to `message` and every other `data` string.
+- `beforeSendLog: scrubLog` (api) applies that cleaner to the `message` and `attributes` of every pino line that `pinoIntegration` ships as a Sentry log, since those bypass `beforeSend`. Keep sensitive data out of paths anyway (repo convention: payloads travel in POST bodies, identifiers are opaque UUIDs).
 - For EU clients, use a `*.eu.sentry.io` DSN, Sentry stores all data in Frankfurt.
 
-If you ship a non-trivial scrubbing exception, document it inline in `sentry-init.ts` and update this section.
+If you ship a non-trivial scrubbing exception, add it to `packages/sentry-scrub` with its test and update this section.
 
 ### Sentry UI, Data Scrubber (server-side defense in depth)
 

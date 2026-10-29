@@ -21,6 +21,7 @@
     "@packages/events": "workspace:*",
     "@packages/i18n": "workspace:*",
     "@packages/policies": "workspace:*",
+    "@packages/sentry-scrub": "workspace:*",
     "@packages/ui": "workspace:*",
     "@sentry/react": "^11.9.0",
     "@tanstack/react-query": "^5.105.0",

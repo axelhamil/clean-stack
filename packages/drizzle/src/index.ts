@@ -23,8 +23,12 @@ export {
 export { migrate } from "drizzle-orm/node-postgres/migrator";
 export type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 export { alias } from "drizzle-orm/pg-core";
-export { type DbClient, db, type Transaction } from "./config";
-export { getRateLimitDbClient, type RateLimitDbClient } from "./rate-limit-client";
+export { closeDb, type DbClient, db, type Transaction } from "./config";
+export {
+  closeRateLimitDb,
+  getRateLimitDbClient,
+  type RateLimitDbClient,
+} from "./rate-limit-client";
 export { trackEventsOnSuccess } from "./repositories/track-events";
 export type { AuditActorType, AuditRetention } from "./schema/audit-log";
 

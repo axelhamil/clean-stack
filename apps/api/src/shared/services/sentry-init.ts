@@ -1,31 +1,6 @@
-import type { ErrorEvent } from "@sentry/bun";
+import { IP_HEADERS, scrubBreadcrumb, scrubEvent, scrubLog } from "@packages/sentry-scrub";
 import * as Sentry from "@sentry/bun";
 import { env } from "../env";
-
-// Headers that carry the client IP or identity; v10's sendDefaultPii: false stripped them.
-const IP_HEADERS = ["forwarded", "-ip", "remote-", "via", "-user"];
-
-export function scrubEvent(event: ErrorEvent): ErrorEvent {
-  if (event.request) {
-    event.request.cookies = undefined;
-    event.request.data = undefined;
-    event.request.query_string = undefined;
-    if (event.request.headers) {
-      const h = event.request.headers as Record<string, string | undefined>;
-      h.cookie = undefined;
-      h.Cookie = undefined;
-      h.authorization = undefined;
-      h.Authorization = undefined;
-      h["x-csrf-token"] = undefined;
-    }
-  }
-  if (event.user) {
-    event.user.email = undefined;
-    event.user.username = undefined;
-    event.user.ip_address = undefined;
-  }
-  return event;
-}
 
 if (env.SENTRY_DSN) {
   Sentry.init({
@@ -49,5 +24,7 @@ if (env.SENTRY_DSN) {
       graphQL: { document: false, variables: false },
     },
     beforeSend: scrubEvent,
+    beforeBreadcrumb: scrubBreadcrumb,
+    beforeSendLog: scrubLog,
   });
 }

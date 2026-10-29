@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import * as realDrizzle from "@packages/drizzle";
+import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { FakePgListenClient } from "./fake-pg-listen-client";
 
 let transactionCalls = 0;
@@ -26,19 +27,13 @@ const fakeOutbox = {
 
 function makeDispatcher() {
   const errors: string[] = [];
-  const captured: unknown[] = [];
   const logger = {
     info() {},
     warn() {},
     debug() {},
     error: (_obj: unknown, msg: string) => errors.push(msg),
   };
-  const instrumentation = {
-    startSpan: <T>(_: unknown, fn: () => T) => fn(),
-    capture: (err: unknown) => captured.push(err),
-    addBreadcrumb() {},
-    setSpanAttributes() {},
-  };
+  const instrumentation = mockInstrumentation();
   const client = new FakePgListenClient();
   const dispatcher = new OutboxDispatcher(
     fakeOutbox,
@@ -48,7 +43,7 @@ function makeDispatcher() {
     instrumentation,
     { createClient: () => client },
   );
-  return { dispatcher, client, errors, captured };
+  return { dispatcher, client, errors, instrumentation };
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,13 +54,13 @@ describe("OutboxDispatcher", () => {
   });
 
   test("a first drain that fails is logged and reported instead of crashing the process", async () => {
-    const { dispatcher, errors, captured } = makeDispatcher();
+    const { dispatcher, errors, instrumentation } = makeDispatcher();
 
     await dispatcher.start();
     await wait(10);
 
     expect(errors).toContain("outbox drain failed (start)");
-    expect(captured).toHaveLength(1);
+    expect(instrumentation.capture).toHaveBeenCalledTimes(1);
 
     await dispatcher.stop();
   });

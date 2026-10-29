@@ -7,6 +7,7 @@ import type {
   HealthStatus,
   IHealthCheckRegistry,
 } from "../../../shared/ports/health.port";
+import { raceWithTimeout } from "../../../shared/race-with-timeout";
 
 const CHECK_TIMEOUT_MS = 5_000;
 const CACHE_TTL_PASS_MS = 30_000;
@@ -58,27 +59,18 @@ export class InMemoryHealthCheckRegistry implements IHealthCheckRegistry {
   }
 }
 
-async function runWithTimeout(fn: HealthCheckFn): Promise<HealthCheckResult> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<HealthCheckResult>((resolve) => {
-    timer = setTimeout(
-      () => resolve({ status: "fail", output: `timeout >${CHECK_TIMEOUT_MS}ms` }),
-      CHECK_TIMEOUT_MS,
-    );
-  });
-  try {
-    return await Promise.race([
-      fn().catch(
-        (err): HealthCheckResult => ({
-          status: "fail",
-          output: err instanceof Error ? err.message : "unknown error",
-        }),
-      ),
-      timeout,
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+function runWithTimeout(fn: HealthCheckFn): Promise<HealthCheckResult> {
+  const settled = fn().catch(
+    (err): HealthCheckResult => ({
+      status: "fail",
+      output: err instanceof Error ? err.message : "unknown error",
+    }),
+  );
+
+  return raceWithTimeout(settled, CHECK_TIMEOUT_MS, () => ({
+    status: "fail",
+    output: `timeout >${CHECK_TIMEOUT_MS}ms`,
+  }));
 }
 
 function aggregate(checks: AggregatedHealthCheck[]): HealthStatus {

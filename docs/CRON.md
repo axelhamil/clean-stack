@@ -375,6 +375,8 @@ Three endpoints purge the derived tables of the event pipeline. Defaults: outbox
 
 Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix and env knobs. Reference cron entrypoint chaining the three in order: `apps/api/src/cron/sweep.ts` (bundled to `dist/cron/sweep.js`). Wire it via the wiring options above, Railway Cron is the reference deploy (see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)).
 
+**Heartbeat**: `sweep.ts` pings `SWEEP_HEARTBEAT_URL` around its run (healthchecks.io / Cronitor style): `<url>/start` before the first sweep, then `<url>` when every sweep succeeded or `<url>/fail` when one failed, including the early exit on an unreachable API. A run that never starts or never finishes is what the monitor alerts on, which logs alone cannot show. Unset means no ping. The ping (`cron/http-heartbeat.ts`) has a 10 s timeout, never throws, and reports only the error name or the status, never the URL (it carries the check's secret).
+
 ### `POST /internal/sweep-email-messages`: email queue retention sweep (Phase D.5)
 
 Two purge passes, run in sequence on every invocation:

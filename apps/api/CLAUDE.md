@@ -29,7 +29,7 @@ apps/api/src/
   auth.ts                       BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`).
   auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), `tx?`-aware. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
   app.ts                        `Hono` construction, chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
-  index.ts                      Server entry: `Bun.serve()`, DI preload, worker starts, graceful shutdown. Imports `app` from `app.ts`, re-exports `AppType`.
+  index.ts                      Server entry: explicit `Bun.serve()` handle (kept on `globalThis` so `bun --hot` reloads it instead of rebinding the port), DI preload, worker starts, ordered shutdown steps. Imports `app` from `app.ts`, re-exports `AppType`.
   migrate.ts                    Migration entry (`pnpm --filter api migrate`); `start` runs it before the server
   client.ts                     `hcWithType` factory, `hc<AppType>` (`AppType` from `app.ts`)
 ```
@@ -81,7 +81,7 @@ Cross-cutting infra, no business. Inventory by concern (the file-level list is `
 - `entitlements.ts`: typed plan catalog and its pure predicates, read by billing, the gates, `quota-reservation` and `auth.ts`.
 - `event-emitter.ts`: `emitEvent(outbox, ...)` for code that emits outside an aggregate flow (plain services, BetterAuth bridge, RGPD, uploads), inside the same `ITransactionService.run(tx)` as the write; use it instead of `outbox.enqueue` directly so the source and scope shape stay consistent. `emitEventBestEffort(...)` is for a request refused whatever happens to its event (CSRF, rate limit, CSP report, abuse checks): a failed emit is logged as a warning instead of turning the refusal into a 500.
 - `services/event-actor.ts`: `ACTOR_KEYS` + `readUserId`, the one actor-key priority list both the audit trail and the notification audience read.
-- `ssrf-guard.ts` + `private-ranges.ts` (outbound URL guard, webhooks), `aead.ts` (XChaCha20-Poly1305 + per-org HKDF sub-key for webhook secrets at rest), `jitter.ts` (retry backoff), `db-failure.ts` (`dbOperationFailure(code)`: the error a store returns when a query throws), `request-context.ts` (request-scoped ALS: request id + trusted-proxy client IP, for BetterAuth hooks that have no Hono context), `shutdown.ts` (`lifecycleState`), `services/digest-schedule.ts` (pure `digestDueAt`, never anchored on "now").
+- `ssrf-guard.ts` + `private-ranges.ts` (outbound URL guard, webhooks), `aead.ts` (XChaCha20-Poly1305 + per-org HKDF sub-key for webhook secrets at rest), `jitter.ts` (retry backoff), `db-failure.ts` (`dbOperationFailure(code)`: the error a store returns when a query throws), `request-context.ts` (request-scoped ALS: request id + trusted-proxy client IP, for BetterAuth hooks that have no Hono context), `shutdown.ts` (`lifecycleState`, `runShutdown` / `installShutdown`: steps in series, each raced against its timeout, a global deadline, exit `0` only when every step finished), `services/digest-schedule.ts` (pure `digestDueAt`, never anchored on "now").
 - `env.ts`, `logger.ts`: process-level singletons. `env-bounds.ts` (`validateEnvBounds`) holds the cross-field refinement that fails the boot when the sweep timeouts are not nested; kept out of `env.ts` so a test can call it without a full `.env`.
 - `transaction.ts`: the `ITransaction` alias above.
 
@@ -178,7 +178,7 @@ Domain and application use `Result<T, E>` (no throw); the controller translates 
 
 ## Observability (`IInstrumentation`)
 
-**Single port, DI everywhere.** `IInstrumentation` (`shared/ports/instrumentation.port.ts`) combines `startSpan`, `capture`, `addBreadcrumb` and `setSpanAttributes`. Default `NoOpInstrumentation`; `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set (`container.ts`). **No module-level singleton, no service locator**: every I/O class receives it via constructor. Sentry SDK init exception: `import "./shared/services/sentry-init"` is the first import of `index.ts` (it must hook async-hooks before pino/Hono/Drizzle).
+**Single port, DI everywhere.** `IInstrumentation` (`shared/ports/instrumentation.port.ts`) combines `startSpan`, `capture`, `addBreadcrumb`, `setSpanAttributes` and `flush(timeoutMs)` (drains pending events, resolves `false` when the timeout cut it short; the shutdown calls it last). Default `NoOpInstrumentation`; `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set (`container.ts`). **No module-level singleton, no service locator**: every I/O class receives it via constructor. Sentry SDK init exception: `import "./shared/services/sentry-init"` is the first import of `index.ts` (it must hook async-hooks before pino/Hono/Drizzle).
 
 **Instrumentation pattern** (see [`docs/OBSERVABILITY.md`](../../docs/OBSERVABILITY.md)):
 - **Outer span** wraps the method body: `{ name: "ClassName > methodName" }`. No `op`, no attributes.

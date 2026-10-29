@@ -1,0 +1,20 @@
+{
+  "name": "@packages/sentry-scrub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/scrub-event.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest watch"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

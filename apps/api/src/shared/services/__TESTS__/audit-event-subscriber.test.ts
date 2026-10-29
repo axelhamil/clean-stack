@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { env as realEnv } from "../../env";
 
 mock.module("../../env", () => ({ env: { ...realEnv, AUDIT_TAMPER_EVIDENCE: true } }));
@@ -7,12 +8,7 @@ mock.module("../../env", () => ({ env: { ...realEnv, AUDIT_TAMPER_EVIDENCE: true
 const { AuditEventSubscriber } = await import("../audit-event-subscriber");
 const { computeAuditHash } = await import("../audit-hash");
 
-const noopInstr = {
-  startSpan: (_: unknown, fn: () => unknown) => fn(),
-  capture: () => {},
-  addBreadcrumb: () => {},
-  setSpanAttributes: () => {},
-};
+const instrumentation = mockInstrumentation();
 
 function makeTx(lastHashRows: () => { hash: string | null }[]) {
   const captured: Record<string, unknown>[] = [];
@@ -68,7 +64,7 @@ function event(id: string) {
 describe("AuditEventSubscriber hash chain", () => {
   it("genesis: first chained row has prevHash = GENESIS and a 64-char hash", async () => {
     const { tx, captured } = makeTx(() => []);
-    const sub = new AuditEventSubscriber(noopInstr as never);
+    const sub = new AuditEventSubscriber(instrumentation);
     await sub.handle(event("e1") as never, tx as never);
     expect(captured).toHaveLength(1);
     const row = captured[0];
@@ -80,7 +76,7 @@ describe("AuditEventSubscriber hash chain", () => {
 
   it("links: next row's prevHash equals the last stored hash", async () => {
     const { tx, captured } = makeTx(() => [{ hash: "abc123" }]);
-    const sub = new AuditEventSubscriber(noopInstr as never);
+    const sub = new AuditEventSubscriber(instrumentation);
     await sub.handle(event("e2") as never, tx as never);
     expect(captured).toHaveLength(1);
     const row = captured[0];
@@ -90,7 +86,7 @@ describe("AuditEventSubscriber hash chain", () => {
 
   it("stores the hash verifyChain recomputes from the persisted row", async () => {
     const { tx, captured } = makeTx(() => []);
-    await new AuditEventSubscriber(noopInstr as never).handle(event("e3") as never, tx as never);
+    await new AuditEventSubscriber(instrumentation).handle(event("e3") as never, tx as never);
 
     const row = captured[0];
     if (!row) throw new Error("expected a captured row");
@@ -118,7 +114,7 @@ describe("AuditEventSubscriber actor", () => {
 
   it("records the payload actor as a user", async () => {
     const { tx, captured } = makeTx(() => []);
-    await new AuditEventSubscriber(noopInstr as never).handle(
+    await new AuditEventSubscriber(instrumentation).handle(
       withPayload({ userId: "subject", inviterUserId: "inviter" }) as never,
       tx as never,
     );
@@ -129,7 +125,7 @@ describe("AuditEventSubscriber actor", () => {
 
   it("falls back to a system actor when no actor key holds a user id", async () => {
     const { tx, captured } = makeTx(() => []);
-    await new AuditEventSubscriber(noopInstr as never).handle(
+    await new AuditEventSubscriber(instrumentation).handle(
       withPayload({ actorUserId: "", foo: "bar" }) as never,
       tx as never,
     );

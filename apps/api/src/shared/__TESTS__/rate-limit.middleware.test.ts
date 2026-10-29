@@ -30,17 +30,8 @@ const {
 const { normalizeHop, resolveClientIp } = await import("../middleware/rate-limit.ip");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
-import type { IInstrumentation } from "../ports/instrumentation.port";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { IRateLimiter, RateLimitDecision, RateLimitError } from "../ports/rate-limiter.port";
-
-function makeNoop(): IInstrumentation {
-  return {
-    startSpan: (_o, cb) => cb() as ReturnType<typeof cb>,
-    capture: () => {},
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  };
-}
 
 function allowDecision(policyName = "global"): RateLimitDecision {
   return {
@@ -89,7 +80,7 @@ function makeApp(limiter: IRateLimiter) {
   });
   app.use("*", requireRateLimit({ limiter }, GLOBAL_POLICY));
   app.get("/ok", (c) => c.json({ ok: true }));
-  app.onError(createErrorHandler(makeNoop()));
+  app.onError(createErrorHandler(mockInstrumentation()));
   return app;
 }
 
@@ -181,7 +172,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("*", requireRateLimit({ limiter: makeFailLimiter() }, AUTH_SIGN_IN_POLICY));
       app.post("/sign-in", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/sign-in", { method: "POST" });
       expect(res.status).toBe(503);
@@ -207,7 +198,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("*", requireRateLimit({ limiter }, GLOBAL_POLICY));
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       await app.request("/ok");
       expect(capturedKey).toBe("global:user-42");
@@ -249,7 +240,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter }, AUTH_MAGIC_LINK_POLICY),
       );
       app.post("/api/auth/sign-in/magic-link", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/sign-in/magic-link", { method: "POST" });
@@ -280,7 +271,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter }, AUTH_MAGIC_LINK_POLICY),
       );
       app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/sign-in/email", { method: "POST" });
@@ -313,7 +304,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter }, AUTH_TWO_FACTOR_POLICY),
       );
       app.post("/api/auth/two-factor/verify-totp", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/two-factor/verify-totp", { method: "POST" });
@@ -342,7 +333,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("/api/auth/verify-email", requireRateLimit({ limiter }, AUTH_VERIFY_EMAIL_POLICY));
       app.get("/api/auth/verify-email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/verify-email?token=abc");
@@ -369,7 +360,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("/api/auth/verify-email", requireRateLimit({ limiter }, AUTH_VERIFY_EMAIL_POLICY));
       app.get("/api/auth/verify-email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "5.6.7.8";
       await app.request("/api/auth/verify-email");
@@ -581,7 +572,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("*", requireRateLimit({ limiter }, AUTH_SIGN_IN_POLICY));
       app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       await app.request("/api/auth/sign-in/email", { method: "POST" });
       expect(capturedKey).toBe("auth-sign-in:9.9.9.9");
@@ -614,7 +605,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter, outbox }, AUTH_SIGN_IN_POLICY),
       );
       app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
       return app;
     }
 
@@ -687,7 +678,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter: makeLimiter(blockDecision()), outbox }, GLOBAL_POLICY),
       );
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/ok");
       expect(res.status).toBe(429);
@@ -793,7 +784,7 @@ describe("requireRateLimit middleware", () => {
         ),
       );
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/ok");
       expect(res.status).toBe(200);
@@ -817,7 +808,7 @@ describe("requireRateLimit middleware", () => {
         ),
       );
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/ok");
       expect(res.status).toBe(429);
