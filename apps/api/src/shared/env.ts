@@ -6,6 +6,7 @@ declare const process: { env: Record<string, string | undefined> };
 const envSchema = z
   .object({
     DATABASE_URL: z.url(),
+    MIGRATIONS_FOLDER: z.string().default("./migrations"),
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_SECRETS: z
