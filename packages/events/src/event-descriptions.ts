@@ -44,7 +44,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.WEBHOOK_ENDPOINT_DISABLED]:
     "A webhook endpoint was auto-disabled after repeated delivery failures.",
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]:
-    "A webhook delivery was abandoned after exhausting all retries.",
+    "A webhook delivery exhausted its retries and is now dead, replayed every few hours unless its endpoint is gone or refused.",
   [EventTypes.WEBHOOK_DELIVERY_REPLAYED]: "A webhook delivery was queued again on request.",
   [EventTypes.USER_POLICY_ACCEPTED]: "A user accepted a legal policy version.",
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: "Cookie consent was granted.",
@@ -64,7 +64,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.BILLING_PAYMENT_FAILED]: "A subscription payment failed.",
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "A plan quota was exceeded.",
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
-    "An email was abandoned after exhausting all delivery attempts.",
+    "An email exhausted its delivery attempts or was rejected; a dead email is replayed every few hours while still recent.",
   [EventTypes.OUTBOX_EVENT_DEAD]:
     "A domain event exhausted its delivery attempts and is now retried every few hours.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:

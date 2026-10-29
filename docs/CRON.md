@@ -371,7 +371,7 @@ Same `internalLayers` (HMAC + optional private network) gate, same `signedIntern
 
 ### `POST /internal/sweep-{outbox,audit-log,webhook-delivery}`: retention sweeps
 
-Three endpoints purge the derived tables of the event pipeline. Defaults: outbox 7d (delivered rows only, by `dispatched_at`: a dead row that never delivered is never purged, the relay replays it every `OUTBOX_DEAD_RETRY_HOURS` without any cron), audit_log operational 90d / compliance 365d, webhook_delivery 30d (`success` + `dead_letter` only, `pending`/`failed` never purged). All take `{ batchSize?: 1 to 50000, dryRun?: boolean }`.
+Three endpoints purge the derived tables of the event pipeline. Defaults: outbox 7d (delivered rows only, by `dispatched_at`: a dead row that never delivered is never purged, the relay replays it every `OUTBOX_DEAD_RETRY_HOURS` without any cron), audit_log operational 90d / compliance 365d, webhook_delivery 30d (`success` + `dead_letter` only, `pending`/`failed` never purged; a replayable `dead_letter` is purged too once past retention, which bounds its cadence replay to `WEBHOOK_DELIVERY_RETENTION_DAYS`). All take `{ batchSize?: 1 to 50000, dryRun?: boolean }`.
 
 Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix and env knobs. Reference cron entrypoint chaining the three in order: `apps/api/src/cron/sweep.ts` (bundled to `dist/cron/sweep.js`). Wire it via the wiring options above, Railway Cron is the reference deploy (see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)).
 
@@ -382,9 +382,9 @@ Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery
 Two purge passes, run in sequence on every invocation:
 
 1. Purges `email_message` rows with `status = 'sent'` older than `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d), cutoff measured from `sent_at`.
-2. Purges `email_message` rows with `status = 'failed'` older than `EMAIL_MESSAGE_FAILED_RETENTION_DAYS` (default 90d), cutoff measured from `created_at` (enqueue time), **not** from when the row failed.
+2. Purges `email_message` rows with `status` `'failed'` or `'dead'` (a dead row is one the replay window has closed on, or that is still waiting for its next replay) older than `EMAIL_MESSAGE_FAILED_RETENTION_DAYS` (default 90d), cutoff measured from `created_at` (enqueue time), **not** from when the row failed.
 
-A `failed` row is the operator's only trace of a dropped email and should be reviewed manually before it ages out, but it is not kept forever: past the 90-day default it is purged like any other retention sweep. All take `{ batchSize?: 1 to 50000, dryRun?: boolean }`. Chained at the end of `apps/api/src/cron/sweep.ts` (runs after the event-pipeline sweeps).
+The email queue itself is not driven by this cron: `EmailDeliveryWorker` claims by lease in the API process, and a dead email is replayed there every `EMAIL_DEAD_RETRY_HOURS` inside `EMAIL_DEAD_REPLAY_WINDOW_HOURS`, with no tick to schedule. A `failed` row is the operator's only trace of a dropped email and should be reviewed manually before it ages out, but it is not kept forever: past the 90-day default it is purged like any other retention sweep. All take `{ batchSize?: 1 to 50000, dryRun?: boolean }`. Chained at the end of `apps/api/src/cron/sweep.ts` (runs after the event-pipeline sweeps).
 
 - **Replay window**: 30s. If your scheduler's clock drifts more than that
   from the API's, NTP is broken, fix that, not the window.

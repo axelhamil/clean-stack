@@ -19,7 +19,6 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 1 | **Phase J** | Open | Front redesign from scratch on shadcn/ui, one design system in `@packages/ui` | The cloner's first impression is the app shell; today it is a generic default with known mobile defects |
 | 2 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
 | 3 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
-| 4 | **Queue lease alignment** | Open | Move the email queue and webhook delivery onto the outbox lease model: claim in SQL with the database clock, settle guarded by the claimed attempt, a dead state replayed on a slow cadence | Phase I debt: both queues still claim with the process clock and can double settle after a lease expires |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -107,6 +106,7 @@ Status is shipped for every row. "Detail" links the as-built record.
 | **Rules review pass** | Sep 2026 | Every file checked against the house rules | PR #70, 149 commits: failed results roll units of work back, a failing first drain no longer crashes the API, audit gaps closed, 2 events | [HISTORY](docs/HISTORY.md#rules-review-pass--sep-2026) |
 | **Dependency refresh Oct 2026** | Oct 2026 | The version floor is a feature the cloner inherits | Node 26 LTS, Bun 1.4.4, pnpm 12, better-auth 1.7.14, stripe 23 and four other majors | [HISTORY](docs/HISTORY.md#dependency-refresh-oct-2026--oct-2026) |
 | **Phase I: Resync on the OpenUp foundations** | Oct 2026 | Kit, guardrails, telemetry hygiene, transactions and outbox delivery hardened from a sister project | Kit combinators and `mockPort`, `check:boundaries` and catalog parity, telemetry scrub and ordered shutdown, ambient unit of work with no `tx` anywhere, outbox by lease with named idempotent handlers and dead replay, 1 event | [HISTORY](docs/HISTORY.md#resync-on-the-openup-foundations--phase-i--oct-2026) |
+| **Queue lease alignment** | Oct 2026 | Phase I debt closed: the three delivery queues share one model | Email queue and webhook delivery claim by lease with the database clock, settle guarded by the claimed attempt, a replayed `dead` email and `dead_letter` webhook, release on stop, `check:email-lease`, `check:webhook-lease`, no new event | [HISTORY](docs/HISTORY.md#queue-lease-alignment--oct-2026) |
 
 ---
 

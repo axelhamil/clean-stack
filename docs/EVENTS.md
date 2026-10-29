@@ -183,6 +183,8 @@ If your event is in `RETENTION_MAP` with `operational` or `compliance`:
 
 ## Delivery: lease, retry and dead replay
 
+Three queues share one delivery model: the outbox (`outbox_event`), the email queue (`email_message`) and webhook delivery (`webhook_delivery`). Each claims in SQL with the database clock, settles guarded by the claimed `attempts`, keeps a dead state that is replayed on a slow cadence, and gives the attempt back on shutdown. The shared SQL fragments (`dbNow`, `leasedBy`, `claimedSet`, `releasedSet`) live in `packages/drizzle/src/lease.ts` and the pure failure schedule (`failureSchedule`, `retryAfterSeconds`) in `shared/jitter.ts`; the live, dead and due selection stays written per queue, since the dead markers, the settled markers and the claim filters differ. The outbox is described first, then what the two other queues change.
+
 The relay (`OutboxRelay`, driven by `OutboxDispatcher`) wakes on the LISTEN notification, on the next due retry (`pendingState().dueInMs`) and on a 30 s poll, then drains in rounds:
 
 1. **Claim by lease.** One statement selects the due rows (`FOR UPDATE SKIP LOCKED`, oldest first), increments `attempts` and pushes `next_attempt_at` to `now() + OUTBOX_LEASE_SECONDS`. The statement commits on its own: no lock survives it. A relay that dies mid batch leaves rows that become claimable again when the lease expires, with `attempts + 1`. The clock is the database's, never the process's. The claim size is capped at what the lease can process (`floor((lease - 10 s) / handler budget) × OUTBOX_CONCURRENCY`, at most 50; the 10 s margin covers the claim and the settles), so a claimed row is settled before its lease runs out. Dead replays take at most a quarter of a claim, so a dead backlog never starves live events. Claiming never touches `dead_at`: a leased dead row is hidden by its lease, not revived.
@@ -205,7 +207,40 @@ The relay (`OutboxRelay`, driven by `OutboxDispatcher`) wakes on the LISTEN noti
 | `OUTBOX_MAX_ATTEMPTS` | 10 | Failed attempts before an event is dead |
 | `OUTBOX_DEAD_RETRY_HOURS` | 6 | Replay cadence of a dead event |
 
-Proven against Postgres by `pnpm --filter api check:outbox-lease` (disjoint concurrent claims, lease expiry, stale settle reported as unwritten, `deliveries` merge, dead replay kept dead until delivered, release without penalty, dead share of a claim, rolled back enqueue, single audit link on redelivery, retention).
+### Email and webhook queues
+
+| | Outbox | Email (`email_message`) | Webhook (`webhook_delivery`) |
+|---|---|---|---|
+| Worker | `OutboxRelay` | `EmailDeliveryWorker` | `WebhookDeliveryWorker` |
+| Live rows | `dispatched_at is null`, not dead | `status = 'pending'` | `status in ('pending','failed')` |
+| Dead marker | `dead_at` | `status = 'dead'` | `status = 'dead_letter'` with `next_attempt_at` set |
+| Terminal | none, a dead row is replayed | `status = 'failed'` (permanent rejection) | `status = 'dead_letter'` with `next_attempt_at` null |
+| Failed sends before dead | `OUTBOX_MAX_ATTEMPTS` (10) | 4 | 4 |
+| Claim size | lease capacity, at most 50 | lease capacity in chunks of 100, at most 300 | lease capacity, at most 10 (8 at 330 s) |
+| Announced on first death | `outbox.event_dead` | `email.delivery.exhausted` | `webhook.delivery.exhausted` |
+
+- **Claim.** One statement, `FOR UPDATE SKIP LOCKED`, oldest first, `attempts + 1` and `next_attempt_at = now() + lease`, no transaction left open and none held across a network call. Dead rows that are due take at most a quarter of a claim, so a dead backlog never starves live rows. Claiming never changes `status`: a leased dead row is hidden by its lease, not revived.
+- **Settle.** `markSent`, `markSuccess` and `markFailed` match `id`, the claimed `attempts` and a non-terminal status, and report whether they wrote. A settle that wrote nothing (the lease expired and another worker reclaimed the row) counts nothing, emits nothing and bumps no endpoint counter. A webhook attempt row is still recorded in that case, since a real HTTP request happened.
+- **Dead.** A failed settle is dead when the row was already dead or `attempts` reached the ceiling. Dead rows are replayed every `EMAIL_DEAD_RETRY_HOURS` or `WEBHOOK_DEAD_RETRY_HOURS`; a replay that succeeds clears the dead state, a replay that fails stays dead and announces nothing. The exhausted event is emitted only on the first death, in the same unit of work as the settle that wrote it, and only when that settle wrote. Its actor is null (the worker is the actor).
+- **Email.** A retryable failure keeps the row `pending` with a jittered retry until the ceiling, then `dead`. A permanent rejection (the provider refuses the message itself) goes straight to `failed`, which is never claimed again. A dead email is replayed only while its `created_at` is within `EMAIL_DEAD_REPLAY_WINDOW_HOURS`, so a stale sign-in link or reset email is never sent late. The `failed` sweep purges `failed` and `dead` rows together after `EMAIL_MESSAGE_FAILED_RETENTION_DAYS`.
+- **Webhook.** The public contract keeps its four statuses. A `dead_letter` with a `next_attempt_at` is replayed on the cadence; one with a null `next_attempt_at` is terminal: endpoint missing or disabled, destination refused by the SSRF guard, and every row that was dead before the lease model, so a deploy replays no old backlog. A dead replay that finds its endpoint disabled settles terminal. The manual replay endpoint is unchanged: it creates a new row (`replay:` idempotency key) due now.
+- **Lease budget.** Every network step is bounded so a claim fits its lease: the Resend batch call aborts after 30 s, the webhook host lookup after 5 s and the request after 30 s; a timeout is a retryable failure. Before each chunk (email) or delivery (webhook) after the first, the worker checks that the rest of its lease still covers one more step plus the settle margin, and releases what is left otherwise. The claim size is derived from the lease the same way.
+- **Poison rows.** An email that fails to render (unknown template, payload the template cannot use) is settled `failed` on its own, with its exhausted event, and the rest of its chunk is still sent.
+- **Release on stop.** Unstarted chunks (email) and unstarted deliveries (webhook) get `attempts - 1` and are due at once, never dead.
+- **Double delivery.** The cadence replay of a dead webhook and a manual replay are independent: both can deliver the same event, with different idempotency keys (the manual row has its own `replay:` key). Receivers dedupe on the event id, not on the idempotency key alone.
+- **Known quirk.** A webhook `processDelivery` that throws marks the delivery `failed` with no organization: no event and no endpoint bump on exhaustion.
+
+| Knob (`apps/api/.env.example`) | Default | Effect |
+|---|---|---|
+| `EMAIL_LEASE_SECONDS` | 120 | How long a claimed email stays invisible; must be at least the 30 s send timeout + a 15 s margin (checked at boot); the claim takes only as many 100 row chunks as the lease covers, at most 3 |
+| `EMAIL_DEAD_RETRY_HOURS` | 6 | Replay cadence of a dead email |
+| `EMAIL_DEAD_REPLAY_WINDOW_HOURS` | 24 | Age after which a dead email is no longer replayed; must exceed `EMAIL_DEAD_RETRY_HOURS` (checked at boot) |
+| `WEBHOOK_LEASE_SECONDS` | 330 | How long a claimed delivery stays invisible; must be at least the 5 s lookup timeout + the 30 s request timeout + a 30 s margin (checked at boot); the claim takes only as many deliveries as the lease covers, at most 10 |
+| `WEBHOOK_DEAD_RETRY_HOURS` | 6 | Replay cadence of a replayable `dead_letter` |
+
+**Schema note.** `db:push` does not detect a changed predicate on an existing partial index: it sees the index name and leaves it. The migration is the source of truth for `email_message_dead_retry_idx`, `email_message_failed_sweep_idx` (widened to `failed` and `dead`) and `webhook_delivery_dead_retry_idx`; an environment built with `db:push` before this change must drop and recreate them, or run the migration.
+
+Proven against Postgres by `pnpm --filter api check:outbox-lease` (disjoint concurrent claims, lease expiry, stale settle reported as unwritten, `deliveries` merge, dead replay kept dead until delivered, release without penalty, dead share of a claim, rolled back enqueue, single audit link on redelivery, retention). The email and webhook queues are proven by `check:email-lease` and `check:webhook-lease` (disjoint concurrent claims, lease expiry with the database clock, stale settle writing nothing, dead replay only when due and capped at a quarter of the claim, live rows not starved, release without penalty; email adds the replay window and `failed` never claimed, webhook adds terminal `dead_letter` never claimed and a manual replay claimed once), and the settle of sent mail by `check:marksent`.
 
 **Deploy order.** Stop every pod running the previous dispatcher before migration `0024` runs: an old dispatcher recreates the `outbox_notify` trigger on boot. The new dispatcher drops that trigger once on `start()` as a safety net, but an old pod restarting afterwards would bring it back until the next restart of a new one.
 
@@ -218,7 +253,7 @@ Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC)
 | `outbox_event` | `OUTBOX_RETENTION_DAYS` | **7d** | `dispatched_at IS NOT NULL AND dispatched_at < cutoff` | NServiceBus / industry consensus 2025: debug window |
 | `audit_log` (operational) | `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS` | **90d** | `retention = 'operational' AND occurred_at < cutoff` | SOC2 minimum-safe (operational logs); RGPD minimisation |
 | `audit_log` (compliance) | `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS` | **365d** | `retention = 'compliance' AND occurred_at < cutoff` | SOC2 Type II ≥ 12 months; PCI-DSS 10.7; NIS2 baseline |
-| `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` | Stripe / GitHub / Hookdeck convergence |
+| `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` (replayable and terminal `dead_letter` alike) | Stripe / GitHub / Hookdeck convergence |
 
 Notes:
 - **An outbox row is purged only once delivered**: the filter reads `dispatched_at` alone, so a dead row that never delivered stays until a replay succeeds, however old it is.
@@ -300,7 +335,7 @@ if (!provided.some((sig) => timingSafeEqual(sig, expected))) return reject(401);
 - **Postgres LISTEN/NOTIFY** via dedicated `pg.Client` (hors pool Drizzle) + **30s poll fallback** for connection drops; the listener reconnects with backoff (250 ms to 15 s) and pings every 15 s. `pg_notify` is sent by `enqueue` on the same executor as the insert, so it leaves only at commit; there is no trigger.
 - **Claim by lease** (`FOR UPDATE SKIP LOCKED` + `UPDATE ... RETURNING` in one statement): multi-instance safe, and no lock is held while handlers run, so a slow or dead worker blocks nothing beyond its lease.
 - **AEAD secret encryption** (`@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key) for webhook secrets at rest.
-- **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`): `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Webhook and email deliveries dead-letter after 5 attempts; the outbox uses the same curve and turns dead after `OUTBOX_MAX_ATTEMPTS`.
+- **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`): `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Webhook and email deliveries turn dead on their 4th failed send; the outbox uses the same curve and turns dead after `OUTBOX_MAX_ATTEMPTS`.
 - **Claim window pattern** in delivery worker: claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
 - **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id`: captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context, unused until OTel is wired.)
 
@@ -515,6 +550,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 - **Tamper-evidence**: `prev_hash`/`hash` columns posed in `audit_log` but calculation off (`AUDIT_TAMPER_EVIDENCE=false`). Implementation (Merkle batch or hash chain with row-lock) deferred until SOC2 audit demands it.
 - **UUID v7 ordering**: monotonic across milliseconds, not strict within the same ms. Sufficient for B-tree locality, not for global causal ordering.
 - **In-process workers**: `OutboxDispatcher` and `WebhookDeliveryWorker` run inside the API process. Above ~500 events/s sustained, extract to a separate `bun` process pointing at the same DB: the lease makes several relays safe side by side.
+- **Rolling deploy of the queue lease**: an old process still running the previous email or webhook worker settles without the `attempts` guard for about one lease (120 s, 330 s), so an in-flight row can end with `attempts` off by one. Accepted: the next claim corrects it.
 - **SIGTERM grace**: `OutboxDispatcher.stop()` waits for the running drain, then abandons handlers still in flight after its grace; their events are claimed again once the lease expires, so a handler can run twice across a restart. Receivers must honor `x-webhook-idempotency` to dedupe potential double-POSTs.
 
 ## Files of reference
