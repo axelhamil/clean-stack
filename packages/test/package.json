@@ -8,9 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./bun": "./src/bun/port-mock.ts",
+    "./source-scan": "./src/source-scan.ts",
     "./base-vitest.config": "./base-vitest.config.js"
   },
   "scripts": {
+    "test": "vitest run",
     "format": "biome format . --write",
     "lint": "biome lint .",
     "check": "biome check .",
