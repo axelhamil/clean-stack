@@ -19,7 +19,6 @@ import type {
   IEmailQueue,
 } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { ITransaction } from "../transaction";
 
 const em = emailSchema.emailMessage;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
@@ -91,13 +90,13 @@ export class DrizzleEmailQueue implements IEmailQueue {
   async claimPending(
     limit: number,
     claimUntil: Date,
-    tx: ITransaction,
   ): Promise<Result<EmailMessageRecord[], EmailQueueError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleEmailQueue > claimPending" },
       async () => {
         try {
-          const subq = tx
+          const subq = exec
             .select({ id: em.id })
             .from(em)
             .where(
@@ -110,7 +109,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
             .limit(limit)
             .for("update", { skipLocked: true });
 
-          const query = tx
+          const query = exec
             .update(em)
             .set({ nextAttemptAt: claimUntil })
             .where(inArray(em.id, subq))
@@ -133,8 +132,8 @@ export class DrizzleEmailQueue implements IEmailQueue {
     ids: string[],
     sentAt: Date,
     providerMessageIds: Record<string, string>,
-    tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markSent" }, async () => {
       if (ids.length === 0) return Result.ok();
 
@@ -144,7 +143,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
         );
         const providerCase = sql`CASE ${sql.join(cases, sql` `)} ELSE NULL END`;
 
-        const query = tx
+        const query = exec
           .update(em)
           .set({
             status: "sent",
@@ -172,11 +171,11 @@ export class DrizzleEmailQueue implements IEmailQueue {
     id: string,
     error: string,
     nextAttempt: Option<Date>,
-    tx: ITransaction,
   ): Promise<Result<void, EmailQueueError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markFailed" }, async () => {
       try {
-        const query = tx
+        const query = exec
           .update(em)
           .set({
             status: nextAttempt.isNone() ? "failed" : "pending",

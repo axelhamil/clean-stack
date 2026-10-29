@@ -1,5 +1,6 @@
+import type { IUnitOfWork } from "@packages/ddd-kit";
 import type { AnyPgTable, SQL } from "@packages/drizzle";
-import { count, db, sql } from "@packages/drizzle";
+import { count, resolveExecutor, sql } from "@packages/drizzle";
 import type { SweepSpans } from "./sweep-span";
 
 /**
@@ -12,10 +13,12 @@ export async function countEligibleWithTimeout(
   table: AnyPgTable,
   where: SQL | undefined,
   spans: SweepSpans,
+  uow: IUnitOfWork,
 ): Promise<number> {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '10s'`);
-    const query = tx.select({ count: count() }).from(table).where(where);
+  return uow.run(async () => {
+    const exec = resolveExecutor();
+    await exec.execute(sql`SET LOCAL statement_timeout = '10s'`);
+    const query = exec.select({ count: count() }).from(table).where(where);
     const rows = await spans.db(
       () => query.toSQL().sql,
       () => query.execute(),

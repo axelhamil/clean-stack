@@ -91,7 +91,14 @@ export const di = container()
   )
   .add(
     "EmailDeliveryWorker",
-    (c) => new EmailDeliveryWorker(c.IEmailQueue, c.IOutboxRepository, logger, c.IInstrumentation),
+    (c) =>
+      new EmailDeliveryWorker(
+        c.IEmailQueue,
+        c.IOutboxRepository,
+        c.ITransactionService,
+        logger,
+        c.IInstrumentation,
+      ),
   )
   .add(
     "IPasswordBreachService",

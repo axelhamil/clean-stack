@@ -1,5 +1,5 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { and, eq, resolveExecutor, sql, type Transaction, webhooksSchema } from "@packages/drizzle";
+import { and, eq, resolveExecutor, sql, webhooksSchema } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
@@ -211,15 +211,15 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
   async bumpFailure(
     id: string,
     organizationId: string,
-    tx: Transaction,
   ): Promise<
     Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
   > {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > bumpFailure" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({
               consecutiveFailures: sql`${we.consecutiveFailures} + 1`,
@@ -251,16 +251,13 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     );
   }
 
-  async resetFailure(
-    id: string,
-    organizationId: string,
-    tx: Transaction,
-  ): Promise<Result<void, WebhookRepoError>> {
+  async resetFailure(id: string, organizationId: string): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > resetFailure" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({ consecutiveFailures: 0, firstFailedAt: null })
             .where(and(eq(we.id, id), eq(we.organizationId, organizationId)));
@@ -281,13 +278,13 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     id: string,
     organizationId: string,
     disabledAt: Date,
-    tx: Transaction,
   ): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > markDisabled" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({ enabled: false, disabledAt })
             .where(and(eq(we.id, id), eq(we.organizationId, organizationId)));

@@ -1,5 +1,6 @@
-import type { AnyPgColumn, AnyPgTable, SQL, Transaction } from "@packages/drizzle";
-import { db, inArray, sql } from "@packages/drizzle";
+import type { IUnitOfWork } from "@packages/ddd-kit";
+import type { AnyPgColumn, AnyPgTable, SQL } from "@packages/drizzle";
+import { inArray, resolveExecutor, sql } from "@packages/drizzle";
 import type { SweepSpans } from "./sweep-span";
 
 export type PurgeBatchOptions = {
@@ -11,14 +12,15 @@ export type PurgeBatchOptions = {
   orderBy: AnyPgColumn;
   batchSize: number;
   spans: SweepSpans;
+  uow: IUnitOfWork;
   /**
    * Test-only escape hatch, run right after the three `SET LOCAL` guards and before
    * the delete. No production call site sets it, so it never changes the delete SQL
    * any route emits. Exists so `apps/api/scripts/check-sweep-lock.ts` can assert
    * `current_setting(...)` against a real Postgres transaction instead of mocking
-   * `tx.execute` and asserting on SQL text (banned, see `apps/api/CLAUDE.md`).
+   * `execute` and asserting on SQL text (banned, see `apps/api/CLAUDE.md`).
    */
-  assertGuards?: (tx: Transaction) => Promise<void>;
+  assertGuards?: () => Promise<void>;
 };
 
 /**
@@ -55,16 +57,17 @@ export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<nu
   if (!opts.where) {
     throw new Error("purgeBatchWithTimeout: refusing an unfiltered delete");
   }
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-    await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+  return opts.uow.run(async () => {
+    const exec = resolveExecutor();
+    await exec.execute(sql`SET LOCAL statement_timeout = '5s'`);
+    await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
+    await exec.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
 
     if (opts.assertGuards) {
-      await opts.assertGuards(tx);
+      await opts.assertGuards();
     }
 
-    const subq = tx
+    const subq = exec
       .select({ id: opts.idColumn })
       .from(opts.table)
       .where(opts.where)
@@ -72,7 +75,7 @@ export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<nu
       .limit(opts.batchSize)
       .for("update", { skipLocked: true });
 
-    const query = tx
+    const query = exec
       .delete(opts.table)
       .where(inArray(opts.idColumn, subq))
       .returning({ id: opts.idColumn });

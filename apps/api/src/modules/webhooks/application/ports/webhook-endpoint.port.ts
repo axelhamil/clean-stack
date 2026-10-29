@@ -1,5 +1,4 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
-import type { ITransaction } from "../../../../shared/transaction";
 
 export type WebhookRepoError = AppError<"WEBHOOK_PERSISTENCE_PROVIDER_FAILURE">;
 
@@ -54,19 +53,13 @@ export interface IWebhookEndpointRepository {
   bumpFailure(
     id: string,
     organizationId: string,
-    tx: ITransaction,
   ): Promise<
     Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
   >;
-  resetFailure(
-    id: string,
-    organizationId: string,
-    tx: ITransaction,
-  ): Promise<Result<void, WebhookRepoError>>;
+  resetFailure(id: string, organizationId: string): Promise<Result<void, WebhookRepoError>>;
   markDisabled(
     id: string,
     organizationId: string,
     disabledAt: Date,
-    tx: ITransaction,
   ): Promise<Result<void, WebhookRepoError>>;
 }

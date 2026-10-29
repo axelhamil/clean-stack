@@ -11,7 +11,6 @@ import {
   or,
   resolveExecutor,
   sql,
-  type Transaction,
   webhooksSchema,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
@@ -131,16 +130,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     );
   }
 
-  async updateStatus(
-    id: string,
-    update: DeliveryUpdate,
-    tx: Transaction,
-  ): Promise<Result<void, WebhookRepoError>> {
+  async updateStatus(id: string, update: DeliveryUpdate): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > updateStatus" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(wd)
             .set({
               status: update.status,
@@ -165,13 +161,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
 
   async findPendingBatch(
     limit: number,
-    tx: Transaction,
   ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findPendingBatch" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .select()
             .from(wd)
             .where(
@@ -253,13 +249,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
 
   async createAttempt(
     args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
-    tx: Transaction,
   ): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > createAttempt" },
       async () => {
         try {
-          const query = tx.insert(wda).values({
+          const query = exec.insert(wda).values({
             id: uuidv7(),
             deliveryId: args.deliveryId,
             attemptNumber: args.attemptNumber,

@@ -53,6 +53,7 @@ export const webhooksModule = defineModule()((b) =>
           c.IWebhookEndpointRepository,
           c.WebhookMasterKey,
           c.IOutboxRepository,
+          c.ITransactionService,
           logger,
           c.IInstrumentation,
         ),
