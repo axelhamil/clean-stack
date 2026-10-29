@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { mockPort } from "@packages/test/bun";
 
 // Replaced before the dynamic import below, so the subject sees the stand-ins.
 const mockedAddress = { address: "127.0.0.1" };
@@ -29,13 +30,8 @@ import type { IOutboxRepository } from "../ports/outbox.port";
 
 const ALLOWED_ORIGINS = ["http://localhost:5173", "https://app.example.com"];
 
-function makeOutbox(): IOutboxRepository {
-  return {
-    enqueue: mock(async () => {}),
-    findPendingBatch: async () => [],
-    markDispatched: async () => {},
-    markFailed: async () => {},
-  };
+function makeOutbox() {
+  return mockPort<IOutboxRepository>();
 }
 
 type CsrfEventPayload = {

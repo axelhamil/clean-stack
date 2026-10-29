@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { noopOutbox } from "./outbox-fakes";
+import type { IOutboxRepository } from "../ports/outbox.port";
 
 const expiresAt = new Date("2027-01-01T00:00:00Z");
 
@@ -34,12 +35,8 @@ describe("ScimConnectionService.issueToken", () => {
     const failure = new Error("outbox unavailable");
     const capture = mock((_err: unknown) => {});
     const instrumentation = Object.assign(new NoOpInstrumentation(), { capture });
-    const outbox = {
-      ...noopOutbox,
-      enqueue: async () => {
-        throw failure;
-      },
-    };
+    const outbox = mockPort<IOutboxRepository>();
+    outbox.enqueue.mockRejectedValue(failure);
 
     const result = await new ScimConnectionService(
       outbox,

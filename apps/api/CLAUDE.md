@@ -160,7 +160,7 @@ b.add(
 )
 ```
 
-User handlers run **post-commit** (best-effort, isolated). Built-in subscribers run **inside the dispatch TX** (atomic with `markDispatched`). Full DX guide, retention map and BetterAuth bridge specifics: `docs/EVENTS.md`.
+User handlers run **post-commit** (best-effort, isolated). Events are claimed by lease (`IOutboxRepository.claim`, `FOR UPDATE SKIP LOCKED` then `attempts + 1` and `next_attempt_at = now() + lease`, one statement) and settled with `markDelivered`/`markFailed` guarded by the claimed `attempts`, so a settle after the lease expired writes nothing; `deliveries` records each handler that succeeded and merges server side. Built-in subscribers run in their own transaction per claimed event, before `markDelivered`. Proven by `check:outbox-lease`. Full DX guide, retention map and BetterAuth bridge specifics: `docs/EVENTS.md`.
 
 ## Hono RPC (end-to-end type safety)
 
@@ -201,7 +201,7 @@ Domain and application use `Result<T, E>` (no throw); the controller translates 
 
 ## Testing
 
-BDD style, runner `bun test`. One test file per service, use case, store/repository, DTO or route file under `__TESTS__/` (services group `describe` per method). Mock at repository/port level. Test `Result`/`Option` state transitions. Outbox and unit-of-work doubles (`noopOutbox`, `recordingOutbox`, `passthroughUow`) come from `shared/__TESTS__/outbox-fakes.ts`, never a local copy.
+BDD style, runner `bun test`. One test file per service, use case, store/repository, DTO or route file under `__TESTS__/` (services group `describe` per method). Mock at repository/port level. Test `Result`/`Option` state transitions. Outbox and unit-of-work doubles are `mockPort<IOutboxRepository>()` and `mockUnitOfWork()` (`@packages/test/bun`), never a hand-written object; `enqueuedEvents(outbox)` (`shared/__TESTS__/enqueued-events.ts`) reads what a mocked outbox received.
 
 **Substitute through the seam the code already has, before reaching for a module replacement.** A handler that takes its collaborators as arguments, a route factory that takes a `deps` object, a class that takes its repository in the constructor: pass a fake, and the substitution is scoped by construction, typed against the real port, and visible in the test's first ten lines. Replacing the module is the fallback for the cases with no seam (a module-level singleton like `db`, a third-party SDK, a lib imported directly). **Why**: injection cannot reach past the object under test, so it cannot be the reason another test's verdict changed, and the day a collaborator gains a method the compiler names every fake that must grow. Reference shape: `github-key-verifier.test.ts`.
 
@@ -216,4 +216,4 @@ BDD style, runner `bun test`. One test file per service, use case, store/reposit
 ## Commands
 
 - **Tests**: `pnpm --filter api test` (`bun test --isolate --parallel`); a bare `bun test` drops file isolation. `bunfig.toml` preloads `src/__TESTS__/preload.ts`, which supplies a test-only `INTERNAL_SIGNING_KEY` when none is exported, so a fresh `pnpm bootstrap` runs green.
-- **Real-database checks**: `pnpm --filter api check:{fanout,digest,api-token-visibility,wipe-rollback,uow-rollback,marksent,enqueue,sweep-lock,auth-transaction,scim-seats,scim-connection}` (scripts in `scripts/`, refuse a non-local database via `require-local-database.ts`, all wired in `.github/workflows/ci.yml`). A new SQL-heavy decision the mocks cannot cover gets a script AND a CI step. Re-run the matching one after touching the code it covers.
+- **Real-database checks**: `pnpm --filter api check:{fanout,digest,api-token-visibility,wipe-rollback,uow-rollback,marksent,enqueue,sweep-lock,auth-transaction,scim-seats,scim-connection,outbox-lease}` (scripts in `scripts/`, refuse a non-local database via `require-local-database.ts`, all wired in `.github/workflows/ci.yml`). A new SQL-heavy decision the mocks cannot cover gets a script AND a CI step. Re-run the matching one after touching the code it covers.

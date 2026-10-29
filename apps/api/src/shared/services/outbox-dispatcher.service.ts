@@ -1,15 +1,17 @@
 import { type EventHandler, type IDomainEvent, isEventHandler } from "@packages/ddd-kit";
-import { db, sql } from "@packages/drizzle";
-import { expectedDelayFromAttempts, nextAttemptAt } from "../jitter";
+import { db } from "@packages/drizzle";
+import { ALL_EVENT_TYPES } from "@packages/events";
+import { expectedDelayFromAttempts, nextDelayMs } from "../jitter";
 import type { Logger } from "../logger";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository, OutboxRecord } from "../ports/outbox.port";
+import { OUTBOX_CHANNEL } from "./drizzle-outbox.service";
 import type { OutboxSubscriber } from "./outbox-subscriber";
 import { PgListener, type PgListenerOptions } from "./pg-listener";
 
 const BATCH_SIZE = 50;
 const POLL_INTERVAL_MS = 30_000;
-const NOTIFY_CHANNEL = "outbox_event";
+const LEASE_SECONDS = 120;
 
 function recordToDomainEvent(rec: OutboxRecord): IDomainEvent {
   return {
@@ -58,7 +60,7 @@ export class OutboxDispatcher {
   ) {
     this.listener = new PgListener(
       {
-        channel: NOTIFY_CHANNEL,
+        channel: OUTBOX_CHANNEL,
         label: "outbox",
         owner: "OutboxDispatcher",
         connectionString,
@@ -76,7 +78,6 @@ export class OutboxDispatcher {
     this.started = true;
     this.stopping = false;
     if (diLike) this.userHandlers = collectUserEventHandlers(diLike);
-    await this.ensureNotifyTrigger();
     await this.listener.start();
     this.pollTimer = setInterval(() => this.drainInBackground("poll tick"), POLL_INTERVAL_MS);
     this.logger.info("outbox dispatcher started");
@@ -108,32 +109,6 @@ export class OutboxDispatcher {
     );
   }
 
-  private async ensureNotifyTrigger(): Promise<void> {
-    return this.instrumentation.startSpan(
-      { name: "OutboxDispatcher > ensureNotifyTrigger" },
-      async () => {
-        try {
-          await db.execute(sql`
-            CREATE OR REPLACE FUNCTION outbox_notify() RETURNS trigger AS $$
-            BEGIN
-              PERFORM pg_notify('outbox_event', NEW.id);
-              RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql
-          `);
-          await db.execute(sql`
-            CREATE OR REPLACE TRIGGER outbox_notify_trigger
-            AFTER INSERT ON outbox_event
-            FOR EACH ROW EXECUTE FUNCTION outbox_notify()
-          `);
-        } catch (err) {
-          this.instrumentation.capture(err);
-          throw err;
-        }
-      },
-    );
-  }
-
   async triggerDrain(): Promise<void> {
     if (this.stopping || this.draining) return;
     this.draining = true;
@@ -154,66 +129,68 @@ export class OutboxDispatcher {
 
   private async drainBatch(): Promise<number> {
     return this.instrumentation.startSpan({ name: "OutboxDispatcher > drainBatch" }, async () => {
-      const dispatched = await this.instrumentation.startSpan(
-        {
-          name: "db.transaction",
-          op: "db.transaction",
-          attributes: { "db.system.name": "postgresql" },
-        },
-        async () => {
-          try {
-            return await db.transaction(async (tx) => {
-              await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '30s'`);
-              const events = await this.outbox.findPendingBatch(BATCH_SIZE, tx);
-              const ok: OutboxRecord[] = [];
-              for (const event of events) {
-                try {
-                  for (const sub of this.builtInSubscribers) {
-                    await sub.handle(event, tx);
-                  }
-                  await this.outbox.markDispatched(event.id, tx);
-                  ok.push(event);
-                } catch (err) {
-                  const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-                  this.instrumentation.capture(err);
-                  this.logger.error(
-                    { err, eventId: event.id, eventType: event.eventType },
-                    "outbox event built-in subscriber failed",
-                  );
-                  const retryAt = nextAttemptAt(
-                    event.attempts + 1,
-                    expectedDelayFromAttempts(event.attempts + 1),
-                  );
-                  await this.outbox.markFailed(event.id, errMsg, retryAt, tx);
-                }
-              }
-              return { dispatched: ok, total: events.length };
-            });
-          } catch (err) {
-            this.instrumentation.capture(err);
-            throw err;
-          }
-        },
-      );
+      const claimed = await this.outbox.claim({
+        limit: BATCH_SIZE,
+        eventTypes: ALL_EVENT_TYPES,
+        leaseSeconds: LEASE_SECONDS,
+      });
+      if (claimed.isFailure) throw new Error(claimed.getError());
 
-      for (const event of dispatched.dispatched) {
+      const events = claimed.getValue();
+      for (const event of events) {
         if (this.stopping) break;
-        const handlers = this.userHandlers.get(event.eventType) ?? [];
-        if (handlers.length === 0) continue;
-        const domainEvent = recordToDomainEvent(event);
-        for (const h of handlers) {
-          try {
-            await h.handle(domainEvent);
-          } catch (err) {
-            this.instrumentation.capture(err);
-            this.logger.error(
-              { err, eventId: event.id, eventType: event.eventType, handlerType: event.eventType },
-              "outbox user handler threw (event already dispatched, handler is best-effort)",
-            );
-          }
-        }
+        await this.settle(event);
       }
-      return dispatched.total;
+
+      return events.length;
     });
+  }
+
+  private async settle(event: OutboxRecord): Promise<void> {
+    try {
+      await db.transaction(async (tx) => {
+        for (const sub of this.builtInSubscribers) await sub.handle(event, tx);
+      });
+    } catch (err) {
+      this.instrumentation.capture(err);
+      this.logger.error(
+        { err, eventId: event.id, eventType: event.eventType },
+        "outbox event built-in subscriber failed",
+      );
+      const failed = await this.outbox.markFailed(event, {
+        lastError: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        retryAfterSeconds: nextDelayMs(expectedDelayFromAttempts(event.attempts)) / 1000,
+        dead: false,
+        deliveries: {},
+      });
+      if (failed.isFailure) this.logger.error({ eventId: event.id }, failed.getError());
+      return;
+    }
+
+    const delivered = await this.outbox.markDelivered(event, {});
+    if (delivered.isFailure) {
+      this.logger.error({ eventId: event.id }, delivered.getError());
+      return;
+    }
+
+    await this.runUserHandlers(event);
+  }
+
+  private async runUserHandlers(event: OutboxRecord): Promise<void> {
+    const handlers = this.userHandlers.get(event.eventType) ?? [];
+    if (handlers.length === 0) return;
+
+    const domainEvent = recordToDomainEvent(event);
+    for (const h of handlers) {
+      try {
+        await h.handle(domainEvent);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        this.logger.error(
+          { err, eventId: event.id, eventType: event.eventType, handlerName: h.handlerName },
+          "outbox user handler threw (event already dispatched, handler is best-effort)",
+        );
+      }
+    }
   }
 }

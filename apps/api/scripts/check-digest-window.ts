@@ -58,6 +58,8 @@ const event = (n: number): OutboxRecord => ({
   metadata: {} as OutboxRecord["metadata"],
   occurredAt: OCCURRED_AT,
   attempts: 0,
+  deadAt: Option.none(),
+  deliveries: {},
 });
 
 const forcedEvent = (): OutboxRecord => ({

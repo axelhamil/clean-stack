@@ -80,8 +80,8 @@ export const di = container()
   .add(
     "ITransactionService",
     (c) =>
-      new TransactionService(c.IInstrumentation, async (events, tx) => {
-        await c.IOutboxRepository.enqueue(events, { source: "app/api" }, tx);
+      new TransactionService(c.IInstrumentation, async (events) => {
+        await c.IOutboxRepository.enqueue(events, { source: "app/api" });
       }),
   )
   .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation))

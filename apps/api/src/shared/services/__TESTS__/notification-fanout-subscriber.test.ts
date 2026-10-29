@@ -14,6 +14,8 @@ const event = (eventType: string, payload: unknown, orgId?: string): OutboxRecor
   metadata: {} as OutboxRecord["metadata"],
   occurredAt: new Date("2026-08-07T10:00:00Z"),
   attempts: 0,
+  deadAt: Option.none(),
+  deliveries: {},
 });
 
 function fakeTx() {

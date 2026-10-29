@@ -2,8 +2,10 @@ import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { POLICY_TYPES, POLICY_VERSIONS } from "@packages/policies";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { noopOutbox, recordingOutbox } from "../../../shared/__TESTS__/outbox-fakes";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IPolicyAcceptanceStore,
@@ -25,7 +27,7 @@ function makeStore(overrides: Partial<IPolicyAcceptanceStore> = {}): IPolicyAcce
 describe("PolicyAcceptanceService", () => {
   describe("accept", () => {
     it("calls store.insert once per type with current versions and emits USER_POLICY_ACCEPTED", async () => {
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore();
       const service = new PolicyAcceptanceService(
         store,
@@ -57,7 +59,9 @@ describe("PolicyAcceptanceService", () => {
         }),
       );
 
-      const policyEvents = enqueued.filter((e) => e.eventType === EventTypes.USER_POLICY_ACCEPTED);
+      const policyEvents = enqueuedEvents(spyOutbox).filter(
+        (e) => e.eventType === EventTypes.USER_POLICY_ACCEPTED,
+      );
       expect(policyEvents).toHaveLength(2);
       expect(
         policyEvents.some((e) => (e.payload as Record<string, unknown>).policyType === "privacy"),
@@ -71,7 +75,7 @@ describe("PolicyAcceptanceService", () => {
       const store = makeStore();
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -93,7 +97,7 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -117,7 +121,7 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -143,7 +147,7 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -164,7 +168,7 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -192,7 +196,7 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -214,7 +218,7 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -229,7 +233,7 @@ describe("PolicyAcceptanceService", () => {
       const store = makeStore();
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );

@@ -21,7 +21,7 @@ export {
   sql,
 } from "drizzle-orm";
 export { migrate } from "drizzle-orm/node-postgres/migrator";
-export type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
+export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 export { alias } from "drizzle-orm/pg-core";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
 export {
@@ -45,7 +45,7 @@ export * as notificationSchema from "./schema/notification";
 export const schema = { ...authSchema, ...multiTenantSchema };
 export * as billingSchema from "./schema/billing";
 export * as emailSchema from "./schema/email";
-export type { OutboxDeliveries, OutboxEventMetadata } from "./schema/outbox";
+export type { OutboxEventMetadata } from "./schema/outbox";
 export * as outboxSchema from "./schema/outbox";
 export * as policiesSchema from "./schema/policies";
 export * as quotaUsageSchema from "./schema/quota-usage";

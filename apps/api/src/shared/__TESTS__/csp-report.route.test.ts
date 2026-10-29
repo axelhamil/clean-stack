@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
+import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { IOutboxRepository } from "../ports/outbox.port";
@@ -19,13 +20,8 @@ mock.module("../logger", () => ({
 
 const { cspReportCors, makeCspReportApp } = await import("../internal-routes/csp-report.route");
 
-function makeOutbox(): IOutboxRepository {
-  return {
-    enqueue: mock(async () => {}),
-    findPendingBatch: async () => [],
-    markDispatched: async () => {},
-    markFailed: async () => {},
-  };
+function makeOutbox() {
+  return mockPort<IOutboxRepository>();
 }
 
 const VALID_LEGACY_BODY = JSON.stringify({
@@ -346,14 +342,8 @@ describe("POST /csp-report", () => {
 
   describe("emit failure resilience", () => {
     it("emitEvent throws → still returns 204 + logger.warn called", async () => {
-      const outbox: IOutboxRepository = {
-        enqueue: mock(async () => {
-          throw new Error("outbox down");
-        }),
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockRejectedValue(new Error("outbox down"));
       const app = makeCspReportApp({ outbox });
 
       const res = await app.request("/csp-report", {

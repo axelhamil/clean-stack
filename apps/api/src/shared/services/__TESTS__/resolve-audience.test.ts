@@ -13,6 +13,8 @@ const baseEvent = (payload: unknown, orgId?: string): OutboxRecord => ({
   metadata: {} as OutboxRecord["metadata"],
   occurredAt: new Date("2026-08-07T10:00:00Z"),
   attempts: 0,
+  deadAt: Option.none(),
+  deliveries: {},
 });
 
 const targetOf = (audience: Parameters<typeof resolveAudience>[0], event: OutboxRecord) =>

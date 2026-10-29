@@ -24,6 +24,8 @@ const event = (eventType: string): OutboxRecord => ({
   metadata: {} as OutboxRecord["metadata"],
   occurredAt: new Date(),
   attempts: 0,
+  deadAt: Option.none(),
+  deliveries: {},
 });
 
 const reset = async () => {

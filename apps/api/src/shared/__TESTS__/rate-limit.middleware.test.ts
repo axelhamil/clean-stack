@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import type { PolicyConfig } from "../middleware/rate-limit.policies";
 import type { IOutboxRepository } from "../ports/outbox.port";
@@ -580,13 +581,8 @@ describe("requireRateLimit middleware", () => {
   });
 
   describe("security event emission on firstBlock", () => {
-    function makeOutbox(): IOutboxRepository {
-      return {
-        enqueue: mock(async () => {}),
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+    function makeOutbox() {
+      return mockPort<IOutboxRepository>();
     }
 
     function makeAuthApp(
@@ -697,14 +693,8 @@ describe("requireRateLimit middleware", () => {
     it("still returns 429 when emit throws, and logger.warn is called once with the error", async () => {
       mockedAddress = "1.2.3.4";
       warnSpy.mockClear();
-      const outbox: IOutboxRepository = {
-        enqueue: mock(async () => {
-          throw new Error("outbox down");
-        }),
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockRejectedValue(new Error("outbox down"));
       const limiter = makeLimiter(blockDecision("auth-sign-in"));
       const app = makeAuthApp(limiter, outbox);
 
@@ -836,12 +826,7 @@ describe("requireRateLimit middleware", () => {
 
     it("does NOT warn when outbox is provided", () => {
       warnSpy.mockClear();
-      const outbox: IOutboxRepository = {
-        enqueue: async () => {},
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const outbox = mockPort<IOutboxRepository>();
       requireRateLimit({ limiter: makeLimiter(allowDecision()), outbox }, AUTH_SIGN_IN_POLICY);
       expect(warnSpy).not.toHaveBeenCalled();
     });

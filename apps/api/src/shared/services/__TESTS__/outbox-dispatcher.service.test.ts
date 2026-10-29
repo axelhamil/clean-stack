@@ -1,29 +1,10 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
-import * as realDrizzle from "@packages/drizzle";
+import { describe, expect, test } from "bun:test";
+import { Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
 import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
+import type { IOutboxRepository } from "../../ports/outbox.port";
+import { OutboxDispatcher } from "../outbox-dispatcher.service";
 import { FakePgListenClient } from "./fake-pg-listen-client";
-
-let transactionCalls = 0;
-
-mock.module("@packages/drizzle", () => ({
-  ...realDrizzle,
-  db: {
-    execute: async () => undefined,
-    transaction: async () => {
-      transactionCalls++;
-      throw new Error("connection refused");
-    },
-  },
-}));
-
-const { OutboxDispatcher } = await import("../outbox-dispatcher.service");
-
-const fakeOutbox = {
-  enqueue: async () => {},
-  findPendingBatch: async () => [],
-  markDispatched: async () => {},
-  markFailed: async () => {},
-};
 
 function makeDispatcher() {
   const errors: string[] = [];
@@ -33,48 +14,44 @@ function makeDispatcher() {
     debug() {},
     error: (_obj: unknown, msg: string) => errors.push(msg),
   };
-  const instrumentation = mockInstrumentation();
+  const outbox = mockPort<IOutboxRepository>();
+  outbox.claim.mockResolvedValue(Result.fail("outbox_unavailable: connection refused"));
   const client = new FakePgListenClient();
   const dispatcher = new OutboxDispatcher(
-    fakeOutbox,
+    outbox,
     [],
     logger as never,
     "postgres://unused",
-    instrumentation,
+    mockInstrumentation(),
     { createClient: () => client },
   );
-  return { dispatcher, client, errors, instrumentation };
+  return { dispatcher, client, errors, outbox };
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("OutboxDispatcher", () => {
-  beforeEach(() => {
-    transactionCalls = 0;
-  });
-
-  test("a first drain that fails is logged and reported instead of crashing the process", async () => {
-    const { dispatcher, errors, instrumentation } = makeDispatcher();
+  test("a first drain that fails is logged instead of crashing the process", async () => {
+    const { dispatcher, errors } = makeDispatcher();
 
     await dispatcher.start();
     await wait(10);
 
     expect(errors).toContain("outbox drain failed (start)");
-    expect(instrumentation.capture).toHaveBeenCalledTimes(1);
 
     await dispatcher.stop();
   });
 
   test("a NOTIFY on the listen connection triggers a drain", async () => {
-    const { dispatcher, client, errors } = makeDispatcher();
+    const { dispatcher, client, errors, outbox } = makeDispatcher();
     await dispatcher.start();
     await wait(10);
-    const before = transactionCalls;
+    const before = outbox.claim.mock.calls.length;
 
     client.deliver("event-1");
     await wait(10);
 
-    expect(transactionCalls).toBe(before + 1);
+    expect(outbox.claim.mock.calls.length).toBe(before + 1);
     expect(errors).toContain("outbox drain failed (notify)");
 
     await dispatcher.stop();

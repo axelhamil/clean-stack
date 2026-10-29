@@ -16,8 +16,6 @@ const ALLOWED_ENV_READERS: Record<string, string> = {
 const LEASE_OUTBOX_REWRITE = "rewritten by I.5 lease outbox";
 
 const ALLOWED_TX_PARAMETERS: Record<string, string> = {
-  "shared/ports/outbox.port.ts": LEASE_OUTBOX_REWRITE,
-  "shared/services/drizzle-outbox.service.ts": LEASE_OUTBOX_REWRITE,
   "shared/services/outbox-subscriber.ts": LEASE_OUTBOX_REWRITE,
   "shared/services/audit-event-subscriber.ts": LEASE_OUTBOX_REWRITE,
   "shared/services/notification-fanout-subscriber.ts": LEASE_OUTBOX_REWRITE,

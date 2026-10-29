@@ -33,13 +33,7 @@ describe("domainEventToOutboxRow identity", () => {
       source: "app/api",
       aggregateType: "user",
     });
-    const scoped = domainEventToOutboxRow(identified, {
-      source: "app/api",
-      aggregateType: "user",
-      id: "scope-id",
-    });
 
     expect(replayed.id).toBe(identified.eventId);
-    expect(scoped.id).toBe("scope-id");
   });
 });

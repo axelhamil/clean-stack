@@ -1,6 +1,7 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
+import { mockPort } from "@packages/test/bun";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -53,7 +54,11 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
 }
 
 function makeService(storageOverrides: Partial<IStorageService> = {}): UploadService {
-  return new UploadService(makeStorage(storageOverrides), noopOutbox, new NoOpInstrumentation());
+  return new UploadService(
+    makeStorage(storageOverrides),
+    mockPort<IOutboxRepository>(),
+    new NoOpInstrumentation(),
+  );
 }
 
 // ─── tests ──────────────────────────────────────────────────────────────────
@@ -107,7 +112,11 @@ describe("UploadService", () => {
     it("calls instrumentation span with op=function", async () => {
       const instrumentation = new NoOpInstrumentation();
       const spy = spyOn(instrumentation, "startSpan");
-      const service = new UploadService(makeStorage(), noopOutbox, instrumentation);
+      const service = new UploadService(
+        makeStorage(),
+        mockPort<IOutboxRepository>(),
+        instrumentation,
+      );
 
       await service.createUploadUrl({
         ownerId: OWNER_ID,
@@ -162,7 +171,11 @@ describe("UploadService", () => {
           Result.ok<ObjectMetadata, StorageError>({ size: SIZE + 1, contentType: CONTENT_TYPE }),
         ),
       });
-      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+      const service = new UploadService(
+        storage,
+        mockPort<IOutboxRepository>(),
+        new NoOpInstrumentation(),
+      );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
       const result = await service.confirmUpload({
@@ -183,7 +196,11 @@ describe("UploadService", () => {
           Result.ok<ObjectMetadata, StorageError>({ size: SIZE, contentType: "application/pdf" }),
         ),
       });
-      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+      const service = new UploadService(
+        storage,
+        mockPort<IOutboxRepository>(),
+        new NoOpInstrumentation(),
+      );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
       const result = await service.confirmUpload({
@@ -222,7 +239,11 @@ describe("UploadService", () => {
     it("calls instrumentation span with op=function", async () => {
       const instrumentation = new NoOpInstrumentation();
       const spy = spyOn(instrumentation, "startSpan");
-      const service = new UploadService(makeStorage(), noopOutbox, instrumentation);
+      const service = new UploadService(
+        makeStorage(),
+        mockPort<IOutboxRepository>(),
+        instrumentation,
+      );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
       await service.confirmUpload({
@@ -242,7 +263,11 @@ describe("UploadService", () => {
   describe("deleteUpload", () => {
     it("deletes the object (happy path)", async () => {
       const storage = makeStorage();
-      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+      const service = new UploadService(
+        storage,
+        mockPort<IOutboxRepository>(),
+        new NoOpInstrumentation(),
+      );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
       const result = await service.deleteUpload({ ownerId: OWNER_ID, key: validKey });
@@ -281,7 +306,11 @@ describe("UploadService", () => {
 
     it("accepts a public URL and deletes the derived key", async () => {
       const storage = makeStorage();
-      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+      const service = new UploadService(
+        storage,
+        mockPort<IOutboxRepository>(),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.deleteUpload({
         ownerId: OWNER_ID,
@@ -294,7 +323,11 @@ describe("UploadService", () => {
 
     it("is a no-op for a URL this storage did not produce", async () => {
       const storage = makeStorage();
-      const service = new UploadService(storage, noopOutbox, new NoOpInstrumentation());
+      const service = new UploadService(
+        storage,
+        mockPort<IOutboxRepository>(),
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.deleteUpload({
         ownerId: OWNER_ID,
@@ -319,7 +352,11 @@ describe("UploadService", () => {
     it("calls instrumentation span with op=function", async () => {
       const instrumentation = new NoOpInstrumentation();
       const spy = spyOn(instrumentation, "startSpan");
-      const service = new UploadService(makeStorage(), noopOutbox, instrumentation);
+      const service = new UploadService(
+        makeStorage(),
+        mockPort<IOutboxRepository>(),
+        instrumentation,
+      );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
       await service.deleteUpload({ ownerId: OWNER_ID, key: validKey });
@@ -382,7 +419,11 @@ describe("UploadService", () => {
     it("calls instrumentation span with op=function", async () => {
       const instrumentation = new NoOpInstrumentation();
       const spy = spyOn(instrumentation, "startSpan");
-      const service = new UploadService(makeStorage(), noopOutbox, instrumentation);
+      const service = new UploadService(
+        makeStorage(),
+        mockPort<IOutboxRepository>(),
+        instrumentation,
+      );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
       await service.createDownloadUrl({ ownerId: OWNER_ID, key: validKey, expiresInSeconds: 300 });

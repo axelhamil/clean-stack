@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import * as realAead from "../../../shared/aead";
 import type { Logger } from "../../../shared/logger";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
@@ -170,14 +170,10 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
 
 function makeOutbox() {
   const enqueueCalls: Array<{ events: unknown[]; opts: unknown; tx: unknown }> = [];
-  const outbox: IOutboxRepository = {
-    enqueue: mock(async (events, opts) => {
-      enqueueCalls.push({ events, opts, tx: UnitOfWorkContext.transaction() });
-    }),
-    findPendingBatch: mock(async () => []),
-    markDispatched: mock(async () => {}),
-    markFailed: mock(async () => {}),
-  };
+  const outbox = mockPort<IOutboxRepository>();
+  outbox.enqueue.mockImplementation(async (events, opts) => {
+    enqueueCalls.push({ events, opts, tx: UnitOfWorkContext.transaction() });
+  });
   return { outbox, enqueueCalls };
 }
 
@@ -222,7 +218,7 @@ function makeWorker(deps: WorkerDeps) {
     deps.deliveries as unknown as IWebhookDeliveryRepository,
     (deps.endpoints ?? makeFakeEndpoints()) as unknown as IWebhookEndpointRepository,
     deps.masterKey ?? (() => Option.some(new Uint8Array(32))),
-    deps.outbox ?? noopOutbox,
+    deps.outbox ?? mockPort<IOutboxRepository>(),
     deps.unitOfWork ?? mockUnitOfWork().unitOfWork,
     (deps.logger ?? makeLogger()) as unknown as Logger,
     deps.instrumentation ?? new NoOpInstrumentation(),

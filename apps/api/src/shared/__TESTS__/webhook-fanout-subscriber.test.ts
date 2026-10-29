@@ -68,6 +68,8 @@ function makeEvent(eventType: string, organizationId = "org-1") {
     },
     occurredAt: new Date(),
     attempts: 0,
+    deadAt: Option.none<Date>(),
+    deliveries: {},
   };
 }
 
