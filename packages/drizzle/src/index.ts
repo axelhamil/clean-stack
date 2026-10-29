@@ -25,6 +25,16 @@ export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-
 export { alias } from "drizzle-orm/pg-core";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
 export {
+  claimedSet,
+  dbNow,
+  deadShareOf,
+  isDeadDue,
+  isDue,
+  leasedBy,
+  releasedSet,
+  secondsFromNow,
+} from "./lease";
+export {
   closeRateLimitDb,
   getRateLimitDbClient,
   type RateLimitDbClient,

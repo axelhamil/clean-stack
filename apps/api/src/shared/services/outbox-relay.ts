@@ -11,7 +11,7 @@ import {
 } from "@packages/events";
 import { scrubText } from "@packages/sentry-scrub";
 import { OUTBOX_SETTLE_MARGIN_SECONDS } from "../env-bounds";
-import { expectedDelayFromAttempts, nextDelayMs } from "../jitter";
+import { failureSchedule } from "../jitter";
 import type { Logger } from "../logger";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type {
@@ -74,10 +74,6 @@ function toDeliveredEvent(record: OutboxRecord): DeliveredEvent {
     dateOccurred: record.occurredAt,
     payload: record.payload,
   };
-}
-
-function retryAfterSeconds(attempts: number): number {
-  return Math.ceil(nextDelayMs(expectedDelayFromAttempts(attempts)) / 1000);
 }
 
 function storedError(failures: readonly HandlerFailure[]): string {
@@ -210,7 +206,11 @@ export class OutboxRelay {
     );
 
     const wasDead = record.deadAt.isSome();
-    const dead = wasDead || record.attempts >= this.options.maxAttempts;
+    const { dead, retryAfterSeconds } = failureSchedule(record.attempts, {
+      wasDead,
+      maxAttempts: this.options.maxAttempts,
+      deadRetrySeconds: this.options.deadRetrySeconds,
+    });
     const death = {
       eventId: record.id,
       eventType: record.eventType,
@@ -222,9 +222,7 @@ export class OutboxRelay {
     const settled = await this.uow.run(async () => {
       const written = await this.repository.markFailed(record, {
         lastError,
-        retryAfterSeconds: dead
-          ? this.options.deadRetrySeconds
-          : retryAfterSeconds(record.attempts),
+        retryAfterSeconds,
         dead,
         deliveries: delivered,
       });

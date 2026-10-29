@@ -1,16 +1,23 @@
 import { domainEventToOutboxRow, type IDomainEvent, Option, Result } from "@packages/ddd-kit";
 import {
   and,
+  claimedSet,
   db,
+  dbNow,
+  deadShareOf,
   eq,
   inArray,
+  isDeadDue,
+  isDue,
   isNotNull,
   isNull,
-  lte,
+  leasedBy,
   or,
   outboxSchema,
   type PgUpdateSetSource,
+  releasedSet,
   resolveExecutor,
+  secondsFromNow,
   sql,
 } from "@packages/drizzle";
 import { PayloadByEventType } from "@packages/events";
@@ -64,15 +71,11 @@ function nonNegative(ms: Option<number>): Option<number> {
   return ms.map((value) => Math.max(0, value));
 }
 
-const now = sql`now()`;
-const secondsFromNow = (seconds: number) => sql`now() + make_interval(secs => ${seconds})`;
 const merged = (deliveries: OutboxDeliveries) =>
   sql`${oe.deliveries} || ${JSON.stringify(deliveries)}::jsonb`;
 const liveRow = and(isNull(oe.dispatchedAt), isNull(oe.deadAt));
 const deadRow = and(isNull(oe.dispatchedAt), isNotNull(oe.deadAt));
-const leased = ({ id, attempts }: OutboxLease) =>
-  and(eq(oe.id, id), eq(oe.attempts, attempts), isNull(oe.dispatchedAt));
-const DEAD_SHARE_OF_CLAIM = 4;
+const leased = (lease: OutboxLease) => and(leasedBy(oe, lease), isNull(oe.dispatchedAt));
 
 function claimQuery(
   exec: ReturnType<typeof resolveExecutor>,
@@ -84,13 +87,7 @@ function claimQuery(
     db
       .select(claimable)
       .from(oe)
-      .where(
-        and(
-          liveRow,
-          inArray(oe.eventType, types),
-          or(isNull(oe.nextAttemptAt), lte(oe.nextAttemptAt, now)),
-        ),
-      )
+      .where(and(liveRow, inArray(oe.eventType, types), isDue(oe.nextAttemptAt)))
       .orderBy(oe.occurredAt, oe.id)
       .limit(limit)
       .for("update", { skipLocked: true }),
@@ -99,9 +96,9 @@ function claimQuery(
     db
       .select(claimable)
       .from(oe)
-      .where(and(deadRow, inArray(oe.eventType, types), lte(oe.nextAttemptAt, now)))
+      .where(and(deadRow, inArray(oe.eventType, types), isDeadDue(oe.nextAttemptAt)))
       .orderBy(oe.nextAttemptAt)
-      .limit(Math.ceil(limit / DEAD_SHARE_OF_CLAIM))
+      .limit(deadShareOf(limit))
       .for("update", { skipLocked: true }),
   );
   const due = db
@@ -118,10 +115,7 @@ function claimQuery(
   return exec
     .with(live, dead, due)
     .update(oe)
-    .set({
-      attempts: sql`${oe.attempts} + 1`,
-      nextAttemptAt: secondsFromNow(leaseSeconds),
-    })
+    .set(claimedSet(oe, leaseSeconds))
     .from(due)
     .where(eq(oe.id, due.id))
     .returning({
@@ -266,7 +260,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
     deliveries: OutboxDeliveries,
   ): Promise<Result<boolean, string>> {
     return this.settle("markDelivered", lease, {
-      dispatchedAt: now,
+      dispatchedAt: dbNow,
       nextAttemptAt: null,
       deadAt: null,
       deliveries: merged(deliveries),
@@ -278,15 +272,12 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
       lastError: failure.lastError,
       nextAttemptAt: secondsFromNow(failure.retryAfterSeconds),
       deliveries: merged(failure.deliveries),
-      ...(failure.dead ? { deadAt: sql`coalesce(${oe.deadAt}, now())` } : {}),
+      ...(failure.dead ? { deadAt: sql`coalesce(${oe.deadAt}, ${dbNow})` } : {}),
     });
   }
 
   async release(lease: OutboxLease): Promise<Result<boolean, string>> {
-    return this.settle("release", lease, {
-      attempts: sql`${oe.attempts} - 1`,
-      nextAttemptAt: now,
-    });
+    return this.settle("release", lease, releasedSet(oe));
   }
 
   private async settle(

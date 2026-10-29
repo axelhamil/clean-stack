@@ -42,3 +42,27 @@ export function nextAttemptAt(currentAttempts: number, lastDelayMs: number): Opt
 
   return Option.some(new Date(Date.now() + nextDelayMs(lastDelayMs)));
 }
+
+export function retryAfterSeconds(attempts: number): number {
+  return Math.ceil(nextDelayMs(expectedDelayFromAttempts(attempts)) / 1000);
+}
+
+export interface FailurePolicy {
+  wasDead: boolean;
+  maxAttempts: number;
+  deadRetrySeconds: number;
+}
+
+export interface FailureSchedule {
+  dead: boolean;
+  retryAfterSeconds: number;
+}
+
+export function failureSchedule(attempts: number, policy: FailurePolicy): FailureSchedule {
+  const dead = policy.wasDead || attempts >= policy.maxAttempts;
+
+  return {
+    dead,
+    retryAfterSeconds: dead ? policy.deadRetrySeconds : retryAfterSeconds(attempts),
+  };
+}
