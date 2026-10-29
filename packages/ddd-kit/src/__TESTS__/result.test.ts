@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { Result } from "../primitives/result";
 
 describe("Result", () => {
@@ -124,14 +124,6 @@ describe("Result", () => {
       expect(combined.isSuccess).toBe(true);
     });
 
-    it("should return the exact failure result instance", () => {
-      const failureResult = Result.fail("error");
-      const results = [Result.ok(1), failureResult, Result.ok(2)];
-      const combined = Result.combine(results);
-
-      expect(combined).toBe(failureResult);
-    });
-
     it("should handle mixed success and failure results", () => {
       const results = [Result.ok("a"), Result.ok("b"), Result.fail("middle error"), Result.ok("c")];
       const combined = Result.combine(results);
@@ -199,5 +191,72 @@ describe("Result", () => {
       expect(result.getError().code).toBe("E001");
       expect(result.getError().message).toBe("Error");
     });
+  });
+});
+
+describe("Result combinators", () => {
+  it("map applies f on success and leaves a failure untouched", () => {
+    const spy = vi.fn((x: number) => x * 2);
+
+    const doubled = Result.ok(2).map((x) => x * 2);
+    const failed = Result.fail<number>("e").map(spy);
+
+    expect(doubled.getValue()).toBe(4);
+    expect(spy).not.toHaveBeenCalled();
+    expect(failed.getError()).toBe("e");
+  });
+
+  it("flatMap chains and widens the error union", () => {
+    const chained = Result.ok<number, "a">(1).flatMap(() => Result.fail<string, "x">("x"));
+
+    expectTypeOf(chained).toEqualTypeOf<Result<string, "a" | "x">>();
+    expect(chained.getError()).toBe("x");
+    expect(
+      Result.ok(1)
+        .flatMap((x) => Result.ok(x + 1))
+        .getValue(),
+    ).toBe(2);
+  });
+
+  it("mapError rewrites only the failure", () => {
+    const rewritten = Result.fail<number>("e").mapError((e) => ({ code: e }));
+    const untouched = Result.ok<number>(3).mapError((e) => ({ code: e }));
+
+    expect(rewritten.getError()).toEqual({ code: "e" });
+    expect(untouched.getValue()).toBe(3);
+  });
+
+  it("match calls the branch of the state", () => {
+    const patterns = { ok: (v: number) => `ok:${v}`, fail: (e: string) => `fail:${e}` };
+
+    expect(Result.ok(1).match(patterns)).toBe("ok:1");
+    expect(Result.fail<number>("boom").match(patterns)).toBe("fail:boom");
+  });
+
+  it("unwrapOr returns default on failure, value on success", () => {
+    expect(Result.fail<number>("e").unwrapOr(7)).toBe(7);
+    expect(Result.ok(1).unwrapOr(7)).toBe(1);
+  });
+
+  it("all returns the typed tuple of values when all succeed", () => {
+    const all = Result.all([Result.ok(1), Result.ok("a")] as const);
+
+    expectTypeOf(all.getValue()).toEqualTypeOf<[number, string]>();
+    expect(all.getValue()).toEqual([1, "a"]);
+  });
+
+  it("all returns the first failure in order", () => {
+    const all = Result.all([Result.ok(1), Result.fail("first"), Result.fail("second")] as const);
+
+    expect(all.getError()).toBe("first");
+  });
+
+  it("combine returns the first failure error and ok void otherwise", () => {
+    const failed = Result.combine([Result.ok(1), Result.fail("first"), Result.fail("second")]);
+    const passed = Result.combine([Result.ok(1), Result.ok("a")]);
+
+    expectTypeOf(passed).toEqualTypeOf<Result<void, string>>();
+    expect(failed.getError()).toBe("first");
+    expect(passed.isSuccess).toBe(true);
   });
 });
