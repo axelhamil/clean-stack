@@ -31,14 +31,14 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Resync on the OpenUp foundations: **Phase I**
 
-- **Status**: in progress, lot I.1 on branch `refactor/phase-i-1-kit`.
+- **Status**: in progress, I.1 shipped, I.2 next.
 - **Date**: Oct 2026.
 - **Why**: OpenUp, a sister project on the same stack, hardened five foundations after clean-stack diverged from the shared Afterlive lineage. Today clean-stack has a thinner kit, layering enforced only by convention, telemetry that can carry PII, a transaction parameter threaded through every port, and an outbox that holds locks during handlers and loses user handlers on a throw. Each lot below buys one architectural property.
 - **Scope**: five ordered lots, each its own branch off `dev` (`refactor/phase-i-1-kit` to `refactor/phase-i-5-outbox`) and its own PR merged as a merge commit. Not ported because they are OpenUp-specific: a per-module outbox, `RouteGuards`, `HttpResponse`, `PgSingleFlight`, `packages/audit`, `dist` builds, typed entity ids, the `DomainEventHandler` class, admin replay of dead events.
 - **Rules for every lot**: each lot ends on the full chain (`pnpm ci:check`, `turbo run build type-check test`, `check:duplication`, `check:unused`, plus `check:boundaries` from I.2) and its real-database checks, then the 5-agent end-of-lot review (Opus for I.4 and I.5). Doc debt moves in the same commit as the code that changes the rule.
 - **References**: root [`CLAUDE.md`](CLAUDE.md) rules 6 to 8, [`docs/EVENTS.md`](docs/EVENTS.md), [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md), the `events-outbox` skill.
 
-### I.1: Kit and test helpers
+### I.1: Kit and test helpers ✅ Oct 2026
 
 - **Why**: a kit with `map`, `flatMap`, `match`, `Option.toResult`, a monotonic `uuidv7`, event ids and JSON-based value-object equality removes hand-rolled glue in every module, and typed test doubles (`mockPort`) replace per-file `mock.module` wiring.
 - **Scope**: `Result` combinators and a typed `Result.all`; `Option.toResult`, `tryMap`, `equals`; `UUID.parse` and monotonic `uuidv7`; optional `eventId` on domain events (reused as the outbox row id); `sameJson` for value objects; an error type parameter on `BaseRepository` and `ScopedRepository`; `mockPort` and `mockInstrumentation` behind a `@packages/test/bun` subpath. Purely additive.
