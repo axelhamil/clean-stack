@@ -30,7 +30,7 @@ export type OutboxMappingScope = {
 
 export function domainEventToOutboxRow(event: IDomainEvent, scope: OutboxMappingScope): OutboxRow {
   return {
-    id: scope.id ?? uuidv7(),
+    id: scope.id ?? event.eventId ?? uuidv7(),
     eventType: event.eventType,
     aggregateId: event.aggregateId,
     aggregateType: scope.aggregateType,

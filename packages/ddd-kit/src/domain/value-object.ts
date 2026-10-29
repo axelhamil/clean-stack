@@ -1,5 +1,21 @@
 import { Result } from "../primitives/result";
 
+function inKeyOrder(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(inKeyOrder);
+  if (typeof value !== "object" || value === null) return value;
+  if ("toJSON" in value && typeof value.toJSON === "function") return inKeyOrder(value.toJSON());
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : 1))
+      .map(([key, entry]) => [key, inKeyOrder(entry)]),
+  );
+}
+
+export function sameJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(inKeyOrder(left)) === JSON.stringify(inKeyOrder(right));
+}
+
 export abstract class ValueObject<T> {
   protected readonly _value: T;
 
@@ -19,7 +35,7 @@ export abstract class ValueObject<T> {
       typeof other.value === "object" &&
       other.value !== null
     ) {
-      return JSON.stringify(this._value) === JSON.stringify(other.value);
+      return sameJson(this._value, other.value);
     }
     return false;
   }

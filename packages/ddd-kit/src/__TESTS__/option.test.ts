@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { match, None, Option, Some } from "../primitives/option";
+import { Result } from "../primitives/result";
 
 describe("Option", () => {
   describe("Option.some()", () => {
@@ -453,5 +454,52 @@ describe("Option", () => {
       expect(typeof option.unwrap()).toBe("string");
       expect(option.unwrap()).toBe("42");
     });
+  });
+});
+
+describe("Option interop", () => {
+  it("toResult fails with the error, or with the lazily built error, on none and succeeds on some", () => {
+    const thunk = vi.fn(() => "lazy");
+
+    expect(Option.none<number>().toResult("missing").getError()).toBe("missing");
+    expect(
+      Option.none<number>()
+        .toResult(() => "lazy")
+        .getError(),
+    ).toBe("lazy");
+    expect(Option.some(1).toResult(thunk).getValue()).toBe(1);
+    expect(thunk).not.toHaveBeenCalled();
+  });
+
+  it("tryMap on some propagates the inner failure and wraps the success in some", () => {
+    const failed = Option.some(1).tryMap(() => Result.fail<number>("bad"));
+    const mapped = Option.some(1).tryMap((x) => Result.ok(x + 1));
+
+    expect(failed.getError()).toBe("bad");
+    expect(mapped.getValue().unwrap()).toBe(2);
+  });
+
+  it("tryMap on none returns ok(none) without calling f", () => {
+    const f = vi.fn((x: number) => Result.ok(x));
+
+    const result = Option.none<number>().tryMap(f);
+
+    expect(result.getValue().isNone()).toBe(true);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("equals is true for two nones and false for some vs none", () => {
+    expect(Option.none<number>().equals(Option.none())).toBe(true);
+    expect(Option.some(1).equals(Option.none())).toBe(false);
+    expect(Option.none<number>().equals(Option.some(1))).toBe(false);
+    expect(Option.some(1).equals(Option.some(1))).toBe(true);
+  });
+
+  it("equals uses the comparator when given", () => {
+    const byId = (l: { id: string }, r: { id: string }) => l.id === r.id;
+
+    expect(Option.some({ id: "a" }).equals(Option.some({ id: "a" }))).toBe(false);
+    expect(Option.some({ id: "a" }).equals(Option.some({ id: "a" }), byId)).toBe(true);
+    expect(Option.some({ id: "a" }).equals(Option.some({ id: "b" }), byId)).toBe(false);
   });
 });

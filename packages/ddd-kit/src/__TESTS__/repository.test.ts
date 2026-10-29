@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it } from "vitest";
 import {
   type BaseRepository,
   createPaginatedResult,
@@ -607,5 +607,32 @@ describe("ScopedRepository", () => {
       expect((await repo.exists(note._id, aliceScope)).getValue()).toBe(true);
       expect((await repo.exists(note._id, bobScope)).getValue()).toBe(false);
     });
+  });
+});
+
+type RepoError = { code: "DB_DOWN" };
+
+describe("repository error type", () => {
+  it("a repository declared with a typed error returns Result with that error", () => {
+    type Repo = BaseRepository<User, unknown, RepoError>;
+    type Scoped = ScopedRepository<User, ScopeOf<"org">, unknown, RepoError>;
+
+    expectTypeOf<ReturnType<Repo["findById"]>>().toEqualTypeOf<
+      Promise<Result<Option<User>, RepoError>>
+    >();
+    expectTypeOf<ReturnType<Repo["count"]>>().toEqualTypeOf<Promise<Result<number, RepoError>>>();
+    expectTypeOf<ReturnType<Scoped["create"]>>().toEqualTypeOf<Promise<Result<User, RepoError>>>();
+    expectTypeOf<ReturnType<Scoped["findAll"]>>().toEqualTypeOf<
+      Promise<Result<PaginatedResult<User>, RepoError>>
+    >();
+  });
+
+  it("the default error stays string so existing implementers compile", () => {
+    expectTypeOf<ReturnType<BaseRepository<User>["exists"]>>().toEqualTypeOf<
+      Promise<Result<boolean, string>>
+    >();
+    expectTypeOf<ReturnType<ScopedRepository<User, ScopeOf<"user">>["delete"]>>().toEqualTypeOf<
+      Promise<Result<User["_id"], string>>
+    >();
   });
 });
