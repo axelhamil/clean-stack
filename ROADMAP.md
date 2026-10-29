@@ -31,7 +31,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Resync on the OpenUp foundations: **Phase I**
 
-- **Status**: in progress, I.1 shipped, I.2 next.
+- **Status**: in progress, I.1 and I.2 shipped, I.3 next.
 - **Date**: Oct 2026.
 - **Why**: OpenUp, a sister project on the same stack, hardened five foundations after clean-stack diverged from the shared Afterlive lineage. Today clean-stack has a thinner kit, layering enforced only by convention, telemetry that can carry PII, a transaction parameter threaded through every port, and an outbox that holds locks during handlers and loses user handlers on a throw. Each lot below buys one architectural property.
 - **Scope**: five ordered lots, each its own branch off `dev` (`refactor/phase-i-1-kit` to `refactor/phase-i-5-outbox`) and its own PR merged as a merge commit. Not ported because they are OpenUp-specific: a per-module outbox, `RouteGuards`, `HttpResponse`, `PgSingleFlight`, `packages/audit`, `dist` builds, typed entity ids, the `DomainEventHandler` class, admin replay of dead events.
@@ -45,7 +45,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 - **Depends on**: Dependency refresh merged.
 - **Done when**: every new primitive has a named scenario in the `ddd-kit` vitest suite, `pnpm --filter api type-check` and `pnpm --filter api test` pass with no existing caller touched, and the 4 existing `BaseDomainEvent` subclasses compile unchanged.
 
-### I.2: Architecture guardrails
+### I.2: Architecture guardrails ✅ Oct 2026
 
 - **Why**: layering that lives only in `CLAUDE.md` rots; a rule that fails the build does not. Orphan events (declared, never emitted) are the recurring trap of root rule 6.
 - **Scope**: `dependency-cruiser` rules (no cross-module import, pure domain and application layers, packages never import apps, no circular dependency) wired into pre-push and CI as `check:boundaries`; a framework-free `source-scan` helper in `@packages/test`; four layering tests (no throw in domain and application, domain import allowlist, routes never write to the database, environment read only through `shared/env`); a catalog parity test that fails on any event type nobody emits.

@@ -1,7 +1,8 @@
 import { db, migrate } from "@packages/drizzle";
+import { env } from "./shared/env";
 import { logger } from "./shared/logger";
 
-const migrationsFolder = process.env.MIGRATIONS_FOLDER ?? "./migrations";
+const migrationsFolder = env.MIGRATIONS_FOLDER;
 
 logger.info({ migrationsFolder }, "running migrations");
 await migrate(db, { migrationsFolder });

@@ -79,6 +79,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
 
+      - name: Check module boundaries
+        run: pnpm check:boundaries
+
       - name: Bootstrap env files
         run: pnpm bootstrap
 
