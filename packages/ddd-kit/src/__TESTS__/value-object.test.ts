@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Result, ValueObject } from "../index";
+import { Result, sameJson, ValueObject } from "../index";
 
 class Email extends ValueObject<string> {
   protected validate(value: string): Result<string> {
@@ -306,5 +306,39 @@ describe("ValueObject", () => {
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().value).toBe("José García");
     });
+  });
+});
+
+class Settings extends ValueObject<Record<string, unknown>> {
+  protected validate(value: Record<string, unknown>): Result<Record<string, unknown>> {
+    return Result.ok(value);
+  }
+}
+
+describe("sameJson", () => {
+  it("sameJson ignores object key order at any depth but not array order", () => {
+    const at = new Date("2026-01-01T00:00:00.000Z");
+
+    expect(sameJson({ a: 1, b: { c: [1, 2], d: at } }, { b: { d: at, c: [1, 2] }, a: 1 })).toBe(
+      true,
+    );
+    expect(sameJson({ list: [1, 2] }, { list: [2, 1] })).toBe(false);
+    expect(sameJson({ at }, { at: new Date("2026-01-02T00:00:00.000Z") })).toBe(false);
+  });
+
+  it("value objects with the same fields in another key order are equal", () => {
+    const left = Settings.create({ theme: "dark", nested: { a: 1, b: 2 } }).getValue();
+    const right = Settings.create({ nested: { b: 2, a: 1 }, theme: "dark" }).getValue();
+
+    expect(left.equals(right)).toBe(true);
+  });
+
+  it("sameJson compares nested values through their own json form", () => {
+    expect(sameJson({ site: new URL("https://a.test") }, { site: new URL("https://b.test") })).toBe(
+      false,
+    );
+    expect(sameJson({ site: new URL("https://a.test") }, { site: new URL("https://a.test") })).toBe(
+      true,
+    );
   });
 });
