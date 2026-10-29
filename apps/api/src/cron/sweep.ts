@@ -2,6 +2,7 @@ import {
   DEFAULT_INTERNAL_FETCH_TIMEOUT_MS,
   signedInternalFetch,
 } from "../shared/internal-routes/internal-fetch";
+import { HttpHeartbeat } from "./http-heartbeat";
 import { classifySweepResult, type SweepResponseShape } from "./sweep-result";
 
 const baseUrl = process.env.API_URL;
@@ -39,7 +40,13 @@ const sweeps = [
   "/internal/sweep-notifications",
 ] as const;
 
+const heartbeat = new HttpHeartbeat(process.env.SWEEP_HEARTBEAT_URL, (message) =>
+  console.warn(`[sweep] ${message}`),
+);
+
 let anyFailure = false;
+
+await heartbeat.start();
 
 for (const path of sweeps) {
   const started = Date.now();
@@ -61,6 +68,7 @@ for (const path of sweeps) {
         err instanceof Error ? err.message : String(err)
       }`,
     );
+    await heartbeat.finish(1);
     process.exit(1);
   }
 
@@ -134,4 +142,6 @@ for (const path of sweeps) {
   }
 }
 
-process.exit(anyFailure ? 1 : 0);
+const exitCode = anyFailure ? 1 : 0;
+await heartbeat.finish(exitCode);
+process.exit(exitCode);
