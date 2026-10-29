@@ -6,8 +6,11 @@ import {
   type IDomainEvent,
   isEventHandler,
   onEvent,
+  UnitOfWorkContext,
   UUID,
 } from "../index";
+
+const inScope = <T>(work: () => Promise<T>): Promise<T> => UnitOfWorkContext.run(undefined, work);
 
 class TestEvent implements IDomainEvent<{ value: number }> {
   readonly eventType = "test.event";
@@ -39,7 +42,7 @@ describe("EventCollector (ALS)", () => {
   });
 
   it("collects events added inside context and drains them once", async () => {
-    const result = await EventCollector.runWithContext(async () => {
+    const result = await inScope(async () => {
       EventCollector.add(new TestEvent("agg-1", 1));
       EventCollector.add([new TestEvent("agg-1", 2), new TestEvent("agg-1", 3)]);
       const drained = EventCollector.drain();
@@ -52,14 +55,14 @@ describe("EventCollector (ALS)", () => {
   });
 
   it("isolates events between concurrent contexts", async () => {
-    const ctxA = EventCollector.runWithContext(async () => {
+    const ctxA = inScope(async () => {
       EventCollector.add(new TestEvent("agg-A", 1));
       await new Promise((r) => setTimeout(r, 10));
       EventCollector.add(new TestEvent("agg-A", 2));
       return EventCollector.drain();
     });
 
-    const ctxB = EventCollector.runWithContext(async () => {
+    const ctxB = inScope(async () => {
       EventCollector.add(new TestEvent("agg-B", 1));
       return EventCollector.drain();
     });
@@ -84,8 +87,50 @@ describe("EventCollector (ALS)", () => {
     expect(EventCollector.drain()).toEqual([]);
   });
 
+  it("given saved aggregates, when collected, then collectFrom pulls the events of one aggregate and of a list", async () => {
+    const one = CounterAggregate.create();
+    one.increment();
+    const other = CounterAggregate.create();
+    other.increment();
+    other.increment();
+    const untouched = CounterAggregate.create();
+
+    const collected = await inScope(async () => {
+      EventCollector.collectFrom(one);
+      EventCollector.collectFrom([one, other, untouched]);
+
+      return EventCollector.drain();
+    });
+
+    expect(collected.map((event) => event.payload)).toEqual([
+      { value: 1 },
+      { value: 1 },
+      { value: 2 },
+    ]);
+    expect(other.hasEvents()).toBe(false);
+  });
+
+  it("given a promise that outlives its scope, when it adds events after the scope closed, then they are reported as lost", async () => {
+    const reports: Array<Record<string, unknown> | undefined> = [];
+    EventCollector.setOutOfContextLogger((_message, meta) => reports.push(meta));
+
+    const late = await inScope(async () => ({
+      added: new Promise<boolean>((resolve) =>
+        setTimeout(() => {
+          EventCollector.add(new TestEvent("agg-late", 1));
+          resolve(EventCollector.hasContext());
+        }, 10),
+      ),
+    }));
+    const contextSeenLate = await late.added;
+    EventCollector.setOutOfContextLogger(null);
+
+    expect(contextSeenLate).toBe(false);
+    expect(reports).toEqual([{ eventTypes: ["test.event"], aggregateIds: ["agg-late"] }]);
+  });
+
   it("does not leak events outside the context after it closes", async () => {
-    await EventCollector.runWithContext(async () => {
+    await inScope(async () => {
       EventCollector.add(new TestEvent("agg-1", 1));
     });
 

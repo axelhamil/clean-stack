@@ -8,7 +8,7 @@ Domain primitives shared by every backend context: `Result`, `Option`, `Entity`,
 src/
   primitives/    result, option, uuid
   domain/        entity, aggregate, value-object, user-id, domain-event, watched-list
-  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), error-code (AppError), pagination
+  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), pagination
   events/        event-collector, event-dispatcher, in-memory-event-dispatcher, on-event, outbox-mapping
   __TESTS__/     one file per primitive
 ```
