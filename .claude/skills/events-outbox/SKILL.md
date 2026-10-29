@@ -18,7 +18,7 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 ## Hard rules
 
-`uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints, guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
+A nested `uow.run()` joins the open transaction (no savepoint); a failed `Result` at any depth rolls the whole unit back; a run's scope is closed when it settles, so a late promise reads the pool. `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
 
 ## Retention
 

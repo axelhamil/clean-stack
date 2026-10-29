@@ -5,10 +5,6 @@ import type { IDomainEvent } from "../domain/domain-event";
 let outOfContextLogger: ((message: string, meta?: Record<string, unknown>) => void) | null = null;
 
 export const EventCollector = {
-  runWithContext<T>(callback: () => Promise<T>): Promise<T> {
-    return UnitOfWorkContext.run(undefined, callback);
-  },
-
   add(events: IDomainEvent | IDomainEvent[]): void {
     const list = Array.isArray(events) ? events : [events];
     const ctx = UnitOfWorkContext.current();

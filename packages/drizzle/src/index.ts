@@ -54,4 +54,8 @@ export * as ssoSchema from "./schema/sso";
 export * as sweepSchema from "./schema/sweep";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
 export * as webhooksSchema from "./schema/webhooks";
-export { type FlushHandler, TransactionService } from "./services/transaction-manager.service";
+export {
+  type FlushHandler,
+  resolveExecutor,
+  TransactionService,
+} from "./services/transaction-manager.service";

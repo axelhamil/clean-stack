@@ -27,8 +27,9 @@ src/
 
 `TransactionService implements IUnitOfWork<Transaction>`; the API pins `TTx = ITransaction` (alias in `apps/api/src/shared/transaction.ts`). It takes a minimal instrumentation slice (`UnitOfWorkInstrumentation`) because a package cannot import the app's port; any `IInstrumentation` fits.
 
-- `run(cb)` opens an `EventCollector` context, runs `cb(tx)`, drains the collected events and hands them to the `FlushHandler` (the outbox) before commit, so the writes and their events are atomic.
-- `run()` cannot be nested: it always opens from `db`, and `EventCollector.hasContext()` makes a nested call throw. **Why**: a nested call takes a separate pool connection and commits independently, and a savepoint would not fix it since `rollback to savepoint` cannot un-collect the in-memory event buffer.
+- `run(cb)` opens the ambient scope (transaction + `EventCollector` buffer), runs `cb(tx)`, drains the collected events and hands them to the `FlushHandler` (the outbox) before commit, so the writes and their events are atomic.
+- The outermost `run()` opens `db.transaction` and publishes it in `UnitOfWorkContext`; a nested `run()` joins it (no savepoint, no second connection) and its events are kept for the outermost flush. A failed `Result` at any depth marks the unit rollback-only (first failure kept) and the outermost `run()` resolves to it. **Why no savepoint**: `rollback to savepoint` cannot un-collect the in-memory event buffer, so a partial rollback would still emit events.
+- `resolveExecutor()` returns the ambient transaction, else `db`. The scope is closed when its run settles, so a promise that outlives the run gets `db`. **Why**: node-postgres does not guard a query on a released client, it may run on a connection another borrower holds.
 - A callback that resolves to a failed `Result` rolls everything back (writes and events) and `run()` resolves to that `Result`; return the failure, never throw a sentinel. Proven against Postgres by `check:uow-rollback` (`apps/api`).
 - A repository's `save`/`create` calls `trackEventsOnSuccess(result, aggregate)`, otherwise the events stay on the aggregate and are silently lost.
 - `run()` does not capture errors: it rethrows to a caller that knows whether the throw is expected, and the central error handler reports the unexpected ones. Capturing here would double-report every 5xx.
