@@ -71,6 +71,7 @@ export const VISIBILITY = {
   "admin.user.password_reset": "internal",
   "admin.user.sessions_revoked": "internal",
   "email.delivery.exhausted": "internal",
+  "outbox.event_dead": "internal",
   "notification.preference.updated": "internal",
   "notification.org_preference.updated": "internal",
   "notification.read": "internal",

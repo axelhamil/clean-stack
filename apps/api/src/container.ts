@@ -1,5 +1,6 @@
 import type { EventHandler, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
+import { ALL_EVENT_TYPES } from "@packages/events";
 import { container } from "inwire";
 import { adminModule } from "./modules/admin/module";
 import { apiTokenModule } from "./modules/api-token/module";
@@ -37,7 +38,11 @@ import { HibpPasswordBreachService } from "./shared/services/hibp-password-breac
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
 import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
-import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
+import {
+  OUTBOX_BATCH_SIZE,
+  OUTBOX_STOP_SETTLE_MARGIN_MS,
+  OutboxDispatcher,
+} from "./shared/services/outbox-dispatcher.service";
 import {
   RateLimiterFlexibleAdapter,
   storeFactoryFor,
@@ -131,6 +136,19 @@ export const di = container()
         logger,
         env.DATABASE_URL,
         c.IInstrumentation,
+        {
+          relay: {
+            eventTypes: ALL_EVENT_TYPES,
+            batchSize: OUTBOX_BATCH_SIZE,
+            maxAttempts: env.OUTBOX_MAX_ATTEMPTS,
+            leaseSeconds: env.OUTBOX_LEASE_SECONDS,
+            deadRetrySeconds: env.OUTBOX_DEAD_RETRY_HOURS * 3600,
+            concurrency: env.OUTBOX_CONCURRENCY,
+            handlerBudgetSeconds: env.OUTBOX_HANDLER_BUDGET_SECONDS,
+          },
+          uow: c.ITransactionService,
+          stopGraceMs: Math.max(0, env.SHUTDOWN_WORKERS_TIMEOUT_MS - OUTBOX_STOP_SETTLE_MARGIN_MS),
+        },
       ),
   )
   .addModule(adminModule)

@@ -7,6 +7,8 @@ import {
   worstCaseShutdownMs,
 } from "./shutdown";
 
+export const OUTBOX_SETTLE_MARGIN_SECONDS = 10;
+
 /**
  * The sweep-timeout bounds only work nested: the sweep must be able to finish and
  * answer before the socket closes, and the socket must close before the client gives
@@ -27,6 +29,8 @@ export function validateEnvBounds(
     SHUTDOWN_STEP_TIMEOUT_MS: number;
     SHUTDOWN_WORKERS_TIMEOUT_MS: number;
     SHUTDOWN_DEADLINE_MS: number;
+    OUTBOX_LEASE_SECONDS: number;
+    OUTBOX_HANDLER_BUDGET_SECONDS: number;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -56,6 +60,15 @@ export function validateEnvBounds(
       code: "custom",
       path: ["SHUTDOWN_DEADLINE_MS"],
       message: `SHUTDOWN_DEADLINE_MS (${value.SHUTDOWN_DEADLINE_MS}) must cover the worst-case shutdown (${shutdownBudgetMs}ms): SHUTDOWN_GRACE_PERIOD_MS + ${GRACE_MARGIN_MS}, 2 x SHUTDOWN_STEP_TIMEOUT_MS (http, database pool), SHUTDOWN_WORKERS_TIMEOUT_MS, the ${TELEMETRY_FLUSH_TIMEOUT_MS + TELEMETRY_FLUSH_MARGIN_MS}ms telemetry flush and the ${DEADLINE_FLUSH_TIMEOUT_MS}ms deadline flush, or a slow but healthy shutdown is cut by the deadline and exits 1.`,
+    });
+  }
+
+  const leaseFloor = value.OUTBOX_HANDLER_BUDGET_SECONDS + OUTBOX_SETTLE_MARGIN_SECONDS;
+  if (value.OUTBOX_LEASE_SECONDS < leaseFloor) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["OUTBOX_LEASE_SECONDS"],
+      message: `OUTBOX_LEASE_SECONDS (${value.OUTBOX_LEASE_SECONDS}) must be at least OUTBOX_HANDLER_BUDGET_SECONDS (${value.OUTBOX_HANDLER_BUDGET_SECONDS}) + the ${OUTBOX_SETTLE_MARGIN_SECONDS}s claim and settle margin (${leaseFloor}), or a handler still within its budget outlives the lease and another relay claims the same event.`,
     });
   }
 }

@@ -90,6 +90,11 @@ const envSchema = z
       .optional()
       .transform((v) => v === "true"),
     OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+    OUTBOX_LEASE_SECONDS: z.coerce.number().int().positive().default(120),
+    OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().positive().default(10),
+    OUTBOX_DEAD_RETRY_HOURS: z.coerce.number().positive().default(6),
+    OUTBOX_CONCURRENCY: z.coerce.number().int().positive().default(4),
+    OUTBOX_HANDLER_BUDGET_SECONDS: z.coerce.number().int().positive().default(30),
     EMAIL_MESSAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
     EMAIL_MESSAGE_FAILED_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
     AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),

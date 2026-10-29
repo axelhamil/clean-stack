@@ -1,54 +1,100 @@
-import { type EventHandler, type IDomainEvent, isEventHandler } from "@packages/ddd-kit";
+import {
+  type EventHandler,
+  type IEventDispatcher,
+  InMemoryEventDispatcher,
+  type IUnitOfWork,
+  isEventHandler,
+  Option,
+} from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
-import { ALL_EVENT_TYPES } from "@packages/events";
-import { expectedDelayFromAttempts, nextDelayMs } from "../jitter";
 import type { Logger } from "../logger";
 import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { IOutboxRepository, OutboxRecord } from "../ports/outbox.port";
+import type { DeliveredEvent, IOutboxRepository, OutboxRecord } from "../ports/outbox.port";
 import { OUTBOX_CHANNEL } from "./drizzle-outbox.service";
+import { OutboxRelay, type OutboxRelayOptions } from "./outbox-relay";
 import type { OutboxSubscriber } from "./outbox-subscriber";
 import { PgListener, type PgListenerOptions } from "./pg-listener";
 
-const BATCH_SIZE = 50;
-const POLL_INTERVAL_MS = 30_000;
-const LEASE_SECONDS = 120;
+export const OUTBOX_BATCH_SIZE = 50;
+export const OUTBOX_STOP_SETTLE_MARGIN_MS = 2_000;
 
-function recordToDomainEvent(rec: OutboxRecord): IDomainEvent {
+const POLL_INTERVAL_MS = 30_000;
+const EMPTY_DRAIN_FLOOR_MS = 50;
+const FAILED_DRAIN_RETRY_MS = 2_000;
+
+export type OutboxDispatcherOptions = {
+  relay: OutboxRelayOptions;
+  uow: IUnitOfWork;
+  stopGraceMs: number;
+  listener?: PgListenerOptions;
+};
+
+export function collectUserEventHandlers(diLike: Record<string, unknown>): EventHandler[] {
+  return Object.values(diLike).filter(isEventHandler);
+}
+
+function recordOf(event: DeliveredEvent): OutboxRecord {
   return {
-    eventId: rec.id,
-    eventType: rec.eventType,
-    dateOccurred: rec.occurredAt,
-    aggregateId: rec.aggregateId,
-    payload: rec.payload,
+    id: event.eventId ?? "",
+    eventType: event.eventType,
+    aggregateId: event.aggregateId,
+    aggregateType: event.aggregateType ?? "unknown",
+    organizationId: Option.fromNullable(event.organizationId),
+    payload: event.payload,
+    metadata: {
+      specversion: "1.0",
+      source: "app/api",
+      datacontenttype: "application/json",
+      requestId: event.requestId,
+    },
+    occurredAt: event.dateOccurred,
+    attempts: 0,
+    deadAt: Option.none(),
+    deliveries: {},
   };
 }
 
-/**
- * Scans the DI container snapshot for `EventHandler` instances and indexes
- * them by `eventType`. Called once at `start()` so dispatch is a plain Map
- * lookup with no reflection at runtime. The DI container is passed as a plain
- * `Record` so this function stays testable without a real container.
- */
-export function collectUserEventHandlers(
-  diLike: Record<string, unknown>,
-): Map<string, EventHandler[]> {
-  const map = new Map<string, EventHandler[]>();
-  for (const value of Object.values(diLike)) {
-    if (!isEventHandler(value)) continue;
-    const arr = map.get(value.eventType) ?? [];
-    arr.push(value);
-    map.set(value.eventType, arr);
+function subscribeAll(
+  dispatcher: IEventDispatcher<DeliveredEvent>,
+  eventType: string,
+  name: string,
+  handle: (event: DeliveredEvent) => Promise<void>,
+): void {
+  const subscribed = dispatcher.subscribe(eventType, name, handle);
+  if (subscribed.isFailure) throw new Error(subscribed.getError());
+}
+
+function legacyDispatcher(
+  eventTypes: readonly string[],
+  subscribers: readonly OutboxSubscriber[],
+  userHandlers: readonly EventHandler[],
+): IEventDispatcher<DeliveredEvent> {
+  const dispatcher = new InMemoryEventDispatcher<DeliveredEvent>();
+  for (const eventType of eventTypes) {
+    for (const subscriber of subscribers) {
+      subscribeAll(dispatcher, eventType, subscriber.name, (event) =>
+        db.transaction((tx) => subscriber.handle(recordOf(event), tx)),
+      );
+    }
   }
-  return map;
+  for (const handler of userHandlers) {
+    subscribeAll(dispatcher, handler.eventType, handler.handlerName, (event) =>
+      handler.handle(event),
+    );
+  }
+
+  return dispatcher;
 }
 
 export class OutboxDispatcher {
   private readonly listener: PgListener;
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private draining = false;
-  private stopping = false;
+  private relay: OutboxRelay | null = null;
   private started = false;
-  private userHandlers: Map<string, EventHandler[]> = new Map();
+  private stopped = true;
+  private draining = false;
+  private wakeRequested = false;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private inFlight: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly outbox: IOutboxRepository,
@@ -56,7 +102,7 @@ export class OutboxDispatcher {
     private readonly logger: Logger,
     connectionString: string,
     private readonly instrumentation: IInstrumentation,
-    options: PgListenerOptions = {},
+    private readonly options: OutboxDispatcherOptions,
   ) {
     this.listener = new PgListener(
       {
@@ -64,133 +110,93 @@ export class OutboxDispatcher {
         label: "outbox",
         owner: "OutboxDispatcher",
         connectionString,
-        onNotification: () => this.drainInBackground("notify"),
+        onNotification: () => this.wake(),
       },
       logger,
       instrumentation,
-      options,
+      options.listener,
     );
   }
 
-  async start(diLike?: Record<string, unknown>): Promise<void> {
+  async start(diLike: Record<string, unknown> = {}): Promise<void> {
     if (this.started) return;
 
     this.started = true;
-    this.stopping = false;
-    if (diLike) this.userHandlers = collectUserEventHandlers(diLike);
+    this.stopped = false;
+    const dispatcher = legacyDispatcher(
+      this.options.relay.eventTypes,
+      this.builtInSubscribers,
+      collectUserEventHandlers(diLike),
+    );
+    this.relay = new OutboxRelay(
+      this.outbox,
+      this.options.uow,
+      dispatcher,
+      this.options.relay,
+      this.instrumentation,
+      this.logger,
+    );
     await this.listener.start();
-    this.pollTimer = setInterval(() => this.drainInBackground("poll tick"), POLL_INTERVAL_MS);
     this.logger.info("outbox dispatcher started");
-    this.drainInBackground("start");
+    this.wake();
   }
 
   async stop(): Promise<void> {
     this.started = false;
-    this.stopping = true;
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
+    this.stopped = true;
+    clearTimeout(this.timer);
+    const relay = this.relay;
+    relay?.halt();
+    const grace = setTimeout(() => relay?.abandonInFlight(), this.options.stopGraceMs);
+    try {
+      await this.inFlight;
+    } finally {
+      clearTimeout(grace);
     }
     await this.listener.stop();
-    while (this.draining) {
-      await new Promise((r) => setTimeout(r, 50));
-    }
     this.logger.info("outbox dispatcher stopped");
   }
 
-  /**
-   * Fire-and-forget entry point for every drain nobody awaits. A rejection left
-   * unhandled here would take the whole process down, so it always ends in a log
-   * line; `drainBatch` has already reported it to telemetry before rethrowing.
-   */
-  private drainInBackground(trigger: string): void {
-    this.triggerDrain().catch((err) =>
-      this.logger.error({ err }, `outbox drain failed (${trigger})`),
-    );
-  }
+  private wake(): void {
+    if (this.stopped) return;
 
-  async triggerDrain(): Promise<void> {
-    if (this.stopping || this.draining) return;
-    this.draining = true;
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "OutboxDispatcher > triggerDrain" },
-        async () => {
-          let drainedSize: number;
-          do {
-            drainedSize = await this.drainBatch();
-          } while (drainedSize === BATCH_SIZE && !this.stopping);
-        },
-      );
-    } finally {
-      this.draining = false;
+    if (this.draining) {
+      this.wakeRequested = true;
+      return;
     }
+
+    clearTimeout(this.timer);
+    this.draining = true;
+    this.inFlight = this.drainUntilQuiet();
   }
 
-  private async drainBatch(): Promise<number> {
-    return this.instrumentation.startSpan({ name: "OutboxDispatcher > drainBatch" }, async () => {
-      const claimed = await this.outbox.claim({
-        limit: BATCH_SIZE,
-        eventTypes: ALL_EVENT_TYPES,
-        leaseSeconds: LEASE_SECONDS,
-      });
-      if (claimed.isFailure) throw new Error(claimed.getError());
+  private async drainUntilQuiet(): Promise<void> {
+    let nextWakeMs = 0;
+    do {
+      this.wakeRequested = false;
+      nextWakeMs = await this.drainThenPlanNextWake();
+    } while (!this.stopped && (this.wakeRequested || nextWakeMs === 0));
 
-      const events = claimed.getValue();
-      for (const event of events) {
-        if (this.stopping) break;
-        await this.settle(event);
-      }
-
-      return events.length;
-    });
+    this.draining = false;
+    if (!this.stopped) this.timer = setTimeout(() => this.wake(), nextWakeMs);
   }
 
-  private async settle(event: OutboxRecord): Promise<void> {
+  private async drainThenPlanNextWake(): Promise<number> {
+    const relay = this.relay;
+    if (!relay) return POLL_INTERVAL_MS;
+
     try {
-      await db.transaction(async (tx) => {
-        for (const sub of this.builtInSubscribers) await sub.handle(event, tx);
-      });
+      const { dispatched, failed } = await relay.drainOnce();
+      const { dueInMs } = await relay.pendingState();
+      const floorMs = dispatched + failed === 0 ? EMPTY_DRAIN_FLOOR_MS : 0;
+      const nextDueMs = Math.max(floorMs, Math.ceil(dueInMs.unwrapOr(POLL_INTERVAL_MS)));
+
+      return Math.min(nextDueMs, POLL_INTERVAL_MS);
     } catch (err) {
       this.instrumentation.capture(err);
-      this.logger.error(
-        { err, eventId: event.id, eventType: event.eventType },
-        "outbox event built-in subscriber failed",
-      );
-      const failed = await this.outbox.markFailed(event, {
-        lastError: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-        retryAfterSeconds: nextDelayMs(expectedDelayFromAttempts(event.attempts)) / 1000,
-        dead: false,
-        deliveries: {},
-      });
-      if (failed.isFailure) this.logger.error({ eventId: event.id }, failed.getError());
-      return;
-    }
+      this.logger.error({ err }, "outbox drain failed");
 
-    const delivered = await this.outbox.markDelivered(event, {});
-    if (delivered.isFailure) {
-      this.logger.error({ eventId: event.id }, delivered.getError());
-      return;
-    }
-
-    await this.runUserHandlers(event);
-  }
-
-  private async runUserHandlers(event: OutboxRecord): Promise<void> {
-    const handlers = this.userHandlers.get(event.eventType) ?? [];
-    if (handlers.length === 0) return;
-
-    const domainEvent = recordToDomainEvent(event);
-    for (const h of handlers) {
-      try {
-        await h.handle(domainEvent);
-      } catch (err) {
-        this.instrumentation.capture(err);
-        this.logger.error(
-          { err, eventId: event.id, eventType: event.eventType, handlerName: h.handlerName },
-          "outbox user handler threw (event already dispatched, handler is best-effort)",
-        );
-      }
+      return FAILED_DRAIN_RETRY_MS;
     }
   }
 }

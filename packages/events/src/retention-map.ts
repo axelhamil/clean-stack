@@ -61,6 +61,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.BILLING_PAYMENT_FAILED]: "compliance",
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "operational",
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]: "operational",
+  [EventTypes.OUTBOX_EVENT_DEAD]: "operational",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]: "compliance",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]: "compliance",
   [EventTypes.ADMIN_USER_BANNED]: "compliance",

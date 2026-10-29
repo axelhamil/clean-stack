@@ -268,6 +268,19 @@ export const EmailDeliveryExhaustedPayload = z.object({
 });
 export type EmailDeliveryExhaustedPayload = z.infer<typeof EmailDeliveryExhaustedPayload>;
 
+export const OUTBOX_LAST_ERROR_MAX_LENGTH = 1_000;
+
+export const OutboxEventDeadPayload = z.object({
+  eventId: z.string(),
+  eventType: z.string(),
+  aggregateId: z.string(),
+  attempts: z.number().int().positive(),
+  lastError: z.string().max(OUTBOX_LAST_ERROR_MAX_LENGTH),
+  failedHandlers: z.array(z.string()),
+  actorUserId: z.null(),
+});
+export type OutboxEventDeadPayload = z.infer<typeof OutboxEventDeadPayload>;
+
 export const UserPolicyAcceptedPayload = UserRef.extend({
   policyType: z.string(),
   policyVersion: z.string(),
@@ -650,6 +663,7 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]: WebhookDeliveryExhaustedPayload,
   [EventTypes.WEBHOOK_DELIVERY_REPLAYED]: WebhookDeliveryReplayedPayload,
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]: EmailDeliveryExhaustedPayload,
+  [EventTypes.OUTBOX_EVENT_DEAD]: OutboxEventDeadPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,

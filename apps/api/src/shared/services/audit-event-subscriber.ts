@@ -16,7 +16,7 @@ function extractActor(event: OutboxRecord): { id: string | null; type: AuditActo
 }
 
 export class AuditEventSubscriber implements OutboxSubscriber {
-  readonly name = "audit";
+  readonly name = "audit-log";
 
   constructor(private readonly instrumentation: IInstrumentation) {}
 

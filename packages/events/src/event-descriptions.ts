@@ -65,6 +65,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "A plan quota was exceeded.",
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
     "An email was abandoned after exhausting all delivery attempts.",
+  [EventTypes.OUTBOX_EVENT_DEAD]:
+    "A domain event exhausted its delivery attempts and is now retried every few hours.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
     "A platform administrator started an impersonation session.",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]:

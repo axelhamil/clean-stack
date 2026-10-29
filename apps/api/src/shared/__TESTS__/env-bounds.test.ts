@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { validateEnvBounds } from "../env-bounds";
+import { OUTBOX_SETTLE_MARGIN_SECONDS, validateEnvBounds } from "../env-bounds";
 
 // Exercises the real guard (`superRefine` in env.ts) against plain literals. Never
 // imports `env.ts` itself, since env.ts parses `process.env` at import time and throws
@@ -14,6 +14,8 @@ const boundsSchema = z
     SHUTDOWN_STEP_TIMEOUT_MS: z.number(),
     SHUTDOWN_WORKERS_TIMEOUT_MS: z.number(),
     SHUTDOWN_DEADLINE_MS: z.number(),
+    OUTBOX_LEASE_SECONDS: z.number(),
+    OUTBOX_HANDLER_BUDGET_SECONDS: z.number(),
   })
   .superRefine(validateEnvBounds);
 
@@ -24,6 +26,11 @@ const SHUTDOWN_DEFAULTS = {
   SHUTDOWN_DEADLINE_MS: 36_000,
 };
 
+const OUTBOX_DEFAULTS = {
+  OUTBOX_LEASE_SECONDS: 120,
+  OUTBOX_HANDLER_BUDGET_SECONDS: 30,
+};
+
 describe("validateEnvBounds", () => {
   it("accepts the three defaults", () => {
     const result = boundsSchema.safeParse({
@@ -31,6 +38,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
     });
     expect(result.success).toBe(true);
   });
@@ -41,6 +49,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 120_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -51,6 +60,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 130_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -61,6 +71,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 120_000,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -71,6 +82,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 100_000,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -86,15 +98,40 @@ describe("validateEnvBounds", () => {
     const atBudget = boundsSchema.safeParse({
       ...sweepBounds,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
       SHUTDOWN_DEADLINE_MS: worstCaseMs,
     });
     const belowBudget = boundsSchema.safeParse({
       ...sweepBounds,
       ...SHUTDOWN_DEFAULTS,
+      ...OUTBOX_DEFAULTS,
       SHUTDOWN_DEADLINE_MS: worstCaseMs - 1,
     });
 
     expect(atBudget.success).toBe(true);
     expect(belowBudget.success).toBe(false);
+  });
+
+  it("rejects an outbox lease that leaves no settle margin after one handler budget and accepts the exact margin", () => {
+    const bounds = {
+      SERVER_IDLE_TIMEOUT_SECONDS: 120,
+      SWEEP_DEADLINE_MS: 90_000,
+      INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
+    };
+
+    const withMargin = boundsSchema.safeParse({
+      ...bounds,
+      OUTBOX_LEASE_SECONDS: 30 + OUTBOX_SETTLE_MARGIN_SECONDS,
+      OUTBOX_HANDLER_BUDGET_SECONDS: 30,
+    });
+    const equalToBudget = boundsSchema.safeParse({
+      ...bounds,
+      OUTBOX_LEASE_SECONDS: 30,
+      OUTBOX_HANDLER_BUDGET_SECONDS: 30,
+    });
+
+    expect(withMargin.success).toBe(true);
+    expect(equalToBudget.success).toBe(false);
   });
 });
