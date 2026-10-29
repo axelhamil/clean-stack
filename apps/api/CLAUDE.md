@@ -34,7 +34,7 @@ apps/api/src/
   client.ts                     `hcWithType` factory, `hc<AppType>` (`AppType` from `app.ts`)
 ```
 
-**Module boundary.** Within a module, layers import inwards (`infrastructure/` → `application/` → `domain/`). Cross-module: domain events, `shared/ports/`, or `shared/services/` only. **Modules NEVER import each other**, not even ports. `module.ts` is imported only by `container.ts`; routes only by `app.ts`. Re-exporting routes from `module.ts` recreates the cycle `module → routes → container → module` (Biome flags it).
+**Module boundary.** Within a module, layers import inwards (`infrastructure/` → `application/` → `domain/`). Cross-module: domain events, `shared/ports/`, or `shared/services/` only. **Modules NEVER import each other**, not even ports. Enforced by `pnpm check:boundaries` (dependency-cruiser, `.dependency-cruiser.cjs`): no cross-module import, `domain/` and `application/` free of infrastructure, database and frameworks, `domain/` reaching only `ddd-kit`, `events`, `zod` and its own module, packages never import an app, the front reaches the api only through `api/client`. `module.ts` is imported only by `container.ts`; routes only by `app.ts`. Re-exporting routes from `module.ts` recreates the cycle `module → routes → container → module` (Biome flags it).
 
 **Removability.** `trash modules/<context>/`, remove its `.addModule()` and `app.route()` lines and its `export *` in the schema barrel; TS error-points the rest. Shared kernel always has ≥ 2 consumers OR is cross-cutting infra by nature.
 
