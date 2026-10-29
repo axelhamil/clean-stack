@@ -1,8 +1,6 @@
+import { IP_HEADERS, scrubBreadcrumb, scrubEvent } from "@packages/sentry-scrub";
 import * as Sentry from "@sentry/react";
 import { env } from "../env";
-
-// Headers that carry the client IP or identity; v10's sendDefaultPii: false stripped them.
-const IP_HEADERS = ["forwarded", "-ip", "remote-", "via", "-user"];
 
 if (env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -18,26 +16,8 @@ if (env.VITE_SENTRY_DSN) {
       urlQueryParams: false,
     },
     tracesSampleRate: 0,
-    beforeSend(event) {
-      if (event.request) {
-        event.request.data = undefined;
-        event.request.query_string = undefined;
-      }
-      if (event.request?.headers) {
-        const h = event.request.headers as Record<string, string | undefined>;
-        h.cookie = undefined;
-        h.Cookie = undefined;
-        h.authorization = undefined;
-        h.Authorization = undefined;
-        h["x-csrf-token"] = undefined;
-      }
-      if (event.user) {
-        event.user.email = undefined;
-        event.user.username = undefined;
-        event.user.ip_address = undefined;
-      }
-      return event;
-    },
+    beforeSend: scrubEvent,
+    beforeBreadcrumb: scrubBreadcrumb,
   });
 }
 

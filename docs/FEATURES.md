@@ -195,7 +195,7 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 
 - **`pino`** + **`hono-pino`**: JSON prod, `pino-pretty` dev. `info` prod / `debug` dev. Status-driven HTTP log level (`5xx`→`error`, `4xx`→`warn`). Every line carries `requestId`.
 - **Single `app.onError(errorHandler)`**: `HTTPException` → `{ error: { code, message, requestId } }`. No per-route try/catch.
-- **Sentry** (`@sentry/bun` api + `@sentry/react` app): NoOp without `SENTRY_DSN`. Captures ≥500 errors with `requestId/userId/orgId` tags, RGPD scrubbing (drops Cookie, Authorization, email, ip_address). Source maps in CI via `@sentry/vite-plugin`.
+- **Sentry** (`@sentry/bun` api + `@sentry/react` app): NoOp without `SENTRY_DSN`. Captures ≥500 errors with `requestId/userId/orgId` tags, RGPD scrubbing shared by api and app in `@packages/sentry-scrub` (drops Cookie, Authorization, email, ip_address, failed-query params, URL query strings and emails in error text, contexts, extra, breadcrumbs and log lines, console breadcrumbs). Source maps in CI via `@sentry/vite-plugin`.
 - OTel + Prometheus `/metrics` deferred until a tracing/scrape backend exists. See [`./OBSERVABILITY.md`](./OBSERVABILITY.md).
 
 ---

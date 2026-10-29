@@ -267,6 +267,9 @@ importers:
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
+      '@packages/sentry-scrub':
+        specifier: workspace:*
+        version: link:../../packages/sentry-scrub
       '@sentry/bun':
         specifier: ^11.9.0
         version: 11.9.0(rollup@4.65.1)
@@ -358,6 +361,9 @@ importers:
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
+      '@packages/sentry-scrub':
+        specifier: workspace:*
+        version: link:../../packages/sentry-scrub
       '@packages/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -650,6 +656,21 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+
+  packages/sentry-scrub:
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/test:
     devDependencies:
