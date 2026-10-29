@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./bun": "./src/bun/port-mock.ts",
+    "./bun/unit-of-work": "./src/bun/unit-of-work-mock.ts",
     "./source-scan": "./src/source-scan.ts",
     "./base-vitest.config": "./base-vitest.config.js"
   },
@@ -17,6 +18,9 @@
     "lint": "biome lint .",
     "check": "biome check .",
     "fix": "biome check --write ."
+  },
+  "peerDependencies": {
+    "@packages/ddd-kit": "workspace:*"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
