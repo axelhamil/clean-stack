@@ -7,7 +7,6 @@ import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
@@ -33,7 +32,7 @@ export class WebhooksService {
   constructor(
     private readonly endpoints: IWebhookEndpointRepository,
     private readonly deliveries: IWebhookDeliveryRepository,
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly outbox: IOutboxRepository,
     private readonly masterKey: MasterKeyProvider,
     private readonly instrumentation: IInstrumentation,
@@ -67,18 +66,15 @@ export class WebhooksService {
         const plaintextSecret = this.secretGen();
         const secretCipher = encryptSecret(plaintextSecret, subKey);
 
-        const created = await this.uow.run(async (tx) => {
-          const result = await this.endpoints.create(
-            {
-              id: uuidv7(),
-              organizationId: args.organizationId,
-              url: args.url,
-              secretCipher,
-              eventTypes: args.eventTypes,
-              enabled: args.enabled,
-            },
-            tx,
-          );
+        const created = await this.uow.run(async () => {
+          const result = await this.endpoints.create({
+            id: uuidv7(),
+            organizationId: args.organizationId,
+            url: args.url,
+            secretCipher,
+            eventTypes: args.eventTypes,
+            enabled: args.enabled,
+          });
           if (result.isFailure) return result;
           const endpoint = result.getValue();
           await emitEvent(
@@ -131,8 +127,8 @@ export class WebhooksService {
               message: guard.getError().message,
             });
         }
-        return this.uow.run(async (tx) => {
-          const updated = await this.endpoints.update(args, tx);
+        return this.uow.run(async () => {
+          const updated = await this.endpoints.update(args);
           if (updated.isFailure) return updated;
           const opt = updated.getValue();
           if (opt.isNone()) return updated;
@@ -167,8 +163,8 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > deleteEndpoint", op: "function" },
       async () =>
-        this.uow.run(async (tx) => {
-          const deleted = await this.endpoints.delete(id, organizationId, tx);
+        this.uow.run(async () => {
+          const deleted = await this.endpoints.delete(id, organizationId);
           if (deleted.isFailure) return deleted;
           if (!deleted.getValue()) return deleted;
           await emitEvent(
@@ -232,12 +228,11 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > replayDelivery", op: "function" },
       async () =>
-        this.uow.run(async (tx) => {
+        this.uow.run(async () => {
           const replayed = await this.deliveries.enqueueReplay(
             deliveryId,
             endpointId,
             organizationId,
-            tx,
           );
           if (replayed.isFailure) return replayed;
           const opt = replayed.getValue();
@@ -272,7 +267,7 @@ export class WebhooksService {
       async () => {
         const endpoint = await this.endpoints.findById(args.id, args.organizationId);
         if (endpoint.isNone()) return Result.ok(Option.none());
-        return this.uow.run(async (tx) => {
+        return this.uow.run(async () => {
           const outboxEventId = await emitEvent(
             this.outbox,
             EventTypes.WEBHOOK_TEST,
@@ -285,20 +280,17 @@ export class WebhooksService {
             },
             { organizationId: args.organizationId },
           );
-          const delivery = await this.deliveries.enqueueTargeted(
-            {
+          const delivery = await this.deliveries.enqueueTargeted({
+            endpointId: args.id,
+            outboxEventId,
+            eventType: EventTypes.WEBHOOK_TEST,
+            payload: {
+              organizationId: args.organizationId,
               endpointId: args.id,
-              outboxEventId,
-              eventType: EventTypes.WEBHOOK_TEST,
-              payload: {
-                organizationId: args.organizationId,
-                endpointId: args.id,
-                actorUserId: args.actorUserId,
-              },
-              idempotencyKey: `test:${outboxEventId}`,
+              actorUserId: args.actorUserId,
             },
-            tx,
-          );
+            idempotencyKey: `test:${outboxEventId}`,
+          });
           if (delivery.isFailure) return Result.fail(delivery.getError());
           return Result.ok(Option.some(delivery.getValue()));
         });
@@ -336,17 +328,14 @@ export class WebhooksService {
           Date.now() + env.WEBHOOK_SECRET_GRACE_HOURS * 3_600_000,
         );
 
-        const rotated = await this.uow.run(async (tx) => {
-          const result = await this.endpoints.applySecretRotation(
-            {
-              id: args.id,
-              organizationId: args.organizationId,
-              secretCipher: newCipher,
-              previousSecretCipher: endpoint.unwrap().secretCipher,
-              previousSecretExpiresAt,
-            },
-            tx,
-          );
+        const rotated = await this.uow.run(async () => {
+          const result = await this.endpoints.applySecretRotation({
+            id: args.id,
+            organizationId: args.organizationId,
+            secretCipher: newCipher,
+            previousSecretCipher: endpoint.unwrap().secretCipher,
+            previousSecretExpiresAt,
+          });
           if (result.isFailure) return result;
           await emitEvent(
             this.outbox,

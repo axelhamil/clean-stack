@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
@@ -38,14 +39,17 @@ function makeDbQuery() {
 
 // Only what this file's subject actually touches: test files do not share a module
 // registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
+const fakeDb = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+};
+
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    select: () => makeDbQuery(),
-    insert: () => makeDbQuery(),
-    update: () => makeDbQuery(),
-    delete: () => makeDbQuery(),
-  },
+  db: fakeDb,
+  resolveExecutor: () => UnitOfWorkContext.transaction() ?? fakeDb,
 }));
 
 // All imports AFTER mock.module to ensure mocks are in place before module resolution.
@@ -506,7 +510,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns Result.ok with the inserted delivery", async () => {
       dbBehavior = async () => [fakeDelivery];
 
-      const result = await repo.enqueueTargeted(targetedArgs, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.enqueueTargeted(targetedArgs),
+      );
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().id).toBe("del-1");
@@ -516,7 +522,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [fakeDelivery];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueTargeted(targetedArgs, makeTx());
+      await UnitOfWorkContext.run(makeTx(), () => repo.enqueueTargeted(targetedArgs));
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -532,7 +538,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.enqueueTargeted(targetedArgs, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.enqueueTargeted(targetedArgs),
+      );
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");

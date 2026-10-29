@@ -312,7 +312,7 @@ describe("RgpdService", () => {
       const result = await service.cancelAccountDeletion({ userId: "u1" });
 
       expect(result.isSuccess).toBe(true);
-      expect(repo.clearPendingDeletion).toHaveBeenCalledWith("u1", expect.anything());
+      expect(repo.clearPendingDeletion).toHaveBeenCalledWith("u1");
       expect(email.sendTemplate).toHaveBeenCalledWith(
         "delete_cancelled",
         "u@example.com",
@@ -800,7 +800,7 @@ describe("RgpdService", () => {
         expect.objectContaining({ name: "User", downloadUrl: expect.any(String) }),
         expect.objectContaining({ idempotencyKey: expect.any(String), locale: "fr" }),
       );
-      expect(repo.touchExportRequestedAt).toHaveBeenCalledWith("u1", expect.anything());
+      expect(repo.touchExportRequestedAt).toHaveBeenCalledWith("u1");
     });
 
     it("succeeds even when email send fails", async () => {

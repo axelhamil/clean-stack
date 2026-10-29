@@ -1,6 +1,5 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
-import type { ITransaction } from "../../../../shared/transaction";
 
 export type RgpdError = AppError<
   | "ACCOUNT_DELETION_BLOCKED"
@@ -86,41 +85,23 @@ export interface UserDeletionState {
 export interface IRgpdRepository {
   findSoleOwnedNonPersonalOrgsWithMembers(
     userId: string,
-    tx?: ITransaction,
   ): Promise<Result<SoleOwnedOrgWithMembers[], RgpdError>>;
 
-  collectUserDataForExport(
-    userId: string,
-    tx?: ITransaction,
-  ): Promise<Result<UserExportPayload, RgpdError>>;
+  collectUserDataForExport(userId: string): Promise<Result<UserExportPayload, RgpdError>>;
 
-  markPendingDeletion(
-    userId: string,
-    until: Date,
-    tx?: ITransaction,
-  ): Promise<Result<void, RgpdError>>;
+  markPendingDeletion(userId: string, until: Date): Promise<Result<void, RgpdError>>;
 
-  clearPendingDeletion(userId: string, tx?: ITransaction): Promise<Result<void, RgpdError>>;
+  clearPendingDeletion(userId: string): Promise<Result<void, RgpdError>>;
 
-  findUsersReadyForWipe(
-    limit: number,
-    tx?: ITransaction,
-  ): Promise<Result<PendingDeletionRow[], RgpdError>>;
+  findUsersReadyForWipe(limit: number): Promise<Result<PendingDeletionRow[], RgpdError>>;
 
-  executeWipe(userId: string, tx: ITransaction): Promise<Result<ExecuteWipeOutput, RgpdError>>;
+  executeWipe(userId: string): Promise<Result<ExecuteWipeOutput, RgpdError>>;
 
-  verifyPassword(
-    userId: string,
-    password: string,
-    tx?: ITransaction,
-  ): Promise<Result<boolean, RgpdError>>;
+  verifyPassword(userId: string, password: string): Promise<Result<boolean, RgpdError>>;
 
-  verifyTotp(userId: string, code: string, tx?: ITransaction): Promise<Result<boolean, RgpdError>>;
+  verifyTotp(userId: string, code: string): Promise<Result<boolean, RgpdError>>;
 
-  touchExportRequestedAt(userId: string, tx?: ITransaction): Promise<Result<void, RgpdError>>;
+  touchExportRequestedAt(userId: string): Promise<Result<void, RgpdError>>;
 
-  getUserDeletionState(
-    userId: string,
-    tx?: ITransaction,
-  ): Promise<Result<Option<UserDeletionState>, RgpdError>>;
+  getUserDeletionState(userId: string): Promise<Result<Option<UserDeletionState>, RgpdError>>;
 }

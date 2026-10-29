@@ -1,8 +1,7 @@
 import { Result, uuidv7 } from "@packages/ddd-kit";
-import { and, db, eq, quotaUsageSchema, sql } from "@packages/drizzle";
+import { and, eq, quotaUsageSchema, resolveExecutor, sql } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   IQuotaUsageStore,
   QuotaError,
@@ -30,9 +29,8 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
     resource: string,
     by: number,
     period: QuotaPeriod,
-    tx?: ITransaction,
   ): Promise<Result<number, QuotaError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleQuotaUsageStore > increment" },
@@ -72,9 +70,8 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
     orgId: string,
     resource: string,
     period: QuotaPeriod,
-    tx?: ITransaction,
   ): Promise<Result<number, QuotaError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleQuotaUsageStore > current" },
@@ -103,9 +100,8 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
     orgId: string,
     resource: string,
     period: QuotaPeriod,
-    tx?: ITransaction,
   ): Promise<Result<void, QuotaError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan({ name: "DrizzleQuotaUsageStore > reset" }, async () => {
       try {

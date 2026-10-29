@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
@@ -54,14 +55,17 @@ const fakeRow = {
 
 // Only what this file's subject actually touches: test files do not share a module
 // registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
+const fakeDb = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+};
+
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    select: () => makeDbQuery(),
-    insert: () => makeDbQuery(),
-    update: () => makeDbQuery(),
-    delete: () => makeDbQuery(),
-  },
+  db: fakeDb,
+  resolveExecutor: () => UnitOfWorkContext.transaction() ?? fakeDb,
 }));
 
 const { DrizzleWebhookEndpointRepository } = await import(
@@ -385,15 +389,14 @@ describe("DrizzleWebhookEndpointRepository", () => {
         },
       ];
 
-      const r = await repo.applySecretRotation(
-        {
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.applySecretRotation({
           id: "ep-1",
           organizationId: "org-1",
           secretCipher: "new-cipher",
           previousSecretCipher: "old-cipher",
           previousSecretExpiresAt: new Date("2030-01-01"),
-        },
-        tx,
+        }),
       );
 
       expect(r.isSuccess).toBe(true);
@@ -405,15 +408,14 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Option.none when no row matched", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.applySecretRotation(
-        {
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.applySecretRotation({
           id: "ep-99",
           organizationId: "org-1",
           secretCipher: "x",
           previousSecretCipher: "y",
           previousSecretExpiresAt: new Date(),
-        },
-        tx,
+        }),
       );
 
       expect(r.isSuccess).toBe(true);
@@ -425,15 +427,14 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.applySecretRotation(
-        {
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.applySecretRotation({
           id: "ep-1",
           organizationId: "org-1",
           secretCipher: "x",
           previousSecretCipher: "y",
           previousSecretExpiresAt: new Date(),
-        },
-        tx,
+        }),
       );
 
       expect(r.isFailure).toBe(true);

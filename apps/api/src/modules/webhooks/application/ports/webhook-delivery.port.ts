@@ -70,7 +70,6 @@ export interface IWebhookDeliveryRepository {
     deliveryId: string,
     endpointId: string,
     organizationId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>>;
   createAttempt(
     args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
@@ -80,14 +79,11 @@ export interface IWebhookDeliveryRepository {
     id: string,
     organizationId: string,
   ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>>;
-  enqueueTargeted(
-    args: {
-      endpointId: string;
-      outboxEventId: string;
-      eventType: string;
-      payload: unknown;
-      idempotencyKey: string;
-    },
-    tx: ITransaction,
-  ): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>>;
+  enqueueTargeted(args: {
+    endpointId: string;
+    outboxEventId: string;
+    eventType: string;
+    payload: unknown;
+    idempotencyKey: string;
+  }): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>>;
 }
