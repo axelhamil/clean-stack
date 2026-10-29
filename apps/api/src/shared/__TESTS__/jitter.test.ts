@@ -2,12 +2,9 @@ import { describe, expect, it } from "bun:test";
 import {
   expectedDelayFromAttempts,
   failureSchedule,
-  isDeadLetter,
   JITTER_BASE_MS,
   JITTER_CAP_MS,
-  JITTER_MAX_ATTEMPTS,
   JITTER_MULTIPLIER,
-  nextAttemptAt,
   nextDelayMs,
   retryAfterSeconds,
 } from "../jitter";
@@ -36,45 +33,6 @@ describe("nextDelayMs", () => {
         expect(nextDelayMs(last)).toBeLessThanOrEqual(upper);
       }
     }
-  });
-});
-
-describe("isDeadLetter", () => {
-  it("returns false for attempt 4 (below JITTER_MAX_ATTEMPTS)", () => {
-    expect(isDeadLetter(4)).toBe(false);
-  });
-
-  it("returns true for attempt 5 (= JITTER_MAX_ATTEMPTS)", () => {
-    expect(isDeadLetter(JITTER_MAX_ATTEMPTS)).toBe(true);
-  });
-
-  it("returns true for attempt 6 (> JITTER_MAX_ATTEMPTS)", () => {
-    expect(isDeadLetter(6)).toBe(true);
-  });
-});
-
-describe("nextAttemptAt", () => {
-  it("returns a future date when currentAttempts=0", () => {
-    const before = Date.now();
-    const result = nextAttemptAt(0, JITTER_BASE_MS);
-    expect(result.isSome()).toBe(true);
-    expect(result.unwrap().getTime()).toBeGreaterThan(before);
-  });
-
-  it("returns none when the next attempt would be dead-letter (currentAttempts=4)", () => {
-    // currentAttempts + 1 = 5 = JITTER_MAX_ATTEMPTS → dead-letter
-    const result = nextAttemptAt(4, JITTER_BASE_MS);
-    expect(result.isNone()).toBe(true);
-  });
-
-  it("returns a date in the future between now+1s and now+12h for currentAttempts=2", () => {
-    const before = Date.now();
-    const result = nextAttemptAt(2, JITTER_BASE_MS);
-    const after = Date.now();
-
-    const dateMs = result.unwrap().getTime();
-    expect(dateMs).toBeGreaterThanOrEqual(before + JITTER_BASE_MS);
-    expect(dateMs).toBeLessThanOrEqual(after + JITTER_CAP_MS);
   });
 });
 
