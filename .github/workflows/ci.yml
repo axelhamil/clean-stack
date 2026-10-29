@@ -64,7 +64,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.4
 
       - name: Resolve pnpm store
         shell: bash
@@ -141,6 +141,11 @@ jobs:
         # Issue and rotate span several plugin transactions; only concurrent calls
         # against the real tables show a duplicate connection or a lost token.
         run: pnpm --filter api check:scim-connection
+
+      - name: Check account deletion only trusts a confirmed two-factor enrolment
+        # The verified filter lives in the WHERE of verifyTotp, which a mocked tx
+        # never evaluates. Creates and removes its own probe user.
+        run: pnpm --filter api check:totp-enrolment
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

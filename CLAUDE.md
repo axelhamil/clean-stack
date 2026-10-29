@@ -25,14 +25,14 @@ Library API/config/SOTA unclear → **check docs first**. Outdated patterns are 
 
 ## Stack
 
-- **Runtime**: Bun 1.4+ (api+scripts), Node 24.20+ (tooling), versions pinned in `mise.toml` · **API**: Hono on native `Bun.serve()`, `bun build` (prod), `bun --hot` (dev)
+- **Runtime**: Bun 1.4+ (api+scripts), Node 26.13+ (tooling), versions pinned in `mise.toml` · **API**: Hono on native `Bun.serve()`, `bun build` (prod), `bun --hot` (dev)
 - **App**: Vite 8 + React 19 + TanStack Router/Query + Tailwind 4 · **UI**: shadcn/ui (`@packages/ui`) + `sonner` + `next-themes`
 - **DB**: Drizzle + Postgres 18 (Docker, port `5433`) · **DI**: `inwire` (type-inference container)
 - **Auth**: BetterAuth (Drizzle adapter + `twoFactor`, `passkey`, `magicLink`, `bearer`): module-level singleton, never wrapped in DI · **Security** (`rate-limiter-flexible` fail-closed on auth routes, Origin-based CSRF, CSP nonce via Caddy+Vite, detail in `apps/api/CLAUDE.md`)
 - **Observability**: `pino` + `hono-pino` · **Contract**: Hono RPC (`hc<AppType>`)
 - **i18n**: `i18next` + `react-i18next`, typed `.ts` catalogs in `@packages/i18n` (`en`/`fr`), locale from cookie then `user.locale`, never from the URL
 - **Primitives**: `@packages/ddd-kit` (`Result`, `Option`, `Entity`, `Aggregate`, `ValueObject`, `UUID`, `DomainEvent`, `BaseRepository`, `ScopedRepository`, `IUnitOfWork`)
-- **Tooling**: pnpm 11 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd · **Testing**: `bun test` (api) + `vitest` (packages, app)
+- **Tooling**: pnpm 12 + Turborepo + Biome + Husky + commitlint + semantic-release + knip + jscpd · **Testing**: `bun test` (api) + `vitest` (packages, app)
 
 ## Cross-cutting rules (always apply)
 

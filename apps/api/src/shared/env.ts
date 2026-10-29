@@ -8,6 +8,33 @@ const envSchema = z
     DATABASE_URL: z.url(),
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_SECRETS: z
+      .string()
+      .optional()
+      .transform((v) =>
+        v
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .map((entry) => {
+            const separator = entry.indexOf(":");
+            return {
+              version: separator < 0 ? entry : entry.slice(0, separator).trim(),
+              value: separator < 0 ? "" : entry.slice(separator + 1).trim(),
+            };
+          }),
+      )
+      .pipe(
+        z
+          .array(
+            z.object({
+              version: z.string().regex(/^\d+$/).transform(Number),
+              value: z.string().min(32),
+            }),
+          )
+          .min(1)
+          .optional(),
+      ),
 
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: z.coerce.number().optional(),
