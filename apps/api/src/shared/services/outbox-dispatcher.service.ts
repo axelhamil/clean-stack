@@ -13,6 +13,7 @@ const NOTIFY_CHANNEL = "outbox_event";
 
 function recordToDomainEvent(rec: OutboxRecord): IDomainEvent {
   return {
+    eventId: rec.id,
     eventType: rec.eventType,
     dateOccurred: rec.occurredAt,
     aggregateId: rec.aggregateId,

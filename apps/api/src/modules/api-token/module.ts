@@ -41,7 +41,6 @@ export const apiTokenModule = defineModule()((b) =>
         IApiTokenRepository: c.IApiTokenRepository,
         IOutboxRepository: c.IOutboxRepository,
         ITransactionService: c.ITransactionService,
-        IInstrumentation: c.IInstrumentation,
       }),
     ),
 );

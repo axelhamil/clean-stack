@@ -1,29 +1,43 @@
 import type { IDomainEvent } from "../domain/domain-event";
+import { Result } from "../primitives/result";
+import { EVENT_HANDLER_SYMBOL, type EventHandler } from "./event-handler";
 
-export const EVENT_HANDLER_SYMBOL = Symbol.for("clean-stack/event-handler");
+/** What a handler body may return: nothing, or a `Result` whose failure fails the delivery. */
+type EventReaction = Promise<Result<void, unknown> | undefined>;
 
-export type EventHandler<T extends IDomainEvent = IDomainEvent> = {
-  readonly [EVENT_HANDLER_SYMBOL]: true;
-  readonly eventType: string;
-  readonly handle: (event: T) => Promise<void>;
-};
+function describeFailure(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
+    return `${String(error.code)}: ${String(error.message)}`;
+  }
 
-export function onEvent<T extends IDomainEvent, TDeps>(
-  eventType: string,
-  factory: (deps: TDeps) => (event: T) => Promise<void>,
-): (deps: TDeps) => EventHandler<T> {
-  return (deps) => ({
-    [EVENT_HANDLER_SYMBOL]: true as const,
-    eventType,
-    handle: factory(deps),
-  });
+  return JSON.stringify(error);
 }
 
-export function isEventHandler(value: unknown): value is EventHandler {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    EVENT_HANDLER_SYMBOL in value &&
-    (value as EventHandler)[EVENT_HANDLER_SYMBOL] === true
-  );
+/**
+ * Declares a handler for `eventType`. `handlerName` is persisted with each delivery
+ * (kebab-case, unique per event type): renaming it makes every pending event run it again.
+ * A failed `Result` returned by the body is thrown, so the dispatcher records the failure.
+ */
+export function onEvent<T extends IDomainEvent, TDeps>(
+  eventType: string,
+  handlerName: string,
+  factory: (deps: TDeps) => (event: T) => EventReaction,
+): (deps: TDeps) => EventHandler<T> {
+  return (deps) => {
+    const react = factory(deps);
+
+    return {
+      [EVENT_HANDLER_SYMBOL]: true as const,
+      eventType,
+      handlerName,
+      handle: async (event) => {
+        const reaction = await react(event);
+        if (reaction instanceof Result && reaction.isFailure) {
+          throw new Error(describeFailure(reaction.getError()));
+        }
+      },
+    };
+  };
 }

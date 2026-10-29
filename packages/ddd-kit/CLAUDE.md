@@ -27,7 +27,7 @@ The package is framework-free: it imports only Node built-ins and `zod`, nothing
 | `Aggregate<TProps>` | A business concept with invariants, identity and lifecycle that emits domain events. Infra orchestration is NOT an aggregate. |
 | `Entity<TProps>` | A child with identity but no independent lifecycle, inside an aggregate. |
 | `ValueObject<T>` | A typed primitive with validation (`Email`, `Money`, `Slug`). |
-| `DomainEvent` + `onEvent` + `EventCollector` | An aggregate emits on state change (`addEvent`); `run()` flushes to the outbox; handlers register with `onEvent(type, factory)` and are auto-discovered. Declaring the event type: `packages/events/CLAUDE.md`. |
+| `DomainEvent` + `onEvent` + `EventCollector` | An aggregate emits on state change (`addEvent`); `run()` flushes to the outbox; handlers register with `onEvent(type, handlerName, factory)` and are auto-discovered; `IEventDispatcher.run(event, handlerName)` runs one named handler and reports its `HandlerOutcome` (a throw is a failure, an unknown name too); which handlers are still owed is the caller's bookkeeping, not the dispatcher's. The name is persisted per delivery: kebab-case, unique per event type. Declaring the event type: `packages/events/CLAUDE.md`. |
 | `BaseRepository<T>` | A genuinely global aggregate (audit logs, system config). Rare. |
 | `ScopedRepository<T, TScope>` | An owned aggregate carrying `userId`/`organizationId`; the scope is a `RepoScope` argument, so ownership lives in the repository's `WHERE`, not in a route. |
 

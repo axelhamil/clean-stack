@@ -4,7 +4,6 @@ import { EventTypes } from "@packages/events";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type { ApiTokenError, IApiTokenRepository } from "../../../shared/ports/api-token.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
-import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { revokeTokensOnMembershipLost } from "../application/event-handlers/revoke-on-membership-lost";
 
 function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository {
@@ -35,7 +34,6 @@ function makeDeps(repo: IApiTokenRepository, outbox = makeOutbox()) {
     IApiTokenRepository: repo,
     IOutboxRepository: outbox,
     ITransactionService: mockUnitOfWork().unitOfWork,
-    IInstrumentation: new NoOpInstrumentation(),
   };
 }
 
@@ -123,7 +121,7 @@ describe("revokeTokensOnMembershipLost", () => {
     expect(outbox.enqueue).not.toHaveBeenCalled();
   });
 
-  it("does not propagate errors from the repository", async () => {
+  it("given a repository failure, when handled, then it throws so the delivery is retried", async () => {
     const repo = makeRepo({
       revokeAllForMembership: mock(async () =>
         Result.fail<string[], ApiTokenError>({
@@ -143,7 +141,7 @@ describe("revokeTokensOnMembershipLost", () => {
           actorUserId: "admin-1",
         }),
       ),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("API_TOKEN_PROVIDER_FAILURE");
 
     expect(outbox.enqueue).not.toHaveBeenCalled();
   });

@@ -149,14 +149,18 @@ declare module "inwire" {
 export const ordersModule = defineModule()((b) =>
   b.add(
     "NotifyCustomerOnOrderPlaced",
-    onEvent(EventTypes.ORDER_PLACED, (c) => async (event) => {
-      await c.IEmailService.sendTemplate("order_confirmation", ...);
+    onEvent(EventTypes.ORDER_PLACED, "notify-customer-on-order-placed", (c) => async (event) => {
+      await c.IEmailService.sendTemplate(
+        "order_confirmation", ..., handlerIdempotency("notify-customer-on-order-placed", event),
+      );
     }),
   ),
 );
 ```
 
-`OutboxDispatcher.start()` discovers it automatically at boot via `Object.entries(di)` + `EVENT_HANDLER_SYMBOL` marker. **No registration array, no manifest.**
+`OutboxDispatcher.start()` discovers it automatically at boot via `Object.entries(di)` + `EVENT_HANDLER_SYMBOL` marker. **No registration array, no manifest.** The handler name is a persisted key (kebab-case, unique per event type, `<module>-<reaction>`): it is how a redelivery knows which handlers already ran, so renaming it reruns the handler on every pending event. A handler that talks to the outside world passes a key derived from it and the event id (`handlerIdempotency(name, event)` in `shared/`) so a redelivery never sends twice.
+
+Shipped handlers and why a redelivery is harmless: `revoke-api-tokens-on-membership-lost` filters `revoked_at is null`, so a second run revokes nothing and emits nothing; `notify-impersonated-user` and `notify-backup-code-used` send with the idempotency key `<handlerName>:<eventId>`, which the email queue deduplicates.
 
 ## Built-in audit & webhook coverage
 

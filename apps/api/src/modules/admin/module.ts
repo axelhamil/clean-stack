@@ -30,7 +30,6 @@ export const adminModule = defineModule()((b) =>
         IEmailService: c.IEmailService,
         AdminQueryService: c.AdminQueryService,
         IProfileStore: c.IProfileStore,
-        IInstrumentation: c.IInstrumentation,
         supportUrl: `${env.APP_URL}/support`,
       }),
     ),

@@ -149,13 +149,13 @@ BetterAuth's adapter receives `db` through `asUnitOfWork` (`shared/auth/unit-of-
 
 **Subscribers built in** to the dispatcher (no glue): `AuditEventSubscriber` (writes `audit_log` if the event is in `RETENTION_MAP`), `WebhookFanoutSubscriber` (creates `webhook_delivery` rows for matching org-scoped endpoints) and `NotificationFanoutSubscriber` (creates notification rows and schedules email digests, honouring user/org preference precedence).
 
-**User-defined handlers** via `onEvent(type, factory)` + inwire binding, auto-discovered at boot via `EVENT_HANDLER_SYMBOL`:
+**User-defined handlers** via `onEvent(type, handlerName, factory)` + inwire binding, auto-discovered at boot via `EVENT_HANDLER_SYMBOL`:
 
 ```typescript
 b.add(
   "NotifyCustomerOnOrderPlaced",
-  onEvent(EventTypes.ORDER_PLACED, (c) => async (event) => {
-    await c.IEmailService.sendTemplate("order_confirmed", ...);
+  onEvent(EventTypes.ORDER_PLACED, "notify-customer-on-order-placed", (c) => async (event) => {
+    await c.IEmailService.sendTemplate("order_confirmed", ..., handlerIdempotency("notify-customer-on-order-placed", event));
   }),
 )
 ```

@@ -1,100 +1,57 @@
 import type { IDomainEvent } from "../domain/domain-event";
 import { Result } from "../primitives/result";
-import type { EventHandlerFn, IEventDispatcher } from "./event-dispatcher";
+import type { EventHandlerFn, HandlerOutcome, IEventDispatcher } from "./event-dispatcher";
 
-type HandlersMap = Map<string, EventHandlerFn[]>;
-
-export interface EventDispatcherLogger {
-  error(message: string, error?: unknown): void;
+interface NamedHandler<E extends IDomainEvent> {
+  name: string;
+  handle: EventHandlerFn<E>;
 }
 
-export class InMemoryEventDispatcher implements IEventDispatcher {
-  private handlers: HandlersMap = new Map();
-  private logger: EventDispatcherLogger | null = null;
+const HANDLER_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-  setLogger(logger: EventDispatcherLogger | null): void {
-    this.logger = logger;
-  }
+/** `IEventDispatcher` held in process memory. */
+export class InMemoryEventDispatcher<E extends IDomainEvent = IDomainEvent>
+  implements IEventDispatcher<E>
+{
+  private readonly handlers = new Map<string, NamedHandler<E>[]>();
 
-  private log(message: string, error?: unknown): void {
-    this.logger?.error(message, error);
-  }
+  subscribe(eventType: string, name: string, handle: EventHandlerFn<E>): Result<void> {
+    if (!HANDLER_NAME.test(name)) return Result.fail(`INVALID_HANDLER_NAME: ${name}`);
 
-  subscribe<T extends IDomainEvent>(eventType: string, handler: EventHandlerFn<T>): Result<void> {
-    try {
-      const existing = this.handlers.get(eventType) ?? [];
-      this.handlers.set(eventType, [...existing, handler as EventHandlerFn]);
-      return Result.ok();
-    } catch (_error) {
-      return Result.fail("SUBSCRIPTION_FAILED");
+    const existing = this.handlers.get(eventType) ?? [];
+    if (existing.some((named) => named.name === name)) {
+      return Result.fail(`DUPLICATE_HANDLER: ${name}`);
     }
+
+    this.handlers.set(eventType, [...existing, { name, handle }]);
+
+    return Result.ok();
   }
 
-  unsubscribe(eventType: string, handler: EventHandlerFn): Result<void> {
-    try {
-      const handlers = this.handlers.get(eventType);
-      if (handlers) {
-        const index = handlers.indexOf(handler);
-        if (index > -1) {
-          handlers.splice(index, 1);
-          this.handlers.set(eventType, handlers);
-        }
-      }
-      return Result.ok();
-    } catch (_error) {
-      return Result.fail("UNSUBSCRIPTION_FAILED");
+  handlersOf(eventType: string): string[] {
+    return (this.handlers.get(eventType) ?? []).map(({ name }) => name);
+  }
+
+  async run(event: E, handlerName: string): Promise<HandlerOutcome> {
+    const named = this.handlers.get(event.eventType)?.find(({ name }) => name === handlerName);
+    if (!named) {
+      return {
+        name: handlerName,
+        ok: false,
+        error: `UNKNOWN_HANDLER: ${handlerName} on ${event.eventType}`,
+      };
     }
-  }
 
-  async dispatch(event: IDomainEvent): Promise<Result<void>> {
     try {
-      const handlers = this.handlers.get(event.eventType) ?? [];
+      await named.handle(event);
 
-      for (const handler of handlers) {
-        try {
-          const result = handler(event);
-
-          if (result instanceof Promise) {
-            const awaitedResult = await result;
-            if (awaitedResult.isFailure) {
-              this.log(`Event handler failed: ${awaitedResult.getError()}`);
-            }
-          } else if (result.isFailure) {
-            this.log(`Event handler failed: ${result.getError()}`);
-          }
-        } catch (error) {
-          this.log("Event handler threw exception:", error);
-        }
-      }
-
-      return Result.ok();
+      return { name: handlerName, ok: true };
     } catch (error) {
-      return Result.fail(`DISPATCH_FAILED: ${error}`);
+      return {
+        name: handlerName,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
-  }
-
-  async dispatchAll(events: IDomainEvent[]): Promise<Result<void>> {
-    try {
-      for (const event of events) {
-        await this.dispatch(event);
-      }
-      return Result.ok();
-    } catch (error) {
-      return Result.fail(`DISPATCH_FAILED: ${error}`);
-    }
-  }
-
-  isSubscribed(eventType: string): boolean {
-    const handlers = this.handlers.get(eventType);
-    return handlers ? handlers.length > 0 : false;
-  }
-
-  getHandlerCount(eventType: string): number {
-    const handlers = this.handlers.get(eventType);
-    return handlers ? handlers.length : 0;
-  }
-
-  clearHandlers(): void {
-    this.handlers.clear();
   }
 }
