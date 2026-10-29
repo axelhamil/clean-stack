@@ -23,6 +23,14 @@ class FailedResultRollback extends Error {
   }
 }
 
+class EventsWithoutOutbox extends Error {
+  constructor(events: IDomainEvent[]) {
+    super(
+      `unit of work rolled back: ${events.map((e) => e.eventType).join(", ")} raised in a run that has no outbox would be lost`,
+    );
+  }
+}
+
 type EventsByFlushHandler = Map<FlushHandler | null, IDomainEvent[]>;
 
 interface OutermostRun {
@@ -115,7 +123,8 @@ export class TransactionService implements IUnitOfWork<Transaction> {
 
 async function flush(pending: EventsByFlushHandler, tx: Transaction): Promise<void> {
   for (const [flushHandler, events] of pending) {
-    if (events.length === 0 || !flushHandler) continue;
+    if (events.length === 0) continue;
+    if (!flushHandler) throw new EventsWithoutOutbox(events);
 
     await flushHandler(events, tx);
   }

@@ -15,7 +15,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-uow-rollback");
 
-import { Result } from "@packages/ddd-kit";
+import { EventCollector, Result } from "@packages/ddd-kit";
 import {
   authSchema,
   type DbClient,
@@ -297,6 +297,34 @@ async function main(): Promise<void> {
       (await currentName()) === "Nested write" &&
       (await currentImage()) === "outer-write" &&
       (await outboxRows()) === 1,
+  );
+
+  await resetProbe();
+  const unpersistable = await uow
+    .run(async (tx) => {
+      await tx
+        .update(authSchema.user)
+        .set({ name: "Written with a lost event" })
+        .where(eq(authSchema.user.id, userId));
+      EventCollector.add({
+        eventType: EventTypes.USER_PROFILE_UPDATED,
+        dateOccurred: new Date(),
+        aggregateId: userId,
+        payload: { userId, changes: {} },
+      });
+
+      return Result.ok();
+    })
+    .catch((err: unknown) => err);
+  console.log(
+    "[7] run without outbox ->",
+    unpersistable instanceof Error ? unpersistable.message : unpersistable,
+  );
+  check(
+    "a run with events and no flush handler rolls back its writes",
+    unpersistable instanceof Error &&
+      unpersistable.message.includes(EventTypes.USER_PROFILE_UPDATED) &&
+      (await currentName()) === ORIGINAL_NAME,
   );
 
   await cleanup();
