@@ -45,7 +45,7 @@ export * as notificationSchema from "./schema/notification";
 export const schema = { ...authSchema, ...multiTenantSchema };
 export * as billingSchema from "./schema/billing";
 export * as emailSchema from "./schema/email";
-export type { OutboxEventMetadata } from "./schema/outbox";
+export type { OutboxDeliveries, OutboxEventMetadata } from "./schema/outbox";
 export * as outboxSchema from "./schema/outbox";
 export * as policiesSchema from "./schema/policies";
 export * as quotaUsageSchema from "./schema/quota-usage";
