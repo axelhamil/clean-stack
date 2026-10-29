@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { type IDomainEvent, Result } from "@packages/ddd-kit";
+import { type IDomainEvent, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
@@ -9,7 +9,10 @@ import * as realAuthQueries from "../../auth-queries";
 const { unitOfWork, outcome } = mockUnitOfWork();
 
 const mockEnqueue = mock(async (_events: IDomainEvent[], _meta: unknown, _tx?: unknown) => {});
-const mockUpdateUserName = mock(async (_userId: string, _name: string, _tx?: unknown) => {});
+const writeTransactions: unknown[] = [];
+const mockUpdateUserName = mock(async (_userId: string, _name: string) => {
+  writeTransactions.push(UnitOfWorkContext.transaction());
+});
 
 mock.module("../../container", () => ({
   di: {
@@ -38,6 +41,7 @@ describe("PATCH /api/v1/me", () => {
   beforeEach(() => {
     mockEnqueue.mockClear();
     mockUpdateUserName.mockClear();
+    writeTransactions.length = 0;
   });
 
   it("emits USER_PROFILE_UPDATED with the changed name, like the session path", async () => {
@@ -49,7 +53,7 @@ describe("PATCH /api/v1/me", () => {
 
     expect(res.status).toBe(200);
     expect(outcome()).toBe("committed");
-    const [, , writeTx] = mockUpdateUserName.mock.calls[0] ?? [];
+    const [writeTx] = writeTransactions;
     const [events, , tx] = mockEnqueue.mock.calls[0] ?? [];
     expect(tx).toBeDefined();
     expect(tx).toBe(writeTx);

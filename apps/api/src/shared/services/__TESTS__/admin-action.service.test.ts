@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
@@ -33,9 +34,10 @@ const authApi = {
 
 mock.module("../../../auth", () => ({ auth: { api: authApi } }));
 
-const setOrgSsoEnforced = mock(
-  async (_organizationId: string, _enforced: boolean, _tx?: unknown) => {},
-);
+const writeTransactions: unknown[] = [];
+const setOrgSsoEnforced = mock(async (_organizationId: string, _enforced: boolean) => {
+  writeTransactions.push(UnitOfWorkContext.transaction());
+});
 const realAuthQueries = await import("../../../auth-queries");
 mock.module("../../../auth-queries", () => ({ ...realAuthQueries, setOrgSsoEnforced }));
 
@@ -193,6 +195,7 @@ describe("AdminActionService", () => {
   describe("setSsoEnforcement", () => {
     it("writes the flag and emits the event in one committed unit of work", async () => {
       setOrgSsoEnforced.mockClear();
+      writeTransactions.length = 0;
       emitted.length = 0;
       const { unitOfWork, outcome } = mockUnitOfWork();
       const result = await service(unitOfWork).setSsoEnforcement({
@@ -204,7 +207,8 @@ describe("AdminActionService", () => {
 
       expect(result.isSuccess).toBe(true);
       expect(outcome()).toBe("committed");
-      expect(setOrgSsoEnforced).toHaveBeenCalledWith("org-1", true, expect.anything());
+      expect(setOrgSsoEnforced).toHaveBeenCalledWith("org-1", true);
+      expect(writeTransactions[0]).toBeDefined();
       expect(emitted.map((e) => e.type)).toEqual([EventTypes.SSO_ENFORCEMENT_CHANGED]);
     });
 

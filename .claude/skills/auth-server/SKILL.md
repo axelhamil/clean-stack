@@ -5,7 +5,7 @@ description: Use when working on BetterAuth server-side, the request pipeline, s
 
 # Auth (BetterAuth integration, server)
 
-**Module-level singleton** (`src/auth.ts`), not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **No inline `db.*` in `auth.ts`**, SQL lives in `auth-queries.ts` as typed Drizzle functions (`tx?`-aware). Auth is infra, not domain: no repository, no port, no DI.
+**Module-level singleton** (`src/auth.ts`), not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **No inline `db.*` in `auth.ts`**, SQL lives in `auth-queries.ts` as typed Drizzle functions reading `resolveExecutor()`. Auth is infra, not domain: no repository, no port, no DI.
 
 ## Server pipeline (in order, `index.ts`)
 

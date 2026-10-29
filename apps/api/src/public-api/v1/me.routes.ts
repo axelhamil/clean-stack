@@ -25,8 +25,8 @@ export const mePublicRoutes = new Hono<{ Variables: ApiTokenVariables }>()
       const { name } = c.req.valid("json");
       const userId = c.get("user").id;
 
-      await di.ITransactionService.run(async (tx) => {
-        await updateUserName(userId, name, tx);
+      await di.ITransactionService.run(async () => {
+        await updateUserName(userId, name);
         await emitEvent(
           di.IOutboxRepository,
           EventTypes.USER_PROFILE_UPDATED,

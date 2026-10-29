@@ -124,8 +124,8 @@ export class AdminActionService {
     viaPlatformAdmin: boolean;
   }): ActionResult {
     return this.run("setSsoEnforcement", async () => {
-      await this.uow.run(async (tx) => {
-        await setOrgSsoEnforced(input.organizationId, input.enforced, tx);
+      await this.uow.run(async () => {
+        await setOrgSsoEnforced(input.organizationId, input.enforced);
 
         await emitEvent(
           this.outbox,

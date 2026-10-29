@@ -27,7 +27,7 @@ apps/api/src/
   cron/                         Standalone bundled sweep caller (`sweep.ts`), runs as its own process, see `docs/CRON.md`
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   auth.ts                       BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`).
-  auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), `tx?`-aware. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
+  auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), reading `resolveExecutor()`. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
   app.ts                        `Hono` construction, chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
   index.ts                      Server entry: explicit `Bun.serve()` handle (kept on `globalThis` so `bun --hot` reloads it instead of rebinding the port), DI preload, worker starts, ordered shutdown steps. Imports `app` from `app.ts`, re-exports `AppType`.
   migrate.ts                    Migration entry (`pnpm --filter api migrate`); `start` runs it before the server

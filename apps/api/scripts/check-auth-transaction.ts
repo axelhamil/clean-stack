@@ -16,7 +16,18 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-auth-transaction");
 
 import { runWithTransaction } from "@better-auth/core/context";
-import { authSchema, db, eq, inArray, multiTenantSchema, outboxSchema } from "@packages/drizzle";
+import {
+  and,
+  authSchema,
+  db,
+  eq,
+  inArray,
+  multiTenantSchema,
+  or,
+  outboxSchema,
+  sql,
+} from "@packages/drizzle";
+import { EventTypes } from "@packages/events";
 import { auth } from "../src/auth";
 
 // The provisioning source the SSO plugin passes, so the probe goes through the same
@@ -46,6 +57,21 @@ async function outboxRowsOf(organizationIds: string[]): Promise<number> {
     .select({ id: outboxSchema.outboxEvent.id })
     .from(outboxSchema.outboxEvent)
     .where(inArray(outboxSchema.outboxEvent.organizationId, organizationIds));
+
+  return rows.length;
+}
+
+async function personalOrgEventsOf(userId: string): Promise<number> {
+  const { eventType, payload } = outboxSchema.outboxEvent;
+  const rows = await db
+    .select({ id: outboxSchema.outboxEvent.id })
+    .from(outboxSchema.outboxEvent)
+    .where(
+      and(
+        inArray(eventType, [EventTypes.ORG_CREATED, EventTypes.ORG_MEMBER_JOINED]),
+        or(eq(sql`${payload}->>'userId'`, userId), eq(sql`${payload}->>'ownerUserId'`, userId)),
+      ),
+    );
 
   return rows.length;
 }
@@ -126,6 +152,10 @@ async function main(): Promise<void> {
       .from(authSchema.user)
       .where(eq(authSchema.user.id, rolledBackUserId));
     check("the user itself was rolled back", user === undefined);
+    check(
+      "an event emitted in a databaseHook is rolled back with the hook write",
+      (await personalOrgEventsOf(rolledBackUserId)) === 0,
+    );
   }
 
   await cleanup();
