@@ -6,6 +6,7 @@ export {
   count,
   desc,
   eq,
+  getTableColumns,
   gt,
   gte,
   ilike,
@@ -24,6 +25,16 @@ export { migrate } from "drizzle-orm/node-postgres/migrator";
 export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 export { alias } from "drizzle-orm/pg-core";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
+export {
+  claimedSet,
+  dbNow,
+  deadShareOf,
+  isDeadDue,
+  isDue,
+  leasedBy,
+  releasedSet,
+  secondsFromNow,
+} from "./lease";
 export {
   closeRateLimitDb,
   getRateLimitDbClient,

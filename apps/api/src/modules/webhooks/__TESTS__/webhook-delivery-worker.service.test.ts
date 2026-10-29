@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
-import { mockPort } from "@packages/test/bun";
-import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { EventTypes } from "@packages/events";
+import { mockPort, type PortMock } from "@packages/test/bun";
+import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import * as realAead from "../../../shared/aead";
 import type { Logger } from "../../../shared/logger";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import * as realSsrfGuard from "../../../shared/ssrf-guard";
 import type {
+  DeliveryFailure,
   IWebhookDeliveryRepository,
-  WebhookDeliveryAttemptRecord,
+  WebhookDeliveryRecord,
 } from "../application/ports/webhook-delivery.port";
 import type { IWebhookEndpointRepository } from "../application/ports/webhook-endpoint.port";
 
@@ -51,6 +54,12 @@ mock.module("../../../shared/ssrf-guard", () => {
     assertPublicUrl: async (rawUrl: string) => {
       try {
         const url = new URL(rawUrl);
+        if (url.hostname === "slow-dns.example.com") {
+          return Result.fail({
+            code: "WEBHOOK_HOST_LOOKUP_TIMEOUT",
+            message: "host lookup timed out",
+          });
+        }
         const isPrivate =
           PRIVATE_HOSTS.includes(url.hostname) ||
           /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(url.hostname);
@@ -93,47 +102,23 @@ const { NoOpInstrumentation } = await import("../../../shared/services/noop-inst
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeDelivery() {
+const OPTIONS = { leaseSeconds: 330, deadRetrySeconds: 21_600 };
+
+function makeDelivery(over: Partial<WebhookDeliveryRecord> = {}): WebhookDeliveryRecord {
   return {
     id: "del-1",
     endpointId: "ep-1",
     outboxEventId: "evt-1",
     eventType: "USER_CREATED",
     payload: { userId: "u1" },
-    status: "pending" as const,
-    attempts: 0,
+    status: "pending",
+    attempts: 1,
     nextAttemptAt: Option.none<Date>(),
     lastError: Option.none<string>(),
     lastResponseStatus: Option.none<number>(),
     idempotencyKey: "idem-1",
     createdAt: new Date("2024-01-01T00:00:00Z"),
-  };
-}
-
-function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [makeDelivery()]) {
-  const updates: { id: string; update: unknown }[] = [];
-  const createAttempts: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">[] = [];
-  let callCount = 0;
-  return {
-    updates,
-    createAttempts,
-    findPendingBatch: async (_limit: number) => {
-      callCount++;
-      return Result.ok(callCount === 1 ? deliveries : []) as unknown as ReturnType<
-        IWebhookDeliveryRepository["findPendingBatch"]
-      >;
-    },
-    updateStatus: async (id: string, update: unknown) => {
-      updates.push({ id, update });
-      return Result.ok() as unknown as ReturnType<IWebhookDeliveryRepository["updateStatus"]>;
-    },
-    createAttempt: async (args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">) => {
-      createAttempts.push(args);
-      return Result.ok() as unknown as ReturnType<IWebhookDeliveryRepository["createAttempt"]>;
-    },
-    list: async () => Result.ok({ items: [], nextCursor: Option.none() }),
-    findById: async () => Option.none(),
-    enqueueReplay: async () => Result.ok(Option.none()),
+    ...over,
   };
 }
 
@@ -168,15 +153,6 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
   };
 }
 
-function makeOutbox() {
-  const enqueueCalls: Array<{ events: unknown[]; opts: unknown; tx: unknown }> = [];
-  const outbox = mockPort<IOutboxRepository>();
-  outbox.enqueue.mockImplementation(async (events, opts) => {
-    enqueueCalls.push({ events, opts, tx: UnitOfWorkContext.transaction() });
-  });
-  return { outbox, enqueueCalls };
-}
-
 const FAKE_ENDPOINT = {
   id: "ep-1",
   url: "https://example.com/hook",
@@ -190,193 +166,235 @@ const FAKE_ENDPOINT = {
   disabledAt: null,
 };
 
-function makeLogger() {
-  return {
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-    debug: () => {},
-    child: function () {
-      return this;
-    },
-  };
-}
+let deliveries: PortMock<IWebhookDeliveryRepository>;
+let outbox: PortMock<IOutboxRepository>;
+let uow: UnitOfWorkMock;
+let endpoints: ReturnType<typeof makeFakeEndpoints>;
+let logger: PortMock<Logger>;
+let settledIn: unknown[];
+let enqueuedIn: unknown[];
 
 type WorkerDeps = {
-  deliveries: ReturnType<typeof makeFakeDeliveries>;
-  endpoints?: ReturnType<typeof makeFakeEndpoints>;
   masterKey?: () => Option<Uint8Array>;
-  outbox?: IOutboxRepository;
-  unitOfWork?: IUnitOfWork;
-  logger?: ReturnType<typeof makeLogger>;
   instrumentation?: IInstrumentation;
+  options?: typeof OPTIONS;
   fetchImpl?: unknown;
+  clock?: () => number;
 };
 
-function makeWorker(deps: WorkerDeps) {
+function makeWorker(deps: WorkerDeps = {}) {
   return new WebhookDeliveryWorker(
-    deps.deliveries as unknown as IWebhookDeliveryRepository,
-    (deps.endpoints ?? makeFakeEndpoints()) as unknown as IWebhookEndpointRepository,
+    deliveries,
+    endpoints as unknown as IWebhookEndpointRepository,
     deps.masterKey ?? (() => Option.some(new Uint8Array(32))),
-    deps.outbox ?? mockPort<IOutboxRepository>(),
-    deps.unitOfWork ?? mockUnitOfWork().unitOfWork,
-    (deps.logger ?? makeLogger()) as unknown as Logger,
+    outbox,
+    uow.unitOfWork,
+    logger,
     deps.instrumentation ?? new NoOpInstrumentation(),
+    deps.options ?? OPTIONS,
     deps.fetchImpl as typeof fetch | undefined,
+    deps.clock,
   );
 }
 
-type WorkerWithPrivates = {
-  drain: () => Promise<void>;
-};
+function claims(batch: WebhookDeliveryRecord[]): void {
+  deliveries.claim.mockResolvedValueOnce(Result.ok(batch));
+}
 
 async function runDrain(worker: InstanceType<typeof WebhookDeliveryWorker>) {
-  await (worker as unknown as WorkerWithPrivates).drain();
+  await (worker as unknown as { drain: () => Promise<void> }).drain();
 }
+
+const respond =
+  (status: number, body: string | null = null) =>
+  async () =>
+    new Response(body, { status });
+
+const failures = (): DeliveryFailure[] => deliveries.markFailed.mock.calls.map(([, f]) => f);
+const attempts = () => deliveries.createAttempt.mock.calls.map(([attempt]) => attempt);
+const eventTypes = () => enqueuedEvents(outbox).map(({ eventType }) => eventType);
 
 describe("WebhookDeliveryWorker", () => {
   beforeEach(() => {
     dbTransactionResult = [FAKE_ENDPOINT];
+    deliveries = mockPort<IWebhookDeliveryRepository>();
+    outbox = mockPort<IOutboxRepository>();
+    uow = mockUnitOfWork();
+    endpoints = makeFakeEndpoints();
+    logger = mockPort<Logger>();
+    settledIn = [];
+    enqueuedIn = [];
+    deliveries.claim.mockResolvedValue(Result.ok([]));
+    deliveries.markSuccess.mockImplementation(async () => {
+      settledIn.push(UnitOfWorkContext.transaction());
+      return Result.ok(true);
+    });
+    deliveries.markFailed.mockImplementation(async () => {
+      settledIn.push(UnitOfWorkContext.transaction());
+      return Result.ok(true);
+    });
+    deliveries.release.mockResolvedValue(Result.ok(true));
+    deliveries.createAttempt.mockResolvedValue(Result.ok());
+    outbox.enqueue.mockImplementation(async () => {
+      enqueuedIn.push(UnitOfWorkContext.transaction());
+    });
   });
 
   it("start() then stop() shuts down cleanly without a blocking loop", async () => {
-    const fakeDeliveries = makeFakeDeliveries([]);
-    const worker = makeWorker({ deliveries: fakeDeliveries });
+    const worker = makeWorker();
 
     await worker.start();
     await new Promise((r) => setTimeout(r, 20));
     await worker.stop();
+
+    expect(deliveries.claim).toHaveBeenCalled();
   });
 
   it("reports a failing first drain instead of leaving an unhandled rejection", async () => {
-    const logger = makeLogger();
-    const errorSpy = spyOn(logger, "error");
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
-    const worker = makeWorker({
-      deliveries: makeFakeDeliveries([]),
-      unitOfWork: mockUnitOfWork({ commit: "fails" }).unitOfWork,
-      logger,
-      instrumentation,
-    });
+    deliveries.claim.mockRejectedValue(new Error("connection refused"));
+    const worker = makeWorker({ instrumentation });
 
     await worker.start();
     await new Promise((r) => setTimeout(r, 20));
     await worker.stop();
 
     expect(captureSpy).toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith(expect.anything(), "webhook delivery drain failed");
+    expect(logger.error.mock.calls.map(([, message]) => message)).toContain(
+      "webhook delivery drain failed",
+    );
   });
 
-  it("marks the delivery success on a 200 response", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
-    const mockFetch = async () => new Response(null, { status: 200, statusText: "OK" });
+  it("keeps a delivery retryable when its host lookup times out", async () => {
+    dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "https://slow-dns.example.com/hook" }];
+    claims([makeDelivery()]);
+    let fetched = false;
+    const mockFetch = async () => {
+      fetched = true;
+      return new Response(null, { status: 200 });
+    };
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
+    await runDrain(makeWorker({ fetchImpl: mockFetch }));
 
-    await runDrain(worker);
+    expect(fetched).toBe(false);
+    expect(failures().map((f) => [f.status, f.lastError])).toEqual([
+      ["failed", "host lookup timed out"],
+    ]);
+    expect(eventTypes()).toEqual([]);
+  });
 
-    const successUpdate = fakeDeliveries.updates.find(
-      (u) => (u.update as { status: string }).status === "success",
-    );
-    if (!successUpdate) throw new Error("successUpdate not found");
-    expect((successUpdate.update as { attempts: number }).attempts).toBe(1);
+  it("releases the deliveries the remaining lease no longer covers", async () => {
+    claims([makeDelivery({ id: "del-1" }), makeDelivery({ id: "del-2" })]);
+    let now = 0;
+    const mockFetch = async () => {
+      now += 300_000;
+      return new Response(null, { status: 200 });
+    };
+
+    await runDrain(makeWorker({ fetchImpl: mockFetch, clock: () => now }));
+
+    expect(deliveries.markSuccess.mock.calls.map(([lease]) => lease.id)).toEqual(["del-1"]);
+    expect(deliveries.release.mock.calls.map(([lease]) => lease.id)).toEqual(["del-2"]);
+  });
+
+  it("claims no more deliveries than the lease covers with a settle margin", async () => {
+    await runDrain(makeWorker());
+    await runDrain(makeWorker({ options: { ...OPTIONS, leaseSeconds: 120 } }));
+
+    expect(deliveries.claim.mock.calls.map(([request]) => request)).toEqual([
+      { limit: 8, leaseSeconds: 330 },
+      { limit: 2, leaseSeconds: 120 },
+    ]);
+  });
+
+  it("settles a 200 response as success on the claimed lease", async () => {
+    claims([makeDelivery()]);
+
+    await runDrain(makeWorker({ fetchImpl: respond(200) }));
+
+    expect(deliveries.markSuccess).toHaveBeenCalledTimes(1);
+    const [lease, status] = deliveries.markSuccess.mock.calls[0] ?? [];
+    expect(lease).toMatchObject({ id: "del-1", attempts: 1 });
+    expect(status?.unwrap()).toBe(200);
+    expect(settledIn[0]).toBeDefined();
   });
 
   it("sends the HMAC signature in the x-webhook-signature header", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
+    claims([makeDelivery()]);
     let capturedHeaders: Record<string, string> | undefined;
-
     const mockFetch = async (_url: string | URL | Request, init?: RequestInit) => {
       capturedHeaders = init?.headers as Record<string, string>;
       return new Response(null, { status: 200 });
     };
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
+    await runDrain(makeWorker({ fetchImpl: mockFetch }));
 
-    await runDrain(worker);
-
-    expect(capturedHeaders).toBeDefined();
-    const sig = capturedHeaders?.["x-webhook-signature"];
-    expect(sig).toMatch(/^t=\d+,v1=[0-9a-f]+$/);
+    expect(capturedHeaders?.["x-webhook-signature"]).toMatch(/^t=\d+,v1=[0-9a-f]+$/);
   });
 
-  it("marks the delivery failed with a scheduled retry on a 500 response", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
-    const mockFetch = async () =>
-      new Response(null, {
-        status: 500,
-        statusText: "Internal Server Error",
-      });
+  it("marks the delivery failed with a retry delay on a 500 response", async () => {
+    claims([makeDelivery()]);
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
 
-    await runDrain(worker);
+    const [failure] = failures();
+    expect(failure?.status).toBe("failed");
+    expect(failure?.retryAfterSeconds.unwrapOr(0)).toBeGreaterThan(0);
+    expect(failure?.lastError).toContain("HTTP 500");
+    expect(failure?.lastResponseStatus.unwrap()).toBe(500);
+  });
 
-    const failUpdate = fakeDeliveries.updates.find(
-      (u) => (u.update as { status: string }).status === "failed",
-    );
-    expect(failUpdate).toBeDefined();
-    const update = failUpdate?.update as {
-      status: string;
-      nextAttemptAt: Option<Date>;
-      lastError: Option<string>;
-    };
-    expect(update.nextAttemptAt.isSome()).toBe(true);
-    expect(update.lastError.isSome()).toBe(true);
-    expect(update.lastError.unwrap()).toContain("HTTP 500");
+  it("keeps a third failed send retryable, as before the lease model", async () => {
+    claims([makeDelivery({ attempts: 3 })]);
+
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
+
+    expect(failures().map((f) => f.status)).toEqual(["failed"]);
+    expect(eventTypes()).toEqual([]);
+  });
+
+  it("dead-letters with a replay date after the fourth failed send", async () => {
+    claims([makeDelivery({ attempts: 4 })]);
+
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
+
+    const [failure] = failures();
+    expect(failure?.status).toBe("dead_letter");
+    expect(failure?.retryAfterSeconds.unwrap()).toBe(21_600);
   });
 
   it("captures a fetch abort and marks the delivery failed", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
+    claims([makeDelivery()]);
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
-
     const mockFetch = async () => {
       throw new DOMException("The operation was aborted", "AbortError");
     };
 
-    const worker = makeWorker({
-      deliveries: fakeDeliveries,
-      instrumentation,
-      fetchImpl: mockFetch,
-    });
-
-    await runDrain(worker);
+    await runDrain(makeWorker({ instrumentation, fetchImpl: mockFetch }));
 
     expect(captureSpy).toHaveBeenCalled();
-
-    const badUpdate = fakeDeliveries.updates.find((u) =>
-      ["failed", "dead_letter"].includes((u.update as { status: string }).status),
-    );
-    expect(badUpdate).toBeDefined();
+    expect(failures().map((f) => f.status)).toEqual(["failed"]);
   });
 
-  it("dead-letters the delivery when the endpoint is missing", async () => {
+  it("dead-letters for good when the endpoint is missing", async () => {
     dbTransactionResult = [];
-    const fakeDeliveries = makeFakeDeliveries();
+    claims([makeDelivery()]);
 
-    const worker = makeWorker({ deliveries: fakeDeliveries });
+    await runDrain(makeWorker());
 
-    await runDrain(worker);
-
-    const dlUpdate = fakeDeliveries.updates.find(
-      (u) => (u.update as { status: string }).status === "dead_letter",
-    );
-    expect(dlUpdate).toBeDefined();
+    expect(failures()).toEqual([
+      expect.objectContaining({ status: "dead_letter", retryAfterSeconds: Option.none() }),
+    ]);
   });
 
   it("marks the delivery failed when the master key is missing", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
+    claims([makeDelivery()]);
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, masterKey: () => Option.none() });
+    await runDrain(makeWorker({ masterKey: () => Option.none() }));
 
-    await runDrain(worker);
-
-    const failUpdate = fakeDeliveries.updates.find((u) =>
-      ["failed", "dead_letter"].includes((u.update as { status: string }).status),
-    );
-    expect(failUpdate).toBeDefined();
+    expect(failures().map((f) => f.status)).toEqual(["failed"]);
   });
 
   it("signs with both secrets while the previous secret is within grace", async () => {
@@ -387,162 +405,162 @@ describe("WebhookDeliveryWorker", () => {
         previousSecretExpiresAt: new Date(Date.now() + 3_600_000),
       },
     ];
+    claims([makeDelivery()]);
     let sig: string | undefined;
     const mockFetch = async (_u: unknown, init?: RequestInit) => {
       sig = (init?.headers as Record<string, string> | undefined)?.["x-webhook-signature"];
       return new Response(null, { status: 200 });
     };
 
-    const fakeDeliveries = makeFakeDeliveries();
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
-
-    await runDrain(worker);
+    await runDrain(makeWorker({ fetchImpl: mockFetch }));
 
     expect(sig?.match(/v1=/g)?.length).toBe(2);
   });
 
-  it("marks dead_letter without fetching when the endpoint url is not publicly routable", async () => {
+  it("dead-letters for good without fetching when the url is not publicly routable", async () => {
     dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://127.0.0.1/hook" }];
+    claims([makeDelivery()]);
     let fetched = false;
     const mockFetch = async () => {
       fetched = true;
       return new Response(null, { status: 200 });
     };
 
-    const fakeDeliveries = makeFakeDeliveries();
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
-
-    await runDrain(worker);
+    await runDrain(makeWorker({ fetchImpl: mockFetch }));
 
     expect(fetched).toBe(false);
-    expect(
-      fakeDeliveries.updates.find((u) => (u.update as { status: string }).status === "dead_letter"),
-    ).toBeDefined();
+    expect(failures()).toEqual([
+      expect.objectContaining({ status: "dead_letter", retryAfterSeconds: Option.none() }),
+    ]);
+    expect(eventTypes()).toEqual([EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]);
   });
 
-  it("records an attempt with request headers and status 200 on success", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
+  it("records an attempt numbered by the lease with request headers and status 200", async () => {
+    claims([makeDelivery({ attempts: 3 })]);
 
-    const mockFetch = async () => new Response(JSON.stringify({ ok: true }), { status: 200 });
+    await runDrain(makeWorker({ fetchImpl: respond(200, JSON.stringify({ ok: true })) }));
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
-
-    await runDrain(worker);
-
-    expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const attempt = fakeDeliveries.createAttempts[0];
-    expect(attempt).toBeDefined();
-    if (!attempt) return;
-    expect(attempt.deliveryId).toBe("del-1");
-    expect(attempt.attemptNumber).toBe(1);
-    expect(attempt.responseStatus.unwrap()).toBe(200);
-    expect(attempt.requestHeaders.unwrap()).toMatchObject({ "content-type": "application/json" });
-    expect(attempt.error.isNone()).toBe(true);
-    expect(typeof attempt.durationMs.unwrap()).toBe("number");
+    const [attempt] = attempts();
+    expect(attempts()).toHaveLength(1);
+    expect(attempt?.deliveryId).toBe("del-1");
+    expect(attempt?.attemptNumber).toBe(3);
+    expect(attempt?.responseStatus.unwrap()).toBe(200);
+    expect(attempt?.requestHeaders.unwrap()).toMatchObject({ "content-type": "application/json" });
+    expect(attempt?.error.isNone()).toBe(true);
+    expect(typeof attempt?.durationMs.unwrap()).toBe("number");
   });
 
   it("caps the recorded response body at WEBHOOK_RESPONSE_CAPTURE_BYTES (4096)", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
-    const largeBody = "x".repeat(8192);
+    claims([makeDelivery()]);
 
-    const mockFetch = async () => new Response(largeBody, { status: 200 });
+    await runDrain(makeWorker({ fetchImpl: respond(200, "x".repeat(8192)) }));
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
-
-    await runDrain(worker);
-
-    expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const [attempt0] = fakeDeliveries.createAttempts;
-    if (!attempt0) throw new Error("expected one delivery attempt");
-    expect(attempt0.responseBody.isSome()).toBe(true);
-    expect(attempt0.responseBody.unwrap().length).toBeLessThanOrEqual(4096);
+    const [attempt] = attempts();
+    expect(attempt?.responseBody.unwrap().length).toBeLessThanOrEqual(4096);
   });
 
   it("records an attempt with no status and an error when fetch throws", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
-
+    claims([makeDelivery()]);
     const mockFetch = async () => {
       throw new DOMException("The operation was aborted", "AbortError");
     };
 
-    const worker = makeWorker({ deliveries: fakeDeliveries, fetchImpl: mockFetch });
+    await runDrain(makeWorker({ fetchImpl: mockFetch }));
 
-    await runDrain(worker);
-
-    expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const [attempt] = fakeDeliveries.createAttempts;
-    if (!attempt) throw new Error("expected one delivery attempt");
-    expect(attempt.responseStatus.isNone()).toBe(true);
-    expect(attempt.error.isSome()).toBe(true);
+    const [attempt] = attempts();
+    expect(attempts()).toHaveLength(1);
+    expect(attempt?.responseStatus.isNone()).toBe(true);
+    expect(attempt?.error.isSome()).toBe(true);
   });
 
   it("records an attempt with an error and no response when SSRF blocks the url", async () => {
     dbTransactionResult = [{ ...FAKE_ENDPOINT, url: "http://192.168.1.1/hook" }];
-    const fakeDeliveries = makeFakeDeliveries();
+    claims([makeDelivery()]);
 
-    const worker = makeWorker({ deliveries: fakeDeliveries });
+    await runDrain(makeWorker());
 
-    await runDrain(worker);
-
-    expect(fakeDeliveries.createAttempts).toHaveLength(1);
-    const [attempt] = fakeDeliveries.createAttempts;
-    if (!attempt) throw new Error("expected one delivery attempt");
-    expect(attempt.responseStatus.isNone()).toBe(true);
-    expect(attempt.responseHeaders.isNone()).toBe(true);
-    expect(attempt.responseBody.isNone()).toBe(true);
-    expect(attempt.error.isSome()).toBe(true);
+    const [attempt] = attempts();
+    expect(attempts()).toHaveLength(1);
+    expect(attempt?.responseStatus.isNone()).toBe(true);
+    expect(attempt?.responseHeaders.isNone()).toBe(true);
+    expect(attempt?.responseBody.isNone()).toBe(true);
+    expect(attempt?.error.isSome()).toBe(true);
   });
 
   it("resets the endpoint failure counter on success", async () => {
-    const fakeDeliveries = makeFakeDeliveries();
-    const endpoints = makeFakeEndpoints();
-    const { outbox } = makeOutbox();
+    claims([makeDelivery()]);
 
-    const mockFetch = async () => new Response(null, { status: 200 });
-
-    const worker = makeWorker({
-      deliveries: fakeDeliveries,
-      endpoints,
-      outbox,
-      fetchImpl: mockFetch,
-    });
-
-    await runDrain(worker);
+    await runDrain(makeWorker({ fetchImpl: respond(200) }));
 
     expect(endpoints.calls.resetFailure).toEqual(["ep-1"]);
   });
 
-  it("emits WEBHOOK_DELIVERY_EXHAUSTED when the delivery is dead-lettered", async () => {
-    const delivery = { ...makeDelivery(), attempts: 4 };
-    const fakeDeliveries = makeFakeDeliveries([delivery]);
-    const endpoints = makeFakeEndpoints();
-    const { outbox, enqueueCalls } = makeOutbox();
+  it("a replayed dead delivery that succeeds clears dead_letter", async () => {
+    claims([makeDelivery({ status: "dead_letter", attempts: 7 })]);
 
-    const mockFetch = async () => new Response(null, { status: 500 });
+    await runDrain(makeWorker({ fetchImpl: respond(200) }));
 
-    const worker = makeWorker({
-      deliveries: fakeDeliveries,
-      endpoints,
-      outbox,
-      fetchImpl: mockFetch,
-    });
+    expect(deliveries.markSuccess).toHaveBeenCalledTimes(1);
+    expect(endpoints.calls.resetFailure).toEqual(["ep-1"]);
+    expect(eventTypes()).toEqual([]);
+  });
 
-    await runDrain(worker);
+  it("a replayed dead delivery for a disabled endpoint becomes terminal", async () => {
+    dbTransactionResult = [{ ...FAKE_ENDPOINT, enabled: false }];
+    claims([makeDelivery({ status: "dead_letter", attempts: 7 })]);
 
-    const exhausted = enqueueCalls.find(
-      ({ events }) =>
-        Array.isArray(events) &&
-        (events[0] as { eventType?: string } | undefined)?.eventType ===
-          "webhook.delivery.exhausted",
-    );
-    expect(exhausted).toBeDefined();
-    expect(exhausted?.tx).toBeDefined();
+    await runDrain(makeWorker({ fetchImpl: respond(200) }));
+
+    expect(failures()).toEqual([
+      expect.objectContaining({ status: "dead_letter", retryAfterSeconds: Option.none() }),
+    ]);
+    expect(eventTypes()).toEqual([]);
+  });
+
+  it("emits WEBHOOK_DELIVERY_EXHAUSTED in the settle's unit of work on the first death", async () => {
+    claims([makeDelivery({ attempts: 4 })]);
+
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
+
+    expect(enqueuedEvents(outbox).map(({ eventType, payload }) => [eventType, payload])).toEqual([
+      [
+        EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
+        expect.objectContaining({ deliveryId: "del-1", attempts: 4, actorUserId: null }),
+      ],
+    ]);
+    expect(endpoints.calls.bumpFailure).toEqual(["ep-1"]);
+    expect(enqueuedIn[0]).toBeDefined();
+    expect(enqueuedIn[0]).toBe(settledIn[0]);
+    expect(uow.outcome()).toBe("committed");
+  });
+
+  it("emits WEBHOOK_DELIVERY_EXHAUSTED only on the first death", async () => {
+    claims([makeDelivery({ status: "dead_letter", attempts: 6 })]);
+
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
+
+    expect(failures().map((f) => f.status)).toEqual(["dead_letter"]);
+    expect(eventTypes()).toEqual([]);
+    expect(endpoints.calls.bumpFailure).toEqual([]);
+  });
+
+  it("skips attempt side effects counters and events when the settle wrote nothing", async () => {
+    claims([makeDelivery({ id: "del-1", attempts: 5 }), makeDelivery({ id: "del-2" })]);
+    deliveries.markFailed.mockResolvedValue(Result.ok(false));
+    deliveries.markSuccess.mockResolvedValue(Result.ok(false));
+    let call = 0;
+    const mockFetch = async () => new Response(null, { status: call++ === 0 ? 500 : 200 });
+
+    await runDrain(makeWorker({ fetchImpl: mockFetch }));
+
+    expect(eventTypes()).toEqual([]);
+    expect(endpoints.calls.bumpFailure).toEqual([]);
+    expect(endpoints.calls.resetFailure).toEqual([]);
+    expect(attempts().map(({ deliveryId }) => deliveryId)).toEqual(["del-1", "del-2"]);
   });
 
   it("disables the endpoint and emits WEBHOOK_ENDPOINT_DISABLED after old repeated failures", async () => {
-    const delivery = { ...makeDelivery(), attempts: 4 };
-    const fakeDeliveries = makeFakeDeliveries([delivery]);
-    const endpoints = makeFakeEndpoints({
+    endpoints = makeFakeEndpoints({
       bumpFailureResult: Promise.resolve(
         Result.ok(
           Option.some({
@@ -552,62 +570,51 @@ describe("WebhookDeliveryWorker", () => {
         ),
       ) as BumpFailureResult,
     });
-    const { outbox, enqueueCalls } = makeOutbox();
+    claims([makeDelivery({ attempts: 5 })]);
 
-    const mockFetch = async () => new Response(null, { status: 500 });
-
-    const worker = makeWorker({
-      deliveries: fakeDeliveries,
-      endpoints,
-      outbox,
-      fetchImpl: mockFetch,
-    });
-
-    await runDrain(worker);
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
 
     expect(endpoints.calls.markDisabled).toContain("ep-1");
-    const disabled = enqueueCalls.find(
-      ({ events }) =>
-        Array.isArray(events) &&
-        (events[0] as { eventType?: string } | undefined)?.eventType ===
-          "webhook.endpoint.disabled",
-    );
-    expect(disabled).toBeDefined();
+    expect(eventTypes()).toContain(EventTypes.WEBHOOK_ENDPOINT_DISABLED);
   });
 
   it("keeps the endpoint enabled after recent or few failures", async () => {
-    const delivery = { ...makeDelivery(), attempts: 4 };
-    const fakeDeliveries = makeFakeDeliveries([delivery]);
-    const endpoints = makeFakeEndpoints({
+    endpoints = makeFakeEndpoints({
       bumpFailureResult: Promise.resolve(
-        Result.ok(
-          Option.some({
-            consecutiveFailures: 1,
-            firstFailedAt: new Date(),
-          }),
-        ),
+        Result.ok(Option.some({ consecutiveFailures: 1, firstFailedAt: new Date() })),
       ) as BumpFailureResult,
     });
-    const { outbox, enqueueCalls } = makeOutbox();
+    claims([makeDelivery({ attempts: 5 })]);
 
-    const mockFetch = async () => new Response(null, { status: 500 });
-
-    const worker = makeWorker({
-      deliveries: fakeDeliveries,
-      endpoints,
-      outbox,
-      fetchImpl: mockFetch,
-    });
-
-    await runDrain(worker);
+    await runDrain(makeWorker({ fetchImpl: respond(500) }));
 
     expect(endpoints.calls.markDisabled).toHaveLength(0);
-    const disabled = enqueueCalls.find(
-      ({ events }) =>
-        Array.isArray(events) &&
-        (events[0] as { eventType?: string } | undefined)?.eventType ===
-          "webhook.endpoint.disabled",
-    );
-    expect(disabled).toBeUndefined();
+    expect(eventTypes()).not.toContain(EventTypes.WEBHOOK_ENDPOINT_DISABLED);
+  });
+
+  it("releases unstarted deliveries on stop", async () => {
+    claims([
+      makeDelivery({ id: "del-1" }),
+      makeDelivery({ id: "del-2" }),
+      makeDelivery({ id: "del-3" }),
+    ]);
+    let answer: () => void = () => {};
+    const firstFetch = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const mockFetch = async () => {
+      await firstFetch;
+      return new Response(null, { status: 200 });
+    };
+    const worker = makeWorker({ fetchImpl: mockFetch });
+
+    const draining = runDrain(worker);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const stopping = worker.stop();
+    answer();
+    await Promise.all([draining, stopping]);
+
+    expect(deliveries.markSuccess.mock.calls.map(([lease]) => lease.id)).toEqual(["del-1"]);
+    expect(deliveries.release.mock.calls.map(([lease]) => lease.id)).toEqual(["del-2", "del-3"]);
   });
 });

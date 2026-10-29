@@ -1,6 +1,6 @@
 // `/internal/sweep-email-messages`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, emailSchema, eq, lt } from "@packages/drizzle";
+import { and, emailSchema, eq, inArray, lt } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
@@ -41,7 +41,7 @@ export function buildEmailSweepPasses(spans: SweepSpans): RetentionPass[] {
         orderBy: em.createdAt,
         filterFor: (cutoff) =>
           requireFilter(
-            and(eq(em.status, "failed"), lt(em.createdAt, cutoff)),
+            and(inArray(em.status, ["failed", "dead"]), lt(em.createdAt, cutoff)),
             "sweep-email-messages:failed",
           ),
       },

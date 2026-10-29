@@ -2,22 +2,32 @@ import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   asc,
+  claimedSet,
+  db,
+  dbNow,
+  deadShareOf,
   desc,
   eq,
+  getTableColumns,
   inArray,
-  isNull,
+  isDeadDue,
+  isDue,
+  isNotNull,
+  leasedBy,
   lt,
-  lte,
-  or,
+  type PgUpdateSetSource,
+  releasedSet,
   resolveExecutor,
-  sql,
+  secondsFromNow,
   webhooksSchema,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
+  DeliveryClaimRequest,
+  DeliveryFailure,
+  DeliveryLease,
   DeliveryPage,
-  DeliveryUpdate,
   IWebhookDeliveryRepository,
   ListDeliveriesArgs,
   WebhookDeliveryAttemptRecord,
@@ -30,6 +40,48 @@ const we = webhooksSchema.webhookEndpoint;
 const wda = webhooksSchema.webhookDeliveryAttempt;
 const fail = createDbFailure("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
+const unsettled = and(
+  inArray(wd.status, ["pending", "failed", "dead_letter"]),
+  isNotNull(wd.nextAttemptAt),
+);
+
+function claimQuery(
+  exec: ReturnType<typeof resolveExecutor>,
+  { limit, leaseSeconds }: DeliveryClaimRequest,
+) {
+  const claimable = { id: wd.id, createdAt: wd.createdAt };
+  const live = db.$with("live").as(
+    db
+      .select(claimable)
+      .from(wd)
+      .where(and(inArray(wd.status, ["pending", "failed"]), isDue(wd.nextAttemptAt)))
+      .orderBy(wd.createdAt)
+      .limit(limit)
+      .for("update", { skipLocked: true }),
+  );
+  const dead = db.$with("dead").as(
+    db
+      .select(claimable)
+      .from(wd)
+      .where(and(eq(wd.status, "dead_letter"), isDeadDue(wd.nextAttemptAt)))
+      .orderBy(wd.nextAttemptAt)
+      .limit(deadShareOf(limit))
+      .for("update", { skipLocked: true }),
+  );
+  const due = db
+    .$with("due")
+    .as(
+      db.select().from(live).unionAll(db.select().from(dead)).orderBy(live.createdAt).limit(limit),
+    );
+
+  return exec
+    .with(live, dead, due)
+    .update(wd)
+    .set(claimedSet(wd, leaseSeconds))
+    .from(due)
+    .where(eq(wd.id, due.id))
+    .returning(getTableColumns(wd));
+}
 
 function toRecord(row: typeof wd.$inferSelect): WebhookDeliveryRecord {
   return {
@@ -130,63 +182,87 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     );
   }
 
-  async updateStatus(id: string, update: DeliveryUpdate): Promise<Result<void, WebhookRepoError>> {
+  async claim(
+    request: DeliveryClaimRequest,
+  ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(
-      { name: "DrizzleWebhookDeliveryRepository > updateStatus" },
+      { name: "DrizzleWebhookDeliveryRepository > claim" },
       async () => {
         try {
-          const query = exec
-            .update(wd)
-            .set({
-              status: update.status,
-              attempts: update.attempts,
-              nextAttemptAt: update.nextAttemptAt.toNull(),
-              lastError: update.lastError.toNull(),
-              lastResponseStatus: update.lastResponseStatus.toNull(),
-            })
-            .where(eq(wd.id, id));
-          await this.instrumentation.startSpan(
+          const query = claimQuery(exec, request);
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok();
+
+          return Result.ok(
+            rows
+              .map(toRecord)
+              .sort(
+                (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
+              ),
+          );
         } catch (e) {
           this.instrumentation.capture(e);
-          return fail(e, "webhook delivery updateStatus failed");
+          return fail(e, "webhook delivery claim failed");
         }
       },
     );
   }
 
-  async findPendingBatch(
-    limit: number,
-  ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>> {
+  async markSuccess(
+    lease: DeliveryLease,
+    lastResponseStatus: Option<number>,
+  ): Promise<Result<boolean, WebhookRepoError>> {
+    return this.settle("markSuccess", lease, {
+      status: "success",
+      nextAttemptAt: null,
+      lastError: null,
+      lastResponseStatus: lastResponseStatus.toNull(),
+    });
+  }
+
+  async markFailed(
+    lease: DeliveryLease,
+    failure: DeliveryFailure,
+  ): Promise<Result<boolean, WebhookRepoError>> {
+    return this.settle("markFailed", lease, {
+      status: failure.status,
+      nextAttemptAt: failure.retryAfterSeconds.map(secondsFromNow).toNull(),
+      lastError: failure.lastError,
+      lastResponseStatus: failure.lastResponseStatus.toNull(),
+    });
+  }
+
+  async release(lease: DeliveryLease): Promise<Result<boolean, WebhookRepoError>> {
+    return this.settle("release", lease, releasedSet(wd));
+  }
+
+  private async settle(
+    method: "markSuccess" | "markFailed" | "release",
+    lease: DeliveryLease,
+    changes: PgUpdateSetSource<typeof wd>,
+  ): Promise<Result<boolean, WebhookRepoError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(
-      { name: "DrizzleWebhookDeliveryRepository > findPendingBatch" },
+      { name: `DrizzleWebhookDeliveryRepository > ${method}` },
       async () => {
         try {
           const query = exec
-            .select()
-            .from(wd)
-            .where(
-              and(
-                inArray(wd.status, ["pending", "failed"]),
-                or(isNull(wd.nextAttemptAt), lte(wd.nextAttemptAt, sql`now()`)),
-              ),
-            )
-            .orderBy(wd.createdAt)
-            .limit(limit)
-            .for("update", { skipLocked: true });
-          const rows = await this.instrumentation.startSpan(
+            .update(wd)
+            .set(changes)
+            .where(and(leasedBy(wd, lease), unsettled))
+            .returning({ id: wd.id });
+          const written = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(rows.map(toRecord));
+
+          return Result.ok(written.length > 0);
         } catch (e) {
           this.instrumentation.capture(e);
-          return fail(e, "webhook delivery findPendingBatch failed");
+          return fail(e, `webhook delivery ${method} failed`);
         }
       },
     );
@@ -230,7 +306,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
               payload: existing.payload,
               status: "pending",
               attempts: 0,
-              nextAttemptAt: new Date(),
+              nextAttemptAt: dbNow,
               idempotencyKey: `replay:${uuidv7()}`,
             })
             .returning();

@@ -97,6 +97,19 @@ jobs:
         # evaluates. Seeds and removes its own probe rows.
         run: pnpm --filter api check:outbox-lease
 
+      - name: Check the email queue lease claim and settle against a real database
+        # Skip locked, the lease expiry on the database clock, the stale settle guard,
+        # the dead replay window and the release live in the claim CTE and the settle
+        # WHERE, which a mocked executor never evaluates. Seeds and removes its own rows.
+        run: pnpm --filter api check:email-lease
+
+      - name: Check the webhook delivery lease claim and settle against a real database
+        # Skip locked, the lease expiry on the database clock, the stale settle guard,
+        # the replayable versus terminal dead_letter split and the release live in the
+        # claim CTE and the settle WHERE, which a mocked executor never evaluates.
+        # Seeds and removes its own tenant, endpoint and rows.
+        run: pnpm --filter api check:webhook-lease
+
       - name: Seed the audited account
         run: pnpm --filter api db:seed
 
@@ -131,7 +144,7 @@ jobs:
         run: pnpm --filter api check:enqueue
 
       - name: Check the email-queue markSent CASE against a real database
-        # Same reason: the CASE expression and the attempts increment are only
+        # Same reason: the CASE expression and the lease guard are only
         # evaluated by Postgres.
         run: pnpm --filter api check:marksent
 

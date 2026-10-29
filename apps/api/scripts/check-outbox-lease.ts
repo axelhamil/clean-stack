@@ -32,35 +32,25 @@ import { emitEvent } from "../src/shared/event-emitter";
 import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
 import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
-import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import type { OutboxRecord } from "../src/shared/ports/outbox.port";
 import { AuditEventSubscriber } from "../src/shared/services/audit-event-subscriber";
 import {
   DrizzleOutboxRepository,
   OUTBOX_CHANNEL,
 } from "../src/shared/services/drizzle-outbox.service";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
-import { checkRecorder } from "./check-harness";
+import { checkRun, recordingInstrumentation } from "./check-harness";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;
 const TYPE_A = `${PROBE}.a`;
 const TYPE_B = `${PROBE}.b`;
 const AGGREGATE = `check-outbox-lease-${crypto.randomUUID()}`;
 
-const spans: string[] = [];
-const noop = new NoOpInstrumentation();
-const instrumentation: IInstrumentation = Object.assign(noop, {
-  startSpan: <T>(options: { name: string; op?: string }, work: () => T): T => {
-    if (options.op === "db.query") spans.push(options.name);
-    return work();
-  },
-});
+const { instrumentation, spans } = recordingInstrumentation();
 const outbox = new DrizzleOutboxRepository(instrumentation);
 const uow = new TransactionService(instrumentation, async (events) => {
   await outbox.enqueue(events, { source: "check/outbox-lease" });
 });
 
-const checks = checkRecorder();
 const oe = outboxSchema.outboxEvent;
 const al = auditLogSchema.auditLog;
 
@@ -69,17 +59,7 @@ async function cleanup(): Promise<void> {
   await db.delete(oe).where(or(like(oe.eventType, `${PROBE}%`), eq(oe.aggregateId, AGGREGATE)));
 }
 
-async function fail(label: string, extra?: unknown): Promise<never> {
-  checks.check(label, false, extra);
-  await cleanup();
-  console.error(`\ncheck-outbox-lease failed at: ${label}`);
-  process.exit(1);
-}
-
-async function step(label: string, ok: boolean, extra?: unknown): Promise<void> {
-  if (!ok) await fail(label, extra);
-  checks.check(label, true);
-}
+const { step, fail, run } = checkRun("check-outbox-lease", cleanup);
 
 async function seed(
   count: number,
@@ -417,16 +397,6 @@ async function main(): Promise<void> {
       keptIds.includes(deadOld),
     { purged, kept: keptIds.length },
   );
-
-  await cleanup();
-  console.log(
-    "\nAll assertions passed, outbox events are claimed by lease and settled per attempt.",
-  );
-  process.exit(0);
 }
 
-main().catch(async (err) => {
-  console.error("check-outbox-lease crashed:", err);
-  await cleanup().catch(() => {});
-  process.exit(1);
-});
+run(main, "outbox events are claimed by lease and settled per attempt");

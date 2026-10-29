@@ -1,6 +1,6 @@
 import { type IUnitOfWork, uuidv7 } from "@packages/ddd-kit";
 
-import { and, eq, resolveExecutor, webhooksSchema } from "@packages/drizzle";
+import { and, dbNow, eq, resolveExecutor, webhooksSchema } from "@packages/drizzle";
 import { isKnownEventType, isPublicEvent, matchesSubscription } from "@packages/events";
 import type { BuiltInEventHandler } from "../event-handlers";
 import type { IInstrumentation } from "../ports/instrumentation.port";
@@ -42,7 +42,6 @@ export class WebhookFanoutSubscriber implements BuiltInEventHandler {
             );
             if (endpoints.length === 0) return;
 
-            const now = new Date();
             const insertQuery = exec
               .insert(wd)
               .values(
@@ -54,7 +53,7 @@ export class WebhookFanoutSubscriber implements BuiltInEventHandler {
                   payload: event.payload,
                   status: "pending" as const,
                   attempts: 0,
-                  nextAttemptAt: now,
+                  nextAttemptAt: dbNow,
                   idempotencyKey: `${eventId}:${e.id}`,
                 })),
               )

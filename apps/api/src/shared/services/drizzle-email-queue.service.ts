@@ -1,18 +1,32 @@
 import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
+  claimedSet,
+  db,
+  dbNow,
+  deadShareOf,
   emailSchema,
   eq,
+  getTableColumns,
+  gt,
   inArray,
-  isNull,
-  lte,
+  isDeadDue,
+  isDue,
+  leasedBy,
   or,
+  type PgUpdateSetSource,
+  releasedSet,
   resolveExecutor,
+  type SQL,
+  secondsFromNow,
   sql,
 } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
 import { logger } from "../logger";
 import type {
+  EmailClaimRequest,
+  EmailFailure,
+  EmailLease,
   EmailMessageInsert,
   EmailMessageRecord,
   EmailQueueError,
@@ -28,6 +42,66 @@ function fail(err: unknown, fallback: string): Result<never, EmailQueueError> {
     code: "EMAIL_QUEUE_WRITE_FAILED",
     message: err instanceof Error ? err.message : fallback,
   });
+}
+
+const LAST_ERROR_MAX_LENGTH = 2000;
+const unsettled = inArray(em.status, ["pending", "dead"]);
+const leasedAll = (leases: readonly EmailLease[]): SQL | undefined =>
+  and(or(...leases.map((lease) => leasedBy(em, lease))), unsettled);
+
+function claimQuery(
+  exec: ReturnType<typeof resolveExecutor>,
+  { limit, leaseSeconds, deadReplayWindowHours }: EmailClaimRequest,
+) {
+  const claimable = { id: em.id, createdAt: em.createdAt };
+  const live = db.$with("live").as(
+    db
+      .select(claimable)
+      .from(em)
+      .where(and(eq(em.status, "pending"), isDue(em.nextAttemptAt)))
+      .orderBy(em.createdAt)
+      .limit(limit)
+      .for("update", { skipLocked: true }),
+  );
+  const dead = db.$with("dead").as(
+    db
+      .select(claimable)
+      .from(em)
+      .where(
+        and(
+          eq(em.status, "dead"),
+          isDeadDue(em.nextAttemptAt),
+          gt(em.createdAt, sql`now() - make_interval(hours => ${deadReplayWindowHours})`),
+        ),
+      )
+      .orderBy(em.nextAttemptAt)
+      .limit(deadShareOf(limit))
+      .for("update", { skipLocked: true }),
+  );
+  const due = db
+    .$with("due")
+    .as(
+      db.select().from(live).unionAll(db.select().from(dead)).orderBy(live.createdAt).limit(limit),
+    );
+
+  return exec
+    .with(live, dead, due)
+    .update(em)
+    .set(claimedSet(em, leaseSeconds))
+    .from(due)
+    .where(eq(em.id, due.id))
+    .returning(getTableColumns(em));
+}
+
+function failureChanges(failure: EmailFailure): PgUpdateSetSource<typeof em> {
+  const lastError = failure.lastError.slice(0, LAST_ERROR_MAX_LENGTH);
+  if (failure.status === "failed") return { status: "failed", lastError, nextAttemptAt: null };
+
+  return {
+    status: failure.status,
+    lastError,
+    nextAttemptAt: secondsFromNow(failure.retryAfterSeconds),
+  };
 }
 
 function toRecord(row: typeof em.$inferSelect): EmailMessageRecord {
@@ -87,79 +161,60 @@ export class DrizzleEmailQueue implements IEmailQueue {
     });
   }
 
-  async claimPending(
-    limit: number,
-    claimUntil: Date,
-  ): Promise<Result<EmailMessageRecord[], EmailQueueError>> {
+  async claim(request: EmailClaimRequest): Promise<Result<EmailMessageRecord[], EmailQueueError>> {
     const exec = resolveExecutor();
-    return this.instrumentation.startSpan(
-      { name: "DrizzleEmailQueue > claimPending" },
-      async () => {
-        try {
-          const subq = exec
-            .select({ id: em.id })
-            .from(em)
-            .where(
-              and(
-                eq(em.status, "pending"),
-                or(isNull(em.nextAttemptAt), lte(em.nextAttemptAt, new Date())),
-              ),
-            )
-            .orderBy(em.createdAt)
-            .limit(limit)
-            .for("update", { skipLocked: true });
+    return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > claim" }, async () => {
+      try {
+        const query = claimQuery(exec, request);
+        const rows = await this.instrumentation.startSpan(
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
+        );
 
-          const query = exec
-            .update(em)
-            .set({ nextAttemptAt: claimUntil })
-            .where(inArray(em.id, subq))
-            .returning();
-
-          const rows = await this.instrumentation.startSpan(
-            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => query.execute(),
-          );
-          return Result.ok(rows.map(toRecord));
-        } catch (err) {
-          this.instrumentation.capture(err);
-          return fail(err, "claim failed");
-        }
-      },
-    );
+        return Result.ok(
+          rows
+            .map(toRecord)
+            .sort(
+              (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
+            ),
+        );
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "claim failed");
+      }
+    });
   }
 
   async markSent(
-    ids: string[],
-    sentAt: Date,
+    leases: EmailLease[],
     providerMessageIds: Record<string, string>,
-  ): Promise<Result<void, EmailQueueError>> {
+  ): Promise<Result<EmailLease[], EmailQueueError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markSent" }, async () => {
-      if (ids.length === 0) return Result.ok();
+      if (leases.length === 0) return Result.ok([]);
 
       try {
-        const cases = ids.map(
-          (id) => sql`WHEN ${em.id} = ${id} THEN ${providerMessageIds[id] ?? null}`,
+        const cases = leases.map(
+          ({ id }) => sql`WHEN ${em.id} = ${id} THEN ${providerMessageIds[id] ?? null}`,
         );
         const providerCase = sql`CASE ${sql.join(cases, sql` `)} ELSE NULL END`;
-
         const query = exec
           .update(em)
           .set({
             status: "sent",
-            sentAt,
+            sentAt: dbNow,
             nextAttemptAt: null,
             lastError: null,
             providerMessageId: providerCase,
-            attempts: sql`${em.attempts} + 1`,
           })
-          .where(inArray(em.id, ids));
-
-        await this.instrumentation.startSpan(
+          .where(leasedAll(leases))
+          .returning({ id: em.id, attempts: em.attempts });
+        const written = await this.instrumentation.startSpan(
           { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
           () => query.execute(),
         );
-        return Result.ok();
+
+        return Result.ok(written);
       } catch (err) {
         this.instrumentation.capture(err);
         return fail(err, "markSent failed");
@@ -168,30 +223,50 @@ export class DrizzleEmailQueue implements IEmailQueue {
   }
 
   async markFailed(
-    id: string,
-    error: string,
-    nextAttempt: Option<Date>,
-  ): Promise<Result<void, EmailQueueError>> {
+    lease: EmailLease,
+    failure: EmailFailure,
+  ): Promise<Result<boolean, EmailQueueError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markFailed" }, async () => {
       try {
         const query = exec
           .update(em)
-          .set({
-            status: nextAttempt.isNone() ? "failed" : "pending",
-            nextAttemptAt: nextAttempt.toNull(),
-            lastError: error.slice(0, 2000),
-            attempts: sql`${em.attempts} + 1`,
-          })
-          .where(eq(em.id, id));
-        await this.instrumentation.startSpan(
+          .set(failureChanges(failure))
+          .where(leasedAll([lease]))
+          .returning({ id: em.id });
+        const written = await this.instrumentation.startSpan(
           { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
           () => query.execute(),
         );
-        return Result.ok();
+
+        return Result.ok(written.length > 0);
       } catch (err) {
         this.instrumentation.capture(err);
         return fail(err, "markFailed failed");
+      }
+    });
+  }
+
+  async release(leases: EmailLease[]): Promise<Result<number, EmailQueueError>> {
+    const exec = resolveExecutor();
+    return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > release" }, async () => {
+      if (leases.length === 0) return Result.ok(0);
+
+      try {
+        const query = exec
+          .update(em)
+          .set(releasedSet(em))
+          .where(leasedAll(leases))
+          .returning({ id: em.id });
+        const written = await this.instrumentation.startSpan(
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
+        );
+
+        return Result.ok(written.length);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "release failed");
       }
     });
   }

@@ -8,6 +8,11 @@ import {
 } from "./shutdown";
 
 export const OUTBOX_SETTLE_MARGIN_SECONDS = 10;
+export const EMAIL_SEND_TIMEOUT_SECONDS = 30;
+export const EMAIL_SETTLE_MARGIN_SECONDS = 15;
+export const WEBHOOK_DNS_TIMEOUT_SECONDS = 5;
+export const WEBHOOK_FETCH_TIMEOUT_SECONDS = 30;
+export const WEBHOOK_SETTLE_MARGIN_SECONDS = 30;
 
 /**
  * The sweep-timeout bounds only work nested: the sweep must be able to finish and
@@ -31,6 +36,10 @@ export function validateEnvBounds(
     SHUTDOWN_DEADLINE_MS: number;
     OUTBOX_LEASE_SECONDS: number;
     OUTBOX_HANDLER_BUDGET_SECONDS: number;
+    EMAIL_LEASE_SECONDS: number;
+    EMAIL_DEAD_RETRY_HOURS: number;
+    EMAIL_DEAD_REPLAY_WINDOW_HOURS: number;
+    WEBHOOK_LEASE_SECONDS: number;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -69,6 +78,33 @@ export function validateEnvBounds(
       code: "custom",
       path: ["OUTBOX_LEASE_SECONDS"],
       message: `OUTBOX_LEASE_SECONDS (${value.OUTBOX_LEASE_SECONDS}) must be at least OUTBOX_HANDLER_BUDGET_SECONDS (${value.OUTBOX_HANDLER_BUDGET_SECONDS}) + the ${OUTBOX_SETTLE_MARGIN_SECONDS}s claim and settle margin (${leaseFloor}), or a handler still within its budget outlives the lease and another relay claims the same event.`,
+    });
+  }
+
+  const emailLeaseFloor = EMAIL_SEND_TIMEOUT_SECONDS + EMAIL_SETTLE_MARGIN_SECONDS;
+  if (value.EMAIL_LEASE_SECONDS < emailLeaseFloor) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["EMAIL_LEASE_SECONDS"],
+      message: `EMAIL_LEASE_SECONDS (${value.EMAIL_LEASE_SECONDS}) must be at least the ${EMAIL_SEND_TIMEOUT_SECONDS}s send timeout + the ${EMAIL_SETTLE_MARGIN_SECONDS}s claim and settle margin (${emailLeaseFloor}), or a batch still waiting on the provider outlives the lease and another worker sends the same emails again.`,
+    });
+  }
+
+  if (value.EMAIL_DEAD_REPLAY_WINDOW_HOURS <= value.EMAIL_DEAD_RETRY_HOURS) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["EMAIL_DEAD_REPLAY_WINDOW_HOURS"],
+      message: `EMAIL_DEAD_REPLAY_WINDOW_HOURS (${value.EMAIL_DEAD_REPLAY_WINDOW_HOURS}) must exceed EMAIL_DEAD_RETRY_HOURS (${value.EMAIL_DEAD_RETRY_HOURS}), or a dead email leaves its replay window before its first replay is due and is never retried.`,
+    });
+  }
+
+  const webhookLeaseFloor =
+    WEBHOOK_DNS_TIMEOUT_SECONDS + WEBHOOK_FETCH_TIMEOUT_SECONDS + WEBHOOK_SETTLE_MARGIN_SECONDS;
+  if (value.WEBHOOK_LEASE_SECONDS < webhookLeaseFloor) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["WEBHOOK_LEASE_SECONDS"],
+      message: `WEBHOOK_LEASE_SECONDS (${value.WEBHOOK_LEASE_SECONDS}) must be at least the ${WEBHOOK_DNS_TIMEOUT_SECONDS}s lookup timeout + the ${WEBHOOK_FETCH_TIMEOUT_SECONDS}s delivery timeout + the ${WEBHOOK_SETTLE_MARGIN_SECONDS}s claim and settle margin (${webhookLeaseFloor}), or a delivery still waiting on its endpoint outlives the lease and another worker sends it again.`,
     });
   }
 }

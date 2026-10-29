@@ -105,6 +105,11 @@ export const di = container()
         c.ITransactionService,
         logger,
         c.IInstrumentation,
+        {
+          leaseSeconds: env.EMAIL_LEASE_SECONDS,
+          deadRetrySeconds: env.EMAIL_DEAD_RETRY_HOURS * 3600,
+          deadReplayWindowHours: env.EMAIL_DEAD_REPLAY_WINDOW_HOURS,
+        },
       ),
   )
   .add(

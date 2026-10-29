@@ -66,6 +66,9 @@ export const webhookDelivery = pgTable(
     index("webhook_delivery_pending_idx")
       .on(table.nextAttemptAt)
       .where(sql`${table.status} IN ('pending', 'failed')`),
+    index("webhook_delivery_dead_retry_idx")
+      .on(table.nextAttemptAt)
+      .where(sql`${table.status} = 'dead_letter' and ${table.nextAttemptAt} is not null`),
     index("webhook_delivery_sweep_idx")
       .on(table.createdAt)
       .where(sql`${table.status} IN ('success', 'dead_letter')`),

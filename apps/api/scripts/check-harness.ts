@@ -1,10 +1,13 @@
 /**
- * The pieces every `check-*.ts` script used to redeclare: a pass/fail recorder, the
- * seeded account lookup, and a signed request to an `/internal/*` route mounted on a
- * throwaway app. One copy, so a fix to how a check reports or signs lands everywhere.
+ * The pieces every `check-*.ts` script used to redeclare: a pass/fail recorder and a
+ * fail-fast step runner, a span recorder, probe claims on a shared queue, a process
+ * clock set ahead, the seeded account lookup, and a signed request to an `/internal/*`
+ * route mounted on a throwaway app. One copy, so a fix to how a check reports or signs
+ * lands everywhere.
  */
 
 import { Writable } from "node:stream";
+import type { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { Hono } from "hono";
 import { pinoLogger } from "hono-pino";
@@ -16,6 +19,8 @@ import {
   SIGNATURE_HEADER,
   sign,
 } from "../src/shared/internal-routes/internal-signature";
+import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
+import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { seedEmail } from "./seed-account";
 
 export interface CheckRecorder {
@@ -36,6 +41,96 @@ export function checkRecorder(): CheckRecorder {
       return failures;
     },
   };
+}
+
+export interface CheckRun {
+  step(label: string, ok: boolean, extra?: unknown): Promise<void>;
+  fail(label: string, extra?: unknown): Promise<never>;
+  run(main: () => Promise<void>, success: string): void;
+}
+
+export function checkRun(name: string, cleanup: () => Promise<void>): CheckRun {
+  const checks = checkRecorder();
+
+  async function fail(label: string, extra?: unknown): Promise<never> {
+    checks.check(label, false, extra);
+    await cleanup();
+    console.error(`\n${name} failed at: ${label}`);
+    process.exit(1);
+  }
+
+  return {
+    fail,
+    async step(label, ok, extra) {
+      if (!ok) await fail(label, extra);
+      checks.check(label, true);
+    },
+    run(main, success) {
+      main()
+        .then(async () => {
+          await cleanup();
+          console.log(`\nAll assertions passed, ${success}.`);
+          process.exit(0);
+        })
+        .catch(async (err) => {
+          console.error(`${name} crashed:`, err);
+          await cleanup().catch(() => {});
+          process.exit(1);
+        });
+    },
+  };
+}
+
+export function recordingInstrumentation(): { instrumentation: IInstrumentation; spans: string[] } {
+  const spans: string[] = [];
+  const instrumentation: IInstrumentation = Object.assign(new NoOpInstrumentation(), {
+    startSpan: <T>(options: { name: string; op?: string }, work: () => T): T => {
+      if (options.op === "db.query") spans.push(options.name);
+      return work();
+    },
+  });
+
+  return { instrumentation, spans };
+}
+
+export function probeClaims<TRow, TRequest>(queue: {
+  claim(request: TRequest): Promise<Result<TRow[], unknown>>;
+  release(foreign: TRow[]): Promise<unknown>;
+  isProbe(row: TRow): boolean;
+  fail(label: string, extra?: unknown): Promise<never>;
+}): { all(request: TRequest): Promise<TRow[]>; probes(request: TRequest): Promise<TRow[]> } {
+  async function all(request: TRequest): Promise<TRow[]> {
+    const result = await queue.claim(request);
+    if (result.isFailure) return queue.fail("claim succeeds", result.getError());
+
+    const foreign = result.getValue().filter((row) => !queue.isProbe(row));
+    if (foreign.length > 0) await queue.release(foreign);
+
+    return result.getValue();
+  }
+
+  return {
+    all,
+    probes: async (request) => (await all(request)).filter((row) => queue.isProbe(row)),
+  };
+}
+
+export function withClockAhead<T>(ms: number, work: () => Promise<T>): Promise<T> {
+  const RealDate = Date;
+  class AheadDate extends RealDate {
+    constructor(value?: number | string | Date) {
+      super(value ?? RealDate.now() + ms);
+    }
+
+    static override now(): number {
+      return RealDate.now() + ms;
+    }
+  }
+  Object.defineProperty(globalThis, "Date", { value: AheadDate, configurable: true });
+
+  return work().finally(() => {
+    Object.defineProperty(globalThis, "Date", { value: RealDate, configurable: true });
+  });
 }
 
 /** The id of the account `db:seed` creates, or a pointer to the command that creates it. */

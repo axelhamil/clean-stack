@@ -12,7 +12,7 @@ import { sweepBodySchema } from "./sweep-runner";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
-const TERMINAL_STATUSES = ["success", "dead_letter"] as const;
+const RETENTION_STATUSES = ["success", "dead_letter"] as const;
 const LABEL = "sweep-webhook-delivery";
 
 const wd = webhooksSchema.webhookDelivery;
@@ -34,7 +34,7 @@ export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
             orderBy: wd.createdAt,
             filterFor: (cutoff) =>
               requireFilter(
-                and(inArray(wd.status, [...TERMINAL_STATUSES]), lt(wd.createdAt, cutoff)),
+                and(inArray(wd.status, [...RETENTION_STATUSES]), lt(wd.createdAt, cutoff)),
                 LABEL,
               ),
           },

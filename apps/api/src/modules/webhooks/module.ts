@@ -56,6 +56,10 @@ export const webhooksModule = defineModule()((b) =>
           c.ITransactionService,
           logger,
           c.IInstrumentation,
+          {
+            leaseSeconds: env.WEBHOOK_LEASE_SECONDS,
+            deadRetrySeconds: env.WEBHOOK_DEAD_RETRY_HOURS * 3600,
+          },
         ),
     ),
 );
