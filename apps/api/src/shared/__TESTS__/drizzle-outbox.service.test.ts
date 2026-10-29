@@ -16,6 +16,7 @@ const executor = { insert, execute: mock(async () => ({ rows: [] })) };
 mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
 
 const { DrizzleOutboxRepository } = await import("../services/drizzle-outbox.service");
+const { emitEvent } = await import("../event-emitter");
 
 function makeEvent(overrides: Partial<IDomainEvent> = {}): IDomainEvent {
   return {
@@ -61,5 +62,17 @@ describe("DrizzleOutboxRepository.enqueue", () => {
     );
 
     expect(insertedRows.map((row) => row.id)).toEqual(["evt-1", "evt-2"]);
+  });
+
+  it("emitEvent returns the id stored as the outbox row id", async () => {
+    const repo = new DrizzleOutboxRepository(mockInstrumentation());
+
+    const eventId = await emitEvent(repo, EventTypes.USER_CREATED, "user", "u1", {
+      userId: "u1",
+      email: "u@test.com",
+      name: "U",
+    });
+
+    expect(insertedRows.map((row) => row.id)).toEqual([eventId]);
   });
 });
