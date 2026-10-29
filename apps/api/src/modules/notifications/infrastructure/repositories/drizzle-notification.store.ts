@@ -2,17 +2,16 @@ import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   count,
-  db,
   desc,
   eq,
   inArray,
   isNull,
   lt,
   notificationSchema,
+  resolveExecutor,
 } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   INotificationStore,
   NotificationError,
@@ -36,13 +35,14 @@ export class DrizzleNotificationStore implements INotificationStore {
     cursor: Option<string>,
     limit: number,
   ): Promise<Result<NotificationRecord[], NotificationError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleNotificationStore > list" }, async () => {
       try {
         const n = notificationSchema.notification;
         const where = cursor.isSome()
           ? and(eq(n.userId, userId), lt(n.createdAt, new Date(cursor.unwrap())))
           : eq(n.userId, userId);
-        const query = db.select().from(n).where(where).orderBy(desc(n.createdAt)).limit(limit);
+        const query = exec.select().from(n).where(where).orderBy(desc(n.createdAt)).limit(limit);
         const rows = await this.instrumentation.startSpan(
           { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
           () => query.execute(),
@@ -56,12 +56,13 @@ export class DrizzleNotificationStore implements INotificationStore {
   }
 
   async unreadCount(userId: string): Promise<Result<number, NotificationError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > unreadCount" },
       async () => {
         try {
           const n = notificationSchema.notification;
-          const query = db
+          const query = exec
             .select({ count: count() })
             .from(n)
             .where(and(eq(n.userId, userId), isNull(n.readAt)));
@@ -82,9 +83,8 @@ export class DrizzleNotificationStore implements INotificationStore {
     userId: string,
     ids: string[],
     now: Date,
-    tx?: ITransaction,
   ): Promise<Result<string[], NotificationError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > markRead" },
       async () => {
@@ -108,12 +108,8 @@ export class DrizzleNotificationStore implements INotificationStore {
     );
   }
 
-  async markAllRead(
-    userId: string,
-    now: Date,
-    tx?: ITransaction,
-  ): Promise<Result<string[], NotificationError>> {
-    const exec = tx ?? db;
+  async markAllRead(userId: string, now: Date): Promise<Result<string[], NotificationError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > markAllRead" },
       async () => {
@@ -141,12 +137,13 @@ export class DrizzleNotificationStore implements INotificationStore {
     scope: PreferenceScope,
     scopeId: string,
   ): Promise<Result<PreferenceRecord[], NotificationError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > listPreferences" },
       async () => {
         try {
           const p = notificationSchema.notificationPreference;
-          const query = db
+          const query = exec
             .select()
             .from(p)
             .where(and(eq(p.scope, scope), eq(p.scopeId, scopeId)));
@@ -163,11 +160,8 @@ export class DrizzleNotificationStore implements INotificationStore {
     );
   }
 
-  async upsertPreference(
-    input: PreferenceInput,
-    tx?: ITransaction,
-  ): Promise<Result<void, NotificationError>> {
-    const exec = tx ?? db;
+  async upsertPreference(input: PreferenceInput): Promise<Result<void, NotificationError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleNotificationStore > upsertPreference" },
       async () => {

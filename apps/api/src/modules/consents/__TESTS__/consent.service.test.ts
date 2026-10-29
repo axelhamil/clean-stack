@@ -1,11 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import {
-  noopOutbox,
-  passthroughUow,
-  recordingOutbox,
-} from "../../../shared/__TESTS__/outbox-fakes";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { noopOutbox, recordingOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   ConsentError,
@@ -13,8 +10,6 @@ import type {
   IConsentStore,
 } from "../application/ports/consent.port";
 import { ConsentService } from "../application/services/consent.service";
-
-const fakeTx = {} as never;
 
 const activeRow: ConsentRecordRow = {
   id: "row-1",
@@ -51,7 +46,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         spyOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -90,7 +85,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         outbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -110,7 +105,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         noopOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -136,7 +131,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         spyOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -169,7 +164,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         outbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -191,7 +186,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         noopOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -216,7 +211,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         noopOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -238,7 +233,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         noopOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -260,14 +255,14 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         store,
         spyOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
       const result = await service.reconcile("subj-1", "u1");
 
       expect(result.isSuccess).toBe(true);
-      expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1", fakeTx);
+      expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1");
       expect(enqueued).toEqual([
         {
           eventType: EventTypes.USER_COOKIE_CONSENT_LINKED,
@@ -282,7 +277,7 @@ describe("ConsentService", () => {
       const service = new ConsentService(
         makeStore(),
         spyOutbox,
-        passthroughUow(fakeTx),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 

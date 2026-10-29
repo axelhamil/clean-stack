@@ -56,8 +56,8 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       const { ids } = c.req.valid("json");
       const userId = c.get("user").id;
 
-      await di.ITransactionService.run(async (tx) => {
-        const result = await di.INotificationStore.markRead(userId, ids, new Date(), tx);
+      await di.ITransactionService.run(async () => {
+        const result = await di.INotificationStore.markRead(userId, ids, new Date());
         if (result.isFailure) throw new AppErrorException(result.getError());
         const marked = result.getValue();
 
@@ -86,8 +86,8 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
   .post("/read-all", requireAuth, requireCurrentPolicies, denyImpersonated, async (c) => {
     const userId = c.get("user").id;
 
-    await di.ITransactionService.run(async (tx) => {
-      const result = await di.INotificationStore.markAllRead(userId, new Date(), tx);
+    await di.ITransactionService.run(async () => {
+      const result = await di.INotificationStore.markAllRead(userId, new Date());
       if (result.isFailure) throw new AppErrorException(result.getError());
       const marked = result.getValue();
       // Nothing was unread: no state changed, so there is nothing to observe.
@@ -121,19 +121,16 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       const body = c.req.valid("json");
       const userId = c.get("user").id;
 
-      await di.ITransactionService.run(async (tx) => {
-        const result = await di.INotificationStore.upsertPreference(
-          {
-            scope: "user",
-            scopeId: userId,
-            category: body.category,
-            channel: body.channel,
-            enabled: body.enabled,
-            frequency: body.frequency,
-            locked: false,
-          },
-          tx,
-        );
+      await di.ITransactionService.run(async () => {
+        const result = await di.INotificationStore.upsertPreference({
+          scope: "user",
+          scopeId: userId,
+          category: body.category,
+          channel: body.channel,
+          enabled: body.enabled,
+          frequency: body.frequency,
+          locked: false,
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
 
         await emitEvent(
@@ -180,19 +177,16 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       const userId = c.get("user").id;
       const orgId = c.get("orgId");
 
-      await di.ITransactionService.run(async (tx) => {
-        const result = await di.INotificationStore.upsertPreference(
-          {
-            scope: "org",
-            scopeId: orgId,
-            category: body.category,
-            channel: body.channel,
-            enabled: body.enabled,
-            frequency: body.frequency,
-            locked: body.locked,
-          },
-          tx,
-        );
+      await di.ITransactionService.run(async () => {
+        const result = await di.INotificationStore.upsertPreference({
+          scope: "org",
+          scopeId: orgId,
+          category: body.category,
+          channel: body.channel,
+          enabled: body.enabled,
+          frequency: body.frequency,
+          locked: body.locked,
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
 
         await emitEvent(

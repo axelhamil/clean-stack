@@ -4,7 +4,6 @@ import { POLICY_TYPES, POLICY_VERSIONS, type PolicyType } from "@packages/polici
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type { IPolicyAcceptanceStore, PolicyError } from "../ports/policy-acceptance.port";
 
 export interface PolicyTypeStatus {
@@ -18,7 +17,7 @@ export class PolicyAcceptanceService {
   constructor(
     private readonly store: IPolicyAcceptanceStore,
     private readonly outbox: IOutboxRepository,
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
   ) {}
 
@@ -30,20 +29,17 @@ export class PolicyAcceptanceService {
     if (types.length === 0) return Result.ok();
 
     try {
-      return await this.uow.run(async (tx) => {
+      return await this.uow.run(async () => {
         for (const policyType of types) {
           const policyVersion = POLICY_VERSIONS[policyType];
 
-          const inserted = await this.store.insert(
-            {
-              id: crypto.randomUUID(),
-              userId,
-              policyType,
-              policyVersion,
-              ipAddress: Option.fromNullable(ipAddress),
-            },
-            tx,
-          );
+          const inserted = await this.store.insert({
+            id: crypto.randomUUID(),
+            userId,
+            policyType,
+            policyVersion,
+            ipAddress: Option.fromNullable(ipAddress),
+          });
           if (inserted.isFailure) return inserted;
 
           await emitEvent(
