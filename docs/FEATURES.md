@@ -215,11 +215,11 @@ PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No 
 
 **Zero plumbing post-clone**: declare an event in `@packages/events`, call `addEvent()` in the aggregate, run via `uow.run()`: audit log row + webhook fanout + in-process `onEvent(...)` handlers fire automatically.
 
-- **Outbox** `outbox_event`: UUID v7 PK, partial index on pending rows, `pg_notify` trigger ensured idempotently at boot.
-- **Dispatcher**: in-process Bun worker, `pg.Client` LISTEN + 30s poll fallback, `FOR UPDATE SKIP LOCKED` drain (multi-instance safe). Built-in subscribers inside the dispatch TX (atomic); `onEvent` handlers post-commit (isolated).
+- **Outbox** `outbox_event`: UUID v7 PK (the event id, returned by `emitEvent`), `dead_at` and per handler `deliveries` jsonb, partial indexes on live pending, dead retry and dispatched rows; `pg_notify` sent by `enqueue` inside the same transaction.
+- **Dispatcher and relay** (`outbox-dispatcher.service.ts`, `outbox-relay.ts`): in-process Bun worker, `pg.Client` LISTEN with backoff reconnect and keepalive, wake at the next due retry, 30s poll fallback. Claim by lease in one statement (`FOR UPDATE SKIP LOCKED`, multi-instance safe, no lock held while handlers run), named handlers (`audit-log`, `webhook-fanout`, `notification-fanout`, then `onEvent(type, handlerName, ...)`) each in its own short transaction with a time budget, settle guarded by `attempts`, jittered retry of the failed handlers only, dead after `OUTBOX_MAX_ATTEMPTS` with one `outbox.event_dead` and a replay every `OUTBOX_DEAD_RETRY_HOURS`. Proven by `check:outbox-lease`.
 - **Audit log** (`audit_log`): append-only (SOC2 / ISO 27001). `operational` (90d) vs `compliance` (7y) retention. Optional tamper-evidence hash chain (`AUDIT_TAMPER_EVIDENCE`). Operator UI at `/admin/audit-log` (filters, pagination, chain verify): gated `requirePlatformAdmin`.
 - **Outbound webhooks**: HMAC-SHA256 signed (Stripe-style), AEAD-encrypted secrets (XChaCha20-Poly1305 + HKDF per org), decorrelated jitter retry (1m/5m/30m/2h/12h), dead-letter after 5 attempts, replay. See §Outbound webhooks for the full front-end surface.
-- **Catalog** `@packages/events`: **85 events** (35 public / 50 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
+- **Catalog** `@packages/events`: **86 events** (35 public / 51 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
 - **Request correlation**: `X-Request-Id` threaded into `outbox_event.metadata` and `audit_log.request_id` via `AsyncLocalStorage`.
 
 See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler, multi-tenant safety, BetterAuth bridge, HMAC verification).
@@ -351,7 +351,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx`: name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts`: list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts`: 85-event catalog with explicit `public` / `internal` classification (35 public / 50 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts`: 86-event catalog with explicit `public` / `internal` classification (35 public / 51 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
 **Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket).
 
@@ -365,13 +365,13 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 Persistent inbox behind a bell, real-time over SSE, three-level preferences. No new event type: D.3 *consumes* the catalog.
 
-**Catalog projection** `packages/events/src/notification-map.ts`: third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 85 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced: `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
+**Catalog projection** `packages/events/src/notification-map.ts`: third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 86 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced: `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
 
 **Audience by capability, never by role tuple**: `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `ORG_ROLES.filter(authorizeRole)` resolves at boot, leaving `WHERE member.role = ANY($1)`.
 
 **Schema** `packages/drizzle/src/schema/notification.ts`: `notification(id, userId FK, organizationId FK nullable, category, eventType, groupKey, dedupKey, payload jsonb, readAt, emailPendingAt, emailSentAt, createdAt)`: `emailPendingAt` is a **due** instant, not an occurrence one: the fan-out resolves the recipient's `frequency` preference and stamps the end of the chosen window there, which is what makes `hourly` / `daily` real without the flush knowing about preferences at all + `notification_preference(scope 'user'|'org', scopeId, category, channel, enabled, frequency, locked)`. Five indexes, three partial: unread count, email-pending, and the dedup unique index `(userId, dedupKey) WHERE dedup_key IS NOT NULL`. **`organizationId` nullable is a documented exception to org-scoping rule #3**: `user.password_changed` belongs to no org.
 
-**Fan-out** `apps/api/src/shared/services/notification-fanout-subscriber.ts`: an `OutboxSubscriber` running inside the dispatch TX beside audit and webhook fan-out, not an `onEvent` post-commit handler (which is best-effort, so a lost notification would fail silently). One `INSERT ... SELECT` over the recipient set, never N inserts in a loop. The recipient set is either a single user or `SELECT user_id FROM member WHERE ...`; everything downstream is shared.
+**Fan-out** `apps/api/src/shared/services/notification-fanout-subscriber.ts`: the built-in `notification-fanout` handler beside `audit-log` and `webhook-fanout`, run by the outbox relay in its own short transaction and retried until it succeeds; every row carries a `dedup_key` (`event:<eventId>` or the `dedupWindow` bucket) inserted with `ON CONFLICT DO NOTHING`, so a redelivery adds nothing. One `INSERT ... SELECT` over the recipient set, never N inserts in a loop. The recipient set is either a single user or `SELECT user_id FROM member WHERE ...`; everything downstream is shared.
 
 **Payload allowlist** `packages/events/src/notification-map.ts`: every notifiable event declares `payloadFields`, and `GET /notifications` returns `publicNotificationPayload(eventType, payload)` rather than the stored jsonb. The row keeps the whole event payload; what crosses to the browser is chosen. Required and empty-is-valid on purpose: without the list, any field added to an event payload later (an invitation token, a storage key) would ship to the recipient's browser by default.
 

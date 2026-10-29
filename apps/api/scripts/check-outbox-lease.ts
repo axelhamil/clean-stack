@@ -3,8 +3,9 @@
  * share a row, a claimed row stays hidden until its lease expires, a settle with a
  * stale attempt count writes nothing, deliveries merge instead of overwriting, a dead
  * row is replayed only once due, a type outside the list is never claimed, and an
- * enqueue rolled back with its run leaves neither a row nor a notification, and a
- * redelivered audit-log handler appends a single link to the hash chain.
+ * enqueue rolled back with its run leaves neither a row nor a notification, a
+ * redelivered audit-log handler appends a single link to the hash chain, and the
+ * retention purge removes delivered rows past the cutoff but never a dead one.
  *
  * Every one of these lives in the claim CTE, the settle WHERE or the transaction,
  * which a mocked executor never evaluates.
@@ -28,6 +29,9 @@ import {
 import { EventTypes } from "@packages/events";
 import { Client } from "pg";
 import { emitEvent } from "../src/shared/event-emitter";
+import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
+import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
+import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import type { OutboxRecord } from "../src/shared/ports/outbox.port";
 import { AuditEventSubscriber } from "../src/shared/services/audit-event-subscriber";
@@ -379,6 +383,39 @@ async function main(): Promise<void> {
       link.hash !== null &&
       successor === undefined,
     { links: links.length, successor: successor?.id },
+  );
+
+  await resetProbes();
+  const cutoff = new Date(Date.now() - 24 * 3_600_000);
+  const longAgo = new Date(cutoff.getTime() - 3_600_000);
+  const [deliveredOld = ""] = await seed(1, TYPE_A, { dispatchedAt: longAgo });
+  const [deliveredRecent = ""] = await seed(1, TYPE_A, { dispatchedAt: new Date() });
+  const [deadOld = ""] = await seed(1, TYPE_A, {
+    occurredAt: longAgo,
+    deadAt: longAgo,
+    attempts: 10,
+  });
+  const purged = await purgeBatchWithTimeout({
+    table: oe,
+    idColumn: oe.id,
+    where: requireFilter(and(buildPurgeFilter(cutoff), like(oe.eventType, `${PROBE}%`)), PROBE),
+    orderBy: oe.dispatchedAt,
+    batchSize: 100,
+    spans: sweepSpans(instrumentation),
+    uow,
+  });
+  const kept = await db
+    .select({ id: oe.id })
+    .from(oe)
+    .where(like(oe.eventType, `${PROBE}%`));
+  const keptIds = kept.map((row) => row.id);
+  await step(
+    "retention keeps dead undelivered rows and removes delivered ones past the cutoff",
+    purged === 1 &&
+      !keptIds.includes(deliveredOld) &&
+      keptIds.includes(deliveredRecent) &&
+      keptIds.includes(deadOld),
+    { purged, kept: keptIds.length },
   );
 
   await cleanup();

@@ -30,6 +30,8 @@ The non-obvious failure modes that crash a fresh deploy. Every one below was hit
 
 **Draining time must exceed the shutdown deadline.** On a redeploy Railway sends `SIGTERM`, then `SIGKILL` once the service's draining time (`RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, Settings → Deploy) runs out. Railway does not document the default, staff answers put it at a few seconds, so treat the setting as required. The API needs up to `SHUTDOWN_DEADLINE_MS` (36 s by default) to drain HTTP, stop the workers and flush telemetry, so set the draining time on `api` above it (e.g. `40`). Below it, the process is killed mid-drain: in-flight emails can be sent twice and the last Sentry batch is lost. Detail: [HEALTH-PROBES.md](HEALTH-PROBES.md#graceful-shutdown-readyz-flips-before-workers-stop).
 
+**Stop the old api before a release that ships outbox migration `0024`.** The api container migrates on start (`bun dist/migrate.js && bun dist/index.js`), and an api built before that migration recreates the `outbox_notify` trigger every time it boots. Scale the `api` service to zero (or wait for the old deployment to be fully removed) before the new one starts, so no old pod restarts after the migration; the new dispatcher drops the trigger once at start as a safety net only. See `docs/EVENTS.md`, delivery section.
+
 **Deploys build from the connected branch.** Changing a variable, hitting *Redeploy*, or pushing all rebuild from the GitHub branch wired to the service (`main`). `railway up` is the only path that deploys local working-tree code, handy for validation, but it does **not** populate `RAILWAY_GIT_*` vars, so build-info shows `unknown` until a real branch deploy.
 
 ---

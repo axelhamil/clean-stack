@@ -19,7 +19,7 @@ The dispatcher is an **in-process Bun worker** holding a persistent `pg.Client` 
 
 If you must ship on serverless functions, the rail still works: you swap the dispatcher only:
 
-1. **Cron-triggered drain** (lowest effort). Expose a protected `POST /internal/drain-outbox` (gated by the same HMAC layer as `/internal/rgpd-sweep`) that runs one batch of `findPendingBatch` + subscribers. Trigger every 1-5 min via Vercel Cron / GitHub Actions / Inngest scheduled function. **Trade-off**: latency floor = cron interval (1 min on Vercel free, 30 s on Inngest).
+1. **Cron-triggered drain** (lowest effort). Expose a protected `POST /internal/drain-outbox` (gated by the same HMAC layer as `/internal/rgpd-sweep`) that runs one `OutboxRelay.drainOnce()` (claim a batch by lease, run its handlers, settle each event). Trigger every 1-5 min via Vercel Cron / GitHub Actions / Inngest scheduled function. **Trade-off**: latency floor = cron interval (1 min on Vercel free, 30 s on Inngest).
 2. **External queue** (lowest latency). Replace `outbox.enqueue()` with a push to SQS / Inngest / QStash inside the same TX (XA-style two-phase, or accept the well-known race window). The queue invokes a serverless function per message.
 3. **Hybrid** (most pragmatic). Keep the api serverless, deploy a tiny worker container alongside (Railway/Fly, ~5 €/mo) running the existing `OutboxDispatcher` + `WebhookDeliveryWorker`. Pointing it at the same `DATABASE_URL` is enough; no other code changes.
 
@@ -31,26 +31,26 @@ The audit/webhook subscribers, the catalogue, the `uow.run` flush: all unchanged
 your code           ─►  uow.run(async () => repo.save(aggregate))
                                           │
                                           ▼ ALS collector flushes pre-COMMIT
-                                  outbox_event INSERT (same TX)
+                       outbox_event INSERT + pg_notify (same TX, delivered at COMMIT)
                                           │
-                                          ▼ pg_notify post-COMMIT
+                                          ▼
                                   OutboxDispatcher (in-process Bun worker)
                                           │
-                       drain via SELECT ... FOR UPDATE SKIP LOCKED
+             OutboxRelay claims by lease: one statement, FOR UPDATE SKIP LOCKED,
+             attempts + 1, next_attempt_at = now() + lease; no transaction stays open
                                           │
-        ┌─── built-in (TX-bound) ─────────┼─────── post-commit (best-effort) ──┐
-        ▼                                 ▼                                    ▼
-  AuditEventSubscriber          WebhookFanoutSubscriber              user-defined handlers
-  → audit_log row               → webhook_delivery rows              (auto-discovered via
-  (idempotent via               (HMAC POST → consumers via            EVENT_HANDLER_SYMBOL)
-  audit-${eventId})             WebhookDeliveryWorker)
-
-  NotificationFanoutSubscriber
-  → notification rows (preference cascade resolved
-    in the INSERT; forced events bypass it)
+          every handler not yet in `deliveries`, each one in its own short transaction
+       ┌──────────────────┬───────────────┴────────────┬──────────────────────────┐
+       ▼                  ▼                            ▼                          ▼
+   audit-log         webhook-fanout          notification-fanout        user handlers
+   audit_log row     webhook_delivery rows   notification rows          onEvent(type, name, ...)
+   id audit-<id>     key <id>:<endpointId>   key event:<id> per user    key <name>:<id>
+                                          │
+          all succeeded → markDelivered       one failed → markFailed: `deliveries` merged,
+                                              `last_error` names it, retried with jitter
 ```
 
-**Key invariant**: built-in subscribers run inside the same DB transaction as `markDispatched`: atomic. User handlers run **post-commit**, best-effort, isolated from each other (one handler throwing doesn't fail the outbox dispatch).
+**Key invariant**: no lock and no transaction is held while a handler runs. Every handler, built in or user defined, is named, runs at least once and is retried alone until it succeeds: the row's `deliveries` records which handlers already succeeded, so a retry runs only the ones that failed. A handler is therefore idempotent on the event id (see [Delivery](#delivery-lease-retry-and-dead-replay)).
 
 ## How to emit a new event
 
@@ -160,15 +160,54 @@ export const ordersModule = defineModule()((b) =>
 
 `OutboxDispatcher.start()` discovers it automatically at boot via `Object.entries(di)` + `EVENT_HANDLER_SYMBOL` marker. **No registration array, no manifest.** The handler name is a persisted key (kebab-case, unique per event type, `<module>-<reaction>`): it is how a redelivery knows which handlers already ran, so renaming it reruns the handler on every pending event. A handler that talks to the outside world passes a key derived from it and the event id (`handlerIdempotency(name, event)` in `shared/`) so a redelivery never sends twice.
 
-Shipped handlers and why a redelivery is harmless: `revoke-api-tokens-on-membership-lost` filters `revoked_at is null`, so a second run revokes nothing and emits nothing; `notify-impersonated-user` and `notify-backup-code-used` send with the idempotency key `<handlerName>:<eventId>`, which the email queue deduplicates.
+A handler that throws, returns a failed `Result` (`onEvent` throws it for you, so the application layer still never throws), or runs past `OUTBOX_HANDLER_BUDGET_SECONDS` is a failed delivery: the event is retried with only that handler (see [Delivery](#delivery-lease-retry-and-dead-replay)), and the relay logs and reports the failure itself. Never swallow an error or capture it in the handler; a swallowed error is a delivery the relay believes succeeded, a captured one is reported twice.
+
+Shipped handlers and why a redelivery is harmless (six in all, every one keyed on the event id):
+
+| Handler | Kind | Why a second run writes nothing twice |
+|---|---|---|
+| `audit-log` | built in | The row id is `audit-<eventId>`, inserted with `ON CONFLICT DO NOTHING` under the chain advisory lock: a redelivery appends no second link. |
+| `webhook-fanout` | built in | One `webhook_delivery` per endpoint keyed `<eventId>:<endpointId>`, `ON CONFLICT DO NOTHING` on that key. |
+| `notification-fanout` | built in | Every row carries a `dedup_key` (`event:<eventId>`, or the `dedupWindow` bucket for grouped types), inserted with `ON CONFLICT DO NOTHING` on the unique `(user_id, dedup_key)`. |
+| `revoke-api-tokens-on-membership-lost` | user | Filters `revoked_at is null`, so a second run revokes nothing and emits nothing. |
+| `notify-impersonated-user` | user | Sends with the idempotency key `<handlerName>:<eventId>`, which the email queue deduplicates. |
+| `notify-backup-code-used` | user | Same key shape, same deduplication. |
 
 ## Built-in audit & webhook coverage
 
 If your event is in `RETENTION_MAP` with `operational` or `compliance`:
-- `audit_log` row written by `AuditEventSubscriber` inside the dispatch TX (idempotent via `audit-${eventId}` deterministic ID + `ON CONFLICT DO NOTHING`).
+- `audit_log` row written by the `audit-log` handler (`AuditEventSubscriber`) in its own short transaction (idempotent via `audit-${eventId}` deterministic ID + `ON CONFLICT DO NOTHING`).
 - Every enabled `webhook_endpoint` matching `eventTypes ? <type>` AND `organizationId = event.organizationId` receives a `webhook_delivery` row, dispatched independently by `WebhookDeliveryWorker` (HMAC POST + retry + dead-letter).
 
 > **Multi-tenant safety**: events with `organizationId = null` (platform-level: `user.created`, `user.signed_in`, etc.) **skip webhook fanout entirely**, never broadcast across tenants.
+
+## Delivery: lease, retry and dead replay
+
+The relay (`OutboxRelay`, driven by `OutboxDispatcher`) wakes on the LISTEN notification, on the next due retry (`pendingState().dueInMs`) and on a 30 s poll, then drains in rounds:
+
+1. **Claim by lease.** One statement selects the due rows (`FOR UPDATE SKIP LOCKED`, oldest first), increments `attempts` and pushes `next_attempt_at` to `now() + OUTBOX_LEASE_SECONDS`. The statement commits on its own: no lock survives it. A relay that dies mid batch leaves rows that become claimable again when the lease expires, with `attempts + 1`. The clock is the database's, never the process's. The claim size is capped at what the lease can process (`floor((lease - 10 s) / handler budget) × OUTBOX_CONCURRENCY`, at most 50; the 10 s margin covers the claim and the settles), so a claimed row is settled before its lease runs out. Dead replays take at most a quarter of a claim, so a dead backlog never starves live events. Claiming never touches `dead_at`: a leased dead row is hidden by its lease, not revived.
+2. **Run the handlers.** Up to `OUTBOX_CONCURRENCY` events settle in parallel. For each, every handler subscribed to its type and absent from `deliveries` runs, raced against `OUTBOX_HANDLER_BUDGET_SECONDS`. A type with no handler in the process fails with `<type> has no subscriber in this process` and stays pending. A row whose type is not in the relay's catalog list (a type removed from the catalog) is never claimed: it waits for the type to come back or for an operator to delete it.
+3. **Settle, guarded by the claim.** All handlers succeeded → `markDelivered` sets `dispatched_at`. Otherwise `markFailed` merges the handlers that did succeed into `deliveries` (server side, earlier entries kept), writes `last_error` as `<handlerName>: <message>; ...` and schedules the retry with decorrelated jitter (`jitter.ts`). Each message is scrubbed before it is stored (query strings, emails, the SQL `params:` tail, same scrubber as telemetry) and the whole is cut at 1000 characters, since it reaches the audit trail through `outbox.event_dead`. Every failed settle logs a warning with the event id, type and failing handler names, and each handler failure or timeout is reported to telemetry. Both writes match `id`, the claimed `attempts` and `dispatched_at is null` and report whether they wrote: a settle that arrives after the lease expired and another relay reclaimed the row writes nothing, and is neither counted nor announced.
+4. **Dead, then replayed.** After `OUTBOX_MAX_ATTEMPTS` failed attempts the row gets `dead_at` and its retry moves to every `OUTBOX_DEAD_RETRY_HOURS`. The first transition only logs an error, reports to telemetry and enqueues one internal `outbox.event_dead` (payload: `eventId`, `eventType`, `aggregateId`, `attempts`, `lastError`, `failedHandlers`, `actorUserId: null` because the relay is the actor); the `dead_at` write and that enqueue share one unit of work, so a death is never stored without its announcement nor announced without being stored. A dead `outbox.event_dead` is never announced again. Replaying a dead row keeps `dead_at` until a replay succeeds (`markDelivered` clears it), keeps counting `attempts` and still skips the handlers in `deliveries`; a fixed handler therefore drains the dead backlog on its own, with no manual replay, and a crash during a replay never re-announces the death.
+5. **Shutdown gives the attempt back.** A handler abandoned at the end of the stop grace, and every claimed row the relay had not started when it halted, is released: `attempts - 1`, due at once, never dead. A deploy therefore never burns the last attempt of a healthy event.
+
+**`handlerName` is a persisted key.** It is what `deliveries` stores, so renaming a handler makes every pending event run it again, and two handlers with the same name on one type are refused at boot (`DUPLICATE_HANDLER`). Names are kebab-case, `<module>-<reaction>` for user handlers.
+
+**Bookkeeping is not a state change.** `attempts`, `deliveries`, `dead_at` and the lease describe how an event travels, not a change of business state, so they emit nothing (root rule 6 exception); the death of an event is the one fact announced, once.
+
+**Audit chain order is completion order.** Handlers run outside any batch transaction and in parallel, so `audit_log` rows are appended in the order the `audit-log` handler completes, not in `occurred_at` order. The chain stays intact: appends are serialized by the advisory lock and `verifyChain` walks `sequence`, the append order. Read `occurred_at` for when it happened, `sequence` for chain position.
+
+| Knob (`apps/api/.env.example`) | Default | Effect |
+|---|---|---|
+| `OUTBOX_LEASE_SECONDS` | 120 | How long a claimed row stays invisible; must be at least the handler budget + 10 s (checked at boot) |
+| `OUTBOX_HANDLER_BUDGET_SECONDS` | 30 | Time a handler gets before it is failed as `timed out` |
+| `OUTBOX_CONCURRENCY` | 4 | Events settled in parallel by one relay |
+| `OUTBOX_MAX_ATTEMPTS` | 10 | Failed attempts before an event is dead |
+| `OUTBOX_DEAD_RETRY_HOURS` | 6 | Replay cadence of a dead event |
+
+Proven against Postgres by `pnpm --filter api check:outbox-lease` (disjoint concurrent claims, lease expiry, stale settle reported as unwritten, `deliveries` merge, dead replay kept dead until delivered, release without penalty, dead share of a claim, rolled back enqueue, single audit link on redelivery, retention).
+
+**Deploy order.** Stop every pod running the previous dispatcher before migration `0024` runs: an old dispatcher recreates the `outbox_notify` trigger on boot. The new dispatcher drops that trigger once on `start()` as a safety net, but an old pod restarting afterwards would bring it back until the next restart of a new one.
 
 ## Retention
 
@@ -182,6 +221,7 @@ Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC)
 | `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` | Stripe / GitHub / Hookdeck convergence |
 
 Notes:
+- **An outbox row is purged only once delivered**: the filter reads `dispatched_at` alone, so a dead row that never delivered stays until a replay succeeds, however old it is.
 - **`pending` and `failed` webhook deliveries are NEVER purged automatically**: they signal worker death or active retry. A `pending` row stale > 24h must page on-call, not be cleaned up.
 - **`retention = 'none'`** rows never reach the DB. `AuditEventSubscriber` returns early when `retentionFor(eventType) === "none"`: uncatalogued events are never written.
 
@@ -257,11 +297,10 @@ if (!provided.some((sig) => timingSafeEqual(sig, expected))) return reject(401);
 ## Architecture choices (SOTA 2026)
 
 - **UUID v7** for `outbox_event.id`, `audit_log.id`, `webhook_*.id`: time-ordered, B-tree locality preserved on inserts.
-- **Postgres LISTEN/NOTIFY** via dedicated `pg.Client` (hors pool Drizzle) + **30s poll fallback** for connection drops. Trigger ensured at boot via idempotent `CREATE OR REPLACE TRIGGER` (Postgres 14+ atomic).
-- **`SELECT ... FOR UPDATE SKIP LOCKED`** drain: multi-instance safe out of the box.
-- **`SET LOCAL idle_in_transaction_session_timeout = '30s'`** at the start of every drain TX: zombie workers can't lock rows indefinitely.
+- **Postgres LISTEN/NOTIFY** via dedicated `pg.Client` (hors pool Drizzle) + **30s poll fallback** for connection drops; the listener reconnects with backoff (250 ms to 15 s) and pings every 15 s. `pg_notify` is sent by `enqueue` on the same executor as the insert, so it leaves only at commit; there is no trigger.
+- **Claim by lease** (`FOR UPDATE SKIP LOCKED` + `UPDATE ... RETURNING` in one statement): multi-instance safe, and no lock is held while handlers run, so a slow or dead worker blocks nothing beyond its lease.
 - **AEAD secret encryption** (`@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key) for webhook secrets at rest.
-- **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`): `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Dead-letter after 5 attempts.
+- **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`): `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Webhook and email deliveries dead-letter after 5 attempts; the outbox uses the same curve and turns dead after `OUTBOX_MAX_ATTEMPTS`.
 - **Claim window pattern** in delivery worker: claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
 - **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id`: captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context, unused until OTel is wired.)
 
@@ -311,9 +350,9 @@ export const NOTIFICATION_MAP = {
 - `forced?: true` : contourne les préférences utilisateur et le batching email (bypass critique du SOTA).
 - `groupBy` et `dedupWindow` : fenêtre de déduplication et clé de regroupement lecteur (style Linear "X et 3 autres").
 
-**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement : une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) et le passage à l'état lu (`notification.read`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **84 événements / 35 publics / 49 internes**.
+**Pourquoi elle ne crée aucun événement.** Une notification est une projection de lecture d'un événement déjà audité et déjà émis dans l'outbox. Émettre un `notification.created` créerait une boucle : son propre abonné (`NotificationFanoutSubscriber`) déclencherait à nouveau l'insertion. La création de notifications n'émet aucun événement : une notification est une projection d'un événement déjà audité, et émettre un `notification.created` créerait une boucle avec son propre abonné. En revanche, les mutations de préférences (`notification.preference.updated`, `notification.org_preference.updated`) et le passage à l'état lu (`notification.read`) émettent bien des événements car ce sont des changements d'état persistant. Le catalogue est à **86 événements / 35 publics / 51 internes**.
 
-**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). Il tourne dans la même transaction que `markDispatched` : une notification perdue ne passe pas inaperçue. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 84 événements sont audit-only).
+**`NotificationFanoutSubscriber`** est l'abonné outbox qui lit cette projection (aux côtés de `AuditEventSubscriber` et `WebhookFanoutSubscriber`). C'est le handler nommé `notification-fanout` : il tourne dans sa propre transaction courte et chaque ligne porte une `dedup_key` (`event:<eventId>`, ou le créneau `dedupWindow`) insérée avec `ON CONFLICT DO NOTHING` sur l'index unique `(user_id, dedup_key)`, donc une relivraison n'ajoute aucune ligne. Les événements absents du catalogue ne génèrent aucune notification (le comportement par défaut : la plupart des 86 événements sont audit-only).
 
 **La cascade de préférences est résolue dans la requête d'insertion**, jamais en amont ni destinataire par destinataire : un `LEFT JOIN notification_preference` par portée et par canal, sur le même `INSERT ... SELECT`.
 
@@ -329,7 +368,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **85 events** (35 public + 50 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3: 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **86 events** (35 public + 51 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 5 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3: 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
@@ -465,7 +504,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 - **A nested `uow.run()` joins the open transaction.** No savepoint, no second connection: its events wait for the outermost flush, and a failed `Result` at any depth rolls the whole unit back (the outermost `run()` resolves to that failure). A promise that outlives its run reads the pool through `resolveExecutor()`, never the finished transaction.
 - **`addEvent()` outside `uow.run()` = events lost.** The `EventCollector` ALS context is created by `uow.run()`. If you emit events in code that doesn't go through `uow.run()`, they stay on the aggregate buffer and never reach the outbox. A dev-mode warning is logged via `EventCollector.setOutOfContextLogger()` (wired in `apps/api/src/index.ts`).
-- **Built-in subscriber failures roll back the dispatch.** Audit writer or webhook fanout throwing → the entire batch's TX rolls back, events retried at next drain with backoff. Make sure built-in subscribers stay deterministic.
+- **A failing handler is retried alone.** A throw, a failed `Result` or a timeout names the handler in `last_error`, keeps the others in `deliveries` and retries the event with jitter; nothing the other handlers wrote is rolled back. Every handler is idempotent on the event id, and none swallows or captures its own failure.
 - **Payloads validated at enqueue.** A payload that doesn't match its Zod schema in `PayloadByEventType` throws inside the outbox `INSERT`, rolling back the surrounding TX. The business write fails with the bad payload, never apply one without the other.
 
 ## Known limitations
@@ -475,23 +514,26 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 - **`/passkey/*register*` fuzzy match was wrong**: current code uses exact path `/passkey/verify-registration` (the only path that writes to DB). Path matching against BetterAuth internals is fragile; if BetterAuth renames a route in a minor version, the bridge silently no-ops. Mitigation: integration test that exercises the real HTTP endpoint and asserts the event lands.
 - **Tamper-evidence**: `prev_hash`/`hash` columns posed in `audit_log` but calculation off (`AUDIT_TAMPER_EVIDENCE=false`). Implementation (Merkle batch or hash chain with row-lock) deferred until SOC2 audit demands it.
 - **UUID v7 ordering**: monotonic across milliseconds, not strict within the same ms. Sufficient for B-tree locality, not for global causal ordering.
-- **In-process workers**: `OutboxDispatcher` and `WebhookDeliveryWorker` run inside the API process. Above ~500 events/s sustained, extract to a separate `bun` process pointing at the same DB: the `IOutboxWorker { start, stop }` interface stays stable.
-- **SIGTERM grace**: `stopWithTimeout` (25s per worker): if a worker has in-flight work that exceeds the grace, the process exits anyway. Receivers must honor `x-webhook-idempotency` to dedupe potential double-POSTs.
+- **In-process workers**: `OutboxDispatcher` and `WebhookDeliveryWorker` run inside the API process. Above ~500 events/s sustained, extract to a separate `bun` process pointing at the same DB: the lease makes several relays safe side by side.
+- **SIGTERM grace**: `OutboxDispatcher.stop()` waits for the running drain, then abandons handlers still in flight after its grace; their events are claimed again once the lease expires, so a handler can run twice across a restart. Receivers must honor `x-webhook-idempotency` to dedupe potential double-POSTs.
 
 ## Files of reference
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (85 events: 35 public + 50 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (86 events: 35 public + 51 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()`: ALS flush + nested runs joining the outermost transaction + rollback when the callback resolves to a failed `Result` |
 | `packages/drizzle/src/repositories/track-events.ts` | `trackEventsOnSuccess()` repo helper |
-| `apps/api/src/shared/services/outbox-dispatcher.service.ts` | LISTEN/NOTIFY worker, drain, fan-out |
-| `apps/api/src/shared/services/audit-event-subscriber.ts` | Built-in audit writer |
-| `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Built-in webhook fanout (org-scoped) |
+| `apps/api/src/shared/services/outbox-dispatcher.service.ts` | LISTEN/NOTIFY worker, wake schedule, start and stop |
+| `apps/api/src/shared/services/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
+| `apps/api/src/shared/services/drizzle-outbox.service.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
+| `apps/api/src/shared/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
+| `apps/api/src/shared/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
+| `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
 | `apps/api/src/modules/webhooks/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
 | `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
 | `apps/api/src/shared/jitter.ts` | Decorrelated jitter math |

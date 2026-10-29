@@ -1364,3 +1364,51 @@ Em and en dashes were removed from every guide, inventory and the roadmap in the
 
 - No real Stripe call: the `2026-09-30.endive` API version has to be checked against the webhook endpoint in the Stripe dashboard, whose API version is set there.
 - Source map upload to a real Sentry project: proven only against a mock, never with a real auth token.
+
+---
+
+## Resync on the OpenUp foundations ✅ Phase I · Oct 2026
+
+- **Status**: shipped, I.1 to I.5 merged into `dev` one lot per PR.
+- **Date**: Oct 2026.
+- **Why**: OpenUp, a sister project on the same stack, hardened five foundations after clean-stack diverged from the shared Afterlive lineage. Today clean-stack has a thinner kit, layering enforced only by convention, telemetry that can carry PII, a transaction parameter threaded through every port, and an outbox that holds locks during handlers and loses user handlers on a throw. Each lot below buys one architectural property.
+- **Scope**: five ordered lots, each its own branch off `dev` (`refactor/phase-i-1-kit` to `refactor/phase-i-5-outbox`) and its own PR merged as a merge commit. Not ported because they are OpenUp-specific: a per-module outbox, `RouteGuards`, `HttpResponse`, `PgSingleFlight`, `packages/audit`, `dist` builds, typed entity ids, the `DomainEventHandler` class, admin replay of dead events.
+- **Rules for every lot**: each lot ends on the full chain (`pnpm ci:check`, `turbo run build type-check test`, `check:duplication`, `check:unused`, plus `check:boundaries` from I.2) and its real-database checks, then the 5-agent end-of-lot review (Opus for I.4 and I.5). Doc debt moves in the same commit as the code that changes the rule.
+- **References**: root [`CLAUDE.md`](../CLAUDE.md) rules 6 to 8, [`docs/EVENTS.md`](EVENTS.md), [`docs/EVENT_PIPELINE.md`](EVENT_PIPELINE.md), the `events-outbox` skill.
+
+### I.1: Kit and test helpers ✅ Oct 2026
+
+- **Why**: a kit with `map`, `flatMap`, `match`, `Option.toResult`, a monotonic `uuidv7`, event ids and JSON-based value-object equality removes hand-rolled glue in every module, and typed test doubles (`mockPort`) replace per-file `mock.module` wiring.
+- **Scope**: `Result` combinators and a typed `Result.all`; `Option.toResult`, `tryMap`, `equals`; `UUID.parse` and monotonic `uuidv7`; optional `eventId` on domain events (reused as the outbox row id); `sameJson` for value objects; an error type parameter on `BaseRepository` and `ScopedRepository`; `mockPort` and `mockInstrumentation` behind a `@packages/test/bun` subpath. Purely additive.
+- **Depends on**: Dependency refresh merged.
+- **Done when**: every new primitive has a named scenario in the `ddd-kit` vitest suite, `pnpm --filter api type-check` and `pnpm --filter api test` pass with no existing caller touched, and the 4 existing `BaseDomainEvent` subclasses compile unchanged.
+
+### I.2: Architecture guardrails ✅ Oct 2026
+
+- **Why**: layering that lives only in `CLAUDE.md` rots; a rule that fails the build does not. Orphan events (declared, never emitted) are the recurring trap of root rule 6.
+- **Scope**: `dependency-cruiser` rules (no cross-module import, pure domain and application layers, packages never import apps, no circular dependency) wired into pre-push and CI as `check:boundaries`; a framework-free `source-scan` helper in `@packages/test`; four layering tests (no throw in domain and application, domain import allowlist, routes never write to the database, environment read only through `shared/env`); a catalog parity test that fails on any event type nobody emits.
+- **Depends on**: I.1 (`source-scan` lives beside the new test helpers).
+- **Done when**: `pnpm check:boundaries` exits 0 with `0 dependency violations` locally and in CI; two deliberate violations (a cross-module import, a `@packages/drizzle` import in `application/`) each make it exit 1 naming the rule, shown in the PR text; the 4 layering tests and 2 parity tests pass; every allowlist entry carries a reason; `no-circular` is an error, or the remaining cycles are listed here.
+
+### I.3: Telemetry hygiene and ordered shutdown ✅ Oct 2026
+
+- **Why**: a Drizzle failure message embeds the query parameters, so a swallowed email address can reach Sentry through the exception text; and a process killed mid-drain loses in-flight work and the last telemetry batch.
+- **Scope**: scrub exception text, messages and breadcrumbs (cut after `params:`, strip query strings, mask emails, drop console breadcrumbs); `flush(timeoutMs)` on `IInstrumentation`; `runShutdown` running ordered steps (grace, HTTP stop, webhook delivery, email delivery, outbox dispatcher, notification hub, database pool, telemetry flush) under a global deadline, with an explicit `Bun.serve` handle; an `HttpHeartbeat` pinging `<url>/start`, `<url>` and `<url>/fail` around the cron sweep.
+- **Depends on**: I.1 (`mockPort`), I.2 (boundaries gate).
+- **Done when**: the scrub tests show no `params:` text and no email in `exception.values`, `message` or breadcrumbs; the shutdown tests prove order, exit 1 on a failed or timed-out step, exit 1 with a flush on the deadline and exit 0 only when every step finished; a manual `SIGTERM` against `bun run dev` shows the steps in order and exit 0 in under 5 s idle; `bun --hot` still reloads.
+
+### I.4: Ambient unit of work ✅ Oct 2026
+
+- **Why**: threading a `tx` parameter through every port and repository makes a forgotten parameter a silent write outside the transaction. An ambient unit of work removes the parameter, so the transaction cannot be bypassed by omission.
+- **Scope**: an `AsyncLocalStorage` scope carrying the transaction and collected events; nested `run` joins the open transaction (no savepoint), a failed `Result` at any depth rolls everything back and returns the same `Result`, events raised without an outbox roll back, a promise outliving its run reads the pool and never a closed transaction; repositories read `resolveExecutor()`; `mockUnitOfWork` with the same nesting rules. Migration is total and in batches (shared ports, then billing, consents, notifications and policies, then api-token, profile, quotas, rgpd and webhooks, then the BetterAuth bridge, then the remaining `db.transaction` sites), ending with `IUnitOfWork.run(work: () => Promise<T>)` and no `tx` anywhere.
+- **Depends on**: I.1 (`mockPort`, event collection), I.2 (a layering test enforces the end state).
+- **Done when**: a grep for `\btx\??:` and `ITransaction` over `modules/` and `shared/` returns nothing; `db.transaction(` appears only in `packages/drizzle` and `scripts/`; `check:uow-rollback`, `check:auth-transaction`, `check:wipe-rollback`, `check:enqueue`, `check:marksent`, `check:scim-seats` and `check:scim-connection` all pass against Postgres; every `db.transaction` removed has a recorded decision in its commit body.
+
+### I.5: Outbox by lease with per-handler delivery ✅ Oct 2026
+
+- **Why**: today the dispatcher holds `FOR UPDATE SKIP LOCKED` locks while the built-in subscribers run, and user handlers run after commit and are lost on a throw. A lease, handlers outside any transaction and per-handler tracking give at-least-once delivery without long locks.
+- **Scope**: `dead_at` and `deliveries jsonb` columns with partial indexes (migration before code, the old dispatcher stays safe); named handlers (`subscribe(type, name, fn)`, `deliver` skips handlers already delivered); a claim by lease (`FOR UPDATE SKIP LOCKED` plus `UPDATE ... RETURNING`, SQL clock, settle guarded by `attempts` so a late settle writes nothing); a relay with bounded concurrency and a per-handler time budget, dead after 10 attempts then replayed every 6 h; listener reconnect with backoff and keepalive; audit, webhook fan-out and notification fan-out rewritten as idempotent named handlers; `emitEvent` without `tx` and a new internal `outbox.event_dead` event emitted once; retention that never purges undelivered dead rows.
+- **Depends on**: I.4 (ambient enqueue, flush in the outer `run`).
+- **Done when**: `check:outbox-lease` passes its scenarios (disjoint concurrent claims, lease expiry, stale settle writes nothing, `deliveries` merge, dead replay, rolled-back enqueue leaves no row, retention keeps dead rows) and runs in CI; `EXPLAIN ANALYZE` of the claim shows the partial indexes used; an end-to-end auth event shows `deliveries` naming the three built-in handlers with `attempts = 1`, and a handler made to throw leaves a partial `deliveries` and a `last_error` naming it; the catalog moves from 85 / 35 / 50 to 86 / 35 / 51 and `docs/EVENTS.md` describes lease delivery.
+- **As built** (I.5): six handlers, each with its idempotence argument in `docs/EVENTS.md` (`audit-log`, `webhook-fanout`, `notification-fanout`, `revoke-api-tokens-on-membership-lost`, `notify-impersonated-user`, `notify-backup-code-used`); `emitEvent` returns the id stored as the row id; the outbox sweep keeps reading `dispatched_at` alone, now proven on Postgres to keep a dead undelivered row. End to end, a sign-up with `webhook-fanout` made to throw left `user.created`, `org.created` and `org.member.joined` at `attempts = 1`, `deliveries` holding `audit-log` and `notification-fanout`, `last_error` naming `webhook-fanout`; once the throw was removed the retry ran `webhook-fanout` alone and all three rows were delivered with the three names.
+- **Debt left open**: the email queue and webhook delivery keep their own claims (process clock, no settle guard, no replayable dead state); aligning them on the outbox lease model is listed in `ROADMAP.md`.
