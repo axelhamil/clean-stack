@@ -3,7 +3,8 @@
  * share a row, a claimed row stays hidden until its lease expires, a settle with a
  * stale attempt count writes nothing, deliveries merge instead of overwriting, a dead
  * row is replayed only once due, a type outside the list is never claimed, and an
- * enqueue rolled back with its run leaves neither a row nor a notification.
+ * enqueue rolled back with its run leaves neither a row nor a notification, and a
+ * redelivered audit-log handler appends a single link to the hash chain.
  *
  * Every one of these lives in the claim CTE, the settle WHERE or the transaction,
  * which a mocked executor never evaluates.
@@ -14,12 +15,22 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-outbox-lease");
 
 import { Result, uuidv7 } from "@packages/ddd-kit";
-import { and, db, eq, like, or, outboxSchema, TransactionService } from "@packages/drizzle";
+import {
+  and,
+  auditLogSchema,
+  db,
+  eq,
+  like,
+  or,
+  outboxSchema,
+  TransactionService,
+} from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { Client } from "pg";
 import { emitEvent } from "../src/shared/event-emitter";
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import type { OutboxRecord } from "../src/shared/ports/outbox.port";
+import { AuditEventSubscriber } from "../src/shared/services/audit-event-subscriber";
 import {
   DrizzleOutboxRepository,
   OUTBOX_CHANNEL,
@@ -47,8 +58,10 @@ const uow = new TransactionService(instrumentation, async (events) => {
 
 const checks = checkRecorder();
 const oe = outboxSchema.outboxEvent;
+const al = auditLogSchema.auditLog;
 
 async function cleanup(): Promise<void> {
+  await db.delete(al).where(eq(al.targetId, AGGREGATE));
   await db.delete(oe).where(or(like(oe.eventType, `${PROBE}%`), eq(oe.aggregateId, AGGREGATE)));
 }
 
@@ -338,6 +351,34 @@ async function main(): Promise<void> {
     pending.isSuccess
       ? { ...pending.getValue(), dueInMs: pending.getValue().dueInMs.toNull() }
       : pending.getError(),
+  );
+
+  const audit = new AuditEventSubscriber(uow, instrumentation, true);
+  const audited = {
+    eventId: uuidv7(),
+    eventType: EventTypes.USER_PROFILE_UPDATED,
+    aggregateId: AGGREGATE,
+    aggregateType: "user",
+    payload: { userId: AGGREGATE, changes: {} },
+    dateOccurred: new Date(),
+  };
+  await Promise.all([audit.handle(audited), audit.handle(audited)]);
+  await audit.handle(audited);
+  const links = await db
+    .select({ id: al.id, hash: al.hash, prevHash: al.prevHash })
+    .from(al)
+    .where(eq(al.targetId, AGGREGATE));
+  const [link] = links;
+  const [successor] = link?.hash
+    ? await db.select({ id: al.id }).from(al).where(eq(al.prevHash, link.hash))
+    : [];
+  await step(
+    "audit-log redelivery keeps a single chain link",
+    links.length === 1 &&
+      link?.id === `audit-${audited.eventId}` &&
+      link.hash !== null &&
+      successor === undefined,
+    { links: links.length, successor: successor?.id },
   );
 
   await cleanup();

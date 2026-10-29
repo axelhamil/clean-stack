@@ -1,66 +1,69 @@
-import { uuidv7 } from "@packages/ddd-kit";
-import { and, eq, type Transaction, webhooksSchema } from "@packages/drizzle";
-import { type EventType, isPublicEvent, matchesSubscription } from "@packages/events";
-import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { OutboxRecord } from "../ports/outbox.port";
-import type { OutboxSubscriber } from "./outbox-subscriber";
+import { type IUnitOfWork, uuidv7 } from "@packages/ddd-kit";
 
-export class WebhookFanoutSubscriber implements OutboxSubscriber {
+import { and, eq, resolveExecutor, webhooksSchema } from "@packages/drizzle";
+import { isKnownEventType, isPublicEvent, matchesSubscription } from "@packages/events";
+import type { BuiltInEventHandler } from "../event-handlers";
+import type { IInstrumentation } from "../ports/instrumentation.port";
+import type { DeliveredEvent } from "../ports/outbox.port";
+
+const ep = webhooksSchema.webhookEndpoint;
+const wd = webhooksSchema.webhookDelivery;
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+
+export class WebhookFanoutSubscriber implements BuiltInEventHandler {
   readonly name = "webhook-fanout";
 
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  constructor(
+    private readonly uow: IUnitOfWork,
+    private readonly instrumentation: IInstrumentation,
+  ) {}
 
-  async handle(event: OutboxRecord, tx: Transaction): Promise<void> {
+  async handle(event: DeliveredEvent): Promise<void> {
     return this.instrumentation.startSpan(
       { name: "WebhookFanoutSubscriber > handle" },
       async () => {
         try {
-          if (event.organizationId.isNone()) return;
-          if (!isPublicEvent(event.eventType as EventType)) return;
-          const ep = webhooksSchema.webhookEndpoint;
-          const endpointsQuery = tx
-            .select({ id: ep.id, eventTypes: ep.eventTypes })
-            .from(ep)
-            .where(and(eq(ep.organizationId, event.organizationId.unwrap()), eq(ep.enabled, true)));
-          const endpointRows = await this.instrumentation.startSpan(
-            {
-              name: endpointsQuery.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
-            () => endpointsQuery.execute(),
-          );
-          const endpoints = endpointRows.filter((e) =>
-            matchesSubscription(event.eventType as EventType, e.eventTypes),
-          );
+          const { eventId, eventType, organizationId } = event;
+          if (!organizationId) return;
+          if (!isKnownEventType(eventType) || !isPublicEvent(eventType)) return;
 
-          if (endpoints.length === 0) return;
+          await this.uow.run(async () => {
+            const exec = resolveExecutor();
+            const endpointsQuery = exec
+              .select({ id: ep.id, eventTypes: ep.eventTypes })
+              .from(ep)
+              .where(and(eq(ep.organizationId, organizationId), eq(ep.enabled, true)));
+            const endpointRows = await this.instrumentation.startSpan(
+              { name: endpointsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
+              () => endpointsQuery.execute(),
+            );
+            const endpoints = endpointRows.filter((e) =>
+              matchesSubscription(eventType, e.eventTypes),
+            );
+            if (endpoints.length === 0) return;
 
-          const now = new Date();
-          const rows = endpoints.map((e) => ({
-            id: uuidv7(),
-            endpointId: e.id,
-            outboxEventId: event.id,
-            eventType: event.eventType,
-            payload: event.payload,
-            status: "pending" as const,
-            attempts: 0,
-            nextAttemptAt: now,
-            idempotencyKey: `${event.id}:${e.id}`,
-          }));
-
-          const insertQuery = tx
-            .insert(webhooksSchema.webhookDelivery)
-            .values(rows)
-            .onConflictDoNothing({ target: webhooksSchema.webhookDelivery.idempotencyKey });
-          await this.instrumentation.startSpan(
-            {
-              name: insertQuery.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
-            () => insertQuery.execute(),
-          );
+            const now = new Date();
+            const insertQuery = exec
+              .insert(wd)
+              .values(
+                endpoints.map((e) => ({
+                  id: uuidv7(),
+                  endpointId: e.id,
+                  outboxEventId: eventId,
+                  eventType,
+                  payload: event.payload,
+                  status: "pending" as const,
+                  attempts: 0,
+                  nextAttemptAt: now,
+                  idempotencyKey: `${eventId}:${e.id}`,
+                })),
+              )
+              .onConflictDoNothing({ target: wd.idempotencyKey });
+            await this.instrumentation.startSpan(
+              { name: insertQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
+              () => insertQuery.execute(),
+            );
+          });
         } catch (err) {
           this.instrumentation.capture(err);
           throw err;

@@ -1,18 +1,8 @@
-import {
-  type EventHandler,
-  type IEventDispatcher,
-  InMemoryEventDispatcher,
-  type IUnitOfWork,
-  isEventHandler,
-  Option,
-} from "@packages/ddd-kit";
-import { db } from "@packages/drizzle";
 import type { Logger } from "../logger";
 import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { DeliveredEvent, IOutboxRepository, OutboxRecord } from "../ports/outbox.port";
+import type { IOutboxRepository } from "../ports/outbox.port";
 import { OUTBOX_CHANNEL } from "./drizzle-outbox.service";
-import { OutboxRelay, type OutboxRelayOptions } from "./outbox-relay";
-import type { OutboxSubscriber } from "./outbox-subscriber";
+import type { OutboxRelay } from "./outbox-relay";
 import { PgListener, type PgListenerOptions } from "./pg-listener";
 
 export const OUTBOX_BATCH_SIZE = 50;
@@ -22,69 +12,12 @@ const POLL_INTERVAL_MS = 30_000;
 const EMPTY_DRAIN_FLOOR_MS = 50;
 const FAILED_DRAIN_RETRY_MS = 2_000;
 
+export type CreateOutboxRelay = (diLike: Record<string, unknown>) => OutboxRelay;
+
 export type OutboxDispatcherOptions = {
-  relay: OutboxRelayOptions;
-  uow: IUnitOfWork;
   stopGraceMs: number;
   listener?: PgListenerOptions;
 };
-
-export function collectUserEventHandlers(diLike: Record<string, unknown>): EventHandler[] {
-  return Object.values(diLike).filter(isEventHandler);
-}
-
-function recordOf(event: DeliveredEvent): OutboxRecord {
-  return {
-    id: event.eventId ?? "",
-    eventType: event.eventType,
-    aggregateId: event.aggregateId,
-    aggregateType: event.aggregateType ?? "unknown",
-    organizationId: Option.fromNullable(event.organizationId),
-    payload: event.payload,
-    metadata: {
-      specversion: "1.0",
-      source: "app/api",
-      datacontenttype: "application/json",
-      requestId: event.requestId,
-    },
-    occurredAt: event.dateOccurred,
-    attempts: 0,
-    deadAt: Option.none(),
-    deliveries: {},
-  };
-}
-
-function subscribeAll(
-  dispatcher: IEventDispatcher<DeliveredEvent>,
-  eventType: string,
-  name: string,
-  handle: (event: DeliveredEvent) => Promise<void>,
-): void {
-  const subscribed = dispatcher.subscribe(eventType, name, handle);
-  if (subscribed.isFailure) throw new Error(subscribed.getError());
-}
-
-function legacyDispatcher(
-  eventTypes: readonly string[],
-  subscribers: readonly OutboxSubscriber[],
-  userHandlers: readonly EventHandler[],
-): IEventDispatcher<DeliveredEvent> {
-  const dispatcher = new InMemoryEventDispatcher<DeliveredEvent>();
-  for (const eventType of eventTypes) {
-    for (const subscriber of subscribers) {
-      subscribeAll(dispatcher, eventType, subscriber.name, (event) =>
-        db.transaction((tx) => subscriber.handle(recordOf(event), tx)),
-      );
-    }
-  }
-  for (const handler of userHandlers) {
-    subscribeAll(dispatcher, handler.eventType, handler.handlerName, (event) =>
-      handler.handle(event),
-    );
-  }
-
-  return dispatcher;
-}
 
 export class OutboxDispatcher {
   private readonly listener: PgListener;
@@ -98,7 +31,7 @@ export class OutboxDispatcher {
 
   constructor(
     private readonly outbox: IOutboxRepository,
-    private readonly builtInSubscribers: OutboxSubscriber[],
+    private readonly createRelay: CreateOutboxRelay,
     private readonly logger: Logger,
     connectionString: string,
     private readonly instrumentation: IInstrumentation,
@@ -124,19 +57,8 @@ export class OutboxDispatcher {
 
     this.started = true;
     this.stopped = false;
-    const dispatcher = legacyDispatcher(
-      this.options.relay.eventTypes,
-      this.builtInSubscribers,
-      collectUserEventHandlers(diLike),
-    );
-    this.relay = new OutboxRelay(
-      this.outbox,
-      this.options.uow,
-      dispatcher,
-      this.options.relay,
-      this.instrumentation,
-      this.logger,
-    );
+    this.relay = this.createRelay(diLike);
+    await this.retireNotifyTrigger();
     await this.listener.start();
     this.logger.info("outbox dispatcher started");
     this.wake();
@@ -156,6 +78,16 @@ export class OutboxDispatcher {
     }
     await this.listener.stop();
     this.logger.info("outbox dispatcher stopped");
+  }
+
+  private async retireNotifyTrigger(): Promise<void> {
+    const retired = await this.outbox.retireNotifyTrigger();
+    if (retired.isSuccess) return;
+
+    this.logger.warn(
+      { err: retired.getError() },
+      "outbox notify trigger could not be dropped, listeners get one extra wake per insert",
+    );
   }
 
   private wake(): void {

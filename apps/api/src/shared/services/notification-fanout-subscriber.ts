@@ -1,23 +1,30 @@
+import type { IUnitOfWork } from "@packages/ddd-kit";
+
 import {
   and,
   eq,
   inArray,
   multiTenantSchema,
   notificationSchema,
+  resolveExecutor,
   type SQL,
   sql,
-  type Transaction,
 } from "@packages/drizzle";
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
+import type { BuiltInEventHandler } from "../event-handlers";
 import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { OutboxRecord } from "../ports/outbox.port";
+import type { DeliveredEvent } from "../ports/outbox.port";
 import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";
-import type { OutboxSubscriber } from "./outbox-subscriber";
 import { resolveAudience } from "./resolve-audience";
 
-function dedupKeyFor(event: OutboxRecord, window: "hour" | "day" | undefined): string | null {
-  if (!window) return null;
-  const iso = event.occurredAt.toISOString();
+function dedupKeyFor(
+  event: DeliveredEvent,
+  eventId: string,
+  window: "hour" | "day" | undefined,
+): string {
+  if (!window) return `event:${eventId}`;
+
+  const iso = event.dateOccurred.toISOString();
   const bucket = window === "hour" ? iso.slice(0, 13) : iso.slice(0, 10);
   return `${event.eventType}:${event.aggregateId}:${bucket}`;
 }
@@ -106,15 +113,16 @@ function emailDueAt(occurredAt: Date, frequency: SQL | null, anchorHourUtc: numb
             END`;
 }
 
-export class NotificationFanoutSubscriber implements OutboxSubscriber {
+export class NotificationFanoutSubscriber implements BuiltInEventHandler {
   readonly name = "notification-fanout";
 
   constructor(
+    private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
     private readonly digestHourUtc: number = DEFAULT_DIGEST_HOUR_UTC,
   ) {}
 
-  async handle(event: OutboxRecord, tx: Transaction): Promise<void> {
+  async handle(event: DeliveredEvent): Promise<void> {
     return this.instrumentation.startSpan(
       { name: "NotificationFanoutSubscriber > handle" },
       async () => {
@@ -126,10 +134,11 @@ export class NotificationFanoutSubscriber implements OutboxSubscriber {
           if (audience.isNone()) return;
 
           const target = audience.unwrap();
+          const { eventId } = event;
 
           const n = notificationSchema.notification;
           const m = multiTenantSchema.member;
-          const organizationId = event.organizationId.toNull();
+          const organizationId = event.organizationId ?? null;
 
           const recipients =
             target.kind === "user"
@@ -164,10 +173,10 @@ export class NotificationFanoutSubscriber implements OutboxSubscriber {
               ${config.category},
               ${event.eventType},
               ${config.groupBy ? `${event.eventType}:${event.aggregateId}` : null},
-              ${dedupKeyFor(event, config.dedupWindow)},
+              ${dedupKeyFor(event, eventId, config.dedupWindow)},
               ${JSON.stringify(event.payload)}::jsonb,
               CASE WHEN ${rules.email}
-                THEN ${emailDueAt(event.occurredAt, rules.frequency, this.digestHourUtc)}
+                THEN ${emailDueAt(event.dateOccurred, rules.frequency, this.digestHourUtc)}
               END
             FROM ${recipients} r
             ${rules.joins}
@@ -178,15 +187,17 @@ export class NotificationFanoutSubscriber implements OutboxSubscriber {
             ) WHERE ${sql.identifier(n.dedupKey.name)} IS NOT NULL DO NOTHING
           `;
 
-          const query = tx.execute(insertSql);
-          await this.instrumentation.startSpan(
-            {
-              name: query.getQuery().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
-            () => query.execute(),
-          );
+          await this.uow.run(async () => {
+            const query = resolveExecutor().execute(insertSql);
+            await this.instrumentation.startSpan(
+              {
+                name: query.getQuery().sql,
+                op: "db.query",
+                attributes: { "db.system.name": "postgresql" },
+              },
+              () => query.execute(),
+            );
+          });
         } catch (err) {
           this.instrumentation.capture(err);
           throw err;

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { Option } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import type { DeliveredEvent } from "../ports/outbox.port";
 
 // ---------------------------------------------------------------------------
 // Query-chain factories, called fresh on each tx.select / tx.insert
@@ -45,31 +46,23 @@ const fakeTx = {
 // ---------------------------------------------------------------------------
 // Drizzle mock: scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
-mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeTx }));
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => fakeTx }));
 
 const { WebhookFanoutSubscriber } = await import("../services/webhook-fanout-subscriber");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
 
 const instrumentation = new NoOpInstrumentation();
-const subscriber = new WebhookFanoutSubscriber(instrumentation);
+const subscriber = new WebhookFanoutSubscriber(mockUnitOfWork().unitOfWork, instrumentation);
 
-function makeEvent(eventType: string, organizationId = "org-1") {
+function makeEvent(eventType: string, organizationId = "org-1"): DeliveredEvent {
   return {
-    id: "event-1",
+    eventId: "event-1",
     eventType,
     aggregateId: "agg-1",
     aggregateType: "test",
-    organizationId: Option.some(organizationId),
+    organizationId,
     payload: {},
-    metadata: {
-      specversion: "1.0" as const,
-      source: "test",
-      datacontenttype: "application/json" as const,
-    },
-    occurredAt: new Date(),
-    attempts: 0,
-    deadAt: Option.none<Date>(),
-    deliveries: {},
+    dateOccurred: new Date(),
   };
 }
 
@@ -79,27 +72,31 @@ describe("WebhookFanoutSubscriber", () => {
     capturedInserts.length = 0;
   });
 
-  it("delivers to endpoint subscribed to 'user.*' when event is user.created", async () => {
-    fakeEndpoints = [{ id: "ep-1", eventTypes: ["user.*"] }];
-    // biome-ignore lint/suspicious/noExplicitAny: test-only cast
-    await subscriber.handle(makeEvent("user.created"), fakeTx as any);
-    expect(capturedInserts.length).toBe(1);
-    const rows = capturedInserts[0] as Array<{ endpointId: string }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.endpointId).toBe("ep-1");
+  it("webhook-fanout creates one delivery per matching endpoint keyed by eventId:endpointId", async () => {
+    fakeEndpoints = [
+      { id: "ep-1", eventTypes: ["user.*"] },
+      { id: "ep-2", eventTypes: ["user.created"] },
+      { id: "ep-3", eventTypes: ["org.*"] },
+    ];
+
+    await subscriber.handle(makeEvent("user.created"));
+
+    expect(capturedInserts).toHaveLength(1);
+    expect(capturedInserts[0]).toMatchObject([
+      { endpointId: "ep-1", outboxEventId: "event-1", idempotencyKey: "event-1:ep-1" },
+      { endpointId: "ep-2", outboxEventId: "event-1", idempotencyKey: "event-1:ep-2" },
+    ]);
   });
 
   it("skips internal webhook.test events even if endpoint subscribes to '*'", async () => {
     fakeEndpoints = [{ id: "ep-2", eventTypes: ["*"] }];
-    // biome-ignore lint/suspicious/noExplicitAny: test-only cast
-    await subscriber.handle(makeEvent("webhook.test"), fakeTx as any);
+    await subscriber.handle(makeEvent("webhook.test"));
     expect(capturedInserts.length).toBe(0);
   });
 
   it("does not deliver when endpoint event type does not match (org.created vs user.created)", async () => {
     fakeEndpoints = [{ id: "ep-3", eventTypes: ["org.created"] }];
-    // biome-ignore lint/suspicious/noExplicitAny: test-only cast
-    await subscriber.handle(makeEvent("user.created"), fakeTx as any);
+    await subscriber.handle(makeEvent("user.created"));
     expect(capturedInserts.length).toBe(0);
   });
 });

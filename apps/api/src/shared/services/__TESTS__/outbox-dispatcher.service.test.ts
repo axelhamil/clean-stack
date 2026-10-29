@@ -4,10 +4,11 @@ import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
+import { type BuiltInEventHandler, buildEventDispatcher } from "../../event-handlers";
 import { logger } from "../../logger";
 import type { IOutboxRepository, OutboxRecord } from "../../ports/outbox.port";
 import { OutboxDispatcher } from "../outbox-dispatcher.service";
-import type { OutboxSubscriber } from "../outbox-subscriber";
+import { OutboxRelay } from "../outbox-relay";
 import { FakePgListenClient } from "./fake-pg-listen-client";
 
 const TYPE = EventTypes.USER_CREATED;
@@ -33,17 +34,16 @@ function makeDispatcher() {
     Result.ok({ dueInMs: Option.none<number>(), oldestPendingSeconds: 0 }),
   );
   outbox.markDelivered.mockResolvedValue(Result.ok(true));
+  outbox.retireNotifyTrigger.mockResolvedValue(Result.ok());
   const instrumentation = mockInstrumentation();
   const client = new FakePgListenClient();
-  const subscribers: OutboxSubscriber[] = [];
-  const dispatcher = new OutboxDispatcher(
-    outbox,
-    subscribers,
-    logger,
-    "postgres://unused",
-    instrumentation,
-    {
-      relay: {
+  const builtIns: BuiltInEventHandler[] = [];
+  const createRelay = (diLike: Record<string, unknown>) =>
+    new OutboxRelay(
+      outbox,
+      mockUnitOfWork().unitOfWork,
+      buildEventDispatcher(builtIns, diLike),
+      {
         eventTypes: [TYPE],
         batchSize: 50,
         maxAttempts: 10,
@@ -52,7 +52,16 @@ function makeDispatcher() {
         concurrency: 4,
         handlerBudgetSeconds: 30,
       },
-      uow: mockUnitOfWork().unitOfWork,
+      instrumentation,
+      logger,
+    );
+  const dispatcher = new OutboxDispatcher(
+    outbox,
+    createRelay,
+    logger,
+    "postgres://unused",
+    instrumentation,
+    {
       stopGraceMs: 10_000,
       listener: { createClient: () => client },
     },
@@ -72,6 +81,17 @@ describe("OutboxDispatcher", () => {
     expect(instrumentation.capture).toHaveBeenCalled();
 
     await dispatcher.stop();
+  });
+
+  test("start drops the legacy notify trigger once, before listening", async () => {
+    const { dispatcher, outbox } = makeDispatcher();
+    outbox.claim.mockResolvedValue(Result.ok([]));
+
+    await dispatcher.start();
+    await dispatcher.start();
+    await dispatcher.stop();
+
+    expect(outbox.retireNotifyTrigger).toHaveBeenCalledTimes(1);
   });
 
   test("a NOTIFY on the listen connection triggers a drain", async () => {
