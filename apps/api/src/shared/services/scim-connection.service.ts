@@ -1,13 +1,6 @@
 import type { SCIMManagedConnection, SCIMScope } from "@better-auth/scim";
-import {
-  type AppError,
-  type IUnitOfWork,
-  Option,
-  Result,
-  UnitOfWorkContext,
-  uuidv7,
-} from "@packages/ddd-kit";
-import { resolveExecutor, sql } from "@packages/drizzle";
+import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { resolveExecutor, savepoint, sql } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
 import { findMemberOf, scimProvisionedMembers } from "../../auth-queries";
@@ -247,7 +240,7 @@ export class ScimConnectionService {
    */
   private async emitCommitted(emit: () => Promise<unknown>): Promise<void> {
     try {
-      await resolveExecutor().transaction((savepoint) => UnitOfWorkContext.run(savepoint, emit));
+      await savepoint(emit);
     } catch (err) {
       this.instrumentation.capture(err);
     }

@@ -1,6 +1,5 @@
-import { UnitOfWorkContext } from "@packages/ddd-kit";
 import type { AnyPgColumn, AnyPgTable } from "@packages/drizzle";
-import { count, eq, resolveExecutor, sql } from "@packages/drizzle";
+import { ambientTransaction, count, eq, resolveExecutor, sql } from "@packages/drizzle";
 import type { QuotaKey } from "../entitlements";
 import { assertQuota } from "../middleware/billing.middleware";
 
@@ -23,7 +22,7 @@ export async function reserveQuota(
   countFn: () => Promise<number>,
 ): Promise<void> {
   if (limit === null) return;
-  if (!UnitOfWorkContext.transaction()) {
+  if (ambientTransaction().isNone()) {
     throw new Error(
       "reserveQuota must run inside uow.run: its lock lives as long as the transaction",
     );

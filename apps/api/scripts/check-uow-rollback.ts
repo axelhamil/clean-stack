@@ -15,8 +15,9 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-uow-rollback");
 
-import { EventCollector, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { EventCollector, match, Result } from "@packages/ddd-kit";
 import {
+  ambientTransaction,
   authSchema,
   type DbClient,
   db,
@@ -82,10 +83,12 @@ const sameBackend = (a: Backend | undefined, b: Backend | undefined): boolean =>
   a !== undefined && b !== undefined && a.pid === b.pid && a.txid === b.txid;
 
 function ambient(): Transaction {
-  const tx = UnitOfWorkContext.transaction<Transaction>();
-  if (!tx) throw new Error("check-uow-rollback: no transaction open in this run");
-
-  return tx;
+  return match(ambientTransaction(), {
+    Some: (tx) => tx,
+    None: () => {
+      throw new Error("check-uow-rollback: no transaction open in this run");
+    },
+  });
 }
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -241,6 +244,36 @@ async function main(): Promise<void> {
   check(
     "a thrown error in nested rolls back and propagates",
     thrownDeep === nestedError && (await currentName()) === ORIGINAL_NAME,
+  );
+
+  const caughtDeep = await uow
+    .run(async () => {
+      await ambient()
+        .update(authSchema.user)
+        .set({ name: "Outer write" })
+        .where(eq(authSchema.user.id, userId));
+      await uow
+        .run(async () => {
+          await ambient()
+            .update(authSchema.user)
+            .set({ image: "nested-write" })
+            .where(eq(authSchema.user.id, userId));
+          throw nestedError;
+        })
+        .catch(() => undefined);
+
+      return Result.ok();
+    })
+    .catch((err: unknown) => err);
+  console.log(
+    "[5b] outer that caught a nested throw ->",
+    caughtDeep === nestedError ? "the nested error" : caughtDeep,
+  );
+  check(
+    "a nested run that throws dooms the outer run even if the error is caught",
+    caughtDeep === nestedError &&
+      (await currentName()) === ORIGINAL_NAME &&
+      (await currentImage()) === null,
   );
 
   const leaked = await uow.run(async () => {

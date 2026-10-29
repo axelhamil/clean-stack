@@ -31,7 +31,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Resync on the OpenUp foundations: **Phase I**
 
-- **Status**: in progress, I.1, I.2 and I.3 shipped, I.4 next.
+- **Status**: in progress, I.1, I.2, I.3 and I.4 shipped, I.5 next.
 - **Date**: Oct 2026.
 - **Why**: OpenUp, a sister project on the same stack, hardened five foundations after clean-stack diverged from the shared Afterlive lineage. Today clean-stack has a thinner kit, layering enforced only by convention, telemetry that can carry PII, a transaction parameter threaded through every port, and an outbox that holds locks during handlers and loses user handlers on a throw. Each lot below buys one architectural property.
 - **Scope**: five ordered lots, each its own branch off `dev` (`refactor/phase-i-1-kit` to `refactor/phase-i-5-outbox`) and its own PR merged as a merge commit. Not ported because they are OpenUp-specific: a per-module outbox, `RouteGuards`, `HttpResponse`, `PgSingleFlight`, `packages/audit`, `dist` builds, typed entity ids, the `DomainEventHandler` class, admin replay of dead events.
@@ -59,7 +59,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 - **Depends on**: I.1 (`mockPort`), I.2 (boundaries gate).
 - **Done when**: the scrub tests show no `params:` text and no email in `exception.values`, `message` or breadcrumbs; the shutdown tests prove order, exit 1 on a failed or timed-out step, exit 1 with a flush on the deadline and exit 0 only when every step finished; a manual `SIGTERM` against `bun run dev` shows the steps in order and exit 0 in under 5 s idle; `bun --hot` still reloads.
 
-### I.4: Ambient unit of work
+### I.4: Ambient unit of work ✅ Oct 2026
 
 - **Why**: threading a `tx` parameter through every port and repository makes a forgotten parameter a silent write outside the transaction. An ambient unit of work removes the parameter, so the transaction cannot be bypassed by omission.
 - **Scope**: an `AsyncLocalStorage` scope carrying the transaction and collected events; nested `run` joins the open transaction (no savepoint), a failed `Result` at any depth rolls everything back and returns the same `Result`, events raised without an outbox roll back, a promise outliving its run reads the pool and never a closed transaction; repositories read `resolveExecutor()`; `mockUnitOfWork` with the same nesting rules. Migration is total and in batches (shared ports, then billing, consents, notifications and policies, then api-token, profile, quotas, rgpd and webhooks, then the BetterAuth bridge, then the remaining `db.transaction` sites), ending with `IUnitOfWork.run(work: () => Promise<T>)` and no `tx` anywhere.

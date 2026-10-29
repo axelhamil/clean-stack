@@ -150,8 +150,8 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     }));
     const enqueued: Array<{ events: IDomainEvent[]; tx: unknown }> = [];
     const outbox = {
-      enqueue: async (events: IDomainEvent[], _scope: unknown, tx: unknown) => {
-        enqueued.push({ events, tx });
+      enqueue: async (events: IDomainEvent[]) => {
+        enqueued.push({ events, tx: UnitOfWorkContext.transaction() });
       },
     };
     const { unitOfWork, outcome } = mockUnitOfWork();

@@ -71,7 +71,10 @@ const mockUpsertPreference = mock(async (): Promise<Result<void, NotificationErr
   return Result.ok();
 });
 
-const mockEnqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+const enqueueTransactions: unknown[] = [];
+const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
+  enqueueTransactions.push(UnitOfWorkContext.transaction());
+});
 
 const { unitOfWork } = mockUnitOfWork();
 
@@ -226,7 +229,8 @@ describe("POST /notifications/read - domain event", () => {
     expect(res.status).toBe(200);
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
     // biome-ignore lint/suspicious/noExplicitAny: test assertion
-    const [events, , tx] = (mockEnqueue.mock.calls[0] ?? []) as any[];
+    const [events] = (mockEnqueue.mock.calls[0] ?? []) as any[];
+    const tx = enqueueTransactions.at(-1);
     expect(events[0].eventType).toBe("notification.read");
     expect(events[0].payload).toEqual({
       userId: "user-1",
@@ -357,8 +361,8 @@ describe("PUT /notifications/preferences", () => {
       body: JSON.stringify({ category: "billing", channel: "email", enabled: false }),
     });
     expect(res.status).toBe(200);
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBeDefined();
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(storeTransactions.at(-1));
+    expect(enqueueTransactions.at(-1)).toBeDefined();
+    expect(enqueueTransactions.at(-1)).toBe(storeTransactions.at(-1));
   });
 
   it("rejects an impersonated session (403)", async () => {
@@ -438,8 +442,8 @@ describe("PUT /notifications/org-preferences", () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBeDefined();
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(storeTransactions.at(-1));
+    expect(enqueueTransactions.at(-1)).toBeDefined();
+    expect(enqueueTransactions.at(-1)).toBe(storeTransactions.at(-1));
   });
 
   it("rejects an impersonated session (403)", async () => {

@@ -25,8 +25,6 @@ const ALLOWED_TX_PARAMETERS: Record<string, string> = {
 };
 
 const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {
-  "shared/services/scim-connection.service.ts":
-    "the one explicit savepoint: a failed event insert after a token rotation must not roll the rotation back",
   "shared/services/outbox-dispatcher.service.ts": LEASE_OUTBOX_REWRITE,
 };
 

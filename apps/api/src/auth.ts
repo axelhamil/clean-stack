@@ -10,8 +10,7 @@ import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
-import { UnitOfWorkContext } from "@packages/ddd-kit";
-import { type DbClient, db, resolveExecutor, sql, type Transaction } from "@packages/drizzle";
+import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -68,6 +67,7 @@ import {
   scimUserChange,
 } from "./shared/auth/sso-paths";
 import { TOTP_OPTIONS } from "./shared/auth/totp-options";
+import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
 import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
@@ -183,25 +183,6 @@ async function emit<TPayload>(
   });
 }
 
-function ambientTransaction(): Transaction {
-  const tx = UnitOfWorkContext.transaction<Transaction>();
-  if (!tx) throw new Error("a BetterAuth transaction ran outside its unit of work");
-
-  return tx;
-}
-
-function asUnitOfWork(client: DbClient): DbClient {
-  return new Proxy(client, {
-    get(target, property, receiver) {
-      if (property !== "transaction") return Reflect.get(target, property, receiver);
-
-      const transaction: DbClient["transaction"] = (work) =>
-        di.ITransactionService.run(() => work(ambientTransaction()));
-      return transaction;
-    },
-  });
-}
-
 /**
  * `emit` for the security signals a before-hook raises on its way to refusing the
  * request: the refusal is the enforcement, the event is telemetry, so a failed
@@ -265,7 +246,7 @@ async function seatCapFor(
   orgId: string,
 ): Promise<{ available: boolean; activeMembers: number; maxMembers: number | null }> {
   const view = await di.EntitlementsService.getEntitlements(orgId);
-  if (UnitOfWorkContext.transaction()) await lockSeatsOf(orgId);
+  if (ambientTransaction().isSome()) await lockSeatsOf(orgId);
   const activeMembers = await countActiveMembers(orgId);
   return {
     available: hasSeatAvailable(activeMembers, view.maxMembers),
@@ -574,7 +555,10 @@ const authOptions = {
   // The adapter gets `db` wrapped so every transaction it opens is an outermost unit
   // of work: the hooks it runs inside read it through `resolveExecutor()` and their
   // events are flushed before it commits.
-  database: drizzleAdapter(asUnitOfWork(db), { provider: "pg", transaction: true }),
+  database: drizzleAdapter(
+    asUnitOfWork(db, () => di.ITransactionService),
+    { provider: "pg", transaction: true },
+  ),
 
   user: {
     additionalFields: {

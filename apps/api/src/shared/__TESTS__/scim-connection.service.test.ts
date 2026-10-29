@@ -18,12 +18,13 @@ mock.module("../../auth", () => ({
   },
 }));
 
-const executor = {
-  execute: async () => undefined,
-  transaction: async (callback: (savepoint: unknown) => Promise<unknown>) => callback(executor),
-};
+const executor = { execute: async () => undefined };
 const realDrizzle = await import("@packages/drizzle");
-mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
+mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
+  resolveExecutor: () => executor,
+  savepoint: <T>(work: () => Promise<T>) => work(),
+}));
 
 const { ScimConnectionService } = await import("../services/scim-connection.service");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type { ProfileError } from "../../../shared/ports/profile.port";
@@ -13,7 +13,10 @@ const mockFindLocale = mock(
 const mockSetLocale = mock(
   async (_userId: string, _locale: Locale): Promise<Result<void, ProfileError>> => Result.ok(),
 );
-const mockEnqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+const enqueueTransactions: unknown[] = [];
+const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
+  enqueueTransactions.push(UnitOfWorkContext.transaction());
+});
 
 mock.module("../../../container", () => ({
   di: {
@@ -68,6 +71,7 @@ describe("PUT /me/locale", () => {
     mockFindLocale.mockClear();
     mockSetLocale.mockClear();
     mockEnqueue.mockClear();
+    enqueueTransactions.length = 0;
   });
 
   it("rejects a locale outside the supported set", async () => {
@@ -97,7 +101,7 @@ describe("PUT /me/locale", () => {
 
     expect(outcome()).toBe("committed");
     expect(mockSetLocale).toHaveBeenCalledWith("user-1", "fr");
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBeDefined();
+    expect(enqueueTransactions[0]).toBeDefined();
   });
 
   it("emits nothing when the write fails", async () => {

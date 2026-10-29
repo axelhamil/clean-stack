@@ -14,6 +14,7 @@ import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
+import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
@@ -46,7 +47,7 @@ import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscr
 
 declare module "inwire" {
   interface AppDeps {
-    ITransactionService: IUnitOfWork;
+    ITransactionService: IUnitOfWork & OutermostUnitOfWork;
     IEmailQueue: IEmailQueue;
     IEmailService: IEmailService;
     IOutboxRepository: IOutboxRepository;

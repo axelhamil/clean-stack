@@ -1,5 +1,5 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
@@ -588,7 +588,6 @@ describe("WebhooksService", () => {
           expect.objectContaining({ eventType: EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED }),
         ]),
         expect.any(Object),
-        expect.any(Object),
       );
     });
     it("returns None when endpoint not found", async () => {
@@ -651,7 +650,6 @@ describe("WebhooksService", () => {
       expect(enqueueMock).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ eventType: EventTypes.WEBHOOK_TEST })]),
         expect.any(Object),
-        expect.any(Object),
       );
       const [[firstArg]] = (enqueueTargeted as ReturnType<typeof mock>).mock.calls as [
         [{ outboxEventId: string }, unknown],
@@ -713,7 +711,10 @@ describe("WebhooksService", () => {
     });
 
     it("emits webhook.delivery.replayed with the requesting user inside the transaction", async () => {
-      const enqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+      const enqueueTransactions: unknown[] = [];
+      const enqueue = mock(async (_events: unknown, _meta: unknown) => {
+        enqueueTransactions.push(UnitOfWorkContext.transaction());
+      });
       const outbox = { ...noopOutbox, enqueue } as IOutboxRepository;
       const deliveries = makeDeliveries({
         enqueueReplay: mock(async () =>
@@ -733,8 +734,8 @@ describe("WebhooksService", () => {
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
 
-      const [events, , enqueueTx] = enqueue.mock.calls[0] ?? [];
-      expect(enqueueTx).toBeDefined();
+      const [events] = enqueue.mock.calls[0] ?? [];
+      expect(enqueueTransactions[0]).toBeDefined();
       expect(events).toEqual([
         expect.objectContaining({
           eventType: EventTypes.WEBHOOK_DELIVERY_REPLAYED,

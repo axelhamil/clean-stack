@@ -1,6 +1,5 @@
 import type { IDomainEvent } from "@packages/ddd-kit";
-import { UnitOfWorkContext, uuidv7 } from "@packages/ddd-kit";
-import type { Transaction } from "@packages/drizzle";
+import { uuidv7 } from "@packages/ddd-kit";
 import type { EventType } from "@packages/events";
 import { logger } from "./logger";
 import type { IOutboxRepository } from "./ports/outbox.port";
@@ -35,17 +34,13 @@ export async function emitEvent<TPayload>(
     aggregateId,
     payload,
   };
-  await outbox.enqueue(
-    [event],
-    {
-      source: SOURCE,
-      aggregateType,
-      organizationId: opts.organizationId,
-      traceparent: opts.traceparent,
-      id,
-    },
-    UnitOfWorkContext.transaction<Transaction>(),
-  );
+  await outbox.enqueue([event], {
+    source: SOURCE,
+    aggregateType,
+    organizationId: opts.organizationId,
+    traceparent: opts.traceparent,
+    id,
+  });
   return id;
 }
 

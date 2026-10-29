@@ -55,7 +55,9 @@ export * as sweepSchema from "./schema/sweep";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
 export * as webhooksSchema from "./schema/webhooks";
 export {
+  ambientTransaction,
   type FlushHandler,
   resolveExecutor,
+  savepoint,
   TransactionService,
 } from "./services/transaction-manager.service";

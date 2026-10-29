@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
@@ -171,8 +171,8 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
 function makeOutbox() {
   const enqueueCalls: Array<{ events: unknown[]; opts: unknown; tx: unknown }> = [];
   const outbox: IOutboxRepository = {
-    enqueue: mock(async (events, opts, tx) => {
-      enqueueCalls.push({ events: events as unknown[], opts, tx });
+    enqueue: mock(async (events, opts) => {
+      enqueueCalls.push({ events, opts, tx: UnitOfWorkContext.transaction() });
     }),
     findPendingBatch: mock(async () => []),
     markDispatched: mock(async () => {}),
