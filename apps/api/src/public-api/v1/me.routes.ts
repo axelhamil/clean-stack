@@ -34,7 +34,6 @@ export const mePublicRoutes = new Hono<{ Variables: ApiTokenVariables }>()
           userId,
           { userId, changes: { name } },
           {},
-          tx,
         );
       });
 

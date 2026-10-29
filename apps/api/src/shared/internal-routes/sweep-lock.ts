@@ -1,7 +1,6 @@
 import { uuidv7 } from "@packages/ddd-kit";
-import { and, db, eq, sql, sweepSchema } from "@packages/drizzle";
+import { and, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
 import { env } from "../env";
-import type { ITransaction } from "../transaction";
 import type { SweepLock } from "./sweep-runner";
 import type { SweepSpans } from "./sweep-span";
 
@@ -19,18 +18,16 @@ import type { SweepSpans } from "./sweep-span";
  * it still holds the same `label`, `releaseSweepLease` deletes by `label` AND
  * `owner`, so a stale caller's release is a no-op instead of stealing the lease.
  *
- * `exec` defaults to the shared `db` client (same `tx ?? db` swap-point used by
- * every repository), a caller inside an existing transaction can pass its `tx`
- * instead of opening a second connection.
+ * Reads the ambient executor like every repository: inside a `uow.run` it joins
+ * the open transaction instead of opening a second connection.
  */
 export async function acquireSweepLease(
   label: string,
   ttlMs: number,
   spans: SweepSpans,
-  exec?: ITransaction,
 ): Promise<string | null> {
   const lock = sweepSchema.sweepLock;
-  const client = exec ?? db;
+  const client = resolveExecutor();
   const owner = uuidv7();
   const until = new Date(Date.now() + ttlMs);
   const query = client
@@ -53,10 +50,9 @@ export async function releaseSweepLease(
   label: string,
   owner: string,
   spans: SweepSpans,
-  exec?: ITransaction,
 ): Promise<void> {
   const lock = sweepSchema.sweepLock;
-  const client = exec ?? db;
+  const client = resolveExecutor();
   const query = client.delete(lock).where(and(eq(lock.label, label), eq(lock.owner, owner)));
   await spans.lease(
     () => query.toSQL().sql,

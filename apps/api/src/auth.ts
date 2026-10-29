@@ -10,6 +10,7 @@ import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { db, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
@@ -179,15 +180,12 @@ async function emit<TPayload>(
   organizationId?: string | null,
   tx?: Transaction,
 ): Promise<void> {
-  await emitEvent(
-    di.IOutboxRepository,
-    eventType,
-    aggregateType,
-    aggregateId,
-    payload,
-    { organizationId },
-    tx ?? currentAuthTransaction(),
-  );
+  const send = () =>
+    emitEvent(di.IOutboxRepository, eventType, aggregateType, aggregateId, payload, {
+      organizationId,
+    });
+  const scope = tx ?? currentAuthTransaction();
+  await (scope ? UnitOfWorkContext.run(scope, send) : send());
 }
 
 /**

@@ -34,10 +34,7 @@ export interface EmailMessageRecord {
 export type EmailQueueError = { code: "EMAIL_QUEUE_WRITE_FAILED"; message: string };
 
 export interface IEmailQueue {
-  enqueue(
-    rows: EmailMessageInsert[],
-    tx?: ITransaction,
-  ): Promise<Result<{ written: number }, EmailQueueError>>;
+  enqueue(rows: EmailMessageInsert[]): Promise<Result<{ written: number }, EmailQueueError>>;
   claimPending(
     limit: number,
     claimUntil: Date,

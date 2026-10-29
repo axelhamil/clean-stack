@@ -1,4 +1,4 @@
-import { Option } from "@packages/ddd-kit";
+import { Option, UnitOfWorkContext } from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
@@ -185,21 +185,23 @@ export class EmailDeliveryWorker {
         return;
       }
       if (date.isSome()) return;
-      await emitEvent(
-        this.outbox,
-        EventTypes.EMAIL_DELIVERY_EXHAUSTED,
-        "email_message",
-        rowRecord.id,
-        {
-          messageId: rowRecord.id,
-          template: rowRecord.template.toNull(),
-          toHash: await sha256Hex(rowRecord.toAddress),
-          attempts,
-          lastError: error,
-          actorUserId: null,
-        },
-        {},
-        tx,
+      const toHash = await sha256Hex(rowRecord.toAddress);
+      await UnitOfWorkContext.run(tx, () =>
+        emitEvent(
+          this.outbox,
+          EventTypes.EMAIL_DELIVERY_EXHAUSTED,
+          "email_message",
+          rowRecord.id,
+          {
+            messageId: rowRecord.id,
+            template: rowRecord.template.toNull(),
+            toHash,
+            attempts,
+            lastError: error,
+            actorUserId: null,
+          },
+          {},
+        ),
       );
     });
   }

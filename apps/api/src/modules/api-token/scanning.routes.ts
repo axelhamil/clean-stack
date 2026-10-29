@@ -9,12 +9,11 @@ import { emitEvent } from "../../shared/event-emitter";
 import type { IApiTokenRepository } from "../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../shared/ports/outbox.port";
-import type { ITransaction } from "../../shared/transaction";
 
 export interface ScanningDeps {
   githubKeyVerifier: { verify(keyId: string, sig: string, body: string): Promise<boolean> };
   apiTokenRepository: Pick<IApiTokenRepository, "findByHmac" | "revoke">;
-  transactionService: Pick<IUnitOfWork<ITransaction>, "run">;
+  transactionService: Pick<IUnitOfWork, "run">;
   outboxRepository: IOutboxRepository;
   emailService: {
     sendTemplate(
@@ -102,8 +101,8 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
 
         if (record.revokedAt.isNone()) {
           const revoked = await deps.transactionService
-            .run(async (tx) => {
-              const revokeResult = await deps.apiTokenRepository.revoke(record.id, "leaked", tx);
+            .run(async () => {
+              const revokeResult = await deps.apiTokenRepository.revoke(record.id, "leaked");
               if (revokeResult.isFailure) return revokeResult;
 
               await emitEvent(
@@ -119,7 +118,6 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
                   reason: "leaked" as const,
                 },
                 { organizationId: record.organizationId.toNull() },
-                tx,
               );
 
               return revokeResult;

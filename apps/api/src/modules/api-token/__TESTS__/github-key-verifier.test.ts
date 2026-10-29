@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { generateToken, hmacToken } from "../../../shared/crypto/api-token";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
@@ -198,7 +199,7 @@ const app = new Hono()
     createApiTokenScanningRoutes({
       githubKeyVerifier: { verify: mockVerify },
       apiTokenRepository: { findByHmac: mockFindByHmac, revoke: mockRevoke },
-      transactionService: { run: async (cb) => cb({} as never) },
+      transactionService: mockUnitOfWork().unitOfWork,
       outboxRepository: { enqueue: mockEnqueue } as never,
       emailService: { sendTemplate: mockSendTemplate },
       instrumentation: new NoOpInstrumentation(),
@@ -294,7 +295,7 @@ describe("POST /api/token-scanning/github", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { label: string }[];
     expect(body[0]?.label).toBe("true_positive");
-    expect(mockRevoke).toHaveBeenCalledWith("tok-1", "leaked", expect.anything());
+    expect(mockRevoke).toHaveBeenCalledWith("tok-1", "leaked");
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
     // biome-ignore lint/style/noNonNullAssertion: guarded by toHaveBeenCalledTimes(1) above
     const [events] = (mockEnqueue as ReturnType<typeof mock>).mock.calls[0]!;
@@ -335,7 +336,7 @@ describe("POST /api/token-scanning/github", () => {
         createApiTokenScanningRoutes({
           githubKeyVerifier: { verify: async () => true },
           apiTokenRepository: { findByHmac: localFindByHmac, revoke: localRevoke },
-          transactionService: { run: async (cb) => cb({} as never) },
+          transactionService: mockUnitOfWork().unitOfWork,
           outboxRepository: { enqueue: localEnqueue } as never,
           emailService: { sendTemplate: localSendTemplate },
           instrumentation: new NoOpInstrumentation(),
@@ -360,7 +361,7 @@ describe("POST /api/token-scanning/github", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { label: string }[];
     expect(body[0]?.label).toBe("true_positive");
-    expect(localRevoke).toHaveBeenCalledWith(prevRecord.id, "leaked", expect.anything());
+    expect(localRevoke).toHaveBeenCalledWith(prevRecord.id, "leaked");
   });
 
   it("returns true_positive and skips revoke for an already-revoked token", async () => {

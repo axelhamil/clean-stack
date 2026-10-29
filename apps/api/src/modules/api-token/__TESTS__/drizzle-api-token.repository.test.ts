@@ -40,14 +40,17 @@ function makeDbQuery() {
 
 // Declared before the dynamic import below so the repository binds this `db` at
 // module-load time. The replacement stays inside this file's module registry.
+const fakeDb = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+};
+
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    select: () => makeDbQuery(),
-    insert: () => makeDbQuery(),
-    update: () => makeDbQuery(),
-    delete: () => makeDbQuery(),
-  },
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
 }));
 
 const { DrizzleApiTokenRepository } = await import(

@@ -142,7 +142,6 @@ export class ConsentService {
           userId,
           { userId, subjectId, consentRecordIds },
           {},
-          tx,
         );
         return Result.ok<ConsentError>();
       });
@@ -174,7 +173,6 @@ export class ConsentService {
           payload.userId ?? payload.subjectId,
           payload,
           {},
-          tx,
         );
 
         return inserted;

@@ -118,7 +118,6 @@ async function main(): Promise<void> {
         userId,
         { userId, changes: { name } },
         {},
-        tx,
       );
 
       return outcome;
@@ -187,7 +186,6 @@ async function main(): Promise<void> {
       userId,
       { userId, changes: {} },
       {},
-      tx,
     );
 
     return uow.run(async () => nestedFailure);
@@ -277,7 +275,6 @@ async function main(): Promise<void> {
         userId,
         { userId, changes: {} },
         {},
-        inner,
       );
 
       return Result.ok();

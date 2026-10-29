@@ -3,7 +3,6 @@ import {
   and,
   asc,
   auditLogSchema,
-  db,
   desc,
   eq,
   gte,
@@ -12,7 +11,7 @@ import {
   like,
   lt,
   lte,
-  type Transaction,
+  resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../db-failure";
 import type {
@@ -54,8 +53,8 @@ function toRecord(row: typeof al.$inferSelect): AuditRecord {
 export class DrizzleAuditRepository implements IAuditPort {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async record(entry: AuditEntry, tx?: Transaction): Promise<Result<AuditRecord, AuditError>> {
-    const exec = tx ?? db;
+  async record(entry: AuditEntry): Promise<Result<AuditRecord, AuditError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleAuditRepository > record" }, async () => {
       const id = uuidv7();
       const occurredAt = new Date();
@@ -91,8 +90,8 @@ export class DrizzleAuditRepository implements IAuditPort {
     });
   }
 
-  async list(filters: AuditFilters, tx?: Transaction): Promise<Result<AuditPage, AuditError>> {
-    const exec = tx ?? db;
+  async list(filters: AuditFilters): Promise<Result<AuditPage, AuditError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleAuditRepository > list" }, async () => {
       const limit = Math.min(filters.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
       const conds = [];
@@ -140,8 +139,8 @@ export class DrizzleAuditRepository implements IAuditPort {
     });
   }
 
-  async verifyChain(tx?: Transaction): Promise<Result<ChainVerification, AuditError>> {
-    const exec = tx ?? db;
+  async verifyChain(): Promise<Result<ChainVerification, AuditError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleAuditRepository > verifyChain" },
       async () => {

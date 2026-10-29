@@ -53,7 +53,6 @@ export class PolicyAcceptanceService {
             userId,
             { userId, policyType, policyVersion, ipAddress },
             {},
-            tx,
           );
         }
 

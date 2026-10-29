@@ -1,5 +1,5 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { and, apiTokenSchema, db, eq, isNull, lt, or } from "@packages/drizzle";
+import { and, apiTokenSchema, eq, isNull, lt, or, resolveExecutor } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   ApiTokenError,
@@ -9,7 +9,6 @@ import type {
   TokenOwner,
 } from "../../../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const t = apiTokenSchema.apiToken;
@@ -60,8 +59,8 @@ export function visibleTokensFilter(owner: TokenOwner) {
 export class DrizzleApiTokenRepository implements IApiTokenRepository {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async insert(row: ApiTokenRecord, tx?: ITransaction): Promise<Result<void, ApiTokenError>> {
-    const exec = tx ?? db;
+  async insert(row: ApiTokenRecord): Promise<Result<void, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > insert" },
       async () => {
@@ -95,11 +94,12 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
   }
 
   async listByOwner(owner: TokenOwner): Promise<Result<ApiTokenRecord[], ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > listByOwner" },
       async () => {
         try {
-          const query = db.select().from(t).where(visibleTokensFilter(owner));
+          const query = exec.select().from(t).where(visibleTokensFilter(owner));
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
@@ -117,11 +117,12 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     id: string,
     owner: TokenOwner,
   ): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > findByIdForOwner" },
       async () => {
         try {
-          const query = db
+          const query = exec
             .select()
             .from(t)
             .where(and(eq(t.id, id), visibleTokensFilter(owner)))
@@ -140,11 +141,12 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
   }
 
   async findByHmac(hmac: string): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > findByHmac" },
       async () => {
         try {
-          const query = db.select().from(t).where(eq(t.tokenHmac, hmac)).limit(1);
+          const query = exec.select().from(t).where(eq(t.tokenHmac, hmac)).limit(1);
           const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
@@ -158,12 +160,8 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     );
   }
 
-  async revoke(
-    id: string,
-    reason: ApiTokenRevokedReason,
-    tx?: ITransaction,
-  ): Promise<Result<void, ApiTokenError>> {
-    const exec = tx ?? db;
+  async revoke(id: string, reason: ApiTokenRevokedReason): Promise<Result<void, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > revoke" },
       async () => {
@@ -188,9 +186,8 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
   async revokeAllForMembership(
     userId: string,
     organizationId: string,
-    tx?: ITransaction,
   ): Promise<Result<string[], ApiTokenError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > revokeAllForMembership" },
       async () => {
@@ -216,11 +213,12 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
   }
 
   async touchLastUsed(id: string, bucketFloor: Date): Promise<Result<boolean, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > touchLastUsed" },
       async () => {
         try {
-          const query = db
+          const query = exec
             .update(t)
             .set({ lastUsedAt: new Date() })
             .where(and(eq(t.id, id), or(isNull(t.lastUsedAt), lt(t.lastUsedAt, bucketFloor))))
@@ -243,11 +241,12 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     hmac: string,
     pepperVersion: number,
   ): Promise<Result<void, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > rehash" },
       async () => {
         try {
-          const query = db.update(t).set({ tokenHmac: hmac, pepperVersion }).where(eq(t.id, id));
+          const query = exec.update(t).set({ tokenHmac: hmac, pepperVersion }).where(eq(t.id, id));
           await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),

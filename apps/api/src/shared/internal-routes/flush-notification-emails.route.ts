@@ -1,5 +1,6 @@
 // `/internal/flush-notification-emails`, gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import {
   alias,
   and,
@@ -266,21 +267,20 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
 
           const digests = buildDigests(rows);
 
-          const enqueued = await di.IEmailService.sendTemplateBatch(
-            "notification_digest",
-            await Promise.all(
-              digests.map(async (d) => ({
-                to: d.email,
-                variables: {
-                  category: d.category,
-                  itemCount: String(d.items.length),
-                  itemsSummary: d.items.map((i) => i.eventType).join(", "),
-                },
-                locale: toLocale(d.locale),
-                idempotencyKey: await digestIdempotencyKey(d.notificationIds),
-              })),
-            ),
-            { tx },
+          const recipients = await Promise.all(
+            digests.map(async (d) => ({
+              to: d.email,
+              variables: {
+                category: d.category,
+                itemCount: String(d.items.length),
+                itemsSummary: d.items.map((i) => i.eventType).join(", "),
+              },
+              locale: toLocale(d.locale),
+              idempotencyKey: await digestIdempotencyKey(d.notificationIds),
+            })),
+          );
+          const enqueued = await UnitOfWorkContext.run(tx, () =>
+            di.IEmailService.sendTemplateBatch("notification_digest", recipients),
           );
 
           if (enqueued.isFailure) {

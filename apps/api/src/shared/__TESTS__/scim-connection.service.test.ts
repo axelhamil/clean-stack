@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { ITransaction } from "../transaction";
-import { noopOutbox, passthroughUow } from "./outbox-fakes";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { noopOutbox } from "./outbox-fakes";
 
 const expiresAt = new Date("2027-01-01T00:00:00Z");
 
@@ -18,14 +18,15 @@ mock.module("../../auth", () => ({
   },
 }));
 
+const executor = {
+  execute: async () => undefined,
+  transaction: async (callback: (savepoint: unknown) => Promise<unknown>) => callback(executor),
+};
+const realDrizzle = await import("@packages/drizzle");
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
+
 const { ScimConnectionService } = await import("../services/scim-connection.service");
 const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
-
-/** A transaction whose savepoints just run their callback, and whose lock is a no-op. */
-const tx = {
-  execute: async () => undefined,
-  transaction: async (callback: (savepoint: unknown) => Promise<unknown>) => callback(tx),
-} as unknown as ITransaction;
 
 describe("ScimConnectionService.issueToken", () => {
   it("still returns the token when its event cannot be recorded, and reports the failure", async () => {
@@ -41,7 +42,7 @@ describe("ScimConnectionService.issueToken", () => {
 
     const result = await new ScimConnectionService(
       outbox,
-      passthroughUow(tx),
+      mockUnitOfWork().unitOfWork,
       instrumentation,
     ).issueToken({
       organizationId: "org-1",

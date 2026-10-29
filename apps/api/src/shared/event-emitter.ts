@@ -1,5 +1,5 @@
 import type { IDomainEvent } from "@packages/ddd-kit";
-import { uuidv7 } from "@packages/ddd-kit";
+import { UnitOfWorkContext, uuidv7 } from "@packages/ddd-kit";
 import type { Transaction } from "@packages/drizzle";
 import type { EventType } from "@packages/events";
 import { logger } from "./logger";
@@ -17,8 +17,8 @@ export type EmitOptions = {
  *
  * Use this for code that runs outside an aggregate flow (BetterAuth lifecycle
  * hooks, RGPD service, upload confirm) where there is no aggregate to call
- * `addEvent()` on. The call site is responsible for passing the active
- * transaction (`tx`) when the emit must be atomic with a surrounding write.
+ * `addEvent()` on. Inside a `uow.run` the row joins the open transaction,
+ * outside one it autocommits on the pool.
  */
 export async function emitEvent<TPayload>(
   outbox: IOutboxRepository,
@@ -27,7 +27,6 @@ export async function emitEvent<TPayload>(
   aggregateId: string,
   payload: TPayload,
   opts: EmitOptions = {},
-  tx?: Transaction,
 ): Promise<string> {
   const id = uuidv7();
   const event: IDomainEvent<TPayload> = {
@@ -45,7 +44,7 @@ export async function emitEvent<TPayload>(
       traceparent: opts.traceparent,
       id,
     },
-    tx,
+    UnitOfWorkContext.transaction<Transaction>(),
   );
   return id;
 }

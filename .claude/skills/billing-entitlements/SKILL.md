@@ -12,7 +12,7 @@ Pragmatic infra, **NOT DDD**. `shared/entitlements.ts` holds `ENTITLEMENTS[tier]
 1. **Role**: `billing:["read","manage"]` capability (`@packages/access-control`).
 2. **Seats**: hard-capped in `beforeAddMember` + `beforeAcceptInvitation` + `beforeCreateInvitation`. **All three must be wired**, missing one silently admits overquota members.
 3. **Tier/feature**: `requireFeature(flag)` / `requirePlan(minTier)` → 402 `BILLING_PAYMENT_REQUIRED`.
-4. **Quota** (Phase B.2, dormant): limits in `ENTITLEMENTS[tier].quotas` (`null` = unlimited). `requireQuota(key, readUsage)` = best-effort pre-check → 429 `BILLING_QUOTA_EXCEEDED`; `reserveQuota(tx, orgId, key, limit, countFn)` = **authoritative** gate (TOCTOU-safe: `pg_advisory_xact_lock` + count inside `uow.run()`). Counting: live `countScopedRows` (default) or `IQuotaUsageStore.{increment,current,reset}` (high-volume, increment in same TX as gated write, never background). Details: [`docs/QUOTA-GATING.md`](../../docs/QUOTA-GATING.md).
+4. **Quota** (Phase B.2, dormant): limits in `ENTITLEMENTS[tier].quotas` (`null` = unlimited). `requireQuota(key, readUsage)` = best-effort pre-check → 429 `BILLING_QUOTA_EXCEEDED`; `reserveQuota(orgId, key, limit, countFn)` = **authoritative** gate (TOCTOU-safe: `pg_advisory_xact_lock` + count in the ambient transaction of `uow.run()`, refuses outside one). Counting: live `countScopedRows` (default) or `IQuotaUsageStore.{increment,current,reset}` (high-volume, increment in same TX as gated write, never background). Details: [`docs/QUOTA-GATING.md`](../../docs/QUOTA-GATING.md).
 
 No billing backoffice, Stripe Checkout + Billing Portal hosted. `POST /billing/portal` gated `requireOrgPermission({ billing:["manage"] })`.
 

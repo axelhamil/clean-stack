@@ -163,7 +163,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId, pendingDeletionUntil: until },
             {},
-            tx,
           );
           return Result.ok<RgpdError>();
         });
@@ -223,7 +222,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId },
             {},
-            tx,
           );
           return Result.ok<RgpdError>();
         });
@@ -285,7 +283,6 @@ export class RgpdService {
               input.userId,
               { userId: input.userId, deletedAt: new Date() },
               {},
-              trx,
             );
             for (const orgId of wipe.getValue().deletedOrgIds) {
               await emitEvent(
@@ -295,7 +292,6 @@ export class RgpdService {
                 orgId,
                 { organizationId: orgId, actorUserId: input.userId },
                 { organizationId: orgId },
-                trx,
               );
             }
             const notified = await this.email.sendTemplate(
@@ -303,7 +299,6 @@ export class RgpdService {
               originalEmail,
               { name: originalName },
               {
-                tx: trx,
                 locale: originalLocale.toUndefined(),
                 idempotencyKey: `delete-completed/${input.userId}`,
               },
@@ -488,7 +483,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId },
             {},
-            tx,
           );
           await emitEvent(
             this.outbox,
@@ -501,7 +495,6 @@ export class RgpdService {
               expiresAt: new Date(presigned.getValue().expiresAt),
             },
             {},
-            tx,
           );
           return Result.ok<RgpdError>();
         });

@@ -1,4 +1,4 @@
-import { Option } from "@packages/ddd-kit";
+import { Option, UnitOfWorkContext } from "@packages/ddd-kit";
 import { db, eq, sql, webhooksSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
@@ -502,21 +502,22 @@ export class WebhookDeliveryWorker {
     newAttempts: number,
     tx: Parameters<IWebhookDeliveryRepository["updateStatus"]>[2],
   ): Promise<void> {
-    await emitEvent(
-      this.outbox,
-      EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
-      "webhook_delivery",
-      delivery.id,
-      {
-        organizationId,
-        endpointId: delivery.endpointId,
-        deliveryId: delivery.id,
-        eventType: delivery.eventType,
-        attempts: newAttempts,
-        actorUserId: null,
-      },
-      { organizationId },
-      tx,
+    await UnitOfWorkContext.run(tx, () =>
+      emitEvent(
+        this.outbox,
+        EventTypes.WEBHOOK_DELIVERY_EXHAUSTED,
+        "webhook_delivery",
+        delivery.id,
+        {
+          organizationId,
+          endpointId: delivery.endpointId,
+          deliveryId: delivery.id,
+          eventType: delivery.eventType,
+          attempts: newAttempts,
+          actorUserId: null,
+        },
+        { organizationId },
+      ),
     );
 
     const bumpedResult = await this.endpoints.bumpFailure(delivery.endpointId, organizationId, tx);
@@ -547,20 +548,21 @@ export class WebhookDeliveryWorker {
       );
       return;
     }
-    await emitEvent(
-      this.outbox,
-      EventTypes.WEBHOOK_ENDPOINT_DISABLED,
-      "webhook_endpoint",
-      delivery.endpointId,
-      {
-        organizationId,
-        endpointId: delivery.endpointId,
-        actorUserId: null,
-        reason: "delivery_failures",
-        consecutiveFailures: bumped.consecutiveFailures,
-      },
-      { organizationId },
-      tx,
+    await UnitOfWorkContext.run(tx, () =>
+      emitEvent(
+        this.outbox,
+        EventTypes.WEBHOOK_ENDPOINT_DISABLED,
+        "webhook_endpoint",
+        delivery.endpointId,
+        {
+          organizationId,
+          endpointId: delivery.endpointId,
+          actorUserId: null,
+          reason: "delivery_failures",
+          consecutiveFailures: bumped.consecutiveFailures,
+        },
+        { organizationId },
+      ),
     );
   }
 

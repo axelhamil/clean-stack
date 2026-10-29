@@ -11,7 +11,6 @@ import {
 } from "../../../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type { ITransaction } from "../../../../shared/transaction";
 
 export type CreateTokenServiceInput = {
   userId: string;
@@ -33,7 +32,7 @@ export class ApiTokenService {
   constructor(
     private readonly repo: IApiTokenRepository,
     private readonly outbox: IOutboxRepository,
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
     private readonly config: ApiTokenServiceConfig,
   ) {}
@@ -71,8 +70,8 @@ export class ApiTokenService {
       };
 
       try {
-        const created = await this.uow.run(async (tx) => {
-          const insertResult = await this.repo.insert(record, tx);
+        const created = await this.uow.run(async () => {
+          const insertResult = await this.repo.insert(record);
           if (insertResult.isFailure) return insertResult;
 
           await emitEvent(
@@ -90,7 +89,6 @@ export class ApiTokenService {
               expiresAt: record.expiresAt.toNull(),
             },
             { organizationId: record.organizationId.toNull() },
-            tx,
           );
 
           return insertResult;
@@ -136,8 +134,8 @@ export class ApiTokenService {
       }
 
       try {
-        return await this.uow.run(async (tx) => {
-          const revokeResult = await this.repo.revoke(id, "user", tx);
+        return await this.uow.run(async () => {
+          const revokeResult = await this.repo.revoke(id, "user");
           if (revokeResult.isFailure) return revokeResult;
 
           await emitEvent(
@@ -153,7 +151,6 @@ export class ApiTokenService {
               reason: "user" as const,
             },
             { organizationId: record.organizationId.toNull() },
-            tx,
           );
 
           return Result.ok<ApiTokenError>();

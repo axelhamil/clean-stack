@@ -14,12 +14,15 @@ const leaseQuery = (rows: Array<{ label: string }>) => {
   return q;
 };
 
+const fakeDb = {
+  insert: () => leaseQuery([{ label: "sweep-x" }]),
+  delete: () => leaseQuery([]),
+};
+
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    insert: () => leaseQuery([{ label: "sweep-x" }]),
-    delete: () => leaseQuery([]),
-  },
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
 }));
 
 const { describe, expect, it, spyOn } = await import("bun:test");

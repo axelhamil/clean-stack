@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type {
   ApiTokenError,
   ApiTokenRecord,
@@ -23,10 +24,9 @@ function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository 
 }
 
 const outbox = { enqueue: mock(async () => "evt") } as never;
-const uow = { run: async (cb: (tx: unknown) => Promise<unknown>) => cb({}) } as never;
 
 function makeService(repo = makeRepo()) {
-  return new ApiTokenService(repo, outbox, uow, new NoOpInstrumentation(), {
+  return new ApiTokenService(repo, outbox, mockUnitOfWork().unitOfWork, new NoOpInstrumentation(), {
     prefix: "clean_",
     pepper: "a".repeat(32),
     maxExpiryDays: 365,

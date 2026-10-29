@@ -26,12 +26,11 @@ const fakeDb = {
   select: () => makeQueryChain(selectExecute),
 };
 
-const fakeTx = {
-  insert: () => makeQueryChain(insertExecute),
-  select: () => makeQueryChain(selectExecute),
-};
-
-mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeDb }));
+mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
+}));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
 const { DrizzleAuditRepository } = await import("../services/drizzle-audit.service");
@@ -127,12 +126,6 @@ describe("DrizzleAuditRepository", () => {
       expect(val.id.length).toBeGreaterThan(0);
       expect(val.occurredAt).toBeInstanceOf(Date);
       expect(val.action).toBe(baseEntry.action);
-    });
-
-    it("uses provided tx instead of module-level db", async () => {
-      const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
-      const result = await repo.record(baseEntry, fakeTx as never);
-      expect(result.isSuccess).toBe(true);
     });
 
     it("calls instrumentation.capture and returns Result.fail on DB error", async () => {

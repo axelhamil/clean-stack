@@ -139,7 +139,6 @@ export class AdminActionService {
             viaPlatformAdmin: input.viaPlatformAdmin,
           },
           { organizationId: input.organizationId },
-          tx,
         );
       });
     });

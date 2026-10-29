@@ -77,7 +77,6 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
           userId,
           { userId, scope: "selection", count: marked.length, notificationIds: marked },
           {},
-          tx,
         );
       });
 
@@ -101,7 +100,6 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
         userId,
         { userId, scope: "all", count: marked.length, notificationIds: [] },
         {},
-        tx,
       );
     });
 
@@ -151,7 +149,6 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
             frequency: body.frequency,
           },
           {},
-          tx,
         );
       });
 
@@ -213,7 +210,6 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
             locked: body.locked,
           },
           { organizationId: orgId },
-          tx,
         );
       });
 

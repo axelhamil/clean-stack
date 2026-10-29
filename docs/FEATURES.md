@@ -90,7 +90,7 @@ Pages: `/organization/new`, `/settings/general`, `/settings/team`, `/dashboard`,
 
 **`@packages/emails`**: in-repo React Email templates, rendered server-side at enqueue. `TEMPLATE_IDS` override: empty = in-repo template, non-empty = Resend dashboard template.
 
-**`QueuedEmailService`** (`shared/services/email.service.ts`): enqueues rows; `options.tx` for atomicity. Methods: `sendTemplate`, `sendTemplateBatch`, `sendRaw`, `sendRawBatch`.
+**`QueuedEmailService`** (`shared/services/email.service.ts`): enqueues rows in the ambient transaction of the open `uow.run` (atomic with the caller), else on the pool. Methods: `sendTemplate`, `sendTemplateBatch`, `sendRaw`, `sendRawBatch`.
 
 **`EmailDeliveryWorker`** (`shared/services/email-delivery-worker.service.ts`): polls every 2 s, `FOR UPDATE SKIP LOCKED`, up to 300 rows per tick, chunked 100/request, 10 req/s (Resend team limit).
 

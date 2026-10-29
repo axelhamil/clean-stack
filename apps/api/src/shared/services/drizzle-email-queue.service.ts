@@ -1,5 +1,15 @@
 import { Option, Result, uuidv7 } from "@packages/ddd-kit";
-import { and, db, emailSchema, eq, inArray, isNull, lte, or, sql } from "@packages/drizzle";
+import {
+  and,
+  emailSchema,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  or,
+  resolveExecutor,
+  sql,
+} from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
 import { logger } from "../logger";
 import type {
@@ -35,11 +45,8 @@ function toRecord(row: typeof em.$inferSelect): EmailMessageRecord {
 export class DrizzleEmailQueue implements IEmailQueue {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async enqueue(
-    rows: EmailMessageInsert[],
-    tx?: ITransaction,
-  ): Promise<Result<{ written: number }, EmailQueueError>> {
-    const exec = tx ?? db;
+  async enqueue(rows: EmailMessageInsert[]): Promise<Result<{ written: number }, EmailQueueError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > enqueue" }, async () => {
       if (rows.length === 0) return Result.ok({ written: 0 });
 

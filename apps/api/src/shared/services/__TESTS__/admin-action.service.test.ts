@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { EventTypes } from "@packages/events";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
-import { passthroughUow } from "../../__TESTS__/outbox-fakes";
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
@@ -43,10 +43,8 @@ const { AdminActionService } = await import("../admin-action.service");
 
 const instrumentation = mockInstrumentation();
 
-const fakeTx = { tx: "admin-action" } as never;
-
-function service() {
-  return new AdminActionService({} as never, passthroughUow(fakeTx), instrumentation);
+function service(unitOfWork = mockUnitOfWork().unitOfWork) {
+  return new AdminActionService({} as never, unitOfWork, instrumentation);
 }
 
 function makeHeaders(token = "tok-1") {
@@ -193,9 +191,11 @@ describe("AdminActionService", () => {
   });
 
   describe("setSsoEnforcement", () => {
-    it("writes the flag inside the unit of work that emits the event", async () => {
+    it("writes the flag and emits the event in one committed unit of work", async () => {
       setOrgSsoEnforced.mockClear();
-      const result = await service().setSsoEnforcement({
+      emitted.length = 0;
+      const { unitOfWork, outcome } = mockUnitOfWork();
+      const result = await service(unitOfWork).setSsoEnforcement({
         organizationId: "org-1",
         enforced: true,
         actorUserId: "owner-1",
@@ -203,7 +203,9 @@ describe("AdminActionService", () => {
       });
 
       expect(result.isSuccess).toBe(true);
-      expect(setOrgSsoEnforced).toHaveBeenCalledWith("org-1", true, fakeTx);
+      expect(outcome()).toBe("committed");
+      expect(setOrgSsoEnforced).toHaveBeenCalledWith("org-1", true, expect.anything());
+      expect(emitted.map((e) => e.type)).toEqual([EventTypes.SSO_ENFORCEMENT_CHANGED]);
     });
 
     it("records the platform admin as actor when lifting sso enforcement", async () => {

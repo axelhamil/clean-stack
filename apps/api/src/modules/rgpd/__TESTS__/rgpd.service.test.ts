@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { IUnitOfWork } from "@packages/ddd-kit";
-import { Option, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
 import { noopOutbox, recordingOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
@@ -46,25 +46,15 @@ const stubExportPayload: UserExportPayload = {
   invitationsSent: [],
 };
 
-let capturedTrx: unknown = null;
-// Mirrors TransactionService: a callback that throws or resolves to a failed
-// Result is what makes the real unit of work issue ROLLBACK.
-let uowRolledBack = false;
-const tx: IUnitOfWork<never> = {
-  startTransaction: async (cb) => cb({} as never),
-  run: async (cb) => {
-    const trx = {} as never;
-    capturedTrx = trx;
-    try {
-      const out = await cb(trx);
-      if (out instanceof Result && out.isFailure) uowRolledBack = true;
-      return out;
-    } catch (e) {
-      uowRolledBack = true;
-      throw e;
-    }
-  },
-};
+let uow: UnitOfWorkMock = mockUnitOfWork();
+
+function throwingUnitOfWork(message: string): IUnitOfWork<never> {
+  const { unitOfWork } = mockUnitOfWork();
+  unitOfWork.run.mockImplementation(async () => {
+    throw new Error(message);
+  });
+  return unitOfWork;
+}
 
 function graceElapsedStateFor(userId: string): UserDeletionState {
   return {
@@ -137,7 +127,7 @@ function buildService(deps: {
     deps.repo,
     deps.storage ?? makeStorage(),
     deps.email,
-    deps.uow ?? tx,
+    deps.uow ?? uow.unitOfWork,
     deps.outbox ?? noopOutbox,
     deps.instrumentation ?? new NoOpInstrumentation(),
   );
@@ -171,8 +161,7 @@ describe("RgpdService", () => {
 
   beforeEach(() => {
     email = makeEmail();
-    capturedTrx = null;
-    uowRolledBack = false;
+    uow = mockUnitOfWork();
   });
 
   describe("preflightAccountDeletion", () => {
@@ -380,16 +369,23 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
         ),
       });
+      const sentInside: boolean[] = [];
+      (email.sendTemplate as unknown as ReturnType<typeof mock>).mockImplementation(async () => {
+        sentInside.push(UnitOfWorkContext.transaction() !== undefined);
+        return Result.ok();
+      });
       const service = buildService({ repo, email });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
       expect(result.isSuccess).toBe(true);
+      expect(uow.outcome()).toBe("committed");
+      expect(sentInside).toEqual([true]);
       expect(email.sendTemplate).toHaveBeenCalledTimes(1);
       const call = (
         email.sendTemplate as unknown as {
           mock: {
-            calls: [string, string, unknown, { idempotencyKey?: string; tx?: unknown }][];
+            calls: [string, string, unknown, { idempotencyKey?: string }][];
           };
         }
       ).mock.calls[0];
@@ -399,7 +395,6 @@ describe("RgpdService", () => {
       expect(to).toBe("u@example.com");
       expect(variables).toEqual({ name: "User" });
       expect(options.idempotencyKey).toBe("delete-completed/u1");
-      expect(options.tx).toBe(capturedTrx);
     });
 
     it("aborts the wipe transaction when the confirmation cannot be enqueued", async () => {
@@ -420,7 +415,7 @@ describe("RgpdService", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE");
-      expect(uowRolledBack).toBe(true);
+      expect(uow.outcome()).toBe("rolled_back");
     });
 
     it("reports a generic provider failure and captures the error when the ROLLBACK itself throws", async () => {
@@ -435,14 +430,7 @@ describe("RgpdService", () => {
           Result.fail<void, EmailError>({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
         ),
       };
-      const brokenTx: IUnitOfWork<never> = {
-        startTransaction: async (cb) => cb({} as never),
-        run: async () => {
-          // Simulates Postgres failing to ROLLBACK (e.g. connection loss): the
-          // unit of work throws instead of resolving to the failed Result.
-          throw new Error("connection terminated unexpectedly");
-        },
-      };
+      const brokenTx = throwingUnitOfWork("connection terminated unexpectedly");
       const captured: unknown[] = [];
       const capturingInstrumentation = new NoOpInstrumentation();
       capturingInstrumentation.capture = (err: unknown) => {
@@ -734,14 +722,7 @@ describe("RgpdService", () => {
         },
       ];
       const repo = makeBatchRepo(badRows);
-      const badTx: IUnitOfWork<never> = {
-        startTransaction: async () => {
-          throw new Error("db failure");
-        },
-        run: async () => {
-          throw new Error("db failure");
-        },
-      };
+      const badTx = throwingUnitOfWork("db failure");
       const service = buildService({ repo, email, uow: badTx });
 
       const result = await service.processPendingDeletions({});

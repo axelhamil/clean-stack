@@ -95,7 +95,6 @@ export class WebhooksService {
               enabled: endpoint.enabled,
             },
             { organizationId: endpoint.organizationId },
-            tx,
           );
           return result;
         });
@@ -153,7 +152,6 @@ export class WebhooksService {
               changes,
             },
             { organizationId: args.organizationId },
-            tx,
           );
           return updated;
         });
@@ -180,7 +178,6 @@ export class WebhooksService {
             id,
             { organizationId, actorUserId, endpointId: id },
             { organizationId },
-            tx,
           );
           return deleted;
         }),
@@ -259,7 +256,6 @@ export class WebhooksService {
               actorUserId,
             },
             { organizationId },
-            tx,
           );
           return replayed;
         }),
@@ -288,7 +284,6 @@ export class WebhooksService {
               actorUserId: args.actorUserId,
             },
             { organizationId: args.organizationId },
-            tx,
           );
           const delivery = await this.deliveries.enqueueTargeted(
             {
@@ -364,7 +359,6 @@ export class WebhooksService {
               actorUserId: args.actorUserId,
             },
             { organizationId: args.organizationId },
-            tx,
           );
           return result;
         });
