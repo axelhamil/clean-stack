@@ -16,8 +16,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 | Order | Phase | Status | What | Why it survived the cut |
 |---|---|---|---|---|
-| 0 | **Dependency refresh Oct 2026** | In progress | Node 26 LTS, Bun 1.4.4, pnpm 12 | The version floor is a feature the cloner inherits; Phase I is cut on top of it |
-| 1 | **Phase I** | Next | Resync on the OpenUp foundations in five lots (I.1 to I.5) | Closes the gaps in kit, guardrails, telemetry hygiene, transactions and outbox delivery |
+| 1 | **Phase I** | In progress | Resync on the OpenUp foundations in five lots (I.1 to I.5) | Closes the gaps in kit, guardrails, telemetry hygiene, transactions and outbox delivery |
 | 2 | **Phase J** | Open | Front redesign from scratch on shadcn/ui, one design system in `@packages/ui` | The cloner's first impression is the app shell; today it is a generic default with known mobile defects |
 | 3 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
 | 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
@@ -30,20 +29,9 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ---
 
-## Dependency refresh Oct 2026
-
-- **Status**: in progress on branch `chore/deps-refresh-2026-10`.
-- **Date**: Oct 2026.
-- **Why**: the version floor is a feature, and "current" decays silently. Same argument as G.1.
-- **Scope**: Node 24.20.0 to 26 LTS, Bun 1.4.0 to 1.4.4, pnpm 11.24.0 to 12. `mise.toml`, `package.json#packageManager` and `.nvmrc` move together so CI and local agree.
-- **Done when**: the whole pre-push chain is green on the new floor, CI is green, and the branch is merged into `dev` before I.1 starts.
-- **References**: [Toolchain refresh G.1](docs/HISTORY.md#toolchain-refresh-pnpm-node-bun-typescript-7-postgres-18-file-based-routing--phase-g1--aug-2026), [Dependency refresh: better-auth 1.7](docs/HISTORY.md#dependency-refresh-better-auth-17--sep-2026).
-
----
-
 ## Resync on the OpenUp foundations: **Phase I**
 
-- **Status**: next, after the dependency refresh.
+- **Status**: in progress, lot I.1 on branch `refactor/phase-i-1-kit`.
 - **Date**: Oct 2026.
 - **Why**: OpenUp, a sister project on the same stack, hardened five foundations after clean-stack diverged from the shared Afterlive lineage. Today clean-stack has a thinner kit, layering enforced only by convention, telemetry that can carry PII, a transaction parameter threaded through every port, and an outbox that holds locks during handlers and loses user handlers on a throw. Each lot below buys one architectural property.
 - **Scope**: five ordered lots, each its own branch off `dev` (`refactor/phase-i-1-kit` to `refactor/phase-i-5-outbox`) and its own PR merged as a merge commit. Not ported because they are OpenUp-specific: a per-module outbox, `RouteGuards`, `HttpResponse`, `PgSingleFlight`, `packages/audit`, `dist` builds, typed entity ids, the `DomainEventHandler` class, admin replay of dead events.
@@ -163,6 +151,7 @@ Status is shipped for every row. "Detail" links the as-built record.
 | **H.1: Back and front surface parity** | Sep 2026 | No capability without a screen, no screen without a route | `apps/api/src/shared/surface/` route map (74 routes, 55 with a front consumer, 19 declared UI-less), `docs/SURFACE.md`, `requireCurrentPolicies` mounted on business routes, 1 event | [HISTORY](docs/HISTORY.md#back--front-surface-parity--phase-h1--sep-2026) |
 | **Dependency refresh: better-auth 1.7** | Sep 2026 | Take a breaking plugin family on purpose | better-auth family on 1.7.6, SCIM moved to managed connections (breaking: directories must be reconnected), 1 event | [HISTORY](docs/HISTORY.md#dependency-refresh-better-auth-17--sep-2026) |
 | **Rules review pass** | Sep 2026 | Every file checked against the house rules | PR #70, 149 commits: failed results roll units of work back, a failing first drain no longer crashes the API, audit gaps closed, 2 events | [HISTORY](docs/HISTORY.md#rules-review-pass--sep-2026) |
+| **Dependency refresh Oct 2026** | Oct 2026 | The version floor is a feature the cloner inherits | Node 26 LTS, Bun 1.4.4, pnpm 12, better-auth 1.7.14, stripe 23 and four other majors | [HISTORY](docs/HISTORY.md#dependency-refresh-oct-2026--oct-2026) |
 
 ---
 

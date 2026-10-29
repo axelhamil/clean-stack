@@ -1,7 +1,7 @@
 // Type-only anchors: the inferred `auth` type references these packages' types, and TS
 // can only name them portably from a direct dependency. @simplewebauthn/server must
 // therefore stay on the exact major @better-auth/passkey depends on (13 as of passkey
-// 1.7.6): a direct 14 resolves to a second copy and brings TS2883 back.
+// 1.7.14): a direct 14 resolves to a second copy and brings TS2883 back.
 import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
@@ -71,6 +71,7 @@ import {
   SSO_PATHS,
   scimUserChange,
 } from "./shared/auth/sso-paths";
+import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
 import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
@@ -553,6 +554,7 @@ const authOptions = {
   appName: "clean-stack",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
+  secrets: env.BETTER_AUTH_SECRETS,
   rateLimit: { enabled: false },
 
   // `transaction: true` is required by `@better-auth/scim`, which refuses to start
@@ -715,7 +717,7 @@ const authOptions = {
       },
     }),
     bearer(),
-    twoFactor(),
+    twoFactor({ totpOptions: TOTP_OPTIONS }),
     magicLink({
       sendMagicLink: async ({ email, token }) => {
         const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;

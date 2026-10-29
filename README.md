@@ -21,7 +21,7 @@ Two ways to run it. Pick one.
 
 ### Option A: Native (fastest hot reload)
 
-**Prerequisites**: [Bun 1.4+](https://bun.com/docs/installation), [Node 24.20+](https://nodejs.org), [pnpm 11](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
+**Prerequisites**: [Bun 1.4+](https://bun.com/docs/installation), [Node 26.13+](https://nodejs.org), [pnpm 12](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
 git clone https://github.com/axelhamil/clean-stack my-saas
@@ -225,11 +225,11 @@ Resend is **optional everywhere**: without `RESEND_API_KEY` (or with unconfigure
 
 ### Billing: Stripe (opt-in)
 
-Billing is wired via `@better-auth/stripe` (plugin v1.6+, SDK `stripe@22+`). **Off until you add the two required env vars.** Without them the billing routes return `402` for all subscription calls; the rest of the app is unaffected.
+Billing is wired via `@better-auth/stripe` (plugin v1.7+, SDK `stripe@23+`, API version `2026-09-30.endive`). **Off until you add the two required env vars.** Without them the billing routes return `402` for all subscription calls; the rest of the app is unaffected.
 
 | | |
 |---|---|
-| **Packages** | `stripe@22.3.0` + `@better-auth/stripe@1.6.23` |
+| **Packages** | `stripe@23.0.1` + `@better-auth/stripe@1.7.14` |
 | **Webhook endpoint** | auto-mounted at `/api/auth/stripe/webhook` by the plugin |
 | **Subscription SSOT** | plugin-managed `subscription` table (webhook-synced), not `organization.metadata` |
 | **Entitlements** | typed `ENTITLEMENTS[tier]` in `apps/api/src/modules/billing/config.ts`: edit + deploy to change gates |
@@ -309,7 +309,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 | Layer | Choice |
 |---|---|
-| **Runtime** | Bun 1.3+ (api, scripts, tests) · Node 24+ for tooling |
+| **Runtime** | Bun 1.4+ (api, scripts, tests) · Node 26+ for tooling |
 | **API** | Hono 4 on native `Bun.serve()` |
 | **App** | Vite 8 · React 19 · TanStack Router/Query · Tailwind 4 · shadcn/ui |
 | **Auth** | BetterAuth + `organization`, `twoFactor`, `passkey`, `magicLink`, `bearer` |
@@ -319,7 +319,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **API ↔ App** | Hono RPC (`hcWithType`): end-to-end types |
 | **i18n** | `i18next` + `react-i18next`: typed `.ts` catalogs (`@packages/i18n`), locale outside the URL |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
-| **Tooling** | pnpm 11 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 12 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
 
 ---
 

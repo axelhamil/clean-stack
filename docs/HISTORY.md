@@ -1314,3 +1314,53 @@ Auditing a finished surface finds what a plan written before the audit could not
 - **Smaller defects**: plan tiers no longer accept prototype names such as `constructor`; a failed lease release no longer fails a committed digest flush; a scan payload that is not a list answers 400; a stored API token expiry parses back into a date; TOTP secret decryption failures reach telemetry; copied recovery codes are confirmed only after the clipboard write succeeds.
 
 Em and en dashes were removed from every guide, inventory and the roadmap in the same pass.
+
+---
+
+## Dependency refresh: Oct 2026 ✅ Oct 2026
+
+**Why**: a month after the better-auth 1.7 pass, Node 26 became the active LTS, pnpm 12 and Bun 1.4.4 shipped, and eight packages had a new major. Staying one LTS and several majors behind turns the next refresh into a migration. This pass moves the runtimes, takes every minor and patch, then every major in its own commit, so each one can be reverted alone. Drizzle 1.0 and Postgres 19 are out on purpose: both are release candidates, not stable releases.
+
+**Runtimes**:
+
+- **Node 26.13.0 LTS** (`.nvmrc`, `mise.toml`, `engines.node`), **Bun 1.4.4** (also pinned in `ci.yml`, which ran `latest`), **pnpm 12.16.1** (`packageManager`).
+- **Node 25+ ships without corepack**, so `corepack enable && corepack prepare` would fail in a `node:26` image. The api dev, app dev and app prod images now install pnpm with `npm install -g pnpm@<version>`, as the api prod image already did. npm 11 warns that the global install has its scripts blocked; pnpm runs correctly in every image (checked).
+- **pnpm 12 lockfile**: regenerated without a single resolution change. The only diff is a new leading document (`packageManagerDependencies`, the pinned pnpm and its platform binaries). Unknown workspace settings are now an error; `pnpm-workspace.yaml` has none.
+- **The four Dockerfiles build on `node:26.12.1-alpine`** until the `26.13.0-alpine` tag is published: Docker Hub answered 404 for it on 28/10 (Node 26.13.0 shipped that day). 26.12.1 is the latest published Node 26 image, the same LTS line; move the `FROM` lines to 26.13.0 once the tag exists.
+- Keycloak (SSO profile) `26.0` → `26.8.1`, the latest 26.x on quay.io.
+
+**Minors and patches** (one commit): better-auth and every `@better-auth/*` plugin 1.7.6 → 1.7.14 (exact pins kept), hono, zod, drizzle-orm 0.45.4, the AWS and Sentry SDKs, React 19.3.1, TanStack, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Turbo 2.11.10, knip, jscpd and the rest of the outdated list. Two things came with it:
+
+- **`@better-auth/utils` 0.4.2 → 0.5.1 in the same commit.** better-auth 1.7.14 depends on exactly 0.5.1, so keeping 0.4.2 installed two copies and two peer variants of `@better-auth/core`, and the api scripts stopped type-checking (the `DBAdapter` of one variant is not assignable to the other). Folding the bump in keeps every commit of the series compiling; `pnpm why` now shows one copy. A `pnpm dedupe` in the same commit removes a stale `@types/node` that split stripe into two peer variants.
+- **Biome 2.6 formats Markdown and YAML by default**: `ci:check` went red on 35 files (every doc, `ci.yml`, the lockfile). `biome.json` disables both formatters, which restores the 2.5 behaviour; reformatting the docs and a generated lockfile does not belong in a dependency PR. lint-staged stops sending `.md`/`.yml` to `biome format` accordingly.
+
+**Fixes found on the way**, each in its own commit:
+
+- **Every Docker build was red on the base.** The images pruned with `npx turbo@2.9.6`, which rejects the `agentGuidance` key of `turbo.json` (the repo resolves a newer turbo). The Dockerfiles now read the version from the root `turbo` devDependency and run that exact version, so the pruner follows each bump.
+- **Account deletion rejected valid TOTP codes for imported secrets.** better-auth 1.7.14 decodes a stored `base32:<secret>` (a secret imported from another provider) into bytes before computing the code; `drizzle-rgpd.repository.ts` used the raw string, so the deletion step-up would have refused a code `twoFactor` accepts. It now applies the same decoding. The new test, built on frozen bytes, fails on the old repository code (2 pass, 1 fail) and passes with the fix.
+- **TOTP settings in one place.** `shared/auth/totp-options.ts` is passed to `twoFactor` and read by the deletion step-up, which kept its own copy of the plugin defaults.
+- **Account deletion failed under secret rotation** (predates the refresh). better-auth encrypts the TOTP secret with the config built from `BETTER_AUTH_SECRETS`; the step-up decrypted with `BETTER_AUTH_SECRET` alone. `env.ts` validates `BETTER_AUTH_SECRETS`, `auth.ts` passes it to `betterAuth`, and `authSecretKey` builds the key the repository decrypts with.
+- **An unconfirmed TOTP enrolment confirmed an account deletion** (predates the refresh). better-auth refuses a `verified = false` row at sign-in; the step-up did not. The `WHERE` now keeps confirmed rows and legacy `NULL` ones, as better-auth does, proven on a real database by `check:totp-enrolment` (wired in CI).
+
+**Majors**, one commit each:
+
+- **stripe 22 → 23**: the SDK pins API version `2026-09-30.endive`, now set in `stripe-client.ts`. `@better-auth/stripe` 1.7.14 peers on `^23`. The removed surfaces (`payment_method_types` on several params, `constructEventWithoutVerification`, `ErrorType`) are used neither here nor in the plugin.
+- **inwire 3 → 4**: a container is single use after `dispose()` and local-mode modules with missing prerequisites are refused; neither applies. 4.0 lets a container be assigned to `Record<string, unknown>`, which removes a double cast in `apps/api/src/index.ts`. Inference checked: no binding typed `any`, an unknown key is a type error.
+- **@hookform/resolvers 5 → 6**: the only break is the effect-ts resolver; every form uses `zodResolver`. `packages/ui`'s optional peer moves to `^6.0.1`, else a 5.x copy stays installed.
+- **@sentry/vite-plugin 5 → 11**: plugins now release with the SDK and drop `@sentry/cli` (its `allowBuilds` entry is gone). A build against a local mock Sentry injected debug ids and left no `.map` in `dist/`.
+- **tsup 8 → 9** (`packages/ddd-kit`): the emitted `dist/` is byte-identical to the tsup 8 output.
+
+**What stays pinned, and why** (measured again):
+
+- `@simplewebauthn/server` stays on `13`: `@better-auth/passkey` 1.7.14 (and 1.8.0-beta.3) still depends on `^13.3.2`. Moving the anchor to `14.0.3`, or removing it, brings back TS2883 on `auth` (`AuthenticationResponseJSON`, `PublicKeyCredentialCreationOptionsJSON`, `PublicKeyCredentialRequestOptionsJSON`).
+- `conventional-changelog-conventionalcommits` stays on `9`: semantic-release 25.0.9's stable analyzer and notes generator still bundle `conventional-changelog-writer` 8. On 10.4.1 the analyzer answers but `generateNotes` throws "requires conventional-changelog-writer@9"; on 9.3.1 a footer `BREAKING CHANGE:` is a major and a wrapped prose "BREAKING" stays a minor.
+- drizzle-orm stays on `0.45` and Postgres on `18`: 1.0 and 19 are not stable yet.
+
+**Checks** on the final series: `ci:check` 1006 files clean; `turbo run build type-check test` 21 tasks green, 1652 tests (api 922, app 364, ddd-kit 287, events 50, i18n 21, access-control 5, emails 3); jscpd 0.57 %; knip exit 0 (4 configuration hints, none new); the twelve real-database `check:*` scripts green; every commit of the series type-checks on its own. The four images build (api and app, dev and prod) on the published `node:26.12.1-alpine`, pulled fresh.
+
+**Live verification** (local API on Postgres 18, curl): `/readyz` 200 (database pass, storage non-critical fail with the storage profile off); email sign-up 200, sign-in refused with `EMAIL_NOT_VERIFIED` until the link from the queued `verify_email` message is followed, then sign-in 200 and a valid session; the outbox holds `org.created`, `org.member.joined`, `user.created` and `user.signed_in`, all dispatched.
+
+**Not covered**:
+
+- No real Stripe call: the `2026-09-30.endive` API version has to be checked against the webhook endpoint in the Stripe dashboard, whose API version is set there.
+- Source map upload to a real Sentry project: proven only against a mock, never with a real auth token.
