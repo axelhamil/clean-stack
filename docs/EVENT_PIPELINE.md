@@ -37,14 +37,14 @@ zero divergence.
 │                         │                                            │
 │                         ▼   pre-COMMIT, same TX                     │
 │                   INSERT INTO outbox_event (...)                    │
+│                   SELECT pg_notify('outbox_event', '')              │
 └─────────────────────────┬───────────────────────────────────────────┘
                           │  COMMIT
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  PHASE 2  ·  Postgres notifies                                      │
 │                                                                      │
-│   AFTER INSERT trigger fires:                                       │
-│     PERFORM pg_notify('outbox_event', NEW.id)                       │
+│   the notification queued by enqueue leaves at COMMIT              │
 │                         │                                            │
 │                         ▼   delivered on the open LISTEN socket     │
 │                   ┌──────────────────┐                              │
@@ -54,32 +54,29 @@ zero divergence.
 └────────────────────────────┼────────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  PHASE 3  ·  dispatcher drains (transactional, at-least-once)       │
+│  PHASE 3  ·  relay claims by lease (one statement, no open TX)      │
 │                                                                      │
-│   OutboxDispatcher.triggerDrain()                                   │
-│     ┌─ BEGIN                                                        │
-│     │   SELECT ... FROM outbox_event                                │
-│     │     WHERE dispatched_at IS NULL                               │
-│     │     FOR UPDATE SKIP LOCKED  ◄── enables horizontal scale      │
-│     │                                                                │
-│     │   for each event:                                             │
-│     │     ├─ AuditEventSubscriber.handle(event, tx)                 │
-│     │     ├─ WebhookFanoutSubscriber.handle(event, tx)              │
-│     │     ├─ NotificationFanoutSubscriber.handle(event, tx)         │
-│     │     └─ markDispatched(event.id, tx)                           │
-│     │                                                                │
-│     │   on failure: markFailed + exponential backoff w/ jitter      │
-│     └─ COMMIT  (subscribers + dispatch flag are atomic)             │
+│   OutboxRelay.drainOnce()                                           │
+│     UPDATE outbox_event SET attempts = attempts + 1,                │
+│            next_attempt_at = now() + lease                          │
+│       FROM (SELECT ... WHERE due                                    │
+│             FOR UPDATE SKIP LOCKED)  ◄── enables horizontal scale   │
+│     RETURNING ...            (locks released as the statement ends) │
 └─────────────────────────┬───────────────────────────────────────────┘
-                          │  post-COMMIT
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  PHASE 4  ·  user handlers (post-commit, best-effort, isolated)     │
+│  PHASE 4  ·  named handlers, outside any transaction                │
 │                                                                      │
-│   for each dispatched event:                                        │
-│     userHandlers[event.type]?.forEach(h =>                          │
-│       h.handle(event).catch(log)   // never re-fails the event      │
-│     )                                                                │
+│   for each claimed event (OUTBOX_CONCURRENCY in parallel):          │
+│     for each handler not yet in `deliveries`:                       │
+│       audit-log · webhook-fanout · notification-fanout · onEvent    │
+│       each in its own short TX, cut at the handler budget           │
+│                                                                      │
+│     all ok      → markDelivered   (dispatched_at = now())           │
+│     some failed → markFailed      (deliveries merged, last_error,   │
+│                                    jittered retry, dead at max)     │
+│     shutdown    → release         (attempts - 1, due now)           │
+│     all guarded by WHERE attempts = <claimed attempts>              │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,8 +86,8 @@ zero divergence.
 |---|---|---|
 | **Producer** | Your use case / service | Adds events via `aggregate.addEvent()` or `emitEvent(outbox, ...)` (joins the open `uow.run`). |
 | **Outbox table** | `outbox_event` row | Holds the pending event in the same TX as the state change. |
-| **Notifier** | Postgres trigger + `pg_notify` | Fires on every INSERT; payload delivered on COMMIT only. |
-| **Dispatcher** | In-process worker | Holds a `LISTEN` socket, drains batches, fans out to subscribers. |
+| **Notifier** | `pg_notify` sent by `enqueue` | Runs on the same executor as the INSERT; delivered on COMMIT only. |
+| **Dispatcher** | In-process worker | Holds a `LISTEN` socket and schedules wakes; its relay claims by lease and runs the named handlers. |
 
 ## How does Postgres "call" the app? (LISTEN/NOTIFY)
 
@@ -102,7 +99,7 @@ LISTEN outbox_event;
 ```
 
 As long as that connection exists, Postgres holds a reference. When *any* other
-session executes `pg_notify('outbox_event', '<id>')`, Postgres walks its
+session executes `pg_notify('outbox_event', '')`, Postgres walks its
 listener list and writes a `NotificationResponse` packet into each socket. The
 Node `pg` driver receives it and fires the `"notification"` event. No polling,
 no webhooks, no inbound port, just a socket that was already there.
@@ -116,31 +113,40 @@ Two practical details:
   connection in `LISTEN` mode is considered busy by Postgres and can't be
   reused for queries. The cost is one fixed connection per process.
 
-A polling fallback (every 30 s) catches anything missed during reconnects:
-this is what makes the pipeline **at-least-once** rather than "best-case fast".
+The socket reconnects with backoff (250 ms up to 15 s) and is pinged every
+15 s, and each reconnect triggers a catch-up drain. A polling fallback (every
+30 s) and a wake at the next due retry catch anything else: this is what makes
+the pipeline **at-least-once** rather than "best-case fast".
 
-## Two-tier delivery
+## One tier: named handlers
 
-Built-in subscribers and user handlers don't run with the same guarantees on
-purpose:
+Every consumer of an event is a **named handler** with the same guarantee,
+whether it ships with the stack (`audit-log`, `webhook-fanout`,
+`notification-fanout`) or a module declares it with `onEvent(type, name, ...)`.
+None runs inside the claim, so a slow handler holds no lock and a failing one
+cannot undo what another wrote.
 
-| Tier | Runs | Guarantees | Use for |
-|---|---|---|---|
-| **Built-in subscribers** | Inside the drain TX | Atomic with `markDispatched`. A failure retries the whole event. | Audit log, webhook fan-out, notification fan-out, anything where dropping a row is a compliance bug. |
-| **User handlers** | After the drain commits | Isolated; a throw is logged but the event stays marked dispatched. | Emails, push notifications, search-index updates, side effects that have their own retry logic. |
-
-If a future handler *cannot* tolerate at-most-once semantics, promote it to a
-built-in subscriber. The split is intentional, not a limitation.
+The row's `deliveries` column maps each handler name that succeeded to the time
+it did. A retry runs only the handlers missing from it, which is why the name
+is a **persisted key**: rename a handler and every pending event runs it again.
+At-least-once per handler means a handler may run twice (a settle lost to a
+crash, a lease that expired mid-run), so each one is idempotent on the event
+id: a deterministic row id, a unique key with `ON CONFLICT DO NOTHING`, or an
+idempotency key handed to the external service. `docs/EVENTS.md` lists the
+argument for each shipped handler.
 
 ## Failure modes
 
 | What fails | What you observe | Recovery |
 |---|---|---|
 | Business TX rolls back | No outbox row, no notify, no event. | Nothing to do, atomicity. |
-| Built-in subscriber throws | Event row gets `attempts++`, `last_error` set, `next_attempt_at` pushed out. | Automatic retry on next drain. Investigate via the `last_error` column. |
-| User handler throws | Event stays dispatched, error logged. | Add observability on the handler; it owns its retry policy. |
-| Dispatcher process dies | Outbox rows accumulate (`dispatched_at IS NULL`). | Restart the process. On boot, the dispatcher drains the backlog before going idle. |
-| LISTEN socket dies mid-life | Reconnect with exponential backoff. The 30 s poll covers the gap. | Automatic. |
+| A handler throws, returns a failed `Result` or exceeds its budget | `attempts` grows, `last_error` (scrubbed, bounded) names the handler, `deliveries` keeps the others, `next_attempt_at` pushed out with jitter; a warning names the failing handlers and telemetry gets each failure. | Automatic retry of that handler only. |
+| A handler keeps failing | After `OUTBOX_MAX_ATTEMPTS` the row gets `dead_at`; one `outbox.event_dead` is emitted in the same unit of work and logged. | Replayed every `OUTBOX_DEAD_RETRY_HOURS` (at most a quarter of each claim): fix the handler and the backlog drains on its own. Never purged while undelivered. |
+| The process stops while handlers run | Abandoned and unstarted claimed rows are released: `attempts - 1`, due at once. | The next relay delivers them; a deploy never burns an attempt. |
+| An event type has no handler in this process | `last_error` reads `<type> has no subscriber in this process`. | Deploy the handler; the next retry delivers it. |
+| Dispatcher process dies mid batch | Claimed rows stay `dispatched_at IS NULL`. | They reappear when their lease expires, `attempts + 1`, on any process. |
+| A settle arrives after its lease expired | The guard on `attempts` matches nothing, zero rows written; the relay neither counts nor announces it. | The process that reclaimed the row settles it. |
+| LISTEN socket dies mid-life | Reconnect with exponential backoff, then a catch-up drain. The 30 s poll covers the gap. | Automatic. |
 | Two dispatchers run in parallel | They split the work via `FOR UPDATE SKIP LOCKED`. | This is the scale-out story, not a bug. |
 
 ## Concurrency: how multiple dispatchers cooperate
@@ -149,23 +155,24 @@ built-in subscriber. The split is intentional, not a limitation.
 Process A                          Process B
   │                                  │
   ▼                                  ▼
-BEGIN                              BEGIN
-  │                                  │
-  ▼                                  ▼
-SELECT ... LIMIT 50                SELECT ... LIMIT 50
+claim (one statement)              claim (one statement)
   FOR UPDATE SKIP LOCKED             FOR UPDATE SKIP LOCKED
-  ──► rows [1..50]                   ──► rows [51..100]
-                                         (skipped 1..50, locked)
-  │                                  │
+  attempts + 1, lease 120 s          attempts + 1, lease 120 s
+  ──► rows [1..12]                   ──► rows [13..24]
+                                         (skipped 1..12, locked)
+  │  locks released                  │  locks released
   ▼                                  ▼
-work                               work
+handlers, no TX held               handlers, no TX held
   │                                  │
-COMMIT                             COMMIT
+settle WHERE attempts = claimed    settle WHERE attempts = claimed
 ```
 
-No leader election, no Redis lock, no coordinator. Postgres row-level locks
-do the entire job. The same primitive powers serious job queues (Oban, Que,
-Sidekiq Pro).
+No leader election, no Redis lock, no coordinator. Row locks decide who claims
+a row, for the length of one statement; the lease (`next_attempt_at`) keeps it
+hidden while its handlers run; the `attempts` guard makes a late settle
+harmless. The claim is capped at what the lease can process minus a fixed
+settle margin, so a healthy relay always settles before its lease runs out. The same primitives power serious job
+queues (Oban, Que, Sidekiq Pro).
 
 ## Where the moving parts live
 
@@ -175,23 +182,30 @@ Names are stable in the repo; the pattern is what matters.
   `emitEvent(outbox, ...)` inside `uow.run()` (service-level or external-lib bridges).
 - **Collector**: an `AsyncLocalStorage` opened by `IUnitOfWork.run(...)`:
   pulls events off aggregates inside the TX and hands them to the outbox.
-- **Outbox repository**: `enqueue`, `findPendingBatch`, `markDispatched`,
-  `markFailed`. The SQL trigger that fires `pg_notify` is created idempotently
-  at dispatcher boot.
+- **Outbox repository**: `enqueue` (insert plus `pg_notify` on the same
+  executor), `claim`, `pendingState`, `markDelivered`, `markFailed`,
+  `release`; each settle reports whether its guard still matched.
+- **Relay**: claims a batch, runs each event's named handlers with a budget
+  and bounded concurrency, settles, announces a death once, in the same unit
+  of work as the `dead_at` write.
 - **Dispatcher**: started once at process boot (`.start()`), stopped on
-  shutdown (`.stop()`). The constructor is passive, nothing happens until
-  `.start()` opens the LISTEN socket and ensures the trigger.
+  shutdown (`.stop()`, waits for the running drain, then releases what it
+  abandoned). The constructor is passive, nothing happens until `.start()`
+  builds the relay from the factory the container injects, drops the legacy
+  notify trigger and opens the LISTEN socket.
 
 ## What guarantees you get
 
 1. **Atomicity** between state change and event publication, same TX.
-2. **At-least-once** delivery to built-in subscribers, retried until they
-   succeed or you give up manually.
-3. **At-most-once** delivery to user handlers, they may run twice if
-   something restarts mid-fanout, so make them idempotent or accept loss.
-4. **Ordering**: events are dispatched in `occurred_at` order *within a
-   single drain batch*. Across batches and across parallel dispatchers,
-   ordering is not guaranteed. Design handlers accordingly.
+2. **At-least-once** delivery to every named handler, retried with jitter,
+   then on a slow cadence once dead, until it succeeds. Handlers are
+   idempotent on the event id, so at-least-once never means "twice visible".
+3. **No lost delivery on crash**: a claim is a lease, not a lock held by a
+   process; whatever a dead process claimed comes back when the lease expires.
+4. **Ordering**: events are claimed in `occurred_at` order, but handlers run
+   in parallel lanes and across processes, so completion order is not
+   guaranteed. The audit chain follows completion order (its `sequence`), not
+   `occurred_at`. Design handlers accordingly.
 
 ## Event visibility, public vs internal
 

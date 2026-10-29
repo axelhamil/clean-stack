@@ -1,267 +1,78 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { Option } from "@packages/ddd-kit";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { IDomainEvent } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
-import * as realEvents from "@packages/events";
 import { EventTypes } from "@packages/events";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 
-// ── Mock @packages/drizzle ─────────────────────────────────────────────────
-const insertExecute = mock(async () => {});
-const selectExecute = mock(async () => [] as unknown[]);
-const updateExecute = mock(async () => {});
-
-function makeQueryChain(executeMock: ReturnType<typeof mock>) {
-  const chain: Record<string, unknown> = {};
-  const leaf = {
-    execute: executeMock,
-    toSQL: () => ({ sql: "SELECT 1" }),
-  };
-  // Covers: insert().values() / update().set().where() / select().from().where()...limit()...for()
-  const proxy: unknown = new Proxy(leaf, {
-    get(target, prop) {
-      if (prop === "execute" || prop === "toSQL") return Reflect.get(target, prop);
-      return () => proxy;
-    },
-  });
-  chain.proxy = proxy;
-  return proxy;
-}
-
-const fakeDb = {
-  insert: () => makeQueryChain(insertExecute),
-  update: () => makeQueryChain(updateExecute),
-  select: () => makeQueryChain(selectExecute),
-};
-
-const fakeTx = {
-  insert: () => makeQueryChain(insertExecute),
-  update: () => makeQueryChain(updateExecute),
-  select: () => makeQueryChain(selectExecute),
-};
-
-mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeDb }));
-
-// ── Mock @packages/events ──────────────────────────────────────────────────
-// The subject under test is the outbox writer, not payload validation, so every
-// payload schema is stubbed to always accept. Everything else is spread from the
-// real module and the stub map is derived from the real catalog: a hand-kept copy
-// would silently stop covering every event type added after it was written.
-const EventTypesMock = EventTypes;
-const stubPayload = { safeParse: () => ({ success: true as const, data: {} as never }) };
-mock.module("@packages/events", () => ({
-  ...realEvents,
-  EventTypes: EventTypesMock,
-  ALL_EVENT_TYPES: Object.values(EventTypesMock),
-  isKnownEventType: (v: string) => Object.values(EventTypesMock).includes(v as never),
-  RETENTION_MAP: Object.fromEntries(Object.values(EventTypesMock).map((t) => [t, "compliance"])),
-  retentionFor: () => "compliance",
-  PayloadByEventType: Object.fromEntries(
-    Object.values(EventTypesMock).map((t) => [t, stubPayload]),
-  ),
+const insertedRows: Array<{ id: string; eventType: string }> = [];
+const insert = mock(() => ({
+  values: (rows: Array<{ id: string; eventType: string }>) => {
+    insertedRows.push(...rows);
+    return { onConflictDoNothing: async () => {} };
+  },
 }));
+const executor = { insert, execute: mock(async () => ({ rows: [] })) };
 
-// ── Imports after mocks ────────────────────────────────────────────────────
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
+
 const { DrizzleOutboxRepository } = await import("../services/drizzle-outbox.service");
-const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
+const { emitEvent } = await import("../event-emitter");
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function makeEvent(
-  overrides: Partial<{
-    eventType: string;
-    aggregateId: string;
-    payload: unknown;
-  }> = {},
-) {
+function makeEvent(overrides: Partial<IDomainEvent> = {}): IDomainEvent {
   return {
-    eventType: overrides.eventType ?? "user.created",
-    aggregateId: overrides.aggregateId ?? "agg-1",
-    payload: overrides.payload ?? { userId: "u1", email: "u@test.com", name: "U" },
+    eventType: EventTypes.USER_CREATED,
+    aggregateId: "u1",
+    payload: { userId: "u1", email: "u@test.com", name: "U" },
     dateOccurred: new Date(),
+    ...overrides,
   };
 }
 
-const defaultScope = { source: "api", organizationId: "org-1", aggregateType: "User" };
+const scope = { source: "app/api", aggregateType: "user" };
 
-// ── Tests ──────────────────────────────────────────────────────────────────
-describe("DrizzleOutboxRepository", () => {
+describe("DrizzleOutboxRepository.enqueue", () => {
   beforeEach(() => {
-    insertExecute.mockReset();
-    insertExecute.mockResolvedValue(undefined);
-    selectExecute.mockReset();
-    selectExecute.mockResolvedValue([]);
-    updateExecute.mockReset();
-    updateExecute.mockResolvedValue(undefined);
+    insertedRows.length = 0;
+    insert.mockClear();
+    executor.execute.mockClear();
   });
 
-  describe("enqueue", () => {
-    it("calls outer startSpan with name 'DrizzleOutboxRepository > enqueue'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.enqueue([makeEvent()], defaultScope);
-      expect(spy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "DrizzleOutboxRepository > enqueue" }),
-        expect.any(Function),
-      );
-    });
+  it("given an unknown event type or an invalid payload, when enqueued, then it rejects before touching the database", async () => {
+    const instrumentation = mockInstrumentation();
+    const repo = new DrizzleOutboxRepository(instrumentation);
 
-    it("calls inner startSpan with op: 'db.query'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.enqueue([makeEvent()], defaultScope);
-      const innerCall = spy.mock.calls.find((c) => c[0]?.op === "db.query");
-      expect(innerCall).toBeDefined();
-    });
+    await expect(repo.enqueue([makeEvent({ eventType: "nope.unknown" })], scope)).rejects.toThrow(
+      'unknown event type "nope.unknown"',
+    );
+    await expect(
+      repo.enqueue([makeEvent(), makeEvent({ payload: { userId: "u1" } })], scope),
+    ).rejects.toThrow(`payload validation failed for "${EventTypes.USER_CREATED}"`);
 
-    it("no-ops when events array is empty", async () => {
-      const repo = new DrizzleOutboxRepository(new NoOpInstrumentation());
-      await expect(repo.enqueue([], defaultScope)).resolves.toBeUndefined();
-      expect(insertExecute).not.toHaveBeenCalled();
-    });
-
-    it("calls instrumentation.capture and rethrows on DB error", async () => {
-      const instr = new NoOpInstrumentation();
-      const captureSpy = spyOn(instr, "capture");
-      // make the inner span throw by patching startSpan to execute the callback but
-      // having insertExecute throw on second call (inner span callback)
-      let callCount = 0;
-      spyOn(instr, "startSpan").mockImplementation(((_opts, cb) => {
-        callCount++;
-        if (callCount === 2) {
-          throw new Error("db fail");
-        }
-        return (cb as () => unknown)();
-      }) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await expect(repo.enqueue([makeEvent()], defaultScope)).rejects.toThrow("db fail");
-      expect(captureSpy).toHaveBeenCalled();
-    });
+    expect(insert).not.toHaveBeenCalled();
+    expect(executor.execute).not.toHaveBeenCalled();
+    expect(instrumentation.capture).toHaveBeenCalledTimes(2);
   });
 
-  describe("findPendingBatch", () => {
-    it("calls outer startSpan with name 'DrizzleOutboxRepository > findPendingBatch'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.findPendingBatch(10, fakeTx as never);
-      expect(spy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "DrizzleOutboxRepository > findPendingBatch" }),
-        expect.any(Function),
-      );
-    });
+  it("given events carrying an eventId, when enqueued, then each row id is that eventId", async () => {
+    const repo = new DrizzleOutboxRepository(mockInstrumentation());
 
-    it("returns rows from the DB query with organizationId wrapped as Option", async () => {
-      const row = {
-        id: "ev-1",
-        eventType: "user.created",
-        aggregateId: "a",
-        aggregateType: "User",
-        organizationId: null,
-        payload: {},
-        metadata: {},
-        occurredAt: new Date(),
-        attempts: 0,
-      };
-      selectExecute.mockResolvedValueOnce([row]);
-      const repo = new DrizzleOutboxRepository(new NoOpInstrumentation());
-      const result = await repo.findPendingBatch(10, fakeTx as never);
-      expect(result).toHaveLength(1);
-      expect(result[0]?.organizationId.isNone()).toBe(true);
-    });
+    await repo.enqueue(
+      [makeEvent({ eventId: "evt-1" }), makeEvent({ eventId: "evt-2", aggregateId: "u2" })],
+      scope,
+    );
 
-    it("calls instrumentation.capture and rethrows on DB error", async () => {
-      const instr = new NoOpInstrumentation();
-      const captureSpy = spyOn(instr, "capture");
-      let callCount = 0;
-      spyOn(instr, "startSpan").mockImplementation(((_opts, cb) => {
-        callCount++;
-        if (callCount === 2) throw new Error("db fail");
-        return (cb as () => unknown)();
-      }) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await expect(repo.findPendingBatch(10, fakeTx as never)).rejects.toThrow("db fail");
-      expect(captureSpy).toHaveBeenCalled();
-    });
+    expect(insertedRows.map((row) => row.id)).toEqual(["evt-1", "evt-2"]);
   });
 
-  describe("markDispatched", () => {
-    it("calls outer startSpan with name 'DrizzleOutboxRepository > markDispatched'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.markDispatched("ev-1", fakeTx as never);
-      expect(spy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "DrizzleOutboxRepository > markDispatched" }),
-        expect.any(Function),
-      );
+  it("emitEvent returns the id stored as the outbox row id", async () => {
+    const repo = new DrizzleOutboxRepository(mockInstrumentation());
+
+    const eventId = await emitEvent(repo, EventTypes.USER_CREATED, "user", "u1", {
+      userId: "u1",
+      email: "u@test.com",
+      name: "U",
     });
 
-    it("calls inner startSpan with op: 'db.query'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.markDispatched("ev-1", fakeTx as never);
-      const innerCall = spy.mock.calls.find((c) => c[0]?.op === "db.query");
-      expect(innerCall).toBeDefined();
-    });
-
-    it("calls instrumentation.capture and rethrows on DB error", async () => {
-      const instr = new NoOpInstrumentation();
-      const captureSpy = spyOn(instr, "capture");
-      let callCount = 0;
-      spyOn(instr, "startSpan").mockImplementation(((_opts, cb) => {
-        callCount++;
-        if (callCount === 2) throw new Error("db fail");
-        return (cb as () => unknown)();
-      }) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await expect(repo.markDispatched("ev-1", fakeTx as never)).rejects.toThrow("db fail");
-      expect(captureSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe("markFailed", () => {
-    it("calls outer startSpan with name 'DrizzleOutboxRepository > markFailed'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.markFailed("ev-1", "some error", Option.none(), fakeTx as never);
-      expect(spy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "DrizzleOutboxRepository > markFailed" }),
-        expect.any(Function),
-      );
-    });
-
-    it("calls inner startSpan with op: 'db.query'", async () => {
-      const instr = new NoOpInstrumentation();
-      const spy = spyOn(instr, "startSpan").mockImplementation(((_opts, cb) =>
-        (cb as () => unknown)()) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await repo.markFailed("ev-1", "boom", Option.some(new Date()), fakeTx as never);
-      const innerCall = spy.mock.calls.find((c) => c[0]?.op === "db.query");
-      expect(innerCall).toBeDefined();
-    });
-
-    it("calls instrumentation.capture and rethrows on DB error", async () => {
-      const instr = new NoOpInstrumentation();
-      const captureSpy = spyOn(instr, "capture");
-      let callCount = 0;
-      spyOn(instr, "startSpan").mockImplementation(((_opts, cb) => {
-        callCount++;
-        if (callCount === 2) throw new Error("db fail");
-        return (cb as () => unknown)();
-      }) as typeof instr.startSpan);
-      const repo = new DrizzleOutboxRepository(instr);
-      await expect(repo.markFailed("ev-1", "err", Option.none(), fakeTx as never)).rejects.toThrow(
-        "db fail",
-      );
-      expect(captureSpy).toHaveBeenCalled();
-    });
+    expect(insertedRows.map((row) => row.id)).toEqual([eventId]);
   });
 });

@@ -1,21 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { Option } from "@packages/ddd-kit";
-import type { OutboxRecord } from "../../ports/outbox.port";
+import type { DeliveredEvent } from "../../ports/outbox.port";
 import { resolveAudience } from "../resolve-audience";
 
-const baseEvent = (payload: unknown, orgId?: string): OutboxRecord => ({
-  id: "01J000000000000000000000",
+const baseEvent = (payload: unknown, organizationId?: string): DeliveredEvent => ({
+  eventId: "01J000000000000000000000",
   eventType: "org.member.joined",
   aggregateId: "agg-1",
   aggregateType: "organization",
-  organizationId: orgId ? Option.some(orgId) : Option.none(),
+  organizationId,
   payload,
-  metadata: {} as OutboxRecord["metadata"],
-  occurredAt: new Date("2026-08-07T10:00:00Z"),
-  attempts: 0,
+  dateOccurred: new Date("2026-08-07T10:00:00Z"),
 });
 
-const targetOf = (audience: Parameters<typeof resolveAudience>[0], event: OutboxRecord) =>
+const targetOf = (audience: Parameters<typeof resolveAudience>[0], event: DeliveredEvent) =>
   resolveAudience(audience, event).toNull();
 
 describe("resolveAudience", () => {

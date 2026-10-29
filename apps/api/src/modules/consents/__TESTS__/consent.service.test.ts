@@ -1,8 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { noopOutbox, recordingOutbox } from "../../../shared/__TESTS__/outbox-fakes";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   ConsentError,
@@ -41,7 +43,7 @@ function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
 describe("ConsentService", () => {
   describe("record", () => {
     it("inserts row with 'necessary' always included and emits USER_COOKIE_CONSENT_GRANTED", async () => {
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore();
       const service = new ConsentService(
         store,
@@ -66,7 +68,7 @@ describe("ConsentService", () => {
       expect(insertedRow.ipAddress.unwrapOr("none")).toBe("1.2.3.4");
       expect(insertedRow.userAgent.isNone()).toBe(true);
 
-      const grantedEvents = enqueued.filter(
+      const grantedEvents = enqueuedEvents(spyOutbox).filter(
         (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_GRANTED,
       );
       expect(grantedEvents).toHaveLength(1);
@@ -81,7 +83,7 @@ describe("ConsentService", () => {
           }),
         ),
       });
-      const { outbox, enqueued } = recordingOutbox();
+      const outbox = mockPort<IOutboxRepository>();
       const service = new ConsentService(
         store,
         outbox,
@@ -93,7 +95,7 @@ describe("ConsentService", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
-      expect(enqueued).toHaveLength(0);
+      expect(enqueuedEvents(outbox)).toHaveLength(0);
     });
 
     it("always inserts a new record when a user updates preferences (append-only)", async () => {
@@ -104,7 +106,7 @@ describe("ConsentService", () => {
       });
       const service = new ConsentService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -126,7 +128,7 @@ describe("ConsentService", () => {
 
   describe("withdraw", () => {
     it("inserts a withdrawal row with empty categories + withdrawnAt set and emits USER_COOKIE_CONSENT_WITHDRAWN", async () => {
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore();
       const service = new ConsentService(
         store,
@@ -145,7 +147,7 @@ describe("ConsentService", () => {
       expect(insertedRow.categories).toEqual([]);
       expect(insertedRow.withdrawnAt.isSome()).toBe(true);
 
-      const withdrawnEvents = enqueued.filter(
+      const withdrawnEvents = enqueuedEvents(spyOutbox).filter(
         (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_WITHDRAWN,
       );
       expect(withdrawnEvents).toHaveLength(1);
@@ -160,7 +162,7 @@ describe("ConsentService", () => {
           }),
         ),
       });
-      const { outbox, enqueued } = recordingOutbox();
+      const outbox = mockPort<IOutboxRepository>();
       const service = new ConsentService(
         store,
         outbox,
@@ -172,7 +174,7 @@ describe("ConsentService", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
-      expect(enqueued).toHaveLength(0);
+      expect(enqueuedEvents(outbox)).toHaveLength(0);
     });
   });
 
@@ -185,7 +187,7 @@ describe("ConsentService", () => {
       });
       const service = new ConsentService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -210,7 +212,7 @@ describe("ConsentService", () => {
       });
       const service = new ConsentService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -232,7 +234,7 @@ describe("ConsentService", () => {
       });
       const service = new ConsentService(
         store,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
@@ -248,7 +250,7 @@ describe("ConsentService", () => {
 
   describe("reconcile", () => {
     it("links the browser's orphan consent records to the user and emits USER_COOKIE_CONSENT_LINKED", async () => {
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore({
         linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>(["c1", "c2"])),
       });
@@ -263,7 +265,7 @@ describe("ConsentService", () => {
 
       expect(result.isSuccess).toBe(true);
       expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1");
-      expect(enqueued).toEqual([
+      expect(enqueuedEvents(spyOutbox)).toEqual([
         {
           eventType: EventTypes.USER_COOKIE_CONSENT_LINKED,
           aggregateId: "u1",
@@ -273,7 +275,7 @@ describe("ConsentService", () => {
     });
 
     it("emits nothing when every record was already linked", async () => {
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const service = new ConsentService(
         makeStore(),
         spyOutbox,
@@ -284,7 +286,7 @@ describe("ConsentService", () => {
       const result = await service.reconcile("subj-1", "u1");
 
       expect(result.isSuccess).toBe(true);
-      expect(enqueued).toEqual([]);
+      expect(enqueuedEvents(spyOutbox)).toEqual([]);
     });
   });
 });

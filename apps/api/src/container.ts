@@ -1,5 +1,6 @@
 import type { EventHandler, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
+import { ALL_EVENT_TYPES } from "@packages/events";
 import { container } from "inwire";
 import { adminModule } from "./modules/admin/module";
 import { apiTokenModule } from "./modules/api-token/module";
@@ -16,6 +17,7 @@ import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
+import { buildEventDispatcher } from "./shared/event-handlers";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
 import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
@@ -37,7 +39,12 @@ import { HibpPasswordBreachService } from "./shared/services/hibp-password-breac
 import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
 import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
-import { OutboxDispatcher } from "./shared/services/outbox-dispatcher.service";
+import {
+  OUTBOX_BATCH_SIZE,
+  OUTBOX_STOP_SETTLE_MARGIN_MS,
+  OutboxDispatcher,
+} from "./shared/services/outbox-dispatcher.service";
+import { OutboxRelay } from "./shared/services/outbox-relay";
 import {
   RateLimiterFlexibleAdapter,
   storeFactoryFor,
@@ -80,8 +87,8 @@ export const di = container()
   .add(
     "ITransactionService",
     (c) =>
-      new TransactionService(c.IInstrumentation, async (events, tx) => {
-        await c.IOutboxRepository.enqueue(events, { source: "app/api" }, tx);
+      new TransactionService(c.IInstrumentation, async (events) => {
+        await c.IOutboxRepository.enqueue(events, { source: "app/api" });
       }),
   )
   .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation))
@@ -116,21 +123,59 @@ export const di = container()
         storeFactoryFor(env.RATE_LIMIT_STORE, getRateLimitDbClient),
       ),
   )
-  .add("AuditEventSubscriber", (c) => new AuditEventSubscriber(c.IInstrumentation))
-  .add("WebhookFanoutSubscriber", (c) => new WebhookFanoutSubscriber(c.IInstrumentation))
+  .add(
+    "AuditEventSubscriber",
+    (c) =>
+      new AuditEventSubscriber(
+        c.ITransactionService,
+        c.IInstrumentation,
+        env.AUDIT_TAMPER_EVIDENCE,
+      ),
+  )
+  .add(
+    "WebhookFanoutSubscriber",
+    (c) => new WebhookFanoutSubscriber(c.ITransactionService, c.IInstrumentation),
+  )
   .add(
     "NotificationFanoutSubscriber",
-    (c) => new NotificationFanoutSubscriber(c.IInstrumentation, env.NOTIFICATION_DIGEST_HOUR_UTC),
+    (c) =>
+      new NotificationFanoutSubscriber(
+        c.ITransactionService,
+        c.IInstrumentation,
+        env.NOTIFICATION_DIGEST_HOUR_UTC,
+      ),
   )
   .add(
     "OutboxDispatcher",
     (c) =>
       new OutboxDispatcher(
         c.IOutboxRepository,
-        [c.AuditEventSubscriber, c.WebhookFanoutSubscriber, c.NotificationFanoutSubscriber],
+        (diLike) =>
+          new OutboxRelay(
+            c.IOutboxRepository,
+            c.ITransactionService,
+            buildEventDispatcher(
+              [c.AuditEventSubscriber, c.WebhookFanoutSubscriber, c.NotificationFanoutSubscriber],
+              diLike,
+            ),
+            {
+              eventTypes: ALL_EVENT_TYPES,
+              batchSize: OUTBOX_BATCH_SIZE,
+              maxAttempts: env.OUTBOX_MAX_ATTEMPTS,
+              leaseSeconds: env.OUTBOX_LEASE_SECONDS,
+              deadRetrySeconds: env.OUTBOX_DEAD_RETRY_HOURS * 3600,
+              concurrency: env.OUTBOX_CONCURRENCY,
+              handlerBudgetSeconds: env.OUTBOX_HANDLER_BUDGET_SECONDS,
+            },
+            c.IInstrumentation,
+            logger,
+          ),
         logger,
         env.DATABASE_URL,
         c.IInstrumentation,
+        {
+          stopGraceMs: Math.max(0, env.SHUTDOWN_WORKERS_TIMEOUT_MS - OUTBOX_STOP_SETTLE_MARGIN_MS),
+        },
       ),
   )
   .addModule(adminModule)

@@ -1,9 +1,23 @@
-import { Client } from "pg";
+import { Client, type ClientConfig } from "pg";
 import type { Logger } from "../logger";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 
-const RECONNECT_BACKOFF_MS = 1_000;
-const RECONNECT_MAX_BACKOFF_MS = 30_000;
+const RECONNECT_BACKOFF_MS = 250;
+const RECONNECT_MAX_BACKOFF_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 15_000;
+const CONNECT_TIMEOUT_MS = 5_000;
+const QUERY_TIMEOUT_MS = 5_000;
+const HEARTBEAT = "select 1";
+
+export function listenClientConfig(connectionString: string): ClientConfig {
+  return {
+    connectionString,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 30_000,
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    query_timeout: QUERY_TIMEOUT_MS,
+  };
+}
 
 /**
  * The slice of `pg`'s `Client` a listener actually uses. Narrowing the
@@ -22,6 +36,7 @@ export type PgListenerOptions = {
   createClient?: () => PgListenClient;
   reconnectBackoffMs?: number;
   reconnectMaxBackoffMs?: number;
+  heartbeatIntervalMs?: number;
 };
 
 export interface PgListenerConfig {
@@ -32,6 +47,7 @@ export interface PgListenerConfig {
   owner: string;
   connectionString: string;
   onNotification: (payload: string | undefined) => void;
+  onReconnect?: () => void;
 }
 
 /**
@@ -46,6 +62,8 @@ export interface PgListenerConfig {
 export class PgListener {
   private listenClient: PgListenClient | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private everConnected = false;
   private readonly disposed = new WeakSet<PgListenClient>();
   private stopping = false;
   private reconnectBackoff: number;
@@ -53,6 +71,7 @@ export class PgListener {
   private readonly createClient: () => PgListenClient;
   private readonly baseBackoffMs: number;
   private readonly maxBackoffMs: number;
+  private readonly heartbeatIntervalMs: number;
 
   constructor(
     private readonly config: PgListenerConfig,
@@ -61,15 +80,10 @@ export class PgListener {
     options: PgListenerOptions = {},
   ) {
     this.createClient =
-      options.createClient ??
-      (() =>
-        new Client({
-          connectionString: this.config.connectionString,
-          keepAlive: true,
-          keepAliveInitialDelayMillis: 30_000,
-        }));
+      options.createClient ?? (() => new Client(listenClientConfig(this.config.connectionString)));
     this.baseBackoffMs = options.reconnectBackoffMs ?? RECONNECT_BACKOFF_MS;
     this.maxBackoffMs = options.reconnectMaxBackoffMs ?? RECONNECT_MAX_BACKOFF_MS;
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
     this.reconnectBackoff = this.baseBackoffMs;
   }
 
@@ -84,6 +98,7 @@ export class PgListener {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.stopHeartbeat();
 
     const client = this.listenClient;
     this.listenClient = null;
@@ -147,7 +162,10 @@ export class PgListener {
 
           this.listenClient = client;
           this.reconnectBackoff = this.baseBackoffMs;
+          this.startHeartbeat(client, dispose);
           this.logger.debug(`${label} listener connected`);
+          if (this.everConnected) this.config.onReconnect?.();
+          this.everConnected = true;
         } catch (err) {
           this.logger.warn({ err }, `${label} listener initial connect failed`);
           this.instrumentation.capture(err);
@@ -172,9 +190,35 @@ export class PgListener {
 
       this.disposed.add(client);
       client.removeAllListeners();
-      if (this.listenClient === client) this.listenClient = null;
+      if (this.listenClient === client) {
+        this.listenClient = null;
+        this.stopHeartbeat();
+      }
       void Promise.resolve(client.end()).catch(() => {});
     };
+  }
+
+  private startHeartbeat(client: PgListenClient, dispose: () => void): void {
+    this.stopHeartbeat();
+    const timer = setInterval(() => {
+      client.query(HEARTBEAT).catch((err: unknown) => {
+        if (this.disposed.has(client)) return;
+
+        this.logger.warn({ err }, `${this.config.label} listener heartbeat failed, will reconnect`);
+        this.instrumentation.capture(err);
+        dispose();
+        this.scheduleReconnect();
+      });
+    }, this.heartbeatIntervalMs);
+    timer.unref?.();
+    this.heartbeatTimer = timer;
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer === null) return;
+
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 
   /**

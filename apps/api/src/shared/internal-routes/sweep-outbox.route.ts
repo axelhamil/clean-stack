@@ -1,5 +1,6 @@
 // `/internal/sweep-outbox`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import type { SQL } from "@packages/drizzle";
 import { and, isNotNull, lt, outboxSchema } from "@packages/drizzle";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -14,6 +15,10 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 
 const event = outboxSchema.outboxEvent;
 const LABEL = "sweep-outbox";
+
+export function buildPurgeFilter(cutoff: Date): SQL {
+  return requireFilter(and(isNotNull(event.dispatchedAt), lt(event.dispatchedAt, cutoff)), LABEL);
+}
 
 const isForeignKeyViolation = (err: unknown): boolean =>
   err instanceof Error &&
@@ -37,11 +42,7 @@ export const sweepOutboxRoutes = new Hono<HonoEnv>()
             table: event,
             idColumn: event.id,
             orderBy: event.dispatchedAt,
-            filterFor: (cutoff) =>
-              requireFilter(
-                and(isNotNull(event.dispatchedAt), lt(event.dispatchedAt, cutoff)),
-                LABEL,
-              ),
+            filterFor: buildPurgeFilter,
             onBatchError: (err) => {
               if (!isForeignKeyViolation(err)) return "throw";
 

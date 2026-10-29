@@ -6,6 +6,7 @@ import {
   type IDomainEvent,
   isEventHandler,
   onEvent,
+  Result,
   UnitOfWorkContext,
   UUID,
 } from "../index";
@@ -167,9 +168,13 @@ describe("Aggregate.pullDomainEvents()", () => {
 
 describe("onEvent / EventHandler", () => {
   it("creates a handler tagged with the marker symbol", () => {
-    const handler = onEvent("user.created", (deps: { calls: string[] }) => async (event) => {
-      deps.calls.push(event.eventType);
-    })({ calls: [] });
+    const handler = onEvent(
+      "user.created",
+      "record-call",
+      (deps: { calls: string[] }) => async (event) => {
+        deps.calls.push(event.eventType);
+      },
+    )({ calls: [] });
 
     expect(handler[EVENT_HANDLER_SYMBOL]).toBe(true);
     expect(handler.eventType).toBe("user.created");
@@ -177,7 +182,7 @@ describe("onEvent / EventHandler", () => {
   });
 
   it("isEventHandler discriminates handlers from arbitrary objects", () => {
-    const handler = onEvent("x.y", () => async () => {})({});
+    const handler = onEvent("x.y", "noop", () => async () => {})({});
     expect(isEventHandler(handler)).toBe(true);
     expect(isEventHandler({})).toBe(false);
     expect(isEventHandler(null)).toBe(false);
@@ -186,11 +191,35 @@ describe("onEvent / EventHandler", () => {
 
   it("handle invokes the factory output", async () => {
     const calls: string[] = [];
-    const handler = onEvent("user.created", (deps: { log: string[] }) => async (event) => {
-      deps.log.push(`got ${event.eventType}`);
-    })({ log: calls });
+    const handler = onEvent(
+      "user.created",
+      "log-event",
+      (deps: { log: string[] }) => async (event) => {
+        deps.log.push(`got ${event.eventType}`);
+      },
+    )({ log: calls });
 
     await handler.handle(new TestEvent("agg-1", 1));
     expect(calls).toEqual(["got test.event"]);
+  });
+
+  it("given a handler that returns a failed Result, when handled, then it throws with the error code and message", async () => {
+    const coded = onEvent(
+      "user.created",
+      "coded-failure",
+      () => async () => Result.fail({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
+    )({});
+    const plain = onEvent(
+      "user.created",
+      "plain-failure",
+      () => async () => Result.fail("gone"),
+    )({});
+    const succeeded = onEvent("user.created", "succeeded", () => async () => Result.ok())({});
+
+    await expect(coded.handle(new TestEvent("agg-1", 1))).rejects.toThrow(
+      "EMAIL_PROVIDER_FAILURE: boom",
+    );
+    await expect(plain.handle(new TestEvent("agg-1", 1))).rejects.toThrow("gone");
+    await expect(succeeded.handle(new TestEvent("agg-1", 1))).resolves.toBeUndefined();
   });
 });

@@ -29,6 +29,7 @@ export async function emitEvent<TPayload>(
 ): Promise<string> {
   const id = uuidv7();
   const event: IDomainEvent<TPayload> = {
+    eventId: id,
     eventType,
     dateOccurred: new Date(),
     aggregateId,
@@ -39,7 +40,6 @@ export async function emitEvent<TPayload>(
     aggregateType,
     organizationId: opts.organizationId,
     traceparent: opts.traceparent,
-    id,
   });
   return id;
 }

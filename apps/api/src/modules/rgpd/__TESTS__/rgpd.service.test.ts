@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
-import { noopOutbox, recordingOutbox } from "../../../shared/__TESTS__/outbox-fakes";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
@@ -128,7 +129,7 @@ function buildService(deps: {
     deps.storage ?? makeStorage(),
     deps.email,
     deps.uow ?? uow.unitOfWork,
-    deps.outbox ?? noopOutbox,
+    deps.outbox ?? mockPort<IOutboxRepository>(),
     deps.instrumentation ?? new NoOpInstrumentation(),
   );
 }
@@ -457,14 +458,16 @@ describe("RgpdService", () => {
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
         ),
       });
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const service = buildService({ repo, email, outbox: spyOutbox });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
       expect(result.isSuccess).toBe(true);
-      expect(enqueued.some((e) => e.eventType === EventTypes.USER_DELETED)).toBe(true);
-      const orgDeleted = enqueued
+      expect(enqueuedEvents(spyOutbox).some((e) => e.eventType === EventTypes.USER_DELETED)).toBe(
+        true,
+      );
+      const orgDeleted = enqueuedEvents(spyOutbox)
         .filter((e) => e.eventType === EventTypes.ORG_DELETED)
         .map((e) => e.aggregateId)
         .sort();
@@ -484,13 +487,13 @@ describe("RgpdService", () => {
           }),
         ),
       });
-      const { outbox: spyOutbox, enqueued } = recordingOutbox();
+      const spyOutbox = mockPort<IOutboxRepository>();
       const service = buildService({ repo, email, outbox: spyOutbox });
 
       const result = await service.executeAccountWipe({ userId: "u1" });
 
       expect(result.isSuccess).toBe(true);
-      expect(enqueued).toHaveLength(0);
+      expect(enqueuedEvents(spyOutbox)).toHaveLength(0);
     });
 
     it("returns success no-op when user is already deleted", async () => {

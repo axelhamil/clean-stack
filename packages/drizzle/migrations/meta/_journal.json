@@ -169,6 +169,13 @@
       "when": 1790759986928,
       "tag": "0023_scim_managed_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793272853905,
+      "tag": "0024_outbox_lease",
+      "breakpoints": true
     }
   ]
 }

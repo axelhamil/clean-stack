@@ -1,6 +1,13 @@
-import { Option } from "@packages/ddd-kit";
-import { db, eq, multiTenantSchema, notificationSchema, sql } from "@packages/drizzle";
-import type { OutboxRecord } from "../src/shared/ports/outbox.port";
+import {
+  db,
+  eq,
+  multiTenantSchema,
+  notificationSchema,
+  sql,
+  TransactionService,
+} from "@packages/drizzle";
+import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
+import type { DeliveredEvent } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";
 import { checkRecorder, findSeededUserId } from "./check-harness";
@@ -12,18 +19,19 @@ const checks = checkRecorder();
 const { check } = checks;
 const userId = await findSeededUserId();
 
-const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation());
+const instrumentation: IInstrumentation = new NoOpInstrumentation();
+const subscriber = new NotificationFanoutSubscriber(
+  new TransactionService(instrumentation, async () => {}),
+  instrumentation,
+);
 
-const event = (eventType: string): OutboxRecord => ({
-  id: "01J000000000000000000000",
+const event = (eventType: string): DeliveredEvent => ({
+  eventId: "01J000000000000000000000",
   eventType,
   aggregateId: `probe-${eventType}`,
   aggregateType: "user",
-  organizationId: Option.none(),
   payload: { userId },
-  metadata: {} as OutboxRecord["metadata"],
-  occurredAt: new Date(),
-  attempts: 0,
+  dateOccurred: new Date(),
 });
 
 const reset = async () => {
@@ -39,8 +47,7 @@ const setPreference = (category: string, channel: string, enabled: boolean) =>
     VALUES (gen_random_uuid()::text, 'user', ${userId}, ${category}, ${channel}, ${enabled}, 'immediate', false)
   `);
 
-const fanout = (eventType: string) =>
-  db.transaction(async (tx) => subscriber.handle(event(eventType), tx));
+const fanout = (eventType: string) => subscriber.handle(event(eventType));
 
 const inspect = async (label: string) => {
   const rows = await db
@@ -91,9 +98,9 @@ const [membership] = await db
 if (!membership) throw new Error("no membership for the seeded user");
 const organizationId = membership.organizationId;
 
-const orgEvent = (): OutboxRecord => ({
+const orgEvent = (): DeliveredEvent => ({
   ...event("org.member.joined"),
-  organizationId: Option.some(organizationId),
+  organizationId,
 });
 
 const setOrgPreference = (category: string, channel: string, enabled: boolean, locked: boolean) =>
@@ -110,7 +117,7 @@ const resetOrg = () =>
 await reset();
 await resetOrg();
 await setPreference("org", "in_app", false);
-await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
+await subscriber.handle(orgEvent());
 const e = await inspect("[5] org audience, user preference in_app=false ->");
 check("the member is filtered out", e.length === 0);
 
@@ -118,14 +125,14 @@ await reset();
 await resetOrg();
 await setPreference("org", "in_app", false);
 await setOrgPreference("org", "in_app", true, true);
-await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
+await subscriber.handle(orgEvent());
 const f = await inspect("[6] org lock enabled=true against user false ->");
 check("the org lock wins", f.length === 1);
 
 await reset();
 await resetOrg();
 await setOrgPreference("org", "in_app", false, false);
-await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
+await subscriber.handle(orgEvent());
 const g = await inspect("[7] unlocked org default false, no user choice ->");
 check("the org default applies", g.length === 0);
 
@@ -133,12 +140,18 @@ await reset();
 await resetOrg();
 await setPreference("org", "in_app", true);
 await setOrgPreference("org", "in_app", false, false);
-await db.transaction(async (tx) => subscriber.handle(orgEvent(), tx));
+await subscriber.handle(orgEvent());
 const h = await inspect("[8] user choice true against unlocked org default false ->");
 check("the user choice wins over an org default", h.length === 1);
 
 await reset();
 await resetOrg();
+await subscriber.handle(event("user.export.completed"));
+await subscriber.handle(event("user.export.completed"));
+const i = await inspect("[9] the same event delivered twice ->");
+check("redelivering the same event creates no second notification row", i.length === 1);
+
+await reset();
 
 if (checks.failures > 0) {
   console.error("check:fanout FAILED");

@@ -1,8 +1,8 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
@@ -136,7 +136,7 @@ function makeService(
     opts.endpoints ?? makeEndpoints(),
     opts.deliveries ?? makeDeliveries(),
     uow,
-    noopOutbox,
+    mockPort<IOutboxRepository>(),
     opts.masterKey ?? validMasterKey,
     new NoOpInstrumentation(),
   );
@@ -205,7 +205,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -317,7 +317,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -378,7 +378,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -434,7 +434,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -474,7 +474,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -537,7 +537,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -686,7 +686,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -712,10 +712,10 @@ describe("WebhooksService", () => {
 
     it("emits webhook.delivery.replayed with the requesting user inside the transaction", async () => {
       const enqueueTransactions: unknown[] = [];
-      const enqueue = mock(async (_events: unknown, _meta: unknown) => {
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockImplementation(async () => {
         enqueueTransactions.push(UnitOfWorkContext.transaction());
       });
-      const outbox = { ...noopOutbox, enqueue } as IOutboxRepository;
       const deliveries = makeDeliveries({
         enqueueReplay: mock(async () =>
           Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(
@@ -734,7 +734,7 @@ describe("WebhooksService", () => {
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
 
-      const [events] = enqueue.mock.calls[0] ?? [];
+      const [events] = outbox.enqueue.mock.calls[0] ?? [];
       expect(enqueueTransactions[0]).toBeDefined();
       expect(events).toEqual([
         expect.objectContaining({
@@ -751,7 +751,7 @@ describe("WebhooksService", () => {
     });
 
     it("emits nothing when there is no delivery to replay", async () => {
-      const enqueue = mock(async () => {});
+      const outbox = mockPort<IOutboxRepository>();
       const deliveries = makeDeliveries({
         enqueueReplay: mock(async () =>
           Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
@@ -761,14 +761,14 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         deliveries,
         uow,
-        { ...noopOutbox, enqueue } as IOutboxRepository,
+        outbox,
         validMasterKey,
         new NoOpInstrumentation(),
       );
 
       await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID, USER_ID);
 
-      expect(enqueue).not.toHaveBeenCalled();
+      expect(outbox.enqueue).not.toHaveBeenCalled();
     });
 
     it("returns None when delivery not found in org scope", async () => {
@@ -820,7 +820,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );
@@ -865,7 +865,7 @@ describe("WebhooksService", () => {
         makeEndpoints(),
         makeDeliveries(),
         uow,
-        noopOutbox,
+        mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
       );

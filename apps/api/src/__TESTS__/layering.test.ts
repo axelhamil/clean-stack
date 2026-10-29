@@ -13,20 +13,9 @@ const ALLOWED_ENV_READERS: Record<string, string> = {
     "standalone script started by the scheduler outside the api process, it cannot import shared/env",
 };
 
-const LEASE_OUTBOX_REWRITE = "rewritten by I.5 lease outbox";
+const ALLOWED_TX_PARAMETERS: Record<string, string> = {};
 
-const ALLOWED_TX_PARAMETERS: Record<string, string> = {
-  "shared/ports/outbox.port.ts": LEASE_OUTBOX_REWRITE,
-  "shared/services/drizzle-outbox.service.ts": LEASE_OUTBOX_REWRITE,
-  "shared/services/outbox-subscriber.ts": LEASE_OUTBOX_REWRITE,
-  "shared/services/audit-event-subscriber.ts": LEASE_OUTBOX_REWRITE,
-  "shared/services/notification-fanout-subscriber.ts": LEASE_OUTBOX_REWRITE,
-  "shared/services/webhook-fanout-subscriber.ts": LEASE_OUTBOX_REWRITE,
-};
-
-const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {
-  "shared/services/outbox-dispatcher.service.ts": LEASE_OUTBOX_REWRITE,
-};
+const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {};
 
 const modules = readdirSync(join(apiSrcRoot, "modules"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())

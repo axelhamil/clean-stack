@@ -21,7 +21,7 @@ export {
   sql,
 } from "drizzle-orm";
 export { migrate } from "drizzle-orm/node-postgres/migrator";
-export type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
+export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 export { alias } from "drizzle-orm/pg-core";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
 export {

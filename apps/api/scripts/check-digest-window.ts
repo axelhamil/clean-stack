@@ -15,11 +15,11 @@
 // seeded account, and takes the real `flush-notification-emails` lease. Local
 // database only, `requireLocalDatabase` enforces it.
 
-import { Option } from "@packages/ddd-kit";
-import { db, sql } from "@packages/drizzle";
+import { db, sql, TransactionService } from "@packages/drizzle";
 import type { Hono } from "hono";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
-import type { OutboxRecord } from "../src/shared/ports/outbox.port";
+import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
+import type { DeliveredEvent } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";
 import {
@@ -39,7 +39,12 @@ const email = seedEmail();
 const userId = await findSeededUserId();
 
 const DIGEST_HOUR_UTC = 8;
-const subscriber = new NotificationFanoutSubscriber(new NoOpInstrumentation(), DIGEST_HOUR_UTC);
+const instrumentation: IInstrumentation = new NoOpInstrumentation();
+const subscriber = new NotificationFanoutSubscriber(
+  new TransactionService(instrumentation, async () => {}),
+  instrumentation,
+  DIGEST_HOUR_UTC,
+);
 
 // Far enough in the future that nothing deferred is due by accident: the whole
 // point of the check is that only what has been deliberately backdated flushes.
@@ -48,19 +53,16 @@ const IMMEDIATE_DUE = "2099-03-10T09:15:00";
 const HOURLY_DUE = "2099-03-10T10:00:00";
 const DAILY_DUE = "2099-03-11T08:00:00";
 
-const event = (n: number): OutboxRecord => ({
-  id: `01J0000000000000000000${String(n).padStart(2, "0")}`,
+const event = (n: number): DeliveredEvent => ({
+  eventId: `01J0000000000000000000${String(n).padStart(2, "0")}`,
   eventType: "user.export.completed",
   aggregateId: `digest-probe-${n}`,
   aggregateType: "user",
-  organizationId: Option.none(),
   payload: { userId, expiresAt: "2099-04-01T00:00:00.000Z" },
-  metadata: {} as OutboxRecord["metadata"],
-  occurredAt: OCCURRED_AT,
-  attempts: 0,
+  dateOccurred: OCCURRED_AT,
 });
 
-const forcedEvent = (): OutboxRecord => ({
+const forcedEvent = (): DeliveredEvent => ({
   ...event(9),
   eventType: "user.password_changed",
   aggregateId: "digest-probe-forced",
@@ -89,7 +91,7 @@ const setEmailEnabled = (category: string, enabled: boolean) =>
     ON CONFLICT (scope, scope_id, category, channel)
     DO UPDATE SET enabled = ${enabled}`);
 
-const fanout = (e: OutboxRecord) => db.transaction(async (tx) => subscriber.handle(e, tx));
+const fanout = (e: DeliveredEvent) => subscriber.handle(e);
 
 // Read the due column back as text. It is a tz-naive `timestamp` holding UTC, and
 // letting the driver hydrate it into a JS `Date` would reinterpret it in the host's

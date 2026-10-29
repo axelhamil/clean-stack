@@ -25,12 +25,11 @@ export type OutboxMappingScope = {
   aggregateType: string;
   traceparent?: string;
   requestId?: string;
-  id?: string;
 };
 
 export function domainEventToOutboxRow(event: IDomainEvent, scope: OutboxMappingScope): OutboxRow {
   return {
-    id: scope.id ?? event.eventId ?? uuidv7(),
+    id: event.eventId ?? uuidv7(),
     eventType: event.eventType,
     aggregateId: event.aggregateId,
     aggregateType: scope.aggregateType,

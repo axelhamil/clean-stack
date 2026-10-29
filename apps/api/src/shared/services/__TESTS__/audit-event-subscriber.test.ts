@@ -1,136 +1,141 @@
-import { describe, expect, it, mock } from "bun:test";
-import { Option } from "@packages/ddd-kit";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import * as realDrizzle from "@packages/drizzle";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
-import { env as realEnv } from "../../env";
+import type { DeliveredEvent } from "../../ports/outbox.port";
 
-mock.module("../../env", () => ({ env: { ...realEnv, AUDIT_TAMPER_EVIDENCE: true } }));
+type AuditRow = Record<string, unknown> & { id: string };
+
+const stored: AuditRow[] = [];
+let lastHash: string | null = null;
+
+const executor = {
+  execute: async () => undefined,
+  select: () => {
+    const chain = {
+      from: () => chain,
+      where: () => chain,
+      orderBy: () => chain,
+      limit: () => chain,
+      execute: async () => (lastHash === null ? [] : [{ hash: lastHash }]),
+    };
+    return chain;
+  },
+  insert: () => {
+    let row: AuditRow | undefined;
+    let ignoreConflictOnId = false;
+    const chain = {
+      values(value: AuditRow) {
+        row = value;
+        return chain;
+      },
+      onConflictDoNothing(options: { target?: unknown }) {
+        ignoreConflictOnId = options.target === realDrizzle.auditLogSchema.auditLog.id;
+        return chain;
+      },
+      toSQL: () => ({ sql: "insert into audit_log" }),
+      execute: async () => {
+        if (!row) return;
+        if (stored.some(({ id }) => id === row?.id)) {
+          if (ignoreConflictOnId) return;
+          throw new Error("duplicate key value violates unique constraint audit_log_pkey");
+        }
+        stored.push(row);
+      },
+    };
+    return chain;
+  },
+};
+
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
 
 const { AuditEventSubscriber } = await import("../audit-event-subscriber");
 const { computeAuditHash } = await import("../audit-hash");
 
-const instrumentation = mockInstrumentation();
-
-function makeTx(lastHashRows: () => { hash: string | null }[]) {
-  const captured: Record<string, unknown>[] = [];
-  const insertChain = {
-    values(v: Record<string, unknown>) {
-      captured.push(v);
-      return this;
-    },
-    onConflictDoNothing() {
-      return this;
-    },
-    toSQL() {
-      return { sql: "INSERT" };
-    },
-    execute: async () => undefined,
-  };
-  const selectChain = {
-    from() {
-      return this;
-    },
-    where() {
-      return this;
-    },
-    orderBy() {
-      return this;
-    },
-    limit() {
-      return this;
-    },
-    execute: async () => lastHashRows(),
-  };
-  const tx = {
-    execute: async () => undefined,
-    insert: () => insertChain,
-    select: () => selectChain,
-  };
-  return { tx, captured };
-}
-
-function event(id: string) {
+function event(eventId: string, payload: unknown = { actorUserId: "op-1", foo: "bar" }) {
   return {
-    id,
+    eventId,
     eventType: "billing.subscription.created",
-    organizationId: Option.some("org-1"),
+    organizationId: "org-1",
     aggregateType: "subscription",
     aggregateId: "sub-1",
-    payload: { actorUserId: "op-1", foo: "bar" },
-    metadata: { requestId: "req-1" },
-    occurredAt: new Date("2026-07-10T00:00:00.000Z"),
-  };
+    requestId: "req-1",
+    payload,
+    dateOccurred: new Date("2026-07-10T00:00:00.000Z"),
+  } satisfies DeliveredEvent;
 }
 
-describe("AuditEventSubscriber hash chain", () => {
+function handler(tamperEvidence = true) {
+  return new AuditEventSubscriber(
+    mockUnitOfWork().unitOfWork,
+    mockInstrumentation(),
+    tamperEvidence,
+  );
+}
+
+beforeEach(() => {
+  stored.length = 0;
+  lastHash = null;
+});
+
+describe("AuditEventSubscriber", () => {
+  it("audit-log is idempotent on redelivery (same eventId writes one row)", async () => {
+    const audit = handler();
+
+    await audit.handle(event("e1"));
+    await audit.handle(event("e1"));
+
+    expect(stored.map(({ id }) => id)).toEqual(["audit-e1"]);
+  });
+
   it("genesis: first chained row has prevHash = GENESIS and a 64-char hash", async () => {
-    const { tx, captured } = makeTx(() => []);
-    const sub = new AuditEventSubscriber(instrumentation);
-    await sub.handle(event("e1") as never, tx as never);
-    expect(captured).toHaveLength(1);
-    const row = captured[0];
-    if (!row) throw new Error("expected a captured row");
-    expect(row.prevHash).toBe("GENESIS");
-    expect(typeof row.hash).toBe("string");
-    expect((row.hash as string).length).toBe(64);
+    await handler().handle(event("e1"));
+
+    expect(stored[0]?.prevHash).toBe("GENESIS");
+    expect(String(stored[0]?.hash)).toHaveLength(64);
   });
 
   it("links: next row's prevHash equals the last stored hash", async () => {
-    const { tx, captured } = makeTx(() => [{ hash: "abc123" }]);
-    const sub = new AuditEventSubscriber(instrumentation);
-    await sub.handle(event("e2") as never, tx as never);
-    expect(captured).toHaveLength(1);
-    const row = captured[0];
-    if (!row) throw new Error("expected a captured row");
-    expect(row.prevHash).toBe("abc123");
+    lastHash = "abc123";
+
+    await handler().handle(event("e2"));
+
+    expect(stored[0]?.prevHash).toBe("abc123");
   });
 
   it("stores the hash verifyChain recomputes from the persisted row", async () => {
-    const { tx, captured } = makeTx(() => []);
-    await new AuditEventSubscriber(instrumentation).handle(event("e3") as never, tx as never);
+    await handler().handle(event("e3"));
 
-    const row = captured[0];
-    if (!row) throw new Error("expected a captured row");
+    const row = stored[0];
+    if (!row) throw new Error("expected a stored row");
     const recomputed = computeAuditHash({
-      id: row.id as string,
-      action: row.action as string,
-      actorId: row.actorId as string | null,
-      actorType: row.actorType as string,
-      organizationId: row.organizationId as string | null,
-      targetType: row.targetType as string,
-      targetId: row.targetId as string,
+      id: row.id,
+      action: String(row.action),
+      actorId: typeof row.actorId === "string" ? row.actorId : null,
+      actorType: String(row.actorType),
+      organizationId: typeof row.organizationId === "string" ? row.organizationId : null,
+      targetType: String(row.targetType),
+      targetId: String(row.targetId),
       metadata: row.metadata,
-      occurredAt: (row.occurredAt as Date).toISOString(),
-      requestId: row.requestId as string | null,
-      retention: row.retention as string,
-      prevHash: row.prevHash as string,
+      occurredAt: row.occurredAt instanceof Date ? row.occurredAt.toISOString() : "",
+      requestId: typeof row.requestId === "string" ? row.requestId : null,
+      retention: String(row.retention),
+      prevHash: String(row.prevHash),
     });
 
+    expect(row).toMatchObject({ targetType: "subscription", requestId: "req-1" });
     expect(row.hash).toBe(recomputed);
   });
-});
-
-describe("AuditEventSubscriber actor", () => {
-  const withPayload = (payload: Record<string, unknown>) => ({ ...event("e4"), payload });
 
   it("records the payload actor as a user", async () => {
-    const { tx, captured } = makeTx(() => []);
-    await new AuditEventSubscriber(instrumentation).handle(
-      withPayload({ userId: "subject", inviterUserId: "inviter" }) as never,
-      tx as never,
-    );
+    await handler().handle(event("e4", { userId: "subject", inviterUserId: "inviter" }));
 
-    expect(captured[0]?.actorId).toBe("inviter");
-    expect(captured[0]?.actorType).toBe("user");
+    expect(stored[0]).toMatchObject({ actorId: "inviter", actorType: "user" });
   });
 
   it("falls back to a system actor when no actor key holds a user id", async () => {
-    const { tx, captured } = makeTx(() => []);
-    await new AuditEventSubscriber(instrumentation).handle(
-      withPayload({ actorUserId: "", foo: "bar" }) as never,
-      tx as never,
-    );
+    await handler().handle(event("e5", { actorUserId: "", foo: "bar" }));
 
-    expect(captured[0]?.actorId).toBeNull();
-    expect(captured[0]?.actorType).toBe("system");
+    expect(stored[0]).toMatchObject({ actorId: null, actorType: "system" });
   });
 });

@@ -49,7 +49,7 @@ function cleanUrl(url: string): string {
   return withoutQuery;
 }
 
-function cleanText(text: string): string {
+export function scrubText(text: string): string {
   const [withoutParams = ""] = text.split(QUERY_PARAMS_MARKER);
 
   return withoutParams.replace(QUERY_IN_TOKEN, dropQuery).replace(EMAIL, "[email]");
@@ -70,7 +70,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function cleanDeep(value: unknown, depth = 0): unknown {
-  if (typeof value === "string") return cleanText(value);
+  if (typeof value === "string") return scrubText(value);
   if (depth >= MAX_DEPTH) return value;
   if (Array.isArray(value)) return value.map((item) => cleanDeep(item, depth + 1));
   if (!isPlainObject(value)) return value;
@@ -90,7 +90,7 @@ function cleanRecord(record: Record<string, unknown>): Record<string, unknown> {
 }
 
 function cleanBreadcrumbEntry(key: string, value: unknown): unknown {
-  if (URL_KEYS.has(key) && typeof value === "string") return cleanText(cleanUrl(value));
+  if (URL_KEYS.has(key) && typeof value === "string") return scrubText(cleanUrl(value));
 
   return cleanDeep(value);
 }
@@ -111,10 +111,10 @@ export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
     user.ip_address = undefined;
   }
 
-  if (event.message) event.message = cleanText(event.message);
+  if (event.message) event.message = scrubText(event.message);
 
   for (const exception of event.exception?.values ?? [])
-    if (exception.value) exception.value = cleanText(exception.value);
+    if (exception.value) exception.value = scrubText(exception.value);
 
   if (event.contexts) event.contexts = cleanRecord(event.contexts);
   if (event.extra) event.extra = cleanRecord(event.extra);
@@ -130,14 +130,14 @@ export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
 export function scrubBreadcrumb<B extends ScrubbableBreadcrumb>(breadcrumb: B): B | null {
   if (breadcrumb.category && DROPPED_BREADCRUMB_CATEGORIES.has(breadcrumb.category)) return null;
 
-  if (breadcrumb.message) breadcrumb.message = cleanText(breadcrumb.message);
+  if (breadcrumb.message) breadcrumb.message = scrubText(breadcrumb.message);
   if (breadcrumb.data) breadcrumb.data = mapValues(breadcrumb.data, cleanBreadcrumbEntry);
 
   return breadcrumb;
 }
 
 export function scrubLog<L extends ScrubbableLog>(log: L): L {
-  log.message = cleanText(log.message);
+  log.message = scrubText(log.message);
   if (log.attributes) log.attributes = cleanRecord(log.attributes);
 
   return log;

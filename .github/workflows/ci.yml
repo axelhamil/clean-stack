@@ -91,6 +91,12 @@ jobs:
       - name: Check the sweep lease against a real database
         run: pnpm --filter api check:sweep-lock
 
+      - name: Check the outbox lease claim and settle against a real database
+        # Skip locked, the lease expiry, the stale settle guard and the dead replay
+        # live in the claim CTE and the settle WHERE, which a mocked executor never
+        # evaluates. Seeds and removes its own probe rows.
+        run: pnpm --filter api check:outbox-lease
+
       - name: Seed the audited account
         run: pnpm --filter api db:seed
 
