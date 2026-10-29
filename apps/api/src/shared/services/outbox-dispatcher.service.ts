@@ -111,6 +111,7 @@ export class OutboxDispatcher {
         owner: "OutboxDispatcher",
         connectionString,
         onNotification: () => this.wake(),
+        onReconnect: () => this.wake(),
       },
       logger,
       instrumentation,

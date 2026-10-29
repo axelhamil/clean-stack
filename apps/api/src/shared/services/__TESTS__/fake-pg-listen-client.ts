@@ -12,6 +12,8 @@ export class FakePgListenClient implements PgListenClient {
   ended = false;
   listening = false;
   connectRejects = false;
+  heartbeatRejects = false;
+  readonly queries: string[] = [];
   private connectGate: Promise<void> | null = null;
   private releaseConnectGate: (() => void) | null = null;
 
@@ -44,7 +46,9 @@ export class FakePgListenClient implements PgListenClient {
     if (this.connectRejects) throw new Error("connect refused");
   }
 
-  async query(_text: string): Promise<unknown> {
+  async query(text: string): Promise<unknown> {
+    this.queries.push(text);
+    if (text === "select 1" && this.heartbeatRejects) throw new Error("query read timeout");
     this.listening = true;
     return {};
   }
