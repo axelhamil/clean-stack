@@ -25,9 +25,9 @@ src/
 
 ## Unit of work
 
-`TransactionService implements IUnitOfWork<Transaction>`; the API pins `TTx = ITransaction` (alias in `apps/api/src/shared/transaction.ts`). It takes a minimal instrumentation slice (`UnitOfWorkInstrumentation`) because a package cannot import the app's port; any `IInstrumentation` fits.
+`TransactionService implements IUnitOfWork`; no transaction handle crosses its interface. It takes a minimal instrumentation slice (`UnitOfWorkInstrumentation`) because a package cannot import the app's port; any `IInstrumentation` fits.
 
-- `run(cb)` opens the ambient scope (transaction + `EventCollector` buffer), runs `cb(tx)`, drains the collected events and hands them to the `FlushHandler` (the outbox) before commit, so the writes and their events are atomic.
+- `run(cb)` opens the ambient scope (transaction + `EventCollector` buffer), runs `cb()`, drains the collected events and hands them to the `FlushHandler` (the outbox) before commit, so the writes and their events are atomic.
 - The outermost `run()` opens `db.transaction` and publishes it in `UnitOfWorkContext`; a nested `run()` joins it (no savepoint, no second connection) and its events are kept for the outermost flush. A failed `Result` at any depth marks the unit rollback-only (first failure kept) and the outermost `run()` resolves to it. **Why no savepoint**: `rollback to savepoint` cannot un-collect the in-memory event buffer, so a partial rollback would still emit events.
 - Events collected by a run built without a `FlushHandler` throw `EventsWithoutOutbox` (naming the event types) at flush and roll the unit back. **Why**: a commit that drops its events is a silent audit and integration gap; the api container always passes the outbox enqueue, so only a mis-wired run fails.
 - `resolveExecutor()` returns the ambient transaction, else `db`. The scope is closed when its run settles, so a promise that outlives the run gets `db`. **Why**: node-postgres does not guard a query on a released client, it may run on a connection another borrower holds.

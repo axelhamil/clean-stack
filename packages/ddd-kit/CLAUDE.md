@@ -13,7 +13,7 @@ src/
   __TESTS__/     one file per primitive
 ```
 
-The package is framework-free: it imports only Node built-ins and `zod`, nothing from Drizzle, Hono or any provider. A provider concern (transaction type, driver error) enters as a type parameter (`IUnitOfWork<TTx>`), never as an import. **It is published to npm**: top-level `main`/`types`/`exports` point at `src/`, only `publishConfig` swaps in `dist/` at publish time (root rule 4); exports keep their JSDoc, it is the public API.
+The package is framework-free: it imports only Node built-ins and `zod`, nothing from Drizzle, Hono or any provider. A provider concern (driver error) enters as a type parameter (the repositories' `E`), never as an import; the transaction never crosses a port, it lives in the ambient scope. **It is published to npm**: top-level `main`/`types`/`exports` point at `src/`, only `publishConfig` swaps in `dist/` at publish time (root rule 4); exports keep their JSDoc, it is the public API.
 
 ## Which primitive when
 
@@ -22,7 +22,7 @@ The package is framework-free: it imports only Node built-ins and `zod`, nothing
 | `Result<T, E>` | A domain failure (validation, not-found, business rule). Never throw for these. |
 | `Option<T>` | Absence is a valid state. Details below. |
 | `AppError<TCode>` | A typed error whose code suffix maps to HTTP through `httpStatusFromCode` (`*_NOT_FOUND` 404, `*_FORBIDDEN` 403, `*_CONFLICT` 409, `*_INVALID` 400, `*_RATE_LIMITED` 429, ...). A new suffix is added to `STATUS_BY_SUFFIX` once, never mapped per route. |
-| `IUnitOfWork<TTx>` | ≥ 2 writes that must be atomic. `run()` joins an open run, and flushes collected events before the outermost commit; `startTransaction()` does not flush. |
+| `IUnitOfWork` | ≥ 2 writes that must be atomic. `run(work)` hands `work` nothing, joins an open run, and flushes collected events before the outermost commit; stores read the ambient transaction. |
 | `UserId` (VO) | The first aggregate referencing a user. Validates the UUID, prevents `OrderId` ↔ `UserId` mix-ups. |
 | `Aggregate<TProps>` | A business concept with invariants, identity and lifecycle that emits domain events. Infra orchestration is NOT an aggregate. |
 | `Entity<TProps>` | A child with identity but no independent lifecycle, inside an aggregate. |

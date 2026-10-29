@@ -29,10 +29,10 @@ zero divergence.
 ┌─────────────────────────────────────────────────────────────────────┐
 │  PHASE 1  ·  inside the business transaction                        │
 │                                                                      │
-│   your use case ──►  uow.run(async tx => {                          │
+│   your use case ──►  uow.run(async () => {                          │
 │                         aggregate.addEvent(...)  // collected in    │
 │                         //                       // AsyncLocalStorage│
-│                         repo.save(aggregate, tx)                    │
+│                         repo.save(aggregate)                        │
 │                       })                                             │
 │                         │                                            │
 │                         ▼   pre-COMMIT, same TX                     │

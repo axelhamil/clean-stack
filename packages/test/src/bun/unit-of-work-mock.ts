@@ -45,11 +45,11 @@ function doom(outermost: OutermostRun, cause: Doom): void {
 async function runNested<T>(
   tx: object,
   outermost: OutermostRun,
-  work: (tx: unknown) => Promise<T>,
+  work: () => Promise<T>,
 ): Promise<T> {
   const result = await UnitOfWorkContext.run(tx, async () => {
     try {
-      const nested = await work(tx);
+      const nested = await work();
       if (!isFailedResult(nested)) outermost.pending.push(...EventCollector.drain());
 
       return nested;
@@ -82,7 +82,7 @@ export function mockUnitOfWork(options: UnitOfWorkOptions = {}): UnitOfWorkMock 
 
     try {
       const result = await UnitOfWorkContext.run(tx, async () => {
-        const done = await work(tx);
+        const done = await work();
         outermost.pending.push(...EventCollector.drain());
 
         return done;

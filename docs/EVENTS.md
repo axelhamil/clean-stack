@@ -28,7 +28,7 @@ The audit/webhook subscribers, the catalogue, the `uow.run` flush: all unchanged
 ## Mental model
 
 ```
-your code           ─►  uow.run(async tx => repo.save(aggregate, tx))
+your code           ─►  uow.run(async () => repo.save(aggregate))
                                           │
                                           ▼ ALS collector flushes pre-COMMIT
                                   outbox_event INSERT (same TX)
@@ -114,14 +114,14 @@ class Order extends Aggregate<IOrderProps> {
 ```ts
 class PlaceOrderUseCase {
   constructor(
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly repo: IOrderRepository,
   ) {}
 
   async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
-    return this.uow.run(async (tx) => {
+    return this.uow.run(async () => {
       const order = Order.place(input);
-      return this.repo.save(order, tx);
+      return this.repo.save(order);
     });
   }
 }

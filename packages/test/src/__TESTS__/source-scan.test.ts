@@ -87,6 +87,31 @@ describe("createSourceScan", () => {
     expect(writes).toEqual({ "writes/repo.ts": 3 });
   });
 
+  it("transactionParametersPerFile counts tx parameters and the transaction alias, not a ternary", () => {
+    fixture("tx-params", {
+      "repo.ts":
+        "save(row: Row, tx?: Tx) {}\nfind(tx: Tx) {}\nimport type { ITransaction } from './t';\n",
+      "clean.ts": 'const exec = tx ? tx : db;\n// tx: Tx\nlog("tx?: Tx");\n',
+    });
+
+    const params = createSourceScan(root).transactionParametersPerFile("tx-params");
+
+    expect(params).toEqual({ "tx-params/repo.ts": 3 });
+  });
+
+  it("transactionOpenersPerFile counts transaction calls handed a callback, not an ambient read", () => {
+    fixture("tx-openers", {
+      "open.ts":
+        "await db.transaction(async (tx) => {});\nawait exec\n  .transaction(\n    work);\n",
+      "read.ts":
+        'UnitOfWorkContext.transaction();\n// db.transaction(cb)\nlog("db.transaction(cb)");\n',
+    });
+
+    const openers = createSourceScan(root).transactionOpenersPerFile("tx-openers");
+
+    expect(openers).toEqual({ "tx-openers/open.ts": 2 });
+  });
+
   it("envReadsPerFile counts every way to reach the environment", () => {
     fixture("env", {
       "config.ts":

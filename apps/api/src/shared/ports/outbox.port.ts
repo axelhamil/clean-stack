@@ -1,6 +1,5 @@
 import type { IDomainEvent, Option } from "@packages/ddd-kit";
-import type { OutboxEventMetadata } from "@packages/drizzle";
-import type { ITransaction } from "../transaction";
+import type { OutboxEventMetadata, Transaction } from "@packages/drizzle";
 
 export type OutboxEnqueueScope = {
   source: string;
@@ -23,13 +22,13 @@ export type OutboxRecord = {
 };
 
 export interface IOutboxRepository {
-  enqueue(events: IDomainEvent[], scope: OutboxEnqueueScope, tx?: ITransaction): Promise<void>;
-  findPendingBatch(limit: number, tx: ITransaction): Promise<OutboxRecord[]>;
-  markDispatched(id: string, tx: ITransaction): Promise<void>;
+  enqueue(events: IDomainEvent[], scope: OutboxEnqueueScope, tx?: Transaction): Promise<void>;
+  findPendingBatch(limit: number, tx: Transaction): Promise<OutboxRecord[]>;
+  markDispatched(id: string, tx: Transaction): Promise<void>;
   markFailed(
     id: string,
     error: string,
     nextAttemptAt: Option<Date>,
-    tx: ITransaction,
+    tx: Transaction,
   ): Promise<void>;
 }

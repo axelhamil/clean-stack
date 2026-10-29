@@ -179,7 +179,7 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 - Postgres on `localhost:5433` (dedicated port) via `docker compose up postgres -d`.
 - Schemas: `packages/drizzle/src/schema/*.ts`: auth, multi-tenant, policies, consent, billing, webhooks, audit-log, outbox, email, quota-usage, rate-limit.
 - Org-scoped tables are NEVER queried without the owner in the `WHERE`: a `RepoScope` through `ScopedRepository`, or an explicit `organizationId` in a store (rule in `apps/api/CLAUDE.md`).
-- `TransactionService`: the use case or service opens `uow.run(...)` and passes `tx` to the stores (rule in `packages/drizzle/CLAUDE.md`).
+- `TransactionService`: the use case, service or route opens `uow.run(...)`; the stores read the ambient transaction through `resolveExecutor()`, no `tx` parameter (rule in `packages/drizzle/CLAUDE.md`).
 
 ---
 

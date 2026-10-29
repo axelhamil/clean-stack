@@ -4,10 +4,10 @@ import type { Result } from "../primitives/result";
 import type { PaginatedResult, PaginationParams } from "./pagination";
 import type { RepoScope } from "./scope";
 
-export interface BaseRepository<T extends IEntity<unknown>, TTransaction = unknown, E = string> {
-  create(entity: T, trx?: TTransaction): Promise<Result<T, E>>;
-  update(entity: T, trx?: TTransaction): Promise<Result<T, E>>;
-  delete(id: T["_id"], trx?: TTransaction): Promise<Result<T["_id"], E>>;
+export interface BaseRepository<T extends IEntity<unknown>, E = string> {
+  create(entity: T): Promise<Result<T, E>>;
+  update(entity: T): Promise<Result<T, E>>;
+  delete(id: T["_id"]): Promise<Result<T["_id"], E>>;
   findById(id: T["_id"]): Promise<Result<Option<T>, E>>;
   findAll(pagination?: PaginationParams): Promise<Result<PaginatedResult<T>, E>>;
   findMany(
@@ -22,12 +22,11 @@ export interface BaseRepository<T extends IEntity<unknown>, TTransaction = unkno
 export interface ScopedRepository<
   T extends IEntity<unknown>,
   TScope extends RepoScope,
-  TTransaction = unknown,
   E = string,
 > {
-  create(entity: T, scope: TScope, trx?: TTransaction): Promise<Result<T, E>>;
-  update(entity: T, scope: TScope, trx?: TTransaction): Promise<Result<T, E>>;
-  delete(id: T["_id"], scope: TScope, trx?: TTransaction): Promise<Result<T["_id"], E>>;
+  create(entity: T, scope: TScope): Promise<Result<T, E>>;
+  update(entity: T, scope: TScope): Promise<Result<T, E>>;
+  delete(id: T["_id"], scope: TScope): Promise<Result<T["_id"], E>>;
   findById(id: T["_id"], scope: TScope): Promise<Result<Option<T>, E>>;
   findAll(scope: TScope, pagination?: PaginationParams): Promise<Result<PaginatedResult<T>, E>>;
   findMany(

@@ -5,7 +5,6 @@ import { setOrgSsoEnforced } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
-import type { ITransaction } from "../transaction";
 
 export type AdminActionError = AppError<"ADMIN_ACTION_PROVIDER_FAILURE">;
 
@@ -26,7 +25,7 @@ type ActionResult = Promise<Result<void, AdminActionError>>;
 export class AdminActionService {
   constructor(
     private readonly outbox: IOutboxRepository,
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
   ) {}
 

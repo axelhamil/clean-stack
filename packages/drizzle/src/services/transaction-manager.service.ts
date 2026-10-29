@@ -49,19 +49,13 @@ function isFailedResult(value: unknown): boolean {
   return value instanceof Result && value.isFailure;
 }
 
-export class TransactionService implements IUnitOfWork<Transaction> {
+export class TransactionService implements IUnitOfWork {
   constructor(
     private readonly instrumentation: UnitOfWorkInstrumentation,
     private readonly flushHandler: FlushHandler | null = null,
   ) {}
 
-  public async startTransaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
-    return this.instrumentation.startSpan({ name: "TransactionService > startTransaction" }, () =>
-      db.transaction(callback),
-    );
-  }
-
-  public async run<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
+  public async run<T>(work: () => Promise<T>): Promise<T> {
     return this.instrumentation.startSpan({ name: "TransactionService > run" }, async () => {
       const ambient = UnitOfWorkContext.transaction<Transaction>();
       if (ambient) return UnitOfWorkContext.run(ambient, () => this.runNested(ambient, work));
@@ -78,8 +72,8 @@ export class TransactionService implements IUnitOfWork<Transaction> {
     });
   }
 
-  private async runNested<T>(tx: Transaction, work: (tx: Transaction) => Promise<T>): Promise<T> {
-    const result = await work(tx);
+  private async runNested<T>(tx: Transaction, work: () => Promise<T>): Promise<T> {
+    const result = await work();
     const outermost = outermostRuns.get(tx);
 
     if (!isFailedResult(result)) {
@@ -96,14 +90,11 @@ export class TransactionService implements IUnitOfWork<Transaction> {
     throw new FailedResultRollback(result);
   }
 
-  private async runOutermost<T>(
-    tx: Transaction,
-    work: (tx: Transaction) => Promise<T>,
-  ): Promise<T> {
+  private async runOutermost<T>(tx: Transaction, work: () => Promise<T>): Promise<T> {
     const outermost: OutermostRun = { rollbackOnly: false, pending: new Map() };
     outermostRuns.set(tx, outermost);
 
-    const result = await work(tx);
+    const result = await work();
     if (isFailedResult(result)) throw new FailedResultRollback(result);
     if (outermost.rollbackOnly) throw new FailedResultRollback(outermost.failure);
 

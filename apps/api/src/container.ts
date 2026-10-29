@@ -43,11 +43,10 @@ import {
 } from "./shared/services/rate-limiter-flexible.adapter";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
 import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscriber";
-import type { ITransaction } from "./shared/transaction";
 
 declare module "inwire" {
   interface AppDeps {
-    ITransactionService: IUnitOfWork<ITransaction>;
+    ITransactionService: IUnitOfWork;
     IEmailQueue: IEmailQueue;
     IEmailService: IEmailService;
     IOutboxRepository: IOutboxRepository;

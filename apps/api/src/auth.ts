@@ -11,7 +11,7 @@ import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { UnitOfWorkContext } from "@packages/ddd-kit";
-import { type DbClient, db, resolveExecutor, sql } from "@packages/drizzle";
+import { type DbClient, db, resolveExecutor, sql, type Transaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -183,12 +183,20 @@ async function emit<TPayload>(
   });
 }
 
+function ambientTransaction(): Transaction {
+  const tx = UnitOfWorkContext.transaction<Transaction>();
+  if (!tx) throw new Error("a BetterAuth transaction ran outside its unit of work");
+
+  return tx;
+}
+
 function asUnitOfWork(client: DbClient): DbClient {
   return new Proxy(client, {
     get(target, property, receiver) {
       if (property !== "transaction") return Reflect.get(target, property, receiver);
 
-      const transaction: DbClient["transaction"] = (work) => di.ITransactionService.run(work);
+      const transaction: DbClient["transaction"] = (work) =>
+        di.ITransactionService.run(() => work(ambientTransaction()));
       return transaction;
     },
   });

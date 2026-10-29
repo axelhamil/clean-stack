@@ -48,7 +48,7 @@ const stubExportPayload: UserExportPayload = {
 
 let uow: UnitOfWorkMock = mockUnitOfWork();
 
-function throwingUnitOfWork(message: string): IUnitOfWork<never> {
+function throwingUnitOfWork(message: string): IUnitOfWork {
   const { unitOfWork } = mockUnitOfWork();
   unitOfWork.run.mockImplementation(async () => {
     throw new Error(message);
@@ -119,7 +119,7 @@ function buildService(deps: {
   repo: IRgpdRepository;
   email: IEmailService;
   storage?: IStorageService;
-  uow?: IUnitOfWork<never>;
+  uow?: IUnitOfWork;
   outbox?: IOutboxRepository;
   instrumentation?: IInstrumentation;
 }): RgpdService {

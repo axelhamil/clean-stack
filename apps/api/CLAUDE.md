@@ -66,7 +66,7 @@ modules/<context>/
 
 ## Layer purity
 
-**Domain has zero external imports** (only `@packages/ddd-kit` + `zod`). **Application has zero infrastructure imports**: `application/**` imports only `@packages/ddd-kit`, `zod` and the ports and types it owns. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `SessionUser`, `S3Client`, ...). **Why**: application says *what*, not *how*; a use case importing a provider type survives a swap only by accident, which is exactly what ports exist to prevent. **One exception**: `shared/transaction.ts` aliases `type ITransaction = Transaction` so repositories thread the tx natively typed (`tx ?? db` works without a cast). Type-only, single swap-point. Cross-aggregate references use VO ids (`UserId`), never `SessionUser["id"]` or `string`.
+**Domain has zero external imports** (only `@packages/ddd-kit` + `zod`). **Application has zero infrastructure imports**: `application/**` imports only `@packages/ddd-kit`, `zod` and the ports and types it owns. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `SessionUser`, `S3Client`, ...). **Why**: application says *what*, not *how*; a use case importing a provider type survives a swap only by accident, which is exactly what ports exist to prevent. Cross-aggregate references use VO ids (`UserId`), never `SessionUser["id"]` or `string`.
 
 ## Shared kernel (`shared/`)
 
@@ -83,7 +83,6 @@ Cross-cutting infra, no business. Inventory by concern (the file-level list is `
 - `services/event-actor.ts`: `ACTOR_KEYS` + `readUserId`, the one actor-key priority list both the audit trail and the notification audience read.
 - `ssrf-guard.ts` + `private-ranges.ts` (outbound URL guard, webhooks), `aead.ts` (XChaCha20-Poly1305 + per-org HKDF sub-key for webhook secrets at rest), `jitter.ts` (retry backoff), `db-failure.ts` (`dbOperationFailure(code)`: the error a store returns when a query throws), `request-context.ts` (request-scoped ALS: request id + trusted-proxy client IP, for BetterAuth hooks that have no Hono context), `shutdown.ts` (`lifecycleState`, `runShutdown` / `installShutdown`: steps in series, each raced against its timeout, a global deadline, exit `0` only when every step finished), `services/digest-schedule.ts` (pure `digestDueAt`, never anchored on "now").
 - `env.ts`, `logger.ts`: process-level singletons. `env-bounds.ts` (`validateEnvBounds`) holds the cross-field refinement that fails the boot when the sweep timeouts are not nested; kept out of `env.ts` so a test can call it without a full `.env`.
-- `transaction.ts`: the `ITransaction` alias above.
 
 ### Port placement: `shared/ports/` vs `modules/<x>/application/ports/`
 
@@ -93,7 +92,7 @@ The decisor is *who consumes the port*, not where the impl lives.
 - **`modules/<x>/application/ports/`** = single context with business orchestration above it. Impl in `modules/<x>/infrastructure/repositories/` for a persistence port, `modules/<x>/infrastructure/services/` for a port to an external service.
 - **Promotion**: a 2nd module needs an existing module-private port → move it to `shared/ports/`, fix imports. Don't pre-emptively put everything in `shared/`. Demote when the 2nd consumer disappears; delete when the 0th does.
 - Asymmetry between port and impl location is fine. The goal is the absence of cross-module coupling, not symmetry.
-- `IUnitOfWork<TTx>` is the lone cross-cutting primitive in `@packages/ddd-kit`; this project pins `TTx = ITransaction` (impl: `packages/drizzle/CLAUDE.md`).
+- `IUnitOfWork` is the lone cross-cutting primitive in `@packages/ddd-kit`; `run(work)` hands `work` nothing, the open transaction lives in the ambient scope (impl: `packages/drizzle/CLAUDE.md`).
 - **Not a module**: a context with only an infra adapter (no domain, use cases, aggregate, DTO or routes) is shared-kernel infra. Test: removing the "module" leaves only `module.ts` + one port impl → it is not a module.
 
 ## CQRS
@@ -120,7 +119,7 @@ export const xModule = defineModule()((b) =>
 2. **Never `defineModule<TDeps>()`** with an explicit generic, it is a fallback for forward references only.
 3. **Use `typeof di`** for the runtime shape after `.build()`, not the global `AppDeps` interface.
 4. **All deps via DI** (`di.<Binding>`); never `new` a collaborator outside the container (it bypasses the container and breaks per-test impl swaps). No service locators.
-5. **The atomic unit is opened by the use case or service** with `uow.run(...)`; a route opens `di.ITransactionService.run(...)` only when it composes several store writes itself (`profile`, `notifications` routes). Stores take an optional `tx`.
+5. **Transactions are opened by `uow.run` in use cases and route handlers; repositories read the ambient executor.** A route opens `di.ITransactionService.run(...)` only when it composes several store writes itself (`profile`, `notifications` routes). No port, store or service declares a transaction parameter, and only `packages/drizzle` and scripts open a transaction directly; `src/__TESTS__/layering.test.ts` enforces both, each allowance carrying its reason. **Why**: a handle threaded by hand is forgotten at one call site, and that write silently commits outside the unit it belongs to.
 
 ## Domain events (zero-plumbing rail)
 
@@ -128,9 +127,9 @@ Event declaration, payload and actor contract: `packages/events/CLAUDE.md`. Even
 
 ```typescript
 async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
-  return this.uow.run(async (tx) => {
+  return this.uow.run(async () => {
     const order = Order.place(input);          // addEvent(OrderPlaced) inside
-    return this.repo.save(order, tx);           // pulled into ALS collector
+    return this.repo.save(order);               // ambient tx, pulled into ALS collector
   });
   // → outbox_event INSERT happens HERE, in the same TX, before COMMIT
   // → audit_log + webhook_delivery rows written by built-in subscribers

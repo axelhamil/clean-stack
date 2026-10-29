@@ -15,7 +15,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-uow-rollback");
 
-import { EventCollector, Result } from "@packages/ddd-kit";
+import { EventCollector, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import {
   authSchema,
   type DbClient,
@@ -81,6 +81,13 @@ async function backendOf(executor: DbClient | Transaction): Promise<Backend | un
 const sameBackend = (a: Backend | undefined, b: Backend | undefined): boolean =>
   a !== undefined && b !== undefined && a.pid === b.pid && a.txid === b.txid;
 
+function ambient(): Transaction {
+  const tx = UnitOfWorkContext.transaction<Transaction>();
+  if (!tx) throw new Error("check-uow-rollback: no transaction open in this run");
+
+  return tx;
+}
+
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function outboxRows(): Promise<number> {
@@ -109,7 +116,8 @@ async function main(): Promise<void> {
   const uow = new TransactionService(instrumentation);
 
   const renameThen = (name: string, outcome: Result<void, string>) =>
-    uow.run(async (tx) => {
+    uow.run(async () => {
+      const tx = ambient();
       await tx.update(authSchema.user).set({ name }).where(eq(authSchema.user.id, userId));
       await emitEvent(
         outbox,
@@ -143,7 +151,8 @@ async function main(): Promise<void> {
   });
   const expected = new Error("probe: an expected 4xx thrown to abort");
   const thrown = await new TransactionService(spy)
-    .run(async (tx) => {
+    .run(async () => {
+      const tx = ambient();
       await tx
         .update(authSchema.user)
         .set({ name: "Thrown" })
@@ -157,10 +166,11 @@ async function main(): Promise<void> {
   check("the unit of work leaves reporting to the caller (no capture)", captures === 0);
 
   await resetProbe();
-  const outerThenNested = await uow.run(async (tx) => {
+  const outerThenNested = await uow.run(async () => {
+    const tx = ambient();
     const outer = await backendOf(tx);
-    const nested = await uow.run(async (inner) => ({
-      handed: inner === tx,
+    const nested = await uow.run(async () => ({
+      handed: resolveExecutor() === tx,
       ambient: await backendOf(resolveExecutor()),
     }));
 
@@ -174,7 +184,8 @@ async function main(): Promise<void> {
   );
 
   const nestedFailure = Result.fail("probe nested failure");
-  const failedDeep = await uow.run(async (tx) => {
+  const failedDeep = await uow.run(async () => {
+    const tx = ambient();
     await tx
       .update(authSchema.user)
       .set({ name: "Outer write" })
@@ -198,7 +209,8 @@ async function main(): Promise<void> {
       (await outboxRows()) === 0,
   );
 
-  const swallowed = await uow.run(async (tx) => {
+  const swallowed = await uow.run(async () => {
+    const tx = ambient();
     await tx
       .update(authSchema.user)
       .set({ name: "Outer write" })
@@ -214,7 +226,8 @@ async function main(): Promise<void> {
 
   const nestedError = new Error("probe: thrown in a nested run");
   const thrownDeep = await uow
-    .run(async (tx) => {
+    .run(async () => {
+      const tx = ambient();
       await tx
         .update(authSchema.user)
         .set({ name: "Outer write" })
@@ -230,7 +243,8 @@ async function main(): Promise<void> {
     thrownDeep === nestedError && (await currentName()) === ORIGINAL_NAME,
   );
 
-  const leaked = await uow.run(async (tx) => {
+  const leaked = await uow.run(async () => {
+    const tx = ambient();
     const inside = await backendOf(tx);
     const late = (async () => {
       await pause(30);
@@ -250,7 +264,8 @@ async function main(): Promise<void> {
       afterCommit.backend.txid !== leaked.inside?.txid,
   );
 
-  const timed = await uow.run(async (tx) => {
+  const timed = await uow.run(async () => {
+    const tx = ambient();
     const before = await backendOf(tx);
     await pause(20);
     const executor = resolveExecutor();
@@ -262,9 +277,10 @@ async function main(): Promise<void> {
     timed.sameTx && sameBackend(timed.before, timed.after),
   );
 
-  const bothCommitted = await uow.run(async (tx) => {
-    const nested = await uow.run(async (inner) => {
-      await inner
+  const bothCommitted = await uow.run(async () => {
+    const tx = ambient();
+    const nested = await uow.run(async () => {
+      await ambient()
         .update(authSchema.user)
         .set({ name: "Nested write" })
         .where(eq(authSchema.user.id, userId));
@@ -298,7 +314,8 @@ async function main(): Promise<void> {
 
   await resetProbe();
   const unpersistable = await uow
-    .run(async (tx) => {
+    .run(async () => {
+      const tx = ambient();
       await tx
         .update(authSchema.user)
         .set({ name: "Written with a lost event" })
