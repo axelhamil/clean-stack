@@ -129,6 +129,7 @@ Frontend cards: `DataExportCard` (→ `/settings/privacy`), `RgpdDeletionCard` +
 ## API: Hono on Bun ✅
 
 - **Native `Bun.serve()`**: `bun build` prod (~7 ms cold), `bun --hot` dev.
+- **Ordered shutdown** (`apps/api/src/shared/shutdown.ts`, steps in `index.ts`): SIGTERM flips `/readyz`, waits the grace, then `http` (drain, then cut what remains) → `workers` (4 runners in parallel, capped by `SHUTDOWN_WORKERS_TIMEOUT_MS`) → `database-pool` (main + rate-limit pools, skipped when `workers` timed out) → `telemetry-flush`, the other steps capped by `SHUTDOWN_STEP_TIMEOUT_MS`, whole run capped by `SHUTDOWN_DEADLINE_MS` (validated against the worst case at boot); exit `0` only when every step finished. Detail: [HEALTH-PROBES.md](HEALTH-PROBES.md).
 - **Hono RPC** end-to-end types via `hcWithType` (one client instance).
 - **Pipeline** (in order): `requestId` → `httpLogger` (pino) → `secureHeaders` + `cors` → `sessionMiddleware` → `auth.handler` for `/api/auth/*` → `app.onError`.
 - **CQRS**: Commands → Use Cases; Queries hit Drizzle directly.

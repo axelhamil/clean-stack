@@ -111,12 +111,17 @@ On `SIGTERM` / `SIGINT`:
 
 1. `lifecycleState.signalShutdown()`: `/readyz` immediately returns `503` (status `"fail"`, output `"shutting down"`). The LB stops routing new requests within one probe interval (~5 s).
 2. Wait `SHUTDOWN_GRACE_PERIOD_MS` (default `15000`, env-tunable) for in-flight requests to drain.
-3. Stop the four background runners in parallel, webhook delivery worker, email delivery worker, outbox dispatcher, notification stream hub (each with its own 25 s timeout, and a step that throws or times out never blocks the others).
-4. `process.exit(0)`.
+3. Then, in series, each step raced against its own budget: `http` (`SHUTDOWN_STEP_TIMEOUT_MS`, default `2000`) drains the `Bun.serve` handle with `server.stop()` and, 250 ms before the budget ends, cuts what is left with `server.stop(true)` (a long-lived stream such as the notification SSE never ends on its own, it reconnects elsewhere); `workers` (`SHUTDOWN_WORKERS_TIMEOUT_MS`, default `12000`, longer because a drain can sit in a Resend call) stops the four background runners in parallel (webhook delivery, email delivery, outbox dispatcher, notification stream hub); `database-pool` (`SHUTDOWN_STEP_TIMEOUT_MS`) ends both pg pools (main and rate-limit), and is skipped when `workers` timed out, since closing the pool under a running drain leaves a sent but unmarked email that is sent again; `telemetry-flush` drains Sentry for up to 2 s.
+4. Exit `0` only when every step finished; a step that throws or times out is logged and the next one still runs, but the exit code becomes `1`.
+5. Global deadline `SHUTDOWN_DEADLINE_MS` (default `36000`): when reached, Sentry gets a last 1 s flush and the process exits `1`. A second signal exits `1` at once.
+
+The boot refuses a configuration whose worst case exceeds `SHUTDOWN_DEADLINE_MS` (`env-bounds.ts`): `SHUTDOWN_GRACE_PERIOD_MS + 1000 + 2 x SHUTDOWN_STEP_TIMEOUT_MS + SHUTDOWN_WORKERS_TIMEOUT_MS + 2500` (telemetry flush) `+ 1000` (deadline flush), `36000` with the defaults, since a slow but healthy shutdown would then be cut and exit `1`.
+
+**Platform stop timeout**: the delay between `SIGTERM` and `SIGKILL` on the platform must exceed `SHUTDOWN_DEADLINE_MS`, or the platform kills the process mid-drain and the deadline never fires (Railway: `RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, see [DEPLOY-RAILWAY.md](DEPLOY-RAILWAY.md); Kubernetes: `terminationGracePeriodSeconds`; Fly: `kill_timeout`).
 
 **Without this flip**, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
 
-The flag lives in `apps/api/src/shared/shutdown.ts` as a process-level singleton (same pattern as `env.ts` / `logger.ts`: it's lifecycle state, not business state). `lifecycleState.markStarted()` is fired after workers have booted, gating `/startupz`.
+The steps are declared in `apps/api/src/index.ts` and run by `runShutdown` / `installShutdown` in `apps/api/src/shared/shutdown.ts`. The flag lives in the same file as a process-level singleton (same pattern as `env.ts` / `logger.ts`: it's lifecycle state, not business state). `lifecycleState.markStarted()` is fired after workers have booted, gating `/startupz`.
 
 ## Env vars
 
@@ -125,6 +130,9 @@ The flag lives in `apps/api/src/shared/shutdown.ts` as a process-level singleton
 | `GIT_SHA` | `"unknown"` | Surfaced in `/livez` + `/startupz` payload (`version` = first 12 chars). Inject at CI build via `GIT_SHA=$(git rev-parse HEAD)` for release tracking. |
 | `BUILD_TIME` | `"unknown"` | ISO timestamp of the build, surfaced in `/livez` + `/startupz`. Inject at CI: `BUILD_TIME=$(date -u +%FT%TZ)`. |
 | `SHUTDOWN_GRACE_PERIOD_MS` | `15000` | Time between SIGTERM and worker stop (window for LB to redirect + in-flight requests to drain). Tune per PaaS. |
+| `SHUTDOWN_STEP_TIMEOUT_MS` | `2000` | Cap of the `http` and `database-pool` steps. |
+| `SHUTDOWN_WORKERS_TIMEOUT_MS` | `12000` | Cap of the `workers` step (a drain mid Resend call). When it times out, `database-pool` is skipped. |
+| `SHUTDOWN_DEADLINE_MS` | `36000` | Hard cap of the whole shutdown, exit `1` when reached. Must cover the worst case above and stay below the platform's SIGKILL delay. |
 
 ## Deploy target recipes
 

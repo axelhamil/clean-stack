@@ -28,6 +28,8 @@ The non-obvious failure modes that crash a fresh deploy. Every one below was hit
 
 **Cross-site auth cookies.** On Railway-generated domains, `app` and `api` sit on different `*.up.railway.app` hosts = different sites (`up.railway.app` is a public suffix). BetterAuth's session cookie must be `SameSite=None; Secure` to survive a cross-site credentialed `fetch`: already wired (`apps/api/src/auth.ts`: `sameSite: isProd ? "none" : "lax"`). With a **custom domain under one parent** (`api.x.com` + `app.x.com`) the cookie is same-site → `SameSite=Lax` works and is preferable. See §8.
 
+**Draining time must exceed the shutdown deadline.** On a redeploy Railway sends `SIGTERM`, then `SIGKILL` once the service's draining time (`RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, Settings → Deploy) runs out. Railway does not document the default, staff answers put it at a few seconds, so treat the setting as required. The API needs up to `SHUTDOWN_DEADLINE_MS` (36 s by default) to drain HTTP, stop the workers and flush telemetry, so set the draining time on `api` above it (e.g. `40`). Below it, the process is killed mid-drain: in-flight emails can be sent twice and the last Sentry batch is lost. Detail: [HEALTH-PROBES.md](HEALTH-PROBES.md#graceful-shutdown-readyz-flips-before-workers-stop).
+
 **Deploys build from the connected branch.** Changing a variable, hitting *Redeploy*, or pushing all rebuild from the GitHub branch wired to the service (`main`). `railway up` is the only path that deploys local working-tree code, handy for validation, but it does **not** populate `RAILWAY_GIT_*` vars, so build-info shows `unknown` until a real branch deploy.
 
 ---

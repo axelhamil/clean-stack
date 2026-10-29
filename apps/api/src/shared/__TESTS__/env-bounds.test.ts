@@ -10,8 +10,19 @@ const boundsSchema = z
     SERVER_IDLE_TIMEOUT_SECONDS: z.number(),
     SWEEP_DEADLINE_MS: z.number(),
     INTERNAL_FETCH_TIMEOUT_MS: z.number(),
+    SHUTDOWN_GRACE_PERIOD_MS: z.number(),
+    SHUTDOWN_STEP_TIMEOUT_MS: z.number(),
+    SHUTDOWN_WORKERS_TIMEOUT_MS: z.number(),
+    SHUTDOWN_DEADLINE_MS: z.number(),
   })
   .superRefine(validateEnvBounds);
+
+const SHUTDOWN_DEFAULTS = {
+  SHUTDOWN_GRACE_PERIOD_MS: 15_000,
+  SHUTDOWN_STEP_TIMEOUT_MS: 2_000,
+  SHUTDOWN_WORKERS_TIMEOUT_MS: 12_000,
+  SHUTDOWN_DEADLINE_MS: 36_000,
+};
 
 describe("validateEnvBounds", () => {
   it("accepts the three defaults", () => {
@@ -19,6 +30,7 @@ describe("validateEnvBounds", () => {
       SERVER_IDLE_TIMEOUT_SECONDS: 120,
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
     });
     expect(result.success).toBe(true);
   });
@@ -28,6 +40,7 @@ describe("validateEnvBounds", () => {
       SERVER_IDLE_TIMEOUT_SECONDS: 120,
       SWEEP_DEADLINE_MS: 120_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -37,6 +50,7 @@ describe("validateEnvBounds", () => {
       SERVER_IDLE_TIMEOUT_SECONDS: 120,
       SWEEP_DEADLINE_MS: 130_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -46,6 +60,7 @@ describe("validateEnvBounds", () => {
       SERVER_IDLE_TIMEOUT_SECONDS: 120,
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 120_000,
+      ...SHUTDOWN_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -55,7 +70,31 @@ describe("validateEnvBounds", () => {
       SERVER_IDLE_TIMEOUT_SECONDS: 120,
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 100_000,
+      ...SHUTDOWN_DEFAULTS,
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts a shutdown deadline equal to the worst case and rejects one millisecond less", () => {
+    const sweepBounds = {
+      SERVER_IDLE_TIMEOUT_SECONDS: 120,
+      SWEEP_DEADLINE_MS: 90_000,
+      INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+    };
+    const worstCaseMs = 15_000 + 1_000 + 2_000 + 12_000 + 2_000 + 2_000 + 500 + 1_000;
+
+    const atBudget = boundsSchema.safeParse({
+      ...sweepBounds,
+      ...SHUTDOWN_DEFAULTS,
+      SHUTDOWN_DEADLINE_MS: worstCaseMs,
+    });
+    const belowBudget = boundsSchema.safeParse({
+      ...sweepBounds,
+      ...SHUTDOWN_DEFAULTS,
+      SHUTDOWN_DEADLINE_MS: worstCaseMs - 1,
+    });
+
+    expect(atBudget.success).toBe(true);
+    expect(belowBudget.success).toBe(false);
   });
 });

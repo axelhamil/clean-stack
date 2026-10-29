@@ -32,19 +32,29 @@ export type Transaction = NodePgTransaction<
 >;
 
 let _db: DbClient | null = null;
+let _pool: Pool | null = null;
 
 function getDb(): DbClient {
   if (_db) return _db;
 
-  const pool = new Pool({
+  _pool = new Pool({
     connectionString: requireDatabaseUrl(),
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
-  _db = drizzle(pool, { schema });
+  _db = drizzle(_pool, { schema });
 
   return _db;
+}
+
+export async function closeDb(): Promise<void> {
+  const pool = _pool;
+  if (!pool) return;
+
+  _pool = null;
+  _db = null;
+  await pool.end();
 }
 
 export const db = new Proxy({} as DbClient, {
