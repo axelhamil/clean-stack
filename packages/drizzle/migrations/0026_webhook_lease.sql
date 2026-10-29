@@ -1,0 +1,1 @@
+CREATE INDEX "webhook_delivery_dead_retry_idx" ON "webhook_delivery" USING btree ("next_attempt_at") WHERE "webhook_delivery"."status" = 'dead_letter' and "webhook_delivery"."next_attempt_at" is not null;

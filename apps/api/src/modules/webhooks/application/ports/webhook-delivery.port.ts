@@ -40,12 +40,18 @@ export type ListDeliveriesArgs = {
   cursor?: string;
 };
 
-export type DeliveryUpdate = {
-  status: WebhookDeliveryStatus;
-  attempts: number;
-  nextAttemptAt: Option<Date>;
-  lastError: Option<string>;
+export type DeliveryLease = Pick<WebhookDeliveryRecord, "id" | "attempts">;
+
+export type DeliveryClaimRequest = {
+  limit: number;
+  leaseSeconds: number;
+};
+
+export type DeliveryFailure = {
+  lastError: string;
   lastResponseStatus: Option<number>;
+  status: "failed" | "dead_letter";
+  retryAfterSeconds: Option<number>;
 };
 
 export type DeliveryPage = {
@@ -56,8 +62,16 @@ export type DeliveryPage = {
 export interface IWebhookDeliveryRepository {
   list(args: ListDeliveriesArgs): Promise<Result<DeliveryPage, WebhookRepoError>>;
   findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>>;
-  updateStatus(id: string, update: DeliveryUpdate): Promise<Result<void, WebhookRepoError>>;
-  findPendingBatch(limit: number): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
+  claim(request: DeliveryClaimRequest): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
+  markSuccess(
+    lease: DeliveryLease,
+    lastResponseStatus: Option<number>,
+  ): Promise<Result<boolean, WebhookRepoError>>;
+  markFailed(
+    lease: DeliveryLease,
+    failure: DeliveryFailure,
+  ): Promise<Result<boolean, WebhookRepoError>>;
+  release(lease: DeliveryLease): Promise<Result<boolean, WebhookRepoError>>;
   enqueueReplay(
     deliveryId: string,
     endpointId: string,

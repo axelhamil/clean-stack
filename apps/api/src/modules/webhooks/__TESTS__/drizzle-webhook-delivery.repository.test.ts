@@ -44,11 +44,11 @@ const fakeDb = {
   insert: () => makeDbQuery(),
   update: () => makeDbQuery(),
   delete: () => makeDbQuery(),
+  with: () => makeDbQuery(),
 };
 
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: fakeDb,
   resolveExecutor: () => UnitOfWorkContext.transaction() ?? fakeDb,
 }));
 
@@ -217,64 +217,27 @@ describe("DrizzleWebhookDeliveryRepository", () => {
   });
 
   // -------------------------------------------------------------------------
-  // updateStatus
+  // claim / settle
   // -------------------------------------------------------------------------
 
-  describe("updateStatus", () => {
-    it("happy path: returns Result.ok(void)", async () => {
-      dbBehavior = async () => [];
+  describe("claim", () => {
+    it("returns the claimed rows oldest first", async () => {
+      dbBehavior = async () => [
+        { ...fakeDelivery, id: "del-2", createdAt: new Date("2024-01-02") },
+        fakeDelivery,
+      ];
 
-      const update = {
-        status: "success" as const,
-        attempts: 1,
-        nextAttemptAt: Option.none<Date>(),
-        lastError: Option.none<string>(),
-        lastResponseStatus: Option.some(200),
-      };
-      const result = await UnitOfWorkContext.run(makeTx(), () =>
-        repo.updateStatus("del-1", update),
-      );
+      const result = await repo.claim({ limit: 10, leaseSeconds: 330 });
 
-      expect(result.isSuccess).toBe(true);
-    });
-
-    it("happy path: outer span name and inner db.query span with postgresql attribute", async () => {
-      dbBehavior = async () => [];
-      const spy = spyOn(instrumentation, "startSpan");
-
-      const update = {
-        status: "success" as const,
-        attempts: 1,
-        nextAttemptAt: Option.none<Date>(),
-        lastError: Option.none<string>(),
-        lastResponseStatus: Option.some(200),
-      };
-      await UnitOfWorkContext.run(makeTx(), () => repo.updateStatus("del-1", update));
-
-      const calls = spy.mock.calls;
-      const outer = calls.find(
-        (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > updateStatus",
-      );
-      const inner = calls.find((c) => c[0]?.op === "db.query");
-      expect(outer).toBeDefined();
-      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+      expect(result.isSuccess && result.getValue().map((d) => d.id)).toEqual(["del-1", "del-2"]);
     });
 
     it("failure path: DB throws → capture called + Result.fail", async () => {
-      const boom = new Error("update boom");
+      const boom = new Error("claim boom");
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const update = {
-        status: "success" as const,
-        attempts: 1,
-        nextAttemptAt: Option.none<Date>(),
-        lastError: Option.none<string>(),
-        lastResponseStatus: Option.some(200),
-      };
-      const result = await UnitOfWorkContext.run(makeTx(), () =>
-        repo.updateStatus("del-1", update),
-      );
+      const result = await repo.claim({ limit: 10, leaseSeconds: 330 });
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -282,50 +245,39 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // findPendingBatch
-  // -------------------------------------------------------------------------
+  describe("settle", () => {
+    const lease = { id: "del-1", attempts: 1 };
+    const failure = {
+      lastError: "HTTP 500",
+      lastResponseStatus: Option.some(500),
+      status: "failed" as const,
+      retryAfterSeconds: Option.some(3),
+    };
 
-  describe("findPendingBatch", () => {
-    it("happy path: returns rows ready for dispatch", async () => {
-      dbBehavior = async () => [fakeDelivery, { ...fakeDelivery, id: "del-2" }];
-
-      const result = await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(10));
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue()).toHaveLength(2);
-    });
-
-    it("happy path: returns empty array when nothing pending", async () => {
+    it("markSuccess, markFailed and release report whether they wrote", async () => {
+      dbBehavior = async () => [{ id: "del-1" }];
+      const wrote = [
+        await repo.markSuccess(lease, Option.some(200)),
+        await repo.markFailed(lease, failure),
+        await repo.release(lease),
+      ];
       dbBehavior = async () => [];
+      const skipped = [
+        await repo.markSuccess(lease, Option.some(200)),
+        await repo.markFailed(lease, failure),
+        await repo.release(lease),
+      ];
 
-      const result = await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(10));
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue()).toEqual([]);
-    });
-
-    it("happy path: outer span + inner db.query span with postgresql attribute", async () => {
-      dbBehavior = async () => [];
-      const spy = spyOn(instrumentation, "startSpan");
-
-      await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(5));
-
-      const calls = spy.mock.calls;
-      const outer = calls.find(
-        (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > findPendingBatch",
-      );
-      const inner = calls.find((c) => c[0]?.op === "db.query");
-      expect(outer).toBeDefined();
-      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+      expect(wrote.map((r) => r.isSuccess && r.getValue())).toEqual([true, true, true]);
+      expect(skipped.map((r) => r.isSuccess && r.getValue())).toEqual([false, false, false]);
     });
 
     it("failure path: DB throws → capture called + Result.fail", async () => {
-      const boom = new Error("batch boom");
+      const boom = new Error("settle boom");
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(10));
+      const result = await repo.markFailed(lease, failure);
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");

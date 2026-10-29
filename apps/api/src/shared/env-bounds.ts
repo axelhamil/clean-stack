@@ -10,6 +10,9 @@ import {
 export const OUTBOX_SETTLE_MARGIN_SECONDS = 10;
 export const EMAIL_SEND_TIMEOUT_SECONDS = 30;
 export const EMAIL_SETTLE_MARGIN_SECONDS = 15;
+export const WEBHOOK_DNS_TIMEOUT_SECONDS = 5;
+export const WEBHOOK_FETCH_TIMEOUT_SECONDS = 30;
+export const WEBHOOK_SETTLE_MARGIN_SECONDS = 30;
 
 /**
  * The sweep-timeout bounds only work nested: the sweep must be able to finish and
@@ -36,6 +39,7 @@ export function validateEnvBounds(
     EMAIL_LEASE_SECONDS: number;
     EMAIL_DEAD_RETRY_HOURS: number;
     EMAIL_DEAD_REPLAY_WINDOW_HOURS: number;
+    WEBHOOK_LEASE_SECONDS: number;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -91,6 +95,16 @@ export function validateEnvBounds(
       code: "custom",
       path: ["EMAIL_DEAD_REPLAY_WINDOW_HOURS"],
       message: `EMAIL_DEAD_REPLAY_WINDOW_HOURS (${value.EMAIL_DEAD_REPLAY_WINDOW_HOURS}) must exceed EMAIL_DEAD_RETRY_HOURS (${value.EMAIL_DEAD_RETRY_HOURS}), or a dead email leaves its replay window before its first replay is due and is never retried.`,
+    });
+  }
+
+  const webhookLeaseFloor =
+    WEBHOOK_DNS_TIMEOUT_SECONDS + WEBHOOK_FETCH_TIMEOUT_SECONDS + WEBHOOK_SETTLE_MARGIN_SECONDS;
+  if (value.WEBHOOK_LEASE_SECONDS < webhookLeaseFloor) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["WEBHOOK_LEASE_SECONDS"],
+      message: `WEBHOOK_LEASE_SECONDS (${value.WEBHOOK_LEASE_SECONDS}) must be at least the ${WEBHOOK_DNS_TIMEOUT_SECONDS}s lookup timeout + the ${WEBHOOK_FETCH_TIMEOUT_SECONDS}s delivery timeout + the ${WEBHOOK_SETTLE_MARGIN_SECONDS}s claim and settle margin (${webhookLeaseFloor}), or a delivery still waiting on its endpoint outlives the lease and another worker sends it again.`,
     });
   }
 }

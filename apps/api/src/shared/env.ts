@@ -107,6 +107,8 @@ const envSchema = z
     WEBHOOK_AUTO_DISABLE_AFTER_DAYS: z.coerce.number().int().positive().default(5),
     WEBHOOK_AUTO_DISABLE_MIN_FAILURES: z.coerce.number().int().positive().default(2),
     WEBHOOK_RESPONSE_CAPTURE_BYTES: z.coerce.number().int().positive().default(4096),
+    WEBHOOK_LEASE_SECONDS: z.coerce.number().int().positive().default(330),
+    WEBHOOK_DEAD_RETRY_HOURS: z.coerce.number().positive().default(6),
     CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
     NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     NOTIFICATION_DIGEST_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(8),

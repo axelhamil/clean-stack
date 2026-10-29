@@ -5,6 +5,9 @@ import {
   EMAIL_SETTLE_MARGIN_SECONDS,
   OUTBOX_SETTLE_MARGIN_SECONDS,
   validateEnvBounds,
+  WEBHOOK_DNS_TIMEOUT_SECONDS,
+  WEBHOOK_FETCH_TIMEOUT_SECONDS,
+  WEBHOOK_SETTLE_MARGIN_SECONDS,
 } from "../env-bounds";
 
 // Exercises the real guard (`superRefine` in env.ts) against plain literals. Never
@@ -24,6 +27,7 @@ const boundsSchema = z
     EMAIL_LEASE_SECONDS: z.number(),
     EMAIL_DEAD_RETRY_HOURS: z.number(),
     EMAIL_DEAD_REPLAY_WINDOW_HOURS: z.number(),
+    WEBHOOK_LEASE_SECONDS: z.number(),
   })
   .superRefine(validateEnvBounds);
 
@@ -40,6 +44,7 @@ const QUEUE_DEFAULTS = {
   EMAIL_LEASE_SECONDS: 120,
   EMAIL_DEAD_RETRY_HOURS: 6,
   EMAIL_DEAD_REPLAY_WINDOW_HOURS: 24,
+  WEBHOOK_LEASE_SECONDS: 330,
 };
 
 describe("validateEnvBounds", () => {
@@ -175,6 +180,24 @@ describe("validateEnvBounds", () => {
 
     const atFloor = boundsSchema.safeParse({ ...bounds, EMAIL_LEASE_SECONDS: floor });
     const below = boundsSchema.safeParse({ ...bounds, EMAIL_LEASE_SECONDS: floor - 1 });
+
+    expect(atFloor.success).toBe(true);
+    expect(below.success).toBe(false);
+  });
+
+  it("rejects a webhook lease shorter than one lookup and delivery timeout plus the settle margin", () => {
+    const bounds = {
+      SERVER_IDLE_TIMEOUT_SECONDS: 120,
+      SWEEP_DEADLINE_MS: 90_000,
+      INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
+      ...QUEUE_DEFAULTS,
+    };
+    const floor =
+      WEBHOOK_DNS_TIMEOUT_SECONDS + WEBHOOK_FETCH_TIMEOUT_SECONDS + WEBHOOK_SETTLE_MARGIN_SECONDS;
+
+    const atFloor = boundsSchema.safeParse({ ...bounds, WEBHOOK_LEASE_SECONDS: floor });
+    const below = boundsSchema.safeParse({ ...bounds, WEBHOOK_LEASE_SECONDS: floor - 1 });
 
     expect(atFloor.success).toBe(true);
     expect(below.success).toBe(false);
