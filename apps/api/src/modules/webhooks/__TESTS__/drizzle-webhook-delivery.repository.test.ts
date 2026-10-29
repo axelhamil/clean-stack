@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
@@ -38,14 +39,17 @@ function makeDbQuery() {
 
 // Only what this file's subject actually touches: test files do not share a module
 // registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
+const fakeDb = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+};
+
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    select: () => makeDbQuery(),
-    insert: () => makeDbQuery(),
-    update: () => makeDbQuery(),
-    delete: () => makeDbQuery(),
-  },
+  db: fakeDb,
+  resolveExecutor: () => UnitOfWorkContext.transaction() ?? fakeDb,
 }));
 
 // All imports AFTER mock.module to ensure mocks are in place before module resolution.
@@ -227,7 +231,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
         lastError: Option.none<string>(),
         lastResponseStatus: Option.some(200),
       };
-      const result = await repo.updateStatus("del-1", update, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.updateStatus("del-1", update),
+      );
 
       expect(result.isSuccess).toBe(true);
     });
@@ -243,7 +249,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
         lastError: Option.none<string>(),
         lastResponseStatus: Option.some(200),
       };
-      await repo.updateStatus("del-1", update, makeTx());
+      await UnitOfWorkContext.run(makeTx(), () => repo.updateStatus("del-1", update));
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -266,7 +272,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
         lastError: Option.none<string>(),
         lastResponseStatus: Option.some(200),
       };
-      const result = await repo.updateStatus("del-1", update, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.updateStatus("del-1", update),
+      );
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -282,7 +290,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns rows ready for dispatch", async () => {
       dbBehavior = async () => [fakeDelivery, { ...fakeDelivery, id: "del-2" }];
 
-      const result = await repo.findPendingBatch(10, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(10));
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toHaveLength(2);
@@ -291,7 +299,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns empty array when nothing pending", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.findPendingBatch(10, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(10));
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toEqual([]);
@@ -301,7 +309,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.findPendingBatch(5, makeTx());
+      await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(5));
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -317,7 +325,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.findPendingBatch(10, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () => repo.findPendingBatch(10));
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -397,7 +405,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns Result.ok(void)", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.createAttempt(fakeAttemptArgs, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.createAttempt(fakeAttemptArgs),
+      );
 
       expect(result.isSuccess).toBe(true);
     });
@@ -406,7 +416,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.createAttempt(fakeAttemptArgs, makeTx());
+      await UnitOfWorkContext.run(makeTx(), () => repo.createAttempt(fakeAttemptArgs));
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -422,7 +432,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.createAttempt(fakeAttemptArgs, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.createAttempt(fakeAttemptArgs),
+      );
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -506,7 +518,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns Result.ok with the inserted delivery", async () => {
       dbBehavior = async () => [fakeDelivery];
 
-      const result = await repo.enqueueTargeted(targetedArgs, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.enqueueTargeted(targetedArgs),
+      );
 
       expect(result.isSuccess).toBe(true);
       expect(result.getValue().id).toBe("del-1");
@@ -516,7 +530,7 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       dbBehavior = async () => [fakeDelivery];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueTargeted(targetedArgs, makeTx());
+      await UnitOfWorkContext.run(makeTx(), () => repo.enqueueTargeted(targetedArgs));
 
       const calls = spy.mock.calls;
       const outer = calls.find(
@@ -532,7 +546,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const result = await repo.enqueueTargeted(targetedArgs, makeTx());
+      const result = await UnitOfWorkContext.run(makeTx(), () =>
+        repo.enqueueTargeted(targetedArgs),
+      );
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");

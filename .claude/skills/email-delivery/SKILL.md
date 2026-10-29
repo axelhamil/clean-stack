@@ -5,7 +5,7 @@ description: Use when working on outgoing email, the queue, the delivery worker,
 
 # Email delivery (`shared/services/`)
 
-**Emails enqueued, never sent inline.** `IEmailService` (`QueuedEmailService`) writes to `email_message` inside the caller's TX when `options.tx` is passed (atomic). `EmailDeliveryWorker` polls every 2 s, delivers via `resend.batch.send` (100 emails/request, 10 req/s ceiling, `batchValidation: "permissive"`).
+**Emails enqueued, never sent inline.** `IEmailService` (`QueuedEmailService`) writes to `email_message` through the ambient executor: inside a `uow.run()` the row joins the caller's TX (atomic), outside one it autocommits. `EmailDeliveryWorker` polls every 2 s, delivers via `resend.batch.send` (100 emails/request, 10 req/s ceiling, `batchValidation: "permissive"`).
 
 - **Never call Resend directly from a request path.** Use `di.IEmailService.sendTemplate(...)` or `di.IEmailService.sendTemplateBatch(...)`.
 - **Failure is best-effort**: logs at `warn`, never rolls back the caller.

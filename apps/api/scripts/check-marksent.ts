@@ -53,9 +53,10 @@ async function main(): Promise<void> {
   const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
   const sentAt = new Date();
 
-  const result = await db.transaction(async (tx) =>
-    queue.markSent(ids, sentAt, { "check-marksent-a": "p1", "check-marksent-b": "p2" }, tx),
-  );
+  const result = await queue.markSent(ids, sentAt, {
+    "check-marksent-a": "p1",
+    "check-marksent-b": "p2",
+  });
 
   console.log("[1] markSent result ->", result.isFailure ? result.getError() : "success");
   check("markSent reports success", result.isSuccess);
@@ -110,9 +111,7 @@ async function main(): Promise<void> {
   // bare `ELSE NULL`, the one shape Postgres can fail to resolve a type for. This is
   // distinct from the `c` case above (map non-empty, one id absent from it).
   await db.insert(em).values(seedRows(allNullIds));
-  const allNullResult = await db.transaction(async (tx) =>
-    queue.markSent(allNullIds, sentAt, {}, tx),
-  );
+  const allNullResult = await queue.markSent(allNullIds, sentAt, {});
   console.log(
     "[3] all-NULL markSent result ->",
     allNullResult.isFailure ? allNullResult.getError() : "success",
@@ -134,7 +133,7 @@ async function main(): Promise<void> {
   );
 
   // Empty ids must be a no-op, no `WHERE id IN ()` should be emitted, and no row touched.
-  const emptyResult = await db.transaction(async (tx) => queue.markSent([], sentAt, {}, tx));
+  const emptyResult = await queue.markSent([], sentAt, {});
   check("markSent([]) reports success", emptyResult.isSuccess);
 
   const untouchedCount = await db.select({ id: em.id }).from(em).where(inArray(em.id, ids));

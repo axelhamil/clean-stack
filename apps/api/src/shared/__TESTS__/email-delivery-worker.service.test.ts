@@ -1,16 +1,10 @@
-import { describe, expect, it, mock } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
-import * as realDrizzle from "@packages/drizzle";
+import { describe, expect, it } from "bun:test";
+import { type IDomainEvent, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { EmailMessageRecord } from "../ports/email-queue.port";
-
-mock.module("@packages/drizzle", () => ({
-  ...realDrizzle,
-  db: {
-    transaction: async (cb: (tx: object) => unknown) => cb({}),
-  },
-}));
 
 // `@packages/emails` is intentionally NOT mocked here: nothing in this file asserts
 // on rendered content (only on which row got claimed/sent), so exercising the real
@@ -40,7 +34,12 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
 
 function harness(rows: EmailMessageRecord[]) {
   const sent: string[][] = [];
-  const settled: Array<{ id: string; error: string; nextAttemptAt: Option<Date> }> = [];
+  const settled: Array<{
+    id: string;
+    error: string;
+    nextAttemptAt: Option<Date>;
+    tx: unknown;
+  }> = [];
   let batchImpl: (payload: unknown[]) => Promise<{
     data: Array<{ id: string }> | null;
     errors?: Array<{ index: number; message: string }>;
@@ -57,7 +56,7 @@ function harness(rows: EmailMessageRecord[]) {
       return Result.ok<void, never>(undefined);
     },
     markFailed: async (id: string, error: string, nextAttemptAt: Option<Date>) => {
-      settled.push({ id, error, nextAttemptAt });
+      settled.push({ id, error, nextAttemptAt, tx: UnitOfWorkContext.transaction() });
       return Result.ok<void, never>(undefined);
     },
   };
@@ -76,10 +75,15 @@ function harness(rows: EmailMessageRecord[]) {
 const outboxStub = { enqueue: async () => {} };
 const loggerStub = { info() {}, warn() {}, error() {} };
 
-function makeWorker(h: ReturnType<typeof harness>) {
+function makeWorker(
+  h: ReturnType<typeof harness>,
+  outbox: object = outboxStub,
+  unitOfWork = mockUnitOfWork().unitOfWork,
+) {
   return new EmailDeliveryWorker(
     h.queue as never,
-    outboxStub as never,
+    outbox as never,
+    unitOfWork,
     loggerStub as never,
     new NoOpInstrumentation(),
     { batchSend: h.batch },
@@ -137,6 +141,31 @@ describe("EmailDeliveryWorker.drainOnce", () => {
     expect(h.settled[0]?.nextAttemptAt.isNone()).toBe(true);
   });
 
+  it("given a rejected recipient, when drained, then the failure and its exhausted event commit in one unit of work", async () => {
+    const h = harness([row({ id: "1", toAddress: "bad" })]);
+    h.setBatch(async () => ({
+      data: [],
+      errors: [{ index: 0, message: "invalid recipient" }],
+      error: null,
+    }));
+    const enqueued: Array<{ events: IDomainEvent[]; tx: unknown }> = [];
+    const outbox = {
+      enqueue: async (events: IDomainEvent[]) => {
+        enqueued.push({ events, tx: UnitOfWorkContext.transaction() });
+      },
+    };
+    const { unitOfWork, outcome } = mockUnitOfWork();
+
+    await makeWorker(h, outbox, unitOfWork).drainOnce();
+
+    expect(outcome()).toBe("committed");
+    expect(enqueued.map((e) => e.events[0]?.eventType)).toEqual([
+      EventTypes.EMAIL_DELIVERY_EXHAUSTED,
+    ]);
+    expect(enqueued[0]?.tx).toBeDefined();
+    expect(enqueued[0]?.tx).toBe(h.settled[0]?.tx);
+  });
+
   it("does not attach provider ids when data is not positionally aligned", async () => {
     const h = harness([row({ id: "1" }), row({ id: "2", toAddress: "bad" })]);
     h.setBatch(async () => ({
@@ -175,6 +204,7 @@ describe("EmailDeliveryWorker.start", () => {
         },
       } as never,
       outboxStub as never,
+      mockUnitOfWork().unitOfWork,
       { ...loggerStub, error: (_obj: unknown, msg: string) => errors.push(msg) } as never,
       instrumentation,
       { batchSend: h.batch },

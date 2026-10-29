@@ -4,12 +4,11 @@ import { emitEvent } from "../../../../shared/event-emitter";
 import type { IApiTokenRepository } from "../../../../shared/ports/api-token.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type { ITransaction } from "../../../../shared/transaction";
 
 interface Deps {
   IApiTokenRepository: IApiTokenRepository;
   IOutboxRepository: IOutboxRepository;
-  ITransactionService: IUnitOfWork<ITransaction>;
+  ITransactionService: IUnitOfWork;
   IInstrumentation: IInstrumentation;
 }
 
@@ -22,12 +21,8 @@ export const revokeTokensOnMembershipLost: (deps: Deps) => EventHandler = onEven
     const { userId, organizationId, actorUserId } = parsed.data;
 
     try {
-      await c.ITransactionService.run(async (tx) => {
-        const result = await c.IApiTokenRepository.revokeAllForMembership(
-          userId,
-          organizationId,
-          tx,
-        );
+      await c.ITransactionService.run(async () => {
+        const result = await c.IApiTokenRepository.revokeAllForMembership(userId, organizationId);
         if (result.isFailure) return;
 
         for (const tokenId of result.getValue()) {
@@ -44,7 +39,6 @@ export const revokeTokensOnMembershipLost: (deps: Deps) => EventHandler = onEven
               reason: "membership_lost" as const,
             },
             { organizationId },
-            tx,
           );
         }
       });

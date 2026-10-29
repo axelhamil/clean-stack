@@ -13,6 +13,21 @@ const ALLOWED_ENV_READERS: Record<string, string> = {
     "standalone script started by the scheduler outside the api process, it cannot import shared/env",
 };
 
+const LEASE_OUTBOX_REWRITE = "rewritten by I.5 lease outbox";
+
+const ALLOWED_TX_PARAMETERS: Record<string, string> = {
+  "shared/ports/outbox.port.ts": LEASE_OUTBOX_REWRITE,
+  "shared/services/drizzle-outbox.service.ts": LEASE_OUTBOX_REWRITE,
+  "shared/services/outbox-subscriber.ts": LEASE_OUTBOX_REWRITE,
+  "shared/services/audit-event-subscriber.ts": LEASE_OUTBOX_REWRITE,
+  "shared/services/notification-fanout-subscriber.ts": LEASE_OUTBOX_REWRITE,
+  "shared/services/webhook-fanout-subscriber.ts": LEASE_OUTBOX_REWRITE,
+};
+
+const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {
+  "shared/services/outbox-dispatcher.service.ts": LEASE_OUTBOX_REWRITE,
+};
+
 const modules = readdirSync(join(apiSrcRoot, "modules"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => `modules/${entry.name}`);
@@ -52,6 +67,37 @@ describe("layering rules of the api", () => {
 
     expect(routeFiles.length).toBeGreaterThan(0);
     expect(writingRoutes).toEqual([]);
+  });
+
+  it("no repository, port or service declares a tx parameter", () => {
+    const declared = {
+      ...scan.transactionParametersPerFile("modules"),
+      ...scan.transactionParametersPerFile("shared"),
+    };
+
+    const strayDeclarations = Object.keys(declared).filter(
+      (file) => !(file in ALLOWED_TX_PARAMETERS),
+    );
+    const staleAllowances = Object.keys(ALLOWED_TX_PARAMETERS).filter(
+      (file) => !(file in declared),
+    );
+
+    expect(strayDeclarations).toEqual([]);
+    expect(staleAllowances).toEqual([]);
+  });
+
+  it("db.transaction is called only inside packages/drizzle and scripts", () => {
+    const openers = scan.transactionOpenersPerFile(".");
+
+    const strayOpeners = Object.keys(openers).filter(
+      (file) => !(file in ALLOWED_TRANSACTION_OPENERS),
+    );
+    const staleAllowances = Object.keys(ALLOWED_TRANSACTION_OPENERS).filter(
+      (file) => !(file in openers),
+    );
+
+    expect(strayOpeners).toEqual([]);
+    expect(staleAllowances).toEqual([]);
   });
 
   it("environment is read only through shared/env", () => {

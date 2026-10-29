@@ -14,7 +14,6 @@ import {
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type { ConsentError, ConsentRecordRow, IConsentStore } from "../ports/consent.port";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -40,7 +39,7 @@ export class ConsentService {
   constructor(
     private readonly store: IConsentStore,
     private readonly outbox: IOutboxRepository,
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
   ) {}
 
@@ -128,8 +127,8 @@ export class ConsentService {
    */
   async reconcile(subjectId: string, userId: string): Promise<Result<void, ConsentError>> {
     try {
-      return await this.uow.run(async (tx) => {
-        const linked = await this.store.linkSubjectToUser(subjectId, userId, tx);
+      return await this.uow.run(async () => {
+        const linked = await this.store.linkSubjectToUser(subjectId, userId);
         if (linked.isFailure) return Result.fail<void, ConsentError>(linked.getError());
 
         const consentRecordIds = linked.getValue();
@@ -142,7 +141,6 @@ export class ConsentService {
           userId,
           { userId, subjectId, consentRecordIds },
           {},
-          tx,
         );
         return Result.ok<ConsentError>();
       });
@@ -163,8 +161,8 @@ export class ConsentService {
     failureMessage: string,
   ): Promise<Result<void, ConsentError>> {
     try {
-      return await this.uow.run(async (tx) => {
-        const inserted = await this.store.insert(row, tx);
+      return await this.uow.run(async () => {
+        const inserted = await this.store.insert(row);
         if (inserted.isFailure) return inserted;
 
         await emitEvent(
@@ -174,7 +172,6 @@ export class ConsentService {
           payload.userId ?? payload.subjectId,
           payload,
           {},
-          tx,
         );
 
         return inserted;

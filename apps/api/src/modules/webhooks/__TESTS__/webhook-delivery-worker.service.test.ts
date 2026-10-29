@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import * as realAead from "../../../shared/aead";
 import type { Logger } from "../../../shared/logger";
@@ -17,7 +18,6 @@ import type { IWebhookEndpointRepository } from "../application/ports/webhook-en
 // Drizzle mock: scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
 let dbTransactionResult: unknown = [];
-let failNextTransaction = false;
 
 function makeQueryChain(result: () => unknown) {
   const leaf = {
@@ -38,20 +38,7 @@ const fakeDb = {
   insert: () => makeQueryChain(() => []),
   update: () => makeQueryChain(() => []),
   delete: () => makeQueryChain(() => []),
-  transaction: async (cb: (tx: unknown) => Promise<unknown>) => {
-    if (failNextTransaction) {
-      failNextTransaction = false;
-      throw new Error("connection refused");
-    }
-    const fakeTx = {
-      execute: async () => {},
-      select: () => makeQueryChain(() => dbTransactionResult),
-      insert: () => makeQueryChain(() => []),
-      update: () => makeQueryChain(() => []),
-      delete: () => makeQueryChain(() => []),
-    };
-    return cb(fakeTx);
-  },
+  execute: async () => {},
 };
 
 // ---------------------------------------------------------------------------
@@ -81,7 +68,11 @@ mock.module("../../../shared/ssrf-guard", () => {
   };
 });
 
-mock.module("@packages/drizzle", () => ({ ...realDrizzle, db: fakeDb }));
+mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
+}));
 
 // ---------------------------------------------------------------------------
 // AEAD mock: returns predictable values so HMAC path is exercised
@@ -126,20 +117,17 @@ function makeFakeDeliveries(deliveries: ReturnType<typeof makeDelivery>[] = [mak
   return {
     updates,
     createAttempts,
-    findPendingBatch: async (_limit: number, _tx: unknown) => {
+    findPendingBatch: async (_limit: number) => {
       callCount++;
       return Result.ok(callCount === 1 ? deliveries : []) as unknown as ReturnType<
         IWebhookDeliveryRepository["findPendingBatch"]
       >;
     },
-    updateStatus: async (id: string, update: unknown, _tx: unknown) => {
+    updateStatus: async (id: string, update: unknown) => {
       updates.push({ id, update });
       return Result.ok() as unknown as ReturnType<IWebhookDeliveryRepository["updateStatus"]>;
     },
-    createAttempt: async (
-      args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
-      _tx: unknown,
-    ) => {
+    createAttempt: async (args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">) => {
       createAttempts.push(args);
       return Result.ok() as unknown as ReturnType<IWebhookDeliveryRepository["createAttempt"]>;
     },
@@ -160,15 +148,15 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
   return {
     calls,
     applySecretRotation: async () => Result.ok(Option.some({} as never)),
-    bumpFailure: async (id: string, _orgId: string, _tx: unknown) => {
+    bumpFailure: async (id: string, _orgId: string) => {
       calls.bumpFailure.push(id);
       return opts?.bumpFailureResult ?? Result.ok(Option.none());
     },
-    resetFailure: async (id: string, _orgId: string, _tx: unknown) => {
+    resetFailure: async (id: string, _orgId: string) => {
       calls.resetFailure.push(id);
       return Result.ok(undefined as never);
     },
-    markDisabled: async (id: string, _orgId: string, _date: Date, _tx: unknown) => {
+    markDisabled: async (id: string, _orgId: string, _date: Date) => {
       calls.markDisabled.push(id);
       return Result.ok(undefined as never);
     },
@@ -183,8 +171,8 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
 function makeOutbox() {
   const enqueueCalls: Array<{ events: unknown[]; opts: unknown; tx: unknown }> = [];
   const outbox: IOutboxRepository = {
-    enqueue: mock(async (events, opts, tx) => {
-      enqueueCalls.push({ events: events as unknown[], opts, tx });
+    enqueue: mock(async (events, opts) => {
+      enqueueCalls.push({ events, opts, tx: UnitOfWorkContext.transaction() });
     }),
     findPendingBatch: mock(async () => []),
     markDispatched: mock(async () => {}),
@@ -223,6 +211,7 @@ type WorkerDeps = {
   endpoints?: ReturnType<typeof makeFakeEndpoints>;
   masterKey?: () => Option<Uint8Array>;
   outbox?: IOutboxRepository;
+  unitOfWork?: IUnitOfWork;
   logger?: ReturnType<typeof makeLogger>;
   instrumentation?: IInstrumentation;
   fetchImpl?: unknown;
@@ -234,6 +223,7 @@ function makeWorker(deps: WorkerDeps) {
     (deps.endpoints ?? makeFakeEndpoints()) as unknown as IWebhookEndpointRepository,
     deps.masterKey ?? (() => Option.some(new Uint8Array(32))),
     deps.outbox ?? noopOutbox,
+    deps.unitOfWork ?? mockUnitOfWork().unitOfWork,
     (deps.logger ?? makeLogger()) as unknown as Logger,
     deps.instrumentation ?? new NoOpInstrumentation(),
     deps.fetchImpl as typeof fetch | undefined,
@@ -251,7 +241,6 @@ async function runDrain(worker: InstanceType<typeof WebhookDeliveryWorker>) {
 describe("WebhookDeliveryWorker", () => {
   beforeEach(() => {
     dbTransactionResult = [FAKE_ENDPOINT];
-    failNextTransaction = false;
   });
 
   it("start() then stop() shuts down cleanly without a blocking loop", async () => {
@@ -264,12 +253,16 @@ describe("WebhookDeliveryWorker", () => {
   });
 
   it("reports a failing first drain instead of leaving an unhandled rejection", async () => {
-    failNextTransaction = true;
     const logger = makeLogger();
     const errorSpy = spyOn(logger, "error");
     const instrumentation = new NoOpInstrumentation();
     const captureSpy = spyOn(instrumentation, "capture");
-    const worker = makeWorker({ deliveries: makeFakeDeliveries([]), logger, instrumentation });
+    const worker = makeWorker({
+      deliveries: makeFakeDeliveries([]),
+      unitOfWork: mockUnitOfWork({ commit: "fails" }).unitOfWork,
+      logger,
+      instrumentation,
+    });
 
     await worker.start();
     await new Promise((r) => setTimeout(r, 20));
@@ -547,6 +540,7 @@ describe("WebhookDeliveryWorker", () => {
           "webhook.delivery.exhausted",
     );
     expect(exhausted).toBeDefined();
+    expect(exhausted?.tx).toBeDefined();
   });
 
   it("disables the endpoint and emits WEBHOOK_ENDPOINT_DISABLED after old repeated failures", async () => {

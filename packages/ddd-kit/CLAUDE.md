@@ -8,12 +8,12 @@ Domain primitives shared by every backend context: `Result`, `Option`, `Entity`,
 src/
   primitives/    result, option, uuid
   domain/        entity, aggregate, value-object, user-id, domain-event, watched-list
-  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), error-code (AppError), pagination
+  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), pagination
   events/        event-collector, event-dispatcher, in-memory-event-dispatcher, on-event, outbox-mapping
   __TESTS__/     one file per primitive
 ```
 
-The package is framework-free: it imports only Node built-ins and `zod`, nothing from Drizzle, Hono or any provider. A provider concern (transaction type, driver error) enters as a type parameter (`IUnitOfWork<TTx>`), never as an import. **It is published to npm**: top-level `main`/`types`/`exports` point at `src/`, only `publishConfig` swaps in `dist/` at publish time (root rule 4); exports keep their JSDoc, it is the public API.
+The package is framework-free: it imports only Node built-ins and `zod`, nothing from Drizzle, Hono or any provider. A provider concern (driver error) enters as a type parameter (the repositories' `E`), never as an import; the transaction never crosses a port, it lives in the ambient scope. **It is published to npm**: top-level `main`/`types`/`exports` point at `src/`, only `publishConfig` swaps in `dist/` at publish time (root rule 4); exports keep their JSDoc, it is the public API.
 
 ## Which primitive when
 
@@ -22,7 +22,7 @@ The package is framework-free: it imports only Node built-ins and `zod`, nothing
 | `Result<T, E>` | A domain failure (validation, not-found, business rule). Never throw for these. |
 | `Option<T>` | Absence is a valid state. Details below. |
 | `AppError<TCode>` | A typed error whose code suffix maps to HTTP through `httpStatusFromCode` (`*_NOT_FOUND` 404, `*_FORBIDDEN` 403, `*_CONFLICT` 409, `*_INVALID` 400, `*_RATE_LIMITED` 429, ...). A new suffix is added to `STATUS_BY_SUFFIX` once, never mapped per route. |
-| `IUnitOfWork<TTx>` | ≥ 2 writes that must be atomic. `run()` also flushes collected events before commit, `startTransaction()` does not. |
+| `IUnitOfWork` | ≥ 2 writes that must be atomic. `run(work)` hands `work` nothing, joins an open run, and flushes collected events before the outermost commit; stores read the ambient transaction. |
 | `UserId` (VO) | The first aggregate referencing a user. Validates the UUID, prevents `OrderId` ↔ `UserId` mix-ups. |
 | `Aggregate<TProps>` | A business concept with invariants, identity and lifecycle that emits domain events. Infra orchestration is NOT an aggregate. |
 | `Entity<TProps>` | A child with identity but no independent lifecycle, inside an aggregate. |
@@ -37,7 +37,7 @@ The package is framework-free: it imports only Node built-ins and `zod`, nothing
 2. **A port never expresses absence as `T | null`.** `Result<Option<T>, E>` for a lookup that may find nothing, `Option<T>` for a record field that may be unset. `null` exists only inside a store while mapping a driver row, converted with `Option.fromNullable` before it leaves. **Why**: `T | null` forces every caller to remember a guard the type does not impose; `Option` makes the check structural. `unwrap()` only behind an `isSome()` guard (`None.unwrap()` throws).
 3. **Value object**: `extends ValueObject<T>`, `protected validate(value): Result<T>`, built with `X.create(v)` (returns a `Result`), read with `.value`. A closed union is a `type XValue` + a class; the aggregate holds the instances. A primitive is allowed only where there is no rule (free text, counter, date); otherwise it is a value object. Identifiers are always typed.
 4. **Aggregate**: constructor `protected`, built through a static factory on the subclass (`create` for a new one, a rehydrating factory for rows). `addEvent` is `protected`: events come from business methods, never from callers. Mutation is by business method returning `void` or `Result<void, E>`, no setters.
-5. **Events must be collected inside a unit of work.** `addEvent()` outside `run()` loses the events (the dev warning comes from `EventCollector.setOutOfContextLogger`); `EventCollector.hasContext()` is what makes a nested `run()` fail loudly. Flush mechanics and the rollback contract: `packages/drizzle/CLAUDE.md`.
+5. **Events must be collected inside a unit of work.** `addEvent()` outside `run()` loses the events (the dev warning comes from `EventCollector.setOutOfContextLogger`); a nested `run()` collects into its own scope and hands its events to the outermost run only when it succeeds. Flush mechanics and the rollback contract: `packages/drizzle/CLAUDE.md`.
 6. **A scope is a union, not a string**: `RepoScope.user(id)`, `RepoScope.org(id)`, `RepoScope.userInOrg(userId, orgId)`, narrowed with `ScopeOf<"user-in-org">`. A new ownership axis is a new variant here, not an ad hoc argument in a repository.
 
 ## Reference shapes

@@ -14,6 +14,7 @@ import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
+import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
@@ -43,11 +44,10 @@ import {
 } from "./shared/services/rate-limiter-flexible.adapter";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
 import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscriber";
-import type { ITransaction } from "./shared/transaction";
 
 declare module "inwire" {
   interface AppDeps {
-    ITransactionService: IUnitOfWork<ITransaction>;
+    ITransactionService: IUnitOfWork & OutermostUnitOfWork;
     IEmailQueue: IEmailQueue;
     IEmailService: IEmailService;
     IOutboxRepository: IOutboxRepository;
@@ -91,7 +91,14 @@ export const di = container()
   )
   .add(
     "EmailDeliveryWorker",
-    (c) => new EmailDeliveryWorker(c.IEmailQueue, c.IOutboxRepository, logger, c.IInstrumentation),
+    (c) =>
+      new EmailDeliveryWorker(
+        c.IEmailQueue,
+        c.IOutboxRepository,
+        c.ITransactionService,
+        logger,
+        c.IInstrumentation,
+      ),
   )
   .add(
     "IPasswordBreachService",

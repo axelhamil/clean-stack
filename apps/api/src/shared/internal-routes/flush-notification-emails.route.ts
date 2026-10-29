@@ -11,6 +11,7 @@ import {
   isNull,
   lte,
   notificationSchema,
+  resolveExecutor,
   sql,
 } from "@packages/drizzle";
 import { NOTIFICATION_MAP } from "@packages/events";
@@ -161,10 +162,11 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
 
     try {
       const flush = () =>
-        db.transaction(async (tx) => {
-          await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
-          await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-          await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+        di.ITransactionService.run(async () => {
+          const exec = resolveExecutor();
+          await exec.execute(sql`SET LOCAL statement_timeout = '30s'`);
+          await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
+          await exec.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
 
           // `batchSize` bounds each round-trip to Postgres, not the run: the
           // lease already rules out a *concurrent* run splitting a window, but
@@ -189,7 +191,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
           let dropped = 0;
 
           for (;;) {
-            const candidates = await tx
+            const candidates = await exec
               .select({
                 id: n.id,
                 userId: n.userId,
@@ -234,13 +236,13 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
             // notification itself, and its in-app read state, are untouched.
             const droppedIds = candidates.filter((r) => !r.emailStillWanted).map((r) => r.id);
             if (droppedIds.length > 0) {
-              await tx.update(n).set({ emailPendingAt: null }).where(inArray(n.id, droppedIds));
+              await exec.update(n).set({ emailPendingAt: null }).where(inArray(n.id, droppedIds));
               dropped += droppedIds.length;
             }
 
             const allowed = candidates.filter((r) => r.emailStillWanted) as PendingRow[];
             if (allowed.length > 0) {
-              await tx
+              await exec
                 .update(n)
                 .set({ emailSentAt: now })
                 .where(
@@ -266,21 +268,21 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
 
           const digests = buildDigests(rows);
 
+          const recipients = await Promise.all(
+            digests.map(async (d) => ({
+              to: d.email,
+              variables: {
+                category: d.category,
+                itemCount: String(d.items.length),
+                itemsSummary: d.items.map((i) => i.eventType).join(", "),
+              },
+              locale: toLocale(d.locale),
+              idempotencyKey: await digestIdempotencyKey(d.notificationIds),
+            })),
+          );
           const enqueued = await di.IEmailService.sendTemplateBatch(
             "notification_digest",
-            await Promise.all(
-              digests.map(async (d) => ({
-                to: d.email,
-                variables: {
-                  category: d.category,
-                  itemCount: String(d.items.length),
-                  itemsSummary: d.items.map((i) => i.eventType).join(", "),
-                },
-                locale: toLocale(d.locale),
-                idempotencyKey: await digestIdempotencyKey(d.notificationIds),
-              })),
-            ),
-            { tx },
+            recipients,
           );
 
           if (enqueued.isFailure) {

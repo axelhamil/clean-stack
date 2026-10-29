@@ -1,6 +1,5 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { AuditActorType, AuditRetention } from "@packages/drizzle";
-import type { ITransaction } from "../transaction";
 
 export type AuditError = AppError<"AUDIT_PERSISTENCE_PROVIDER_FAILURE">;
 
@@ -48,7 +47,7 @@ export type ChainVerification = {
 };
 
 export interface IAuditPort {
-  record(entry: AuditEntry, tx?: ITransaction): Promise<Result<AuditRecord, AuditError>>;
-  list(filters: AuditFilters, tx?: ITransaction): Promise<Result<AuditPage, AuditError>>;
-  verifyChain(tx?: ITransaction): Promise<Result<ChainVerification, AuditError>>;
+  record(entry: AuditEntry): Promise<Result<AuditRecord, AuditError>>;
+  list(filters: AuditFilters): Promise<Result<AuditPage, AuditError>>;
+  verifyChain(): Promise<Result<ChainVerification, AuditError>>;
 }

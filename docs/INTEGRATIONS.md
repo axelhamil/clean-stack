@@ -14,7 +14,7 @@ see [`CRON.md`](./CRON.md).
 
 ## 1. Resend, email delivery queue + templates
 
-**Phase D.5 changed the delivery model.** `IEmailService` (`QueuedEmailService`) no longer calls Resend directly, every send enqueues one or more rows in the `email_message` table (inside the caller's transaction when `options.tx` is passed). `EmailDeliveryWorker` polls every 2 s, claims up to 300 pending rows (`FOR UPDATE SKIP LOCKED`, 120 s claim window), groups by `(kind, template)`, chunks to 100, and sends each chunk via `resend.batch.send`. Batch cap is 100 emails/request against a **10 req/s per team** Resend ceiling. This makes fan-out (RGPD wipe sweep, org announcements, D.3 digests) safe under the rate limit: N recipients → ⌈N/100⌉ HTTP calls, not N.
+**Phase D.5 changed the delivery model.** `IEmailService` (`QueuedEmailService`) no longer calls Resend directly, every send enqueues one or more rows in the `email_message` table (inside the caller's transaction when it runs in a `uow.run()`). `EmailDeliveryWorker` polls every 2 s, claims up to 300 pending rows (`FOR UPDATE SKIP LOCKED`, 120 s claim window), groups by `(kind, template)`, chunks to 100, and sends each chunk via `resend.batch.send`. Batch cap is 100 emails/request against a **10 req/s per team** Resend ceiling. This makes fan-out (RGPD wipe sweep, org announcements, D.3 digests) safe under the rate limit: N recipients → ⌈N/100⌉ HTTP calls, not N.
 
 ### Template rendering (Phase D.5, in-repo React Email)
 

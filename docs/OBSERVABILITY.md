@@ -79,8 +79,8 @@ import type { IInstrumentation } from "../../../../shared/ports/instrumentation.
 export class DrizzleFooRepository implements IFooRepository {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async create(input: FooInput, tx?: Transaction): Promise<Result<Foo, FooError>> {
-    const exec = tx ?? db;
+  async create(input: FooInput): Promise<Result<Foo, FooError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleFooRepository > create" },
       async () => {
@@ -105,7 +105,7 @@ export class DrizzleFooRepository implements IFooRepository {
 
 - **Outer span** wraps the entire method body: `{ name: "ClassName > methodName" }`. No `op`, no attributes, it's the method-level boundary.
 - **Inner span** wraps only the `query.execute()` (or external `client.send()` / `fetch()` call): `{ name: query.toSQL().sql, op: "db.query", attributes: { "db.system.name": "postgresql" } }`. For HTTP I/O, use `op: "http.client"` + relevant attrs (`http.method`, `rpc.system`).
-- **`const exec = tx ?? db`** lives **outside** the `startSpan` callback (the `tx ?? db` resolution shouldn't pollute the span duration, Lazar convention).
+- **`const exec = resolveExecutor()`** lives **outside** the `startSpan` callback: it returns the transaction of the open `uow.run`, else the pool, and that resolution shouldn't pollute the span duration (Lazar convention). No `tx` parameter: a repository never receives the transaction, it reads the ambient one.
 - **catch + capture + return-or-rethrow**: for methods returning `Promise<Result<T, E>>`, call `this.instrumentation.capture(err)` inside the existing `catch` block, then `return fail(...)`. For methods returning `Promise<T>` (throwing on infra failure), capture + rethrow. Never swallow.
 - **Multi-query methods** (e.g., `executeWipe` running 7+ DELETEs): keep only the outer span, 7 inner spans = noise. Single-statement methods always get an inner span.
 - **Span composition**: don't call sibling repo methods that themselves open spans from within a span, the inner spans become orphaned siblings rather than children. Inline the query instead.

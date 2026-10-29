@@ -1,13 +1,12 @@
 import type { SCIMManagedConnection, SCIMScope } from "@better-auth/scim";
 import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
-import { sql } from "@packages/drizzle";
+import { resolveExecutor, savepoint, sql } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
 import { findMemberOf, scimProvisionedMembers } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
-import type { ITransaction } from "../transaction";
 
 export type ScimConnectionError = AppError<
   "SCIM_CONNECTION_NOT_FOUND" | "SCIM_CONNECTION_PROVIDER_FAILURE"
@@ -65,7 +64,7 @@ const TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
 export class ScimConnectionService {
   constructor(
     private readonly outbox: IOutboxRepository,
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
   ) {}
 
@@ -104,7 +103,7 @@ export class ScimConnectionService {
     actorUserId: string;
   }): Promise<Result<IssuedScimToken, ScimConnectionError>> {
     return this.run("issueToken", () =>
-      this.serialized(input.organizationId, async (tx) => {
+      this.serialized(input.organizationId, async () => {
         const { organizationId, actorUserId } = input;
         const expiresAt = new Date(Date.now() + TOKEN_LIFETIME_MS);
         const connection = await this.activeConnection(organizationId);
@@ -120,7 +119,6 @@ export class ScimConnectionService {
             },
           });
           await this.emitConnectionEvent(
-            tx,
             EventTypes.SCIM_CONNECTION_CREATED,
             created.connection.connectionId,
             input,
@@ -159,7 +157,6 @@ export class ScimConnectionService {
         }
 
         await this.emitConnectionEvent(
-          tx,
           EventTypes.SCIM_CONNECTION_TOKEN_ROTATED,
           connectionId,
           input,
@@ -180,7 +177,7 @@ export class ScimConnectionService {
     actorUserId: string;
   }): Promise<Result<void, ScimConnectionError>> {
     return this.run("disconnect", () =>
-      this.serialized(input.organizationId, async (tx) => {
+      this.serialized(input.organizationId, async () => {
         const { organizationId, actorUserId } = input;
         const connection = await this.activeConnection(organizationId);
         if (!connection) {
@@ -198,7 +195,7 @@ export class ScimConnectionService {
 
         for (const { memberId, userId } of provisioned) {
           if (await findMemberOf(userId, organizationId)) continue;
-          await this.emitCommitted(tx, (savepoint) =>
+          await this.emitCommitted(() =>
             emitEvent(
               this.outbox,
               EventTypes.ORG_MEMBER_REMOVED,
@@ -206,12 +203,11 @@ export class ScimConnectionService {
               memberId,
               { organizationId, actorUserId, userId },
               { organizationId },
-              savepoint,
             ),
           );
         }
 
-        await this.emitConnectionEvent(tx, EventTypes.SCIM_CONNECTION_DELETED, connectionId, input);
+        await this.emitConnectionEvent(EventTypes.SCIM_CONNECTION_DELETED, connectionId, input);
         return Result.ok();
       }),
     );
@@ -228,13 +224,13 @@ export class ScimConnectionService {
 
   private serialized<T>(
     organizationId: string,
-    work: (tx: ITransaction) => Promise<Result<T, ScimConnectionError>>,
+    work: () => Promise<Result<T, ScimConnectionError>>,
   ): Promise<Result<T, ScimConnectionError>> {
-    return this.uow.run(async (tx) => {
-      await tx.execute(
+    return this.uow.run(async () => {
+      await resolveExecutor().execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`scim-connection:${organizationId}`}, 0))`,
       );
-      return work(tx);
+      return work();
     });
   }
 
@@ -242,19 +238,15 @@ export class ScimConnectionService {
    * Emits on a savepoint of the lock's transaction: a failed insert neither aborts
    * that transaction nor fails a change the plugin already committed.
    */
-  private async emitCommitted(
-    tx: ITransaction,
-    emit: (savepoint: ITransaction) => Promise<unknown>,
-  ): Promise<void> {
+  private async emitCommitted(emit: () => Promise<unknown>): Promise<void> {
     try {
-      await tx.transaction(emit);
+      await savepoint(emit);
     } catch (err) {
       this.instrumentation.capture(err);
     }
   }
 
   private async emitConnectionEvent(
-    tx: ITransaction,
     eventType:
       | typeof EventTypes.SCIM_CONNECTION_CREATED
       | typeof EventTypes.SCIM_CONNECTION_TOKEN_ROTATED
@@ -262,7 +254,7 @@ export class ScimConnectionService {
     connectionId: string,
     input: { organizationId: string; actorUserId: string },
   ): Promise<void> {
-    await this.emitCommitted(tx, (savepoint) =>
+    await this.emitCommitted(() =>
       emitEvent(
         this.outbox,
         eventType,
@@ -274,7 +266,6 @@ export class ScimConnectionService {
           providerId: connectionId,
         },
         { organizationId: input.organizationId },
-        savepoint,
       ),
     );
   }

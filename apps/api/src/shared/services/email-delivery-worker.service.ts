@@ -1,5 +1,4 @@
-import { Option } from "@packages/ddd-kit";
-import { db } from "@packages/drizzle";
+import { type IUnitOfWork, Option } from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE } from "@packages/i18n";
@@ -58,6 +57,7 @@ export class EmailDeliveryWorker {
   constructor(
     private readonly queue: IEmailQueue,
     private readonly outbox: IOutboxRepository,
+    private readonly uow: IUnitOfWork,
     private readonly logger: Logger,
     private readonly instrumentation: IInstrumentation,
     sender?: BatchSender,
@@ -101,8 +101,8 @@ export class EmailDeliveryWorker {
     this.draining = true;
     return this.instrumentation.startSpan({ name: "EmailDeliveryWorker > drainOnce" }, async () => {
       try {
-        const claimed = await db.transaction((tx) =>
-          this.queue.claimPending(CLAIM_LIMIT, new Date(Date.now() + CLAIM_WINDOW_MS), tx),
+        const claimed = await this.uow.run(() =>
+          this.queue.claimPending(CLAIM_LIMIT, new Date(Date.now() + CLAIM_WINDOW_MS)),
         );
         if (claimed.isFailure) {
           this.logger.error({ err: claimed.getError() }, "email claimPending failed");
@@ -155,7 +155,7 @@ export class EmailDeliveryWorker {
     }
 
     if (sentIds.length > 0) {
-      await db.transaction((tx) => this.queue.markSent(sentIds, new Date(), providerIds, tx));
+      await this.uow.run(() => this.queue.markSent(sentIds, new Date(), providerIds));
     }
   }
 
@@ -178,13 +178,14 @@ export class EmailDeliveryWorker {
     date: Option<Date>,
   ): Promise<void> {
     const attempts = rowRecord.attempts + 1;
-    await db.transaction(async (tx) => {
-      const marked = await this.queue.markFailed(rowRecord.id, error, date, tx);
+    await this.uow.run(async () => {
+      const marked = await this.queue.markFailed(rowRecord.id, error, date);
       if (marked.isFailure) {
         this.logger.error({ err: marked.getError(), messageId: rowRecord.id }, "markFailed failed");
         return;
       }
       if (date.isSome()) return;
+      const toHash = await sha256Hex(rowRecord.toAddress);
       await emitEvent(
         this.outbox,
         EventTypes.EMAIL_DELIVERY_EXHAUSTED,
@@ -193,13 +194,12 @@ export class EmailDeliveryWorker {
         {
           messageId: rowRecord.id,
           template: rowRecord.template.toNull(),
-          toHash: await sha256Hex(rowRecord.toAddress),
+          toHash,
           attempts,
           lastError: error,
           actorUserId: null,
         },
         {},
-        tx,
       );
     });
   }

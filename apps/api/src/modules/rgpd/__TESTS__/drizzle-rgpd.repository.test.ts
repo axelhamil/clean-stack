@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createOTP } from "@better-auth/utils/otp";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { type SecretConfig, symmetricEncrypt } from "better-auth/crypto";
 import { env } from "../../../shared/env";
 import type { Logger } from "../../../shared/logger";
@@ -28,10 +29,9 @@ describe("DrizzleRgpdRepository.verifyTotp", () => {
     const secret = "generated-two-factor-secret-0123456789";
     const code = await createOTP(secret, { period: 30, digits: 6 }).totp();
 
-    const result = await repository().verifyTotp(
-      "u1",
-      code,
+    const result = await UnitOfWorkContext.run(
       selectReturning([{ secret: await storedSecret(secret) }]),
+      () => repository().verifyTotp("u1", code),
     );
 
     expect(result.getValue()).toBe(true);
@@ -43,10 +43,9 @@ describe("DrizzleRgpdRepository.verifyTotp", () => {
     ]);
     const code = await createOTP(helloDeadBeef, { period: 30, digits: 6 }).totp();
 
-    const result = await repository().verifyTotp(
-      "u1",
-      code,
+    const result = await UnitOfWorkContext.run(
       selectReturning([{ secret: await storedSecret("base32:jbswy3dpehpk3pxp") }]),
+      () => repository().verifyTotp("u1", code),
     );
 
     expect(result.getValue()).toBe(true);
@@ -76,7 +75,9 @@ describe("DrizzleRgpdRepository.verifyTotp", () => {
       afterRotation,
     );
 
-    const result = await repo.verifyTotp("u1", code, selectReturning([{ secret: stored }]));
+    const result = await UnitOfWorkContext.run(selectReturning([{ secret: stored }]), () =>
+      repo.verifyTotp("u1", code),
+    );
 
     expect(result.getValue()).toBe(true);
   });
@@ -89,10 +90,9 @@ describe("DrizzleRgpdRepository.verifyTotp", () => {
       instrumentation,
     );
 
-    const result = await repo.verifyTotp(
-      "u1",
-      "123456",
+    const result = await UnitOfWorkContext.run(
       selectReturning([{ secret: "not-an-encrypted-secret" }]),
+      () => repo.verifyTotp("u1", "123456"),
     );
 
     expect(result.getValue()).toBe(false);

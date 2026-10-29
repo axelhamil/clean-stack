@@ -73,7 +73,7 @@ export class QueuedEmailService implements IEmailService {
               : batchRowKey(options, index),
           });
         }
-        return this.enqueue(rows, options?.tx);
+        return this.enqueue(rows);
       },
     );
   }
@@ -105,16 +105,13 @@ export class QueuedEmailService implements IEmailService {
           payload: m.body,
           idempotencyKey: batchRowKey(options, index),
         }));
-        return this.enqueue(rows, options?.tx);
+        return this.enqueue(rows);
       },
     );
   }
 
-  private async enqueue(
-    rows: EmailMessageInsert[],
-    tx: SendTemplateOptions["tx"],
-  ): Promise<Result<void, EmailError>> {
-    const result = await this.queue.enqueue(rows, tx);
+  private async enqueue(rows: EmailMessageInsert[]): Promise<Result<void, EmailError>> {
+    const result = await this.queue.enqueue(rows);
     if (result.isFailure) {
       return Result.fail({
         code: "EMAIL_PROVIDER_FAILURE",

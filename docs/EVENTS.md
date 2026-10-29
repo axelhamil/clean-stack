@@ -28,7 +28,7 @@ The audit/webhook subscribers, the catalogue, the `uow.run` flush: all unchanged
 ## Mental model
 
 ```
-your code           ─►  uow.run(async tx => repo.save(aggregate, tx))
+your code           ─►  uow.run(async () => repo.save(aggregate))
                                           │
                                           ▼ ALS collector flushes pre-COMMIT
                                   outbox_event INSERT (same TX)
@@ -114,14 +114,14 @@ class Order extends Aggregate<IOrderProps> {
 ```ts
 class PlaceOrderUseCase {
   constructor(
-    private readonly uow: IUnitOfWork<ITransaction>,
+    private readonly uow: IUnitOfWork,
     private readonly repo: IOrderRepository,
   ) {}
 
   async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
-    return this.uow.run(async (tx) => {
+    return this.uow.run(async () => {
       const order = Order.place(input);
-      return this.repo.save(order, tx);
+      return this.repo.save(order);
     });
   }
 }
@@ -459,7 +459,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 ## Hard rules
 
-- **`uow.run()` cannot be nested.** Drizzle nested `db.transaction()` opens independent TXs (not savepoints). The `TransactionService.run()` throws if `EventCollector.hasContext()` is already true. Refactor your code to a single outer `uow.run()`.
+- **A nested `uow.run()` joins the open transaction.** No savepoint, no second connection: its events wait for the outermost flush, and a failed `Result` at any depth rolls the whole unit back (the outermost `run()` resolves to that failure). A promise that outlives its run reads the pool through `resolveExecutor()`, never the finished transaction.
 - **`addEvent()` outside `uow.run()` = events lost.** The `EventCollector` ALS context is created by `uow.run()`. If you emit events in code that doesn't go through `uow.run()`, they stay on the aggregate buffer and never reach the outbox. A dev-mode warning is logged via `EventCollector.setOutOfContextLogger()` (wired in `apps/api/src/index.ts`).
 - **Built-in subscriber failures roll back the dispatch.** Audit writer or webhook fanout throwing → the entire batch's TX rolls back, events retried at next drain with backoff. Make sure built-in subscribers stay deterministic.
 - **Payloads validated at enqueue.** A payload that doesn't match its Zod schema in `PayloadByEventType` throws inside the outbox `INSERT`, rolling back the surrounding TX. The business write fails with the bad payload, never apply one without the other.
@@ -483,7 +483,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
-| `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()`: ALS flush + nested-run guard + rollback when the callback resolves to a failed `Result` |
+| `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()`: ALS flush + nested runs joining the outermost transaction + rollback when the callback resolves to a failed `Result` |
 | `packages/drizzle/src/repositories/track-events.ts` | `trackEventsOnSuccess()` repo helper |
 | `apps/api/src/shared/services/outbox-dispatcher.service.ts` | LISTEN/NOTIFY worker, drain, fan-out |
 | `apps/api/src/shared/services/audit-event-subscriber.ts` | Built-in audit writer |

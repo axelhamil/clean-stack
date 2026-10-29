@@ -167,6 +167,17 @@ export function createSourceScan(root: string) {
     );
   }
 
+  function transactionParametersPerFile(layer: string): Record<string, number> {
+    return countPerFile(
+      layer,
+      ({ blanked }) => countOf(blanked, /\btx\??:/g) + countOf(blanked, /\bITransaction\b/g),
+    );
+  }
+
+  function transactionOpenersPerFile(layer: string): Record<string, number> {
+    return countPerFile(layer, ({ blanked }) => countOf(blanked, /\.transaction\s*\(\s*[^\s)]/g));
+  }
+
   function envReadsPerFile(layer: string): Record<string, number> {
     return countPerFile(
       layer,
@@ -183,6 +194,8 @@ export function createSourceScan(root: string) {
     codeOf,
     throwsPerFile,
     writeCallsPerFile,
+    transactionParametersPerFile,
+    transactionOpenersPerFile,
     envReadsPerFile,
   };
 }

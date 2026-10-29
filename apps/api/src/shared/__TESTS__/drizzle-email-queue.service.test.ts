@@ -12,23 +12,27 @@ mock.module("../logger", () => ({
   logger: { warn: warnSpy, info: mock(() => {}), error: mock(() => {}), debug: mock(() => {}) },
 }));
 
+const fakeDb = {
+  insert: () => ({
+    values: (rows: unknown[]) => {
+      inserted.push(...rows);
+      const written = insertReturns ? insertReturns(rows) : rows.map(() => ({ id: "id" }));
+      const chain = {
+        onConflictDoNothing: () => chain,
+        returning: () => chain,
+        toSQL: () => ({ sql: "insert into email_message" }),
+        execute: async () => written,
+      };
+      return chain;
+    },
+  }),
+};
+let executor: unknown = fakeDb;
+
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    insert: () => ({
-      values: (rows: unknown[]) => {
-        inserted.push(...rows);
-        const written = insertReturns ? insertReturns(rows) : rows.map(() => ({ id: "id" }));
-        const chain = {
-          onConflictDoNothing: () => chain,
-          returning: () => chain,
-          toSQL: () => ({ sql: "insert into email_message" }),
-          execute: async () => written,
-        };
-        return chain;
-      },
-    }),
-  },
+  db: fakeDb,
+  resolveExecutor: () => executor,
 }));
 
 const { DrizzleEmailQueue } = await import("../services/drizzle-email-queue.service");
@@ -47,6 +51,7 @@ const rowFixture = (to: string) => ({
 describe("DrizzleEmailQueue.enqueue", () => {
   beforeEach(() => {
     insertReturns = null;
+    executor = fakeDb;
     inserted.length = 0;
     warnSpy.mockClear();
   });
@@ -80,7 +85,7 @@ describe("DrizzleEmailQueue.enqueue", () => {
 
   it("returns a failure Result instead of throwing when the insert rejects", async () => {
     const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
-    const tx = {
+    executor = {
       insert: () => ({
         values: () => ({
           onConflictDoNothing: () => ({
@@ -94,20 +99,17 @@ describe("DrizzleEmailQueue.enqueue", () => {
         }),
       }),
     };
-    const result = await queue.enqueue(
-      [
-        {
-          kind: "raw",
-          template: Option.none(),
-          toAddress: "a@x.test",
-          subject: "s",
-          locale: "en",
-          payload: {},
-          idempotencyKey: Option.none(),
-        },
-      ],
-      tx as never,
-    );
+    const result = await queue.enqueue([
+      {
+        kind: "raw",
+        template: Option.none(),
+        toAddress: "a@x.test",
+        subject: "s",
+        locale: "en",
+        payload: {},
+        idempotencyKey: Option.none(),
+      },
+    ]);
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("EMAIL_QUEUE_WRITE_FAILED");
   });
@@ -150,11 +152,11 @@ describe("DrizzleEmailQueue.markSent", () => {
       }),
     };
 
+    executor = tx;
     const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
       ["a", "b", "c"],
       new Date(),
       { a: "p1", b: "p2" },
-      tx as never,
     );
 
     expect(result.isSuccess).toBe(true);
@@ -170,11 +172,11 @@ describe("DrizzleEmailQueue.markSent", () => {
       },
     };
 
+    executor = tx;
     const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
       [],
       new Date(),
       {},
-      tx as never,
     );
 
     expect(result.isSuccess).toBe(true);
@@ -204,11 +206,11 @@ describe("DrizzleEmailQueue.markFailed", () => {
   it("parks the row as failed when no further attempt is scheduled", async () => {
     const { tx, sets } = recordingTx();
 
+    executor = tx;
     const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markFailed(
       "m1",
       "HTTP 422",
       Option.none(),
-      tx as never,
     );
 
     expect(result.isSuccess).toBe(true);
@@ -220,11 +222,11 @@ describe("DrizzleEmailQueue.markFailed", () => {
     const { tx, sets } = recordingTx();
     const retryAt = new Date("2026-08-04T00:05:00Z");
 
+    executor = tx;
     await new DrizzleEmailQueue(new NoOpInstrumentation()).markFailed(
       "m1",
       "HTTP 503",
       Option.some(retryAt),
-      tx as never,
     );
 
     expect(sets[0]?.status).toBe("pending");

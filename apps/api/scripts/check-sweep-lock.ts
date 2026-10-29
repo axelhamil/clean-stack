@@ -11,8 +11,9 @@
 // reference shape. Run: `pnpm --filter api check:sweep-lock`, re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
-import { db, eq, sql, sweepSchema } from "@packages/drizzle";
+import { db, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
 import type { Hono } from "hono";
+import { di } from "../src/container";
 import { env } from "../src/shared/env";
 import { sweepAuditLogRoutes } from "../src/shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "../src/shared/internal-routes/sweep-consents.route";
@@ -128,8 +129,9 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
     orderBy: sweepSchema.sweepLock.lockedAt,
     batchSize: 1,
     spans: freshSpans(),
-    assertGuards: async (tx) => {
-      const result = await tx.execute(sql`
+    uow: di.ITransactionService,
+    assertGuards: async () => {
+      const result = await resolveExecutor().execute(sql`
         SELECT
           current_setting('statement_timeout') AS statement_timeout,
           current_setting('lock_timeout') AS lock_timeout,

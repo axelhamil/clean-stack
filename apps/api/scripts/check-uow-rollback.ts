@@ -2,6 +2,8 @@
  * Proves against a real Postgres that `TransactionService.run` rolls back a transaction
  * whose callback resolves to a failed `Result`, still commits one that succeeds, and
  * rethrows a callback's exception without reporting it (the caller knows if it is expected).
+ * A nested `run` joins the open transaction (same backend, same txid), a failure at any
+ * depth rolls everything back, and a promise that outlives its run reads the pool.
  *
  * A mocked unit of work can only prove the service throws inside `db.transaction`; only
  * a real database can prove the write that happened before the failure is discarded,
@@ -13,8 +15,19 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-uow-rollback");
 
-import { Result } from "@packages/ddd-kit";
-import { authSchema, db, eq, outboxSchema, TransactionService } from "@packages/drizzle";
+import { EventCollector, match, Result } from "@packages/ddd-kit";
+import {
+  ambientTransaction,
+  authSchema,
+  type DbClient,
+  db,
+  eq,
+  outboxSchema,
+  resolveExecutor,
+  sql,
+  type Transaction,
+  TransactionService,
+} from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../src/shared/event-emitter";
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
@@ -43,6 +56,43 @@ async function currentName(): Promise<string | undefined> {
   return row?.name;
 }
 
+async function currentImage(): Promise<string | null | undefined> {
+  const [row] = await db
+    .select({ image: authSchema.user.image })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, userId))
+    .limit(1);
+
+  return row?.image;
+}
+
+interface Backend {
+  pid: number;
+  txid: string;
+}
+
+async function backendOf(executor: DbClient | Transaction): Promise<Backend | undefined> {
+  const { rows } = await executor.execute<{ pid: number; txid: string }>(
+    sql`select pg_backend_pid() as pid, txid_current()::text as txid`,
+  );
+
+  return rows[0];
+}
+
+const sameBackend = (a: Backend | undefined, b: Backend | undefined): boolean =>
+  a !== undefined && b !== undefined && a.pid === b.pid && a.txid === b.txid;
+
+function ambient(): Transaction {
+  return match(ambientTransaction(), {
+    Some: (tx) => tx,
+    None: () => {
+      throw new Error("check-uow-rollback: no transaction open in this run");
+    },
+  });
+}
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function outboxRows(): Promise<number> {
   const rows = await db
     .select({ id: outboxSchema.outboxEvent.id })
@@ -52,7 +102,7 @@ async function outboxRows(): Promise<number> {
   return rows.length;
 }
 
-async function main(): Promise<void> {
+async function resetProbe(): Promise<void> {
   await cleanup();
   await db.insert(authSchema.user).values({
     id: userId,
@@ -60,12 +110,17 @@ async function main(): Promise<void> {
     email: `${userId}@example.com`,
     emailVerified: true,
   });
+}
+
+async function main(): Promise<void> {
+  await resetProbe();
 
   const outbox = new DrizzleOutboxRepository(instrumentation);
   const uow = new TransactionService(instrumentation);
 
   const renameThen = (name: string, outcome: Result<void, string>) =>
-    uow.run(async (tx) => {
+    uow.run(async () => {
+      const tx = ambient();
       await tx.update(authSchema.user).set({ name }).where(eq(authSchema.user.id, userId));
       await emitEvent(
         outbox,
@@ -74,7 +129,6 @@ async function main(): Promise<void> {
         userId,
         { userId, changes: { name } },
         {},
-        tx,
       );
 
       return outcome;
@@ -100,7 +154,8 @@ async function main(): Promise<void> {
   });
   const expected = new Error("probe: an expected 4xx thrown to abort");
   const thrown = await new TransactionService(spy)
-    .run(async (tx) => {
+    .run(async () => {
+      const tx = ambient();
       await tx
         .update(authSchema.user)
         .set({ name: "Thrown" })
@@ -112,6 +167,212 @@ async function main(): Promise<void> {
   check("a thrown error reaches the caller unchanged", thrown === expected);
   check("the write before the throw was rolled back", (await currentName()) === "Renamed");
   check("the unit of work leaves reporting to the caller (no capture)", captures === 0);
+
+  await resetProbe();
+  const outerThenNested = await uow.run(async () => {
+    const tx = ambient();
+    const outer = await backendOf(tx);
+    const nested = await uow.run(async () => ({
+      handed: resolveExecutor() === tx,
+      ambient: await backendOf(resolveExecutor()),
+    }));
+
+    return { outer, nested };
+  });
+  console.log("[4] backends ->", outerThenNested.outer, outerThenNested.nested.ambient);
+  check(
+    "nested run joins the open transaction (one pid for both)",
+    outerThenNested.nested.handed &&
+      sameBackend(outerThenNested.outer, outerThenNested.nested.ambient),
+  );
+
+  const nestedFailure = Result.fail("probe nested failure");
+  const failedDeep = await uow.run(async () => {
+    const tx = ambient();
+    await tx
+      .update(authSchema.user)
+      .set({ name: "Outer write" })
+      .where(eq(authSchema.user.id, userId));
+    await emitEvent(
+      outbox,
+      EventTypes.USER_PROFILE_UPDATED,
+      "user",
+      userId,
+      { userId, changes: {} },
+      {},
+    );
+
+    return uow.run(async () => nestedFailure);
+  });
+  console.log("[5] outer resolved to ->", failedDeep.isFailure ? failedDeep.getError() : "success");
+  check(
+    "nested failure rolls back the outer write and returns the same Result",
+    failedDeep === nestedFailure &&
+      (await currentName()) === ORIGINAL_NAME &&
+      (await outboxRows()) === 0,
+  );
+
+  const swallowed = await uow.run(async () => {
+    const tx = ambient();
+    await tx
+      .update(authSchema.user)
+      .set({ name: "Outer write" })
+      .where(eq(authSchema.user.id, userId));
+    await uow.run(async () => nestedFailure).catch(() => undefined);
+
+    return Result.ok();
+  });
+  check(
+    "a nested failure the outer work swallows still rolls back and is returned",
+    swallowed === nestedFailure && (await currentName()) === ORIGINAL_NAME,
+  );
+
+  const nestedError = new Error("probe: thrown in a nested run");
+  const thrownDeep = await uow
+    .run(async () => {
+      const tx = ambient();
+      await tx
+        .update(authSchema.user)
+        .set({ name: "Outer write" })
+        .where(eq(authSchema.user.id, userId));
+
+      return uow.run(async () => {
+        throw nestedError;
+      });
+    })
+    .catch((err: unknown) => err);
+  check(
+    "a thrown error in nested rolls back and propagates",
+    thrownDeep === nestedError && (await currentName()) === ORIGINAL_NAME,
+  );
+
+  const caughtDeep = await uow
+    .run(async () => {
+      await ambient()
+        .update(authSchema.user)
+        .set({ name: "Outer write" })
+        .where(eq(authSchema.user.id, userId));
+      await uow
+        .run(async () => {
+          await ambient()
+            .update(authSchema.user)
+            .set({ image: "nested-write" })
+            .where(eq(authSchema.user.id, userId));
+          throw nestedError;
+        })
+        .catch(() => undefined);
+
+      return Result.ok();
+    })
+    .catch((err: unknown) => err);
+  console.log(
+    "[5b] outer that caught a nested throw ->",
+    caughtDeep === nestedError ? "the nested error" : caughtDeep,
+  );
+  check(
+    "a nested run that throws dooms the outer run even if the error is caught",
+    caughtDeep === nestedError &&
+      (await currentName()) === ORIGINAL_NAME &&
+      (await currentImage()) === null,
+  );
+
+  const leaked = await uow.run(async () => {
+    const tx = ambient();
+    const inside = await backendOf(tx);
+    const late = (async () => {
+      await pause(30);
+      const executor = resolveExecutor();
+
+      return { onPool: executor === db, backend: await backendOf(executor) };
+    })();
+
+    return { inside, late };
+  });
+  const afterCommit = await leaked.late;
+  console.log("[6] late backend ->", afterCommit.backend, "run backend ->", leaked.inside);
+  check(
+    "a promise started in a run and awaited after commit uses the pool, not the dead tx",
+    afterCommit.onPool &&
+      afterCommit.backend !== undefined &&
+      afterCommit.backend.txid !== leaked.inside?.txid,
+  );
+
+  const timed = await uow.run(async () => {
+    const tx = ambient();
+    const before = await backendOf(tx);
+    await pause(20);
+    const executor = resolveExecutor();
+
+    return { sameTx: executor === tx, before, after: await backendOf(executor) };
+  });
+  check(
+    "a repository call inside a run after a setTimeout still sees the run's pid",
+    timed.sameTx && sameBackend(timed.before, timed.after),
+  );
+
+  const bothCommitted = await uow.run(async () => {
+    const tx = ambient();
+    const nested = await uow.run(async () => {
+      await ambient()
+        .update(authSchema.user)
+        .set({ name: "Nested write" })
+        .where(eq(authSchema.user.id, userId));
+      await emitEvent(
+        outbox,
+        EventTypes.USER_PROFILE_UPDATED,
+        "user",
+        userId,
+        { userId, changes: {} },
+        {},
+      );
+
+      return Result.ok();
+    });
+    if (nested.isFailure) return nested;
+
+    await tx
+      .update(authSchema.user)
+      .set({ image: "outer-write" })
+      .where(eq(authSchema.user.id, userId));
+
+    return Result.ok();
+  });
+  check(
+    "an outer write after a successful nested run commits both",
+    bothCommitted.isSuccess &&
+      (await currentName()) === "Nested write" &&
+      (await currentImage()) === "outer-write" &&
+      (await outboxRows()) === 1,
+  );
+
+  await resetProbe();
+  const unpersistable = await uow
+    .run(async () => {
+      const tx = ambient();
+      await tx
+        .update(authSchema.user)
+        .set({ name: "Written with a lost event" })
+        .where(eq(authSchema.user.id, userId));
+      EventCollector.add({
+        eventType: EventTypes.USER_PROFILE_UPDATED,
+        dateOccurred: new Date(),
+        aggregateId: userId,
+        payload: { userId, changes: {} },
+      });
+
+      return Result.ok();
+    })
+    .catch((err: unknown) => err);
+  console.log(
+    "[7] run without outbox ->",
+    unpersistable instanceof Error ? unpersistable.message : unpersistable,
+  );
+  check(
+    "a run with events and no flush handler rolls back its writes",
+    unpersistable instanceof Error &&
+      unpersistable.message.includes(EventTypes.USER_PROFILE_UPDATED) &&
+      (await currentName()) === ORIGINAL_NAME,
+  );
 
   await cleanup();
 

@@ -1,8 +1,7 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { and, billingSchema, db, eq, inArray } from "@packages/drizzle";
+import { and, billingSchema, eq, inArray, resolveExecutor } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   BillingError,
   ISubscriptionReadStore,
@@ -24,9 +23,8 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
 
   async findCustomerIdByReference(
     referenceId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<string>, BillingError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleSubscriptionReadStore > findCustomerIdByReference" },
@@ -56,9 +54,8 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
 
   async findActiveByReference(
     referenceId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<SubscriptionRow>, BillingError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleSubscriptionReadStore > findActiveByReference" },

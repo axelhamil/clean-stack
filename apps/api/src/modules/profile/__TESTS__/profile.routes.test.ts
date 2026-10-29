@@ -1,27 +1,28 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type { ProfileError } from "../../../shared/ports/profile.port";
 
-const TX = { sentinel: "transaction" };
+const { unitOfWork, outcome } = mockUnitOfWork();
 
 const mockFindLocale = mock(
-  async (_userId: string, _tx?: unknown): Promise<Result<Option<Locale>, ProfileError>> =>
+  async (_userId: string): Promise<Result<Option<Locale>, ProfileError>> =>
     Result.ok(Option.none()),
 );
 const mockSetLocale = mock(
-  async (_userId: string, _locale: Locale, _tx?: unknown): Promise<Result<void, ProfileError>> =>
-    Result.ok(),
+  async (_userId: string, _locale: Locale): Promise<Result<void, ProfileError>> => Result.ok(),
 );
-const mockEnqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+const enqueueTransactions: unknown[] = [];
+const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
+  enqueueTransactions.push(UnitOfWorkContext.transaction());
+});
 
 mock.module("../../../container", () => ({
   di: {
     IProfileStore: { findLocale: mockFindLocale, setLocale: mockSetLocale },
     IOutboxRepository: { enqueue: mockEnqueue },
-    ITransactionService: {
-      run: async (callback: (tx: unknown) => Promise<unknown>) => callback(TX),
-    },
+    ITransactionService: unitOfWork,
     PolicyAcceptanceService: { hasAcceptedCurrent: mock(async () => Result.ok(true)) },
   },
 }));
@@ -70,6 +71,7 @@ describe("PUT /me/locale", () => {
     mockFindLocale.mockClear();
     mockSetLocale.mockClear();
     mockEnqueue.mockClear();
+    enqueueTransactions.length = 0;
   });
 
   it("rejects a locale outside the supported set", async () => {
@@ -94,11 +96,12 @@ describe("PUT /me/locale", () => {
     expect(emittedPayload()).toEqual({ userId: "user-1", locale: "fr", previousLocale: "en" });
   });
 
-  it("writes the locale and emits the event in the same transaction", async () => {
+  it("writes the locale and emits the event inside one committed unit of work", async () => {
     await putLocale("fr");
 
-    expect(mockSetLocale.mock.calls[0]?.[2]).toBe(TX);
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
+    expect(outcome()).toBe("committed");
+    expect(mockSetLocale).toHaveBeenCalledWith("user-1", "fr");
+    expect(enqueueTransactions[0]).toBeDefined();
   });
 
   it("emits nothing when the write fails", async () => {

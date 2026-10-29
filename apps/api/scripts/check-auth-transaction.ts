@@ -16,8 +16,24 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-auth-transaction");
 
 import { runWithTransaction } from "@better-auth/core/context";
-import { authSchema, db, eq, inArray, multiTenantSchema, outboxSchema } from "@packages/drizzle";
+import { Result } from "@packages/ddd-kit";
+import {
+  and,
+  authSchema,
+  type DbClient,
+  db,
+  eq,
+  inArray,
+  multiTenantSchema,
+  or,
+  outboxSchema,
+  resolveExecutor,
+  sql,
+  type Transaction,
+} from "@packages/drizzle";
+import { EventTypes } from "@packages/events";
 import { auth } from "../src/auth";
+import { di } from "../src/container";
 
 // The provisioning source the SSO plugin passes, so the probe goes through the same
 // creation seam as a first SSO sign-in.
@@ -48,6 +64,36 @@ async function outboxRowsOf(organizationIds: string[]): Promise<number> {
     .where(inArray(outboxSchema.outboxEvent.organizationId, organizationIds));
 
   return rows.length;
+}
+
+async function personalOrgEventsOf(userId: string): Promise<number> {
+  const { eventType, payload } = outboxSchema.outboxEvent;
+  const rows = await db
+    .select({ id: outboxSchema.outboxEvent.id })
+    .from(outboxSchema.outboxEvent)
+    .where(
+      and(
+        inArray(eventType, [EventTypes.ORG_CREATED, EventTypes.ORG_MEMBER_JOINED]),
+        or(eq(sql`${payload}->>'userId'`, userId), eq(sql`${payload}->>'ownerUserId'`, userId)),
+      ),
+    );
+
+  return rows.length;
+}
+
+async function userExists(userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: authSchema.user.id })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, userId));
+
+  return rows.length === 1;
+}
+
+async function backendPid(executor: DbClient | Transaction): Promise<number | undefined> {
+  const { rows } = await executor.execute<{ pid: number }>(sql`select pg_backend_pid() as pid`);
+
+  return rows[0]?.pid;
 }
 
 async function cleanup(): Promise<void> {
@@ -126,7 +172,40 @@ async function main(): Promise<void> {
       .from(authSchema.user)
       .where(eq(authSchema.user.id, rolledBackUserId));
     check("the user itself was rolled back", user === undefined);
+    check(
+      "an event emitted in a databaseHook is rolled back with the hook write",
+      (await personalOrgEventsOf(rolledBackUserId)) === 0,
+    );
   }
+
+  const appFailure = Result.fail("probe: the app run fails after BetterAuth committed");
+  let appPid: number | undefined;
+  let authPid: number | undefined;
+  let nestedUserId: string | undefined;
+  let visibleBeforeAppCommit = false;
+  const appRun = await di.ITransactionService.run(async () => {
+    appPid = await backendPid(resolveExecutor());
+    const user = await runWithTransaction(ctx.adapter, async () => {
+      authPid = await backendPid(resolveExecutor());
+
+      return ctx.internalAdapter.createUser(newUser(), SSO_SOURCE);
+    });
+    nestedUserId = user.id;
+    createdUserIds.push(user.id);
+    visibleBeforeAppCommit = await userExists(user.id);
+
+    return appFailure;
+  });
+  console.log("[3] BetterAuth transaction inside an app run ->", { appPid, authPid });
+  check(
+    "a BetterAuth transaction opened inside an app run commits on its own connection",
+    appRun === appFailure &&
+      authPid !== undefined &&
+      authPid !== appPid &&
+      visibleBeforeAppCommit &&
+      nestedUserId !== undefined &&
+      (await userExists(nestedUserId)),
+  );
 
   await cleanup();
 

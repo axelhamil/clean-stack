@@ -8,7 +8,6 @@ import type { IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   ExecuteWipeOutput,
   IRgpdRepository,
@@ -77,7 +76,7 @@ export class RgpdService {
     private readonly rgpd: IRgpdRepository,
     private readonly storage: IStorageService,
     private readonly email: IEmailService,
-    private readonly transactions: IUnitOfWork<ITransaction>,
+    private readonly transactions: IUnitOfWork,
     private readonly outbox: IOutboxRepository,
     private readonly instrumentation: IInstrumentation,
   ) {}
@@ -153,8 +152,8 @@ export class RgpdService {
         const until = new Date(
           Date.now() + (env.RGPD_GRACE_PERIOD_DAYS ?? 7) * 24 * 60 * 60 * 1000,
         );
-        const txResult = await this.transactions.run(async (tx) => {
-          const marked = await this.rgpd.markPendingDeletion(input.userId, until, tx);
+        const txResult = await this.transactions.run(async () => {
+          const marked = await this.rgpd.markPendingDeletion(input.userId, until);
           if (marked.isFailure) return marked;
           await emitEvent(
             this.outbox,
@@ -163,7 +162,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId, pendingDeletionUntil: until },
             {},
-            tx,
           );
           return Result.ok<RgpdError>();
         });
@@ -213,8 +211,8 @@ export class RgpdService {
           });
         const pendingUntil = state.pendingDeletionUntil.unwrap();
 
-        const txResult = await this.transactions.run(async (tx) => {
-          const cleared = await this.rgpd.clearPendingDeletion(input.userId, tx);
+        const txResult = await this.transactions.run(async () => {
+          const cleared = await this.rgpd.clearPendingDeletion(input.userId);
           if (cleared.isFailure) return cleared;
           await emitEvent(
             this.outbox,
@@ -223,7 +221,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId },
             {},
-            tx,
           );
           return Result.ok<RgpdError>();
         });
@@ -274,8 +271,8 @@ export class RgpdService {
 
         let inner: Result<ExecuteWipeOutput, RgpdError>;
         try {
-          inner = await this.transactions.run(async (trx) => {
-            const wipe = await this.rgpd.executeWipe(input.userId, trx);
+          inner = await this.transactions.run(async () => {
+            const wipe = await this.rgpd.executeWipe(input.userId);
             if (wipe.isFailure) return wipe;
             if (wipe.getValue().alreadyWiped) return wipe;
             await emitEvent(
@@ -285,7 +282,6 @@ export class RgpdService {
               input.userId,
               { userId: input.userId, deletedAt: new Date() },
               {},
-              trx,
             );
             for (const orgId of wipe.getValue().deletedOrgIds) {
               await emitEvent(
@@ -295,7 +291,6 @@ export class RgpdService {
                 orgId,
                 { organizationId: orgId, actorUserId: input.userId },
                 { organizationId: orgId },
-                trx,
               );
             }
             const notified = await this.email.sendTemplate(
@@ -303,7 +298,6 @@ export class RgpdService {
               originalEmail,
               { name: originalName },
               {
-                tx: trx,
                 locale: originalLocale.toUndefined(),
                 idempotencyKey: `delete-completed/${input.userId}`,
               },
@@ -478,8 +472,8 @@ export class RgpdService {
         });
         if (presigned.isFailure) return Result.fail(presigned.getError());
 
-        const txResult = await this.transactions.run(async (tx) => {
-          const touched = await this.rgpd.touchExportRequestedAt(input.userId, tx);
+        const txResult = await this.transactions.run(async () => {
+          const touched = await this.rgpd.touchExportRequestedAt(input.userId);
           if (touched.isFailure) return touched;
           await emitEvent(
             this.outbox,
@@ -488,7 +482,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId },
             {},
-            tx,
           );
           await emitEvent(
             this.outbox,
@@ -501,7 +494,6 @@ export class RgpdService {
               expiresAt: new Date(presigned.getValue().expiresAt),
             },
             {},
-            tx,
           );
           return Result.ok<RgpdError>();
         });

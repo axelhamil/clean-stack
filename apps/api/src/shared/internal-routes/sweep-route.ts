@@ -44,8 +44,10 @@ export function tableRetentionPass(opts: TablePassOptions, spans: SweepSpans): R
         orderBy,
         batchSize,
         spans,
+        uow: di.ITransactionService,
       }),
-    countEligible: (cutoff) => countEligibleWithTimeout(table, filterFor(cutoff), spans),
+    countEligible: (cutoff) =>
+      countEligibleWithTimeout(table, filterFor(cutoff), spans, di.ITransactionService),
     onBatchError: opts.onBatchError,
   };
 }

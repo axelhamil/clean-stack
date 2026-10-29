@@ -6,26 +6,13 @@
  */
 
 import { Option } from "@packages/ddd-kit";
-import {
-  and,
-  count,
-  db,
-  desc,
-  eq,
-  schema,
-  sql,
-  ssoSchema,
-  type Transaction,
-} from "@packages/drizzle";
+import { and, count, desc, eq, resolveExecutor, schema, sql, ssoSchema } from "@packages/drizzle";
 import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
 
 // ── #1: ensurePersonalOrgFor queries ──────────────────────────────────────
 
-export async function findActiveMemberOrgId(
-  userId: string,
-  tx?: Transaction,
-): Promise<string | undefined> {
-  const exec = tx ?? db;
+export async function findActiveMemberOrgId(userId: string): Promise<string | undefined> {
+  const exec = resolveExecutor();
   const [row] = await exec
     .select({ id: schema.member.organizationId })
     .from(schema.member)
@@ -34,20 +21,18 @@ export async function findActiveMemberOrgId(
   return row?.id;
 }
 
-export async function insertPersonalOrgWithOwner(
-  params: {
-    orgId: string;
-    memberId: string;
-    userId: string;
-    slug: string;
-    name: string;
-    createdAt: Date;
-  },
-  tx: Transaction,
-): Promise<void> {
+export async function insertPersonalOrgWithOwner(params: {
+  orgId: string;
+  memberId: string;
+  userId: string;
+  slug: string;
+  name: string;
+  createdAt: Date;
+}): Promise<void> {
   const { orgId, memberId, userId, slug, name, createdAt } = params;
-  await tx.insert(schema.organization).values({ id: orgId, name, slug, createdAt });
-  await tx.insert(schema.member).values({
+  const exec = resolveExecutor();
+  await exec.insert(schema.organization).values({ id: orgId, name, slug, createdAt });
+  await exec.insert(schema.member).values({
     id: memberId,
     organizationId: orgId,
     userId,
@@ -58,19 +43,15 @@ export async function insertPersonalOrgWithOwner(
 
 // ── #2: sendChangeEmailConfirmation ──────────────────────────────────────
 
-export async function setPendingEmail(
-  userId: string,
-  newEmail: string,
-  tx?: Transaction,
-): Promise<void> {
-  const exec = tx ?? db;
+export async function setPendingEmail(userId: string, newEmail: string): Promise<void> {
+  const exec = resolveExecutor();
   await exec.update(schema.user).set({ pendingEmail: newEmail }).where(eq(schema.user.id, userId));
 }
 
 // ── #3: afterRemoveMember: delete org when last member leaves ─────────────
 
-export async function deleteOrgIfEmpty(organizationId: string, tx?: Transaction): Promise<boolean> {
-  const exec = tx ?? db;
+export async function deleteOrgIfEmpty(organizationId: string): Promise<boolean> {
+  const exec = resolveExecutor();
   const deleted = await exec
     .delete(schema.organization)
     .where(
@@ -87,12 +68,8 @@ export async function deleteOrgIfEmpty(organizationId: string, tx?: Transaction)
 
 /** Clears `pendingEmail` when BetterAuth confirms the new address.
  *  Returns true if a row was actually updated (i.e. pendingEmail matched). */
-export async function clearConfirmedPendingEmail(
-  userId: string,
-  email: string,
-  tx?: Transaction,
-): Promise<boolean> {
-  const exec = tx ?? db;
+export async function clearConfirmedPendingEmail(userId: string, email: string): Promise<boolean> {
+  const exec = resolveExecutor();
   const cleared = await exec
     .update(schema.user)
     .set({ pendingEmail: null })
@@ -106,7 +83,7 @@ export async function clearConfirmedPendingEmail(
 export async function findLatestPasskey(
   userId: string,
 ): Promise<{ id: string; deviceType: string | null } | undefined> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({ id: schema.passkey.id, deviceType: schema.passkey.deviceType })
     .from(schema.passkey)
     .where(eq(schema.passkey.userId, userId))
@@ -126,7 +103,7 @@ export async function findLatestLinkedAccount(userId: string): Promise<
     }
   | undefined
 > {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({
       id: schema.account.id,
       providerId: schema.account.providerId,
@@ -146,7 +123,7 @@ export async function findActiveMemberRole(
   userId: string,
   organizationId: string,
 ): Promise<string | null> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({ role: schema.member.role })
     .from(schema.member)
     .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.userId, userId)))
@@ -155,7 +132,7 @@ export async function findActiveMemberRole(
 }
 
 export async function findOrgOwnerUserId(organizationId: string): Promise<string | null> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({ userId: schema.member.userId })
     .from(schema.member)
     .where(and(eq(schema.member.organizationId, organizationId), eq(schema.member.role, "owner")))
@@ -163,11 +140,8 @@ export async function findOrgOwnerUserId(organizationId: string): Promise<string
   return row?.userId ?? null;
 }
 
-export async function countActiveMembers(
-  organizationId: string,
-  tx?: Transaction,
-): Promise<number> {
-  const [row] = await (tx ?? db)
+export async function countActiveMembers(organizationId: string): Promise<number> {
+  const [row] = await resolveExecutor()
     .select({ count: count() })
     .from(schema.member)
     .where(eq(schema.member.organizationId, organizationId));
@@ -175,13 +149,13 @@ export async function countActiveMembers(
 }
 
 /**
- * Serialises seat checks for one organization until `tx` ends: a second
- * transaction adding a member waits here, then counts the rows the first one
- * committed. Without it, two concurrent provisionings both count the same free
+ * Serialises seat checks for one organization until the ambient transaction
+ * ends: a second transaction adding a member waits here, then counts the rows
+ * the first one committed. Without it, two concurrent provisionings both count the same free
  * seat and both take it.
  */
-export async function lockSeatsOf(organizationId: string, tx: Transaction): Promise<void> {
-  await tx.execute(
+export async function lockSeatsOf(organizationId: string): Promise<void> {
+  await resolveExecutor().execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${`seats:${organizationId}`}, 0))`,
   );
 }
@@ -189,25 +163,25 @@ export async function lockSeatsOf(organizationId: string, tx: Transaction): Prom
 // ── #8: api-token middleware ──────────────────────────────────────────────
 
 export async function findUserById(id: string) {
-  const [row] = await db.select().from(schema.user).where(eq(schema.user.id, id)).limit(1);
+  const [row] = await resolveExecutor()
+    .select()
+    .from(schema.user)
+    .where(eq(schema.user.id, id))
+    .limit(1);
   return row;
 }
 
 // ── #9: public API v1 ────────────────────────────────────────────────────
 
-export async function updateUserName(
-  userId: string,
-  name: string,
-  tx?: Transaction,
-): Promise<void> {
-  const exec = tx ?? db;
+export async function updateUserName(userId: string, name: string): Promise<void> {
+  const exec = resolveExecutor();
   await exec.update(schema.user).set({ name }).where(eq(schema.user.id, userId));
 }
 
 export async function findUserOrganizations(
   userId: string,
 ): Promise<{ id: string; name: string; slug: string; role: string }[]> {
-  return db
+  return resolveExecutor()
     .select({
       id: schema.organization.id,
       name: schema.organization.name,
@@ -224,7 +198,7 @@ export async function findUserOrganizations(
 export async function findSsoProviderByProviderId(
   providerId: string,
 ): Promise<{ organizationId: string | null; domain: string; issuer: string } | undefined> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({
       organizationId: ssoSchema.ssoProvider.organizationId,
       domain: ssoSchema.ssoProvider.domain,
@@ -252,7 +226,7 @@ export interface ScimUserSnapshot {
  * provisioning domain is always the organization id (see `ScimConnectionService`).
  */
 export async function findScimUser(scimUserId: string): Promise<ScimUserSnapshot | undefined> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({
       userId: ssoSchema.scimUser.userId,
       connectionId: ssoSchema.scimUser.connectionId,
@@ -272,7 +246,7 @@ export async function findScimUser(scimUserId: string): Promise<ScimUserSnapshot
  * session of its own.
  */
 export async function scimConnectionCreator(connectionId: string): Promise<string | null> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({ createdBy: ssoSchema.scimManagedConnection.createdBy })
     .from(ssoSchema.scimManagedConnection)
     .where(eq(ssoSchema.scimManagedConnection.connectionId, connectionId))
@@ -288,7 +262,7 @@ export async function scimProvisionedMembers(
   connectionId: string,
   organizationId: string,
 ): Promise<{ memberId: string; userId: string }[]> {
-  return db
+  return resolveExecutor()
     .select({ memberId: schema.member.id, userId: schema.member.userId })
     .from(ssoSchema.scimUser)
     .innerJoin(
@@ -316,7 +290,7 @@ export async function isVerifiedSsoDomainOf(
   organizationId: string,
   domain: string,
 ): Promise<boolean> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({ id: ssoSchema.ssoProvider.id })
     .from(ssoSchema.ssoProvider)
     .where(
@@ -333,7 +307,7 @@ export async function isVerifiedSsoDomainOf(
 // ── #12: SSO enforcement: session-creation guard (Task 9) ─────────────────
 
 export async function emailFor(userId: string): Promise<string | undefined> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({ email: schema.user.email })
     .from(schema.user)
     .where(eq(schema.user.id, userId))
@@ -344,7 +318,7 @@ export async function emailFor(userId: string): Promise<string | undefined> {
 // ── #13: SSO enforcement predicate lookup ─────────────────────────────────
 
 export const enforcedProviderForDomain: EnforcementLookup = async (domain) => {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({
       providerId: ssoSchema.ssoProvider.providerId,
       organizationId: ssoSchema.ssoProvider.organizationId,
@@ -381,7 +355,7 @@ export async function findMemberOf(
   userId: string,
   organizationId: string,
 ): Promise<{ id: string; role: string; createdAt: Date } | undefined> {
-  const [row] = await db
+  const [row] = await resolveExecutor()
     .select({
       id: schema.member.id,
       role: schema.member.role,
@@ -395,12 +369,8 @@ export async function findMemberOf(
 
 // ── #15: SSO enforcement toggle (AdminActionService) ─────────────────────
 
-export async function setOrgSsoEnforced(
-  organizationId: string,
-  enforced: boolean,
-  tx?: Transaction,
-): Promise<void> {
-  const exec = tx ?? db;
+export async function setOrgSsoEnforced(organizationId: string, enforced: boolean): Promise<void> {
+  const exec = resolveExecutor();
   await exec
     .update(schema.organization)
     .set({ ssoEnforced: enforced })

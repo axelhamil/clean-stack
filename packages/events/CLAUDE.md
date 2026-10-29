@@ -32,7 +32,7 @@ One new type touches five files; `tsc` names the missing entries in the exhausti
 1. **The payload identifies its actor** (root rule 7). Recognized keys in priority order, the one list both the audit trail and the notification audience read (`ACTOR_KEYS` in the API's `shared/services/event-actor.ts`): `actorUserId` (canonical, REQUIRED when the actor differs from the subject) → `inviterUserId` → `ownerUserId` → `userId` (only when subject == actor: sign-in, self-deletion, MFA toggle). A kicked member's `userId` is the subject; the admin who kicked is `actorUserId`.
 2. **System-triggered events** (cron, cascade, webhook bridge with no upstream user) make `actorUserId` nullable explicitly in the schema (`z.string().nullable()`), never implicitly.
 3. **Payload fields are simple values**: ids and primitives, never a value-object instance or a class. A serialization boundary is `.value` out, `X.create` in.
-4. **No orphan**: a type in the catalog without an emit site fails QA. Before adding one, find the emit call (`aggregate.addEvent(...)` inside `uow.run()`, or `emitEvent(outbox, ..., tx)` for service and library-bridge code); before removing a call, check the type is still emitted elsewhere.
+4. **No orphan**: a type in the catalog without an emit site fails QA. Before adding one, find the emit call (`aggregate.addEvent(...)` inside `uow.run()`, or `emitEvent(outbox, ...)` inside `uow.run()` for service and library-bridge code); before removing a call, check the type is still emitted elsewhere.
 5. **`EVENT_DESCRIPTIONS` stays English**, like the rest of the API documentation: a documented exception to the app's i18n rule.
 
 ## Commands

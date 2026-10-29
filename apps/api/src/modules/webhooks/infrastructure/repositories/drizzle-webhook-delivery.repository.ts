@@ -2,7 +2,6 @@ import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   asc,
-  db,
   desc,
   eq,
   inArray,
@@ -10,8 +9,8 @@ import {
   lt,
   lte,
   or,
+  resolveExecutor,
   sql,
-  type Transaction,
   webhooksSchema,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
@@ -69,6 +68,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
   constructor(private readonly instrumentation: IInstrumentation) {}
 
   async list(args: ListDeliveriesArgs): Promise<Result<DeliveryPage, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > list" },
       async () => {
@@ -80,7 +80,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
             const cursorDate = new Date(args.cursor);
             if (!Number.isNaN(cursorDate.getTime())) conds.push(lt(wd.createdAt, cursorDate));
           }
-          const query = db
+          const query = exec
             .select({ d: wd })
             .from(wd)
             .innerJoin(we, eq(wd.endpointId, we.id))
@@ -106,11 +106,12 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
   }
 
   async findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findById" },
       async () => {
         try {
-          const query = db
+          const query = exec
             .select({ d: wd })
             .from(wd)
             .innerJoin(we, eq(wd.endpointId, we.id))
@@ -129,16 +130,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     );
   }
 
-  async updateStatus(
-    id: string,
-    update: DeliveryUpdate,
-    tx: Transaction,
-  ): Promise<Result<void, WebhookRepoError>> {
+  async updateStatus(id: string, update: DeliveryUpdate): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > updateStatus" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(wd)
             .set({
               status: update.status,
@@ -163,13 +161,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
 
   async findPendingBatch(
     limit: number,
-    tx: Transaction,
   ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findPendingBatch" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .select()
             .from(wd)
             .where(
@@ -198,9 +196,8 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     deliveryId: string,
     endpointId: string,
     organizationId: string,
-    tx?: Transaction,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > enqueueReplay" },
       async () => {
@@ -252,13 +249,13 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
 
   async createAttempt(
     args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
-    tx: Transaction,
   ): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > createAttempt" },
       async () => {
         try {
-          const query = tx.insert(wda).values({
+          const query = exec.insert(wda).values({
             id: uuidv7(),
             deliveryId: args.deliveryId,
             attemptNumber: args.attemptNumber,
@@ -287,11 +284,12 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     id: string,
     organizationId: string,
   ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findByIdWithAttempts" },
       async () => {
         try {
-          const deliveryQuery = db
+          const deliveryQuery = exec
             .select({ d: wd })
             .from(wd)
             .innerJoin(we, eq(wd.endpointId, we.id))
@@ -302,7 +300,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
             () => deliveryQuery.execute(),
           );
           if (!row) return Option.none();
-          const attemptsQuery = db
+          const attemptsQuery = exec
             .select()
             .from(wda)
             .where(eq(wda.deliveryId, id))
@@ -323,21 +321,19 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     );
   }
 
-  async enqueueTargeted(
-    args: {
-      endpointId: string;
-      outboxEventId: string;
-      eventType: string;
-      payload: unknown;
-      idempotencyKey: string;
-    },
-    tx: Transaction,
-  ): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>> {
+  async enqueueTargeted(args: {
+    endpointId: string;
+    outboxEventId: string;
+    eventType: string;
+    payload: unknown;
+    idempotencyKey: string;
+  }): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > enqueueTargeted" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .insert(wd)
             .values({
               id: uuidv7(),

@@ -1,9 +1,8 @@
 import { Result } from "@packages/ddd-kit";
-import { db, desc, eq, policiesSchema } from "@packages/drizzle";
+import { desc, eq, policiesSchema, resolveExecutor } from "@packages/drizzle";
 import type { PolicyType } from "@packages/policies";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   IPolicyAcceptanceStore,
   PolicyAcceptanceRecord,
@@ -18,8 +17,8 @@ const storeFailure = dbOperationFailure("POLICY_ACCEPTANCE_PROVIDER_FAILURE");
 export class DrizzlePolicyAcceptanceStore implements IPolicyAcceptanceStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async insert(row: PolicyAcceptanceRecord, tx?: ITransaction): Promise<Result<void, PolicyError>> {
-    const exec = tx ?? db;
+  async insert(row: PolicyAcceptanceRecord): Promise<Result<void, PolicyError>> {
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzlePolicyAcceptanceStore > insert" },
@@ -49,9 +48,8 @@ export class DrizzlePolicyAcceptanceStore implements IPolicyAcceptanceStore {
 
   async findLatestVersions(
     userId: string,
-    tx?: ITransaction,
   ): Promise<Result<Partial<Record<PolicyType, string>>, PolicyError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzlePolicyAcceptanceStore > findLatestVersions" },

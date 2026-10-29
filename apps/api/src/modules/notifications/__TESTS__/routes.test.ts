@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type {
   NotificationError,
   NotificationRecord,
@@ -54,29 +55,28 @@ const mockList = mock(
   async (): Promise<Result<NotificationRecord[], NotificationError>> => Result.ok([NOTIFICATION]),
 );
 const mockUnreadCount = mock(async (): Promise<Result<number, NotificationError>> => Result.ok(3));
-const mockMarkRead = mock(
-  async (
-    _userId: string,
-    _ids: string[],
-    _now: Date,
-    _tx?: unknown,
-  ): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
-);
+const storeTransactions: unknown[] = [];
+const mockMarkRead = mock(async (): Promise<Result<string[], NotificationError>> => {
+  storeTransactions.push(UnitOfWorkContext.transaction());
+  return Result.ok(["notif-1"]);
+});
 const mockMarkAllRead = mock(
   async (): Promise<Result<string[], NotificationError>> => Result.ok(["notif-1"]),
 );
 const mockListPreferences = mock(
   async (): Promise<Result<PreferenceRecord[], NotificationError>> => Result.ok([PREFERENCE]),
 );
-// The parameters are declared: without them `mock.calls` is typed `[]` and
-// the assertions on the transaction handle do not compile.
-const mockUpsertPreference = mock(
-  async (_input: unknown, _tx?: unknown): Promise<Result<void, NotificationError>> => Result.ok(),
-);
+const mockUpsertPreference = mock(async (): Promise<Result<void, NotificationError>> => {
+  storeTransactions.push(UnitOfWorkContext.transaction());
+  return Result.ok();
+});
 
-const mockEnqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+const enqueueTransactions: unknown[] = [];
+const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
+  enqueueTransactions.push(UnitOfWorkContext.transaction());
+});
 
-const TX = { sentinel: "transaction" };
+const { unitOfWork } = mockUnitOfWork();
 
 mock.module("../../../container", () => ({
   di: {
@@ -91,9 +91,7 @@ mock.module("../../../container", () => ({
     IOutboxRepository: {
       enqueue: mockEnqueue,
     },
-    ITransactionService: {
-      run: async (callback: (tx: unknown) => Promise<unknown>) => callback(TX),
-    },
+    ITransactionService: unitOfWork,
     PolicyAcceptanceService: {
       hasAcceptedCurrent: mock(async () => Result.ok(true)),
     },
@@ -231,7 +229,8 @@ describe("POST /notifications/read - domain event", () => {
     expect(res.status).toBe(200);
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
     // biome-ignore lint/suspicious/noExplicitAny: test assertion
-    const [events, , tx] = (mockEnqueue.mock.calls[0] ?? []) as any[];
+    const [events] = (mockEnqueue.mock.calls[0] ?? []) as any[];
+    const tx = enqueueTransactions.at(-1);
     expect(events[0].eventType).toBe("notification.read");
     expect(events[0].payload).toEqual({
       userId: "user-1",
@@ -239,8 +238,8 @@ describe("POST /notifications/read - domain event", () => {
       count: 1,
       notificationIds: ["notif-1"],
     });
-    expect(tx).toBe(TX);
-    expect(mockMarkRead.mock.calls[0]?.[3]).toBe(TX);
+    expect(tx).toBeDefined();
+    expect(tx).toBe(storeTransactions.at(-1));
   });
 
   it("answers 404 and emits nothing for someone else's notification", async () => {
@@ -362,12 +361,8 @@ describe("PUT /notifications/preferences", () => {
       body: JSON.stringify({ category: "billing", channel: "email", enabled: false }),
     });
     expect(res.status).toBe(200);
-    // A call count proves nothing: both writes could just as well run outside
-    // the transaction. What matters is that they carry the SAME handle,
-    // otherwise a crash between them would leave a changed preference with no
-    // event, hence no audit trail.
-    expect(mockUpsertPreference.mock.calls[0]?.[1]).toBe(TX);
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
+    expect(enqueueTransactions.at(-1)).toBeDefined();
+    expect(enqueueTransactions.at(-1)).toBe(storeTransactions.at(-1));
   });
 
   it("rejects an impersonated session (403)", async () => {
@@ -447,11 +442,8 @@ describe("PUT /notifications/org-preferences", () => {
       }),
     });
     expect(res.status).toBe(200);
-    // Same reason as on the user side: an org lock is a compliance event, and
-    // a locked preference without an event is an audit gap nothing can
-    // recover afterwards.
-    expect(mockUpsertPreference.mock.calls[0]?.[1]).toBe(TX);
-    expect(mockEnqueue.mock.calls[0]?.[2]).toBe(TX);
+    expect(enqueueTransactions.at(-1)).toBeDefined();
+    expect(enqueueTransactions.at(-1)).toBe(storeTransactions.at(-1));
   });
 
   it("rejects an impersonated session (403)", async () => {

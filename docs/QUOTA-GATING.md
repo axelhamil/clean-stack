@@ -8,8 +8,8 @@ a code change + deploy, never a Stripe dashboard toggle.
 
 1. Add the key to `QuotaKey` and a limit per tier in `ENTITLEMENTS[*].quotas`.
 2. **Enforcement (authoritative)**: inside the resource write's `uow.run()`, call
-   `reserveQuota(tx, orgId, "yourKey", view.quotas.yourKey, (tx) => countScopedRows(tx, yourTable, yourTable.organizationId, orgId))`
-   **before** the insert. The advisory lock + `COUNT(*)` is atomic against the write (no TOCTOU).
+   `reserveQuota(orgId, "yourKey", view.quotas.yourKey, () => countScopedRows(yourTable, yourTable.organizationId, orgId))`
+   **before** the insert. Both read the run's ambient transaction, so the advisory lock + `COUNT(*)` is atomic against the write (no TOCTOU); outside a `uow.run()` `reserveQuota` refuses, since its lock would end with the statement.
 3. **Pre-check (UX, optional)**: mount `requireQuota("yourKey", c => countScopedRows(...))` on the
    route to reject early with `429 BILLING_QUOTA_EXCEEDED` before doing the work.
 4. **Front**: `const { useQuota } = useEntitlements(); useQuota("yourKey", currentUsage)` →

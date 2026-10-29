@@ -7,7 +7,11 @@ export interface IAggregate {
   clearEvents(): void;
 }
 
-export abstract class Aggregate<T> extends Entity<T> implements IAggregate {
+export interface IEventSource {
+  pullDomainEvents(): IDomainEvent[];
+}
+
+export abstract class Aggregate<T> extends Entity<T> implements IAggregate, IEventSource {
   private _domainEvents: IDomainEvent[] = [];
 
   protected constructor(props: T, id?: UUID<string | number>) {

@@ -5,7 +5,7 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 # Events (transactional outbox)
 
-`IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg, tx)` calls `trackEventsOnSuccess` → events flushed via `outbox.enqueue` in the same TX (atomicity). Post-commit, `pg_notify` wakes `OutboxDispatcher` → built-in subscribers (audit, webhook, notification fan-out) in the dispatch TX, then `onEvent(...)` handlers post-commit (best-effort, isolated).
+`IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg)` reads the ambient transaction and calls `trackEventsOnSuccess` → events flushed via `outbox.enqueue` in the same TX (atomicity). Post-commit, `pg_notify` wakes `OutboxDispatcher` → built-in subscribers (audit, webhook, notification fan-out) in the dispatch TX, then `onEvent(...)` handlers post-commit (best-effort, isolated).
 
 ## BetterAuth → outbox bridge (`auth.ts`)
 
@@ -18,7 +18,7 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 ## Hard rules
 
-`uow.run()` cannot be nested (Drizzle nested TX = independent, not savepoints, guarded by `EventCollector.hasContext()` throw). `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
+A nested `uow.run()` joins the open transaction (no savepoint); a failed `Result` or a throw at any depth rolls the whole unit back, even when the outer work caught it; a BetterAuth transaction is a `runOutermost`, its own connection, never joined to an app run; a run's scope is closed when it settles, so a late promise reads the pool; a run with collected events and no flush handler rolls back (`EventsWithoutOutbox`). No store, port or service takes a `tx`: `run(work)` hands `work` nothing and the store (outbox enqueue included) reads `resolveExecutor()`; the open transaction is read through `ambientTransaction()`, never `UnitOfWorkContext`. `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
 
 ## Retention
 

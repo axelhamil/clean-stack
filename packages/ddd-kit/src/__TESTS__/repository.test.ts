@@ -614,8 +614,8 @@ type RepoError = { code: "DB_DOWN" };
 
 describe("repository error type", () => {
   it("a repository declared with a typed error returns Result with that error", () => {
-    type Repo = BaseRepository<User, unknown, RepoError>;
-    type Scoped = ScopedRepository<User, ScopeOf<"org">, unknown, RepoError>;
+    type Repo = BaseRepository<User, RepoError>;
+    type Scoped = ScopedRepository<User, ScopeOf<"org">, RepoError>;
 
     expectTypeOf<ReturnType<Repo["findById"]>>().toEqualTypeOf<
       Promise<Result<Option<User>, RepoError>>

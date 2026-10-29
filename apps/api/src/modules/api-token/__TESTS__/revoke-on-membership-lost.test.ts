@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type { ApiTokenError, IApiTokenRepository } from "../../../shared/ports/api-token.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
@@ -33,9 +34,7 @@ function makeDeps(repo: IApiTokenRepository, outbox = makeOutbox()) {
   return {
     IApiTokenRepository: repo,
     IOutboxRepository: outbox,
-    ITransactionService: {
-      run: async (cb: (tx: unknown) => Promise<void>) => cb({}),
-    } as never,
+    ITransactionService: mockUnitOfWork().unitOfWork,
     IInstrumentation: new NoOpInstrumentation(),
   };
 }
@@ -69,7 +68,7 @@ describe("revokeTokensOnMembershipLost", () => {
       }),
     );
 
-    expect(repo.revokeAllForMembership).toHaveBeenCalledWith("user-1", "org-1", expect.anything());
+    expect(repo.revokeAllForMembership).toHaveBeenCalledWith("user-1", "org-1");
     expect(outbox.enqueue).toHaveBeenCalledTimes(2);
 
     const calls = (outbox.enqueue as ReturnType<typeof mock>).mock.calls;
@@ -120,7 +119,7 @@ describe("revokeTokensOnMembershipLost", () => {
       }),
     );
 
-    expect(repo.revokeAllForMembership).toHaveBeenCalledWith("user-1", "org-1", expect.anything());
+    expect(repo.revokeAllForMembership).toHaveBeenCalledWith("user-1", "org-1");
     expect(outbox.enqueue).not.toHaveBeenCalled();
   });
 

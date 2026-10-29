@@ -10,7 +10,7 @@ import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
-import { db, sql, type Transaction } from "@packages/drizzle";
+import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -54,11 +54,6 @@ import {
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
-import {
-  currentAuthTransaction,
-  inAuthTransaction,
-  withPublishedTransactions,
-} from "./shared/auth/auth-transaction";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { scimIdentityResolver, scimMembershipProjection } from "./shared/auth/scim-membership";
@@ -72,6 +67,7 @@ import {
   scimUserChange,
 } from "./shared/auth/sso-paths";
 import { TOTP_OPTIONS } from "./shared/auth/totp-options";
+import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env } from "./shared/env";
 import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
@@ -114,8 +110,10 @@ interface SignupUser {
  * the `member` insert would reference a user that is not committed yet.
  */
 async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Promise<string> {
-  return inAuthTransaction(db, async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+  return di.ITransactionService.run(async () => {
+    await resolveExecutor().execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
+    );
 
     const emitUserCreated = async () => {
       if (!signupUser) return;
@@ -125,11 +123,10 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
         userId,
         { userId, email: signupUser.email, name: signupUser.name },
         null,
-        tx,
       );
     };
 
-    const existingOrgId = await findActiveMemberOrgId(userId, tx);
+    const existingOrgId = await findActiveMemberOrgId(userId);
     if (existingOrgId) {
       await emitUserCreated();
       return existingOrgId;
@@ -139,17 +136,20 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
     const memberId = crypto.randomUUID();
     const slug = `personal-${orgId}`;
     const now = new Date();
-    await insertPersonalOrgWithOwner(
-      { orgId, memberId, userId, slug, name: "Personal", createdAt: now },
-      tx,
-    );
+    await insertPersonalOrgWithOwner({
+      orgId,
+      memberId,
+      userId,
+      slug,
+      name: "Personal",
+      createdAt: now,
+    });
     await emit(
       EventTypes.ORG_CREATED,
       "organization",
       orgId,
       { organizationId: orgId, ownerUserId: userId, slug, name: "Personal" },
       orgId,
-      tx,
     );
     await emit(
       EventTypes.ORG_MEMBER_JOINED,
@@ -157,7 +157,6 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
       memberId,
       { organizationId: orgId, userId, role: "owner" },
       orgId,
-      tx,
     );
     await emitUserCreated();
     return orgId;
@@ -167,9 +166,10 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
 /**
  * Thin adapter that binds the module-level `di.IOutboxRepository` to
  * `emitEvent` so BetterAuth hooks don't need to import the DI container
- * directly. Keeps all hook bodies concise and the DI reference local. Without an
- * explicit `tx`, an event raised inside a BetterAuth transaction joins it, so it is
- * committed or rolled back with the change it describes.
+ * directly. Keeps all hook bodies concise and the DI reference local. An event
+ * raised inside a BetterAuth transaction joins it (the adapter runs every
+ * transaction as a unit of work), so it is committed or rolled back with the change
+ * it describes.
  */
 async function emit<TPayload>(
   eventType: EventType,
@@ -177,17 +177,10 @@ async function emit<TPayload>(
   aggregateId: string,
   payload: TPayload,
   organizationId?: string | null,
-  tx?: Transaction,
 ): Promise<void> {
-  await emitEvent(
-    di.IOutboxRepository,
-    eventType,
-    aggregateType,
-    aggregateId,
-    payload,
-    { organizationId },
-    tx ?? currentAuthTransaction(),
-  );
+  await emitEvent(di.IOutboxRepository, eventType, aggregateType, aggregateId, payload, {
+    organizationId,
+  });
 }
 
 /**
@@ -253,9 +246,8 @@ async function seatCapFor(
   orgId: string,
 ): Promise<{ available: boolean; activeMembers: number; maxMembers: number | null }> {
   const view = await di.EntitlementsService.getEntitlements(orgId);
-  const tx = currentAuthTransaction();
-  if (tx) await lockSeatsOf(orgId, tx);
-  const activeMembers = await countActiveMembers(orgId, tx);
+  if (ambientTransaction().isSome()) await lockSeatsOf(orgId);
+  const activeMembers = await countActiveMembers(orgId);
   return {
     available: hasSeatAvailable(activeMembers, view.maxMembers),
     activeMembers,
@@ -560,9 +552,13 @@ const authOptions = {
   // `transaction: true` is required by `@better-auth/scim`, which refuses to start
   // without native transactions: a directory change and the membership it
   // projects must commit or roll back together.
-  // The adapter gets `db` wrapped so the transactions it opens are visible to the
-  // hooks it runs inside them (`shared/auth/auth-transaction.ts`).
-  database: drizzleAdapter(withPublishedTransactions(db), { provider: "pg", transaction: true }),
+  // The adapter gets `db` wrapped so every transaction it opens is an outermost unit
+  // of work: the hooks it runs inside read it through `resolveExecutor()` and their
+  // events are flushed before it commits.
+  database: drizzleAdapter(
+    asUnitOfWork(db, () => di.ITransactionService),
+    { provider: "pg", transaction: true },
+  ),
 
   user: {
     additionalFields: {
@@ -575,15 +571,14 @@ const authOptions = {
     changeEmail: {
       enabled: true,
       sendChangeEmailConfirmation: async ({ user, newEmail, url, token }) => {
-        await inAuthTransaction(db, async (tx) => {
-          await setPendingEmail(user.id, newEmail, tx);
+        await di.ITransactionService.run(async () => {
+          await setPendingEmail(user.id, newEmail);
           await emit(
             EventTypes.USER_EMAIL_CHANGE_REQUESTED,
             "user",
             user.id,
             { userId: user.id, newEmail },
             null,
-            tx,
           );
         });
         await dispatchEmail(
@@ -833,8 +828,8 @@ const authOptions = {
             org.id,
           );
           if (isPersonalOrg(org.slug)) return;
-          await inAuthTransaction(db, async (tx) => {
-            const deleted = await deleteOrgIfEmpty(org.id, tx);
+          await di.ITransactionService.run(async () => {
+            const deleted = await deleteOrgIfEmpty(org.id);
             if (!deleted) return;
             await emit(
               EventTypes.ORG_DELETED,
@@ -842,7 +837,6 @@ const authOptions = {
               org.id,
               { organizationId: org.id, actorUserId },
               org.id,
-              tx,
             );
           });
         },
@@ -1387,8 +1381,8 @@ const authOptions = {
       },
       update: {
         after: async (user) => {
-          await db.transaction(async (tx) => {
-            const cleared = await clearConfirmedPendingEmail(user.id, user.email, tx);
+          await di.ITransactionService.run(async () => {
+            const cleared = await clearConfirmedPendingEmail(user.id, user.email);
             if (!cleared) return;
             await emit(
               EventTypes.USER_PROFILE_UPDATED,
@@ -1396,7 +1390,6 @@ const authOptions = {
               user.id,
               { userId: user.id, changes: { email: user.email } },
               null,
-              tx,
             );
           });
         },

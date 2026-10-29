@@ -1,4 +1,3 @@
-import type { IUnitOfWork } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 /**
@@ -31,12 +30,4 @@ export function recordingOutbox(): { outbox: IOutboxRepository; enqueued: Enqueu
   };
 
   return { outbox, enqueued };
-}
-
-/** Runs the callback directly with the given transaction: no rollback semantics. */
-export function passthroughUow<TTx>(tx: TTx): IUnitOfWork<TTx> {
-  return {
-    startTransaction: async (cb) => cb(tx),
-    run: async (cb) => cb(tx),
-  };
 }

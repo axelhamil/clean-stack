@@ -29,10 +29,10 @@ zero divergence.
 ┌─────────────────────────────────────────────────────────────────────┐
 │  PHASE 1  ·  inside the business transaction                        │
 │                                                                      │
-│   your use case ──►  uow.run(async tx => {                          │
+│   your use case ──►  uow.run(async () => {                          │
 │                         aggregate.addEvent(...)  // collected in    │
 │                         //                       // AsyncLocalStorage│
-│                         repo.save(aggregate, tx)                    │
+│                         repo.save(aggregate)                        │
 │                       })                                             │
 │                         │                                            │
 │                         ▼   pre-COMMIT, same TX                     │
@@ -87,7 +87,7 @@ zero divergence.
 
 | Actor | What it is | Role |
 |---|---|---|
-| **Producer** | Your use case / service | Adds events via `aggregate.addEvent()` or `emitEvent(outbox, ..., tx)`. |
+| **Producer** | Your use case / service | Adds events via `aggregate.addEvent()` or `emitEvent(outbox, ...)` (joins the open `uow.run`). |
 | **Outbox table** | `outbox_event` row | Holds the pending event in the same TX as the state change. |
 | **Notifier** | Postgres trigger + `pg_notify` | Fires on every INSERT; payload delivered on COMMIT only. |
 | **Dispatcher** | In-process worker | Holds a `LISTEN` socket, drains batches, fans out to subscribers. |
@@ -172,7 +172,7 @@ Sidekiq Pro).
 Names are stable in the repo; the pattern is what matters.
 
 - **Producer surface**: `aggregate.addEvent(...)` (DDD code) and
-  `emitEvent(outbox, ..., tx)` (service-level or external-lib bridges).
+  `emitEvent(outbox, ...)` inside `uow.run()` (service-level or external-lib bridges).
 - **Collector**: an `AsyncLocalStorage` opened by `IUnitOfWork.run(...)`:
   pulls events off aggregates inside the TX and hands them to the outbox.
 - **Outbox repository**: `enqueue`, `findPendingBatch`, `markDispatched`,

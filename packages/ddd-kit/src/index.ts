@@ -5,6 +5,7 @@ export * from "./application/pagination";
 export * from "./application/repository";
 export * from "./application/scope";
 export * from "./application/transaction";
+export * from "./application/unit-of-work-context";
 export * from "./domain/aggregate";
 export * from "./domain/domain-event";
 export * from "./domain/entity";

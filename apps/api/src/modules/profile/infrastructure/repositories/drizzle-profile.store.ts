@@ -1,10 +1,9 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { authSchema, db, eq, type SQL } from "@packages/drizzle";
+import { authSchema, eq, resolveExecutor, type SQL } from "@packages/drizzle";
 import { isLocale, type Locale } from "@packages/i18n";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IProfileStore, ProfileError } from "../../../../shared/ports/profile.port";
-import type { ITransaction } from "../../../../shared/transaction";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
@@ -13,26 +12,16 @@ const storeFailure = dbOperationFailure("PROFILE_PROVIDER_FAILURE");
 export class DrizzleProfileStore implements IProfileStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async findLocale(
-    userId: string,
-    tx?: ITransaction,
-  ): Promise<Result<Option<Locale>, ProfileError>> {
-    return this.findLocaleWhere("findLocale", eq(authSchema.user.id, userId), tx);
+  async findLocale(userId: string): Promise<Result<Option<Locale>, ProfileError>> {
+    return this.findLocaleWhere("findLocale", eq(authSchema.user.id, userId));
   }
 
-  async findLocaleByEmail(
-    email: string,
-    tx?: ITransaction,
-  ): Promise<Result<Option<Locale>, ProfileError>> {
-    return this.findLocaleWhere("findLocaleByEmail", eq(authSchema.user.email, email), tx);
+  async findLocaleByEmail(email: string): Promise<Result<Option<Locale>, ProfileError>> {
+    return this.findLocaleWhere("findLocaleByEmail", eq(authSchema.user.email, email));
   }
 
-  async setLocale(
-    userId: string,
-    locale: Locale,
-    tx?: ITransaction,
-  ): Promise<Result<void, ProfileError>> {
-    const invoker = tx ?? db;
+  async setLocale(userId: string, locale: Locale): Promise<Result<void, ProfileError>> {
+    const invoker = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleProfileStore > setLocale" }, async () => {
       try {
         const query = invoker
@@ -55,9 +44,8 @@ export class DrizzleProfileStore implements IProfileStore {
   private async findLocaleWhere(
     op: "findLocale" | "findLocaleByEmail",
     condition: SQL,
-    tx?: ITransaction,
   ): Promise<Result<Option<Locale>, ProfileError>> {
-    const invoker = tx ?? db;
+    const invoker = resolveExecutor();
     return this.instrumentation.startSpan({ name: `DrizzleProfileStore > ${op}` }, async () => {
       try {
         const query = invoker

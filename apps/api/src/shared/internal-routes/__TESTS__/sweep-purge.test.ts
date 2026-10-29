@@ -22,17 +22,15 @@ function fakeQuery(sql: string, rows: Array<{ id: string }>) {
 
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: {
-    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
-      fn({
-        execute: async () => {},
-        select: () => fakeQuery("select id", []),
-        delete: () => fakeQuery('delete from "t"', [{ id: "a" }, { id: "b" }]),
-      }),
-  },
+  resolveExecutor: () => ({
+    execute: async () => {},
+    select: () => fakeQuery("select id", []),
+    delete: () => fakeQuery('delete from "t"', [{ id: "a" }, { id: "b" }]),
+  }),
 }));
 
 const { describe, expect, it, spyOn } = await import("bun:test");
+const { mockUnitOfWork } = await import("@packages/test/bun/unit-of-work");
 const { NoOpInstrumentation } = await import("../../services/noop-instrumentation");
 const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
@@ -52,6 +50,7 @@ describe("purgeBatchWithTimeout", () => {
       orderBy: {} as never,
       batchSize: 100,
       spans,
+      uow: mockUnitOfWork().unitOfWork,
     });
 
     expect(deleted).toBe(2);
@@ -68,6 +67,7 @@ describe("purgeBatchWithTimeout", () => {
         orderBy: {} as never,
         batchSize: 100,
         spans,
+        uow: mockUnitOfWork().unitOfWork,
       }),
     ).rejects.toThrow("refusing an unfiltered delete");
   });
@@ -84,6 +84,7 @@ describe("purgeBatchWithTimeout", () => {
       orderBy: {} as never,
       batchSize: 100,
       spans,
+      uow: mockUnitOfWork().unitOfWork,
     });
 
     expect(spy).toHaveBeenCalledTimes(1);

@@ -1,12 +1,12 @@
 import { domainEventToOutboxRow, type IDomainEvent, Option } from "@packages/ddd-kit";
 import {
   and,
-  db,
   eq,
   isNull,
   lte,
   or,
   outboxSchema,
+  resolveExecutor,
   sql,
   type Transaction,
 } from "@packages/drizzle";
@@ -48,7 +48,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
     scope: OutboxEnqueueScope,
     tx?: Transaction,
   ): Promise<void> {
-    const exec = tx ?? db;
+    const exec = tx ?? resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleOutboxRepository > enqueue" },
       async () => {

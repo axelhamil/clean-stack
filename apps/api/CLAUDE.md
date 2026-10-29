@@ -27,7 +27,7 @@ apps/api/src/
   cron/                         Standalone bundled sweep caller (`sweep.ts`), runs as its own process, see `docs/CRON.md`
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   auth.ts                       BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`).
-  auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), `tx?`-aware. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
+  auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), reading `resolveExecutor()`. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
   app.ts                        `Hono` construction, chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
   index.ts                      Server entry: explicit `Bun.serve()` handle (kept on `globalThis` so `bun --hot` reloads it instead of rebinding the port), DI preload, worker starts, ordered shutdown steps. Imports `app` from `app.ts`, re-exports `AppType`.
   migrate.ts                    Migration entry (`pnpm --filter api migrate`); `start` runs it before the server
@@ -66,7 +66,7 @@ modules/<context>/
 
 ## Layer purity
 
-**Domain has zero external imports** (only `@packages/ddd-kit` + `zod`). **Application has zero infrastructure imports**: `application/**` imports only `@packages/ddd-kit`, `zod` and the ports and types it owns. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `SessionUser`, `S3Client`, ...). **Why**: application says *what*, not *how*; a use case importing a provider type survives a swap only by accident, which is exactly what ports exist to prevent. **One exception**: `shared/transaction.ts` aliases `type ITransaction = Transaction` so repositories thread the tx natively typed (`tx ?? db` works without a cast). Type-only, single swap-point. Cross-aggregate references use VO ids (`UserId`), never `SessionUser["id"]` or `string`.
+**Domain has zero external imports** (only `@packages/ddd-kit` + `zod`). **Application has zero infrastructure imports**: `application/**` imports only `@packages/ddd-kit`, `zod` and the ports and types it owns. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `SessionUser`, `S3Client`, ...). **Why**: application says *what*, not *how*; a use case importing a provider type survives a swap only by accident, which is exactly what ports exist to prevent. Cross-aggregate references use VO ids (`UserId`), never `SessionUser["id"]` or `string`.
 
 ## Shared kernel (`shared/`)
 
@@ -79,11 +79,10 @@ Cross-cutting infra, no business. Inventory by concern (the file-level list is `
 - `surface/`: back↔front route parity: `back-routes.ts` (live route table from `app.ts`), `front-consumers.ts` (front `api.*.$method` call-site scan), `route-map.ts` (documented per-route intent); `__TESTS__/surface-parity.test.ts` fails on drift. See `docs/SURFACE.md`.
 - `db/quota-reservation.ts`: `reserveQuota` (advisory lock + count + `assertQuota` inside the caller's TX = authoritative, TOCTOU-safe quota gate) and `countScopedRows`. Dormant until a resource is wired. See `docs/QUOTA-GATING.md`.
 - `entitlements.ts`: typed plan catalog and its pure predicates, read by billing, the gates, `quota-reservation` and `auth.ts`.
-- `event-emitter.ts`: `emitEvent(outbox, ...)` for code that emits outside an aggregate flow (plain services, BetterAuth bridge, RGPD, uploads), inside the same `ITransactionService.run(tx)` as the write; use it instead of `outbox.enqueue` directly so the source and scope shape stay consistent. `emitEventBestEffort(...)` is for a request refused whatever happens to its event (CSRF, rate limit, CSP report, abuse checks): a failed emit is logged as a warning instead of turning the refusal into a 500.
+- `event-emitter.ts`: `emitEvent(outbox, ...)` for code that emits outside an aggregate flow (plain services, BetterAuth bridge, RGPD, uploads), inside the same `uow.run()` as the write (the outbox reads the ambient executor: inside a run the row commits or rolls back with the write, outside one it autocommits); use it instead of `outbox.enqueue` directly so the source and scope shape stay consistent. `emitEventBestEffort(...)` is for a request refused whatever happens to its event (CSRF, rate limit, CSP report, abuse checks): a failed emit is logged as a warning instead of turning the refusal into a 500.
 - `services/event-actor.ts`: `ACTOR_KEYS` + `readUserId`, the one actor-key priority list both the audit trail and the notification audience read.
 - `ssrf-guard.ts` + `private-ranges.ts` (outbound URL guard, webhooks), `aead.ts` (XChaCha20-Poly1305 + per-org HKDF sub-key for webhook secrets at rest), `jitter.ts` (retry backoff), `db-failure.ts` (`dbOperationFailure(code)`: the error a store returns when a query throws), `request-context.ts` (request-scoped ALS: request id + trusted-proxy client IP, for BetterAuth hooks that have no Hono context), `shutdown.ts` (`lifecycleState`, `runShutdown` / `installShutdown`: steps in series, each raced against its timeout, a global deadline, exit `0` only when every step finished), `services/digest-schedule.ts` (pure `digestDueAt`, never anchored on "now").
 - `env.ts`, `logger.ts`: process-level singletons. `env-bounds.ts` (`validateEnvBounds`) holds the cross-field refinement that fails the boot when the sweep timeouts are not nested; kept out of `env.ts` so a test can call it without a full `.env`.
-- `transaction.ts`: the `ITransaction` alias above.
 
 ### Port placement: `shared/ports/` vs `modules/<x>/application/ports/`
 
@@ -93,7 +92,7 @@ The decisor is *who consumes the port*, not where the impl lives.
 - **`modules/<x>/application/ports/`** = single context with business orchestration above it. Impl in `modules/<x>/infrastructure/repositories/` for a persistence port, `modules/<x>/infrastructure/services/` for a port to an external service.
 - **Promotion**: a 2nd module needs an existing module-private port → move it to `shared/ports/`, fix imports. Don't pre-emptively put everything in `shared/`. Demote when the 2nd consumer disappears; delete when the 0th does.
 - Asymmetry between port and impl location is fine. The goal is the absence of cross-module coupling, not symmetry.
-- `IUnitOfWork<TTx>` is the lone cross-cutting primitive in `@packages/ddd-kit`; this project pins `TTx = ITransaction` (impl: `packages/drizzle/CLAUDE.md`).
+- `IUnitOfWork` is the lone cross-cutting primitive in `@packages/ddd-kit`; `run(work)` hands `work` nothing, the open transaction lives in the ambient scope (impl: `packages/drizzle/CLAUDE.md`).
 - **Not a module**: a context with only an infra adapter (no domain, use cases, aggregate, DTO or routes) is shared-kernel infra. Test: removing the "module" leaves only `module.ts` + one port impl → it is not a module.
 
 ## CQRS
@@ -120,7 +119,7 @@ export const xModule = defineModule()((b) =>
 2. **Never `defineModule<TDeps>()`** with an explicit generic, it is a fallback for forward references only.
 3. **Use `typeof di`** for the runtime shape after `.build()`, not the global `AppDeps` interface.
 4. **All deps via DI** (`di.<Binding>`); never `new` a collaborator outside the container (it bypasses the container and breaks per-test impl swaps). No service locators.
-5. **The atomic unit is opened by the use case or service** with `uow.run(...)`; a route opens `di.ITransactionService.run(...)` only when it composes several store writes itself (`profile`, `notifications` routes). Stores take an optional `tx`.
+5. **Transactions are opened by `uow.run` in use cases and route handlers; repositories read the ambient executor.** A route opens `di.ITransactionService.run(...)` only when it composes several store writes itself (`profile`, `notifications` routes). No port, store or service declares a transaction parameter, and only `packages/drizzle` and scripts open a transaction directly; `src/__TESTS__/layering.test.ts` enforces both, each allowance carrying its reason. **Why**: a handle threaded by hand is forgotten at one call site, and that write silently commits outside the unit it belongs to.
 
 ## Domain events (zero-plumbing rail)
 
@@ -128,9 +127,9 @@ Event declaration, payload and actor contract: `packages/events/CLAUDE.md`. Even
 
 ```typescript
 async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
-  return this.uow.run(async (tx) => {
+  return this.uow.run(async () => {
     const order = Order.place(input);          // addEvent(OrderPlaced) inside
-    return this.repo.save(order, tx);           // pulled into ALS collector
+    return this.repo.save(order);               // ambient tx, pulled into ALS collector
   });
   // → outbox_event INSERT happens HERE, in the same TX, before COMMIT
   // → audit_log + webhook_delivery rows written by built-in subscribers
@@ -138,12 +137,15 @@ async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
 ```
 
 **Hard rules**:
-- `uow.run()` cannot be nested: it always opens from `db` (independent commit, no savepoint), and a rolled-back inner write could not un-collect the in-memory `EventCollector` buffer, so its events would still be emitted. `TransactionService.run()` throws if `EventCollector.hasContext()` is already true.
+- A `uow.run()` started inside an open one joins its transaction: same connection, no savepoint, its collected events wait for the outermost run's flush. A failed `Result` returned at any depth (even swallowed by the outer work) rolls the whole unit back and the outermost `run()` resolves to that first failure; a throw at any depth rolls back and propagates, even when the outer work caught it. The ambient scope is marked closed when its run settles, so a promise that outlives its run reads the pool (`resolveExecutor()` returns `db`), never a transaction whose client went back to the pool. **Why**: node-postgres does not refuse a query on a released client, it may run on a connection another request now holds. Proven against Postgres by `check:uow-rollback`.
+- A run that collected events but has no flush handler rolls back with `EventsWithoutOutbox` instead of committing without them. The container wires the outbox enqueue, so this only catches a hand-built `TransactionService` that forgot it.
 - A callback that resolves to a failed `Result` rolls the whole transaction back (writes and collected events) and `run()` resolves to that `Result`. Return the failure, never throw a sentinel to force the rollback. **Why**: a failure is all or nothing without the caller remembering to throw, and a thrown sentinel has to be told apart from a real crash in every `catch`. Proven against Postgres by `check:uow-rollback`.
 - Repos must call `trackEventsOnSuccess(result, aggregate)` (helper in `@packages/drizzle`) inside their `save`/`create` impl, otherwise events stay on the aggregate buffer and are silently lost.
 - `addEvent()` outside `uow.run()` = events lost (warning logged in dev via `EventCollector.setOutOfContextLogger`).
 
-**Outside an aggregate** (every shipped module today), a write and its `emitEvent(outbox, ..., tx)` share one `ITransactionService.run(tx)`. Give every store write method an optional `tx?: ITransaction`, and assert the tx handle itself in tests: a call count passes even when both writes run outside the transaction.
+**Outside an aggregate** (every shipped module today), a write and its `emitEvent(outbox, ...)` share one `uow.run(async () => ...)`. Stores take no `tx`: they read `resolveExecutor()`, so both land in the run's transaction. `emitEvent` passes no `tx`: the outbox reads `resolveExecutor()` too. In tests, use `mockUnitOfWork` and record `UnitOfWorkContext.transaction()` inside the store and `enqueue` mocks, then assert both saw the same one: a call count passes even when both writes run outside the transaction.
+
+BetterAuth's adapter receives `db` through `asUnitOfWork` (`shared/auth/unit-of-work-adapter.ts`): each transaction it opens is a `runOutermost`, its own connection even inside an app run, so a plugin change commits on its own and the hooks inside it join that transaction. A run that resolves to a failed `Result` makes the adapter's transaction reject, never report success over a rollback. Proven by `check:auth-transaction` and `check:scim-connection`.
 
 **Subscribers built in** to the dispatcher (no glue): `AuditEventSubscriber` (writes `audit_log` if the event is in `RETENTION_MAP`), `WebhookFanoutSubscriber` (creates `webhook_delivery` rows for matching org-scoped endpoints) and `NotificationFanoutSubscriber` (creates notification rows and schedules email digests, honouring user/org preference precedence).
 
@@ -183,7 +185,7 @@ Domain and application use `Result<T, E>` (no throw); the controller translates 
 **Instrumentation pattern** (see [`docs/OBSERVABILITY.md`](../../docs/OBSERVABILITY.md)):
 - **Outer span** wraps the method body: `{ name: "ClassName > methodName" }`. No `op`, no attributes.
 - **Inner span** wraps `query.execute()` / `client.send()` / `fetch()`: `{ name: query.toSQL().sql, op: "db.query", attributes: { "db.system.name": "postgresql" } }` (or `op: "http.client"`).
-- **`const exec = tx ?? db`** outside the `startSpan` callback.
+- **`const exec = resolveExecutor()`** outside the `startSpan` callback (ambient transaction of the open `uow.run`, else `db`); no `tx` parameter.
 - **catch + `this.instrumentation.capture(err)`** + return `Result.fail(...)` or rethrow. Never swallow.
 - **Multi-query methods** (e.g. `executeWipe`): outer span only.
 - **Don't call sibling-repo methods from inside a span**: inline the query.

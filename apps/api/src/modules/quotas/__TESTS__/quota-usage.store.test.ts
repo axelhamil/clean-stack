@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { DrizzleQuotaUsageStore } from "../infrastructure/repositories/drizzle-quota-usage.store";
 
@@ -46,12 +47,8 @@ describe("DrizzleQuotaUsageStore.increment", () => {
   it("returns the stored used value on success (Result.ok)", async () => {
     const store = new DrizzleQuotaUsageStore(new NoOpInstrumentation());
 
-    const res = await store.increment(
-      "org1",
-      "uploads",
-      3,
-      period,
-      insertChain(resolves([{ used: 7 }])),
+    const res = await UnitOfWorkContext.run(insertChain(resolves([{ used: 7 }])), () =>
+      store.increment("org1", "uploads", 3, period),
     );
 
     expect(res.isSuccess).toBe(true);
@@ -62,12 +59,8 @@ describe("DrizzleQuotaUsageStore.increment", () => {
     const { capture, instrumentation } = capturingInstrumentation();
     const store = new DrizzleQuotaUsageStore(instrumentation);
 
-    const res = await store.increment(
-      "org1",
-      "uploads",
-      3,
-      period,
-      insertChain(rejects(new Error("db down"))),
+    const res = await UnitOfWorkContext.run(insertChain(rejects(new Error("db down"))), () =>
+      store.increment("org1", "uploads", 3, period),
     );
 
     expect(res.isFailure).toBe(true);
@@ -79,7 +72,9 @@ describe("DrizzleQuotaUsageStore.reset", () => {
   it("returns Result.ok on success", async () => {
     const store = new DrizzleQuotaUsageStore(new NoOpInstrumentation());
 
-    const res = await store.reset("org1", "uploads", period, updateChain(resolves([])));
+    const res = await UnitOfWorkContext.run(updateChain(resolves([])), () =>
+      store.reset("org1", "uploads", period),
+    );
 
     expect(res.isSuccess).toBe(true);
   });
@@ -88,11 +83,8 @@ describe("DrizzleQuotaUsageStore.reset", () => {
     const { capture, instrumentation } = capturingInstrumentation();
     const store = new DrizzleQuotaUsageStore(instrumentation);
 
-    const res = await store.reset(
-      "org1",
-      "uploads",
-      period,
-      updateChain(rejects(new Error("db down"))),
+    const res = await UnitOfWorkContext.run(updateChain(rejects(new Error("db down"))), () =>
+      store.reset("org1", "uploads", period),
     );
 
     expect(res.isFailure).toBe(true);
@@ -104,7 +96,9 @@ describe("DrizzleQuotaUsageStore.current", () => {
   it("returns 0 when no row exists (Result.ok)", async () => {
     const store = new DrizzleQuotaUsageStore(new NoOpInstrumentation());
 
-    const res = await store.current("org1", "uploads", period, selectChain(resolves([])));
+    const res = await UnitOfWorkContext.run(selectChain(resolves([])), () =>
+      store.current("org1", "uploads", period),
+    );
 
     expect(res.isSuccess).toBe(true);
     expect(res.getValue()).toBe(0);
@@ -114,11 +108,8 @@ describe("DrizzleQuotaUsageStore.current", () => {
     const { capture, instrumentation } = capturingInstrumentation();
     const store = new DrizzleQuotaUsageStore(instrumentation);
 
-    const res = await store.current(
-      "org1",
-      "uploads",
-      period,
-      selectChain(rejects(new Error("db down"))),
+    const res = await UnitOfWorkContext.run(selectChain(rejects(new Error("db down"))), () =>
+      store.current("org1", "uploads", period),
     );
 
     expect(res.isFailure).toBe(true);

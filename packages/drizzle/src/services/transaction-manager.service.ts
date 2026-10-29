@@ -1,5 +1,12 @@
-import { EventCollector, type IDomainEvent, type IUnitOfWork, Result } from "@packages/ddd-kit";
-import { db, type Transaction } from "../config";
+import {
+  EventCollector,
+  type IDomainEvent,
+  type IUnitOfWork,
+  Option,
+  Result,
+  UnitOfWorkContext,
+} from "@packages/ddd-kit";
+import { type DbClient, db, type Transaction } from "../config";
 
 export type FlushHandler = (events: IDomainEvent[], tx: Transaction) => Promise<void>;
 
@@ -11,59 +18,130 @@ export interface UnitOfWorkInstrumentation {
   startSpan<T>(options: { name: string }, callback: () => Promise<T>): Promise<T>;
 }
 
-/** Carries a failed `Result` out of `db.transaction` so the driver issues ROLLBACK. */
 class FailedResultRollback extends Error {
   constructor(readonly result: unknown) {
-    super("unit of work rolled back: the callback returned a failed Result");
+    super("unit of work rolled back: the work returned a failed Result");
   }
 }
 
-export class TransactionService implements IUnitOfWork<Transaction> {
+class EventsWithoutOutbox extends Error {
+  constructor(events: IDomainEvent[]) {
+    super(
+      `unit of work rolled back: ${events.map((e) => e.eventType).join(", ")} raised in a run that has no outbox would be lost`,
+    );
+  }
+}
+
+type EventsByFlushHandler = Map<FlushHandler | null, IDomainEvent[]>;
+
+type Doom = { kind: "failed"; result: unknown } | { kind: "thrown"; error: unknown };
+
+interface OutermostRun {
+  doom?: Doom;
+  pending: EventsByFlushHandler;
+}
+
+const outermostRuns = new WeakMap<Transaction, OutermostRun>();
+
+export function ambientTransaction(): Option<Transaction> {
+  return Option.fromNullable(UnitOfWorkContext.transaction<Transaction>());
+}
+
+export function resolveExecutor(): DbClient | Transaction {
+  return ambientTransaction().toUndefined() ?? db;
+}
+
+export function savepoint<T>(work: () => Promise<T>): Promise<T> {
+  return resolveExecutor().transaction((tx) => UnitOfWorkContext.run(tx, work));
+}
+
+function isFailedResult(value: unknown): boolean {
+  return value instanceof Result && value.isFailure;
+}
+
+function doom(outermost: OutermostRun | undefined, cause: Doom): void {
+  if (outermost && !outermost.doom) outermost.doom = cause;
+}
+
+export class TransactionService implements IUnitOfWork {
   constructor(
     private readonly instrumentation: UnitOfWorkInstrumentation,
     private readonly flushHandler: FlushHandler | null = null,
   ) {}
 
-  public async startTransaction<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
-    return this.instrumentation.startSpan({ name: "TransactionService > startTransaction" }, () =>
-      db.transaction(callback),
+  public async run<T>(work: () => Promise<T>): Promise<T> {
+    return this.instrumentation.startSpan({ name: "TransactionService > run" }, async () => {
+      const ambient = ambientTransaction();
+      if (ambient.isNone()) return this.openTransaction(work);
+
+      const tx = ambient.unwrap();
+      return UnitOfWorkContext.run(tx, () => this.runNested(tx, work));
+    });
+  }
+
+  public async runOutermost<T>(work: () => Promise<T>): Promise<T> {
+    return this.instrumentation.startSpan({ name: "TransactionService > runOutermost" }, () =>
+      this.openTransaction(work),
     );
   }
 
-  /**
-   * A callback that resolves to a failed `Result` rolls the whole transaction back
-   * (its writes and the events it collected) and `run` resolves to that same
-   * `Result`: a failure is all or nothing, callers never throw to undo a write.
-   */
-  public async run<T>(callback: (tx: Transaction) => Promise<T>): Promise<T> {
-    if (EventCollector.hasContext()) {
-      throw new Error(
-        "nested IUnitOfWork.run() is not supported: run() always opens from `db`, never from the parent tx, so a nested call takes a separate pool connection and commits independently. Threading the parent tx (a real Drizzle savepoint) would not fix it either: `rollback to savepoint` cannot un-collect the in-memory EventCollector buffer, so rolled-back writes would still emit events. Refactor to a single outer run().",
-      );
+  private async openTransaction<T>(work: () => Promise<T>): Promise<T> {
+    try {
+      return await db.transaction((tx) => UnitOfWorkContext.run(tx, () => this.complete(tx, work)));
+    } catch (err) {
+      if (err instanceof FailedResultRollback) return err.result as T;
+
+      throw err;
     }
+  }
 
-    return this.instrumentation.startSpan({ name: "TransactionService > run" }, async () => {
-      try {
-        return await db.transaction((tx) =>
-          EventCollector.runWithContext(async () => {
-            const result = await callback(tx);
-            const events = EventCollector.drain();
-            if (result instanceof Result && result.isFailure)
-              throw new FailedResultRollback(result);
+  private async runNested<T>(tx: Transaction, work: () => Promise<T>): Promise<T> {
+    const outermost = outermostRuns.get(tx);
 
-            if (events.length > 0 && this.flushHandler) await this.flushHandler(events, tx);
-
-            return result;
-          }),
-        );
-      } catch (err) {
-        if (err instanceof FailedResultRollback) return err.result as T;
-
-        // No capture here: the error is rethrown to a caller that knows whether it is
-        // expected (a 4xx HTTPException thrown to abort) or not, and the central error
-        // handler reports the unexpected ones. Capturing here double-reports every 5xx.
-        throw err;
+    try {
+      const result = await work();
+      if (isFailedResult(result)) {
+        doom(outermost, { kind: "failed", result });
+        throw new FailedResultRollback(result);
       }
-    });
+
+      if (outermost) this.collect(outermost.pending);
+      return result;
+    } catch (err) {
+      if (!(err instanceof FailedResultRollback)) doom(outermost, { kind: "thrown", error: err });
+
+      throw err;
+    }
+  }
+
+  private async complete<T>(tx: Transaction, work: () => Promise<T>): Promise<T> {
+    const outermost: OutermostRun = { pending: new Map() };
+    outermostRuns.set(tx, outermost);
+
+    const result = await work();
+    if (isFailedResult(result)) throw new FailedResultRollback(result);
+    if (outermost.doom?.kind === "thrown") throw outermost.doom.error;
+    if (outermost.doom?.kind === "failed") throw new FailedResultRollback(outermost.doom.result);
+
+    this.collect(outermost.pending);
+    await flush(outermost.pending, tx);
+
+    return result;
+  }
+
+  private collect(pending: EventsByFlushHandler): void {
+    const drained = EventCollector.drain();
+    if (drained.length === 0) return;
+
+    pending.set(this.flushHandler, [...(pending.get(this.flushHandler) ?? []), ...drained]);
+  }
+}
+
+async function flush(pending: EventsByFlushHandler, tx: Transaction): Promise<void> {
+  for (const [flushHandler, events] of pending) {
+    if (events.length === 0) continue;
+    if (!flushHandler) throw new EventsWithoutOutbox(events);
+
+    await flushHandler(events, tx);
   }
 }

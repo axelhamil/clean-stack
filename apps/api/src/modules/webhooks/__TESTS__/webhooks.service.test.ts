@@ -1,11 +1,10 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
-import type { IUnitOfWork } from "@packages/ddd-kit";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { noopOutbox } from "../../../shared/__TESTS__/outbox-fakes";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
-import type { ITransaction } from "../../../shared/transaction";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
@@ -84,10 +83,7 @@ const MASTER_KEY_HEX = "a".repeat(64);
 const validMasterKey: MasterKeyProvider = masterKeyProvider(MASTER_KEY_HEX);
 const noMasterKey: MasterKeyProvider = masterKeyProvider(undefined);
 
-const tx: IUnitOfWork<ITransaction> = {
-  startTransaction: async (cb) => cb({} as ITransaction),
-  run: async (cb) => cb({} as ITransaction),
-};
+const { unitOfWork: uow } = mockUnitOfWork();
 
 function makeEndpoints(
   overrides: Partial<IWebhookEndpointRepository> = {},
@@ -139,7 +135,7 @@ function makeService(
   return new WebhooksService(
     opts.endpoints ?? makeEndpoints(),
     opts.deliveries ?? makeDeliveries(),
-    tx,
+    uow,
     noopOutbox,
     opts.masterKey ?? validMasterKey,
     new NoOpInstrumentation(),
@@ -208,7 +204,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -320,7 +316,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -381,7 +377,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -437,7 +433,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -477,7 +473,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -540,7 +536,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -573,7 +569,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         endpoints,
         makeDeliveries(),
-        tx,
+        uow,
         spiedOutbox,
         validMasterKey,
         new NoOpInstrumentation(),
@@ -591,7 +587,6 @@ describe("WebhooksService", () => {
         expect.arrayContaining([
           expect.objectContaining({ eventType: EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED }),
         ]),
-        expect.any(Object),
         expect.any(Object),
       );
     });
@@ -636,7 +631,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         deliveries,
-        tx,
+        uow,
         spiedOutbox,
         validMasterKey,
         new NoOpInstrumentation(),
@@ -654,7 +649,6 @@ describe("WebhooksService", () => {
       expect(enqueueMock).toHaveBeenCalledTimes(1);
       expect(enqueueMock).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ eventType: EventTypes.WEBHOOK_TEST })]),
-        expect.any(Object),
         expect.any(Object),
       );
       const [[firstArg]] = (enqueueTargeted as ReturnType<typeof mock>).mock.calls as [
@@ -691,7 +685,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -717,8 +711,10 @@ describe("WebhooksService", () => {
     });
 
     it("emits webhook.delivery.replayed with the requesting user inside the transaction", async () => {
-      const TX = {} as ITransaction;
-      const enqueue = mock(async (_events: unknown, _meta: unknown, _tx?: unknown) => {});
+      const enqueueTransactions: unknown[] = [];
+      const enqueue = mock(async (_events: unknown, _meta: unknown) => {
+        enqueueTransactions.push(UnitOfWorkContext.transaction());
+      });
       const outbox = { ...noopOutbox, enqueue } as IOutboxRepository;
       const deliveries = makeDeliveries({
         enqueueReplay: mock(async () =>
@@ -730,7 +726,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         deliveries,
-        { ...tx, run: async (cb) => cb(TX) },
+        uow,
         outbox,
         validMasterKey,
         new NoOpInstrumentation(),
@@ -738,8 +734,8 @@ describe("WebhooksService", () => {
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
 
-      const [events, , enqueueTx] = enqueue.mock.calls[0] ?? [];
-      expect(enqueueTx).toBe(TX);
+      const [events] = enqueue.mock.calls[0] ?? [];
+      expect(enqueueTransactions[0]).toBeDefined();
       expect(events).toEqual([
         expect.objectContaining({
           eventType: EventTypes.WEBHOOK_DELIVERY_REPLAYED,
@@ -764,7 +760,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         deliveries,
-        tx,
+        uow,
         { ...noopOutbox, enqueue } as IOutboxRepository,
         validMasterKey,
         new NoOpInstrumentation(),
@@ -823,7 +819,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,
@@ -868,7 +864,7 @@ describe("WebhooksService", () => {
       const service = new WebhooksService(
         makeEndpoints(),
         makeDeliveries(),
-        tx,
+        uow,
         noopOutbox,
         validMasterKey,
         instrumentation,

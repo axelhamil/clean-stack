@@ -1,8 +1,16 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { and, consentSchema, db, desc, eq, gt, isNull, type SQL } from "@packages/drizzle";
+import {
+  and,
+  consentSchema,
+  desc,
+  eq,
+  gt,
+  isNull,
+  resolveExecutor,
+  type SQL,
+} from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   ConsentError,
   ConsentRecordRow,
@@ -29,7 +37,7 @@ function toRow(r: typeof cr.$inferSelect): ConsentRecordRow {
   };
 }
 
-function latestActive(exec: ITransaction | typeof db, owner: SQL, policyVersion: string) {
+function latestActive(exec: ReturnType<typeof resolveExecutor>, owner: SQL, policyVersion: string) {
   return exec
     .select()
     .from(cr)
@@ -48,8 +56,8 @@ function latestActive(exec: ITransaction | typeof db, owner: SQL, policyVersion:
 export class DrizzleConsentStore implements IConsentStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async insert(row: ConsentRecordRow, tx?: ITransaction): Promise<Result<void, ConsentError>> {
-    const exec = tx ?? db;
+  async insert(row: ConsentRecordRow): Promise<Result<void, ConsentError>> {
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan({ name: "DrizzleConsentStore > insert" }, async () => {
       try {
@@ -82,9 +90,8 @@ export class DrizzleConsentStore implements IConsentStore {
   async findActiveBySubject(
     subjectId: string,
     policyVersion: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleConsentStore > findActiveBySubject" },
@@ -109,9 +116,8 @@ export class DrizzleConsentStore implements IConsentStore {
   async findActiveByUser(
     userId: string,
     policyVersion: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleConsentStore > findActiveByUser" },
@@ -136,9 +142,8 @@ export class DrizzleConsentStore implements IConsentStore {
   async linkSubjectToUser(
     subjectId: string,
     userId: string,
-    tx?: ITransaction,
   ): Promise<Result<string[], ConsentError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleConsentStore > linkSubjectToUser" },

@@ -1,5 +1,4 @@
 import type { Option, Result } from "@packages/ddd-kit";
-import type { ITransaction } from "../../../../shared/transaction";
 import type { WebhookRepoError } from "./webhook-endpoint.port";
 
 export type WebhookDeliveryStatus = "pending" | "success" | "failed" | "dead_letter";
@@ -57,37 +56,25 @@ export type DeliveryPage = {
 export interface IWebhookDeliveryRepository {
   list(args: ListDeliveriesArgs): Promise<Result<DeliveryPage, WebhookRepoError>>;
   findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>>;
-  updateStatus(
-    id: string,
-    update: DeliveryUpdate,
-    tx: ITransaction,
-  ): Promise<Result<void, WebhookRepoError>>;
-  findPendingBatch(
-    limit: number,
-    tx: ITransaction,
-  ): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
+  updateStatus(id: string, update: DeliveryUpdate): Promise<Result<void, WebhookRepoError>>;
+  findPendingBatch(limit: number): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
   enqueueReplay(
     deliveryId: string,
     endpointId: string,
     organizationId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>>;
   createAttempt(
     args: Omit<WebhookDeliveryAttemptRecord, "id" | "createdAt">,
-    tx: ITransaction,
   ): Promise<Result<void, WebhookRepoError>>;
   findByIdWithAttempts(
     id: string,
     organizationId: string,
   ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>>;
-  enqueueTargeted(
-    args: {
-      endpointId: string;
-      outboxEventId: string;
-      eventType: string;
-      payload: unknown;
-      idempotencyKey: string;
-    },
-    tx: ITransaction,
-  ): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>>;
+  enqueueTargeted(args: {
+    endpointId: string;
+    outboxEventId: string;
+    eventType: string;
+    payload: unknown;
+    idempotencyKey: string;
+  }): Promise<Result<WebhookDeliveryRecord, WebhookRepoError>>;
 }
