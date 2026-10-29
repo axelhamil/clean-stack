@@ -26,6 +26,7 @@
     "check:scim-connection": "bun scripts/check-scim-connection.ts",
     "check:totp-enrolment": "bun scripts/check-totp-enrolment.ts",
     "check:outbox-lease": "bun scripts/check-outbox-lease.ts",
+    "check:email-lease": "bun scripts/check-email-lease.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --isolate --parallel --pass-with-no-tests",

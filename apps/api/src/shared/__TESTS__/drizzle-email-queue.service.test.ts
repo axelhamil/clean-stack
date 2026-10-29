@@ -31,7 +31,6 @@ let executor: unknown = fakeDb;
 
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  db: fakeDb,
   resolveExecutor: () => executor,
 }));
 
@@ -136,100 +135,72 @@ describe("DrizzleEmailQueue.enqueue", () => {
   });
 });
 
-describe("DrizzleEmailQueue.markSent", () => {
-  it("issues a single statement for many ids", async () => {
-    const updates: unknown[] = [];
-    const tx = {
-      update: () => ({
-        set: () => ({
-          where: () => ({
-            toSQL: () => ({ sql: "update" }),
-            execute: async () => {
-              updates.push(1);
-            },
-          }),
-        }),
-      }),
-    };
+function chainResolving(rows: () => Promise<unknown[]>): unknown {
+  const chain: unknown = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (property === "then") return undefined;
+        if (property === "toSQL") return () => ({ sql: "update email_message" });
+        if (property === "execute") return rows;
+        return () => chain;
+      },
+    },
+  );
+  return chain;
+}
 
-    executor = tx;
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
-      ["a", "b", "c"],
-      new Date(),
-      { a: "p1", b: "p2" },
-    );
+const lease = { id: "m1", attempts: 1 };
 
-    expect(result.isSuccess).toBe(true);
-    expect(updates).toHaveLength(1);
+describe("DrizzleEmailQueue.claim", () => {
+  beforeEach(() => {
+    executor = fakeDb;
   });
 
-  it("is a no-op for an empty id list", async () => {
+  it("claim returns a failure Result when the query rejects", async () => {
+    executor = chainResolving(async () => {
+      throw new Error("db down");
+    });
+
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).claim({
+      limit: 10,
+      leaseSeconds: 120,
+      deadReplayWindowHours: 24,
+    });
+
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().message).toBe("db down");
+  });
+});
+
+describe("DrizzleEmailQueue.markSent", () => {
+  it("markSent is a no-op for an empty lease list", async () => {
     let called = false;
-    const tx = {
+    executor = {
       update: () => {
         called = true;
-        return {} as never;
+        return chainResolving(async () => []);
       },
     };
 
-    executor = tx;
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
-      [],
-      new Date(),
-      {},
-    );
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent([], {});
 
-    expect(result.isSuccess).toBe(true);
+    expect(result.isSuccess && result.getValue()).toEqual([]);
     expect(called).toBe(false);
   });
 });
 
 describe("DrizzleEmailQueue.markFailed", () => {
-  function recordingTx() {
-    const sets: Array<{ status: string; nextAttemptAt: Date | null }> = [];
-    const tx = {
-      update: () => ({
-        set: (values: { status: string; nextAttemptAt: Date | null }) => {
-          sets.push(values);
-          return {
-            where: () => ({
-              toSQL: () => ({ sql: "update email_message" }),
-              execute: async () => undefined,
-            }),
-          };
-        },
-      }),
-    };
-    return { tx, sets };
-  }
+  it("markFailed reports whether it wrote", async () => {
+    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const failure = { lastError: "HTTP 503", status: "pending", retryAfterSeconds: 3 } as const;
 
-  it("parks the row as failed when no further attempt is scheduled", async () => {
-    const { tx, sets } = recordingTx();
+    executor = chainResolving(async () => [{ id: "m1" }]);
+    const written = await queue.markFailed(lease, failure);
+    executor = chainResolving(async () => []);
+    const stale = await queue.markFailed(lease, failure);
 
-    executor = tx;
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markFailed(
-      "m1",
-      "HTTP 422",
-      Option.none(),
-    );
-
-    expect(result.isSuccess).toBe(true);
-    expect(sets[0]?.status).toBe("failed");
-    expect(sets[0]?.nextAttemptAt).toBeNull();
-  });
-
-  it("keeps the row pending until the scheduled retry", async () => {
-    const { tx, sets } = recordingTx();
-    const retryAt = new Date("2026-08-04T00:05:00Z");
-
-    executor = tx;
-    await new DrizzleEmailQueue(new NoOpInstrumentation()).markFailed(
-      "m1",
-      "HTTP 503",
-      Option.some(retryAt),
-    );
-
-    expect(sets[0]?.status).toBe("pending");
-    expect(sets[0]?.nextAttemptAt).toEqual(retryAt);
+    expect(written.isSuccess && written.getValue()).toBe(true);
+    expect(stale.isSuccess && stale.getValue()).toBe(false);
   });
 });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { OUTBOX_SETTLE_MARGIN_SECONDS, validateEnvBounds } from "../env-bounds";
+import {
+  EMAIL_SEND_TIMEOUT_SECONDS,
+  EMAIL_SETTLE_MARGIN_SECONDS,
+  OUTBOX_SETTLE_MARGIN_SECONDS,
+  validateEnvBounds,
+} from "../env-bounds";
 
 // Exercises the real guard (`superRefine` in env.ts) against plain literals. Never
 // imports `env.ts` itself, since env.ts parses `process.env` at import time and throws
@@ -16,6 +21,9 @@ const boundsSchema = z
     SHUTDOWN_DEADLINE_MS: z.number(),
     OUTBOX_LEASE_SECONDS: z.number(),
     OUTBOX_HANDLER_BUDGET_SECONDS: z.number(),
+    EMAIL_LEASE_SECONDS: z.number(),
+    EMAIL_DEAD_RETRY_HOURS: z.number(),
+    EMAIL_DEAD_REPLAY_WINDOW_HOURS: z.number(),
   })
   .superRefine(validateEnvBounds);
 
@@ -26,9 +34,12 @@ const SHUTDOWN_DEFAULTS = {
   SHUTDOWN_DEADLINE_MS: 36_000,
 };
 
-const OUTBOX_DEFAULTS = {
+const QUEUE_DEFAULTS = {
   OUTBOX_LEASE_SECONDS: 120,
   OUTBOX_HANDLER_BUDGET_SECONDS: 30,
+  EMAIL_LEASE_SECONDS: 120,
+  EMAIL_DEAD_RETRY_HOURS: 6,
+  EMAIL_DEAD_REPLAY_WINDOW_HOURS: 24,
 };
 
 describe("validateEnvBounds", () => {
@@ -38,7 +49,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
     });
     expect(result.success).toBe(true);
   });
@@ -49,7 +60,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 120_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -60,7 +71,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 130_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -71,7 +82,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 120_000,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -82,7 +93,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 100_000,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
     });
     expect(result.success).toBe(false);
   });
@@ -98,13 +109,13 @@ describe("validateEnvBounds", () => {
     const atBudget = boundsSchema.safeParse({
       ...sweepBounds,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
       SHUTDOWN_DEADLINE_MS: worstCaseMs,
     });
     const belowBudget = boundsSchema.safeParse({
       ...sweepBounds,
       ...SHUTDOWN_DEFAULTS,
-      ...OUTBOX_DEFAULTS,
+      ...QUEUE_DEFAULTS,
       SHUTDOWN_DEADLINE_MS: worstCaseMs - 1,
     });
 
@@ -118,6 +129,7 @@ describe("validateEnvBounds", () => {
       SWEEP_DEADLINE_MS: 90_000,
       INTERNAL_FETCH_TIMEOUT_MS: 150_000,
       ...SHUTDOWN_DEFAULTS,
+      ...QUEUE_DEFAULTS,
     };
 
     const withMargin = boundsSchema.safeParse({
@@ -133,5 +145,38 @@ describe("validateEnvBounds", () => {
 
     expect(withMargin.success).toBe(true);
     expect(equalToBudget.success).toBe(false);
+  });
+
+  it("rejects an email replay window that closes before the first dead replay is due", () => {
+    const bounds = {
+      SERVER_IDLE_TIMEOUT_SECONDS: 120,
+      SWEEP_DEADLINE_MS: 90_000,
+      INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
+      ...QUEUE_DEFAULTS,
+    };
+
+    const longer = boundsSchema.safeParse({ ...bounds, EMAIL_DEAD_REPLAY_WINDOW_HOURS: 7 });
+    const equal = boundsSchema.safeParse({ ...bounds, EMAIL_DEAD_REPLAY_WINDOW_HOURS: 6 });
+
+    expect(longer.success).toBe(true);
+    expect(equal.success).toBe(false);
+  });
+
+  it("rejects an email lease shorter than one send timeout plus the settle margin", () => {
+    const bounds = {
+      SERVER_IDLE_TIMEOUT_SECONDS: 120,
+      SWEEP_DEADLINE_MS: 90_000,
+      INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
+      ...QUEUE_DEFAULTS,
+    };
+    const floor = EMAIL_SEND_TIMEOUT_SECONDS + EMAIL_SETTLE_MARGIN_SECONDS;
+
+    const atFloor = boundsSchema.safeParse({ ...bounds, EMAIL_LEASE_SECONDS: floor });
+    const below = boundsSchema.safeParse({ ...bounds, EMAIL_LEASE_SECONDS: floor - 1 });
+
+    expect(atFloor.success).toBe(true);
+    expect(below.success).toBe(false);
   });
 });

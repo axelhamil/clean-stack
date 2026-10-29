@@ -176,6 +176,13 @@
       "when": 1793272853905,
       "tag": "0024_outbox_lease",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793289347595,
+      "tag": "0025_email_lease",
+      "breakpoints": true
     }
   ]
 }
