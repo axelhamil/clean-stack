@@ -76,6 +76,12 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.ADMIN_STAFF_REVOKED]: "A staff manager removed a staff member's access.",
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: "A staff member confirmed a sensitive action with a code.",
   [EventTypes.ADMIN_STEP_UP_FAILED]: "A staff member's confirmation code was refused.",
+  [EventTypes.ADMIN_APPROVAL_REQUESTED]: "A staff member asked a colleague to approve an action.",
+  [EventTypes.ADMIN_APPROVAL_DECIDED]: "A staff member approved or rejected a requested action.",
+  [EventTypes.ADMIN_APPROVAL_CANCELLED]: "A staff member withdrew their approval request.",
+  [EventTypes.ADMIN_APPROVAL_EXPIRED]: "An approval request expired before anyone decided.",
+  [EventTypes.ADMIN_APPROVAL_EXECUTED]: "An approved action was carried out.",
+  [EventTypes.ADMIN_APPROVAL_FAILED]: "An approved action was refused when it was carried out.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
     "A platform administrator started an impersonation session.",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]:

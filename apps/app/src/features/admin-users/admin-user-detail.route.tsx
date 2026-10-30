@@ -64,8 +64,10 @@ function AdminUserDetailPage() {
 
   const banMutation = useMutation({
     ...banUserMutationOptions,
-    onSuccess: () => {
-      toast.success(t("users.detail.banSuccessToast"));
+    onSuccess: ({ awaitsApproval }) => {
+      toast.success(
+        t(awaitsApproval ? "users.detail.banPendingToast" : "users.detail.banSuccessToast"),
+      );
       setBanOpen(false);
       void invalidateUser();
     },

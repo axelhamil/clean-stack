@@ -1,3 +1,4 @@
+import { APPROVAL_ACTIONS } from "@packages/access-control";
 import { z } from "zod";
 import { validateEnvBounds, validateSecuritySignalsEnv } from "./env-bounds";
 
@@ -125,6 +126,16 @@ const envSchema = z
       .optional()
       .transform((v) => v !== "false"),
     ADMIN_STEP_UP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+    ADMIN_APPROVAL_ENABLED: z
+      .string()
+      .optional()
+      .transform((v) => v === "true"),
+    ADMIN_APPROVAL_ACTIONS: z
+      .string()
+      .transform(commaList)
+      .pipe(z.array(z.enum(APPROVAL_ACTIONS)))
+      .default([...APPROVAL_ACTIONS]),
+    ADMIN_APPROVAL_TTL_HOURS: z.coerce.number().int().positive().default(72),
     DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
     RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
     TRUSTED_PROXIES: z.string().transform(commaList).optional(),

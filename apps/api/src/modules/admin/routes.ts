@@ -11,6 +11,7 @@ import { banNeedsStepUp, banUserBodySchema } from "./application/dto/ban-user.dt
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import type { AdminUserRow } from "./application/ports/admin-user-store.port";
 import type { AdminUserDetail } from "./application/services/admin-query.service";
+import { approvalGate } from "./approval-gate";
 
 async function findUserOr404(userId: string): Promise<AdminUserDetail> {
   const result = await di.AdminQueryService.getUser(userId);
@@ -71,7 +72,17 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       const actor = c.get("user");
       const userId = c.req.param("id");
       const body = c.req.valid("json");
-      if (banNeedsStepUp(body)) await assertStepUp(actor, c.get("session"));
+      if (banNeedsStepUp(body)) {
+        await assertStepUp(actor, c.get("session"));
+
+        const pending = await approvalGate({
+          action: "user.ban_permanent",
+          subjectId: userId,
+          params: body,
+          requestedBy: actor.id,
+        });
+        if (pending.isSome()) return c.json({ approvalId: pending.unwrap() }, 202);
+      }
 
       const result = await di.StaffService.moderateBan(
         { actorPermissions: c.get("staff").permissions, targetUserId: userId },

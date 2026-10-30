@@ -17,7 +17,7 @@ export const banUserMutationOptions = mutationOptions({
   mutationFn: async ({ id, ...json }: BanBody & { id: string }) => {
     const res = await $ban({ param: { id }, json });
     if (!res.ok) await throwApiError(res, "banUser");
-    return (await res.json()) as InferResponseType<typeof $ban, 200>;
+    return { awaitsApproval: res.status === 202 };
   },
 });
 

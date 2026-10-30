@@ -127,6 +127,16 @@ export default {
       "Ce code n'est pas valide. Vérifiez votre application d'authentification.",
     ADMIN_STEP_UP_REPLAY_INVALID: "Ce code a déjà servi. Attendez le suivant.",
     ADMIN_STEP_UP_SESSION_NOT_FOUND: "Cette session est terminée. Reconnectez-vous.",
+    ADMIN_APPROVAL_NOT_FOUND: "Cette demande d'approbation n'existe plus.",
+    ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN:
+      "Vous ne pouvez pas demander cette action sur votre propre compte.",
+    ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN: "Une autre personne doit trancher cette demande.",
+    ADMIN_APPROVAL_PERMISSION_FORBIDDEN:
+      "Vous n'avez plus la permission requise par cette demande.",
+    ADMIN_APPROVAL_DECIDED_CONFLICT: "Cette demande a déjà été traitée.",
+    ADMIN_APPROVAL_EXPIRED_CONFLICT:
+      "Cette demande a expiré. Refaites-la si elle reste nécessaire.",
+    ADMIN_APPROVAL_PARAMS_INVALID: "La demande enregistrée n'est plus valide.",
     ADMIN_USER_NOT_FOUND: "Ce compte n'existe plus.",
     ADMIN_USER_SELF_BAN_FORBIDDEN: "Vous ne pouvez pas suspendre votre propre compte.",
     ADMIN_IMPERSONATION_FORBIDDEN: "Vous ne pouvez pas voir le produit avec ce compte.",

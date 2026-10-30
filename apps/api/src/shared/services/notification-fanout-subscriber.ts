@@ -1,21 +1,27 @@
+import { rolesWithStaffPermission } from "@packages/access-control";
 import type { IUnitOfWork } from "@packages/ddd-kit";
-
 import {
   and,
+  authSchema,
   eq,
+  gt,
   inArray,
+  isNull,
   multiTenantSchema,
+  not,
   notificationSchema,
+  or,
   resolveExecutor,
   type SQL,
   sql,
+  staffSchema,
 } from "@packages/drizzle";
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
 import type { BuiltInEventHandler } from "../event-handlers";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { DeliveredEvent } from "../ports/outbox.port";
 import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";
-import { resolveAudience } from "./resolve-audience";
+import { type AudienceTarget, resolveAudience } from "./resolve-audience";
 
 function dedupKeyFor(
   event: DeliveredEvent,
@@ -113,6 +119,42 @@ function emailDueAt(occurredAt: Date, frequency: SQL | null, anchorHourUtc: numb
             END`;
 }
 
+/**
+ * Who holds a staff permission now, read the way `staffAccessOf` decides it, plus the
+ * requester, minus whoever acted. A listed id is always a manager and carries no override;
+ * an `env` row off the list grants nothing.
+ */
+function staffRecipients(
+  target: Extract<AudienceTarget, { kind: "staff" }>,
+  listedIds: readonly string[],
+): SQL {
+  const s = staffSchema.staffMember;
+  const o = staffSchema.staffPermissionOverride;
+  const u = authSchema.user;
+  const actor = target.actorUserId.toNull();
+  const liveOverride = (effect: "grant" | "deny") =>
+    sql`EXISTS (SELECT 1 FROM ${o} WHERE ${and(
+      eq(o.userId, s.userId),
+      eq(o.permission, target.permission),
+      eq(o.effect, effect),
+      isNull(o.revokedAt),
+      or(isNull(o.expiresAt), gt(o.expiresAt, new Date())),
+    )})`;
+  const staffWhere = and(
+    isNull(s.revokedAt),
+    not(eq(s.source, "env")),
+    or(inArray(s.role, rolesWithStaffPermission(target.permission)), liveOverride("grant")),
+    sql`NOT ${liveOverride("deny")}`,
+    actor === null ? undefined : not(eq(s.userId, actor)),
+  );
+  const direct = [...listedIds, ...target.requesterUserId.map((id) => [id]).unwrapOr([])].filter(
+    (id) => id !== actor,
+  );
+
+  return sql`(SELECT ${s.userId} AS user_id FROM ${s} WHERE ${staffWhere}
+    UNION SELECT ${u.id} FROM ${u} WHERE ${inArray(u.id, direct)})`;
+}
+
 export class NotificationFanoutSubscriber implements BuiltInEventHandler {
   readonly name = "notification-fanout";
 
@@ -120,6 +162,7 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
     private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
     private readonly digestHourUtc: number = DEFAULT_DIGEST_HOUR_UTC,
+    private readonly listedStaffIds: readonly string[] = [],
   ) {}
 
   async handle(event: DeliveredEvent): Promise<void> {
@@ -141,16 +184,18 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
           const organizationId = event.organizationId ?? null;
 
           const recipients =
-            target.kind === "user"
-              ? sql`(SELECT ${target.userId}::text AS user_id)`
-              : sql`(SELECT ${m.userId} AS user_id FROM ${m} WHERE ${
-                  target.roles === "all"
-                    ? eq(m.organizationId, target.organizationId)
-                    : and(
-                        eq(m.organizationId, target.organizationId),
-                        inArray(m.role, target.roles),
-                      )
-                })`;
+            target.kind === "staff"
+              ? staffRecipients(target, this.listedStaffIds)
+              : target.kind === "user"
+                ? sql`(SELECT ${target.userId}::text AS user_id)`
+                : sql`(SELECT ${m.userId} AS user_id FROM ${m} WHERE ${
+                    target.roles === "all"
+                      ? eq(m.organizationId, target.organizationId)
+                      : and(
+                          eq(m.organizationId, target.organizationId),
+                          inArray(m.role, target.roles),
+                        )
+                  })`;
 
           const rules = deliveryRules(config.category, organizationId, config.forced === true);
 

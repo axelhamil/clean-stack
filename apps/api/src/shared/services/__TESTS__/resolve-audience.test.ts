@@ -59,6 +59,18 @@ describe("resolveAudience", () => {
     });
   });
 
+  test("a staff audience keeps the requester and leaves out a system actor", () => {
+    const target = targetOf(
+      { staff: "approvals.decide" },
+      baseEvent({ requesterUserId: "r", userId: "subject", actorUserId: null }),
+    );
+
+    expect(target).toMatchObject({ kind: "staff", permission: "approvals.decide" });
+    if (target?.kind !== "staff") throw new Error("expected a staff target");
+    expect(target.requesterUserId.unwrap()).toBe("r");
+    expect(target.actorUserId.isNone()).toBe(true);
+  });
+
   test("an org audience without organizationId targets nobody", () => {
     expect(resolveAudience("org:all", baseEvent({})).isNone()).toBe(true);
     expect(resolveAudience({ can: { billing: ["read"] } }, baseEvent({})).isNone()).toBe(true);

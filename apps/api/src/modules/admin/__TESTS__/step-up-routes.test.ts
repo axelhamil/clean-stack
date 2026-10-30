@@ -50,6 +50,7 @@ mock.module("../../../auth-queries", () => ({
   setOrgSsoEnforced: async () => {},
 }));
 
+const { adminApprovalRoutes } = await import("../approvals.routes");
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
 const { adminOrgRoutes } = await import("../admin-orgs.routes");
 const { adminUserRoutes } = await import("../routes");
@@ -57,6 +58,7 @@ const { adminStaffRoutes } = await import("../staff.routes");
 
 const app = new Hono()
   .route("/admin", adminStaffRoutes)
+  .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes);
@@ -78,6 +80,7 @@ const GATED: [string, string, string, unknown][] = [
   ["a staff revocation", "DELETE", "/admin/staff/x", undefined],
   ["an impersonation start", "POST", "/admin/impersonation/x/start", { reason: "ticket 42" }],
   ["SSO enforcement off", "POST", "/admin/orgs/x/sso-enforcement", { enforced: false }],
+  ["an approval decision", "POST", "/admin/approvals/x/decide", { decision: "reject", note: "no" }],
 ];
 
 const OPEN: [string, string, string, unknown][] = [

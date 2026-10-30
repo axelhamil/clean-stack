@@ -33,6 +33,10 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   },
   "DELETE /uploads": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
   "DELETE /admin/staff/:id": { uiLess: "dormant-by-design" },
+  "GET /admin/approvals": { uiLess: "dormant-by-design" },
+  "GET /admin/approvals/:id": { uiLess: "dormant-by-design" },
+  "POST /admin/approvals/:id/decide": { uiLess: "dormant-by-design" },
+  "POST /admin/approvals/:id/cancel": { uiLess: "dormant-by-design" },
   "GET /admin/audit-log": {
     consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
   },
@@ -115,6 +119,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /csp-report": { uiLess: "provider-callback" },
   "POST /internal/flush-notification-emails": { uiLess: "internal-cron" },
   "POST /internal/rgpd-sweep": { uiLess: "internal-cron" },
+  "POST /internal/sweep-admin-approvals": { uiLess: "internal-cron" },
   "POST /internal/sweep-audit-log": { uiLess: "internal-cron" },
   "POST /internal/sweep-consents": { uiLess: "internal-cron" },
   "POST /internal/sweep-email-messages": { uiLess: "internal-cron" },

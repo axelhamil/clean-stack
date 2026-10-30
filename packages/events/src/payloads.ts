@@ -508,6 +508,37 @@ export const AdminStepUpFailedPayload = UserRef.extend({
 });
 export type AdminStepUpFailedPayload = z.infer<typeof AdminStepUpFailedPayload>;
 
+const ApprovalRef = UserRef.extend({
+  approvalId: z.string(),
+  action: z.string(),
+  requesterUserId: z.string(),
+});
+
+export const AdminApprovalRequestedPayload = ActorRef.extend(ApprovalRef.shape);
+export type AdminApprovalRequestedPayload = z.infer<typeof AdminApprovalRequestedPayload>;
+
+export const AdminApprovalDecidedPayload = ActorRef.extend(ApprovalRef.shape).extend({
+  outcome: z.enum(["approved", "rejected"]),
+  note: z.string().min(1),
+});
+export type AdminApprovalDecidedPayload = z.infer<typeof AdminApprovalDecidedPayload>;
+
+export const AdminApprovalCancelledPayload = ActorRef.extend(ApprovalRef.shape);
+export type AdminApprovalCancelledPayload = z.infer<typeof AdminApprovalCancelledPayload>;
+
+export const AdminApprovalExpiredPayload = ApprovalRef.extend({
+  actorUserId: z.string().nullable(),
+});
+export type AdminApprovalExpiredPayload = z.infer<typeof AdminApprovalExpiredPayload>;
+
+export const AdminApprovalExecutedPayload = ActorRef.extend(ApprovalRef.shape);
+export type AdminApprovalExecutedPayload = z.infer<typeof AdminApprovalExecutedPayload>;
+
+export const AdminApprovalFailedPayload = ActorRef.extend(ApprovalRef.shape).extend({
+  reason: z.string().min(1),
+});
+export type AdminApprovalFailedPayload = z.infer<typeof AdminApprovalFailedPayload>;
+
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
   actorUserId: z.string(),
@@ -742,6 +773,12 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
   [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
+  [EventTypes.ADMIN_APPROVAL_REQUESTED]: AdminApprovalRequestedPayload,
+  [EventTypes.ADMIN_APPROVAL_DECIDED]: AdminApprovalDecidedPayload,
+  [EventTypes.ADMIN_APPROVAL_CANCELLED]: AdminApprovalCancelledPayload,
+  [EventTypes.ADMIN_APPROVAL_EXPIRED]: AdminApprovalExpiredPayload,
+  [EventTypes.ADMIN_APPROVAL_EXECUTED]: AdminApprovalExecutedPayload,
+  [EventTypes.ADMIN_APPROVAL_FAILED]: AdminApprovalFailedPayload,
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
