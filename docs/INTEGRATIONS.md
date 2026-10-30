@@ -262,7 +262,7 @@ fast on missing/invalid values.
 - `RESEND_FROM`: defaults to `onboarding@resend.dev`; switch to your
   authenticated domain once DNS is green.
 
-The full schema lives in `apps/api/common/env.ts`. `.env.example` at the API
+The full schema lives in `apps/api/src/shared/env.ts`. `.env.example` at the API
 root is the up-to-date template.
 
 ---
@@ -338,7 +338,7 @@ publicly accessible HTTPS endpoint and a GitHub review of the integration:
 ## TL;DR, pre-production checklist
 
 - [ ] 9 Resend templates created with exact variable names; IDs filled in
-      `TEMPLATE_IDS` in `apps/api/src/shared/services/email.service.ts`
+      `TEMPLATE_IDS` in `apps/api/src/shared/services/email-delivery-worker.service.ts`
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC): green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
 - [ ] Stripe Products created with `metadata.tier` set; `ENTITLEMENTS` in

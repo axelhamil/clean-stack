@@ -11,7 +11,7 @@ Builds one story as a vertical slice through clean-stack, using a sequential pip
 
 - **No code before Gate 1.** The architect's plan must be explicitly approved by the user first. No exceptions, not for "small" stories.
 - **Never commit, never open a PR.** Only on explicit user request after Gate 2.
-- **Mockups are law.** If the story involves UI visuals, mockup image files must exist on disk before the front phase (ask the user for paths, or `docs/stories/<slug>/`). Subagents cannot see conversation images, only files they can `Read`. Pixel-perfect or it's wrong; a blocking technical constraint gets reported before implementing around it.
+- **Mockups are law.** If the story involves UI visuals, mockup image files must exist on disk before the front phase (ask the user for paths, or `docs/stories/<slug>/`, created on demand). Subagents cannot see conversation images, only files they can `Read`. Pixel-perfect or it's wrong; a blocking technical constraint gets reported before implementing around it.
 - **One story = one vertical slice.** A story touching only one layer of a user-facing feature is mis-split, flag it before starting.
 
 ## Pipeline
