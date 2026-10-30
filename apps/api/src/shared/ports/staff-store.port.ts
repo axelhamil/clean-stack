@@ -14,6 +14,7 @@ export interface StaffRecord {
   userId: string;
   role: StaffRole;
   source: StaffSource;
+  banned: boolean;
   overrides: StaffOverrideRecord[];
 }
 
@@ -42,4 +43,5 @@ export interface IStaffStore {
     createdBy: string;
   }): Promise<Result<void, StaffStoreError>>;
   revoke(userId: string): Promise<Result<void, StaffStoreError>>;
+  endImpersonationsBy(userId: string): Promise<Result<void, StaffStoreError>>;
 }

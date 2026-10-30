@@ -11,7 +11,9 @@ import type {
 } from "../../../../shared/ports/staff-store.port";
 import {
   grantsStaffAccess,
+  IMPERSONATE_PERMISSION,
   isLastManager,
+  permissionsOfRecord,
   type StaffListing,
 } from "../../../../shared/staff-access";
 import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
@@ -108,7 +110,8 @@ export class StaffService {
 
       if (found.getValue().isNone()) return this.add(input);
 
-      const from = found.getValue().unwrap().role;
+      const row = found.getValue().unwrap();
+      const from = row.role;
       if (from === input.role) return Result.ok();
 
       if (from === "manager" && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
@@ -121,6 +124,15 @@ export class StaffService {
         createdBy: input.actorUserId,
       });
       if (assigned.isFailure) return Result.fail(assigned.getError());
+
+      const stillImpersonates = permissionsOfRecord(
+        { ...row, role: input.role },
+        new Date(),
+      ).includes(IMPERSONATE_PERMISSION);
+      if (!stillImpersonates) {
+        const ended = await this.store.endImpersonationsBy(input.targetUserId);
+        if (ended.isFailure) return Result.fail(ended.getError());
+      }
 
       await emitEvent(
         this.outbox,

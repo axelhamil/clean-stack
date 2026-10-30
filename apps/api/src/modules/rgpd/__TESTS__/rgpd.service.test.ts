@@ -357,6 +357,7 @@ describe("RgpdService", () => {
       userId: "u1",
       role: "manager",
       source: "console",
+      banned: false,
       overrides: [],
     });
     const request = { userId: "u1", password: "pw" };
@@ -407,6 +408,7 @@ describe("RgpdService", () => {
           userId: "u1",
           role: "support",
           source: "console",
+          banned: false,
           overrides: [],
         }),
         [],
@@ -435,6 +437,7 @@ describe("RgpdService", () => {
           userId: "u1",
           role: "manager",
           source: "console",
+          banned: false,
           overrides: [],
         }),
         [],
@@ -483,6 +486,7 @@ describe("RgpdService", () => {
           userId: "u1",
           role: "support",
           source: "console",
+          banned: false,
           overrides: [],
         }),
         [],

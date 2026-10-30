@@ -55,7 +55,9 @@ export class StaffAccessService {
     const found = await this.lookup(impersonatorId);
     if (found.isFailure) return false;
 
-    return staffAccessOf({ id: impersonatorId }, found.getValue(), this.env)
+    const unbanned = found.getValue().filter((row) => !row.banned);
+
+    return staffAccessOf({ id: impersonatorId }, unbanned, this.env)
       .map((access) => access.permissions.includes(IMPERSONATE_PERMISSION))
       .unwrapOr(false);
   }

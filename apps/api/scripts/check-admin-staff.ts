@@ -357,6 +357,8 @@ async function proveWipeRevokes(): Promise<void> {
     .set({ role: "admin", pendingDeletionUntil: new Date(Date.now() - 1000) })
     .where(eq(authSchema.user.id, leaver));
 
+  await openImpersonation(leaver);
+
   const wiped = await di.RgpdService.executeAccountWipe({ userId: leaver });
   console.log("[5] wipe ->", wiped.isFailure ? wiped.getError() : "success");
   check("the wipe of a manager succeeds", wiped.isSuccess);
@@ -373,6 +375,10 @@ async function proveWipeRevokes(): Promise<void> {
   check(
     "the wipe revokes the overrides",
     overrides.length === 1 && overrides.every((o) => o.revokedAt !== null),
+  );
+  check(
+    "the wipe deletes the sessions they impersonate through",
+    (await impersonationSessionsOf(leaver)) === 0,
   );
   check("the wipe resets the mirror", (await mirrorRole(leaver)) === "user");
 
@@ -527,6 +533,79 @@ async function proveImpersonatorRecheck(): Promise<void> {
   check("a revoked one does not", !(await service.impersonatorHolds(supportActor)));
 }
 
+async function impersonationSessionsOf(impersonator: string): Promise<number> {
+  const rows = await db
+    .select({ id: authSchema.session.id })
+    .from(authSchema.session)
+    .where(eq(authSchema.session.impersonatedBy, impersonator));
+
+  return rows.length;
+}
+
+async function openImpersonation(impersonator: string): Promise<void> {
+  await db.insert(authSchema.session).values({
+    id: crypto.randomUUID(),
+    token: crypto.randomUUID(),
+    userId: plainUser,
+    impersonatedBy: impersonator,
+    expiresAt: new Date(Date.now() + 60_000),
+    updatedAt: new Date(),
+  });
+}
+
+async function proveImpersonationsEnd(): Promise<void> {
+  const service = staffService();
+  await db
+    .update(staffSchema.staffMember)
+    .set({ role: "support", revokedAt: null })
+    .where(eq(staffSchema.staffMember.userId, supportActor));
+  await db
+    .insert(staffSchema.staffMember)
+    .values({ userId: managerB, role: "manager", source: "console" });
+  await openImpersonation(supportActor);
+
+  await service.assignRole({
+    actorUserId: managerB,
+    targetUserId: supportActor,
+    role: "manager",
+  });
+  console.log(
+    "[8] sessions after a role keeping the permission ->",
+    await impersonationSessionsOf(supportActor),
+  );
+  check(
+    "a role change that keeps the permission keeps the session",
+    (await impersonationSessionsOf(supportActor)) === 1,
+  );
+
+  await service.assignRole({
+    actorUserId: managerB,
+    targetUserId: supportActor,
+    role: "auditor",
+  });
+  check(
+    "a role change that loses the permission deletes the session",
+    (await impersonationSessionsOf(supportActor)) === 0,
+  );
+
+  await openImpersonation(supportActor);
+  await service.revoke({ actorUserId: managerB, targetUserId: supportActor });
+  check("a revocation deletes the session", (await impersonationSessionsOf(supportActor)) === 0);
+
+  await db
+    .update(staffSchema.staffMember)
+    .set({ role: "support", revokedAt: null })
+    .where(eq(staffSchema.staffMember.userId, supportActor));
+  await db
+    .update(authSchema.user)
+    .set({ banned: true })
+    .where(eq(authSchema.user.id, supportActor));
+  check(
+    "a banned impersonator no longer holds the permission",
+    !(await di.StaffAccessService.impersonatorHolds(supportActor)),
+  );
+}
+
 async function refusedByCheck(write: () => Promise<unknown>): Promise<boolean> {
   try {
     await write();
@@ -634,6 +713,7 @@ async function main(): Promise<void> {
   await resetManagers([]);
   await proveReviveAndRegrant();
   await proveImpersonatorRecheck();
+  await proveImpersonationsEnd();
   await proveCheckConstraints();
   await proveMigrationDataStep();
 

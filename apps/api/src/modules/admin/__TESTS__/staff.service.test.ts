@@ -29,7 +29,7 @@ const USER: AdminUserRow = {
 };
 
 function member(role: StaffRole): Option<StaffRecord> {
-  return Option.some({ userId: TARGET, role, source: "console", overrides: [] });
+  return Option.some({ userId: TARGET, role, source: "console", banned: false, overrides: [] });
 }
 
 function setup(given: {
@@ -45,6 +45,7 @@ function setup(given: {
   );
   store.assign.mockImplementation(async () => Result.ok());
   store.revoke.mockImplementation(async () => Result.ok());
+  store.endImpersonationsBy.mockImplementation(async () => Result.ok());
 
   const users = mockPort<IAdminUserStore>();
   users.findUserById.mockImplementation(async () => Result.ok(given.user ?? Option.some(USER)));
@@ -153,6 +154,7 @@ describe("StaffService", () => {
       userId: TARGET,
       role: "manager",
       source: "env",
+      banned: false,
       overrides: [],
     });
 
@@ -181,6 +183,69 @@ describe("StaffService", () => {
 
       expect((await service.revoke(change)).getError().code).toBe("ADMIN_STAFF_NOT_FOUND");
       expect(store.revoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("assignRole and the impersonations of the target", () => {
+    const denied = {
+      permission: "users.impersonate" as const,
+      effect: "deny" as const,
+      expiresAt: Option.none<Date>(),
+    };
+    const granted = { ...denied, effect: "grant" as const };
+
+    function withOverrides(role: StaffRole, overrides: StaffRecord["overrides"]) {
+      return Option.some<StaffRecord>({
+        userId: TARGET,
+        role,
+        source: "console",
+        banned: false,
+        overrides,
+      });
+    }
+
+    it("ends them when the new role no longer holds the permission", async () => {
+      const { store, service } = setup({ target: member("support") });
+
+      await service.assignRole({ ...change, role: "auditor" });
+
+      expect(store.endImpersonationsBy).toHaveBeenCalledWith(TARGET);
+    });
+
+    it("keeps them when the new role still holds the permission", async () => {
+      const { store, service } = setup({ target: member("support") });
+
+      await service.assignRole({ ...change, role: "manager" });
+
+      expect(store.endImpersonationsBy).not.toHaveBeenCalled();
+    });
+
+    it("ends them when an override denies the permission of the new role", async () => {
+      const { store, service } = setup({ target: withOverrides("auditor", [denied]) });
+
+      await service.assignRole({ ...change, role: "support" });
+
+      expect(store.endImpersonationsBy).toHaveBeenCalledWith(TARGET);
+    });
+
+    it("keeps them when an override grants the permission the new role lacks", async () => {
+      const { store, service } = setup({ target: withOverrides("support", [granted]) });
+
+      await service.assignRole({ ...change, role: "auditor" });
+
+      expect(store.endImpersonationsBy).not.toHaveBeenCalled();
+    });
+
+    it("rolls the role change back when they cannot be ended", async () => {
+      const { store, service, outcome } = setup({ target: member("support") });
+      store.endImpersonationsBy.mockImplementation(async () =>
+        Result.fail({ code: "ADMIN_STAFF_PROVIDER_FAILURE", message: "down" }),
+      );
+
+      const result = await service.assignRole({ ...change, role: "auditor" });
+
+      expect(result.isFailure).toBe(true);
+      expect(outcome()).toBe("rolled_back");
     });
   });
 
@@ -233,6 +298,7 @@ describe("StaffService", () => {
           userId: TARGET,
           role: "manager",
           source: "env",
+          banned: false,
           overrides: [],
         }),
       });

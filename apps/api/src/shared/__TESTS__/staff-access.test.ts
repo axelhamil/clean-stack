@@ -7,7 +7,13 @@ import { grantsStaffAccess, isLastManager, staffAccessOf } from "../staff-access
 const NOW = new Date("2026-10-30T12:00:00Z");
 
 function row(source: StaffSource = "console", overrides: StaffRecord["overrides"] = []) {
-  return Option.some<StaffRecord>({ userId: "u", role: "support", source, overrides });
+  return Option.some<StaffRecord>({
+    userId: "u",
+    role: "support",
+    source,
+    banned: false,
+    overrides,
+  });
 }
 
 function env(ids: string[], requireMfa: boolean) {

@@ -23,6 +23,8 @@ import type {
   StaffStoreError,
 } from "../../../../shared/ports/staff-store.port";
 
+type Executor = ReturnType<typeof resolveExecutor>;
+
 const fail = createDbFailure("ADMIN_STAFF_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const MIRROR_STAFF = "admin";
@@ -48,6 +50,16 @@ export function overrideOf(row: {
   });
 }
 
+function banIsLive(banned: boolean | null, banExpires: Date | null, now: Date): boolean {
+  if (banned !== true) return false;
+
+  return banExpires === null || banExpires > now;
+}
+
+async function deleteImpersonationSessions(exec: Executor, userId: string): Promise<void> {
+  await exec.delete(authSchema.session).where(eq(authSchema.session.impersonatedBy, userId));
+}
+
 function stillCountsAsManager(
   owner: {
     banned: boolean | null;
@@ -58,9 +70,8 @@ function stillCountsAsManager(
   now: Date,
 ): boolean {
   if (owner.deletedAt || owner.pendingDeletionUntil) return false;
-  if (owner.banned !== true) return true;
 
-  return owner.banExpires !== null && owner.banExpires <= now;
+  return !banIsLive(owner.banned, owner.banExpires, now);
 }
 
 export class DrizzleStaffStore implements IStaffStore {
@@ -76,11 +87,14 @@ export class DrizzleStaffStore implements IStaffStore {
           .select({
             role: staffMember.role,
             source: staffMember.source,
+            banned: authSchema.user.banned,
+            banExpires: authSchema.user.banExpires,
             permission: staffPermissionOverride.permission,
             effect: staffPermissionOverride.effect,
             expiresAt: staffPermissionOverride.expiresAt,
           })
           .from(staffMember)
+          .innerJoin(authSchema.user, eq(authSchema.user.id, staffMember.userId))
           .leftJoin(
             staffPermissionOverride,
             and(
@@ -105,6 +119,7 @@ export class DrizzleStaffStore implements IStaffStore {
             userId,
             role,
             source,
+            banned: banIsLive(first.banned, first.banExpires, new Date()),
             overrides: rows.flatMap(({ permission, effect, expiresAt }) => {
               if (permission === null || effect === null) return [];
 
@@ -319,11 +334,31 @@ export class DrizzleStaffStore implements IStaffStore {
           .set({ role: MIRROR_PLAIN })
           .where(eq(authSchema.user.id, userId));
 
+        await deleteImpersonationSessions(exec, userId);
+
         return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);
         return fail(err, "staff revocation failed");
       }
     });
+  }
+
+  async endImpersonationsBy(userId: string): Promise<Result<void, StaffStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > endImpersonationsBy" },
+      async () => {
+        try {
+          await deleteImpersonationSessions(exec, userId);
+
+          return Result.ok();
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "impersonation end failed");
+        }
+      },
+    );
   }
 }

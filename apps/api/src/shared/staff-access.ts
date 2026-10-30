@@ -35,6 +35,14 @@ export function isLastManager(
   return !managers.some((m) => m.userId !== targetUserId && grantsStaffAccess(m, env));
 }
 
+export function permissionsOfRecord(row: StaffRecord, now: Date): StaffPermission[] {
+  return effectivePermissions(
+    row.role,
+    row.overrides.map((o) => ({ ...o, expiresAt: o.expiresAt.toNull() })),
+    now,
+  );
+}
+
 export function staffAccessOf(
   user: StaffUser,
   staffRow: Option<StaffRecord>,
@@ -55,11 +63,7 @@ export function staffAccessOf(
     .filter((row) => grantsStaffAccess(row, env))
     .map((row) => ({
       role: row.role,
-      permissions: effectivePermissions(
-        row.role,
-        row.overrides.map((o) => ({ ...o, expiresAt: o.expiresAt.toNull() })),
-        now,
-      ),
+      permissions: permissionsOfRecord(row, now),
       mfaOk,
     }));
 }

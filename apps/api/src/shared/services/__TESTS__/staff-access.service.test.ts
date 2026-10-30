@@ -12,7 +12,13 @@ import { StaffAccessService } from "../staff-access.service";
 const LISTED = { id: "op", twoFactorEnabled: false };
 const PLAIN = { id: "plain", twoFactorEnabled: true };
 const SESSION = { impersonatedBy: null };
-const RECORD: StaffRecord = { userId: "op", role: "support", source: "console", overrides: [] };
+const RECORD: StaffRecord = {
+  userId: "op",
+  role: "support",
+  source: "console",
+  banned: false,
+  overrides: [],
+};
 
 function setup(row: Option<StaffRecord>, inserted = true) {
   const store = mockPort<IStaffStore>();
@@ -153,6 +159,12 @@ describe("StaffAccessService", () => {
       );
 
       expect(await service.impersonatorHolds("former")).toBe(false);
+    });
+
+    it("is false for a banned impersonator", async () => {
+      const { service } = setup(Option.some({ ...RECORD, banned: true }));
+
+      expect(await service.impersonatorHolds("banned")).toBe(false);
     });
 
     it("answers a listed id without any read", async () => {
