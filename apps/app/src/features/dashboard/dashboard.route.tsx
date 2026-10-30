@@ -1,6 +1,7 @@
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
-import { TypographyH1, TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -17,10 +18,10 @@ function DashboardPage() {
 
   return (
     <main className={cn(pageContainerVariants(), "flex flex-col gap-8 py-10")}>
-      <header className="flex flex-col gap-1">
-        <TypographyH1 variant="page">{t("dashboard.welcome", { name: firstName })}</TypographyH1>
-        <TypographyMuted>{t("dashboard.subtitle")}</TypographyMuted>
-      </header>
+      <PageHeader
+        title={t("dashboard.welcome", { name: firstName })}
+        description={t("dashboard.subtitle")}
+      />
 
       <SettingsSection
         title={t("dashboard.gettingStartedTitle")}

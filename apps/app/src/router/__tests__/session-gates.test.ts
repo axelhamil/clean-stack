@@ -2,8 +2,10 @@ import { QueryClient } from "@tanstack/react-query";
 import { isRedirect } from "@tanstack/react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
+import { refetchSession } from "../../shared/auth/use-refresh-session";
 import { Route as GuestRoute } from "../_guest";
 import { Route as ProtectedRoute } from "../_protected";
+import { Route as IndexRoute } from "../index.route";
 
 const getSession = vi.hoisted(() => vi.fn());
 
@@ -31,6 +33,10 @@ function runProtected(queryClient: QueryClient) {
 
 function runGuest(queryClient: QueryClient) {
   return GuestRoute.options.beforeLoad?.({ context: { queryClient } } as never);
+}
+
+function runIndex(queryClient: QueryClient) {
+  return IndexRoute.options.beforeLoad?.({ context: { queryClient } } as never);
 }
 
 async function rejection(run: Promise<unknown> | unknown) {
@@ -89,5 +95,36 @@ describe("session gates", () => {
     getSession.mockResolvedValue(failure(429));
 
     expect(await rejection(runGuest(newQueryClient()))).toBeUndefined();
+  });
+
+  it("given a failing session check, when the root loads, then it sends the visitor to the sign-in form", async () => {
+    getSession.mockResolvedValue(failure(503));
+
+    const error = await rejection(runIndex(newQueryClient()));
+
+    expect(error).toMatchObject({ options: { to: "/sign-in" } });
+  });
+
+  it("given a signed out cache, when the post sign-in refetch fails, then the guard reads the fresh session", async () => {
+    const queryClient = newQueryClient();
+    getSession.mockResolvedValueOnce({ data: null, error: null });
+    await queryClient.fetchQuery(sessionQueryOptions);
+
+    getSession.mockResolvedValueOnce(failure(429));
+    await refetchSession(queryClient);
+
+    getSession.mockResolvedValueOnce({ data: VALID_SESSION, error: null });
+    expect(await runProtected(queryClient)).toMatchObject({ user: VALID_SESSION.user });
+  });
+
+  it("given a known session, when the post sign-in refetch fails, then the session is kept", async () => {
+    const queryClient = newQueryClient();
+    getSession.mockResolvedValueOnce({ data: VALID_SESSION, error: null });
+    await queryClient.fetchQuery(sessionQueryOptions);
+
+    getSession.mockResolvedValueOnce(failure(429));
+    await refetchSession(queryClient);
+
+    expect(queryClient.getQueryData(sessionQueryOptions.queryKey)).toEqual(VALID_SESSION);
   });
 });

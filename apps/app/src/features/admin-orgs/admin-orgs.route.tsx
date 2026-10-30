@@ -1,7 +1,8 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import { Switch } from "@packages/ui/components/ui/switch";
 import {
@@ -12,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -51,11 +52,8 @@ function AdminOrgsPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
-        <TypographyMuted>{t("orgs.ssoEnforcementOffHint")}</TypographyMuted>
-        <ImpersonationReason guard={guard} />
-      </header>
+      <PageHeader title={t("orgs.pageTitle")} description={t("orgs.ssoEnforcementOffHint")} />
+      <ImpersonationReason guard={guard} />
 
       <Input
         placeholder={t("orgs.searchPlaceholder")}
@@ -66,11 +64,7 @@ function AdminOrgsPage() {
 
       {query.isLoading && <SkeletonTable label={t("orgs.loading")} columns={5} />}
 
-      {query.isError && (
-        <Alert variant="destructive">
-          <AlertDescription>{t("orgs.loadFailed")}</AlertDescription>
-        </Alert>
-      )}
+      {query.isError && <LoadErrorAlert message={t("orgs.loadFailed")} />}
 
       {query.isSuccess && orgs.length === 0 && <TypographyMuted>{t("orgs.empty")}</TypographyMuted>}
 

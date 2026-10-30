@@ -2,14 +2,8 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Moon, Sun } from "lucide-react";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { revealThemeChange } from "../theme/reveal-transition";
 import { useTheme } from "../theme/use-theme";
-
-type DocWithVT = Document & {
-  startViewTransition?: (cb: () => void | Promise<void>) => {
-    ready: Promise<void>;
-    finished: Promise<void>;
-  };
-};
 
 interface ThemeToggleProps {
   className?: string;
@@ -23,57 +17,12 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   const isDark = resolvedTheme === "dark";
   const next = isDark ? "light" : "dark";
 
-  const handleClick = async () => {
-    const doc = document as DocWithVT;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const button = buttonRef.current;
-
-    if (!doc.startViewTransition || reduced || !button) {
-      setTheme(next);
-      return;
-    }
-
-    const rect = button.getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-    const endRadius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    );
-
-    const root = document.documentElement;
-    root.classList.add("theme-transitioning");
-
-    const transition = doc.startViewTransition(() => {
-      setTheme(next);
-    });
-
-    try {
-      await transition.ready;
-      root.animate(
-        {
-          clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`],
-        },
-        {
-          duration: 200,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-          pseudoElement: "::view-transition-new(root)",
-        },
-      );
-      await transition.finished;
-    } catch (err) {
-      if (!(err instanceof DOMException && err.name === "AbortError")) throw err;
-    } finally {
-      root.classList.remove("theme-transitioning");
-    }
-  };
-
   return (
     <Button
       ref={buttonRef}
       variant="ghost"
       size="icon"
-      onClick={handleClick}
+      onClick={() => void revealThemeChange(buttonRef.current, () => setTheme(next))}
       aria-label={isDark ? t("theme.switchToLight") : t("theme.switchToDark")}
       className={className}
     >

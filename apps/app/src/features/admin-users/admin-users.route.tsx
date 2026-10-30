@@ -1,6 +1,7 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import {
   Select,
   SelectContent,
@@ -16,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -49,9 +50,7 @@ function AdminUsersPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header>
-        <TypographyH1 variant="page">{t("users.pageTitle")}</TypographyH1>
-      </header>
+      <PageHeader title={t("users.pageTitle")} />
 
       <div className="flex flex-wrap gap-3">
         <Input
@@ -105,11 +104,7 @@ function AdminUsersPage() {
 
       {query.isLoading && <SkeletonTable label={t("users.loading")} columns={5} />}
 
-      {query.isError && (
-        <Alert variant="destructive">
-          <AlertDescription>{t("users.loadFailed")}</AlertDescription>
-        </Alert>
-      )}
+      {query.isError && <LoadErrorAlert message={t("users.loadFailed")} />}
 
       {query.isSuccess && users.length === 0 && (
         <TypographyMuted>{t("users.empty")}</TypographyMuted>

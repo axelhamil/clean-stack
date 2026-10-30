@@ -1,11 +1,12 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import {
   DescriptionDetails,
   DescriptionItem,
   DescriptionList,
   DescriptionTerm,
 } from "@packages/ui/components/ui/description-list";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import {
   Table,
   TableBody,
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1, TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
@@ -48,14 +49,12 @@ function AdminOrgDetailPage() {
   if (!org) {
     return (
       <main className="flex flex-col gap-6">
-        <header className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           {backLink}
-          <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
-        </header>
+          <PageHeader title={t("orgs.pageTitle")} />
+        </div>
         {query.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{t("orgs.detail.loadFailed")}</AlertDescription>
-          </Alert>
+          <LoadErrorAlert message={t("orgs.detail.loadFailed")} />
         ) : (
           <TypographyMuted>{t("orgs.detail.loading")}</TypographyMuted>
         )}
@@ -65,12 +64,10 @@ function AdminOrgDetailPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         {backLink}
-        <TypographyH1 variant="page" className="break-words">
-          {org.name}
-        </TypographyH1>
-      </header>
+        <PageHeader title={org.name} />
+      </div>
 
       <div className="grid gap-8 md:grid-cols-2">
         <section className="flex min-w-0 flex-col gap-4">

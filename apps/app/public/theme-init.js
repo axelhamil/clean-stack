@@ -13,4 +13,8 @@
     : stored === "dark";
 
   document.documentElement.classList.toggle("dark", dark);
+
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute("content", dark ? "#0d1013" : "#fbfcfd");
+  }
 })();

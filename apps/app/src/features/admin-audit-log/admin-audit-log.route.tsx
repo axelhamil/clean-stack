@@ -1,6 +1,7 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import {
   Select,
   SelectContent,
@@ -16,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -43,10 +44,7 @@ function AdminAuditLogPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <TypographyH1 variant="page">{t("auditLog.pageTitle")}</TypographyH1>
-        <ChainBadge />
-      </header>
+      <PageHeader title={t("auditLog.pageTitle")} actions={<ChainBadge />} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Select
@@ -102,11 +100,7 @@ function AdminAuditLogPage() {
 
       {query.isLoading && <SkeletonTable label={t("auditLog.loading")} columns={6} />}
 
-      {query.isError && (
-        <Alert variant="destructive">
-          <AlertDescription>{t("auditLog.loadFailed")}</AlertDescription>
-        </Alert>
-      )}
+      {query.isError && <LoadErrorAlert message={t("auditLog.loadFailed")} />}
 
       {query.isSuccess && rows.length === 0 && (
         <TypographyMuted>{t("auditLog.empty")}</TypographyMuted>

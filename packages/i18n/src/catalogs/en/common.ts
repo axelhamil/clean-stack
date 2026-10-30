@@ -16,7 +16,7 @@ export default {
   },
   errorBoundary: {
     title: "Something went wrong",
-    body: "We've been notified and are looking into it. Try reloading the page.",
+    body: "This page could not load. Try reloading it.",
   },
   nav: {
     dashboard: "Dashboard",

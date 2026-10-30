@@ -1,5 +1,3 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
-import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Dialog,
@@ -7,30 +5,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@packages/ui/components/ui/select";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import {
-  TypographyH1,
-  TypographyH2,
-  TypographyInline,
-  TypographyMuted,
-} from "@packages/ui/components/ui/typography";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -44,32 +31,19 @@ import { useAuthorization } from "../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
 import { errorFallback } from "../../shared/i18n/get-errors-t";
-import { useFormatDate } from "../../shared/i18n/use-format-date";
 import {
   createEndpointMutationOptions,
   deleteEndpointMutationOptions,
-  replayDeliveryMutationOptions,
   rotateSecretMutationOptions,
   sendTestMutationOptions,
   updateEndpointMutationOptions,
 } from "./api/webhooks.mutations";
-import type { DeliveryListItem, WebhookEndpoint } from "./api/webhooks.queries";
-import {
-  webhookDeliveriesInfiniteQueryOptions,
-  webhookEndpointsQueryOptions,
-} from "./api/webhooks.queries";
-import { DeliverySheet } from "./components/delivery-sheet";
+import type { WebhookEndpoint } from "./api/webhooks.queries";
+import { webhookEndpointsQueryOptions } from "./api/webhooks.queries";
+import { DeliveriesSection } from "./components/deliveries-section";
 import { EndpointRow } from "./components/endpoint-row";
 import { VerifySnippet } from "./components/verify-snippet";
 import { WebhookForm } from "./forms/webhook-form";
-import type { DeliveryFilters } from "./webhook-delivery-filters";
-import {
-  DELIVERY_STATUS_BADGE_VARIANTS,
-  DELIVERY_STATUS_KEYS,
-  isDeliveryStatus,
-} from "./webhook-labels";
-
-const ALL_DELIVERY_STATUSES = "all";
 
 export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/webhooks")({
   beforeLoad: ensureOrgPermission({ webhooks: ["read"] }),
@@ -78,7 +52,6 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/web
 
 function WebhooksPage() {
   const { t } = useTranslation(["settings", "common", "errors"]);
-  const formatDate = useFormatDate();
   const qc = useQueryClient();
   const { can } = useAuthorization();
   const canWrite = can({ webhooks: ["write"] });
@@ -88,19 +61,9 @@ function WebhooksPage() {
   const [editing, setEditing] = useState<WebhookEndpoint | null>(null);
   const [creating, setCreating] = useState(false);
   const [revealSecret, setRevealSecret] = useState<string | null>(null);
-  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryListItem | null>(null);
-  const [deliveryFilters, setDeliveryFilters] = useState<DeliveryFilters>({});
 
   const organizationId = useActiveOrgId();
   const endpoints = useQuery(webhookEndpointsQueryOptions(organizationId));
-
-  const deliveries = useInfiniteQuery(
-    webhookDeliveriesInfiniteQueryOptions(
-      organizationId,
-      selectedEndpointId ?? "",
-      deliveryFilters,
-    ),
-  );
 
   const create = useMutation({
     ...createEndpointMutationOptions,
@@ -153,13 +116,6 @@ function WebhooksPage() {
     onError: (err) => toastError(err, errorFallback("sendWebhookTestEvent")),
   });
 
-  const replay = useMutation({
-    ...replayDeliveryMutationOptions,
-    onSuccess: () => toast.success(t("settings:webhooks.deliveryReplayedToast")),
-    onError: (err) => toastError(err, errorFallback("replayWebhookDelivery")),
-  });
-
-  const deliveryItems = deliveries.data?.pages.flatMap((p) => p.items) ?? [];
   const dialogOpen = creating || editing !== null;
 
   const closeDialog = () => {
@@ -169,31 +125,31 @@ function WebhooksPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <TypographyH1 variant="page">{t("settings:webhooks.pageTitle")}</TypographyH1>
+      <PageHeader
+        title={t("settings:webhooks.pageTitle")}
+        description={
           <NavLink variant="plain" asChild>
             <Link to="/developers/events">{t("settings:webhooks.viewEventCatalog")}</Link>
           </NavLink>
-        </div>
-        <Can requires={{ webhooks: ["write"] }}>
-          <Button
-            onClick={() => setCreating(true)}
-            disabled={guard.blocked}
-            {...guard.describeProps()}
-          >
-            {t("settings:webhooks.addEndpoint")}
-          </Button>
-        </Can>
-      </div>
+        }
+        actions={
+          <Can requires={{ webhooks: ["write"] }}>
+            <Button
+              onClick={() => setCreating(true)}
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
+              {t("settings:webhooks.addEndpoint")}
+            </Button>
+          </Can>
+        }
+      />
       <ImpersonationReason guard={guard} />
 
       {endpoints.isPending ? (
         <TypographyMuted role="status">{t("settings:webhooks.loading")}</TypographyMuted>
-      ) : endpoints.isError ? (
-        <Alert variant="destructive">
-          <AlertDescription>{t("errors:fallback.loadWebhookEndpoints")}</AlertDescription>
-        </Alert>
+      ) : endpoints.isLoadingError ? (
+        <LoadErrorAlert message={t("errors:fallback.loadWebhookEndpoints")} />
       ) : endpoints.data.items.length === 0 ? (
         <TypographyMuted>{t("settings:webhooks.noEndpoints")}</TypographyMuted>
       ) : (
@@ -232,111 +188,7 @@ function WebhooksPage() {
       {selectedEndpointId !== null && (
         <>
           <Separator />
-          <section className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <TypographyH2>{t("settings:webhooks.deliveries.title")}</TypographyH2>
-              <Select
-                value={deliveryFilters.status ?? ALL_DELIVERY_STATUSES}
-                onValueChange={(v) =>
-                  setDeliveryFilters((f) => ({
-                    ...f,
-                    status: isDeliveryStatus(v) ? v : undefined,
-                  }))
-                }
-              >
-                <SelectTrigger
-                  className="w-40"
-                  aria-label={t("settings:webhooks.deliveries.statusHeader")}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_DELIVERY_STATUSES}>
-                    {t("settings:webhooks.deliveries.allStatusFilter")}
-                  </SelectItem>
-                  <SelectItem value="pending">{t(DELIVERY_STATUS_KEYS.pending)}</SelectItem>
-                  <SelectItem value="success">{t(DELIVERY_STATUS_KEYS.success)}</SelectItem>
-                  <SelectItem value="failed">{t(DELIVERY_STATUS_KEYS.failed)}</SelectItem>
-                  <SelectItem value="dead_letter">{t(DELIVERY_STATUS_KEYS.dead_letter)}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {deliveries.isPending ? (
-              <TypographyMuted role="status">
-                {t("settings:webhooks.deliveries.loading")}
-              </TypographyMuted>
-            ) : deliveries.isError ? (
-              <Alert variant="destructive">
-                <AlertDescription>{t("errors:fallback.loadWebhookDeliveries")}</AlertDescription>
-              </Alert>
-            ) : deliveryItems.length === 0 ? (
-              <TypographyMuted>{t("settings:webhooks.deliveries.empty")}</TypographyMuted>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("settings:webhooks.deliveries.eventTypeHeader")}</TableHead>
-                      <TableHead>{t("settings:webhooks.deliveries.statusHeader")}</TableHead>
-                      <TableHead className="hidden sm:table-cell">
-                        {t("settings:webhooks.deliveries.attemptsHeader")}
-                      </TableHead>
-                      <TableHead className="hidden sm:table-cell">
-                        {t("settings:webhooks.deliveries.createdHeader")}
-                      </TableHead>
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {deliveryItems.map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell className="max-w-32 truncate sm:max-w-xs">
-                          <TypographyInline font="mono">{d.eventType}</TypographyInline>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={DELIVERY_STATUS_BADGE_VARIANTS[d.status]}>
-                            {isDeliveryStatus(d.status)
-                              ? t(DELIVERY_STATUS_KEYS[d.status])
-                              : d.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">{d.attempts}</TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {formatDate(d.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedDelivery(d)}>
-                            {t("settings:webhooks.deliveries.detailsAction")}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                {deliveries.hasNextPage && (
-                  <Button
-                    variant="outline"
-                    className="self-start"
-                    disabled={deliveries.isFetchingNextPage}
-                    onClick={() => void deliveries.fetchNextPage()}
-                  >
-                    {t("settings:webhooks.deliveries.loadMore")}
-                  </Button>
-                )}
-              </>
-            )}
-          </section>
-
-          <DeliverySheet
-            endpointId={selectedEndpointId}
-            delivery={selectedDelivery}
-            canReplay={canWrite}
-            onReplay={(deliveryId) => replay.mutate({ endpointId: selectedEndpointId, deliveryId })}
-            onClose={() => setSelectedDelivery(null)}
-            guard={guard}
-          />
+          <DeliveriesSection endpointId={selectedEndpointId} canWrite={canWrite} guard={guard} />
         </>
       )}
 

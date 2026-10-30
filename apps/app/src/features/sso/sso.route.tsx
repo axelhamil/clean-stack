@@ -1,7 +1,8 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Skeleton, SkeletonGroup } from "@packages/ui/components/ui/skeleton";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -27,25 +28,35 @@ function SsoPage() {
 
   return (
     <main className="flex flex-col gap-8">
-      <TypographyH1 variant="page">{t("sso.pageTitle")}</TypographyH1>
+      <PageHeader title={t("sso.pageTitle")} />
       {hasFeature("sso") ? <SsoSections /> : <SsoUpsell />}
     </main>
   );
 }
 
 function SsoSections() {
-  const { t } = useTranslation(["settings", "errors"]);
+  const { t } = useTranslation(["settings", "errors", "common"]);
   const providers = useQuery(ssoProvidersQueryOptions);
 
   if (providers.isPending) {
     return <SsoSectionsSkeleton label={t("settings:sso.loading")} />;
   }
 
-  if (providers.isError) {
+  if (providers.isLoadingError) {
     return (
-      <Alert variant="destructive">
-        <AlertDescription>{t("errors:fallback.loadSsoProviders")}</AlertDescription>
-      </Alert>
+      <LoadErrorAlert
+        message={t("errors:fallback.loadSsoProviders")}
+        retry={
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={providers.isFetching}
+            onClick={() => void providers.refetch()}
+          >
+            {t("common:actions.retry")}
+          </Button>
+        }
+      />
     );
   }
 
@@ -85,7 +96,7 @@ function SsoUpsell() {
   const { t } = useTranslation("settings");
 
   return (
-    <section className="flex max-w-prose flex-col items-start gap-4">
+    <section className="flex flex-col items-start gap-4">
       <TypographyMuted>{t("sso.upsell.description")}</TypographyMuted>
       <Button asChild>
         <Link to="/pricing" search={{ plan: "business" }}>

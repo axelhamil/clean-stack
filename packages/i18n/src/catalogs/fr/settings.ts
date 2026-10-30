@@ -218,6 +218,8 @@ export default {
   organization: {
     membersLoading: "Chargement…",
     membersLoadFailed: "Impossible de charger les membres. Rechargez la page pour réessayer.",
+    invitationsLoadFailed:
+      "Impossible de charger les invitations en attente. Rechargez la page pour réessayer.",
     noActiveOrg: "Aucune organisation active.",
     title: "Paramètres de l'organisation",
     detailsTitle: "Détails",

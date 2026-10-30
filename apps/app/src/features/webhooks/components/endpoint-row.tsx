@@ -60,6 +60,9 @@ export function EndpointRow({
         <TypographyInline font="mono" title={endpoint.url}>
           {endpoint.url}
         </TypographyInline>
+        <TypographyInline tone="muted" size="xs" className="block sm:hidden">
+          {formatDate(endpoint.createdAt)}
+        </TypographyInline>
       </TableCell>
       <TableCell>
         {status === "auto-disabled" ? (

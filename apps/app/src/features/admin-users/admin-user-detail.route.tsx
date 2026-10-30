@@ -1,4 +1,3 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
@@ -15,9 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Separator } from "@packages/ui/components/ui/separator";
-import { TypographyH1, TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
@@ -137,14 +138,12 @@ function AdminUserDetailPage() {
   if (!user) {
     return (
       <main className="flex flex-col gap-6">
-        <header className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           {backLink}
-          <TypographyH1 variant="page">{t("users.pageTitle")}</TypographyH1>
-        </header>
+          <PageHeader title={t("users.pageTitle")} />
+        </div>
         {query.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{t("users.detail.loadFailed")}</AlertDescription>
-          </Alert>
+          <LoadErrorAlert message={t("users.detail.loadFailed")} />
         ) : (
           <TypographyMuted>{t("users.detail.loading")}</TypographyMuted>
         )}
@@ -154,30 +153,30 @@ function AdminUserDetailPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         {backLink}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <TypographyH1 variant="page" className="min-w-0 break-words">
-            {user.name}
-          </TypographyH1>
-          <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
-            <DialogTrigger asChild>
-              <Button variant={user.banned ? "outline" : "default"}>
-                {t("users.detail.impersonate")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent closeLabel={t("common:actions.close")}>
-              <DialogHeader>
-                <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
-              </DialogHeader>
-              <ImpersonateForm
-                isPending={impersonateMutation.isPending}
-                onSubmit={(values) => impersonateMutation.mutate({ id, ...values })}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </header>
+        <PageHeader
+          title={user.name}
+          actions={
+            <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
+              <DialogTrigger asChild>
+                <Button variant={user.banned ? "outline" : "default"}>
+                  {t("users.detail.impersonate")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent closeLabel={t("common:actions.close")}>
+                <DialogHeader>
+                  <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
+                </DialogHeader>
+                <ImpersonateForm
+                  isPending={impersonateMutation.isPending}
+                  onSubmit={(values) => impersonateMutation.mutate({ id, ...values })}
+                />
+              </DialogContent>
+            </Dialog>
+          }
+        />
+      </div>
 
       <div className="grid gap-8 md:grid-cols-2">
         <section className="flex min-w-0 flex-col gap-4">

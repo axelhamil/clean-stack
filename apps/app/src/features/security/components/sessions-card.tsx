@@ -7,6 +7,7 @@ import {
   ListRowMedia,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
@@ -41,7 +42,7 @@ interface SessionsCardProps {
 }
 
 export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
-  const { data, isLoading, isError } = useQuery(sessionsQueryOptions);
+  const { data, isLoading, isLoadingError } = useQuery(sessionsQueryOptions);
   const revokeOthers = useRevokeOtherSessions();
   const { t } = useTranslation("settings");
   // `/revoke-session` and `/revoke-other-sessions` are on the BetterAuth
@@ -55,8 +56,8 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
     <SettingsSection title={t("sessions.title")} description={t("sessions.description")}>
       {isLoading ? (
         <TypographyMuted>{t("sessions.loading")}</TypographyMuted>
-      ) : isError ? (
-        <TypographyMuted>{t("sessions.loadFailed")}</TypographyMuted>
+      ) : isLoadingError ? (
+        <LoadErrorAlert message={t("sessions.loadFailed")} />
       ) : data && data.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {data.map((session) => (

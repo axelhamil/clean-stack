@@ -3,6 +3,7 @@ import { routeTree } from "./routeTree.gen";
 import { watchPolicyRefusals } from "./shared/api/errors/policy-refusal";
 import { queryClient } from "./shared/api/query-client";
 import { AppErrorFallback } from "./shared/components/app-error-fallback";
+import { reportCaughtError } from "./shared/observability/report-caught-error";
 
 export const router = createRouter({
   routeTree,
@@ -13,6 +14,7 @@ export const router = createRouter({
   defaultPendingMinMs: 300,
   scrollRestoration: true,
   defaultErrorComponent: AppErrorFallback,
+  defaultOnCatch: reportCaughtError,
 });
 
 watchPolicyRefusals(queryClient, () => router.invalidate());

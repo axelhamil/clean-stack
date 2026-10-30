@@ -1,5 +1,5 @@
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,7 +21,7 @@ export function OrgNotificationDefaultsCard() {
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
   const organizationId = useActiveOrgId();
-  const { data, isPending, isError } = useQuery(
+  const { data, isPending, isLoadingError } = useQuery(
     orgNotificationPreferencesQueryOptions(organizationId),
   );
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
@@ -43,8 +43,8 @@ export function OrgNotificationDefaultsCard() {
         title={t("organization.notificationDefaultsTitle")}
         description={t("organization.notificationDefaultsDescription")}
       >
-        {isError ? (
-          <TypographyMuted>{t("notifications.loadFailed")}</TypographyMuted>
+        {isLoadingError ? (
+          <LoadErrorAlert message={t("notifications.loadFailed")} />
         ) : (
           <PreferenceMatrix
             rows={rows}

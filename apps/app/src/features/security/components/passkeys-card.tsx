@@ -15,6 +15,7 @@ import {
   ListRowMedia,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
@@ -34,7 +35,7 @@ import { useDeletePasskey } from "../hooks/use-delete-passkey";
 export function PasskeysCard() {
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
-  const { data, isLoading, isError } = useQuery(passkeysQueryOptions);
+  const { data, isLoading, isLoadingError } = useQuery(passkeysQueryOptions);
   const [open, setOpen] = useState(false);
   // `/passkey` is on the BetterAuth impersonation blocklist: both registering
   // and deleting a passkey 403 while impersonating. One guard for the whole
@@ -45,8 +46,8 @@ export function PasskeysCard() {
     <SettingsSection title={t("passkeys.title")} description={t("passkeys.description")}>
       {isLoading ? (
         <TypographyMuted>{t("passkeys.loading")}</TypographyMuted>
-      ) : isError ? (
-        <TypographyMuted>{t("passkeys.loadFailed")}</TypographyMuted>
+      ) : isLoadingError ? (
+        <LoadErrorAlert message={t("passkeys.loadFailed")} />
       ) : data && data.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {data.map((passkey) => (

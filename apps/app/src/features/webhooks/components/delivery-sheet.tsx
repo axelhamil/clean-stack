@@ -1,4 +1,3 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { CodeBlock } from "@packages/ui/components/ui/code-block";
@@ -7,6 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@packages/ui/components/ui/collapsible";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { Panel } from "@packages/ui/components/ui/panel";
 import {
   Sheet,
@@ -131,12 +131,8 @@ export function DeliverySheet({
                   {t("webhooks.deliverySheet.loadingAttempts")}
                 </TypographyMuted>
               )}
-              {detail.isError && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    {t("errors:fallback.loadWebhookDeliveryDetail")}
-                  </AlertDescription>
-                </Alert>
+              {detail.isLoadingError && (
+                <LoadErrorAlert message={t("errors:fallback.loadWebhookDeliveryDetail")} />
               )}
               {detail.data && (
                 <>

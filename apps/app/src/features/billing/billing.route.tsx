@@ -1,8 +1,9 @@
 import { Button } from "@packages/ui/components/ui/button";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Progress } from "@packages/ui/components/ui/progress";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
-import { TypographyH1, TypographyP } from "@packages/ui/components/ui/typography";
+import { TypographyP } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -34,18 +35,20 @@ function BillingPage() {
 
   return (
     <main className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <TypographyH1 variant="page">{t("billing.pageTitle")}</TypographyH1>
-        {isPaid && (
-          <Button
-            onClick={() => portal.mutate()}
-            disabled={portal.isPending || guard.blocked}
-            {...guard.describeProps(portal.isPending)}
-          >
-            {t("billing.manageBilling")}
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title={t("billing.pageTitle")}
+        actions={
+          isPaid && (
+            <Button
+              onClick={() => portal.mutate()}
+              disabled={portal.isPending || guard.blocked}
+              {...guard.describeProps(portal.isPending)}
+            >
+              {t("billing.manageBilling")}
+            </Button>
+          )
+        }
+      />
       <ImpersonationReason guard={guard} />
       <SettingsSection
         title={t("billing.currentPlanTitle", { tier: t(TIER_KEYS[ent.tier]) })}
@@ -54,7 +57,7 @@ function BillingPage() {
         {ent.maxMembers === null ? (
           <TypographyP>{t("billing.unlimitedMembers")}</TypographyP>
         ) : (
-          <div className="flex flex-col gap-2 md:max-w-md">
+          <div className="flex flex-col gap-2">
             <TypographyP>
               {t("billing.membersUsage", { count: memberCount, max: ent.maxMembers })}
             </TypographyP>

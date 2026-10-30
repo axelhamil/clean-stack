@@ -1,5 +1,6 @@
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -23,7 +24,7 @@ function NotificationsPage() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
-  const { data, isPending, isError } = useQuery(notificationPreferencesQueryOptions);
+  const { data, isPending, isLoadingError } = useQuery(notificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
@@ -43,8 +44,8 @@ function NotificationsPage() {
         title={t("notifications.preferencesTitle")}
         description={t("notifications.preferencesDescription")}
       >
-        {isError ? (
-          <TypographyMuted>{t("notifications.loadFailed")}</TypographyMuted>
+        {isLoadingError ? (
+          <LoadErrorAlert message={t("notifications.loadFailed")} />
         ) : (
           <PreferenceMatrix
             rows={rows}

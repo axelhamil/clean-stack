@@ -1,9 +1,9 @@
 import { toLocale } from "@packages/i18n";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import {
-  TypographyH1,
   TypographyH2,
   TypographyH3,
   TypographyList,
@@ -24,10 +24,10 @@ function DataRightsPage() {
   const locale = toLocale(i18n.language);
   return (
     <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1 variant="page">{t("legal.dataRights.title")}</TypographyH1>
-        <TypographyMuted>{t("legal.dataRights.subtitle")}</TypographyMuted>
-      </header>
+      <PageHeader
+        title={t("legal.dataRights.title")}
+        description={t("legal.dataRights.subtitle")}
+      />
 
       <Separator />
 

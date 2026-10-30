@@ -1,5 +1,6 @@
 import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -21,13 +22,34 @@ function AcceptInvitationPage() {
   const { t: tAuth } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
   const { invitationId } = Route.useParams();
-  const { data: session, isPending } = useQuery(sessionQueryOptions);
+  const { data: session, isPending, isError, isFetching, refetch } = useQuery(sessionQueryOptions);
   const mutation = useAcceptInvitation();
 
   if (isPending) {
     return (
       <main className={pageClassName}>
         <TypographyH1 variant="page">{t("invitation.joinTitle")}</TypographyH1>
+      </main>
+    );
+  }
+
+  if (isError && !session) {
+    return (
+      <main className={pageClassName}>
+        <TypographyH1 variant="page">{t("invitation.joinTitle")}</TypographyH1>
+        <LoadErrorAlert
+          message={tErrors("fallback.loadSession")}
+          retry={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isFetching}
+              onClick={() => void refetch()}
+            >
+              {t("actions.retry")}
+            </Button>
+          }
+        />
       </main>
     );
   }

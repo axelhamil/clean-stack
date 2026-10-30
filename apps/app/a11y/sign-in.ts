@@ -5,9 +5,9 @@ export const SEED_EMAIL = process.env.SEED_EMAIL ?? "dev@example.com";
 export const SEED_PASSWORD = process.env.SEED_PASSWORD ?? "Nimbus-Harbor-42-Quartz";
 
 /**
- * `/sign-in` renders two forms whose email field carries the same label: the
- * credentials form and the magic-link one. Scoping by the submit button is what
- * keeps the locators unambiguous.
+ * `/sign-in` can mount several forms whose email field carries the same label:
+ * the credentials form and whichever alternative (magic link, SSO) is open.
+ * Scoping by the submit button is what keeps the locators unambiguous.
  */
 export function signInForm(page: Page): Locator {
   return page

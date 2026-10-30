@@ -16,7 +16,7 @@ export default {
   },
   errorBoundary: {
     title: "Une erreur est survenue",
-    body: "Nous avons été alertés et nous examinons le problème. Essayez de recharger la page.",
+    body: "Cette page n'a pas pu se charger. Essayez de la recharger.",
   },
   nav: {
     dashboard: "Tableau de bord",

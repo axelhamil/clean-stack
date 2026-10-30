@@ -1,6 +1,6 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -53,10 +53,8 @@ export function DomainVerificationCard() {
       ) : (
         <>
           <Badge variant="secondary">{t("settings:sso.domainCard.unverifiedBadge")}</Badge>
-          {token.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>{t("errors:fallback.loadSsoVerificationToken")}</AlertDescription>
-            </Alert>
+          {token.isLoadingError && (
+            <LoadErrorAlert message={t("errors:fallback.loadSsoVerificationToken")} />
           )}
           {token.data && (
             <div className="flex flex-col gap-3">

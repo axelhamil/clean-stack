@@ -207,6 +207,7 @@ export default {
   organization: {
     membersLoading: "Loading…",
     membersLoadFailed: "Could not load members. Reload the page to retry.",
+    invitationsLoadFailed: "Could not load pending invitations. Reload the page to retry.",
     noActiveOrg: "No active organization.",
     title: "Organization settings",
     detailsTitle: "Details",

@@ -1,3 +1,4 @@
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +26,8 @@ function OrganizationPage() {
   const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
   const membersQuery = useQuery(orgMembersQueryOptions(org?.id ?? null));
   const members = membersQuery.data ?? [];
-  const { data: invitations = [] } = useQuery(orgInvitationsQueryOptions(org?.id ?? null));
+  const invitationsQuery = useQuery(orgInvitationsQueryOptions(org?.id ?? null));
+  const invitations = invitationsQuery.data ?? [];
 
   if (!org) {
     return (
@@ -62,12 +64,14 @@ function OrganizationPage() {
 
       <SettingsSection
         title={t("organization.membersTitle")}
-        description={t("organization.membersCount", { count: members.length })}
+        description={
+          membersQuery.data ? t("organization.membersCount", { count: members.length }) : undefined
+        }
       >
         {membersQuery.isPending ? (
           <TypographyMuted>{t("organization.membersLoading")}</TypographyMuted>
-        ) : membersQuery.isError ? (
-          <TypographyMuted>{t("organization.membersLoadFailed")}</TypographyMuted>
+        ) : membersQuery.isLoadingError ? (
+          <LoadErrorAlert message={t("organization.membersLoadFailed")} />
         ) : (
           <ul className="flex flex-col gap-2">
             {members.map((m) => (
@@ -81,6 +85,12 @@ function OrganizationPage() {
           </ul>
         )}
       </SettingsSection>
+
+      {invitationsQuery.isLoadingError && (
+        <SettingsSection title={t("organization.pendingInvitationsTitle")}>
+          <LoadErrorAlert message={t("organization.invitationsLoadFailed")} />
+        </SettingsSection>
+      )}
 
       {pendingInvitations.length > 0 && (
         <SettingsSection

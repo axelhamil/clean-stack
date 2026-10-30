@@ -6,7 +6,7 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
-  "theme_color": "#0d1013",
+  "theme_color": "#fbfcfd",
   "background_color": "#fbfcfd",
   "icons": []
 }

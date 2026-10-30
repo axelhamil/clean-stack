@@ -1,4 +1,3 @@
-import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Card,
@@ -7,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { Skeleton, SkeletonGroup } from "@packages/ui/components/ui/skeleton";
 import {
   TypographyLarge,
@@ -22,14 +22,15 @@ import { plansQueryOptions } from "../api/queries/billing-plans";
 import type { PlanCatalogItem } from "../api/queries/billing-types";
 
 export interface PricingCtaArgs {
-  isAuthenticated: boolean;
+  isAuthenticated: boolean | null;
   tier: string;
   currentTier: string | null;
 }
 
 export function resolvePricingCta({ isAuthenticated, tier, currentTier }: PricingCtaArgs): {
-  kind: "login" | "upgrade" | "current";
+  kind: "unavailable" | "login" | "upgrade" | "current";
 } {
+  if (isAuthenticated === null) return { kind: "unavailable" };
   if (!isAuthenticated) return { kind: "login" };
   if (currentTier === tier) return { kind: "current" };
   return { kind: "upgrade" };
@@ -87,25 +88,21 @@ function formatPlanPrice(t: TFunction<"common">, locale: string, plan: PlanCatal
 }
 
 interface PricingTableProps {
-  isAuthenticated: boolean;
+  isAuthenticated: boolean | null;
   currentTier: string | null;
   activeOrgId: string | null;
 }
 
 export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: PricingTableProps) {
   const { t, i18n } = useTranslation("common");
-  const { data: plans = [], isPending, isError } = useQuery(plansQueryOptions);
+  const { data: plans = [], isPending, isLoadingError } = useQuery(plansQueryOptions);
   const navigate = useNavigate();
   const upgrade = useMutation(upgradeSubscriptionMutationOptions);
 
   if (isPending) return <PricingTableSkeleton label={t("pricing.loading")} />;
 
-  if (isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{t("pricing.loadFailed")}</AlertDescription>
-      </Alert>
-    );
+  if (isLoadingError) {
+    return <LoadErrorAlert message={t("pricing.loadFailed")} />;
   }
 
   if (plans.length === 0) return <TypographyMuted>{t("pricing.empty")}</TypographyMuted>;
@@ -134,7 +131,11 @@ export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: Pric
               </TypographyList>
             </CardContent>
             <CardFooter>
-              {cta.kind === "current" ? (
+              {cta.kind === "unavailable" ? (
+                <Button disabled variant={ctaVariant} className="w-full">
+                  {t("pricing.getStarted")}
+                </Button>
+              ) : cta.kind === "current" ? (
                 <Button disabled variant="secondary" className="w-full">
                   {t("pricing.currentPlanCta")}
                 </Button>

@@ -9,6 +9,7 @@ import {
 } from "@packages/ui/components/ui/alert-dialog";
 import { Button } from "@packages/ui/components/ui/button";
 import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
@@ -108,14 +109,7 @@ function DeletionPreflight({ twoFactorEnabled }: DeletionPreflightProps) {
 
   if (preflight.isPending) return <TypographyMuted>{t("deletion.checking")}</TypographyMuted>;
 
-  if (preflight.isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTriangleIcon />
-        <AlertDescription>{t("deletion.checkFailed")}</AlertDescription>
-      </Alert>
-    );
-  }
+  if (preflight.isLoadingError) return <LoadErrorAlert message={t("deletion.checkFailed")} />;
 
   const { blockingOrgs } = preflight.data;
   if (blockingOrgs.length > 0) return <BlockingOrgsList orgs={blockingOrgs} />;

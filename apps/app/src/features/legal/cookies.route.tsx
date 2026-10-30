@@ -1,6 +1,7 @@
 import { CONSENT_CATEGORIES } from "@packages/cookie-consent";
 import { toLocale } from "@packages/i18n";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
@@ -12,10 +13,8 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import {
-  TypographyH1,
   TypographyH2,
   TypographyInlineCode,
-  TypographyMuted,
   TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -70,10 +69,7 @@ function CookiesPage() {
   const locale = toLocale(i18n.language);
   return (
     <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1 variant="page">{t("legal.cookies.title")}</TypographyH1>
-        <TypographyMuted>{t("legal.cookies.subtitle")}</TypographyMuted>
-      </header>
+      <PageHeader title={t("legal.cookies.title")} description={t("legal.cookies.subtitle")} />
 
       <Separator />
 

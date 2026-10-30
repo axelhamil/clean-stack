@@ -1,5 +1,6 @@
 import { toLocale } from "@packages/i18n";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
@@ -11,12 +12,7 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TextLink } from "@packages/ui/components/ui/text-link";
-import {
-  TypographyH1,
-  TypographyH2,
-  TypographyMuted,
-  TypographyP,
-} from "@packages/ui/components/ui/typography";
+import { TypographyH2, TypographyP } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -87,10 +83,10 @@ function SubProcessorsPage() {
 
   return (
     <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1 variant="page">{t("legal.subProcessors.title")}</TypographyH1>
-        <TypographyMuted>{t("legal.subProcessors.subtitle")}</TypographyMuted>
-      </header>
+      <PageHeader
+        title={t("legal.subProcessors.title")}
+        description={t("legal.subProcessors.subtitle")}
+      />
 
       <Separator />
 
