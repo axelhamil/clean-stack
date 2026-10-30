@@ -10,7 +10,7 @@
     "check": "biome check .",
     "fix": "biome check --write .",
     "ui:add": "pnpm dlx shadcn@latest add",
-    "ui:fix-imports": "sed -i 's|from \"/src/libs/utils\"|from \"../../libs/utils\"|g; s|from \"/src/hooks/\\([^\"]*\\)\"|from \"../../hooks/\\1\"|g; s|from \"/src/components/ui/\\([^\"]*\\)\"|from \"./\\1\"|g; s|from \"/src/components/lib/utils\"|from \"../../libs/utils\"|g' src/components/ui/*.tsx"
+    "ui:fix-imports": "sed -i 's|from \"cn\"|from \"../../libs/utils\"|g; s|from \"/src/libs/utils\"|from \"../../libs/utils\"|g; s|from \"/src/hooks/\\([^\"]*\\)\"|from \"../../hooks/\\1\"|g; s|from \"/src/components/ui/\\([^\"]*\\)\"|from \"./\\1\"|g; s|from \"/src/components/lib/utils\"|from \"../../libs/utils\"|g' src/components/ui/*.tsx"
   },
   "exports": {
     "./globals.css": "./src/styles/globals.css",

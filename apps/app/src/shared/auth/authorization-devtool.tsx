@@ -40,7 +40,7 @@ export function AuthorizationDevTool() {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
       {open && (
-        <Card className="w-96 max-h-[70vh] overflow-y-auto shadow-lg">
+        <Card className="w-96 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
               <ShieldCheck className="size-4" />
@@ -88,7 +88,6 @@ export function AuthorizationDevTool() {
       <Button
         variant="outline"
         size="icon"
-        className="rounded-full shadow"
         onClick={() => setOpen((v) => !v)}
         aria-label="Toggle authorization devtool"
       >

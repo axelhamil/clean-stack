@@ -14,13 +14,13 @@ export function LogoMark({ className }: LogoMarkProps) {
       xmlns="http://www.w3.org/2000/svg"
       role="img"
       aria-label={t("shell.logoAlt")}
-      className={cn("size-6 text-foreground", className)}
+      className={cn("size-6", className)}
     >
-      <rect x="4" y="8" width="20" height="20" rx="5" fill="currentColor" fillOpacity="0.18" />
-      <rect x="8" y="4" width="20" height="20" rx="5" fill="currentColor" />
+      <rect x="4" y="8" width="20" height="20" rx="5" className="fill-input" />
+      <rect x="8" y="4" width="20" height="20" rx="5" className="fill-foreground" />
       <path
         d="M14 10.5h8M14 14h5"
-        stroke="var(--background)"
+        className="stroke-background"
         strokeWidth="1.75"
         strokeLinecap="round"
       />

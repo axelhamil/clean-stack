@@ -13,16 +13,13 @@ function BottomBanner({ className, children, ...props }: React.ComponentProps<"d
   return (
     <div
       data-slot="bottom-banner"
-      className={cn(
-        "fixed right-0 bottom-0 left-0 z-50 border-t bg-background shadow-lg",
-        className,
-      )}
+      className={cn("fixed right-0 bottom-0 left-0 z-50 border-t bg-background", className)}
       {...props}
     >
       <div
         className={cn(
           pageContainerVariants(),
-          "flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between md:py-6",
+          "flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between",
         )}
       >
         {children}

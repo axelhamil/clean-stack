@@ -100,7 +100,7 @@ export default {
     signOutFailed: "Sign-out failed",
   },
   impersonation: {
-    activeSession: "Active impersonation session: acting as <name></name>. {{remaining}}",
+    activeSession: "Active impersonation session: acting as <name>{{name}}</name>. {{remaining}}",
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",

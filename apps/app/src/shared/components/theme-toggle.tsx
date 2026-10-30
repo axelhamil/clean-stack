@@ -1,5 +1,4 @@
 import { Button } from "@packages/ui/components/ui/button";
-import { cn } from "@packages/ui/libs/utils.js";
 import { Moon, Sun } from "lucide-react";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -63,7 +62,6 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       );
       await transition.finished;
     } catch (err) {
-      // AbortError fires when a transition is interrupted by another click.
       if (!(err instanceof DOMException && err.name === "AbortError")) throw err;
     } finally {
       root.classList.remove("theme-transitioning");
@@ -73,14 +71,14 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   return (
     <Button
       ref={buttonRef}
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={handleClick}
       aria-label={isDark ? t("theme.switchToLight") : t("theme.switchToDark")}
-      className={cn("tap-scale", className)}
+      className={className}
     >
-      <Sun className="size-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
-      <Moon className="absolute size-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
+      <Sun className="dark:hidden" />
+      <Moon className="hidden dark:block" />
     </Button>
   );
 }

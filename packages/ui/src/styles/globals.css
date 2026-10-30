@@ -275,17 +275,12 @@ html.theme-transitioning::view-transition-new(root) {
   }
 }
 
-.tap-scale {
-  transition: transform 150ms var(--ease-out-soft);
-}
+@utility scrollbar-none {
+  scrollbar-width: none;
 
-.tap-scale:active {
-  transform: scale(0.97);
-}
-
-@utility glass-header {
-  background-color: color-mix(in oklab, var(--background) 80%, transparent);
-  backdrop-filter: blur(8px);
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 html.theme-switching,

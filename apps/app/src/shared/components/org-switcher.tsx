@@ -45,12 +45,12 @@ export function OrgSwitcher() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-9 gap-2 px-2">
+        <Button variant="ghost" size="sm" className="h-9 min-w-0 shrink gap-2 px-2">
           <InitialsAvatar initials={activeOrg ? initialsOf(activeOrg.name) : "?"} />
-          <TypographySmall className="max-w-32 truncate">
+          <TypographySmall className="min-w-0 max-w-32 truncate">
             {activeOrg?.name ?? t("orgSwitcher.selectPlaceholder")}
           </TypographySmall>
-          <ChevronsUpDown className="size-3.5 opacity-60" />
+          <ChevronsUpDown className="size-3.5 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
@@ -68,7 +68,7 @@ export function OrgSwitcher() {
                 >
                   <InitialsAvatar size="xs" initials={initialsOf(org.name)} />
                   <span className="flex-1 truncate">{org.name}</span>
-                  {org.id === activeOrg?.id && <Check className="size-4 opacity-60" />}
+                  {org.id === activeOrg?.id && <Check className="size-4 text-muted-foreground" />}
                 </CommandItem>
               ))}
             </CommandGroup>

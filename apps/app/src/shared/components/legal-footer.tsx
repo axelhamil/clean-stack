@@ -11,10 +11,7 @@ export function LegalFooter() {
     <footer className="border-t">
       <nav
         aria-label={t("legalFooter.ariaLabel")}
-        className={cn(
-          pageContainerVariants({ width: "wide" }),
-          "flex flex-wrap items-center justify-center gap-x-8 gap-y-1 py-3",
-        )}
+        className={cn(pageContainerVariants(), "flex flex-wrap items-center gap-x-6 gap-y-1 py-3")}
       >
         {LEGAL_ROUTES.map((route) => (
           <NavLink key={route.to} size="sm" variant="plain" asChild>

@@ -46,13 +46,13 @@ export function ImpersonationBanner() {
   return (
     <Alert variant="banner">
       <ShieldAlert />
-      <AlertDescription className="flex items-center justify-between gap-4">
-        <span>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <span className="min-w-0 break-words">
           <Trans
             ns="common"
             i18nKey="impersonation.activeSession"
-            values={{ remaining }}
-            components={{ name: <strong>{name}</strong> }}
+            values={{ name, remaining }}
+            components={{ name: <strong /> }}
           />
         </span>
         <Button

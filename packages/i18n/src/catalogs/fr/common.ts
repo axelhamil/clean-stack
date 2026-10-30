@@ -101,7 +101,7 @@ export default {
   },
   impersonation: {
     activeSession:
-      "Session d'emprunt d'identité active : agit en tant que <name></name>. {{remaining}}",
+      "Session d'emprunt d'identité active : agit en tant que <name>{{name}}</name>. {{remaining}}",
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
