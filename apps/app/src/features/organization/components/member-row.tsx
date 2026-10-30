@@ -10,10 +10,10 @@ import {
   SelectValue,
 } from "@packages/ui/components/ui/select";
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { removeMemberMutationOptions } from "../../../shared/api/mutations/remove-member";
 import { updateMemberRoleMutationOptions } from "../../../shared/api/mutations/update-member-role";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";

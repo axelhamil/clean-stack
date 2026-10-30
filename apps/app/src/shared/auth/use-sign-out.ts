@@ -1,7 +1,7 @@
+import { toastError, toastSuccess } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { toastError, toastSuccess } from "../api/errors/toast";
 import { sessionQueryOptions } from "../api/queries/session";
 import { broadcastAuthChange } from "./auth-broadcast";
 import { authClient } from "./auth-client";

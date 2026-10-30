@@ -8,7 +8,7 @@ vi.mock("../../api-client", () => ({
   },
 }));
 
-import { isUnexpectedMutationError } from "../../../observability/error-classifier";
+import { isUnexpectedMutationError } from "@packages/web-kit/observability/error-classifier";
 import { createUpload } from "../create-upload";
 
 describe("createUpload", () => {

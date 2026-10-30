@@ -1,5 +1,5 @@
+import { enLabel } from "@packages/web-kit/i18n/__tests__/catalog-t";
 import { describe, expect, it } from "vitest";
-import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import {
   DELIVERY_STATUS_BADGE_VARIANTS,
   DELIVERY_STATUS_KEYS,

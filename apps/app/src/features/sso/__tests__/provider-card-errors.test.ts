@@ -1,6 +1,6 @@
 import { createI18n, loadCatalog } from "@packages/i18n";
+import { formatApiError } from "@packages/web-kit/api/errors/messages";
 import { describe, expect, it } from "vitest";
-import { formatApiError } from "../../../shared/api/errors/messages";
 
 async function frenchErrorsT() {
   const resources = await loadCatalog("fr");

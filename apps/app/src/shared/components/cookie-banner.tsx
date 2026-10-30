@@ -9,14 +9,14 @@ import {
 } from "@packages/ui/components/ui/dialog";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../api/errors/toast";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { consentQueryOptions } from "../api/queries/consent";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
-import { errorFallback } from "../i18n/get-errors-t";
 import { ConsentSettings } from "./consent-settings";
 
 export function CookieBanner() {

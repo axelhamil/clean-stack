@@ -1,0 +1,37 @@
+{
+  "name": "@packages/web-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest watch"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.105.0",
+    "i18next": "^26.5.11",
+    "react": "^19",
+    "sonner": "^2.0.8",
+    "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "@packages/i18n": "workspace:*"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@tanstack/react-query": "^5.105.0",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "i18next": "^26.5.11",
+    "react": "^19.3.1",
+    "sonner": "^2.0.8",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
+  }
+}

@@ -13,12 +13,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components
 import { Tooltip, TooltipContent, TooltipTrigger } from "@packages/ui/components/ui/tooltip";
 import { useTruncationTooltip } from "@packages/ui/components/ui/truncated-text";
 import { TypographySmall } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { useSetActiveOrg } from "../auth/use-set-active-org";

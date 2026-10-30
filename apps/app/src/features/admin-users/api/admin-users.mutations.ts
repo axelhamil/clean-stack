@@ -1,7 +1,7 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferRequestType, InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError } from "../../../shared/api/errors/api-error";
 
 const $ban = api.admin.users[":id"].ban.$post;
 const $unban = api.admin.users[":id"].unban.$post;

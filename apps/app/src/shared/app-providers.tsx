@@ -1,5 +1,7 @@
 import { Toaster } from "@packages/ui/components/ui/sonner";
 import { TooltipProvider } from "@packages/ui/components/ui/tooltip";
+import { applyZodErrorMap } from "@packages/web-kit/i18n/zod-error-map";
+import { useTheme } from "@packages/web-kit/theme/use-theme";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "@tanstack/react-router";
@@ -18,10 +20,8 @@ import { AnalyticsScripts } from "./components/analytics-scripts";
 import { AppErrorFallback } from "./components/app-error-fallback";
 import { CookieBanner } from "./components/cookie-banner";
 import { LocaleSync } from "./i18n/locale-sync";
-import { applyZodErrorMap } from "./i18n/zod-error-map";
 import { ErrorBoundary } from "./observability/sentry";
 import { watchSession } from "./observability/session-watcher";
-import { useTheme } from "./theme/use-theme";
 
 const TOOLTIP_OPEN_DELAY_MS = 300;
 

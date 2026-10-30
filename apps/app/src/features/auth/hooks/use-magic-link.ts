@@ -1,9 +1,9 @@
+import { SSO_REDIRECT_IN_PROGRESS } from "@packages/web-kit/observability/error-classifier";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { MagicLinkInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
-import { SSO_REDIRECT_IN_PROGRESS } from "../../../shared/observability/error-classifier";
 import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
 
 export function useMagicLink(redirectTo?: string) {

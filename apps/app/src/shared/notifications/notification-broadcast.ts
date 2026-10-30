@@ -1,3 +1,4 @@
+import { createBroadcastChannel } from "@packages/web-kit/broadcast-channel";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import {
   type Notification,
@@ -6,7 +7,6 @@ import {
   type UnreadCountResponse,
   unreadCountQueryOptions,
 } from "../api/queries/notifications";
-import { createBroadcastChannel } from "../broadcast-channel";
 
 export type NotificationReadMessage = { ids: string[] } | { all: true };
 

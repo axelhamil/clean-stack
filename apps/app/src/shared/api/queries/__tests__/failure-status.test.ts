@@ -15,7 +15,7 @@ vi.mock("../../../auth/auth-client", () => ({
   },
 }));
 
-import { isUnexpectedError } from "../../../observability/error-classifier";
+import { isUnexpectedError } from "@packages/web-kit/observability/error-classifier";
 import { preflightDeletionQueryOptions } from "../account-deletion";
 import { passkeysQueryOptions } from "../passkeys";
 import { sessionsQueryOptions } from "../sessions";

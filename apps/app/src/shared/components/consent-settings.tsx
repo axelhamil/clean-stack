@@ -4,18 +4,18 @@ import { Hint } from "@packages/ui/components/ui/hint";
 import { Label } from "@packages/ui/components/ui/label";
 import { Switch } from "@packages/ui/components/ui/switch";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../api/errors/toast";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { withdrawConsentMutationOptions } from "../api/mutations/withdraw-consent";
 import { consentQueryOptions } from "../api/queries/consent";
 import { GuardHint } from "../auth/guard-hint";
 import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
-import { errorFallback } from "../i18n/get-errors-t";
 
 type OptionalKey = (typeof OPTIONAL_CATEGORIES)[number];
 

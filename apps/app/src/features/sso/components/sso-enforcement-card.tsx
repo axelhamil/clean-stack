@@ -1,17 +1,17 @@
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { Switch } from "@packages/ui/components/ui/switch";
 import { TypographyInline, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
 import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { QueryLoadError } from "../../../shared/components/query-load-error";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
 

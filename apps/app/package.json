@@ -23,6 +23,7 @@
     "@packages/policies": "workspace:*",
     "@packages/sentry-scrub": "workspace:*",
     "@packages/ui": "workspace:*",
+    "@packages/web-kit": "workspace:*",
     "@sentry/react": "^11.9.0",
     "@tanstack/react-query": "^5.105.0",
     "@tanstack/react-router": "^1.170.46",

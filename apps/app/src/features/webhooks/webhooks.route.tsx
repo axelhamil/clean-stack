@@ -17,12 +17,13 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../shared/api/errors/toast";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { GuardHint } from "../../shared/auth/guard-hint";
@@ -31,7 +32,6 @@ import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useAuthorization } from "../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
-import { errorFallback } from "../../shared/i18n/get-errors-t";
 import {
   createEndpointMutationOptions,
   deleteEndpointMutationOptions,

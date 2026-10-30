@@ -1,12 +1,12 @@
+import {
+  PASSKEY_CANCELLED,
+  SSO_REDIRECT_IN_PROGRESS,
+} from "@packages/web-kit/observability/error-classifier";
 import { useMutation } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { authClient } from "../../../shared/auth/auth-client";
-import {
-  PASSKEY_CANCELLED,
-  SSO_REDIRECT_IN_PROGRESS,
-} from "../../../shared/observability/error-classifier";
 import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
 import { useCompleteSignIn } from "./use-complete-sign-in";
 
