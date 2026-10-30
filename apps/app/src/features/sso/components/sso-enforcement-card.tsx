@@ -10,6 +10,7 @@ import { Can } from "../../../shared/auth/can";
 import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { setSsoEnforcementMutationOptions } from "../api/sso.mutations";
 import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
@@ -25,7 +26,8 @@ export function SsoEnforcementCard() {
   const qc = useQueryClient();
   const { t } = useTranslation("settings");
   const guard = useImpersonationGuard();
-  const { data: org } = useQuery(activeOrgQueryOptions);
+  const orgQuery = useQuery(activeOrgQueryOptions);
+  const org = orgQuery.data;
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
   const hasVerifiedProvider = provider?.domainVerified === true;
@@ -50,26 +52,36 @@ export function SsoEnforcementCard() {
         title={t("sso.enforcementCard.title")}
         description={t("sso.enforcementCard.description")}
       >
-        <div className="flex items-center gap-3">
-          <GuardHint guard={guard} otherwiseDisabled={otherwiseFrozen}>
-            <Switch
-              aria-label={t("sso.enforcementCard.switchAriaLabel")}
-              checked={enforced}
-              disabled={otherwiseFrozen || guard.blocked}
-              {...guard.describeProps(otherwiseFrozen)}
-              onCheckedChange={(next) => setEnforcement.mutate(next)}
-            />
-          </GuardHint>
-          <TypographyInline size="sm">
-            {enforced
-              ? t("sso.enforcementCard.enforcedLabel")
-              : t("sso.enforcementCard.notEnforcedLabel")}
-          </TypographyInline>
-        </div>
-        {!enforced && !hasVerifiedProvider && (
-          <TypographyMuted>{t("sso.enforcementCard.verifyDomainFirst")}</TypographyMuted>
+        {orgQuery.isLoadingError ? (
+          <QueryLoadError
+            message={t("sso.enforcementCard.loadFailed")}
+            isFetching={orgQuery.isFetching}
+            onRetry={() => void orgQuery.refetch()}
+          />
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <GuardHint guard={guard} otherwiseDisabled={otherwiseFrozen}>
+                <Switch
+                  aria-label={t("sso.enforcementCard.switchAriaLabel")}
+                  checked={enforced}
+                  disabled={otherwiseFrozen || guard.blocked}
+                  {...guard.describeProps(otherwiseFrozen)}
+                  onCheckedChange={(next) => setEnforcement.mutate(next)}
+                />
+              </GuardHint>
+              <TypographyInline size="sm">
+                {enforced
+                  ? t("sso.enforcementCard.enforcedLabel")
+                  : t("sso.enforcementCard.notEnforcedLabel")}
+              </TypographyInline>
+            </div>
+            {!enforced && !hasVerifiedProvider && (
+              <TypographyMuted>{t("sso.enforcementCard.verifyDomainFirst")}</TypographyMuted>
+            )}
+            <ImpersonationReason guard={guard} />
+          </>
         )}
-        <ImpersonationReason guard={guard} />
       </SettingsSection>
     </Can>
   );

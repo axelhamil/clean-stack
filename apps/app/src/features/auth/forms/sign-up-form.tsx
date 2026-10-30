@@ -10,10 +10,14 @@ import { PolicyLink } from "../../../shared/components/policy-link";
 import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { useSignUp } from "../hooks/use-sign-up";
 
-export function SignUpForm() {
+interface SignUpFormProps {
+  redirectTo?: string;
+}
+
+export function SignUpForm({ redirectTo }: SignUpFormProps) {
   const { t } = useTranslation("auth");
   const revealLabels = usePasswordRevealLabels();
-  const mutation = useSignUp();
+  const mutation = useSignUp(redirectTo);
 
   const form = useForm<SignUpInput>({
     resolver: zodResolver(signUpSchema),

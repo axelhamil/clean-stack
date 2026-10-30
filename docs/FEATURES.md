@@ -80,7 +80,7 @@ Org-scoped from the very first migration.
 - **Capability-based authorization** (`@packages/access-control`: single SSOT). Three layers, same predicate: server `requireOrgPermission` middleware · route gate `ensureOrgPermission` in `beforeLoad` · UI `<Can requires={…}>` + `useAuthorization().can()`.
 - **Dev-only `<AuthorizationDevTool>`**: live role-by-capability matrix, tree-shaken in prod.
 
-Pages: `/organization/new`, `/settings/general`, `/settings/team`, `/dashboard`, `/invitations`.
+Pages: `/org/new`, `/settings/organization`, `/dashboard`, `/accept-invitation/$invitationId`.
 
 ---
 
@@ -117,7 +117,7 @@ Module: `apps/api/src/modules/uploads/`.
 
 - **Export**: `POST /me/export`, auth-gated, sync (walks user tables, uploads JSON to R2, emails a signed 7-day URL). Rate-limited 1/24h.
 - **Delete**: `POST /me/delete`, 2FA-required + sole-owner preflight + **7-day soft-delete grace**. Cron `POST /internal/rgpd/process-pending-deletions` (HMAC-signed) wipes PII and anonymizes `member` rows. Preflight `GET /me/delete/preflight` lists blocking orgs; UI shows Transfer/Leave CTAs. No implicit auto-transfer.
-- **Cancel UX**: sign-in during grace window prompts cancel/continue. `deletedAt` + `pendingDeletionUntil` are the only soft-delete columns in the schema.
+- **Cancel UX**: during the grace window a banner on every shell page offers Cancel, next to the card in `/settings/account`. `deletedAt` + `pendingDeletionUntil` are the only soft-delete columns in the schema.
 - **Public `/legal/data-rights`**: what's deleted vs anonymized vs retained per legal basis.
 
 Frontend cards: `DataExportCard` (→ `/settings/privacy`), `RgpdDeletionCard` + preflight list (→ `/settings/account` danger zone). Source: `features/rgpd/`.

@@ -5,10 +5,11 @@ import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typ
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { policiesQueryOptions } from "../../../shared/api/queries/policies";
+import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { policyLabelFor } from "../../../shared/legal/policy-labels";
 
 export function PolicyAcceptanceCard() {
-  const { data, isLoading } = useQuery(policiesQueryOptions);
+  const { data, isLoading, isFetching, refetch } = useQuery(policiesQueryOptions);
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
 
@@ -44,7 +45,11 @@ export function PolicyAcceptanceCard() {
           ))}
         </ul>
       ) : (
-        <TypographyMuted>{t("privacy.policyAcceptance.loadError")}</TypographyMuted>
+        <QueryLoadError
+          message={t("privacy.policyAcceptance.loadError")}
+          isFetching={isFetching}
+          onRetry={() => void refetch()}
+        />
       )}
     </SettingsSection>
   );

@@ -6,8 +6,9 @@ import type { SignUpInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
 import { SSO_REDIRECT_IN_PROGRESS } from "../../../shared/observability/error-classifier";
 import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
+import { rememberPostVerifyRedirect } from "../post-verify-redirect";
 
-export function useSignUp() {
+export function useSignUp(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export function useSignUp() {
       return data;
     },
     onSuccess: () => {
+      rememberPostVerifyRedirect(redirectTo);
       toast.success(t("signUp.successToast"));
       void navigate({ to: "/verify-email" });
     },

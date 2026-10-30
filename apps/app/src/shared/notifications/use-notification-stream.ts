@@ -2,6 +2,7 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "../api/api-client";
 import { notificationsListQueryKey, unreadCountQueryOptions } from "../api/queries/notifications";
+import { SUBSCRIPTION_QUERY_PREFIX } from "../api/queries/subscription";
 import { addBreadcrumb } from "../observability/sentry";
 
 const FRAME_SEPARATOR = /\r?\n\r?\n/;
@@ -35,6 +36,7 @@ export function handleStreamChunk(chunk: string, queryClient: QueryClient): stri
         queryKey: notificationsListQueryKey,
         refetchType: "none",
       });
+      void queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_PREFIX });
     }
   }
 

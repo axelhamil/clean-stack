@@ -11,25 +11,23 @@ import {
 import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Fragment, useEffect } from "react";
+import { Fragment, type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
 import { policiesQueryOptions } from "../../shared/api/queries/policies";
 import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
+import { redirectSearchSchema } from "../../shared/auth/safe-redirect";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
+import { useSignOut } from "../../shared/auth/use-sign-out";
 import { PolicyLink } from "../../shared/components/policy-link";
+import { QueryLoadError } from "../../shared/components/query-load-error";
 import { ThemeToggle } from "../../shared/components/theme-toggle";
 import { isPolicyType, POLICY_TITLE_KEYS } from "../../shared/legal/policy-labels";
 import { useAcceptPolicies } from "./hooks/use-accept-policies";
 import { getChangesSince, POLICY_DOCS } from "./policies.config";
 
-const searchSchema = z.object({
-  redirect: z.string().optional(),
-});
-
 export const Route = createFileRoute("/_protected/legal/accept")({
-  validateSearch: searchSchema,
+  validateSearch: redirectSearchSchema,
   component: AcceptPoliciesPage,
 });
 
@@ -38,7 +36,7 @@ function AcceptPoliciesPage() {
   const { redirect } = Route.useSearch();
   const navigate = useNavigate();
   const guard = useImpersonationGuard();
-  const { data: policies } = useQuery(policiesQueryOptions);
+  const { data: policies, isLoadingError, isFetching, refetch } = useQuery(policiesQueryOptions);
 
   const staleTypes = policies
     ? Object.entries(policies)
@@ -57,8 +55,90 @@ function AcceptPoliciesPage() {
     }
   }, [policies, staleTypes.length, navigate, redirect]);
 
+  if (isLoadingError) {
+    return (
+      <AcceptPageLayout>
+        <TypographyH1 variant="page">{t("legal.accept.title")}</TypographyH1>
+        <QueryLoadError
+          message={t("legal.accept.loadFailed")}
+          isFetching={isFetching}
+          onRetry={() => void refetch()}
+        />
+        <DeclineButton />
+      </AcceptPageLayout>
+    );
+  }
+
   if (!policies || staleTypes.length === 0) return null;
 
+  return (
+    <AcceptPageLayout>
+      <div className="flex flex-col gap-2">
+        <TypographyH1 variant="page">
+          {isReacceptance ? t("legal.accept.titleReacceptance") : t("legal.accept.title")}
+        </TypographyH1>
+        <TypographyMuted>
+          {isReacceptance ? t("legal.accept.subtitleReacceptance") : t("legal.accept.subtitle")}
+        </TypographyMuted>
+      </div>
+
+      {staleTypes.map((type) => {
+        const doc = POLICY_DOCS[type];
+        const title = t(POLICY_TITLE_KEYS[type]);
+        const acceptedVersion = policies[type]?.acceptedVersion ?? null;
+        const changes = acceptedVersion ? getChangesSince(type, acceptedVersion) : [];
+
+        return (
+          <Fragment key={type}>
+            <Separator />
+            <section className="flex flex-col gap-2">
+              <TypographyH2 className="flex items-center gap-2">
+                {title}
+                {acceptedVersion ? (
+                  <Badge variant="secondary">{t("legal.accept.updatedBadge")}</Badge>
+                ) : null}
+              </TypographyH2>
+              <TypographyMuted>
+                {t("legal.policies.versionLine", {
+                  version: doc.version,
+                  date: doc.effectiveDate,
+                })}
+              </TypographyMuted>
+              {changes.map((entry) => (
+                <div key={entry.version} className="flex flex-col gap-1">
+                  <TypographySmall>{entry.version}</TypographySmall>
+                  <TypographyMuted>{entry.summary}</TypographyMuted>
+                </div>
+              ))}
+              <TypographyMuted>
+                <PolicyLink type={type}>{t("legal.accept.readFull", { title })}</PolicyLink>
+              </TypographyMuted>
+            </section>
+          </Fragment>
+        );
+      })}
+
+      <GuardHint guard={guard} otherwiseDisabled={mutation.isPending} className="w-full">
+        <Button
+          className="w-full"
+          onClick={() => mutation.mutate({})}
+          disabled={mutation.isPending || guard.blocked}
+          {...guard.describeProps(mutation.isPending)}
+        >
+          {mutation.isPending ? t("legal.accept.acceptingButton") : t("legal.accept.acceptButton")}
+        </Button>
+      </GuardHint>
+      <ImpersonationReason guard={guard} />
+      <DeclineButton />
+    </AcceptPageLayout>
+  );
+}
+
+interface AcceptPageLayoutProps {
+  children: ReactNode;
+}
+
+function AcceptPageLayout({ children }: AcceptPageLayoutProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex justify-end p-4">
@@ -71,65 +151,24 @@ function AcceptPoliciesPage() {
           "flex flex-1 flex-col justify-center gap-6 pb-8",
         )}
       >
-        <div className="flex flex-col gap-2">
-          <TypographyH1 variant="page">
-            {isReacceptance ? t("legal.accept.titleReacceptance") : t("legal.accept.title")}
-          </TypographyH1>
-          <TypographyMuted>
-            {isReacceptance ? t("legal.accept.subtitleReacceptance") : t("legal.accept.subtitle")}
-          </TypographyMuted>
-        </div>
-
-        {staleTypes.map((type) => {
-          const doc = POLICY_DOCS[type];
-          const title = t(POLICY_TITLE_KEYS[type]);
-          const acceptedVersion = policies[type]?.acceptedVersion ?? null;
-          const changes = acceptedVersion ? getChangesSince(type, acceptedVersion) : [];
-
-          return (
-            <Fragment key={type}>
-              <Separator />
-              <section className="flex flex-col gap-2">
-                <TypographyH2 className="flex items-center gap-2">
-                  {title}
-                  {acceptedVersion ? (
-                    <Badge variant="secondary">{t("legal.accept.updatedBadge")}</Badge>
-                  ) : null}
-                </TypographyH2>
-                <TypographyMuted>
-                  {t("legal.policies.versionLine", {
-                    version: doc.version,
-                    date: doc.effectiveDate,
-                  })}
-                </TypographyMuted>
-                {changes.map((entry) => (
-                  <div key={entry.version} className="flex flex-col gap-1">
-                    <TypographySmall>{entry.version}</TypographySmall>
-                    <TypographyMuted>{entry.summary}</TypographyMuted>
-                  </div>
-                ))}
-                <TypographyMuted>
-                  <PolicyLink type={type}>{t("legal.accept.readFull", { title })}</PolicyLink>
-                </TypographyMuted>
-              </section>
-            </Fragment>
-          );
-        })}
-
-        <GuardHint guard={guard} otherwiseDisabled={mutation.isPending} className="w-full">
-          <Button
-            className="w-full"
-            onClick={() => mutation.mutate({})}
-            disabled={mutation.isPending || guard.blocked}
-            {...guard.describeProps(mutation.isPending)}
-          >
-            {mutation.isPending
-              ? t("legal.accept.acceptingButton")
-              : t("legal.accept.acceptButton")}
-          </Button>
-        </GuardHint>
-        <ImpersonationReason guard={guard} />
+        {children}
       </main>
     </div>
+  );
+}
+
+function DeclineButton() {
+  const { t } = useTranslation("common");
+  const signOut = useSignOut();
+
+  return (
+    <Button
+      variant="ghost"
+      className="w-full"
+      disabled={signOut.isPending}
+      onClick={() => signOut.mutate()}
+    >
+      {t("legal.accept.declineButton")}
+    </Button>
   );
 }
