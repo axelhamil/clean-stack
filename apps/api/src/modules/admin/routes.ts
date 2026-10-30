@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
+import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
 import { zV } from "../../shared/validator";
 import { banUserBodySchema } from "./application/dto/ban-user.dto";
@@ -39,16 +39,22 @@ function serializeUser(u: AdminUserRow) {
 }
 
 export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
-  .get("/", requireAuth, requirePlatformAdmin, zV("query", listUsersQuerySchema), async (c) => {
-    const result = await di.AdminQueryService.listUsers(c.req.valid("query"));
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    const page = result.getValue();
-    return c.json({
-      items: page.items.map(serializeUser),
-      nextCursor: page.nextCursor.toNull(),
-    });
-  })
-  .get("/:id", requireAuth, requirePlatformAdmin, async (c) => {
+  .get(
+    "/",
+    requireAuth,
+    requireStaffPermission("users.read"),
+    zV("query", listUsersQuerySchema),
+    async (c) => {
+      const result = await di.AdminQueryService.listUsers(c.req.valid("query"));
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const page = result.getValue();
+      return c.json({
+        items: page.items.map(serializeUser),
+        nextCursor: page.nextCursor.toNull(),
+      });
+    },
+  )
+  .get("/:id", requireAuth, requireStaffPermission("users.read"), async (c) => {
     const u = await findUserOr404(c.req.param("id"));
     return c.json({
       ...serializeUser(u),
@@ -63,20 +69,26 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       memberships: u.memberships,
     });
   })
-  .post("/:id/ban", requireAuth, requirePlatformAdmin, zV("json", banUserBodySchema), async (c) => {
-    const actor = c.get("user");
-    const body = c.req.valid("json");
-    const result = await actionSvc.ban({
-      actorUserId: actor.id,
-      userId: c.req.param("id"),
-      reason: body.reason,
-      expiresIn: body.expiresIn,
-      headers: c.req.raw.headers,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true });
-  })
-  .post("/:id/unban", requireAuth, requirePlatformAdmin, async (c) => {
+  .post(
+    "/:id/ban",
+    requireAuth,
+    requireStaffPermission("users.moderate"),
+    zV("json", banUserBodySchema),
+    async (c) => {
+      const actor = c.get("user");
+      const body = c.req.valid("json");
+      const result = await actionSvc.ban({
+        actorUserId: actor.id,
+        userId: c.req.param("id"),
+        reason: body.reason,
+        expiresIn: body.expiresIn,
+        headers: c.req.raw.headers,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      return c.json({ ok: true });
+    },
+  )
+  .post("/:id/unban", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
     const actor = c.get("user");
     const result = await actionSvc.unban({
       actorUserId: actor.id,
@@ -86,22 +98,37 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
   })
-  .put("/:id/role", requireAuth, requirePlatformAdmin, zV("json", setRoleBodySchema), async (c) => {
-    const actor = c.get("user");
-    const body = c.req.valid("json");
-    const userId = c.req.param("id");
-    const u = await findUserOr404(userId);
-    const result = await actionSvc.setRole({
-      actorUserId: actor.id,
-      userId,
-      role: body.role,
-      previousRole: u.role.toNull(),
-      headers: c.req.raw.headers,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true });
-  })
-  .post("/:id/reset-password", requireAuth, requirePlatformAdmin, async (c) => {
+  .put(
+    "/:id/role",
+    requireAuth,
+    requireStaffPermission("users.role"),
+    zV("json", setRoleBodySchema),
+    async (c) => {
+      const actor = c.get("user");
+      const body = c.req.valid("json");
+      const userId = c.req.param("id");
+      const managed = await di.StaffService.isManaged(userId);
+      if (managed.isFailure) throw new AppErrorException(managed.getError());
+      if (managed.getValue()) {
+        throw new AppErrorException({
+          code: "ADMIN_USER_ROLE_STAFF_MANAGED_FORBIDDEN",
+          message: "A staff member's role changes through the staff routes.",
+        });
+      }
+
+      const u = await findUserOr404(userId);
+      const result = await actionSvc.setRole({
+        actorUserId: actor.id,
+        userId,
+        role: body.role,
+        previousRole: u.role.toNull(),
+        headers: c.req.raw.headers,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      return c.json({ ok: true });
+    },
+  )
+  .post("/:id/reset-password", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
     const actor = c.get("user");
     const userId = c.req.param("id");
     const u = await findUserOr404(userId);
@@ -114,7 +141,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
   })
-  .delete("/:id/sessions", requireAuth, requirePlatformAdmin, async (c) => {
+  .delete("/:id/sessions", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
     const actor = c.get("user");
     const userId = c.req.param("id");
     const u = await findUserOr404(userId);

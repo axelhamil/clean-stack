@@ -9,6 +9,7 @@ import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
+import { adminStaffRoutes } from "./modules/admin/staff.routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
@@ -175,6 +176,10 @@ for (const [path, policy] of AUTH_RATE_LIMITS) {
   app.use(`/api/auth${path}`, securityRateLimit(policy));
 }
 
+app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/admin/*", (c) =>
+  c.json({ error: { code: "NOT_FOUND", message: "Not found." } }, 404),
+);
+
 // SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId, BetterAuth's
 // own router 404s any method/path it hasn't registered, so widening the verb list here
 // exposes no surface beyond what the mounted plugins already declare.
@@ -200,7 +205,6 @@ app.route(
     pepperVersion: env.API_TOKEN_PEPPER_VERSION,
     pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
     bucketMin: env.API_TOKEN_LAST_USED_BUCKET_MIN,
-    platformAdminIds: env.PLATFORM_ADMIN_IDS,
     limiter: di.IRateLimiter,
     resolveIp: resolveClientIp,
   }),
@@ -231,6 +235,7 @@ const routes = app
   .route("/me", profileRoutes)
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
+  .route("/admin", adminStaffRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)

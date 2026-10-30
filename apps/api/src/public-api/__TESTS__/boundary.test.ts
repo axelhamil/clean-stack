@@ -138,7 +138,6 @@ const publicApiV1 = createPublicApiV1({
   pepper: PEPPER,
   pepperVersion: 1,
   bucketMin: 15,
-  platformAdminIds: [],
   limiter: mockLimiter,
   resolveIp: () => "127.0.0.1",
 });
@@ -223,7 +222,7 @@ describe("public API response shape", () => {
       "pendingDeletionUntil",
       "deletedAt",
       "lastExportRequestedAt",
-      "isPlatformAdmin",
+      "staff",
     ]) {
       expect(body.user).not.toHaveProperty(leaked);
     }
@@ -259,7 +258,6 @@ describe("public API rate limit order", () => {
         pepper: PEPPER,
         pepperVersion: 1,
         bucketMin: 15,
-        platformAdminIds: [],
         limiter,
         resolveIp: () => "203.0.113.9",
       }) as never,

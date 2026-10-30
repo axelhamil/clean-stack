@@ -481,6 +481,24 @@ export const AdminUserSessionsRevokedPayload = ActorRef.extend(UserRef.shape).ex
 });
 export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
 
+export const AdminStaffAddedPayload = UserRef.extend({
+  actorUserId: z.string().nullable(),
+  role: z.string(),
+  source: z.enum(["env", "console"]),
+});
+export type AdminStaffAddedPayload = z.infer<typeof AdminStaffAddedPayload>;
+
+export const AdminStaffRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
+  from: z.string(),
+  to: z.string(),
+});
+export type AdminStaffRoleChangedPayload = z.infer<typeof AdminStaffRoleChangedPayload>;
+
+export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
+  role: z.string(),
+});
+export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
+
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
   actorUserId: z.string(),
@@ -711,6 +729,9 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
+  [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,
+  [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: AdminStaffRoleChangedPayload,
+  [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,

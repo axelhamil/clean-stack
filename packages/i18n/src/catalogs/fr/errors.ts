@@ -114,6 +114,19 @@ export default {
     YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
       "Vous n'avez pas la permission d'accéder à cette organisation.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
+    ADMIN_STAFF_FORBIDDEN: "Cet espace est réservé à l'équipe de la plateforme.",
+    ADMIN_STAFF_MFA_FORBIDDEN:
+      "Activez l'authentification à deux facteurs pour utiliser l'espace de l'équipe.",
+    ADMIN_STAFF_PERMISSION_FORBIDDEN: "Votre rôle dans l'équipe ne permet pas cette action.",
+    ADMIN_STAFF_SELF_CHANGE_FORBIDDEN:
+      "Demandez à un autre responsable de modifier votre propre accès.",
+    ADMIN_STAFF_LISTED_FORBIDDEN:
+      "L'accès de cette personne vient de la configuration du serveur. Modifiez plutôt PLATFORM_ADMIN_IDS.",
+    ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
+      "C'est le dernier responsable. Ajoutez-en un autre avant de modifier cet accès.",
+    ADMIN_STAFF_NOT_FOUND: "Cette personne ne fait pas partie de l'équipe.",
+    ADMIN_USER_ROLE_STAFF_MANAGED_FORBIDDEN:
+      "Ce compte fait partie de l'équipe. Modifiez son accès depuis l'équipe.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "Cette action est indisponible pendant l'emprunt d'identité d'un autre utilisateur.",
     POLICY_ACCEPTANCE_REQUIRED:

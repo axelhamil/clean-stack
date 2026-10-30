@@ -22,6 +22,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
 import type { UserFilters } from "./admin-user-filters";
 import {
   isPlatformRole,
@@ -34,6 +35,7 @@ import { UserRow } from "./components/user-row";
 const ALL = "all";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/users")({
+  beforeLoad: ensureStaffPermission("users.read"),
   component: AdminUsersPage,
 });
 

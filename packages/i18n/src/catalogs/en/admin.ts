@@ -52,7 +52,7 @@ export default {
       changeRole: "Change role",
       changeRoleTitle: "Change this account's role",
       changeRoleDescription:
-        "A platform admin can reach every organization's data and the operator audit log.",
+        "This is the account role the auth library stores. It grants no staff access: staff access comes from the staff team.",
       roleOptionUser: "User",
       roleOptionAdmin: "Platform admin",
       changeRoleSubmit: "Change role",

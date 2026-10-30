@@ -32,14 +32,17 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
     consumer: "apps/app/src/features/webhooks/api/webhooks.mutations.ts",
   },
   "DELETE /uploads": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
+  "DELETE /admin/staff/:id": { uiLess: "dormant-by-design" },
   "GET /admin/audit-log": {
     consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
   },
   "GET /admin/audit-log/verify": {
     consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
   },
+  "GET /admin/me": { uiLess: "dormant-by-design" },
   "GET /admin/orgs": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
   "GET /admin/orgs/:id": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
+  "GET /admin/staff": { uiLess: "dormant-by-design" },
   "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
   "GET /admin/users/:id": {
     consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts",
@@ -148,6 +151,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /uploads/confirm": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
   "POST /uploads/download": { uiLess: "dormant-by-design" },
   "POST /uploads/presign": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
+  "PUT /admin/staff/:id/role": { uiLess: "dormant-by-design" },
   "PUT /admin/users/:id/role": {
     consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
   },

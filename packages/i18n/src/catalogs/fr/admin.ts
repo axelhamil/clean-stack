@@ -50,7 +50,7 @@ export default {
       changeRole: "Changer le rôle",
       changeRoleTitle: "Changer le rôle de ce compte",
       changeRoleDescription:
-        "Un administrateur de la plateforme accède aux données de toutes les organisations et au journal d'audit opérateur.",
+        "Il s'agit du rôle de compte conservé par la bibliothèque d'authentification. Il ne donne aucun accès d'équipe : celui-ci vient de l'équipe de la plateforme.",
       roleOptionUser: "Utilisateur",
       roleOptionAdmin: "Administrateur de la plateforme",
       changeRoleSubmit: "Changer le rôle",

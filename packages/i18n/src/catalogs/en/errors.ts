@@ -119,6 +119,17 @@ export default {
     YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
       "You don't have permission to access this organization.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
+    ADMIN_STAFF_FORBIDDEN: "This area is for platform staff.",
+    ADMIN_STAFF_MFA_FORBIDDEN: "Turn on two-factor authentication to use the staff area.",
+    ADMIN_STAFF_PERMISSION_FORBIDDEN: "Your staff role does not allow this action.",
+    ADMIN_STAFF_SELF_CHANGE_FORBIDDEN: "Ask another manager to change your own access.",
+    ADMIN_STAFF_LISTED_FORBIDDEN:
+      "This person's access comes from the server configuration. Change PLATFORM_ADMIN_IDS instead.",
+    ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
+      "This is the last manager. Add another manager before changing this access.",
+    ADMIN_STAFF_NOT_FOUND: "This person is not on the staff.",
+    ADMIN_USER_ROLE_STAFF_MANAGED_FORBIDDEN:
+      "This account is on the staff. Change its access from the staff team instead.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "This action is unavailable while you are impersonating another user.",
     POLICY_ACCEPTANCE_REQUIRED: "Our terms have been updated. Accept the new version to continue.",

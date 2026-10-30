@@ -87,7 +87,6 @@ function makeDeps(repoOverride?: ReturnType<typeof makeRepo>["repo"]) {
     pepper: PEPPER,
     pepperVersion: PEPPER_VERSION,
     bucketMin: BUCKET_MIN,
-    platformAdminIds: [] as string[],
   };
 }
 
