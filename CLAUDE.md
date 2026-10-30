@@ -53,7 +53,7 @@ pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semanti
 
 ## Scripts & local infrastructure
 
-`pnpm bootstrap` (copies `.env.example` → `.env` in `apps/api`, `apps/app` and `packages/drizzle`, idempotent) · `pnpm dev` (Turbo TUI, `--filter=<app>` to scope) · `dev:docker` (`docker compose up --watch`, fully containerized hot reload) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` · `check:unused` · `ui:add` · `db:push` / `db:generate` / `db:migrate` / `db:seed` / `db:studio` · `clean`.
+`pnpm bootstrap` (copies `.env.example` → `.env` in `apps/api`, `apps/app`, `apps/admin` and `packages/drizzle`, idempotent) · `pnpm dev` (Turbo TUI, `--filter=<app>` to scope) · `dev:docker` (`docker compose up --watch`, fully containerized hot reload) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` · `check:unused` · `ui:add` · `db:push` / `db:generate` / `db:migrate` / `db:seed` / `db:studio` · `clean`.
 
 - Postgres runs on `localhost:5433` (never pin it back to 5432, it collides with a system Postgres): `docker compose up postgres -d` for native dev. `docker compose up -d` without arguments starts postgres + api + app + admin and collides with `pnpm dev` on ports 3000, 5173 and 5174.
 - Opt-in profiles: `--profile storage` (SeaweedFS, host port `8333`), `--profile sso` (Keycloak, host port `8080`, see `docs/SSO-LOCAL.md`).

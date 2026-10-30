@@ -11,6 +11,7 @@
     "./bun/unit-of-work": "./src/bun/unit-of-work-mock.ts",
     "./source-scan": "./src/source-scan.ts",
     "./a11y": "./src/a11y.ts",
+    "./redirect-vectors": "./src/redirect-vectors.ts",
     "./base-vitest.config": "./base-vitest.config.js"
   },
   "scripts": {

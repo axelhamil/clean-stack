@@ -238,6 +238,34 @@ describe("validateHostsEnv", () => {
       AUTH_COOKIE_DOMAIN: z.string().optional(),
     })
     .superRefine(validateHostsEnv);
+  it.each([
+    [
+      "up.railway.app",
+      "https://app.up.railway.app",
+      "https://api.up.railway.app",
+      "https://admin.up.railway.app",
+    ],
+    [
+      "co.uk",
+      "https://app.example.co.uk",
+      "https://api.example.co.uk",
+      "https://admin.example.co.uk",
+    ],
+  ])(
+    "refuses the public suffix %s as a cookie domain",
+    (domain, APP_URL, BETTER_AUTH_URL, ADMIN_URL) => {
+      const parsed = schema.safeParse({
+        NODE_ENV: "production",
+        APP_URL,
+        BETTER_AUTH_URL,
+        ADMIN_URL,
+        AUTH_COOKIE_DOMAIN: domain,
+      });
+
+      expect(parsed.error?.issues[0]?.message).toContain("public suffix");
+    },
+  );
+
   const hosts = {
     NODE_ENV: "production",
     ADMIN_URL: "https://admin.example.com",

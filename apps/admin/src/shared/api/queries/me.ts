@@ -14,5 +14,6 @@ export const meQueryOptions = queryOptions({
   },
   staleTime: 0,
   retry: false,
+  networkMode: "always",
   refetchOnWindowFocus: "always",
 });

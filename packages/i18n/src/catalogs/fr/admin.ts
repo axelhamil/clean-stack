@@ -138,7 +138,9 @@ export default {
       description: "Connectez-vous avec un autre compte ou retournez sur l'application.",
       needsTwoFactor:
         "Activez l'authentification à deux facteurs dans les réglages de votre compte, puis revenez.",
+      needsPolicies: "Acceptez les politiques mises à jour dans l'application, puis revenez.",
       backToApp: "Aller sur l'application",
+      retry: "Réessayer",
     },
     notFound: {
       title: "Page introuvable",

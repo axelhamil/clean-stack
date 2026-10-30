@@ -5,6 +5,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "apps/admin/prod.Dockerfile"
 watchPatterns = [
   "apps/admin/**",
+  "infra/caddy/**",
   "packages/ui/**",
   "packages/access-control/**",
   "packages/web-kit/**",

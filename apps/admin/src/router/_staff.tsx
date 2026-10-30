@@ -10,6 +10,9 @@ export const Route = createFileRoute("/_staff")({
       const refusal = refusalRedirect(error, `${window.location.origin}${location.href}`);
       if (refusal) throw refusal;
 
+      const known = context.queryClient.getQueryData(meQueryOptions.queryKey);
+      if (known) return known;
+
       throw error;
     });
 

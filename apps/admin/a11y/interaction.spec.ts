@@ -1,4 +1,4 @@
-import { blockingViolations, tabTo } from "@packages/test/a11y";
+import { blockingViolations, corsHeaders, tabTo } from "@packages/test/a11y";
 import { expect, type Page, test } from "@playwright/test";
 import { STORAGE_STATE } from "./playwright.config";
 
@@ -12,16 +12,9 @@ const ME = {
 };
 const ALL_SECTIONS = ["Accounts", "Organizations", "Audit log", "Operations", "Approvals", "Team"];
 
-function allow(origin?: string) {
-  return {
-    "access-control-allow-origin": origin ?? "*",
-    "access-control-allow-credentials": "true",
-  };
-}
-
 async function fulfillMe(page: Page, status: number, json: unknown): Promise<void> {
   await page.route("**/admin/me", (route) =>
-    route.fulfill({ status, json, headers: allow(route.request().headers().origin) }),
+    route.fulfill({ status, json, headers: corsHeaders(route.request().headers().origin) }),
   );
 }
 
@@ -97,6 +90,29 @@ test.describe("signed in", () => {
       "href",
       /\/settings\/account$/,
     );
+  });
+
+  test("stale policies point to the app's acceptance page", async ({ page }) => {
+    await refuseMe(page, "POLICY_ACCEPTANCE_REQUIRED");
+    await page.goto("/");
+
+    await expect(page).toHaveURL(/\/denied\?reason=policies$/);
+    await expect(page.getByRole("link", { name: "Go to the app" })).toHaveAttribute(
+      "href",
+      /\/legal\/accept$/,
+    );
+  });
+
+  test("the denied page offers a way back once the cause is fixed", async ({ page }) => {
+    await refuseMe(page, "ADMIN_STAFF_MFA_FORBIDDEN");
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/denied/);
+    await page.unroute("**/admin/me");
+    await fulfillMe(page, 200, { ...ME, permissions: ["users.read"] });
+
+    await page.getByRole("link", { name: "Try again" }).click();
+
+    await expect(page.getByRole("navigation", { name: "Back office sections" })).toBeVisible();
   });
 
   test("access lost while the page is open cuts on the way back to the tab", async ({ page }) => {

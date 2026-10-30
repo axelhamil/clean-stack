@@ -14,10 +14,15 @@ const stepUpSchema = z.object({ code: totpCodeSchema });
 
 type StepUpValues = z.infer<typeof stepUpSchema>;
 
+export interface StepUpDialogOptions {
+  namespace: "admin";
+}
+
 export function useStepUpDialog<TData>(
   verifyOptions: UseMutationOptions<TData, Error, StepUpValues, unknown>,
+  { namespace }: StepUpDialogOptions,
 ) {
-  const { t } = useTranslation(["admin", "common"]);
+  const { t } = useTranslation([namespace, "common"]);
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const form = useForm<StepUpValues>({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { REDIRECT_ADMIN_ORIGIN, REDIRECT_VECTORS } from "@packages/test/redirect-vectors";
 import { redirectQuery } from "../auth/email-redirect";
 
 const authUrl = (callback: string) =>
@@ -43,5 +44,15 @@ describe("redirectQuery", () => {
 
   it("adds nothing when the link has no callback", () => {
     expect(redirectQuery("https://api.test/api/auth/verify-email?token=t")).toBe("");
+  });
+});
+
+describe("the redirect allowlist shared with the sign-in pages", () => {
+  it.each([...REDIRECT_VECTORS])("$target", ({ target, expected }) => {
+    const url = `https://api.example.com/verify?callbackURL=${encodeURIComponent(target)}`;
+
+    expect(redirectQuery(url, REDIRECT_ADMIN_ORIGIN)).toBe(
+      expected ? `&redirect=${encodeURIComponent(expected)}` : "",
+    );
   });
 });

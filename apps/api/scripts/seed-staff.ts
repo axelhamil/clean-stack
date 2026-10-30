@@ -2,11 +2,12 @@ import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
 import { seedTwoFactor } from "./check-harness";
+import { requireSeedableDatabase } from "./require-local-database";
 
 /**
  * Staff accounts for the back office gate and local work, written directly so no sign-up, email
  * or DNS check stands in the way. The TOTP secret is public on purpose, which is why this only
- * ever runs from the dev seed and refuses production. `apps/admin/a11y/staff.ts` mirrors it.
+ * ever runs from the dev seed, skips production and refuses a database that is not local. `apps/admin/a11y/staff.ts` mirrors it.
  */
 const STAFF_TOTP_SECRET = "dev-seed-staff-totp-secret";
 const SEEDED_STAFF = [
@@ -16,6 +17,8 @@ const SEEDED_STAFF = [
 
 export async function seedDevStaff(password: string): Promise<void> {
   if (process.env.NODE_ENV === "production") return;
+
+  requireSeedableDatabase(process.env.DATABASE_URL);
 
   for (const { id, email, role } of SEEDED_STAFF) {
     const [existing] = await db

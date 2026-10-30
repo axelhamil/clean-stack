@@ -1,4 +1,4 @@
-import type { AuditedPage } from "@packages/test/a11y";
+import { type AuditedPage, corsHeaders } from "@packages/test/a11y";
 import type { Page } from "@playwright/test";
 
 /**
@@ -15,10 +15,7 @@ async function servePoliciesAsStale(page: Page): Promise<void> {
   await page.route("**/me/policies", (route) =>
     route.fulfill({
       json: STALE_POLICIES,
-      headers: {
-        "access-control-allow-origin": route.request().headers().origin ?? "*",
-        "access-control-allow-credentials": "true",
-      },
+      headers: corsHeaders(route.request().headers().origin),
     }),
   );
 }

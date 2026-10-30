@@ -78,7 +78,7 @@ The add-on exposes `${{Postgres.DATABASE_URL}}` to other services, never copy th
 
 ---
 
-## 3. Create the 3 services
+## 3. Create the 4 services
 
 For **each** service (`api`, `app`, `admin`, `cron`): either via dashboard (recommended for first deploy) or CLI:
 
@@ -196,6 +196,10 @@ The pepper is the HMAC key for token storage, a compromised pepper means a DB du
 | `PORT`                  | (Railway injects)                    | Runtime       |
 
 The `app` service also takes `VITE_ADMIN_URL=https://admin.<your-domain>` as a build arg (the only external target sign-in may return to), and `api` takes `ADMIN_URL` with the same value (joins CORS and CSRF), plus `AUTH_COOKIE_DOMAIN=<your-domain>` when the session must span the subdomains.
+
+**`AUTH_COOKIE_DOMAIN` is off by default, leave it empty unless staff must share the session across subdomains.** Once set, every host under that domain receives the session cookie: never set it if a subdomain serves user content or a third party (status page, docs host, marketing tool), since any of them could read or fixate the session. A public suffix refuses the boot.
+
+**Existing `.env` files** predate `ADMIN_URL` (`apps/api`) and `VITE_ADMIN_URL` (`apps/app`), and `pnpm bootstrap` never overwrites a file: add both by hand, or sign-in will not return to the back office. Same for build args on a service that already exists.
 
 **`admin` needs a custom domain in production.** On `*.up.railway.app` the hosts are different sites under a public suffix, so no cookie domain can span them and a staff session would rest on third-party cookies. A value of `AUTH_COOKIE_DOMAIN` that is not a parent of `APP_URL`, `BETTER_AUTH_URL` and `ADMIN_URL` refuses the boot. If a cookie change still locks staff out, the break-glass path is `PLATFORM_ADMIN_IDS` plus removing `AUTH_COOKIE_DOMAIN`.
 

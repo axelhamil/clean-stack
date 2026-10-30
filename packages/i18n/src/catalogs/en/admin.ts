@@ -141,7 +141,9 @@ export default {
       title: "This account cannot open the back office",
       description: "Sign in with another account, or go back to the app.",
       needsTwoFactor: "Turn on two-factor authentication in your account settings, then come back.",
+      needsPolicies: "Accept the updated policies in the app, then come back.",
       backToApp: "Go to the app",
+      retry: "Try again",
     },
     notFound: {
       title: "Page not found",

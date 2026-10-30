@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { getPublicSuffix } from "tldts";
 import type { z } from "zod";
 import {
   DEADLINE_FLUSH_TIMEOUT_MS,
@@ -262,6 +263,15 @@ export function validateHostsEnv(
       code: "custom",
       path: ["AUTH_COOKIE_DOMAIN"],
       message: `AUTH_COOKIE_DOMAIN (${cookieDomain}) must be a bare lowercase parent domain, e.g. example.com.`,
+    });
+    return;
+  }
+
+  if (getPublicSuffix(cookieDomain, { allowPrivateDomains: true }) === cookieDomain) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["AUTH_COOKIE_DOMAIN"],
+      message: `AUTH_COOKIE_DOMAIN (${cookieDomain}) is a public suffix: browsers reject the cookie, which signs everyone out. Use a domain you own, or leave it empty.`,
     });
     return;
   }

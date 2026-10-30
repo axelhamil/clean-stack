@@ -97,3 +97,9 @@ export function staffReachable(access: StaffAccess | null): boolean {
 export function authorizeStaff(access: StaffAccess | null, permission: StaffPermission): boolean {
   return staffReachable(access) && access?.permissions.includes(permission) === true;
 }
+
+export const STAFF_REFUSAL = {
+  notStaff: "ADMIN_STAFF_FORBIDDEN",
+  mfaMissing: "ADMIN_STAFF_MFA_FORBIDDEN",
+  permissionMissing: "ADMIN_STAFF_PERMISSION_FORBIDDEN",
+} as const;

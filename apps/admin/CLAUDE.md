@@ -17,7 +17,7 @@ The staff back office, on its own host, against the same API under `/admin/*`. F
 
 ## CSP
 
-Same mechanism as the app (Vite `html.cspNonce`, Caddy `templates`), stricter policy in `Caddyfile`: no third-party script or image, `connect-src` limited to the API, plus `noindex`. `VITE_API_URL` must exist at runtime for Caddy, `CSP_CONNECT_EXTRA` adds the Sentry host when a DSN is set.
+Same mechanism as the app (Vite `html.cspNonce`, Caddy `templates`), headers and SPA serving shared with the app through `infra/caddy/static-site.caddy`, stricter policy in `Caddyfile`: no third-party script or image, `connect-src` limited to the API, plus `noindex`. `VITE_API_URL` must exist at runtime for Caddy, `CSP_CONNECT_EXTRA` adds the Sentry host when a DSN is set.
 
 ## Commands
 

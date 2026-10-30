@@ -1,8 +1,5 @@
+import { blankAsAbsent } from "@packages/web-kit/env/blank-as-absent";
 import { z } from "zod";
-
-function blankAsAbsent<T extends z.ZodType>(schema: T) {
-  return z.preprocess((value) => (value === "" ? undefined : value), schema.optional());
-}
 
 const envSchema = z.object({
   VITE_API_URL: z.url().default("http://localhost:3000"),

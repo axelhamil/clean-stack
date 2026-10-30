@@ -1,12 +1,12 @@
 import { Toaster } from "@packages/ui/components/ui/sonner";
 import { TooltipProvider } from "@packages/ui/components/ui/tooltip";
-import { applyZodErrorMap } from "@packages/web-kit/i18n/zod-error-map";
+import { ZodLocale } from "@packages/web-kit/i18n/zod-locale";
 import { useTheme } from "@packages/web-kit/theme/use-theme";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import type { i18n as I18nInstance } from "i18next";
-import { StrictMode, useEffect } from "react";
-import { I18nextProvider, useTranslation } from "react-i18next";
+import { StrictMode } from "react";
+import { I18nextProvider } from "react-i18next";
 import { router } from "../router";
 import { queryClient } from "./api/query-client";
 import { AppErrorFallback } from "./components/app-error-fallback";
@@ -40,14 +40,4 @@ function ThemedToaster() {
   const { resolvedTheme } = useTheme();
 
   return <Toaster theme={resolvedTheme} richColors closeButton />;
-}
-
-function ZodLocale() {
-  const { t } = useTranslation("errors");
-
-  useEffect(() => {
-    applyZodErrorMap(t);
-  }, [t]);
-
-  return null;
 }

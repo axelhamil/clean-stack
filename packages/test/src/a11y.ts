@@ -23,6 +23,13 @@ function formatViolation(violation: Violation): string {
   return `${violation.id} (${violation.impact}): ${violation.help} → ${targets}`;
 }
 
+export function corsHeaders(origin?: string): Record<string, string> {
+  return {
+    "access-control-allow-origin": origin ?? "*",
+    "access-control-allow-credentials": "true",
+  };
+}
+
 export async function blockingViolations(page: Page, include?: string): Promise<string[]> {
   const builder = new AxeBuilder({ page }).withTags(WCAG_TAGS);
   const results = await (include ? builder.include(include) : builder).analyze();

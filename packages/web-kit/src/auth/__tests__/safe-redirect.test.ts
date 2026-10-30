@@ -1,3 +1,4 @@
+import { REDIRECT_ADMIN_ORIGIN, REDIRECT_VECTORS } from "@packages/test/redirect-vectors";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createRedirectSearchSchema,
@@ -166,5 +167,11 @@ describe("twoFactorPath with an allowed external origin", () => {
       `/two-factor?redirect=${encodeURIComponent(`${ADMIN}/users`)}`,
     );
     expect(twoFactorPath(search)).toBe("/two-factor");
+  });
+});
+
+describe("the redirect allowlist shared with the API", () => {
+  it.each(REDIRECT_VECTORS)("$target", ({ target, expected }) => {
+    expect(toSafeRedirect(target, REDIRECT_ADMIN_ORIGIN)).toBe(expected);
   });
 });
