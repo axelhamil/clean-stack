@@ -13,7 +13,7 @@ The non-obvious failure modes that crash a fresh deploy. Every one below was hit
 **Boot is fail-hard on these (prod): the API refuses to start without them:**
 
 - `NODE_ENV=production` (see the trap below)
-- `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), `SCIM_CREDENTIAL_HASH_SECRET` (≥ 32 chars), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
+- `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), `API_TOKEN_PEPPER` (≥ 32 chars), `SCIM_CREDENTIAL_HASH_SECRET` (≥ 32 chars), `CORS_ORIGIN` (the app public origin), `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` (see [INTEGRATIONS.md](INTEGRATIONS.md) section 4), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
 - `APP_URL` (public app URL, e.g. `https://app.example.com`): Zod-required in `env.ts` at any `NODE_ENV`; the API refuses to boot if the value is absent or not a valid URL. Auth email links, the CSP-report origin filter, and the impersonation notification email all derive from it. The `.env.example` provides `http://localhost:5173` as the dev default.
 
 **Boot degrades gracefully on these, the API starts, the feature stays inert until configured:**
@@ -110,6 +110,8 @@ Set these **once at project level**, then reference from each service:
 | `WEBHOOK_MASTER_KEY`    | `openssl rand -hex 32` (64 hex chars) | api             |
 | `API_TOKEN_PEPPER`      | `openssl rand -hex 32` (min 32 chars) | api             |
 | `SCIM_CREDENTIAL_HASH_SECRET` | `openssl rand -hex 32` (min 32 chars) | api       |
+| `STRIPE_SECRET_KEY`     | Stripe dashboard, see [INTEGRATIONS.md](INTEGRATIONS.md) section 4 | api |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint signing secret, see [INTEGRATIONS.md](INTEGRATIONS.md) section 4 | api |
 | `RESEND_API_KEY`        | Resend dashboard (live key)           | api             |
 | `RESEND_FROM`           | `onboarding@<your-verified-domain>`   | api             |
 | `S3_ENDPOINT`           | `https://<account>.r2.cloudflarestorage.com` | api      |
@@ -233,7 +235,7 @@ If you choose Railway Bucket: `railway add --bucket <name>`, region `europe-west
 2. **Settings → Region → EU** (irrelevant for routing, matters for log residency)
 3. **API Keys → Create** with `sending_access` scope only, store as `RESEND_API_KEY` shared var
 4. `RESEND_FROM=onboarding@<your-verified-domain>` (or any address on the verified domain)
-5. The 8 template IDs are hardcoded **empty** in `apps/api/src/shared/services/email.service.ts` (`TEMPLATE_IDS`): fill each from the Resend dashboard when cloning. Empty IDs (or a missing `RESEND_API_KEY`) no longer crash the boot: the service logs a warning and those emails are **logged, not delivered**. Set `RESEND_API_KEY`, `RESEND_FROM`, and all 8 IDs before relying on any email flow (verification, magic link, password reset, org invitation, RGPD export/deletion notices).
+5. The 8 template IDs are hardcoded **empty** in `apps/api/src/shared/services/email-delivery-worker.service.ts` (`TEMPLATE_IDS`): fill each from the Resend dashboard when cloning. Empty IDs (or a missing `RESEND_API_KEY`) no longer crash the boot: the service logs a warning and those emails are **logged, not delivered**. Set `RESEND_API_KEY`, `RESEND_FROM`, and all 8 IDs before relying on any email flow (verification, magic link, password reset, org invitation, RGPD export/deletion notices).
 
 ---
 
