@@ -1,24 +1,30 @@
 /**
  * Proves against a real Postgres what mocks cannot: the bootstrap insert of a listed id
- * announces once however many first requests race, the last-manager guard holds when two
- * managers revoke each other at the same time, and the migration's data step gives an existing
- * `role = admin` user a manager row. The lock and the `ON CONFLICT` live in SQL, a mocked
- * transaction evaluates neither. Creates and removes its own probe users.
+ * announces once however many first requests race and revives a revoked row, the last-manager
+ * guard holds when two managers revoke or ban each other at the same time, a banned or deleted
+ * manager does not count, an account wipe revokes its staff row in its own transaction, the
+ * CHECK constraints refuse an unknown source or effect, and the migration's data step gives an
+ * existing `role = admin` user a manager row and a deleted one nothing. The lock and the
+ * `ON CONFLICT` live in SQL, a mocked transaction evaluates neither. Creates and removes its
+ * own probe users.
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
   db,
   eq,
   inArray,
+  or,
   outboxSchema,
   sql,
   staffSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
 import { StaffService } from "../src/modules/admin/application/services/staff.service";
 import { StaffAccessService } from "../src/shared/services/staff-access.service";
@@ -35,7 +41,26 @@ const managerA = `${prefix}-a`;
 const managerB = `${prefix}-b`;
 const legacyAdmin = `${prefix}-legacy`;
 const plainUser = `${prefix}-plain`;
-const probeIds = [listedId, managerA, managerB, legacyAdmin, plainUser];
+const legacyDeleted = `${prefix}-legacy-deleted`;
+const leaver = `${prefix}-leaver`;
+const ghost = `${prefix}-ghost`;
+const revivedId = `${prefix}-revived`;
+const formerListed = `${prefix}-former`;
+const supportActor = `${prefix}-support`;
+const probeIds = [
+  listedId,
+  managerA,
+  managerB,
+  legacyAdmin,
+  plainUser,
+  legacyDeleted,
+  leaver,
+  ghost,
+  revivedId,
+  formerListed,
+  supportActor,
+];
+const PASSWORD = "check-admin-staff-password";
 
 const checks = checkRecorder();
 const { check } = checks;
@@ -44,6 +69,9 @@ async function cleanup(): Promise<void> {
   await db
     .delete(outboxSchema.outboxEvent)
     .where(inArray(outboxSchema.outboxEvent.aggregateId, probeIds));
+  await db.execute(
+    sql`DELETE FROM email_message WHERE ${or(...probeIds.map((id) => sql`to_address = ${`${id}@example.com`}`))}`,
+  );
   await db.delete(authSchema.user).where(inArray(authSchema.user.id, probeIds));
 }
 
@@ -55,7 +83,8 @@ async function seed(): Promise<void> {
       email: `${id}@example.com`,
       emailVerified: true,
       locale: "en",
-      role: id === legacyAdmin ? "admin" : "user",
+      role: id === legacyAdmin || id === legacyDeleted ? "admin" : "user",
+      deletedAt: id === legacyDeleted ? new Date() : null,
     })),
   );
 }
@@ -134,14 +163,12 @@ async function activeManagersOf(ids: string[]): Promise<string[]> {
   return rows.filter((r) => r.revokedAt === null).map((r) => r.userId);
 }
 
-async function proveLastManagerHolds(): Promise<void> {
+async function withOnlyProbeManagers(work: () => Promise<void>): Promise<void> {
   const otherManagers = await db
     .select({ userId: staffSchema.staffMember.userId })
     .from(staffSchema.staffMember)
     .where(eq(staffSchema.staffMember.role, "manager"));
-  const parked = otherManagers
-    .map((row) => row.userId)
-    .filter((id) => id !== managerA && id !== managerB);
+  const parked = otherManagers.map((row) => row.userId).filter((id) => !probeIds.includes(id));
 
   if (parked.length > 0) {
     await db
@@ -151,55 +178,7 @@ async function proveLastManagerHolds(): Promise<void> {
   }
 
   try {
-    const service = new StaffService(
-      di.IStaffStore,
-      di.IAdminUserStore,
-      di.IOutboxRepository,
-      di.ITransactionService,
-      [],
-    );
-
-    for (let round = 1; round <= ROUNDS; round += 1) {
-      await db
-        .delete(staffSchema.staffMember)
-        .where(inArray(staffSchema.staffMember.userId, [managerA, managerB]));
-      await db
-        .delete(outboxSchema.outboxEvent)
-        .where(inArray(outboxSchema.outboxEvent.aggregateId, [managerA, managerB]));
-      await db
-        .insert(staffSchema.staffMember)
-        .values(
-          [managerA, managerB].map((userId) => ({ userId, role: "manager", source: "console" })),
-        );
-
-      const outcomes = await Promise.all([
-        service.revoke({ actorUserId: managerA, targetUserId: managerB }),
-        service.revoke({ actorUserId: managerB, targetUserId: managerA }),
-      ]);
-
-      const succeeded = outcomes.filter((r) => r.isSuccess).length;
-      const refused = outcomes.filter(
-        (r) => r.isFailure && r.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
-      ).length;
-      const remaining = await activeManagersOf([managerA, managerB]);
-      const events =
-        (await staffEvents(managerA, EventTypes.ADMIN_STAFF_REVOKED)) +
-        (await staffEvents(managerB, EventTypes.ADMIN_STAFF_REVOKED));
-      const loser = remaining[0] === managerA ? managerB : managerA;
-
-      console.log(`[2.${round}] two managers revoke each other ->`, {
-        succeeded,
-        refused,
-        remaining,
-      });
-      check("exactly one of the two revocations wins", succeeded === 1 && refused === 1);
-      check("one manager remains", remaining.length === 1);
-      check("only the winning revocation is announced", events === 1);
-      check(
-        "the revoked member's mirror role is written with the row",
-        (await mirrorRole(loser)) === "user",
-      );
-    }
+    await work();
   } finally {
     if (parked.length > 0) {
       await db
@@ -208,6 +187,381 @@ async function proveLastManagerHolds(): Promise<void> {
         .where(inArray(staffSchema.staffMember.userId, parked));
     }
   }
+}
+
+function staffService(listed: string[] = []): StaffService {
+  return new StaffService(
+    di.IStaffStore,
+    di.IAdminUserStore,
+    di.IOutboxRepository,
+    di.ITransactionService,
+    { PLATFORM_ADMIN_IDS: listed },
+  );
+}
+
+async function resetManagers(ids: string[]): Promise<void> {
+  await db.delete(staffSchema.staffMember).where(inArray(staffSchema.staffMember.userId, probeIds));
+  await db
+    .delete(outboxSchema.outboxEvent)
+    .where(inArray(outboxSchema.outboxEvent.aggregateId, probeIds));
+  await db
+    .update(authSchema.user)
+    .set({ banned: false, banExpires: null, pendingDeletionUntil: null })
+    .where(inArray(authSchema.user.id, probeIds));
+  if (ids.length === 0) return;
+
+  await db
+    .insert(staffSchema.staffMember)
+    .values(ids.map((userId) => ({ userId, role: "manager", source: "console" })));
+}
+
+async function proveLastManagerHolds(): Promise<void> {
+  const service = staffService();
+
+  for (let round = 1; round <= ROUNDS; round += 1) {
+    await db
+      .delete(staffSchema.staffMember)
+      .where(inArray(staffSchema.staffMember.userId, [managerA, managerB]));
+    await db
+      .delete(outboxSchema.outboxEvent)
+      .where(inArray(outboxSchema.outboxEvent.aggregateId, [managerA, managerB]));
+    await db
+      .insert(staffSchema.staffMember)
+      .values(
+        [managerA, managerB].map((userId) => ({ userId, role: "manager", source: "console" })),
+      );
+
+    const outcomes = await Promise.all([
+      service.revoke({ actorUserId: managerA, targetUserId: managerB }),
+      service.revoke({ actorUserId: managerB, targetUserId: managerA }),
+    ]);
+
+    const succeeded = outcomes.filter((r) => r.isSuccess).length;
+    const refused = outcomes.filter(
+      (r) => r.isFailure && r.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
+    ).length;
+    const remaining = await activeManagersOf([managerA, managerB]);
+    const events =
+      (await staffEvents(managerA, EventTypes.ADMIN_STAFF_REVOKED)) +
+      (await staffEvents(managerB, EventTypes.ADMIN_STAFF_REVOKED));
+    const loser = remaining[0] === managerA ? managerB : managerA;
+
+    console.log(`[2.${round}] two managers revoke each other ->`, {
+      succeeded,
+      refused,
+      remaining,
+    });
+    check("exactly one of the two revocations wins", succeeded === 1 && refused === 1);
+    check("one manager remains", remaining.length === 1);
+    check("only the winning revocation is announced", events === 1);
+    check(
+      "the revoked member's mirror role is written with the row",
+      (await mirrorRole(loser)) === "user",
+    );
+  }
+}
+
+async function isBanned(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ banned: authSchema.user.banned })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, userId));
+
+  return row?.banned === true;
+}
+
+const fullPermissions = ["users.moderate", "staff.manage"] as const;
+
+function banWrite(userId: string) {
+  return async () => {
+    await db.update(authSchema.user).set({ banned: true }).where(eq(authSchema.user.id, userId));
+
+    return Result.ok<void, never>(undefined);
+  };
+}
+
+async function proveBanGuardHolds(): Promise<void> {
+  const service = staffService();
+
+  for (let round = 1; round <= ROUNDS; round += 1) {
+    await resetManagers([managerA, managerB]);
+
+    const outcomes = await Promise.all([
+      service.moderateBan(
+        { actorPermissions: fullPermissions, targetUserId: managerB },
+        banWrite(managerB),
+      ),
+      service.moderateBan(
+        { actorPermissions: fullPermissions, targetUserId: managerA },
+        banWrite(managerA),
+      ),
+    ]);
+    const succeeded = outcomes.filter((r) => r.isSuccess).length;
+    const refused = outcomes.filter(
+      (r) => r.isFailure && r.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
+    ).length;
+    const banned = [await isBanned(managerA), await isBanned(managerB)].filter(Boolean).length;
+
+    console.log(`[4.${round}] two managers ban each other ->`, { succeeded, refused, banned });
+    check("exactly one of the two bans wins", succeeded === 1 && refused === 1 && banned === 1);
+  }
+
+  await resetManagers([managerA, managerB]);
+  await db.update(authSchema.user).set({ banned: true }).where(eq(authSchema.user.id, managerA));
+  check(
+    "a banned manager does not count: the other one cannot be revoked",
+    (await service.revoke({ actorUserId: plainUser, targetUserId: managerB })).isFailure,
+  );
+
+  await db
+    .update(authSchema.user)
+    .set({ banExpires: new Date(Date.now() - 1000) })
+    .where(eq(authSchema.user.id, managerA));
+  check(
+    "a manager whose ban has expired counts again",
+    (await service.revoke({ actorUserId: plainUser, targetUserId: managerB })).isSuccess,
+  );
+}
+
+async function proveModerationTarget(): Promise<void> {
+  await resetManagers([managerA]);
+  const support = { actorPermissions: ["users.moderate"] as const };
+  const service = staffService([listedId]);
+  const allowed = async () => Result.ok<void, never>(undefined);
+
+  const onManager = await service.moderate({ ...support, targetUserId: managerA }, allowed);
+  const onListed = await service.moderate({ ...support, targetUserId: listedId }, allowed);
+  const onPlain = await service.moderate({ ...support, targetUserId: plainUser }, allowed);
+  const banListed = await service.moderateBan({ ...support, targetUserId: listedId }, allowed);
+
+  check(
+    "support cannot act on a manager or a listed id, and can on a plain user",
+    onManager.isFailure &&
+      onManager.getError().code === "ADMIN_USER_STAFF_TARGET_FORBIDDEN" &&
+      onListed.isFailure &&
+      banListed.isFailure &&
+      onPlain.isSuccess,
+  );
+}
+
+async function proveWipeRevokes(): Promise<void> {
+  await resetManagers([leaver, managerA]);
+  await db.insert(staffSchema.staffPermissionOverride).values({
+    id: crypto.randomUUID(),
+    userId: leaver,
+    permission: "audit.read",
+    effect: "grant",
+  });
+  await db
+    .update(authSchema.user)
+    .set({ role: "admin", pendingDeletionUntil: new Date(Date.now() - 1000) })
+    .where(eq(authSchema.user.id, leaver));
+
+  const wiped = await di.RgpdService.executeAccountWipe({ userId: leaver });
+  console.log("[5] wipe ->", wiped.isFailure ? wiped.getError() : "success");
+  check("the wipe of a manager succeeds", wiped.isSuccess);
+
+  const [row] = await db
+    .select({ revokedAt: staffSchema.staffMember.revokedAt })
+    .from(staffSchema.staffMember)
+    .where(eq(staffSchema.staffMember.userId, leaver));
+  const overrides = await db
+    .select({ revokedAt: staffSchema.staffPermissionOverride.revokedAt })
+    .from(staffSchema.staffPermissionOverride)
+    .where(eq(staffSchema.staffPermissionOverride.userId, leaver));
+  check("the wipe revokes the staff row", row?.revokedAt instanceof Date);
+  check(
+    "the wipe revokes the overrides",
+    overrides.length === 1 && overrides.every((o) => o.revokedAt !== null),
+  );
+  check("the wipe resets the mirror", (await mirrorRole(leaver)) === "user");
+
+  const [event] = await db
+    .select({ payload: outboxSchema.outboxEvent.payload })
+    .from(outboxSchema.outboxEvent)
+    .where(
+      and(
+        eq(outboxSchema.outboxEvent.aggregateId, leaver),
+        eq(outboxSchema.outboxEvent.eventType, EventTypes.ADMIN_STAFF_REVOKED),
+      ),
+    );
+  check(
+    "the wipe announces the revocation with the member as actor",
+    JSON.stringify(event?.payload).includes(`"actorUserId":"${leaver}"`),
+  );
+
+  check(
+    "the wiped manager no longer counts",
+    (await staffService().revoke({ actorUserId: plainUser, targetUserId: managerA })).isFailure,
+  );
+
+  await resetManagers([ghost, managerA]);
+  await db
+    .update(authSchema.user)
+    .set({ deletedAt: new Date() })
+    .where(eq(authSchema.user.id, ghost));
+  check(
+    "an active row on a deleted account does not count either",
+    (await staffService().revoke({ actorUserId: plainUser, targetUserId: managerA })).isFailure,
+  );
+  await db.update(authSchema.user).set({ deletedAt: null }).where(eq(authSchema.user.id, ghost));
+}
+
+async function proveDeletionRefused(): Promise<void> {
+  await resetManagers([managerA]);
+  await db.insert(authSchema.account).values({
+    id: crypto.randomUUID(),
+    accountId: managerA,
+    providerId: "credential",
+    userId: managerA,
+    password: await hashPassword(PASSWORD),
+  });
+
+  const refused = await di.RgpdService.requestAccountDeletion({
+    userId: managerA,
+    password: PASSWORD,
+  });
+  console.log("[6] last manager asks deletion ->", refused.isFailure ? refused.getError() : "ok");
+  check(
+    "the last manager cannot request deletion",
+    refused.isFailure && refused.getError().code === "ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN",
+  );
+
+  const [state] = await db
+    .select({ pending: authSchema.user.pendingDeletionUntil })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, managerA));
+  check("the refusal marks nothing", state?.pending === null);
+
+  await db
+    .insert(staffSchema.staffMember)
+    .values({ userId: managerB, role: "manager", source: "console" });
+  await db
+    .update(authSchema.user)
+    .set({ pendingDeletionUntil: new Date(Date.now() + 60_000) })
+    .where(eq(authSchema.user.id, managerB));
+  const stillRefused = await di.RgpdService.requestAccountDeletion({
+    userId: managerA,
+    password: PASSWORD,
+  });
+  check("a manager about to leave does not count as remaining", stillRefused.isFailure);
+}
+
+async function proveReviveAndRegrant(): Promise<void> {
+  await db
+    .insert(staffSchema.staffMember)
+    .values({ userId: revivedId, role: "support", source: "console", revokedAt: new Date() });
+  const service = new StaffAccessService(
+    di.IStaffStore,
+    di.IOutboxRepository,
+    di.ITransactionService,
+    { PLATFORM_ADMIN_IDS: [revivedId], PLATFORM_ADMIN_REQUIRE_MFA: false },
+  );
+  const user = { id: revivedId, twoFactorEnabled: false };
+
+  await Promise.all(
+    Array.from({ length: RACERS }, () => service.gate(user, { impersonatedBy: null })),
+  );
+  const [revived] = await db
+    .select({
+      role: staffSchema.staffMember.role,
+      source: staffSchema.staffMember.source,
+      revokedAt: staffSchema.staffMember.revokedAt,
+    })
+    .from(staffSchema.staffMember)
+    .where(eq(staffSchema.staffMember.userId, revivedId));
+  console.log("[7] revived ->", revived);
+  check(
+    "a listed id's revoked row revives as an env manager",
+    revived?.role === "manager" && revived.source === "env" && revived.revokedAt === null,
+  );
+  check(
+    "the revival is announced once however many requests race",
+    (await staffEvents(revivedId, EventTypes.ADMIN_STAFF_ADDED)) === 1,
+  );
+
+  await service.gate(user, { impersonatedBy: null });
+  check(
+    "a later request writes and announces nothing",
+    (await staffEvents(revivedId, EventTypes.ADMIN_STAFF_ADDED)) === 1,
+  );
+
+  await db
+    .insert(staffSchema.staffMember)
+    .values({ userId: formerListed, role: "manager", source: "env" });
+  const regranted = await staffService().assignRole({
+    actorUserId: managerA,
+    targetUserId: formerListed,
+    role: "manager",
+  });
+  const [flipped] = await db
+    .select({ source: staffSchema.staffMember.source })
+    .from(staffSchema.staffMember)
+    .where(eq(staffSchema.staffMember.userId, formerListed));
+  check(
+    "re-granting a de-listed id flips the source and announces it",
+    regranted.isSuccess &&
+      flipped?.source === "console" &&
+      (await staffEvents(formerListed, EventTypes.ADMIN_STAFF_ADDED)) === 1,
+  );
+}
+
+async function proveImpersonatorRecheck(): Promise<void> {
+  await db
+    .insert(staffSchema.staffMember)
+    .values({ userId: supportActor, role: "support", source: "console" });
+  const service = di.StaffAccessService;
+
+  check("a support member holds impersonation", await service.impersonatorHolds(supportActor));
+
+  await db
+    .update(staffSchema.staffMember)
+    .set({ role: "auditor" })
+    .where(eq(staffSchema.staffMember.userId, supportActor));
+  check("a demoted one does not", !(await service.impersonatorHolds(supportActor)));
+
+  await db
+    .update(staffSchema.staffMember)
+    .set({ role: "support", revokedAt: new Date() })
+    .where(eq(staffSchema.staffMember.userId, supportActor));
+  check("a revoked one does not", !(await service.impersonatorHolds(supportActor)));
+}
+
+async function refusedByCheck(write: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await write();
+
+    return false;
+  } catch (err) {
+    return JSON.stringify(err, Object.getOwnPropertyNames(err)).includes("_check");
+  }
+}
+
+async function proveCheckConstraints(): Promise<void> {
+  check(
+    "the database refuses an unknown source",
+    await refusedByCheck(() =>
+      db
+        .insert(staffSchema.staffMember)
+        .values({ userId: ghost, role: "manager", source: "legacy" }),
+    ),
+  );
+
+  await db
+    .insert(staffSchema.staffMember)
+    .values({ userId: ghost, role: "support", source: "console" })
+    .onConflictDoNothing();
+  check(
+    "the database refuses an unknown effect",
+    await refusedByCheck(() =>
+      db.insert(staffSchema.staffPermissionOverride).values({
+        id: crypto.randomUUID(),
+        userId: ghost,
+        permission: "audit.read",
+        effect: "maybe",
+      }),
+    ),
+  );
 }
 
 async function proveMigrationDataStep(): Promise<void> {
@@ -236,7 +590,13 @@ async function proveMigrationDataStep(): Promise<void> {
     .from(staffSchema.staffMember)
     .where(eq(staffSchema.staffMember.userId, plainUser));
 
-  console.log("[3] data step ->", { legacy, plain });
+  const [deleted] = await db
+    .select({ role: staffSchema.staffMember.role })
+    .from(staffSchema.staffMember)
+    .where(eq(staffSchema.staffMember.userId, legacyDeleted));
+
+  console.log("[3] data step ->", { legacy, plain, deleted });
+  check("a deleted admin gets no row", deleted === undefined);
   check(
     "an existing role = admin user gets a manager row",
     legacy?.role === "manager" && legacy.source === "migration",
@@ -264,7 +624,17 @@ async function main(): Promise<void> {
   await seed();
 
   await proveBootstrapEmitsOnce();
-  await proveLastManagerHolds();
+  await withOnlyProbeManagers(async () => {
+    await proveLastManagerHolds();
+    await proveBanGuardHolds();
+    await proveModerationTarget();
+    await proveWipeRevokes();
+    await proveDeletionRefused();
+  });
+  await resetManagers([]);
+  await proveReviveAndRegrant();
+  await proveImpersonatorRecheck();
+  await proveCheckConstraints();
   await proveMigrationDataStep();
 
   await cleanup();
@@ -274,7 +644,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   console.log(
-    "\nAll assertions passed, the bootstrap and the last-manager guard hold under concurrency.",
+    "\nAll assertions passed, the bootstrap, the guards and the wipe hold against a real database.",
   );
   process.exit(0);
 }

@@ -85,7 +85,6 @@ const fakeRow = {
   id: "u-1",
   email: "a@example.com",
   name: "A",
-  role: "admin",
   banned: false,
   banReason: null,
   banExpires: null,
@@ -110,7 +109,6 @@ describe("DrizzleAdminUserStore", () => {
       const rows = (await store.listUsers({ limit: 50 })).getValue();
       expect(rows).toHaveLength(1);
       expect(rows[0]?.id).toBe("u-1");
-      expect(rows[0]?.role.unwrap()).toBe("admin");
       expect(rows[0]?.banReason.isNone()).toBe(true);
     });
 

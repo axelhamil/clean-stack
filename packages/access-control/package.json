@@ -12,7 +12,8 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "better-auth": "1.7.14"
+    "better-auth": "1.7.14",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",

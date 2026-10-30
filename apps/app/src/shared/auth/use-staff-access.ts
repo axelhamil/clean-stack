@@ -1,7 +1,7 @@
-import type { StaffPermission } from "@packages/access-control";
+import { authorizeStaff, type StaffPermission } from "@packages/access-control";
 import { useQuery } from "@tanstack/react-query";
 import { sessionQueryOptions } from "../api/queries/session";
-import { staffCan, staffOf } from "./staff-access";
+import { staffOf } from "./staff-access";
 
 export function useStaffAccess() {
   const { data: session } = useQuery(sessionQueryOptions);
@@ -9,6 +9,6 @@ export function useStaffAccess() {
 
   return {
     staff,
-    can: (permission: StaffPermission) => staffCan(staff, permission),
+    can: (permission: StaffPermission) => authorizeStaff(staff, permission),
   };
 }

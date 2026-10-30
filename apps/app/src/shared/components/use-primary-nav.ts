@@ -1,3 +1,4 @@
+import { staffReachable } from "@packages/access-control";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Settings, ShieldCheck } from "lucide-react";
@@ -31,9 +32,9 @@ const PRIMARY_NAV = [
 export function usePrimaryNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: session } = useQuery(sessionQueryOptions);
-  const staffReachable = staffOf(session)?.mfaOk === true;
+  const reachable = staffReachable(staffOf(session));
 
-  return PRIMARY_NAV.filter((entry) => staffReachable || !entry.staffOnly).map((entry) => ({
+  return PRIMARY_NAV.filter((entry) => reachable || !entry.staffOnly).map((entry) => ({
     ...entry,
     active: pathname === entry.section || pathname.startsWith(`${entry.section}/`),
   }));

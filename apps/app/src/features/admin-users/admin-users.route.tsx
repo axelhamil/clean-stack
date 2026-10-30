@@ -24,11 +24,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
 import type { UserFilters } from "./admin-user-filters";
-import {
-  isPlatformRole,
-  PLATFORM_ROLE_LABEL_KEYS,
-  USER_STATUS_LABEL_KEYS,
-} from "./admin-user-labels";
+import { USER_STATUS_LABEL_KEYS } from "./admin-user-labels";
 import { adminUsersInfiniteQueryOptions } from "./api/admin-users.queries";
 import { UserRow } from "./components/user-row";
 
@@ -40,10 +36,9 @@ export const Route = createFileRoute("/_protected/_shell/_admin/admin/users")({
 });
 
 function AdminUsersPage() {
-  const { t } = useTranslation(["admin", "common"]);
+  const { t } = useTranslation("admin");
   const [filters, setFilters] = useState<UserFilters>({
     search: "",
-    role: undefined,
     banned: undefined,
   });
 
@@ -61,25 +56,6 @@ function AdminUsersPage() {
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
-
-        <Select
-          value={filters.role ?? ALL}
-          onValueChange={(v) =>
-            setFilters((f) => ({
-              ...f,
-              role: isPlatformRole(v) ? v : undefined,
-            }))
-          }
-        >
-          <SelectTrigger aria-label={t("users.table.role")} className="flex-1 sm:w-44 sm:flex-none">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("users.allRolesPlaceholder")}</SelectItem>
-            <SelectItem value="admin">{t(PLATFORM_ROLE_LABEL_KEYS.admin)}</SelectItem>
-            <SelectItem value="user">{t(PLATFORM_ROLE_LABEL_KEYS.user)}</SelectItem>
-          </SelectContent>
-        </Select>
 
         <Select
           value={filters.banned === undefined ? ALL : String(filters.banned)}
@@ -104,7 +80,7 @@ function AdminUsersPage() {
         </Select>
       </div>
 
-      {query.isLoading && <SkeletonTable label={t("users.loading")} columns={5} />}
+      {query.isLoading && <SkeletonTable label={t("users.loading")} columns={4} />}
 
       {query.isError && <LoadErrorAlert message={t("users.loadFailed")} />}
 
@@ -118,7 +94,6 @@ function AdminUsersPage() {
             <TableRow>
               <TableHead>{t("users.table.email")}</TableHead>
               <TableHead>{t("users.table.name")}</TableHead>
-              <TableHead>{t("users.table.role")}</TableHead>
               <TableHead>{t("users.table.status")}</TableHead>
               <TableHead>{t("users.table.created")}</TableHead>
             </TableRow>

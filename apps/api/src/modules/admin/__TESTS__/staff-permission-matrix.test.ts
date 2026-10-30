@@ -50,7 +50,6 @@ const REQUIRED: Record<string, string> = {
   "POST /admin/users/:id/unban": "users.moderate",
   "POST /admin/users/:id/reset-password": "users.moderate",
   "DELETE /admin/users/:id/sessions": "users.moderate",
-  "PUT /admin/users/:id/role": "users.role",
   "POST /admin/impersonation/:id/start": "users.impersonate",
   "GET /admin/orgs": "orgs.read",
   "GET /admin/orgs/:id": "orgs.read",

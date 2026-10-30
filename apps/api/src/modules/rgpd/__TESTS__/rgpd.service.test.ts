@@ -7,6 +7,11 @@ import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
+import type {
+  IStaffStore,
+  StaffManagerRecord,
+  StaffRecord,
+} from "../../../shared/ports/staff-store.port";
 import type { IStorageService } from "../../../shared/ports/storage.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
@@ -123,6 +128,8 @@ function buildService(deps: {
   uow?: IUnitOfWork;
   outbox?: IOutboxRepository;
   instrumentation?: IInstrumentation;
+  staff?: IStaffStore;
+  listed?: string[];
 }): RgpdService {
   return new RgpdService(
     deps.repo,
@@ -131,7 +138,18 @@ function buildService(deps: {
     deps.uow ?? uow.unitOfWork,
     deps.outbox ?? mockPort<IOutboxRepository>(),
     deps.instrumentation ?? new NoOpInstrumentation(),
+    deps.staff ?? makeStaff(Option.none(), []),
+    { PLATFORM_ADMIN_IDS: deps.listed ?? [] },
   );
+}
+
+function makeStaff(row: Option<StaffRecord>, managers: StaffManagerRecord[]) {
+  const staff = mockPort<IStaffStore>();
+  staff.findActive.mockImplementation(async () => Result.ok(row));
+  staff.lockActiveManagers.mockImplementation(async () => Result.ok(managers));
+  staff.revoke.mockImplementation(async () => Result.ok());
+
+  return staff;
 }
 
 function makeService(opts: {
@@ -334,11 +352,150 @@ describe("RgpdService", () => {
     });
   });
 
+  describe("requestAccountDeletion by staff", () => {
+    const managerRow = Option.some<StaffRecord>({
+      userId: "u1",
+      role: "manager",
+      source: "console",
+      overrides: [],
+    });
+    const request = { userId: "u1", password: "pw" };
+
+    it("refuses the last manager with an actionable error and marks nothing", async () => {
+      const repo = makeRepo();
+      const service = buildService({
+        repo,
+        email,
+        staff: makeStaff(managerRow, [{ userId: "u1", source: "console" }]),
+      });
+
+      const result = await service.requestAccountDeletion(request);
+
+      expect(result.getError().code).toBe("ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN");
+      expect(repo.markPendingDeletion).not.toHaveBeenCalled();
+    });
+
+    it("lets a manager go when another one remains", async () => {
+      const repo = makeRepo();
+      const service = buildService({
+        repo,
+        email,
+        staff: makeStaff(managerRow, [
+          { userId: "u1", source: "console" },
+          { userId: "u2", source: "console" },
+        ]),
+      });
+
+      expect((await service.requestAccountDeletion(request)).isSuccess).toBe(true);
+    });
+
+    it("lets an env-listed last manager go, the env being the recovery", async () => {
+      const repo = makeRepo();
+      const service = buildService({
+        repo,
+        email,
+        listed: ["u1"],
+        staff: makeStaff(managerRow, [{ userId: "u1", source: "console" }]),
+      });
+
+      expect((await service.requestAccountDeletion(request)).isSuccess).toBe(true);
+    });
+
+    it("lets a support member go without touching the manager lock", async () => {
+      const staff = makeStaff(
+        Option.some<StaffRecord>({
+          userId: "u1",
+          role: "support",
+          source: "console",
+          overrides: [],
+        }),
+        [],
+      );
+      const service = buildService({ repo: makeRepo(), email, staff });
+
+      expect((await service.requestAccountDeletion(request)).isSuccess).toBe(true);
+      expect(staff.lockActiveManagers).not.toHaveBeenCalled();
+    });
+  });
+
   describe("executeAccountWipe", () => {
     const elapsedState: UserDeletionState = {
       ...baseState,
       pendingDeletionUntil: Option.some(new Date(Date.now() - 1000)),
     };
+
+    it("revokes the staff row of a wiped member and announces it with the member as actor", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const staff = makeStaff(
+        Option.some<StaffRecord>({
+          userId: "u1",
+          role: "manager",
+          source: "console",
+          overrides: [],
+        }),
+        [],
+      );
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockImplementation(async () => {});
+      const service = buildService({ repo, email, staff, outbox });
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(staff.revoke).toHaveBeenCalledWith("u1");
+      expect(
+        enqueuedEvents(outbox).filter((e) => e.eventType === EventTypes.ADMIN_STAFF_REVOKED),
+      ).toEqual([
+        {
+          eventType: EventTypes.ADMIN_STAFF_REVOKED,
+          aggregateId: "u1",
+          payload: { actorUserId: "u1", userId: "u1", role: "manager" },
+        },
+      ]);
+    });
+
+    it("writes nothing on the staff side for a user who is not staff", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const staff = makeStaff(Option.none(), []);
+      const service = buildService({ repo, email, staff });
+
+      await service.executeAccountWipe({ userId: "u1" });
+
+      expect(staff.revoke).not.toHaveBeenCalled();
+    });
+
+    it("rolls the wipe back when the staff revocation fails", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const staff = makeStaff(
+        Option.some<StaffRecord>({
+          userId: "u1",
+          role: "support",
+          source: "console",
+          overrides: [],
+        }),
+        [],
+      );
+      staff.revoke.mockImplementation(async () =>
+        Result.fail({ code: "ADMIN_STAFF_PROVIDER_FAILURE", message: "down" }),
+      );
+      const service = buildService({ repo, email, staff });
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.getError().code).toBe("ACCOUNT_WIPE_PROVIDER_FAILURE");
+    });
 
     it("anonymizes via repo, deletes storage prefix, and emails the user", async () => {
       const repo = makeRepo({

@@ -27,7 +27,6 @@ mock.module("../../event-emitter", () => ({
 const authApi = {
   banUser: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
   unbanUser: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
-  setRole: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
   revokeUserSessions: mock(async (_args: unknown) => ({ success: true })),
   requestPasswordReset: mock(async (_args: unknown) => ({ status: true })),
 };
@@ -110,35 +109,6 @@ describe("AdminActionService", () => {
       const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_UNBANNED);
       expect(event?.payload.actorUserId).toBe("admin-1");
       expect(event?.payload.userId).toBe("u-2");
-    });
-  });
-
-  describe("setRole", () => {
-    it("passes headers to auth.api.setRole", async () => {
-      authApi.setRole.mockClear();
-      const headers = makeHeaders();
-      await service().setRole({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        role: "admin",
-        previousRole: "user",
-        headers,
-      });
-      expect(authApi.setRole).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("records the previous role in the event payload", async () => {
-      emitted.length = 0;
-      await service().setRole({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        role: "admin",
-        previousRole: "user",
-        headers: makeHeaders(),
-      });
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_ROLE_CHANGED);
-      expect(event?.payload.from).toBe("user");
-      expect(event?.payload.to).toBe("admin");
     });
   });
 

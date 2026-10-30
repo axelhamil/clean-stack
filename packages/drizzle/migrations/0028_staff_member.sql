@@ -5,7 +5,8 @@ CREATE TABLE "staff_member" (
 	"created_by" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
-	"revoked_at" timestamp
+	"revoked_at" timestamp,
+	CONSTRAINT "staff_member_source_check" CHECK ("staff_member"."source" IN ('env', 'console', 'migration'))
 );
 --> statement-breakpoint
 CREATE TABLE "staff_permission_override" (
@@ -16,7 +17,8 @@ CREATE TABLE "staff_permission_override" (
 	"created_by" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"expires_at" timestamp,
-	"revoked_at" timestamp
+	"revoked_at" timestamp,
+	CONSTRAINT "staff_permission_override_effect_check" CHECK ("staff_permission_override"."effect" IN ('grant', 'deny'))
 );
 --> statement-breakpoint
 ALTER TABLE "staff_member" ADD CONSTRAINT "staff_member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -26,5 +28,5 @@ ALTER TABLE "staff_permission_override" ADD CONSTRAINT "staff_permission_overrid
 CREATE INDEX "staff_member_role_revoked_idx" ON "staff_member" USING btree ("role","revoked_at");--> statement-breakpoint
 CREATE INDEX "staff_permission_override_user_idx" ON "staff_permission_override" USING btree ("user_id");--> statement-breakpoint
 INSERT INTO "staff_member" ("user_id", "role", "source")
-SELECT "id", 'manager', 'migration' FROM "user" WHERE "role" = 'admin'
+SELECT "id", 'manager', 'migration' FROM "user" WHERE "role" = 'admin' AND "deleted_at" IS NULL
 ON CONFLICT DO NOTHING;

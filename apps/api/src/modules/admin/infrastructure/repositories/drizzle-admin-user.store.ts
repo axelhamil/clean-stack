@@ -33,7 +33,6 @@ function userColumns() {
     id: user.id,
     email: user.email,
     name: user.name,
-    role: user.role,
     banned: user.banned,
     banReason: user.banReason,
     banExpires: user.banExpires,
@@ -57,7 +56,6 @@ function toUserRow(row: UserSelection): AdminUserRow {
     id: row.id,
     email: row.email,
     name: row.name,
-    role: Option.fromNullable(row.role),
     banned: row.banned === true,
     banReason: Option.fromNullable(row.banReason),
     banExpires: Option.fromNullable(row.banExpires),
@@ -93,7 +91,6 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
               or(ilike(user.email, `%${input.search}%`), ilike(user.name, `%${input.search}%`)),
             );
           }
-          if (input.role) conditions.push(eq(user.role, input.role));
           if (input.banned !== undefined) conditions.push(eq(user.banned, input.banned));
           if (input.cursor) conditions.push(lt(user.createdAt, new Date(input.cursor)));
           if (input.organizationId) {

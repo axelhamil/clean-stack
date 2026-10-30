@@ -4,7 +4,7 @@ The capability model shared by the server, the route gates and the UI: one state
 
 ## Layout
 
-`src/staff.ts` holds the platform staff section, re-exported by `index.ts`: `STAFF_ROLES`, `STAFF_PERMISSIONS`, `permissionsOfRole`, `effectivePermissions(role, overrides, now)`. `src/index.ts` exports `ac` (the access-control instance), `roles = { owner, admin, member }`, `ORG_ROLES`, `STATEMENTS`, `OrgRole`, `OrgPermissions`, `authorizeRole(role, permissions, connector?)`, `rolesWith(permissions)`, and the personal-org helpers (`isPersonalOrg(slug)`, `PERSONAL_ORG_SLUG_PREFIX`, `PERSONAL_ORG_SLUG_LIKE_PATTERN`).
+`src/staff.ts` holds the platform staff section, re-exported by `index.ts`: `STAFF_ROLES`, `STAFF_PERMISSIONS`, `permissionsOfRole`, `effectivePermissions(role, overrides, now)`, `staffAccessSchema`, `authorizeStaff(access, permission)`, `staffReachable(access)`. `src/index.ts` exports `ac` (the access-control instance), `roles = { owner, admin, member }`, `ORG_ROLES`, `STATEMENTS`, `OrgRole`, `OrgPermissions`, `authorizeRole(role, permissions, connector?)`, `rolesWith(permissions)`, and the personal-org helpers (`isPersonalOrg(slug)`, `PERSONAL_ORG_SLUG_PREFIX`, `PERSONAL_ORG_SLUG_LIKE_PATTERN`).
 
 ## Rules
 

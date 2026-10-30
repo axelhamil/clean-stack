@@ -1,25 +1,38 @@
 import {
   effectivePermissions,
+  type StaffAccess,
   type StaffPermission,
-  type StaffRole,
 } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
-import type { StaffRecord } from "./ports/staff-store.port";
+import type { StaffRecord, StaffSource } from "./ports/staff-store.port";
 
 export interface StaffEnv {
   PLATFORM_ADMIN_IDS: readonly string[];
   PLATFORM_ADMIN_REQUIRE_MFA: boolean;
 }
 
-export interface StaffAccess {
-  role: StaffRole;
-  permissions: StaffPermission[];
-  mfaOk: boolean;
-}
+export type StaffListing = Pick<StaffEnv, "PLATFORM_ADMIN_IDS">;
 
 export interface StaffUser {
   id: string;
   twoFactorEnabled?: boolean | null;
+}
+
+export const IMPERSONATE_PERMISSION: StaffPermission = "users.impersonate";
+
+export function grantsStaffAccess(
+  row: { userId: string; source: StaffSource },
+  env: StaffListing,
+): boolean {
+  return row.source !== "env" || env.PLATFORM_ADMIN_IDS.includes(row.userId);
+}
+
+export function isLastManager(
+  targetUserId: string,
+  managers: ReadonlyArray<{ userId: string; source: StaffSource }>,
+  env: StaffListing,
+): boolean {
+  return !managers.some((m) => m.userId !== targetUserId && grantsStaffAccess(m, env));
 }
 
 export function staffAccessOf(
@@ -39,7 +52,7 @@ export function staffAccessOf(
   }
 
   return staffRow
-    .filter((row) => row.source !== "env")
+    .filter((row) => grantsStaffAccess(row, env))
     .map((row) => ({
       role: row.role,
       permissions: effectivePermissions(

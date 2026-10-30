@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { StaffRole } from "@packages/access-control";
-import { Option, Result } from "@packages/ddd-kit";
+import { type AppError, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
@@ -21,7 +21,6 @@ const USER: AdminUserRow = {
   id: TARGET,
   email: "t@example.com",
   name: "T",
-  role: Option.none(),
   banned: false,
   banReason: Option.none(),
   banExpires: Option.none(),
@@ -54,7 +53,9 @@ function setup(given: {
   outbox.enqueue.mockImplementation(async () => {});
 
   const { unitOfWork, outcome } = mockUnitOfWork();
-  const service = new StaffService(store, users, outbox, unitOfWork, given.listed ?? []);
+  const service = new StaffService(store, users, outbox, unitOfWork, {
+    PLATFORM_ADMIN_IDS: given.listed ?? [],
+  });
 
   return { store, outbox, service, outcome };
 }
@@ -144,6 +145,201 @@ describe("StaffService", () => {
       const result = await service.assignRole({ ...change, role: "auditor" });
 
       expect(result.getError().code).toBe("ADMIN_STAFF_LISTED_FORBIDDEN");
+    });
+  });
+
+  describe("assignRole on a row that grants nothing", () => {
+    const delisted = Option.some<StaffRecord>({
+      userId: TARGET,
+      role: "manager",
+      source: "env",
+      overrides: [],
+    });
+
+    it("treats a de-listed row as absent and announces the grant", async () => {
+      const { store, outbox, service } = setup({ target: delisted });
+
+      const result = await service.assignRole({ ...change, role: "manager" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.assign).toHaveBeenCalledWith({
+        userId: TARGET,
+        role: "manager",
+        createdBy: ACTOR,
+      });
+      expect(enqueuedEvents(outbox)).toEqual([
+        {
+          eventType: EventTypes.ADMIN_STAFF_ADDED,
+          aggregateId: TARGET,
+          payload: { actorUserId: ACTOR, userId: TARGET, role: "manager", source: "console" },
+        },
+      ]);
+    });
+
+    it("answers not found when revoking it, since it grants nothing", async () => {
+      const { store, service } = setup({ target: delisted });
+
+      expect((await service.revoke(change)).getError().code).toBe("ADMIN_STAFF_NOT_FOUND");
+      expect(store.revoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("moderate", () => {
+    const allowed = async () => Result.ok<void, never>(undefined);
+    const managerPermissions = ["users.moderate", "staff.manage"] as const;
+    const supportPermissions = ["users.moderate"] as const;
+
+    it("lets a moderator act on a plain user", async () => {
+      const { service } = setup({});
+
+      const result = await service.moderate(
+        { actorPermissions: supportPermissions, targetUserId: TARGET },
+        allowed,
+      );
+
+      expect(result.isSuccess).toBe(true);
+    });
+
+    it("refuses a moderator without staff.manage on an active staff member", async () => {
+      const { service } = setup({ target: member("auditor") });
+      let ran = false;
+
+      const result = await service.moderate(
+        { actorPermissions: supportPermissions, targetUserId: TARGET },
+        async () => {
+          ran = true;
+          return Result.ok<void, never>(undefined);
+        },
+      );
+
+      expect(result.getError().code).toBe("ADMIN_USER_STAFF_TARGET_FORBIDDEN");
+      expect(ran).toBe(false);
+    });
+
+    it("refuses a moderator without staff.manage on a listed id with no row", async () => {
+      const { service } = setup({ listed: [TARGET] });
+
+      const result = await service.moderate(
+        { actorPermissions: supportPermissions, targetUserId: TARGET },
+        allowed,
+      );
+
+      expect(result.getError().code).toBe("ADMIN_USER_STAFF_TARGET_FORBIDDEN");
+    });
+
+    it("treats a de-listed row as a plain user", async () => {
+      const { service } = setup({
+        target: Option.some<StaffRecord>({
+          userId: TARGET,
+          role: "manager",
+          source: "env",
+          overrides: [],
+        }),
+      });
+
+      const result = await service.moderate(
+        { actorPermissions: supportPermissions, targetUserId: TARGET },
+        allowed,
+      );
+
+      expect(result.isSuccess).toBe(true);
+    });
+
+    it("lets a holder of staff.manage act on staff", async () => {
+      const { service } = setup({ target: member("manager") });
+
+      const result = await service.moderate(
+        { actorPermissions: managerPermissions, targetUserId: TARGET },
+        allowed,
+      );
+
+      expect(result.isSuccess).toBe(true);
+    });
+  });
+
+  describe("moderateBan", () => {
+    const managerPermissions = ["users.moderate", "staff.manage"] as const;
+    const input = { actorPermissions: managerPermissions, targetUserId: TARGET };
+
+    it("refuses banning the last manager and rolls back", async () => {
+      const { service, outcome } = setup({
+        target: member("manager"),
+        managers: onlyTargetManages,
+      });
+      let banned = false;
+
+      const result = await service.moderateBan(input, async () => {
+        banned = true;
+        return Result.ok<void, never>(undefined);
+      });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_LAST_MANAGER_FORBIDDEN");
+      expect(banned).toBe(false);
+      expect(outcome()).toBe("rolled_back");
+    });
+
+    it("refuses banning a listed id who is the last manager", async () => {
+      const { service } = setup({ listed: [TARGET], managers: [] });
+
+      const result = await service.moderateBan(input, async () =>
+        Result.ok<void, never>(undefined),
+      );
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_LAST_MANAGER_FORBIDDEN");
+    });
+
+    it("bans a manager when another one remains, under the lock", async () => {
+      const { store, service } = setup({ target: member("manager") });
+      let banned = false;
+
+      const result = await service.moderateBan(input, async () => {
+        banned = true;
+        return Result.ok<void, never>(undefined);
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(banned).toBe(true);
+      expect(store.lockActiveManagers).toHaveBeenCalled();
+    });
+
+    it("bans a plain user whoever the managers are", async () => {
+      const { service } = setup({
+        managers: onlyTargetManages.map((m) => ({ ...m, userId: "x" })),
+      });
+
+      const result = await service.moderateBan(
+        { actorPermissions: ["users.moderate"], targetUserId: TARGET },
+        async () => Result.ok<void, never>(undefined),
+      );
+
+      expect(result.isSuccess).toBe(true);
+    });
+
+    it("refuses a moderator without staff.manage before the guard", async () => {
+      const { service } = setup({ target: member("support") });
+
+      const result = await service.moderateBan(
+        { actorPermissions: ["users.moderate"], targetUserId: TARGET },
+        async () => Result.ok<void, never>(undefined),
+      );
+
+      expect(result.getError().code).toBe("ADMIN_USER_STAFF_TARGET_FORBIDDEN");
+    });
+
+    it("rolls back when the ban itself fails", async () => {
+      const { service, outcome } = setup({});
+
+      const result = await service.moderateBan(
+        { actorPermissions: ["users.moderate"], targetUserId: TARGET },
+        async () =>
+          Result.fail<void, AppError<"ADMIN_ACTION_PROVIDER_FAILURE">>({
+            code: "ADMIN_ACTION_PROVIDER_FAILURE",
+            message: "x",
+          }),
+      );
+
+      expect(result.getError().code).toBe("ADMIN_ACTION_PROVIDER_FAILURE");
+      expect(outcome()).toBe("rolled_back");
     });
   });
 

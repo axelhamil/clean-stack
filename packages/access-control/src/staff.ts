@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const STAFF_ROLES = ["manager", "support", "auditor"] as const;
 
 export const STAFF_PERMISSIONS = [
@@ -56,4 +58,20 @@ export function effectivePermissions(
   ]);
 
   return STAFF_PERMISSIONS.filter((p) => granted.has(p) && !denied.has(p));
+}
+
+export const staffAccessSchema = z.object({
+  role: z.enum(STAFF_ROLES),
+  permissions: z.array(z.enum(STAFF_PERMISSIONS)),
+  mfaOk: z.boolean(),
+});
+
+export type StaffAccess = z.infer<typeof staffAccessSchema>;
+
+export function staffReachable(access: StaffAccess | null): boolean {
+  return access?.mfaOk === true;
+}
+
+export function authorizeStaff(access: StaffAccess | null, permission: StaffPermission): boolean {
+  return staffReachable(access) && access?.permissions.includes(permission) === true;
 }

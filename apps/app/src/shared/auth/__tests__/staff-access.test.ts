@@ -2,7 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { sessionQueryOptions } from "../../api/queries/session";
 import { ensureStaffAccess, ensureStaffPermission } from "../ensure-staff";
-import { staffCan, staffOf } from "../staff-access";
+import { staffOf } from "../staff-access";
 
 const session = (staff: unknown) => ({ user: { id: "u" }, session: { id: "s" }, staff });
 const auditor = { role: "auditor", permissions: ["audit.read"], mfaOk: true };
@@ -27,17 +27,6 @@ describe("staffOf", () => {
 
   it("ignores the auth role: a session with role admin and no staff stays refused", () => {
     expect(staffOf({ user: { id: "u", role: "admin" }, staff: null })).toBeNull();
-  });
-});
-
-describe("staffCan", () => {
-  it("answers from the permissions, never from the role", () => {
-    expect(staffCan(staffOf(session(auditor)), "audit.read")).toBe(true);
-    expect(staffCan(staffOf(session(auditor)), "users.moderate")).toBe(false);
-  });
-
-  it("refuses while the server reports MFA is missing", () => {
-    expect(staffCan(staffOf(session({ ...auditor, mfaOk: false })), "audit.read")).toBe(false);
   });
 });
 

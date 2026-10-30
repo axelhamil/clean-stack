@@ -4,6 +4,8 @@ export default {
     ACCOUNT_PASSWORD_REQUIRED: "Confirmez avec votre mot de passe.",
     ACCOUNT_DELETION_BLOCKED:
       "Réglez la propriété de vos organisations avant de supprimer votre compte.",
+    ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN:
+      "Nommez un autre responsable de l'équipe avant de supprimer votre compte.",
     ACCOUNT_DELETION_NOT_FOUND: "Aucune suppression à annuler.",
     ACCOUNT_PASSWORD_INVALID: "Mot de passe invalide.",
     TWO_FACTOR_REQUIRED: "Confirmez avec votre mot de passe ou votre code d'authentification.",
@@ -125,8 +127,8 @@ export default {
     ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
       "C'est le dernier responsable. Ajoutez-en un autre avant de modifier cet accès.",
     ADMIN_STAFF_NOT_FOUND: "Cette personne ne fait pas partie de l'équipe.",
-    ADMIN_USER_ROLE_STAFF_MANAGED_FORBIDDEN:
-      "Ce compte fait partie de l'équipe. Modifiez son accès depuis l'équipe.",
+    ADMIN_USER_STAFF_TARGET_FORBIDDEN:
+      "Seule une personne qui gère l'équipe peut agir sur un de ses membres.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "Cette action est indisponible pendant l'emprunt d'identité d'un autre utilisateur.",
     POLICY_ACCEPTANCE_REQUIRED:
@@ -236,7 +238,6 @@ export default {
     revokeUserSessions: "Échec de la révocation des sessions",
     resetUserPassword: "Échec de l'envoi de la réinitialisation du mot de passe",
     startImpersonation: "Échec du démarrage de l'emprunt d'identité",
-    setUserRole: "Échec du changement de rôle",
     loadAdminUsers: "Échec du chargement des comptes",
     loadAdminUser: "Échec du chargement du compte",
     loadAdminOrgs: "Échec du chargement des organisations",

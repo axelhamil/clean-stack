@@ -69,7 +69,6 @@ export const VISIBILITY = {
   "admin.impersonation.stopped": "internal",
   "admin.user.banned": "internal",
   "admin.user.unbanned": "internal",
-  "admin.user.role_changed": "internal",
   "admin.user.password_reset": "internal",
   "admin.user.sessions_revoked": "internal",
   "admin.staff.added": "internal",

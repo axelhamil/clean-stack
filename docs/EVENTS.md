@@ -403,7 +403,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **91 events** (35 public + 56 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **7 from `modules/admin/`** (Phase C.3: 5 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **90 events** (35 public + 55 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
@@ -453,13 +453,12 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 ### Via `AdminActionService` / `AdminImpersonationRoutes` (Phase C.3)
 
-Emitted via `emitEvent(outbox, ...)` in `modules/admin/` routes and `AdminActionService`. All 7 events carry `actorUserId` (the operator's id, distinct from `userId` which is the target): actor identification is explicit, never inferred from session state. All events have `organizationId = null` (platform-level, no org context) and `retention: "compliance"`.
+Emitted via `emitEvent(outbox, ...)` in `modules/admin/` routes and `AdminActionService`. All 6 events carry `actorUserId` (the operator's id, distinct from `userId` which is the target): actor identification is explicit, never inferred from session state. All events have `organizationId = null` (platform-level, no org context) and `retention: "compliance"`.
 
 - `ADMIN_IMPERSONATION_STARTED` (`admin.impersonation.started`): emitted in `POST /admin/impersonation/:id/start` after the BetterAuth impersonation session is issued. Payload: `{ actorUserId: string, userId: string, reason: string, ticketRef?: string, ip: string | null, expiresAt: string }`. `reason` is never empty (min 1 char enforced at the API boundary).
 - `ADMIN_IMPERSONATION_STOPPED` (`admin.impersonation.stopped`): emitted in `POST /admin/impersonation/stop` **only** if BetterAuth `stopImpersonating` succeeds. Payload: `{ actorUserId: string, userId: string, durationMs: number }`.
 - `ADMIN_USER_BANNED` (`admin.user.banned`): emitted by `AdminActionService.ban`. Payload: `{ actorUserId: string, userId: string, reason: string, expiresAt: string | null }`. `expiresAt: null` means a permanent ban.
 - `ADMIN_USER_UNBANNED` (`admin.user.unbanned`): emitted by `AdminActionService.unban`. Payload: `{ actorUserId: string, userId: string }`.
-- `ADMIN_USER_ROLE_CHANGED` (`admin.user.role_changed`): emitted by `AdminActionService.setRole`. Payload: `{ actorUserId: string, userId: string, from: string | null, to: string }`. `from` is `null` when the user had no prior platform role.
 - `ADMIN_USER_PASSWORD_RESET` (`admin.user.password_reset`): emitted by `AdminActionService.forcePasswordReset` (triggers a BetterAuth reset email). Payload: `{ actorUserId: string, userId: string }`.
 - `ADMIN_USER_SESSIONS_REVOKED` (`admin.user.sessions_revoked`): emitted by `AdminActionService.revokeSessions`. Payload: `{ actorUserId: string, userId: string, count: number }`. `count` is the number of sessions deleted.
 
@@ -467,7 +466,7 @@ Emitted via `emitEvent(outbox, ...)` in `modules/admin/` routes and `AdminAction
 
 - `ADMIN_STAFF_ADDED` (`admin.staff.added`): a user joined the staff, or came back after a revocation. Payload: `{ actorUserId: string | null, userId: string, role: string, source: "env" | "console" }`. `actorUserId` is `null` for the bootstrap insert of an id listed in `PLATFORM_ADMIN_IDS`, which only the real insert announces.
 - `ADMIN_STAFF_ROLE_CHANGED` (`admin.staff.role_changed`): payload `{ actorUserId: string, userId: string, from: string, to: string }`.
-- `ADMIN_STAFF_REVOKED` (`admin.staff.revoked`): payload `{ actorUserId: string, userId: string, role: string }`.
+- `ADMIN_STAFF_REVOKED` (`admin.staff.revoked`): payload `{ actorUserId: string, userId: string, role: string }`. Also emitted by an account wipe, inside its transaction, with the member as actor since the deletion is their own request.
 
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 
@@ -567,7 +566,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (91 events: 35 public + 56 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (90 events: 35 public + 55 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |

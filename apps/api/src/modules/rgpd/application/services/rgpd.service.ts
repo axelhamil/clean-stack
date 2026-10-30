@@ -7,7 +7,13 @@ import { logger } from "../../../../shared/logger";
 import type { IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
+import {
+  grantsStaffAccess,
+  isLastManager,
+  type StaffListing,
+} from "../../../../shared/staff-access";
 import type {
   ExecuteWipeOutput,
   IRgpdRepository,
@@ -79,6 +85,8 @@ export class RgpdService {
     private readonly transactions: IUnitOfWork,
     private readonly outbox: IOutboxRepository,
     private readonly instrumentation: IInstrumentation,
+    private readonly staff: IStaffStore,
+    private readonly staffEnv: StaffListing,
   ) {}
 
   async preflightAccountDeletion(
@@ -153,6 +161,9 @@ export class RgpdService {
           Date.now() + (env.RGPD_GRACE_PERIOD_DAYS ?? 7) * 24 * 60 * 60 * 1000,
         );
         const txResult = await this.transactions.run(async () => {
+          const refused = await this.refusedLastManager(input.userId);
+          if (refused.isFailure) return refused;
+
           const marked = await this.rgpd.markPendingDeletion(input.userId, until);
           if (marked.isFailure) return marked;
           await emitEvent(
@@ -275,6 +286,11 @@ export class RgpdService {
             const wipe = await this.rgpd.executeWipe(input.userId);
             if (wipe.isFailure) return wipe;
             if (wipe.getValue().alreadyWiped) return wipe;
+
+            const revoked = await this.revokeStaffAccess(input.userId);
+            if (revoked.isFailure)
+              return Result.fail<ExecuteWipeOutput, RgpdError>(revoked.getError());
+
             await emitEvent(
               this.outbox,
               EventTypes.USER_DELETED,
@@ -343,6 +359,45 @@ export class RgpdService {
         return Result.ok({ deletedOrgIds: wipeOutput.deletedOrgIds, storageKeysDeleted });
       },
     );
+  }
+
+  private async refusedLastManager(userId: string): Promise<Result<void, RgpdError>> {
+    if (this.staffEnv.PLATFORM_ADMIN_IDS.includes(userId)) return Result.ok();
+
+    const found = await this.staff.findActive(userId);
+    if (found.isFailure) return Result.fail(found.getError());
+
+    const isManager = found
+      .getValue()
+      .filter((row) => row.role === "manager" && grantsStaffAccess(row, this.staffEnv))
+      .isSome();
+    if (!isManager) return Result.ok();
+
+    const managers = await this.staff.lockActiveManagers();
+    if (managers.isFailure) return Result.fail(managers.getError());
+    if (!isLastManager(userId, managers.getValue(), this.staffEnv)) return Result.ok();
+
+    return Result.fail({
+      code: "ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN",
+      message: "appoint another staff manager before deleting this account",
+    });
+  }
+
+  private async revokeStaffAccess(userId: string): Promise<Result<void, RgpdError>> {
+    const found = await this.staff.findActive(userId);
+    if (found.isFailure) return Result.fail(found.getError());
+    if (found.getValue().isNone()) return Result.ok();
+
+    const revoked = await this.staff.revoke(userId);
+    if (revoked.isFailure) return Result.fail(revoked.getError());
+
+    await emitEvent(this.outbox, EventTypes.ADMIN_STAFF_REVOKED, "user", userId, {
+      actorUserId: userId,
+      userId,
+      role: found.getValue().unwrap().role,
+    });
+
+    return Result.ok();
   }
 
   async processPendingDeletions(

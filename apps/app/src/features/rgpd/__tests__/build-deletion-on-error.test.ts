@@ -43,6 +43,12 @@ describe("buildDeletionOnError", () => {
     expect(reportFieldError).not.toHaveBeenCalled();
   });
 
+  it("closes the dialog when the last manager is refused, the toast says what to do", () => {
+    onError(apiError("ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN"));
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("toasts and keeps the dialog open on any other failure", () => {
     onError(new Error("network"));
 

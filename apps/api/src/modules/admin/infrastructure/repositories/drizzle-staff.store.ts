@@ -1,6 +1,16 @@
 import { isStaffPermission, isStaffRole, type StaffRole } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
-import { and, asc, authSchema, eq, isNull, resolveExecutor, staffSchema } from "@packages/drizzle";
+import {
+  and,
+  asc,
+  authSchema,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  resolveExecutor,
+  staffSchema,
+} from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
@@ -18,13 +28,13 @@ const dbAttrs = { "db.system.name": "postgresql" } as const;
 const MIRROR_STAFF = "admin";
 const MIRROR_PLAIN = "user";
 
-function sourceOf(value: string): StaffSource {
-  if (value === "env" || value === "migration") return value;
+export function sourceOf(value: string): Option<StaffSource> {
+  if (value === "env" || value === "console" || value === "migration") return Option.some(value);
 
-  return "console";
+  return Option.none();
 }
 
-function overrideOf(row: {
+export function overrideOf(row: {
   permission: string;
   effect: string;
   expiresAt: Date | null;
@@ -33,9 +43,24 @@ function overrideOf(row: {
 
   return Option.some({
     permission: row.permission,
-    effect: row.effect === "deny" ? "deny" : "grant",
+    effect: row.effect === "grant" ? "grant" : "deny",
     expiresAt: Option.fromNullable(row.expiresAt),
   });
+}
+
+function stillCountsAsManager(
+  owner: {
+    banned: boolean | null;
+    banExpires: Date | null;
+    deletedAt: Date | null;
+    pendingDeletionUntil: Date | null;
+  },
+  now: Date,
+): boolean {
+  if (owner.deletedAt || owner.pendingDeletionUntil) return false;
+  if (owner.banned !== true) return true;
+
+  return owner.banExpires !== null && owner.banExpires <= now;
 }
 
 export class DrizzleStaffStore implements IStaffStore {
@@ -47,39 +72,47 @@ export class DrizzleStaffStore implements IStaffStore {
     return this.instrumentation.startSpan({ name: "DrizzleStaffStore > findActive" }, async () => {
       try {
         const { staffMember, staffPermissionOverride } = staffSchema;
-        const [row] = await exec
-          .select({ role: staffMember.role, source: staffMember.source })
-          .from(staffMember)
-          .where(and(eq(staffMember.userId, userId), isNull(staffMember.revokedAt)))
-          .limit(1);
-
-        if (!row || !isStaffRole(row.role)) return Result.ok(Option.none());
-
-        const overrides = await exec
+        const query = exec
           .select({
+            role: staffMember.role,
+            source: staffMember.source,
             permission: staffPermissionOverride.permission,
             effect: staffPermissionOverride.effect,
             expiresAt: staffPermissionOverride.expiresAt,
           })
-          .from(staffPermissionOverride)
-          .where(
+          .from(staffMember)
+          .leftJoin(
+            staffPermissionOverride,
             and(
-              eq(staffPermissionOverride.userId, userId),
+              eq(staffPermissionOverride.userId, staffMember.userId),
               isNull(staffPermissionOverride.revokedAt),
             ),
-          );
+          )
+          .where(and(eq(staffMember.userId, userId), isNull(staffMember.revokedAt)));
+
+        const rows = await this.instrumentation.startSpan(
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
+        );
+
+        const [first] = rows;
+        if (!first || !isStaffRole(first.role)) return Result.ok(Option.none());
+
+        const { role } = first;
 
         return Result.ok(
-          Option.some({
+          sourceOf(first.source).map((source) => ({
             userId,
-            role: row.role,
-            source: sourceOf(row.source),
-            overrides: overrides.flatMap((o) => {
-              const parsed = overrideOf(o);
+            role,
+            source,
+            overrides: rows.flatMap(({ permission, effect, expiresAt }) => {
+              if (permission === null || effect === null) return [];
+
+              const parsed = overrideOf({ permission, effect, expiresAt });
 
               return parsed.isSome() ? [parsed.unwrap()] : [];
             }),
-          }),
+          })),
         );
       } catch (err) {
         this.instrumentation.capture(err);
@@ -117,9 +150,10 @@ export class DrizzleStaffStore implements IStaffStore {
         return Result.ok(
           rows.flatMap((row) => {
             const { role } = row;
-            if (!isStaffRole(role)) return [];
+            const source = sourceOf(row.source);
+            if (!isStaffRole(role) || source.isNone()) return [];
 
-            return [{ ...row, role, source: sourceOf(row.source) }];
+            return [{ ...row, role, source: source.unwrap() }];
           }),
         );
       } catch (err) {
@@ -137,20 +171,46 @@ export class DrizzleStaffStore implements IStaffStore {
       async () => {
         try {
           const { staffMember } = staffSchema;
+          const { user } = authSchema;
           const manager: StaffRole = "manager";
-          const query = exec
+          const locked = await exec
             .select({ userId: staffMember.userId, source: staffMember.source })
             .from(staffMember)
             .where(and(eq(staffMember.role, manager), isNull(staffMember.revokedAt)))
             .orderBy(asc(staffMember.userId))
             .for("update");
 
-          const rows = await this.instrumentation.startSpan(
-            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => query.execute(),
+          if (locked.length === 0) return Result.ok([]);
+
+          const owners = await exec
+            .select({
+              id: user.id,
+              banned: user.banned,
+              banExpires: user.banExpires,
+              deletedAt: user.deletedAt,
+              pendingDeletionUntil: user.pendingDeletionUntil,
+            })
+            .from(user)
+            .where(
+              inArray(
+                user.id,
+                locked.map((row) => row.userId),
+              ),
+            );
+
+          const now = new Date();
+          const counted = new Set(
+            owners.filter((owner) => stillCountsAsManager(owner, now)).map((owner) => owner.id),
           );
 
-          return Result.ok(rows.map((row) => ({ ...row, source: sourceOf(row.source) })));
+          return Result.ok(
+            locked.flatMap(({ userId, source }) => {
+              const parsed = sourceOf(source);
+              if (!counted.has(userId) || parsed.isNone()) return [];
+
+              return [{ userId, source: parsed.unwrap() }];
+            }),
+          );
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "staff manager lock failed");
@@ -159,21 +219,25 @@ export class DrizzleStaffStore implements IStaffStore {
     );
   }
 
-  async insertFromEnv(userId: string): Promise<Result<boolean, StaffStoreError>> {
+  async bootstrapFromEnv(userId: string): Promise<Result<boolean, StaffStoreError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
-      { name: "DrizzleStaffStore > insertFromEnv" },
+      { name: "DrizzleStaffStore > bootstrapFromEnv" },
       async () => {
         try {
           const { staffMember } = staffSchema;
-          const inserted = await exec
+          const written = await exec
             .insert(staffMember)
             .values({ userId, role: "manager", source: "env" })
-            .onConflictDoNothing()
+            .onConflictDoUpdate({
+              target: staffMember.userId,
+              set: { role: "manager", source: "env", revokedAt: null, updatedAt: new Date() },
+              where: isNotNull(staffMember.revokedAt),
+            })
             .returning({ userId: staffMember.userId });
 
-          if (inserted.length === 0) return Result.ok(false);
+          if (written.length === 0) return Result.ok(false);
 
           await exec
             .update(authSchema.user)
@@ -205,7 +269,13 @@ export class DrizzleStaffStore implements IStaffStore {
           .values({ ...input, source: "console" })
           .onConflictDoUpdate({
             target: staffSchema.staffMember.userId,
-            set: { role: input.role, source: "console", updatedAt: now, revokedAt: null },
+            set: {
+              role: input.role,
+              source: "console",
+              createdBy: input.createdBy,
+              updatedAt: now,
+              revokedAt: null,
+            },
           });
 
         await exec

@@ -28,6 +28,7 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-wipe-rollback");
 
 import { authSchema, db, eq, sql, TransactionService } from "@packages/drizzle";
+import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "../src/modules/uploads/infrastructure/services/noop-storage.service";
@@ -99,6 +100,8 @@ async function main(): Promise<void> {
     new TransactionService(instrumentation),
     outbox,
     instrumentation,
+    new DrizzleStaffStore(instrumentation),
+    { PLATFORM_ADMIN_IDS: [] },
   );
 
   const result = await service.executeAccountWipe({ userId });

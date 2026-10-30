@@ -9,7 +9,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -30,19 +29,13 @@ import { toast } from "sonner";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
 import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
-import { useStaffAccess } from "../../shared/auth/use-staff-access";
+import { StaffCan } from "../../shared/auth/staff-can";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
-import { EMPTY_VALUE } from "../../shared/utils";
-import {
-  isPlatformRole,
-  PLATFORM_ROLE_LABEL_KEYS,
-  USER_STATUS_LABEL_KEYS,
-} from "./admin-user-labels";
+import { USER_STATUS_LABEL_KEYS } from "./admin-user-labels";
 import {
   banUserMutationOptions,
   resetPasswordMutationOptions,
   revokeSessionsMutationOptions,
-  setRoleMutationOptions,
   startImpersonationMutationOptions,
   unbanUserMutationOptions,
 } from "./api/admin-users.mutations";
@@ -50,7 +43,6 @@ import { adminUserQueryOptions } from "./api/admin-users.queries";
 import { SessionsSection } from "./components/sessions-section";
 import { BanForm } from "./forms/ban-form";
 import { ImpersonateForm } from "./forms/impersonate-form";
-import { SetRoleForm } from "./forms/set-role-form";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/users/$id")({
   beforeLoad: ensureStaffPermission("users.read"),
@@ -63,11 +55,8 @@ function AdminUserDetailPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { can } = useStaffAccess();
-  const canModerate = can("users.moderate");
   const [banOpen, setBanOpen] = useState(false);
   const [impersonateOpen, setImpersonateOpen] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
 
   const query = useQuery(adminUserQueryOptions(id));
 
@@ -119,16 +108,6 @@ function AdminUserDetailPage() {
     onError: (err) => toastError(err, errorFallback("resetUserPassword")),
   });
 
-  const setRoleMutation = useMutation({
-    ...setRoleMutationOptions,
-    onSuccess: () => {
-      toast.success(t("users.detail.changeRoleSuccessToast"));
-      setRoleOpen(false);
-      void invalidateUser();
-    },
-    onError: (err) => toastError(err, errorFallback("setUserRole")),
-  });
-
   const user = query.data;
 
   const backLink = (
@@ -163,7 +142,7 @@ function AdminUserDetailPage() {
         <PageHeader
           title={user.name}
           actions={
-            can("users.impersonate") && (
+            <StaffCan permission="users.impersonate">
               <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
                 <DialogTrigger asChild>
                   <Button variant={user.banned ? "outline" : "default"}>
@@ -180,7 +159,7 @@ function AdminUserDetailPage() {
                   />
                 </DialogContent>
               </Dialog>
-            )
+            </StaffCan>
           }
         />
       </div>
@@ -192,40 +171,6 @@ function AdminUserDetailPage() {
             <DescriptionItem className="gap-4">
               <DescriptionTerm className="shrink-0">{t("users.table.email")}</DescriptionTerm>
               <DescriptionDetails className="min-w-0 break-all">{user.email}</DescriptionDetails>
-            </DescriptionItem>
-            <DescriptionItem className="gap-4">
-              <DescriptionTerm className="shrink-0">{t("users.table.role")}</DescriptionTerm>
-              <DescriptionDetails className="flex-wrap justify-end">
-                {user.role ? (
-                  <Badge variant="secondary">
-                    {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
-                  </Badge>
-                ) : (
-                  EMPTY_VALUE
-                )}
-                {can("users.role") && (
-                  <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        {t("users.detail.changeRole")}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent closeLabel={t("common:actions.close")}>
-                      <DialogHeader>
-                        <DialogTitle>{t("users.detail.changeRoleTitle")}</DialogTitle>
-                        <DialogDescription>
-                          {t("users.detail.changeRoleDescription")}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <SetRoleForm
-                        currentRole={user.role && isPlatformRole(user.role) ? user.role : null}
-                        isPending={setRoleMutation.isPending}
-                        onSubmit={(values) => setRoleMutation.mutate({ id, ...values })}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </DescriptionDetails>
             </DescriptionItem>
             <DescriptionItem>
               <DescriptionTerm>{t("users.detail.twoFactorLabel")}</DescriptionTerm>
@@ -276,7 +221,7 @@ function AdminUserDetailPage() {
               </DescriptionItem>
             )}
           </DescriptionList>
-          {canModerate && (
+          <StaffCan permission="users.moderate">
             <div className="flex flex-wrap gap-2">
               {user.banned && (
                 <Button
@@ -322,7 +267,7 @@ function AdminUserDetailPage() {
                 </Dialog>
               )}
             </div>
-          )}
+          </StaffCan>
         </section>
       </div>
 

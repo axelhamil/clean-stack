@@ -68,7 +68,6 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]: "compliance",
   [EventTypes.ADMIN_USER_BANNED]: "compliance",
   [EventTypes.ADMIN_USER_UNBANNED]: "compliance",
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "compliance",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: "compliance",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: "compliance",
   [EventTypes.ADMIN_STAFF_ADDED]: "compliance",

@@ -14,7 +14,6 @@ const USER: AdminUserRow = {
   id: "u-1",
   email: "a@example.com",
   name: "A",
-  role: Option.some("admin"),
   banned: false,
   banReason: Option.none(),
   banExpires: Option.none(),
@@ -68,7 +67,6 @@ describe("AdminQueryService", () => {
     it("returns the store rows as page items", async () => {
       const page = (await service().listUsers({ limit: 50 })).getValue();
 
-      expect(page.items[0]?.role.unwrap()).toBe("admin");
       expect(page.items[0]?.banReason.isNone()).toBe(true);
     });
 

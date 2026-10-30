@@ -1,4 +1,5 @@
-import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export const staffMember = pgTable(
@@ -14,7 +15,10 @@ export const staffMember = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     revokedAt: timestamp("revoked_at"),
   },
-  (table) => [index("staff_member_role_revoked_idx").on(table.role, table.revokedAt)],
+  (table) => [
+    index("staff_member_role_revoked_idx").on(table.role, table.revokedAt),
+    check("staff_member_source_check", sql`${table.source} IN ('env', 'console', 'migration')`),
+  ],
 );
 
 export const staffPermissionOverride = pgTable(
@@ -31,5 +35,8 @@ export const staffPermissionOverride = pgTable(
     expiresAt: timestamp("expires_at"),
     revokedAt: timestamp("revoked_at"),
   },
-  (table) => [index("staff_permission_override_user_idx").on(table.userId)],
+  (table) => [
+    index("staff_permission_override_user_idx").on(table.userId),
+    check("staff_permission_override_effect_check", sql`${table.effect} IN ('grant', 'deny')`),
+  ],
 );

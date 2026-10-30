@@ -473,6 +473,9 @@ importers:
       better-auth:
         specifier: 1.7.14
         version: 1.7.14(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(solid-js@1.9.15)(vitest@5.0.5)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@packages/test':
         specifier: workspace:*

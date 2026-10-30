@@ -467,12 +467,6 @@ export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 export const AdminUserUnbannedPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
-export const AdminUserRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
-  from: z.string().nullable(),
-  to: z.string(),
-});
-export type AdminUserRoleChangedPayload = z.infer<typeof AdminUserRoleChangedPayload>;
-
 export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserPasswordResetPayload = z.infer<typeof AdminUserPasswordResetPayload>;
 
@@ -726,7 +720,6 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]: AdminImpersonationStoppedPayload,
   [EventTypes.ADMIN_USER_BANNED]: AdminUserBannedPayload,
   [EventTypes.ADMIN_USER_UNBANNED]: AdminUserUnbannedPayload,
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
   [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,

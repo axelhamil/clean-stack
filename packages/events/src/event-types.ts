@@ -67,7 +67,6 @@ export const EventTypes = {
   ADMIN_IMPERSONATION_STOPPED: "admin.impersonation.stopped",
   ADMIN_USER_BANNED: "admin.user.banned",
   ADMIN_USER_UNBANNED: "admin.user.unbanned",
-  ADMIN_USER_ROLE_CHANGED: "admin.user.role_changed",
   ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
   ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
   ADMIN_STAFF_ADDED: "admin.staff.added",

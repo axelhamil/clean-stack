@@ -1,4 +1,4 @@
-import type { StaffAccess } from "./shared/staff-access";
+import type { StaffAccess } from "@packages/access-control";
 
 export function buildSessionPayload<
   U extends { id: string; locale?: string | null },

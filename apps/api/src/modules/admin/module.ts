@@ -45,7 +45,7 @@ export const adminModule = defineModule()((b) =>
           c.IAdminUserStore,
           c.IOutboxRepository,
           c.ITransactionService,
-          env.PLATFORM_ADMIN_IDS,
+          env,
         ),
     )
     .add("NotifyImpersonatedUser", (c) =>

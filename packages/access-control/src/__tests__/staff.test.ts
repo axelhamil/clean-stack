@@ -1,12 +1,39 @@
 import { describe, expect, it } from "vitest";
 import {
+  authorizeStaff,
   effectivePermissions,
   permissionsOfRole,
   STAFF_PERMISSIONS,
   STAFF_ROLES,
   type StaffPermission,
   type StaffRole,
+  staffAccessSchema,
+  staffReachable,
 } from "../staff";
+
+describe("staff access", () => {
+  const auditor = { role: "auditor" as const, permissions: ["audit.read" as const], mfaOk: true };
+
+  it("authorizes from the permissions, never from the role", () => {
+    expect(authorizeStaff(auditor, "audit.read")).toBe(true);
+    expect(authorizeStaff(auditor, "users.moderate")).toBe(false);
+  });
+
+  it("refuses without access, and while MFA is missing", () => {
+    expect(authorizeStaff(null, "audit.read")).toBe(false);
+    expect(authorizeStaff({ ...auditor, mfaOk: false }, "audit.read")).toBe(false);
+  });
+
+  it("is reachable only with access and its MFA requirement met", () => {
+    expect(staffReachable(auditor)).toBe(true);
+    expect(staffReachable({ ...auditor, mfaOk: false })).toBe(false);
+    expect(staffReachable(null)).toBe(false);
+  });
+
+  it("rejects a role outside the catalog at the boundary", () => {
+    expect(staffAccessSchema.safeParse({ ...auditor, role: "root" }).success).toBe(false);
+  });
+});
 
 const MATRIX: Record<StaffRole, readonly StaffPermission[]> = {
   manager: STAFF_PERMISSIONS,

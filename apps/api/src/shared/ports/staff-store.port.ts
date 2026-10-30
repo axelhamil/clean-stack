@@ -35,7 +35,7 @@ export interface IStaffStore {
   findActive(userId: string): Promise<Result<Option<StaffRecord>, StaffStoreError>>;
   listActive(): Promise<Result<StaffListRow[], StaffStoreError>>;
   lockActiveManagers(): Promise<Result<StaffManagerRecord[], StaffStoreError>>;
-  insertFromEnv(userId: string): Promise<Result<boolean, StaffStoreError>>;
+  bootstrapFromEnv(userId: string): Promise<Result<boolean, StaffStoreError>>;
   assign(input: {
     userId: string;
     role: StaffRole;

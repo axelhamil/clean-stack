@@ -4293,7 +4293,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "staff_member_source_check": {
+          "name": "staff_member_source_check",
+          "value": "\"staff_member\".\"source\" IN ('env', 'console', 'migration')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.staff_permission_override": {
@@ -4398,7 +4403,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "staff_permission_override_effect_check": {
+          "name": "staff_permission_override_effect_check",
+          "value": "\"staff_permission_override\".\"effect\" IN ('grant', 'deny')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.sweep_lock": {

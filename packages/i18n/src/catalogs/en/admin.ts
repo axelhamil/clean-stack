@@ -6,9 +6,7 @@ export default {
     loadFailed: "Failed to load accounts.",
     empty: "No accounts match these filters.",
     loadMore: "Load more",
-    allRolesPlaceholder: "All roles",
     allStatusesPlaceholder: "All statuses",
-    roleUser: "User",
     // Shared by the ban dialog's title and the ban form's own submit button:
     // both name the exact same action in the exact same flow.
     suspendAccountTitle: "Suspend account",
@@ -23,7 +21,6 @@ export default {
     table: {
       email: "Email",
       name: "Name",
-      role: "Role",
       status: "Status",
       created: "Created",
     },
@@ -49,15 +46,6 @@ export default {
       impersonateSuccessToast: "Impersonation started.",
       revokeSessionsSuccessToast: "Sessions revoked.",
       resetPasswordSuccessToast: "Password reset email sent.",
-      changeRole: "Change role",
-      changeRoleTitle: "Change this account's role",
-      changeRoleDescription:
-        "This is the account role the auth library stores. It grants no staff access: staff access comes from the staff team.",
-      roleOptionUser: "User",
-      roleOptionAdmin: "Platform admin",
-      changeRoleSubmit: "Change role",
-      sameRoleHint: "Choose a role different from the current one.",
-      changeRoleSuccessToast: "Role updated.",
     },
     sessions: {
       title: "Active sessions ({{count}})",

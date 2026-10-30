@@ -80,7 +80,6 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A platform administrator ended an impersonation session.",
   [EventTypes.ADMIN_USER_BANNED]: "A platform administrator banned a user account.",
   [EventTypes.ADMIN_USER_UNBANNED]: "A platform administrator lifted the ban on a user account.",
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "A platform administrator changed a user's platform role.",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]:
     "A platform administrator triggered a password reset for a user.",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:

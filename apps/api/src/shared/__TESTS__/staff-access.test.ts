@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { permissionsOfRole } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import type { StaffRecord, StaffSource } from "../ports/staff-store.port";
-import { staffAccessOf } from "../staff-access";
+import { grantsStaffAccess, isLastManager, staffAccessOf } from "../staff-access";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
 
@@ -17,6 +17,37 @@ function env(ids: string[], requireMfa: boolean) {
 const noRow = Option.none<StaffRecord>();
 const withMfa = { id: "u", twoFactorEnabled: true };
 const withoutMfa = { id: "u", twoFactorEnabled: false };
+
+describe("grantsStaffAccess", () => {
+  const listed = { PLATFORM_ADMIN_IDS: ["op"] };
+
+  it("grants for a row that does not come from the env", () => {
+    expect(grantsStaffAccess({ userId: "u", source: "console" }, listed)).toBe(true);
+    expect(grantsStaffAccess({ userId: "u", source: "migration" }, listed)).toBe(true);
+  });
+
+  it("grants for an env row only while the id stays listed", () => {
+    expect(grantsStaffAccess({ userId: "op", source: "env" }, listed)).toBe(true);
+    expect(grantsStaffAccess({ userId: "u", source: "env" }, listed)).toBe(false);
+  });
+});
+
+describe("isLastManager", () => {
+  const none = { PLATFORM_ADMIN_IDS: [] };
+
+  it("is true when nobody else counts", () => {
+    expect(isLastManager("t", [{ userId: "t", source: "console" }], none)).toBe(true);
+    expect(isLastManager("t", [], none)).toBe(true);
+  });
+
+  it("is false when another manager grants access", () => {
+    expect(isLastManager("t", [{ userId: "o", source: "console" }], none)).toBe(false);
+  });
+
+  it("does not count another manager whose env listing is gone", () => {
+    expect(isLastManager("t", [{ userId: "o", source: "env" }], none)).toBe(true);
+  });
+});
 
 describe("staffAccessOf", () => {
   it("refuses a plain user with no row and no listing", () => {

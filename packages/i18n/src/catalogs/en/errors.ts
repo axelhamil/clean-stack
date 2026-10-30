@@ -3,6 +3,8 @@ export default {
     ACCOUNT_EXPORT_RATE_LIMITED: "You can request another data export in 24 hours.",
     ACCOUNT_PASSWORD_REQUIRED: "Confirm with your password.",
     ACCOUNT_DELETION_BLOCKED: "Resolve organization ownership before deleting your account.",
+    ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN:
+      "Appoint another staff manager before deleting your account.",
     ACCOUNT_DELETION_NOT_FOUND: "No deletion to cancel.",
     ACCOUNT_PASSWORD_INVALID: "Invalid password.",
     TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
@@ -128,8 +130,8 @@ export default {
     ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
       "This is the last manager. Add another manager before changing this access.",
     ADMIN_STAFF_NOT_FOUND: "This person is not on the staff.",
-    ADMIN_USER_ROLE_STAFF_MANAGED_FORBIDDEN:
-      "This account is on the staff. Change its access from the staff team instead.",
+    ADMIN_USER_STAFF_TARGET_FORBIDDEN:
+      "Only someone who manages the staff can act on a staff member.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "This action is unavailable while you are impersonating another user.",
     POLICY_ACCEPTANCE_REQUIRED: "Our terms have been updated. Accept the new version to continue.",
@@ -247,7 +249,6 @@ export default {
     revokeUserSessions: "Failed to revoke sessions",
     resetUserPassword: "Failed to send password reset",
     startImpersonation: "Failed to start impersonation",
-    setUserRole: "Failed to change role",
     loadAdminUsers: "Failed to load accounts",
     loadAdminUser: "Failed to load account",
     loadAdminOrgs: "Failed to load organizations",
