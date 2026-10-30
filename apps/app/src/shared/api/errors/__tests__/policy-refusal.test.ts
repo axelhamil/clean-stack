@@ -1,6 +1,6 @@
+import type { ApiError } from "@packages/web-kit/api/errors/api-error";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { ApiError } from "../api-error";
 import { handlePolicyRefusal, watchPolicyRefusals } from "../policy-refusal";
 
 function apiError(code: string, status: number): ApiError {

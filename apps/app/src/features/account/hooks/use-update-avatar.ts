@@ -1,13 +1,13 @@
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
-import { toastError } from "../../../shared/api/errors/toast";
 import { createUpload, deleteUploadByUrl } from "../../../shared/api/mutations/create-upload";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { captureError } from "../../../shared/observability/sentry";
 
 export function useUpdateAvatar(previousImage: string | null) {

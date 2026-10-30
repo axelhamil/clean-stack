@@ -1,9 +1,9 @@
 import { IconButton } from "@packages/ui/components/ui/icon-button";
+import { revealThemeChange } from "@packages/web-kit/theme/reveal-transition";
+import { useTheme } from "@packages/web-kit/theme/use-theme";
 import { Moon, Sun } from "lucide-react";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { revealThemeChange } from "../theme/reveal-transition";
-import { useTheme } from "../theme/use-theme";
 
 interface ThemeToggleProps {
   className?: string;

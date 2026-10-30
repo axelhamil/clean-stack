@@ -54,7 +54,7 @@ VITE_SENTRY_ENVIRONMENT=production
 VITE_GIT_SHA=...
 ```
 
-`<Sentry.ErrorBoundary>` already wraps the provider tree in `apps/app/src/shared/app-providers.tsx` with a fallback UI. With the DSN set you also get, with zero extra wiring: global query/mutation error capture (`shared/observability/query-error-handler.ts`, bound in `shared/api/query-client.ts`) and user-id tagging (`shared/observability/session-watcher.ts`, started module-level in `app-providers.tsx`).
+`<Sentry.ErrorBoundary>` already wraps the provider tree in `apps/app/src/shared/app-providers.tsx` with a fallback UI. With the DSN set you also get, with zero extra wiring: global query/mutation error capture (`packages/web-kit/src/observability/query-error-handler.ts`, bound in `apps/app/src/shared/api/query-client.ts`) and user-id tagging (`shared/observability/session-watcher.ts`, started module-level in `app-providers.tsx`).
 
 ### CI, source maps upload (production builds)
 
@@ -152,7 +152,7 @@ The whole Sentry stack is one DI binding plus one side-effect import. The call s
 To remove Sentry entirely:
 
 1. **API binding**: edit `apps/api/src/container.ts` → replace the `IInstrumentation` factory by `() => new LoggingInstrumentation(logger)` (drop the conditional). `trash apps/api/src/shared/services/sentry-{init,instrumentation}.ts`. Remove the `import "./shared/services/sentry-init"` line from `index.ts`.
-2. **Front**: swap `from "./observability/sentry"` (or `"../observability/sentry"`) to the `noop` module in the five importers, `main.tsx`, `app-providers.tsx`, `observability/session-watcher.ts`, `observability/query-error-handler.ts`, `observability/report-caught-error.ts`. `trash apps/app/src/shared/observability/sentry.ts`. `error-classifier.ts`, `session-watcher.ts` and `query-error-handler.ts` stay, they only talk to the noop-able module.
+2. **Front**: swap `from "./observability/sentry"` (or `"../observability/sentry"`) to the `noop` module in the five importers, `main.tsx`, `app-providers.tsx`, `api/query-client.ts`, `observability/session-watcher.ts`, `observability/report-caught-error.ts`. `trash apps/app/src/shared/observability/sentry.ts`. `session-watcher.ts` stays, and `@packages/web-kit` receives `captureError` as a parameter, so it never changes.
 3. **Build plugin**: remove the `@sentry/vite-plugin` block from `apps/app/vite.config.ts` (revert to `plugins: [react(), tailwindcss()]`).
 4. **Packages**: `pnpm remove @sentry/bun --filter=api && pnpm remove @sentry/react @sentry/vite-plugin --filter=app`.
 5. **Env**: unset `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and drop the matching `.env.example` blocks if you like).

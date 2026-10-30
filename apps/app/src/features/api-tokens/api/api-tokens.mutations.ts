@@ -1,7 +1,7 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferRequestType, InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError } from "../../../shared/api/errors/api-error";
 
 const $create = api.settings.tokens.$post;
 const $delete = api.settings.tokens[":id"].$delete;

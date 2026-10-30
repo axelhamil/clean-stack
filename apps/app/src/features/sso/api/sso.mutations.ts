@@ -1,10 +1,10 @@
+import { throwApiError, toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError, toAuthClientError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import { env } from "../../../shared/env";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import type { OidcProviderInput, SamlProviderInput } from "../sso.schema";
 
 // Providers aren't given an id by the operator: the server just wants a stable

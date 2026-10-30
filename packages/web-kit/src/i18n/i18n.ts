@@ -6,7 +6,7 @@ import {
   resolveLocale,
 } from "@packages/i18n";
 import type { i18n as I18nInstance } from "i18next";
-import { captureError } from "../observability/sentry";
+import type { CaptureError } from "../observability/capture-error";
 import { readLocaleCookie, writeLocaleCookie } from "./locale-cookie";
 
 function browserCandidates(): string[] {
@@ -52,7 +52,7 @@ async function bootInstance(locale: Locale): Promise<I18nInstance> {
  * therefore not subject to the same network failure. Only a second failure
  * (meaning the bundle itself is broken, not the network) propagates.
  */
-export async function initI18n(): Promise<I18nInstance> {
+export async function initI18n(captureError: CaptureError): Promise<I18nInstance> {
   try {
     const locale = resolveLocale(browserCandidates());
     return await bootInstance(locale);

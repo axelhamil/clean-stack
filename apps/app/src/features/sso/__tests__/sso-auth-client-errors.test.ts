@@ -13,8 +13,8 @@ vi.mock("../../../shared/auth/auth-client", () => ({
   },
 }));
 
+import { isUnexpectedMutationError } from "@packages/web-kit/observability/error-classifier";
 import { authClient } from "../../../shared/auth/auth-client";
-import { isUnexpectedMutationError } from "../../../shared/observability/error-classifier";
 import {
   registerOidcProviderMutationOptions,
   verifyDomainMutationOptions,

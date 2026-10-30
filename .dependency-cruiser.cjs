@@ -49,6 +49,19 @@ module.exports = {
       to: { path: "^apps/" },
     },
     {
+      name: "web-kit-stays-app-agnostic",
+      comment:
+        "What differs per app (telemetry sink, auth client, api client, router) reaches the web kit as a parameter, so a second app reuses it unchanged.",
+      severity: "error",
+      from: { path: "^packages/web-kit/" },
+      to: {
+        path: [
+          "(^|node_modules/)(@sentry|better-auth|@better-auth|hono|@tanstack/react-router)(/|$)",
+          "^packages/(access-control|drizzle|ddd-kit|emails|events|ui)/",
+        ],
+      },
+    },
+    {
       name: "app-never-imports-api",
       comment:
         "The front reaches the api only through the typed Hono RPC client factory (api/client), never its internals.",

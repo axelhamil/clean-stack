@@ -1,7 +1,7 @@
+import type { ApiError } from "@packages/web-kit/api/errors/api-error";
+import { formatApiError } from "@packages/web-kit/api/errors/messages";
 import type { TFunction } from "i18next";
 import { toast } from "sonner";
-import type { ApiError } from "../../shared/api/errors/api-error";
-import { formatApiError } from "../../shared/api/errors/messages";
 
 type FieldErrorReporter = (message: string) => void;
 

@@ -1,6 +1,6 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "../api-client";
-import { throwApiError } from "../errors/api-error";
 import type { PlanCatalogItem } from "./billing-types";
 
 export const plansQueryOptions = queryOptions({

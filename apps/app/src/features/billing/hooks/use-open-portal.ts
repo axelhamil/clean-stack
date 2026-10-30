@@ -1,7 +1,7 @@
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation } from "@tanstack/react-query";
-import { toastError } from "../../../shared/api/errors/toast";
 import { openBillingPortalMutationOptions } from "../../../shared/api/mutations/open-billing-portal";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 
 export function useOpenPortal() {
   return useMutation({

@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_COLORS } from "../theme-colors";
 
-const script = readFileSync(resolve(__dirname, "../../../../public/theme-init.js"), "utf8");
+const script = readFileSync(resolve(__dirname, "../theme-init.js"), "utf8");
 
 function runThemeInit(getItem: () => string | null, systemDark: boolean) {
   const toggle = vi.fn();

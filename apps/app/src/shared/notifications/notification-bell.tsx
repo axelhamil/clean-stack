@@ -6,11 +6,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components
 import { ScrollArea } from "@packages/ui/components/ui/scroll-area";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../api/errors/toast";
 import {
   markAllReadMutationOptions,
   markReadMutationOptions,
@@ -22,7 +23,6 @@ import {
 import { GuardHint } from "../auth/guard-hint";
 import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
-import { errorFallback } from "../i18n/get-errors-t";
 import { groupNotifications } from "./group-notifications";
 import {
   applyRead,

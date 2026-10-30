@@ -17,9 +17,9 @@
  * route guards read, then hand control back to the router.
  */
 
+import { apiErrorFields } from "@packages/web-kit/api/errors/api-error";
 import type { QueryClient } from "@tanstack/react-query";
 import { policiesQueryOptions } from "../queries/policies";
-import { apiErrorFields } from "./api-error";
 
 const POLICY_ACCEPTANCE_REQUIRED = "POLICY_ACCEPTANCE_REQUIRED";
 

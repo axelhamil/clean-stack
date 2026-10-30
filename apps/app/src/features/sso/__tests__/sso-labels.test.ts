@@ -1,5 +1,5 @@
+import { enLabel } from "@packages/web-kit/i18n/__tests__/catalog-t";
 import { describe, expect, it } from "vitest";
-import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { isSsoProviderType, SSO_PROVIDER_TYPE_KEYS } from "../sso-labels";
 
 describe("SSO_PROVIDER_TYPE_KEYS", () => {

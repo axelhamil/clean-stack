@@ -5,13 +5,13 @@ import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import { TypographyInlineCode, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { deleteOrgMutationOptions } from "../../../shared/api/mutations/delete-org";
 import { leaveOrgMutationOptions } from "../../../shared/api/mutations/leave-org";
 import { transferAndLeaveMutationOptions } from "../../../shared/api/mutations/transfer-and-leave";

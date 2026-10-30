@@ -1,7 +1,7 @@
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import type { ChangePasswordInput } from "../account.schema";
 

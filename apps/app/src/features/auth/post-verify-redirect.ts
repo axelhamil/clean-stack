@@ -1,4 +1,4 @@
-import { toSafeRedirect } from "../../shared/auth/safe-redirect";
+import { toSafeRedirect } from "@packages/web-kit/auth/safe-redirect";
 
 const STORAGE_KEY = "post-verify-redirect";
 

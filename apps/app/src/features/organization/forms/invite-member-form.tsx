@@ -16,11 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { inviteMemberMutationOptions } from "../../../shared/api/mutations/invite-member";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import {

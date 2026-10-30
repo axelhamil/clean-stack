@@ -1,5 +1,5 @@
+import { enLabel } from "@packages/web-kit/i18n/__tests__/catalog-t";
 import { describe, expect, it } from "vitest";
-import { enLabel } from "../../../shared/i18n/__tests__/catalog-t";
 import { INVITATION_STATUS_LABEL_KEYS, isInvitationStatus } from "../invitation-status-labels";
 
 describe("INVITATION_STATUS_LABEL_KEYS", () => {

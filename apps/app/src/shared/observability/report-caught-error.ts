@@ -1,4 +1,4 @@
-import { isUnexpectedError } from "./error-classifier";
+import { isUnexpectedError } from "@packages/web-kit/observability/error-classifier";
 import { captureError } from "./sentry";
 
 const reported = new WeakSet<object>();

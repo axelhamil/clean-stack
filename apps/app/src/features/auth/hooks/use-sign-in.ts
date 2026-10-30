@@ -1,13 +1,13 @@
+import {
+  EMAIL_NOT_VERIFIED_REDIRECT,
+  SSO_REDIRECT_IN_PROGRESS,
+} from "@packages/web-kit/observability/error-classifier";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SignInInput } from "../../../shared/auth/auth.schema";
 import { authClient } from "../../../shared/auth/auth-client";
-import {
-  EMAIL_NOT_VERIFIED_REDIRECT,
-  SSO_REDIRECT_IN_PROGRESS,
-} from "../../../shared/observability/error-classifier";
 import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
 import { rememberPostVerifyRedirect } from "../post-verify-redirect";
 import { useCompleteSignIn } from "./use-complete-sign-in";

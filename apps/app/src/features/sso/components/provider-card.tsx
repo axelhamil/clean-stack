@@ -1,11 +1,11 @@
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@packages/ui/components/ui/tabs";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { formatApiError } from "@packages/web-kit/api/errors/messages";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { formatApiError } from "../../../shared/api/errors/messages";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import {
   registerOidcProviderMutationOptions,
