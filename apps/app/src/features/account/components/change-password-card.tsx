@@ -10,6 +10,7 @@ import {
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { ChangePasswordForm } from "../forms/change-password-form";
@@ -26,16 +27,18 @@ export function ChangePasswordCard() {
       description={t("account.changePasswordDescription")}
     >
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            className="self-start"
-            disabled={guard.blocked}
-            {...guard.describeProps()}
-          >
-            {t("account.changePasswordButton")}
-          </Button>
-        </DialogTrigger>
+        <GuardHint guard={guard} className="self-start">
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="self-start"
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
+              {t("account.changePasswordButton")}
+            </Button>
+          </DialogTrigger>
+        </GuardHint>
         <DialogContent closeLabel={tCommon("actions.close")}>
           <DialogHeader>
             <DialogTitle>{t("account.changePasswordDialogTitle")}</DialogTitle>

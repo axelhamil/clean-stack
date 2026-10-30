@@ -15,6 +15,7 @@ import { Fragment, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { policiesQueryOptions } from "../../shared/api/queries/policies";
+import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { PolicyLink } from "../../shared/components/policy-link";
@@ -115,14 +116,18 @@ function AcceptPoliciesPage() {
           );
         })}
 
-        <Button
-          className="w-full"
-          onClick={() => mutation.mutate({})}
-          disabled={mutation.isPending || guard.blocked}
-          {...guard.describeProps(mutation.isPending)}
-        >
-          {mutation.isPending ? t("legal.accept.acceptingButton") : t("legal.accept.acceptButton")}
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={mutation.isPending} className="w-full">
+          <Button
+            className="w-full"
+            onClick={() => mutation.mutate({})}
+            disabled={mutation.isPending || guard.blocked}
+            {...guard.describeProps(mutation.isPending)}
+          >
+            {mutation.isPending
+              ? t("legal.accept.acceptingButton")
+              : t("legal.accept.acceptButton")}
+          </Button>
+        </GuardHint>
         <ImpersonationReason guard={guard} />
       </main>
     </div>

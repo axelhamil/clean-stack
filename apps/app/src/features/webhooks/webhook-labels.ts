@@ -41,6 +41,13 @@ export const DELIVERY_STATUS_KEYS = {
   dead_letter: "common:states.delivery.deadLetter",
 } as const satisfies Record<WebhookDeliveryStatus, string>;
 
+export const DELIVERY_STATUS_HINT_KEYS = {
+  pending: null,
+  success: null,
+  failed: "common:states.delivery.failedHint",
+  dead_letter: "common:states.delivery.deadLetterHint",
+} as const satisfies Record<WebhookDeliveryStatus, string | null>;
+
 export const DELIVERY_STATUS_BADGE_VARIANTS = {
   pending: "secondary",
   success: "default",

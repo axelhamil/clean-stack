@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@packages/ui/components/ui/avatar";
-import { Button } from "@packages/ui/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +9,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@packages/ui/components/ui/dropdown-menu";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -35,18 +35,21 @@ export function UserMenu({ user }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <IconButton
+          variant="ghost"
+          label={t("userMenu.openMenu")}
+          accessibleName={`${initialsOf(display)} ${t("userMenu.openMenu")}`}
+        >
           <Avatar className="size-8">
             {image ? <AvatarImage src={image} alt={display} /> : null}
             <AvatarFallback className="text-xs font-medium">{initialsOf(display)}</AvatarFallback>
           </Avatar>
-          <span className="sr-only">{t("userMenu.openMenu")}</span>
-        </Button>
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="w-64">
         <DropdownMenuLabel weight="normal" className="flex flex-col gap-0.5">
-          <TypographySmall className="truncate">{display}</TypographySmall>
-          <TypographyMuted className="truncate">{user.email}</TypographyMuted>
+          <TypographySmall className="break-words">{display}</TypographySmall>
+          <TypographyMuted className="break-words">{user.email}</TypographyMuted>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup className="md:hidden">

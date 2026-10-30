@@ -54,6 +54,7 @@ export default {
       roleOptionUser: "Utilisateur",
       roleOptionAdmin: "Administrateur de la plateforme",
       changeRoleSubmit: "Changer le rôle",
+      sameRoleHint: "Choisissez un rôle différent du rôle actuel.",
       changeRoleSuccessToast: "Rôle mis à jour.",
     },
     sessions: {
@@ -74,6 +75,7 @@ export default {
     banForm: {
       reasonLabel: "Motif",
       reasonPlaceholder: "Motif de la suspension…",
+      reasonRequired: "Saisissez d'abord le motif de la suspension.",
       durationLabel: "Durée",
       duration24h: "24 heures",
       duration7d: "7 jours",
@@ -82,6 +84,7 @@ export default {
     impersonateForm: {
       reasonLabel: "Motif",
       reasonPlaceholder: "Décrivez le motif de l'emprunt d'identité…",
+      reasonRequired: "Saisissez d'abord le motif de l'emprunt d'identité.",
       ticketRefLabel: "Référence du ticket (optionnel)",
       ticketRefPlaceholder: "SUP-42",
       submit: "Démarrer l'emprunt d'identité",
@@ -150,7 +153,11 @@ export default {
     chain: {
       checking: "Vérification de la chaîne…",
       verified: "Chaîne vérifiée ✓",
+      verifiedHint:
+        "Chaque entrée du journal correspond toujours à l'empreinte de la précédente : rien n'a été modifié.",
       broken: "Chaîne rompue au n° {{sequence}}",
+      brokenHint:
+        "Une entrée du journal ne correspond plus à l'empreinte de la précédente : le journal a peut-être été modifié.",
     },
     metadata: {
       actorLabel: "Acteur",

@@ -5,6 +5,7 @@ import {
   type NotificationChannel,
   type NotificationFrequency,
 } from "@packages/events";
+import { Hint } from "@packages/ui/components/ui/hint";
 import {
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ import {
 } from "@packages/ui/components/ui/table";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
-import type { ImpersonationGuard } from "../auth/use-impersonation-guard";
+import { type ImpersonationGuard, isFrozenByGuard } from "../auth/use-impersonation-guard";
 import type { PreferenceRow } from "./build-preference-matrix";
 import { CATEGORY_KEYS } from "./notification-labels";
 
@@ -73,113 +74,124 @@ export function PreferenceMatrix({
   const { t: tCommon } = useTranslation("common");
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("notifications.categoryHeader")}</TableHead>
-          <TableHead>{t("notifications.inAppHeader")}</TableHead>
-          <TableHead>{t("notifications.emailHeader")}</TableHead>
-          <TableHead>{t("notifications.emailFrequencyHeader")}</TableHead>
-          {showLock && <TableHead>{t("notifications.enforceHeader")}</TableHead>}
-        </TableRow>
-      </TableHeader>
+    <>
+      {isFrozenByGuard(guard, disabled) && <TypographyMuted>{guard.reason}</TypographyMuted>}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("notifications.categoryHeader")}</TableHead>
+            <TableHead>{t("notifications.inAppHeader")}</TableHead>
+            <TableHead>{t("notifications.emailHeader")}</TableHead>
+            <TableHead>{t("notifications.emailFrequencyHeader")}</TableHead>
+            {showLock && <TableHead>{t("notifications.enforceHeader")}</TableHead>}
+          </TableRow>
+        </TableHeader>
 
-      <TableBody>
-        {rows.map((row) => {
-          const forced = forcedLevelOf(row.category);
-          const noteKey = FORCED_NOTE_KEYS[forced];
-          // The row can be frozen for three unrelated reasons (pending save,
-          // an org-forced category, impersonation); the frequency select adds a
-          // fourth (its channel is off). `describeProps` is what keeps a
-          // forced-category row from explaining itself with a sentence about
-          // impersonation, which isn't its cause.
-          const otherwiseFrozen = disabled || forced === "all";
-          const frozen = otherwiseFrozen || guard.blocked;
-          const describe = guard.describeProps(otherwiseFrozen);
-          // Category keys live in `common` (the inbox shares them), not `settings`.
-          const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
+        <TableBody>
+          {rows.map((row) => {
+            const forced = forcedLevelOf(row.category);
+            const noteKey = FORCED_NOTE_KEYS[forced];
+            // The row can be frozen for three unrelated reasons (pending save,
+            // an org-forced category, impersonation); the frequency select adds a
+            // fourth (its channel is off). `describeProps` is what keeps a
+            // forced-category row from explaining itself with a sentence about
+            // impersonation, which isn't its cause.
+            const otherwiseFrozen = disabled || forced === "all";
+            const frozen = otherwiseFrozen || guard.blocked;
+            const describe = guard.describeProps(otherwiseFrozen);
+            // Category keys live in `common` (the inbox shares them), not `settings`.
+            const categoryLabel = tCommon(CATEGORY_KEYS[row.category]);
 
-          const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>
-            onChange({
-              category: row.category,
-              channel,
-              enabled: row[channel].enabled,
-              frequency: row[channel].frequency,
-              locked: row[channel].locked,
-              ...patch,
-            });
+            const emit = (channel: NotificationChannel, patch: Partial<PreferenceChange>) =>
+              onChange({
+                category: row.category,
+                channel,
+                enabled: row[channel].enabled,
+                frequency: row[channel].frequency,
+                locked: row[channel].locked,
+                ...patch,
+              });
 
-          return (
-            <TableRow key={row.category}>
-              <TableCell className="max-w-48 whitespace-normal">
-                <TypographySmall>{categoryLabel}</TypographySmall>
-                {noteKey && <TypographyMuted>{t(noteKey)}</TypographyMuted>}
-              </TableCell>
+            return (
+              <TableRow key={row.category}>
+                <TableCell className="max-w-48 whitespace-normal">
+                  <TypographySmall>{categoryLabel}</TypographySmall>
+                  {noteKey && <TypographyMuted>{t(noteKey)}</TypographyMuted>}
+                </TableCell>
 
-              <TableCell>
-                <Switch
-                  checked={row.in_app.enabled}
-                  disabled={frozen}
-                  {...describe}
-                  onCheckedChange={(enabled) => emit("in_app", { enabled })}
-                  aria-label={t("notifications.inAppAriaLabel", { category: categoryLabel })}
-                />
-              </TableCell>
-
-              <TableCell>
-                <Switch
-                  checked={row.email.enabled}
-                  disabled={frozen}
-                  {...describe}
-                  onCheckedChange={(enabled) => emit("email", { enabled })}
-                  aria-label={t("notifications.emailAriaLabel", { category: categoryLabel })}
-                />
-              </TableCell>
-
-              <TableCell>
-                <Select
-                  value={row.email.frequency}
-                  disabled={frozen || !row.email.enabled}
-                  onValueChange={(frequency) =>
-                    emit("email", { frequency: frequency as NotificationFrequency })
-                  }
-                >
-                  <SelectTrigger
-                    aria-label={t("notifications.emailFrequencyAriaLabel", {
-                      category: categoryLabel,
-                    })}
-                    {...guard.describeProps(otherwiseFrozen || !row.email.enabled)}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NOTIFICATION_FREQUENCIES.map((frequency) => (
-                      <SelectItem key={frequency} value={frequency}>
-                        {t(FREQUENCY_KEYS[frequency])}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-
-              {showLock && (
                 <TableCell>
                   <Switch
-                    checked={row.in_app.locked}
+                    checked={row.in_app.enabled}
                     disabled={frozen}
                     {...describe}
-                    onCheckedChange={(locked) => {
-                      emit("in_app", { locked });
-                      emit("email", { locked });
-                    }}
-                    aria-label={t("notifications.enforceAriaLabel", { category: categoryLabel })}
+                    onCheckedChange={(enabled) => emit("in_app", { enabled })}
+                    aria-label={t("notifications.inAppAriaLabel", { category: categoryLabel })}
                   />
                 </TableCell>
-              )}
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+
+                <TableCell>
+                  <Switch
+                    checked={row.email.enabled}
+                    disabled={frozen}
+                    {...describe}
+                    onCheckedChange={(enabled) => emit("email", { enabled })}
+                    aria-label={t("notifications.emailAriaLabel", { category: categoryLabel })}
+                  />
+                </TableCell>
+
+                <TableCell>
+                  <Hint
+                    text={
+                      !frozen && !row.email.enabled
+                        ? t("notifications.emailFrequencyDisabledHint")
+                        : undefined
+                    }
+                  >
+                    <Select
+                      value={row.email.frequency}
+                      disabled={frozen || !row.email.enabled}
+                      onValueChange={(frequency) =>
+                        emit("email", { frequency: frequency as NotificationFrequency })
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label={t("notifications.emailFrequencyAriaLabel", {
+                          category: categoryLabel,
+                        })}
+                        {...guard.describeProps(otherwiseFrozen || !row.email.enabled)}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NOTIFICATION_FREQUENCIES.map((frequency) => (
+                          <SelectItem key={frequency} value={frequency}>
+                            {t(FREQUENCY_KEYS[frequency])}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Hint>
+                </TableCell>
+
+                {showLock && (
+                  <TableCell>
+                    <Switch
+                      checked={row.in_app.locked}
+                      disabled={frozen}
+                      {...describe}
+                      onCheckedChange={(locked) => {
+                        emit("in_app", { locked });
+                        emit("email", { locked });
+                      }}
+                      aria-label={t("notifications.enforceAriaLabel", { category: categoryLabel })}
+                    />
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </>
   );
 }

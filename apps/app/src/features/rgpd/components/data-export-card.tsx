@@ -3,6 +3,7 @@ import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { DownloadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
@@ -27,17 +28,19 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
 
   return (
     <SettingsSection title={t("dataExport.title")} description={t("dataExport.description")}>
-      <Button
-        type="button"
-        variant="outline"
-        className="self-start"
-        disabled={otherwiseDisabled || guard.blocked}
-        {...guard.describeProps(otherwiseDisabled)}
-        onClick={() => mutation.mutate()}
-      >
-        <DownloadIcon />
-        {mutation.isPending ? t("dataExport.requesting") : t("dataExport.request")}
-      </Button>
+      <GuardHint guard={guard} otherwiseDisabled={otherwiseDisabled} className="self-start">
+        <Button
+          type="button"
+          variant="outline"
+          className="self-start"
+          disabled={otherwiseDisabled || guard.blocked}
+          {...guard.describeProps(otherwiseDisabled)}
+          onClick={() => mutation.mutate()}
+        >
+          <DownloadIcon />
+          {mutation.isPending ? t("dataExport.requesting") : t("dataExport.request")}
+        </Button>
+      </GuardHint>
       {cooldown && nextAllowedAt && (
         <TypographyMuted>
           {t("dataExport.nextAvailable", { date: formatDateTime(nextAllowedAt) })}

@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
+import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
@@ -83,13 +84,15 @@ function ApiTokensPage() {
       <PageHeader
         title={t("apiTokens.pageTitle")}
         actions={
-          <Button
-            onClick={() => setCreating(true)}
-            disabled={guard.blocked}
-            {...guard.describeProps()}
-          >
-            {t("apiTokens.newTokenAction")}
-          </Button>
+          <GuardHint guard={guard}>
+            <Button
+              onClick={() => setCreating(true)}
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
+              {t("apiTokens.newTokenAction")}
+            </Button>
+          </GuardHint>
         }
       />
       <ImpersonationReason guard={guard} />

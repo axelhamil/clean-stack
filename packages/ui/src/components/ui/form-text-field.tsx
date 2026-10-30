@@ -1,8 +1,8 @@
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { type ComponentProps, useState } from "react";
 import type { Control, FieldPath, FieldValues } from "react-hook-form";
-import { Button } from "./button";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "./form";
+import { IconButton } from "./icon-button";
 import { Input } from "./input";
 
 /**
@@ -69,17 +69,17 @@ export function FormTextField<
             {isPassword ? (
               <div className="relative">
                 {input}
-                <Button
+                <IconButton
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="absolute inset-y-0 right-1 my-auto"
                   onClick={() => setRevealed((value) => !value)}
-                  aria-label={revealed ? hidePasswordLabel : showPasswordLabel}
+                  label={revealed ? hidePasswordLabel : showPasswordLabel}
                   tabIndex={-1}
                 >
                   {revealed ? <EyeOffIcon /> : <EyeIcon />}
-                </Button>
+                </IconButton>
               </div>
             ) : (
               input

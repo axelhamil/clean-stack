@@ -1,5 +1,6 @@
 import { BrandLink } from "@packages/ui/components/ui/brand-link";
 import { Button } from "@packages/ui/components/ui/button";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
@@ -79,15 +80,15 @@ export function AppShell({ user, children }: AppShellProps) {
               <KeyboardShortcut className="ml-2">{SHORTCUT_LABEL}</KeyboardShortcut>
             </Button>
 
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
               onClick={fireCommandPalette}
               className="lg:hidden"
-              aria-label={t("shell.openCommandPalette")}
+              label={t("shell.openCommandPalette")}
+              shortcut={SHORTCUT_LABEL}
             >
               <Search />
-            </Button>
+            </IconButton>
 
             <NotificationBell />
 

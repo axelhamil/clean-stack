@@ -10,7 +10,6 @@ import { isImpersonating } from "./is-impersonating";
  * receives never depends on the branch it came from.
  */
 export interface ImpersonationDescription {
-  title: string | undefined;
   "aria-describedby": string | undefined;
 }
 
@@ -25,6 +24,10 @@ export function impersonationGuard(session: Parameters<typeof isImpersonating>[0
   blocked: boolean;
 } {
   return { blocked: isImpersonating(session) };
+}
+
+export function isFrozenByGuard(guard: { blocked: boolean }, otherwiseDisabled = false): boolean {
+  return guard.blocked && !otherwiseDisabled;
 }
 
 /**
@@ -42,16 +45,15 @@ export function describeImpersonation(
   guard: { blocked: boolean; reason: string | undefined; descriptionId: string },
   otherwiseDisabled = false,
 ): ImpersonationDescription {
-  const ours = guard.blocked && !otherwiseDisabled;
+  const ours = isFrozenByGuard(guard, otherwiseDisabled);
   return {
-    title: ours ? guard.reason : undefined,
     "aria-describedby": ours ? guard.descriptionId : undefined,
   };
 }
 
 /**
- * A disabled control is skipped by Tab, so `title` alone never reaches a
- * keyboard/screen-reader user: it is mouse-only. `descriptionId` names a
+ * A disabled control is skipped by Tab and takes no pointer events, so the
+ * sighted explanation is `GuardHint` around it. `descriptionId` names a
  * DOM element (rendered by `ImpersonationReason` below) that `describeProps`
  * wires in via `aria-describedby`, which screen readers do read in browse mode
  * even though the control itself is unreachable by Tab. One id per guard call:
@@ -60,7 +62,7 @@ export function describeImpersonation(
  * not more correct.
  *
  * Call sites spread `guard.describeProps(otherwiseDisabled)` onto the control
- * and never assemble `title`/`aria-describedby` themselves: the "is the freeze
+ * and never assemble `aria-describedby` themselves: the "is the freeze
  * actually ours?" test belongs to the guard, not to 24 copies of it.
  */
 export function useImpersonationGuard(): ImpersonationGuard {

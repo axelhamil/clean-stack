@@ -1,5 +1,6 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { Hint } from "@packages/ui/components/ui/hint";
 import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import {
   Select,
@@ -16,11 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import {
-  TypographyH2,
-  TypographyInline,
-  TypographyMuted,
-} from "@packages/ui/components/ui/typography";
+import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
+import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -36,6 +34,7 @@ import { webhookDeliveriesInfiniteQueryOptions } from "../api/webhooks.queries";
 import type { DeliveryFilters } from "../webhook-delivery-filters";
 import {
   DELIVERY_STATUS_BADGE_VARIANTS,
+  DELIVERY_STATUS_HINT_KEYS,
   DELIVERY_STATUS_KEYS,
   isDeliveryStatus,
 } from "../webhook-labels";
@@ -55,6 +54,12 @@ export function DeliveriesSection({ endpointId, canWrite, guard }: DeliveriesSec
   const organizationId = useActiveOrgId();
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryListItem | null>(null);
   const [filters, setFilters] = useState<DeliveryFilters>({});
+
+  const deliveryStatusHint = (status: DeliveryListItem["status"]) => {
+    const key = DELIVERY_STATUS_HINT_KEYS[status];
+
+    return key ? t(key) : undefined;
+  };
 
   const deliveries = useInfiniteQuery(
     webhookDeliveriesInfiniteQueryOptions(organizationId, endpointId, filters),
@@ -127,13 +132,21 @@ export function DeliveriesSection({ endpointId, canWrite, guard }: DeliveriesSec
               <TableBody>
                 {items.map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="max-w-32 truncate sm:max-w-xs">
-                      <TypographyInline font="mono">{d.eventType}</TypographyInline>
+                    <TableCell>
+                      <TruncatedText
+                        value={d.eventType}
+                        font="mono"
+                        className="max-w-32 sm:max-w-xs"
+                      />
                     </TableCell>
                     <TableCell>
-                      <Badge variant={DELIVERY_STATUS_BADGE_VARIANTS[d.status]}>
-                        {isDeliveryStatus(d.status) ? t(DELIVERY_STATUS_KEYS[d.status]) : d.status}
-                      </Badge>
+                      <Hint text={deliveryStatusHint(d.status)}>
+                        <Badge variant={DELIVERY_STATUS_BADGE_VARIANTS[d.status]}>
+                          {isDeliveryStatus(d.status)
+                            ? t(DELIVERY_STATUS_KEYS[d.status])
+                            : d.status}
+                        </Badge>
+                      </Hint>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{d.attempts}</TableCell>
                     <TableCell className="hidden sm:table-cell">

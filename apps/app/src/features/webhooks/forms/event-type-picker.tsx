@@ -1,6 +1,10 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import { TypographyInline, TypographySmall } from "@packages/ui/components/ui/typography";
+import {
+  TypographyInline,
+  TypographyMuted,
+  TypographySmall,
+} from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
@@ -55,6 +59,9 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
         />
         <TypographySmall>{t("webhooks.eventTypePicker.allEvents")}</TypographySmall>
       </label>
+      {allSelected && (
+        <TypographyMuted>{t("webhooks.eventTypePicker.allEventsNote")}</TypographyMuted>
+      )}
       {groups.map((g) => {
         const groupSelected = selected.has(g.wildcard);
 
@@ -70,6 +77,9 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                 {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
               </TypographySmall>
             </label>
+            {groupSelected && !allSelected && (
+              <TypographyMuted>{t("webhooks.eventTypePicker.groupNote")}</TypographyMuted>
+            )}
             <div className="ml-6 flex flex-col gap-1">
               {g.events.map((type) => (
                 // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally

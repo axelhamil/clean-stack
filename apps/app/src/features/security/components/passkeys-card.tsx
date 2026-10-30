@@ -8,6 +8,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
+import { Hint } from "@packages/ui/components/ui/hint";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import {
   ListRow,
   ListRowAction,
@@ -23,6 +25,7 @@ import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { passkeysQueryOptions } from "../../../shared/api/queries/passkeys";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import {
   type ImpersonationGuard,
@@ -67,17 +70,19 @@ export function PasskeysCard() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            className="w-fit"
-            disabled={guard.blocked}
-            {...guard.describeProps()}
-          >
-            <PlusIcon />
-            {t("passkeys.add")}
-          </Button>
-        </DialogTrigger>
+        <GuardHint guard={guard}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-fit"
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
+              <PlusIcon />
+              {t("passkeys.add")}
+            </Button>
+          </DialogTrigger>
+        </GuardHint>
         <DialogContent closeLabel={tCommon("actions.close")}>
           <DialogHeader>
             <DialogTitle>{t("passkeys.add")}</DialogTitle>
@@ -112,10 +117,22 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt, guard }: Passke
         <ListRowContent>
           <TypographySmall>{name ?? t("passkeys.unnamed")}</TypographySmall>
           <ListRowMeta className="flex-wrap">
-            <Badge variant="secondary">
-              {deviceType === "singleDevice" ? t("passkeys.deviceBound") : t("passkeys.synced")}
-            </Badge>
-            {backedUp && <Badge variant="outline">{t("passkeys.backedUp")}</Badge>}
+            <Hint
+              text={
+                deviceType === "singleDevice"
+                  ? t("passkeys.deviceBoundHint")
+                  : t("passkeys.syncedHint")
+              }
+            >
+              <Badge variant="secondary">
+                {deviceType === "singleDevice" ? t("passkeys.deviceBound") : t("passkeys.synced")}
+              </Badge>
+            </Hint>
+            {backedUp && (
+              <Hint text={t("passkeys.backedUpHint")}>
+                <Badge variant="outline">{t("passkeys.backedUp")}</Badge>
+              </Hint>
+            )}
             <TypographyMuted>
               {t("passkeys.added", { date: formatDate(createdAt) })}
             </TypographyMuted>
@@ -123,17 +140,19 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt, guard }: Passke
         </ListRowContent>
       </ListRowMedia>
       <ListRowAction>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => mutation.mutate(id)}
-          disabled={mutation.isPending || guard.blocked}
-          {...guard.describeProps(mutation.isPending)}
-          aria-label={t("passkeys.remove")}
-        >
-          <Trash2Icon />
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={mutation.isPending}>
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => mutation.mutate(id)}
+            disabled={mutation.isPending || guard.blocked}
+            {...guard.describeProps(mutation.isPending)}
+            label={t("passkeys.remove")}
+          >
+            <Trash2Icon />
+          </IconButton>
+        </GuardHint>
       </ListRowAction>
     </ListRow>
   );

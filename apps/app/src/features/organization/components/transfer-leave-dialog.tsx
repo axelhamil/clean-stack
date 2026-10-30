@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@packages/ui/components/ui/alert-dialog";
+import { Hint } from "@packages/ui/components/ui/hint";
 import { Label } from "@packages/ui/components/ui/label";
 import {
   Select,
@@ -88,15 +89,17 @@ export function TransferLeaveDialog({
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={!selectedMemberId || isPending}
-            onClick={() => {
-              if (selectedMemberId) onConfirm(selectedMemberId);
-            }}
-          >
-            {t("organization.transferAndLeaveAction")}
-          </AlertDialogAction>
+          <Hint text={!selectedMemberId ? t("organization.transferSelectMemberHint") : undefined}>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!selectedMemberId || isPending}
+              onClick={() => {
+                if (selectedMemberId) onConfirm(selectedMemberId);
+              }}
+            >
+              {t("organization.transferAndLeaveAction")}
+            </AlertDialogAction>
+          </Hint>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

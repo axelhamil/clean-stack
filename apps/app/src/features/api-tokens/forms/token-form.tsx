@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { API_SCOPES, type TokenFormInput, tokenFormSchema } from "../api-tokens.schema";
@@ -163,13 +164,15 @@ export function TokenForm({
           )}
         />
 
-        <Button
-          type="submit"
-          disabled={isPending || guard.blocked}
-          {...guard.describeProps(isPending)}
-        >
-          {submitLabel}
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={isPending}>
+          <Button
+            type="submit"
+            disabled={isPending || guard.blocked}
+            {...guard.describeProps(isPending)}
+          >
+            {submitLabel}
+          </Button>
+        </GuardHint>
       </form>
     </Form>
   );

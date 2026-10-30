@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@packages/ui/components/ui/form";
+import { Hint } from "@packages/ui/components/ui/hint";
 import {
   Select,
   SelectContent,
@@ -64,9 +65,14 @@ export function SetRoleForm({ currentRole, isPending, onSubmit }: SetRoleFormPro
             </FormItem>
           )}
         />
-        <Button type="submit" className="self-end" disabled={role === currentRole || isPending}>
-          {t("users.detail.changeRoleSubmit")}
-        </Button>
+        <Hint
+          text={role === currentRole ? t("users.detail.sameRoleHint") : undefined}
+          className="self-end"
+        >
+          <Button type="submit" className="self-end" disabled={role === currentRole || isPending}>
+            {t("users.detail.changeRoleSubmit")}
+          </Button>
+        </Hint>
       </form>
     </Form>
   );

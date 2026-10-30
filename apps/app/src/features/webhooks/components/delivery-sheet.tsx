@@ -23,6 +23,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import type { DeliveryAttempt, DeliveryListItem } from "../api/webhooks.queries";
@@ -118,13 +119,15 @@ export function DeliverySheet({
             </SheetHeader>
             <div className="flex min-w-0 flex-col items-start gap-4 px-4 pb-4">
               {canReplay && (
-                <Button
-                  disabled={guard.blocked}
-                  {...guard.describeProps()}
-                  onClick={() => onReplay(delivery.id)}
-                >
-                  {t("webhooks.deliverySheet.replay")}
-                </Button>
+                <GuardHint guard={guard}>
+                  <Button
+                    disabled={guard.blocked}
+                    {...guard.describeProps()}
+                    onClick={() => onReplay(delivery.id)}
+                  >
+                    {t("webhooks.deliverySheet.replay")}
+                  </Button>
+                </GuardHint>
               )}
               {detail.isLoading && (
                 <TypographyMuted role="status">

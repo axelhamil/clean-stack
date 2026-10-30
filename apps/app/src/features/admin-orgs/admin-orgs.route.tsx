@@ -20,6 +20,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
+import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { errorFallback } from "../../shared/i18n/get-errors-t";
@@ -97,15 +98,17 @@ function AdminOrgsPage() {
                   <TableCell>{org.memberCount}</TableCell>
                   <TableCell>{formatDate(org.createdAt)}</TableCell>
                   <TableCell>
-                    <Switch
-                      aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
-                      checked={org.ssoEnforced}
-                      disabled={saving || guard.blocked}
-                      {...guard.describeProps(saving)}
-                      onCheckedChange={(enforced) =>
-                        ssoEnforcementMutation.mutate({ id: org.id, enforced })
-                      }
-                    />
+                    <GuardHint guard={guard} otherwiseDisabled={saving}>
+                      <Switch
+                        aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
+                        checked={org.ssoEnforced}
+                        disabled={saving || guard.blocked}
+                        {...guard.describeProps(saving)}
+                        onCheckedChange={(enforced) =>
+                          ssoEnforcementMutation.mutate({ id: org.id, enforced })
+                        }
+                      />
+                    </GuardHint>
                   </TableCell>
                 </TableRow>
               );

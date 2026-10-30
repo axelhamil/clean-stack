@@ -101,7 +101,7 @@ export default {
   },
   impersonation: {
     activeSession:
-      "Session d'emprunt d'identité active : agit en tant que <name>{{name}}</name>. {{remaining}}",
+      "Session d'emprunt d'identité active : agit en tant que <name>{{name}}</name>. {{remaining}}. Les modifications sont bloquées pendant cette session.",
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
@@ -118,6 +118,7 @@ export default {
     preferencesTitle: "Préférences cookies",
   },
   cookieConsent: {
+    necessaryAlwaysOnHint: "Les cookies strictement nécessaires ne peuvent pas être désactivés.",
     title: "Gérez vos préférences cookies",
     save: "Enregistrer les préférences",
     withdraw: "Retirer tous les consentements",
@@ -249,6 +250,7 @@ export default {
   notifications: {
     title: "Notifications",
     markAllRead: "Tout marquer comme lu",
+    nothingToMarkRead: "Aucune notification non lue.",
     empty: "Vous êtes à jour.",
     unreadNone: "Notifications, aucune non lue",
     unreadLabel_one: "Notifications, {{count}} non lue",
@@ -308,6 +310,8 @@ export default {
       success: "Réussi",
       failed: "Échec",
       deadLetter: "Dead letter",
+      failedHint: "La dernière tentative a échoué, une autre est prévue.",
+      deadLetterHint: "Toutes les tentatives ont échoué, cette livraison ne sera plus réessayée.",
     },
   },
   pricing: {
@@ -327,5 +331,7 @@ export default {
     currentPlanCta: "Forfait actuel",
     getStarted: "Commencer",
     upgrade: "Mettre à niveau",
+    upgradeNeedsOrgHint: "Sélectionnez une organisation pour mettre à niveau.",
+    upgradeUnavailableHint: "Cette offre n'est pas encore disponible à l'achat.",
   },
 } as const;
