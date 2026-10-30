@@ -119,6 +119,10 @@ export default {
     ADMIN_STAFF_FORBIDDEN: "Cet espace est réservé à l'équipe de la plateforme.",
     ADMIN_REAUTH_REQUIRED:
       "Confirmez cette action avec un code de votre application d'authentification.",
+    ADMIN_STEP_UP_MFA_FORBIDDEN:
+      "Activez l'authentification à deux facteurs pour confirmer cette action.",
+    ADMIN_PASSWORD_RESET_UNAVAILABLE:
+      "L'email de réinitialisation n'a pas pu être envoyé. Les sessions de l'utilisateur ont été fermées, réessayez.",
     ADMIN_STEP_UP_CODE_INVALID:
       "Ce code n'est pas valide. Vérifiez votre application d'authentification.",
     ADMIN_STEP_UP_REPLAY_INVALID: "Ce code a déjà servi. Attendez le suivant.",

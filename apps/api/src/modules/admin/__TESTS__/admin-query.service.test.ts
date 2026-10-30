@@ -8,6 +8,7 @@ import type {
   AdminUserRow,
   EndedSession,
   IAdminUserStore,
+  UnbanOutcome,
 } from "../application/ports/admin-user-store.port";
 import { AdminQueryService } from "../application/services/admin-query.service";
 
@@ -46,7 +47,7 @@ function userStore(overrides: Partial<IAdminUserStore> = {}): IAdminUserStore {
     listSessionsFor: mock(async () => ok([])),
     listMembershipsFor: mock(async () => ok([])),
     ban: mock(async () => ok(Option.none<EndedSession[]>())),
-    unban: mock(async () => ok(false)),
+    unban: mock(async () => ok<UnbanOutcome>("not_found")),
     deleteSessions: mock(async () => ok([])),
     ...overrides,
   };

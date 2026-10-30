@@ -8,14 +8,13 @@
  * Creates and removes its own probe user.
  */
 
-import { checkRecorder } from "./check-harness";
+import { checkRecorder, seedTwoFactor } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-totp-enrolment");
 
 import { createOTP } from "@better-auth/utils/otp";
-import { authSchema, db, eq } from "@packages/drizzle";
-import { symmetricEncrypt } from "better-auth/crypto";
+import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
@@ -40,13 +39,7 @@ async function seed(): Promise<void> {
     emailVerified: true,
     locale: "en",
   });
-  await db.insert(authSchema.twoFactor).values({
-    id: `${userId}-two-factor`,
-    userId,
-    secret: await symmetricEncrypt({ key: authSecretKey(env), data: totpSecret }),
-    backupCodes: "[]",
-    verified: false,
-  });
+  await seedTwoFactor(userId, totpSecret, false);
 }
 
 async function setVerified(verified: boolean | null): Promise<void> {
@@ -58,9 +51,13 @@ async function setVerified(verified: boolean | null): Promise<void> {
 
 async function verifiesCurrentCode(): Promise<boolean> {
   const code = await createOTP(totpSecret, TOTP_OPTIONS).totp();
-  const result = await new DrizzleTotpVerifier(new NoOpInstrumentation()).verify(userId, code);
+  await db
+    .delete(staffSchema.adminTotpCounter)
+    .where(eq(staffSchema.adminTotpCounter.userId, userId));
+  const verifier = new DrizzleTotpVerifier(new NoOpInstrumentation(), authSecretKey(env));
+  const result = await verifier.consume(userId, code);
 
-  return result.isSuccess && result.getValue().isSome();
+  return result.isSuccess && result.getValue() === "accepted";
 }
 
 async function main(): Promise<void> {

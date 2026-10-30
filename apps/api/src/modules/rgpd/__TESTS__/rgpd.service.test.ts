@@ -147,7 +147,7 @@ function buildService(deps: {
 
 function acceptingTotp() {
   const totp = mockPort<ITotpVerifier>();
-  totp.verify.mockImplementation(async () => Result.ok(Option.some(1)));
+  totp.consume.mockImplementation(async () => Result.ok("accepted"));
 
   return totp;
 }
@@ -296,7 +296,7 @@ describe("RgpdService", () => {
         ),
       });
       const totp = mockPort<ITotpVerifier>();
-      totp.verify.mockImplementation(async () => Result.ok(Option.none()));
+      totp.consume.mockImplementation(async () => Result.ok("invalid"));
       const service = buildService({ repo, email, totp });
 
       const result = await service.requestAccountDeletion({ userId: "u1", totpCode: "000000" });

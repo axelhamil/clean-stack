@@ -32,6 +32,8 @@ import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositor
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "../src/modules/uploads/infrastructure/services/noop-storage.service";
+import { authSecretKey } from "../src/shared/auth/auth-secrets";
+import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
@@ -103,7 +105,7 @@ async function main(): Promise<void> {
     instrumentation,
     new DrizzleStaffStore(instrumentation),
     { PLATFORM_ADMIN_IDS: [] },
-    new DrizzleTotpVerifier(instrumentation),
+    new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
   );
 
   const result = await service.executeAccountWipe({ userId });

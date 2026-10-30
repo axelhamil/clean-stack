@@ -3,10 +3,11 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
 import { di } from "../../container";
+import { deliverPasswordReset } from "../../shared/auth/password-reset-delivery";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
-import { banUserBodySchema } from "./application/dto/ban-user.dto";
+import { banNeedsStepUp, banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import type { AdminUserRow } from "./application/ports/admin-user-store.port";
 import type { AdminUserDetail } from "./application/services/admin-query.service";
@@ -70,7 +71,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       const actor = c.get("user");
       const userId = c.req.param("id");
       const body = c.req.valid("json");
-      if (body.expiresIn === undefined) await assertStepUp(actor, c.get("session"));
+      if (banNeedsStepUp(body)) await assertStepUp(actor, c.get("session"));
 
       const result = await di.StaffService.moderateBan(
         { actorPermissions: c.get("staff").permissions, targetUserId: userId },
@@ -104,7 +105,10 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       { actorPermissions: c.get("staff").permissions, targetUserId: userId },
       () =>
         di.AdminModerationService.resetPassword({ actorUserId: actor.id, userId }, () =>
-          auth.api.requestPasswordReset({ body: { email: u.email } }),
+          deliverPasswordReset(
+            () => auth.api.requestPasswordReset({ body: { email: u.email } }),
+            (error) => di.IInstrumentation.capture(error),
+          ),
         ),
     );
     if (result.isFailure) throw new AppErrorException(result.getError());

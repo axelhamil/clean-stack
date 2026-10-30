@@ -408,7 +408,7 @@ The boilerplate emits **92 events** (35 public + 57 internal) automatically. Sou
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
 - `USER_SIGNED_IN`: `databaseHooks.session.create.after`
-- `USER_SIGNED_OUT`: `databaseHooks.session.delete.after`
+- `USER_SIGNED_OUT`: `databaseHooks.session.delete.after` (null `actorUserId`), or `AdminModerationService` when an admin ended the session (the admin as `actorUserId`)
 - `USER_ACCOUNT_UNLINKED`: `databaseHooks.account.delete.after` (skip credential)
 
 ### Via `hooks.after` + `createAuthMiddleware` (path-based, plugin events)
@@ -453,12 +453,12 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 
 ### Via `AdminModerationService` (Phase C.3, atomic since Phase K)
 
-Emitted via `emitEvent(outbox, ...)` by `AdminModerationService`, inside the `uow.run` of the write. **Residual window**: impersonation and password reset only exist in the auth library, which commits on its own connection, so they run last in the unit; a commit that fails after them leaves the action without its event. All 6 events carry `actorUserId` (the operator's id, distinct from `userId` which is the target): actor identification is explicit, never inferred from session state. All events have `organizationId = null` (platform-level, no org context) and `retention: "compliance"`.
+Emitted via `emitEvent(outbox, ...)` by `AdminModerationService`, inside the `uow.run` of the write. **Residual window**: impersonation only exists in the auth library, which commits on its own connection, so it runs last in the unit; a commit that fails after it leaves the action without its event. A password reset is the opposite: its event commits first and the mail follows, a failed mail is retried by the admin. All 6 events carry `actorUserId` (the operator's id, distinct from `userId` which is the target): actor identification is explicit, never inferred from session state. All events have `organizationId = null` (platform-level, no org context) and `retention: "compliance"`.
 
 - `ADMIN_IMPERSONATION_STARTED` (`admin.impersonation.started`): emitted in the unit of `POST /admin/impersonation/:id/start`, the BetterAuth session is issued right after and a refusal rolls the event back. Payload: `{ actorUserId: string, userId: string, reason: string, ticketRef?: string, ip: string | null, expiresAt: string }`. `reason` is never empty (min 1 char enforced at the API boundary).
 - `ADMIN_IMPERSONATION_STOPPED` (`admin.impersonation.stopped`): emitted in the unit of `POST /admin/impersonation/stop`, rolled back if BetterAuth `stopImpersonating` refuses. Payload: `{ actorUserId: string, userId: string, durationMs: number }`.
 - `ADMIN_USER_BANNED` (`admin.user.banned`): emitted by `AdminModerationService.ban`, along with one `user.signed_out` per ended session. Payload: `{ actorUserId: string, userId: string, reason: string, expiresAt: string | null }`. `expiresAt: null` means a permanent ban.
-- `ADMIN_USER_UNBANNED` (`admin.user.unbanned`): emitted by `AdminModerationService.unban`. Payload: `{ actorUserId: string, userId: string }`.
+- `ADMIN_USER_UNBANNED` (`admin.user.unbanned`): emitted by `AdminModerationService.unban`, only if the user was banned, and when a sign-in clears an expired ban (null actor). Payload: `{ actorUserId: string | null, userId: string }`.
 - `ADMIN_USER_PASSWORD_RESET` (`admin.user.password_reset`): emitted by `AdminModerationService.resetPassword` (triggers a BetterAuth reset email). Payload: `{ actorUserId: string, userId: string }`.
 - `ADMIN_USER_SESSIONS_REVOKED` (`admin.user.sessions_revoked`): emitted by `AdminModerationService.revokeSessions`, along with one `user.signed_out` per ended session. Payload: `{ actorUserId: string, userId: string, count: number }`. `count` is the number of sessions deleted.
 

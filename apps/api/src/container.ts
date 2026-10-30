@@ -15,6 +15,7 @@ import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
+import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
 import { buildEventDispatcher } from "./shared/event-handlers";
@@ -162,7 +163,10 @@ export const di = container()
         asnHeader: env.GEO_ASN_HEADER,
       }),
   )
-  .add("ITotpVerifier", (c): ITotpVerifier => new DrizzleTotpVerifier(c.IInstrumentation))
+  .add(
+    "ITotpVerifier",
+    (c): ITotpVerifier => new DrizzleTotpVerifier(c.IInstrumentation, authSecretKey(env)),
+  )
   .add("ISessionGeoStore", (c): ISessionGeoStore => new DrizzleSessionGeoStore(c.IInstrumentation))
   .add(
     "SecuritySignalsService",

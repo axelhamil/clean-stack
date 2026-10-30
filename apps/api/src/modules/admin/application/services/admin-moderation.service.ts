@@ -64,7 +64,7 @@ export class AdminModerationService {
       if (banned.isFailure) return Result.fail(banned.getError());
       if (banned.getValue().isNone()) return Result.fail(userNotFound);
 
-      await this.announceEnded(banned.getValue().unwrap());
+      await this.announceEnded(banned.getValue().unwrap(), input.actorUserId);
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_BANNED, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
@@ -80,7 +80,8 @@ export class AdminModerationService {
     return this.uow.run(async (): Promise<Result<void, AdminModerationError>> => {
       const unbanned = await this.store.unban(input.userId);
       if (unbanned.isFailure) return Result.fail(unbanned.getError());
-      if (!unbanned.getValue()) return Result.fail(userNotFound);
+      if (unbanned.getValue() === "not_found") return Result.fail(userNotFound);
+      if (unbanned.getValue() === "not_banned") return Result.ok();
 
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_UNBANNED, "user", input.userId, {
         actorUserId: input.actorUserId,
@@ -96,7 +97,7 @@ export class AdminModerationService {
       const ended = await this.store.deleteSessions(input.userId);
       if (ended.isFailure) return Result.fail(ended.getError());
 
-      await this.announceEnded(ended.getValue());
+      await this.announceEnded(ended.getValue(), input.actorUserId);
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_SESSIONS_REVOKED, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
@@ -107,23 +108,25 @@ export class AdminModerationService {
     });
   }
 
-  async resetPassword(
+  async resetPassword<E>(
     input: ModerationSubject,
-    requestReset: () => Promise<unknown>,
-  ): Promise<Result<void, AdminModerationError>> {
-    return this.uow.run(async (): Promise<Result<void, AdminModerationError>> => {
+    requestReset: () => Promise<Result<void, E>>,
+  ): Promise<Result<void, AdminModerationError | E>> {
+    const committed = await this.uow.run(async (): Promise<Result<void, AdminModerationError>> => {
       const ended = await this.store.deleteSessions(input.userId);
       if (ended.isFailure) return Result.fail(ended.getError());
 
-      await this.announceEnded(ended.getValue());
+      await this.announceEnded(ended.getValue(), input.actorUserId);
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_PASSWORD_RESET, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
       });
-      await requestReset();
 
       return Result.ok();
     });
+    if (committed.isFailure) return committed;
+
+    return requestReset();
   }
 
   startImpersonation<T, E>(
@@ -159,11 +162,12 @@ export class AdminModerationService {
     });
   }
 
-  private async announceEnded(sessions: EndedSession[]): Promise<void> {
+  private async announceEnded(sessions: EndedSession[], actorUserId: string): Promise<void> {
     for (const session of sessions) {
       await emitEvent(this.outbox, EventTypes.USER_SIGNED_OUT, "session", session.id, {
         userId: session.userId,
         sessionId: session.id,
+        actorUserId,
       });
     }
   }

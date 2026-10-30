@@ -7,12 +7,20 @@
  */
 
 import { createOTP } from "@better-auth/utils/otp";
+import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { app } from "../src/app";
+import { di } from "../src/container";
 import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
-import { type AdminProbe, adminProbes } from "./admin-probes";
+import {
+  type AdminProbe,
+  type AppCall,
+  adminProbes,
+  appCall,
+  codeOf,
+  freshIp,
+} from "./admin-probes";
 import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
@@ -22,41 +30,10 @@ const probes = adminProbes(`check-admin-step-up-${crypto.randomUUID()}`);
 const checks = checkRecorder();
 const { check } = checks;
 
-const ORIGIN = env.CORS_ORIGIN?.[0] ?? "http://localhost:5173";
 const RACERS = 8;
-let nextAddress = 1;
+const DAY_SECONDS = 24 * 60 * 60;
 
-function freshIp(): string {
-  nextAddress += 1;
-
-  return `198.51.100.${nextAddress}`;
-}
-
-interface Call {
-  status: number;
-  body: { error?: { code?: string }; stepUpValidUntil?: string | null };
-  response: Response;
-}
-
-async function call(
-  cookie: string,
-  method: string,
-  path: string,
-  body?: unknown,
-  ip = freshIp(),
-): Promise<Call> {
-  const response = await app.request(
-    path,
-    {
-      method,
-      headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    },
-    { server: { requestIP: () => ({ address: ip, family: "IPv4", port: 1 }) } },
-  );
-
-  return { status: response.status, body: await response.clone().json(), response };
-}
+const call = appCall;
 
 function currentCounter(): number {
   return Math.floor(Date.now() / 1000 / (TOTP_OPTIONS.period ?? 30));
@@ -66,7 +43,7 @@ function codeAt(probe: AdminProbe, counter: number): Promise<string> {
   return createOTP(probe.totpSecret, TOTP_OPTIONS).hotp(counter);
 }
 
-function submit(cookie: string, code: string, ip?: string): Promise<Call> {
+function submit(cookie: string, code: string, ip?: string): Promise<AppCall> {
   return call(cookie, "POST", "/admin/step-up", { code }, ip);
 }
 
@@ -106,10 +83,6 @@ async function banOf(userId: string): Promise<boolean | null | undefined> {
     .where(eq(authSchema.user.id, userId));
 
   return row?.banned;
-}
-
-function codeOf(result: Call): string | undefined {
-  return result.body.error?.code;
 }
 
 async function proveTheGateOpensAndCloses(): Promise<void> {
@@ -239,7 +212,7 @@ async function proveRacingCode(): Promise<void> {
 
 async function proveRateLimit(): Promise<void> {
   const { cookie } = await confirmedManager("limit");
-  const ip = "203.0.113.77";
+  const ip = freshIp();
   const statuses: number[] = [];
   for (let attempt = 0; attempt < 6; attempt += 1) {
     statuses.push((await submit(cookie, "000000", ip)).status);
@@ -278,6 +251,125 @@ async function proveSensitiveRoutes(): Promise<void> {
   );
 }
 
+async function proveLongBanNeedsPermanentRoute(): Promise<void> {
+  const { cookie } = await confirmedManager("long-ban");
+  const target = await probes.user("long-ban-target");
+  const banPath = `/admin/users/${target.id}/ban`;
+
+  for (const expiresIn of [100 * 365 * DAY_SECONDS, 1e15]) {
+    const refused = await call(cookie, "POST", banPath, { reason: "probe", expiresIn });
+    check(`a ${expiresIn} s ban is refused`, refused.status === 400, refused.body);
+    check("the refused long ban writes nothing", (await banOf(target.id)) === false);
+  }
+
+  const limit = await call(cookie, "POST", banPath, {
+    reason: "probe",
+    expiresIn: 90 * DAY_SECONDS,
+  });
+  check("a 90 day ban needs no step-up", limit.status === 200, limit.body);
+}
+
+async function realTwoFactorSignIn(probe: AdminProbe, code: string): Promise<AppCall> {
+  const challenge = await appCall("", "POST", "/api/auth/sign-in/email", {
+    email: probe.email,
+    password: probes.password,
+  });
+  const cookie = challenge.response.headers
+    .getSetCookie()
+    .map((value) => value.split(";")[0])
+    .join("; ");
+
+  return appCall(cookie, "POST", "/api/auth/two-factor/verify-totp", { code });
+}
+
+function sessionCookieOf(result: AppCall): string {
+  return result.response.headers
+    .getSetCookie()
+    .map((value) => value.split(";")[0] ?? "")
+    .filter((pair) => pair.includes("session_token"))
+    .join("; ");
+}
+
+async function proveOtherFlowsBurnTheCode(): Promise<void> {
+  const signedIn = await confirmedManager("burn-sign-in");
+  const signInCode = await codeAt(signedIn.probe, currentCounter());
+  const verified = await realTwoFactorSignIn(signedIn.probe, signInCode);
+  check("a real two-factor sign-in succeeds", verified.status === 200, verified.body);
+  const replayedSignIn = await submit(signedIn.cookie, signInCode);
+  check(
+    "a code used at sign-in cannot confirm a step-up",
+    codeOf(replayedSignIn) === "ADMIN_STEP_UP_REPLAY_INVALID",
+    replayedSignIn.body,
+  );
+
+  const leaving = await confirmedManager("burn-rgpd");
+  const spare = await probes.manager("burn-rgpd-spare");
+  check("a second manager exists for the deletion", spare.id.length > 0);
+  const rgpdCode = await codeAt(leaving.probe, currentCounter());
+  const deletion = await di.RgpdService.requestAccountDeletion({
+    userId: leaving.probe.id,
+    totpCode: rgpdCode,
+  });
+  check("the deletion accepts the code", deletion.isSuccess);
+  const replayedDeletion = await submit(leaving.cookie, rgpdCode);
+  check(
+    "a code used for a deletion cannot confirm a step-up",
+    codeOf(replayedDeletion) === "ADMIN_STEP_UP_REPLAY_INVALID",
+    replayedDeletion.body,
+  );
+}
+
+async function proveSignInSurvivesRecordingFailure(): Promise<void> {
+  const { probe } = await confirmedManager("burn-failure");
+  const verifier = di.ITotpVerifier;
+  const realConsume = verifier.consume;
+  verifier.consume = async () =>
+    Result.fail({ code: "TOTP_VERIFIER_PROVIDER_FAILURE", message: "forced" });
+  const verified = await realTwoFactorSignIn(probe, await codeAt(probe, currentCounter()));
+  verifier.consume = realConsume;
+
+  check("a failure to record the code does not block sign-in", verified.status === 200);
+  check("that sign-in still opens a session", sessionCookieOf(verified).length > 0);
+}
+
+async function provePerUserLimit(): Promise<void> {
+  const { cookie } = await confirmedManager("user-limit");
+  const statuses: number[] = [];
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    statuses.push((await submit(cookie, "000000", freshIp())).status);
+  }
+  check(
+    "the sixth attempt of one user is limited across addresses",
+    statuses.at(-1) === 429,
+    statuses,
+  );
+}
+
+async function proveNoTwoFactorRefusalIsAccurate(): Promise<void> {
+  const probe = await probes.manager("no-mfa-policy");
+  const cookie = await probes.sessionCookie(probe);
+  const target = await probes.user("no-mfa-policy-target");
+  const banPath = `/admin/users/${target.id}/ban`;
+  Object.assign(env, { PLATFORM_ADMIN_REQUIRE_MFA: false });
+
+  const permanent = await call(cookie, "POST", banPath, { reason: "probe" });
+  const submitted = await submit(cookie, "000000");
+  const timed = await call(cookie, "POST", banPath, { reason: "probe", expiresIn: DAY_SECONDS });
+  Object.assign(env, { PLATFORM_ADMIN_REQUIRE_MFA: true });
+
+  check(
+    "a sensitive action without two-factor says to turn it on",
+    codeOf(permanent) === "ADMIN_STEP_UP_MFA_FORBIDDEN",
+    permanent.body,
+  );
+  check(
+    "no enrolled secret refuses a code the same way",
+    codeOf(submitted) === "ADMIN_STEP_UP_MFA_FORBIDDEN",
+    submitted.body,
+  );
+  check("a timed ban keeps working without two-factor", timed.status === 200, timed.body);
+}
+
 async function main(): Promise<void> {
   await proveTheGateOpensAndCloses();
   await proveExpiry();
@@ -287,6 +379,11 @@ async function main(): Promise<void> {
   await proveRacingCode();
   await proveRateLimit();
   await proveSensitiveRoutes();
+  await proveLongBanNeedsPermanentRoute();
+  await proveOtherFlowsBurnTheCode();
+  await proveSignInSurvivesRecordingFailure();
+  await provePerUserLimit();
+  await proveNoTwoFactorRefusalIsAccurate();
   await probes.cleanup();
 
   if (checks.failures > 0) {

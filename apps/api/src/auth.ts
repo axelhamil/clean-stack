@@ -33,6 +33,7 @@ import { CryptoHasher } from "bun";
 import type Stripe from "stripe";
 import {
   clearConfirmedPendingEmail,
+  clearExpiredBan,
   countActiveMembers,
   deleteOrgIfEmpty,
   emailFor,
@@ -60,6 +61,7 @@ import {
 } from "./modules/billing/application/subscription-events";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { redirectQuery } from "./shared/auth/email-redirect";
+import { markPasswordResetDelivered } from "./shared/auth/password-reset-delivery";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { scimIdentityResolver, scimMembershipProjection } from "./shared/auth/scim-membership";
@@ -178,6 +180,31 @@ async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Pr
  * transaction as a unit of work), so it is committed or rolled back with the change
  * it describes.
  */
+const TOTP_VERIFY_PATH = "/two-factor/verify-totp";
+
+const clearExpiredBanBeforeAdminPlugin = {
+  id: "clear-expired-ban",
+  init: () => ({
+    options: {
+      databaseHooks: {
+        session: {
+          create: {
+            before: async (session: { userId: string }) => {
+              await di.ITransactionService.run(async () => {
+                if (!(await clearExpiredBan(session.userId))) return;
+                await emit(EventTypes.ADMIN_USER_UNBANNED, "user", session.userId, {
+                  actorUserId: null,
+                  userId: session.userId,
+                });
+              });
+            },
+          },
+        },
+      },
+    },
+  }),
+} satisfies BetterAuthPlugin;
+
 async function emit<TPayload>(
   eventType: EventType,
   aggregateType: string,
@@ -683,6 +710,7 @@ const authOptions = {
         tokenIdempotencyKey("reset-password", token),
         localeOf(user),
       );
+      markPasswordResetDelivered();
     },
     onPasswordReset: async ({ user }) => {
       await emit(EventTypes.USER_PASSWORD_CHANGED, "user", user.id, { userId: user.id });
@@ -803,6 +831,7 @@ const authOptions = {
       },
     }),
     passkey({ rpName: "clean-stack" }),
+    clearExpiredBanBeforeAdminPlugin,
     admin({ adminUserIds: env.PLATFORM_ADMIN_IDS, defaultRole: "user", adminRoles: ["admin"] }),
     organization({
       ac,
@@ -1194,6 +1223,11 @@ const authOptions = {
       const path = ctx.path;
       const body = ctx.body as Record<string, unknown> | undefined;
 
+      const totpUserId = ctx.context.newSession?.user.id;
+      if (path === TOTP_VERIFY_PATH && totpUserId && typeof body?.code === "string") {
+        await di.ITotpVerifier.consume(totpUserId, body.code);
+      }
+
       // sso.login.failure is the one event this hook emits on a rejected call, so it
       // must run before the early-return below, every other branch only sees success.
       if (ctx.context.returned instanceof APIError && isSsoCallbackPath(path)) {
@@ -1544,6 +1578,7 @@ const authOptions = {
           await emit(EventTypes.USER_SIGNED_OUT, "session", session.id, {
             userId: session.userId,
             sessionId: session.id,
+            actorUserId: null,
           });
         },
       },

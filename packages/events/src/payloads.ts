@@ -21,6 +21,7 @@ export type UserSignedInPayload = z.infer<typeof UserSignedInPayload>;
 
 export const UserSignedOutPayload = UserRef.extend({
   sessionId: z.string(),
+  actorUserId: z.string().nullable(),
 });
 export type UserSignedOutPayload = z.infer<typeof UserSignedOutPayload>;
 
@@ -464,7 +465,9 @@ export const AdminUserBannedPayload = ActorRef.extend(UserRef.shape).extend({
 });
 export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 
-export const AdminUserUnbannedPayload = ActorRef.extend(UserRef.shape);
+export const AdminUserUnbannedPayload = UserRef.extend({
+  actorUserId: z.string().nullable(),
+});
 export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
 export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);

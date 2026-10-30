@@ -5,33 +5,26 @@ import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
-import type { ITotpVerifier } from "../../../shared/ports/totp-verifier.port";
+import type { ITotpVerifier, TotpOutcome } from "../../../shared/ports/totp-verifier.port";
 import type { IStepUpStore } from "../application/ports/step-up-store.port";
 import { StepUpService } from "../application/services/step-up.service";
 
 const ATTEMPT = {
   userId: "u1",
   sessionId: "s1",
-  twoFactorEnabled: true,
   code: "123456",
   ip: "203.0.113.9",
 };
 const TTL_SECONDS = 300;
 const NOW = new Date("2026-10-30T12:00:00Z");
 
-function setup(given: {
-  matched?: Option<number>;
-  consumed?: boolean;
-  sessionLive?: boolean;
-  verifiedAt?: Option<Date>;
-}) {
+function setup(given: { totp?: TotpOutcome; sessionLive?: boolean; verifiedAt?: Option<Date> }) {
   const store = mockPort<IStepUpStore>();
-  store.consumeTotpCounter.mockImplementation(async () => Result.ok(given.consumed ?? true));
   store.record.mockImplementation(async () => Result.ok(given.sessionLive ?? true));
   store.findVerifiedAt.mockImplementation(async () => Result.ok(given.verifiedAt ?? Option.none()));
 
   const totp = mockPort<ITotpVerifier>();
-  totp.verify.mockImplementation(async () => Result.ok(given.matched ?? Option.some(42)));
+  totp.consume.mockImplementation(async () => Result.ok(given.totp ?? "accepted"));
 
   const outbox = mockPort<IOutboxRepository>();
   outbox.enqueue.mockImplementation(async () => {});
@@ -56,7 +49,6 @@ describe("StepUpService.verify", () => {
     const result = await service.verify(ATTEMPT);
 
     expect(result.getValue().validUntil).toEqual(new Date(NOW.getTime() + TTL_SECONDS * 1000));
-    expect(store.consumeTotpCounter).toHaveBeenCalledWith("u1", 42);
     expect(store.record).toHaveBeenCalledWith("s1", NOW);
     expect(enqueuedEvents(outbox)).toEqual([
       {
@@ -71,17 +63,18 @@ describe("StepUpService.verify", () => {
     ]);
   });
 
-  it("refuses without two-factor and never looks at the code", async () => {
-    const { service, store } = setup({});
+  it("answers that two-factor is needed when no secret is enrolled", async () => {
+    const { service, store, outbox } = setup({ totp: "not_enrolled" });
 
-    const result = await service.verify({ ...ATTEMPT, twoFactorEnabled: false });
+    const result = await service.verify(ATTEMPT);
 
-    expect(result.getError().code).toBe("ADMIN_STAFF_MFA_FORBIDDEN");
+    expect(result.getError().code).toBe("ADMIN_STEP_UP_MFA_FORBIDDEN");
+    expect(enqueuedEvents(outbox)).toEqual([]);
     expect(store.record).not.toHaveBeenCalled();
   });
 
   it("refuses a wrong code, records nothing and announces the failure", async () => {
-    const { service, store, outbox } = setup({ matched: Option.none() });
+    const { service, store, outbox } = setup({ totp: "invalid" });
 
     const result = await service.verify(ATTEMPT);
 
@@ -97,7 +90,7 @@ describe("StepUpService.verify", () => {
   });
 
   it("refuses a replayed code, records nothing and announces the failure", async () => {
-    const { service, store, outbox } = setup({ consumed: false });
+    const { service, store, outbox } = setup({ totp: "replayed" });
 
     const result = await service.verify(ATTEMPT);
 

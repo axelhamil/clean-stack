@@ -23,6 +23,7 @@ import type {
   BanWrite,
   EndedSession,
   IAdminUserStore,
+  UnbanOutcome,
 } from "../../application/ports/admin-user-store.port";
 
 const fail = createDbFailure("ADMIN_QUERY_PROVIDER_FAILURE");
@@ -76,6 +77,12 @@ function toSessionRow(row: SessionSelection): AdminSessionRow {
     userAgent: Option.fromNullable(row.userAgent),
     impersonatedBy: Option.fromNullable(row.impersonatedBy),
   };
+}
+
+function sessionsHeldOrImpersonatedBy(userId: string) {
+  const { session } = authSchema;
+
+  return or(eq(session.userId, userId), eq(session.impersonatedBy, userId));
 }
 
 export class DrizzleAdminUserStore implements IAdminUserStore {
@@ -234,7 +241,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
 
         const ended = await exec
           .delete(session)
-          .where(or(eq(session.userId, input.userId), eq(session.impersonatedBy, input.userId)))
+          .where(sessionsHeldOrImpersonatedBy(input.userId))
           .returning({ id: session.id, userId: session.userId });
 
         return Result.ok(Option.some(ended));
@@ -245,23 +252,26 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
     });
   }
 
-  async unban(userId: string): Promise<Result<boolean, AdminStoreError>> {
+  async unban(userId: string): Promise<Result<UnbanOutcome, AdminStoreError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > unban" }, async () => {
       try {
         const { user } = authSchema;
-        const query = exec
+        const written = await exec
           .update(user)
           .set({ banned: false, banReason: null, banExpires: null, updatedAt: new Date() })
-          .where(eq(user.id, userId))
+          .where(and(eq(user.id, userId), eq(user.banned, true)))
           .returning({ id: user.id });
-        const written = await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
+        if (written.length > 0) return Result.ok("unbanned");
 
-        return Result.ok(written.length > 0);
+        const [existing] = await exec
+          .select({ id: user.id })
+          .from(user)
+          .where(eq(user.id, userId))
+          .limit(1);
+
+        return Result.ok(existing ? "not_banned" : "not_found");
       } catch (err) {
         this.instrumentation.capture(err);
         return fail(err, "admin unban failed");
@@ -279,7 +289,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
           const { session } = authSchema;
           const query = exec
             .delete(session)
-            .where(eq(session.userId, userId))
+            .where(sessionsHeldOrImpersonatedBy(userId))
             .returning({ id: session.id, userId: session.userId });
           const ended = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },

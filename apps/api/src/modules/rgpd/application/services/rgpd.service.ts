@@ -142,9 +142,9 @@ export class RgpdService {
               message: "two-factor TOTP code required",
             });
 
-          const totpResult = await this.totp.verify(input.userId, input.totpCode);
+          const totpResult = await this.totp.consume(input.userId, input.totpCode);
           if (totpResult.isFailure) return Result.fail(totpResult.getError());
-          if (totpResult.getValue().isNone())
+          if (totpResult.getValue() !== "accepted")
             return Result.fail({ code: "TWO_FACTOR_INVALID", message: "invalid TOTP code" });
         } else {
           if (!input.password)

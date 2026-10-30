@@ -2,16 +2,13 @@ import { timingSafeEqual } from "node:crypto";
 import { base32 } from "@better-auth/utils/base32";
 import { createOTP } from "@better-auth/utils/otp";
 import { Option, Result } from "@packages/ddd-kit";
-import { and, eq, isNull, or, resolveExecutor, schema } from "@packages/drizzle";
+import { and, eq, isNull, lt, or, resolveExecutor, schema, staffSchema } from "@packages/drizzle";
 import { type SecretConfig, symmetricDecrypt } from "better-auth/crypto";
-import { authSecretKey } from "../auth/auth-secrets";
 import { TOTP_OPTIONS } from "../auth/totp-options";
 import { dbOperationFailure } from "../db-failure";
-import { env } from "../env";
 import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { ITotpVerifier, TotpVerifierError } from "../ports/totp-verifier.port";
+import type { ITotpVerifier, TotpOutcome, TotpVerifierError } from "../ports/totp-verifier.port";
 
-const dbAttrs = { "db.system.name": "postgresql" } as const;
 const IMPORTED_SECRET_PREFIX = "base32:";
 const CLOCK_DRIFT_STEPS = 1;
 
@@ -50,15 +47,15 @@ async function matchedCounter(secret: string | Uint8Array, code: string): Promis
 export class DrizzleTotpVerifier implements ITotpVerifier {
   constructor(
     private readonly instrumentation: IInstrumentation,
-    private readonly authSecret: string | SecretConfig = authSecretKey(env),
+    private readonly authSecret: string | SecretConfig,
   ) {}
 
-  async verify(userId: string, code: string): Promise<Result<Option<number>, TotpVerifierError>> {
+  async consume(userId: string, code: string): Promise<Result<TotpOutcome, TotpVerifierError>> {
     const exec = resolveExecutor();
 
-    return this.instrumentation.startSpan({ name: "DrizzleTotpVerifier > verify" }, async () => {
+    return this.instrumentation.startSpan({ name: "DrizzleTotpVerifier > consume" }, async () => {
       try {
-        const query = exec
+        const [row] = await exec
           .select({ secret: schema.twoFactor.secret })
           .from(schema.twoFactor)
           .where(
@@ -68,16 +65,27 @@ export class DrizzleTotpVerifier implements ITotpVerifier {
             ),
           )
           .limit(1);
-        const [row] = await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
-        if (!row?.secret) return Result.ok(Option.none());
+        if (!row?.secret) return Result.ok("not_enrolled");
 
-        return Result.ok(await this.match(row.secret, code));
+        const matched = await this.match(row.secret, code);
+        if (matched.isNone()) return Result.ok("invalid");
+
+        const { adminTotpCounter } = staffSchema;
+        const counter = matched.unwrap();
+        const written = await exec
+          .insert(adminTotpCounter)
+          .values({ userId, lastCounter: counter })
+          .onConflictDoUpdate({
+            target: adminTotpCounter.userId,
+            set: { lastCounter: counter },
+            where: lt(adminTotpCounter.lastCounter, counter),
+          })
+          .returning({ userId: adminTotpCounter.userId });
+
+        return Result.ok(written.length > 0 ? "accepted" : "replayed");
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(failure("verify"));
+        return Result.fail(failure("consume"));
       }
     });
   }

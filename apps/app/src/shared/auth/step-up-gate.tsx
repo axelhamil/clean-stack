@@ -25,29 +25,32 @@ export function StepUpGate() {
 
   useEffect(() => watchStepUpRefusals(queryClient, () => setOpen(true)), [queryClient]);
 
+  const mutation = useMutation(verifyStepUpMutationOptions);
+
   const close = () => {
     setOpen(false);
     form.reset();
+    mutation.reset();
   };
 
-  const mutation = useMutation({
-    ...verifyStepUpMutationOptions,
-    onSuccess: () => {
-      close();
-      toast.success(t("stepUp.confirmedToast"));
-    },
-    onError: (err) =>
-      form.setError("code", {
-        message: formatApiError(err, errorFallback("verifyStepUp"), getErrorsT()),
-      }),
-  });
+  const submit = (values: StepUpFormValues) =>
+    mutation.mutate(values, {
+      onSuccess: () => {
+        close();
+        toast.success(t("stepUp.confirmedToast"));
+      },
+      onError: (err) =>
+        form.setError("code", {
+          message: formatApiError(err, errorFallback("verifyStepUp"), getErrorsT()),
+        }),
+    });
 
   return (
     <StepUpDialog
       open={open}
       onOpenChange={(next) => (next ? setOpen(true) : close())}
       form={form}
-      onSubmit={(values) => mutation.mutate(values)}
+      onSubmit={submit}
       isPending={mutation.isPending}
       title={t("stepUp.title")}
       description={t("stepUp.description")}

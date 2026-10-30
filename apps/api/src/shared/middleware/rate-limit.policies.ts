@@ -117,6 +117,18 @@ export function visitorCapRoutes(
 
 // Two-factor verify paths: /two-factor/verify-totp, /two-factor/verify-otp,
 // /two-factor/verify-backup-code (BetterAuth twoFactor plugin, confirmed via dist grep).
+export const ADMIN_STEP_UP_USER_POLICY: PolicyConfig = {
+  name: "admin-step-up-user",
+  keyFn: (c) => {
+    const user = c.get("user") as { id: string } | null | undefined;
+    return `admin-step-up-user:${user?.id ?? resolveClientIp(c)}`;
+  },
+  windows: [{ policyName: "admin-step-up-user", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
+  failClosed: true,
+  advertiseBudget: false,
+};
+
 export const AUTH_TWO_FACTOR_POLICY: PolicyConfig = {
   name: "auth-two-factor",
   keyFn: ipKeyFn("auth-two-factor"),

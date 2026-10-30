@@ -6,7 +6,10 @@ import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.mi
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
-import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
+import {
+  setSsoEnforcementBodySchema,
+  ssoEnforcementChangeNeedsStepUp,
+} from "../../shared/services/set-sso-enforcement.dto";
 import { zV } from "../../shared/validator";
 import { listOrgsQuerySchema } from "./application/dto/list-orgs.dto";
 
@@ -54,8 +57,10 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
     denyImpersonated,
     zV("json", setSsoEnforcementBodySchema),
     async (c) => {
-      const { enforced } = c.req.valid("json");
-      if (!enforced) await assertStepUp(c.get("user"), c.get("session"));
+      const body = c.req.valid("json");
+      const { enforced } = body;
+      if (ssoEnforcementChangeNeedsStepUp(body))
+        await assertStepUp(c.get("user"), c.get("session"));
 
       const result = await actionSvc.setSsoEnforcement({
         organizationId: c.req.param("id"),

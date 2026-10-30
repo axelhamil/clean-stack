@@ -18,6 +18,7 @@
  */
 
 import { apiErrorFields } from "@packages/web-kit/api/errors/api-error";
+import { watchRefusals } from "@packages/web-kit/api/errors/watch-refusals";
 import type { QueryClient } from "@tanstack/react-query";
 import { policiesQueryOptions } from "../queries/policies";
 
@@ -55,19 +56,7 @@ export function watchPolicyRefusals(
   queryClient: QueryClient,
   refreshRouter: () => Promise<void> | void,
 ): () => void {
-  const react = (error: unknown): void => {
+  return watchRefusals(queryClient, (error) => {
     void handlePolicyRefusal(error, queryClient, refreshRouter);
-  };
-
-  const unsubscribeQueries = queryClient.getQueryCache().subscribe((event) => {
-    if (event.type === "updated" && event.action.type === "error") react(event.action.error);
   });
-  const unsubscribeMutations = queryClient.getMutationCache().subscribe((event) => {
-    if (event.type === "updated" && event.action.type === "error") react(event.action.error);
-  });
-
-  return () => {
-    unsubscribeQueries();
-    unsubscribeMutations();
-  };
 }

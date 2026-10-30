@@ -38,7 +38,6 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
     const result = await di.StepUpService.verify({
       userId: user.id,
       sessionId: c.get("session").id,
-      twoFactorEnabled: user.twoFactorEnabled === true,
       code: c.req.valid("json").code,
       ip: resolveClientIp(c),
     });

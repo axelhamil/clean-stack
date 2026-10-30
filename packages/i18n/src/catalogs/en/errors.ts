@@ -123,6 +123,9 @@ export default {
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
     ADMIN_STAFF_FORBIDDEN: "This area is for platform staff.",
     ADMIN_REAUTH_REQUIRED: "Confirm this action with a code from your authenticator app.",
+    ADMIN_STEP_UP_MFA_FORBIDDEN: "Turn on two-factor authentication to confirm this action.",
+    ADMIN_PASSWORD_RESET_UNAVAILABLE:
+      "The reset email could not be sent. The user's sessions were ended, try again.",
     ADMIN_STEP_UP_CODE_INVALID: "This code is not valid. Check your authenticator app.",
     ADMIN_STEP_UP_REPLAY_INVALID: "This code was already used. Wait for the next one.",
     ADMIN_STEP_UP_SESSION_NOT_FOUND: "This session has ended. Sign in again.",

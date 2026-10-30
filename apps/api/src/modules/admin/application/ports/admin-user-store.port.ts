@@ -29,6 +29,8 @@ export interface AdminMembershipRow {
   role: string;
 }
 
+export type UnbanOutcome = "unbanned" | "not_banned" | "not_found";
+
 export interface EndedSession {
   id: string;
   userId: string;
@@ -46,6 +48,6 @@ export interface IAdminUserStore {
   listSessionsFor(userId: string): Promise<Result<AdminSessionRow[], AdminStoreError>>;
   listMembershipsFor(userId: string): Promise<Result<AdminMembershipRow[], AdminStoreError>>;
   ban(input: BanWrite): Promise<Result<Option<EndedSession[]>, AdminStoreError>>;
-  unban(userId: string): Promise<Result<boolean, AdminStoreError>>;
+  unban(userId: string): Promise<Result<UnbanOutcome, AdminStoreError>>;
   deleteSessions(userId: string): Promise<Result<EndedSession[], AdminStoreError>>;
 }

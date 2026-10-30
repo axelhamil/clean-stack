@@ -5,7 +5,11 @@ import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
-import type { EndedSession, IAdminUserStore } from "../application/ports/admin-user-store.port";
+import type {
+  EndedSession,
+  IAdminUserStore,
+  UnbanOutcome,
+} from "../application/ports/admin-user-store.port";
 import { AdminModerationService } from "../application/services/admin-moderation.service";
 
 const SUBJECT = { actorUserId: "admin", userId: "target" };
@@ -14,7 +18,7 @@ const ENDED: EndedSession[] = [
   { id: "s2", userId: "someone-impersonated" },
 ];
 
-function setup(given: { banned?: Option<EndedSession[]>; unbanned?: boolean } = {}) {
+function setup(given: { banned?: Option<EndedSession[]>; unbanned?: UnbanOutcome } = {}) {
   const store = mockPort<IAdminUserStore>();
   const writeTransactions: unknown[] = [];
   store.ban.mockImplementation(async () => {
@@ -22,7 +26,7 @@ function setup(given: { banned?: Option<EndedSession[]>; unbanned?: boolean } = 
 
     return Result.ok(given.banned ?? Option.some(ENDED));
   });
-  store.unban.mockImplementation(async () => Result.ok(given.unbanned ?? true));
+  store.unban.mockImplementation(async () => Result.ok(given.unbanned ?? "unbanned"));
   store.deleteSessions.mockImplementation(async () =>
     Result.ok([ENDED[0] ?? { id: "", userId: "" }]),
   );
@@ -117,8 +121,15 @@ describe("AdminModerationService.unban", () => {
     ]);
   });
 
+  it("writes no event when the user was not banned", async () => {
+    const { service, outbox } = setup({ unbanned: "not_banned" });
+
+    expect((await service.unban(SUBJECT)).isSuccess).toBe(true);
+    expect(enqueuedEvents(outbox)).toEqual([]);
+  });
+
   it("answers not found for an unknown user", async () => {
-    const { service } = setup({ unbanned: false });
+    const { service } = setup({ unbanned: "not_found" });
 
     expect((await service.unban(SUBJECT)).getError().code).toBe("ADMIN_USER_NOT_FOUND");
   });
@@ -138,17 +149,42 @@ describe("AdminModerationService.revokeSessions", () => {
 });
 
 describe("AdminModerationService.resetPassword", () => {
-  it("rolls everything back when the library refuses after the emit", async () => {
+  it("commits the revocation and its event before asking for the mail", async () => {
+    const { service, outcome } = setup();
+    let outcomeAtRequest = "";
+
+    const result = await service.resetPassword(SUBJECT, async () => {
+      outcomeAtRequest = outcome();
+
+      return Result.ok();
+    });
+
+    expect(result.isSuccess).toBe(true);
+    expect(outcomeAtRequest).toBe("committed");
+  });
+
+  it("keeps the committed state and hands back a failed mail for a retry", async () => {
     const { service, outbox, outcome } = setup();
 
-    await expect(
-      service.resetPassword(SUBJECT, async () => {
-        throw new Error("library down");
-      }),
-    ).rejects.toThrow("library down");
+    const result = await service.resetPassword(SUBJECT, async () =>
+      Result.fail({ code: "ADMIN_PASSWORD_RESET_UNAVAILABLE", message: "mail" }),
+    );
 
+    expect(result.getError().code).toBe("ADMIN_PASSWORD_RESET_UNAVAILABLE");
     expect(types(outbox)).toContain(EventTypes.ADMIN_USER_PASSWORD_RESET);
-    expect(outcome()).toBe("rolled_back");
+    expect(outcome()).toBe("committed");
+  });
+
+  it("never asks for the mail when the revocation failed", async () => {
+    const { service, store } = setup();
+    store.deleteSessions.mockImplementation(async () =>
+      Result.fail({ code: "ADMIN_QUERY_PROVIDER_FAILURE", message: "db" }),
+    );
+    const requestReset = mock(async () => Result.ok());
+
+    await service.resetPassword(SUBJECT, requestReset);
+
+    expect(requestReset).not.toHaveBeenCalled();
   });
 });
 

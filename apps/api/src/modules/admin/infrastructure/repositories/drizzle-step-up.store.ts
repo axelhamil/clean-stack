@@ -1,5 +1,5 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { authSchema, eq, lt, resolveExecutor, staffSchema } from "@packages/drizzle";
+import { authSchema, eq, resolveExecutor, staffSchema } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IStepUpStore, StepUpStoreError } from "../../application/ports/step-up-store.port";
@@ -32,40 +32,6 @@ export class DrizzleStepUpStore implements IStepUpStore {
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "step-up lookup failed");
-        }
-      },
-    );
-  }
-
-  async consumeTotpCounter(
-    userId: string,
-    counter: number,
-  ): Promise<Result<boolean, StepUpStoreError>> {
-    const exec = resolveExecutor();
-
-    return this.instrumentation.startSpan(
-      { name: "DrizzleStepUpStore > consumeTotpCounter" },
-      async () => {
-        try {
-          const { adminTotpCounter } = staffSchema;
-          const query = exec
-            .insert(adminTotpCounter)
-            .values({ userId, lastCounter: counter })
-            .onConflictDoUpdate({
-              target: adminTotpCounter.userId,
-              set: { lastCounter: counter },
-              where: lt(adminTotpCounter.lastCounter, counter),
-            })
-            .returning({ userId: adminTotpCounter.userId });
-          const written = await this.instrumentation.startSpan(
-            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => query.execute(),
-          );
-
-          return Result.ok(written.length > 0);
-        } catch (err) {
-          this.instrumentation.capture(err);
-          return fail(err, "step-up code consumption failed");
         }
       },
     );

@@ -2,7 +2,12 @@ import { z } from "zod";
 
 export const banFormSchema = z.object({
   reason: z.string().trim().min(1).max(500),
-  expiresIn: z.number().int().positive().optional(),
+  expiresIn: z
+    .number()
+    .int()
+    .positive()
+    .max(90 * 24 * 60 * 60)
+    .optional(),
 });
 export type BanFormInput = z.infer<typeof banFormSchema>;
 

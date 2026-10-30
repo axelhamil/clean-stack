@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { apiErrorFields } from "./api-error";
+import { watchRefusals } from "./watch-refusals";
 
 const ADMIN_REAUTH_REQUIRED = "ADMIN_REAUTH_REQUIRED";
 
@@ -8,8 +9,7 @@ export function isStepUpRefusal(error: unknown): boolean {
 }
 
 export function watchStepUpRefusals(queryClient: QueryClient, onRefusal: () => void): () => void {
-  return queryClient.getMutationCache().subscribe((event) => {
-    if (event.type !== "updated" || event.action.type !== "error") return;
-    if (isStepUpRefusal(event.action.error)) onRefusal();
+  return watchRefusals(queryClient, (error) => {
+    if (isStepUpRefusal(error)) onRefusal();
   });
 }

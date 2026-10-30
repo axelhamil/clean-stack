@@ -9,9 +9,11 @@
 import { Writable } from "node:stream";
 import type { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
+import { symmetricEncrypt } from "better-auth/crypto";
 import { Hono } from "hono";
 import { pinoLogger } from "hono-pino";
 import { pino } from "pino";
+import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { env } from "../src/shared/env";
 import {
   buildSignatureHeader,
@@ -22,6 +24,20 @@ import {
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { seedEmail } from "./seed-account";
+
+export async function seedTwoFactor(
+  userId: string,
+  secret: string,
+  verified: boolean,
+): Promise<void> {
+  await db.insert(authSchema.twoFactor).values({
+    id: `${userId}-two-factor`,
+    userId,
+    secret: await symmetricEncrypt({ key: authSecretKey(env), data: secret }),
+    backupCodes: "[]",
+    verified,
+  });
+}
 
 export interface CheckRecorder {
   check(label: string, ok: boolean, extra?: unknown): void;

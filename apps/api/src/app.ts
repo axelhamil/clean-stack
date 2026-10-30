@@ -42,6 +42,7 @@ import { httpLogger } from "./shared/middleware/logger.middleware";
 import { resolveClientIp } from "./shared/middleware/rate-limit.ip";
 import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
 import {
+  ADMIN_STEP_UP_USER_POLICY,
   AUTH_FORGOT_PASSWORD_POLICY,
   AUTH_MAGIC_LINK_POLICY,
   AUTH_PASSKEY_POLICY,
@@ -177,6 +178,7 @@ for (const [path, policy] of AUTH_RATE_LIMITS) {
 }
 
 app.use("/admin/step-up", securityRateLimit(AUTH_TWO_FACTOR_POLICY));
+app.use("/admin/step-up", securityRateLimit(ADMIN_STEP_UP_USER_POLICY));
 
 app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/admin/*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Not found." } }, 404),

@@ -138,6 +138,41 @@ test.describe("signed in", () => {
     expect(backInside).toBe(true);
   });
 
+  test("ignores a code refusal that lands after the prompt was cancelled", async ({ page }) => {
+    await fulfillAsStaffWithRefusedImpersonation(page);
+    await page.route("**/admin/step-up", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({
+        status: 400,
+        headers: {
+          "access-control-allow-origin": route.request().headers().origin ?? "*",
+          "access-control-allow-credentials": "true",
+        },
+        json: { error: { code: "ADMIN_STEP_UP_CODE_INVALID", message: "Invalid." } },
+      });
+    });
+    await page.goto(`/admin/users/${STEP_UP_TARGET}`);
+
+    await page.getByRole("button", { name: "Impersonate", exact: true }).click();
+    const action = page.getByRole("dialog", { name: "Impersonate account" });
+    await action.getByRole("textbox", { name: "Reason" }).fill("ticket 42");
+    const start = action.getByRole("button", { name: "Start impersonation" });
+    await start.click();
+
+    const prompt = page.getByRole("dialog", { name: "Confirm it's you" });
+    await prompt.getByRole("textbox", { name: "Authenticator code" }).fill("123456");
+    await prompt.getByRole("button", { name: "Confirm" }).click();
+    await prompt.getByRole("button", { name: "Cancel" }).click();
+    await expect(prompt).toBeHidden();
+
+    const refusal = page.waitForResponse("**/admin/step-up");
+    await refusal;
+    await start.click();
+    await expect(prompt).toBeVisible();
+    await expect(prompt.getByRole("textbox", { name: "Authenticator code" })).toHaveValue("");
+    await expect(prompt.getByText("This code is not valid")).toBeHidden();
+  });
+
   test("traps focus inside the command palette", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page.locator("main")).toBeVisible();

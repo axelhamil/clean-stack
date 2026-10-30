@@ -1,8 +1,9 @@
 import { authSchema, db, eq, inArray, or, outboxSchema, sql, staffSchema } from "@packages/drizzle";
-import { hashPassword, symmetricEncrypt } from "better-auth/crypto";
+import { hashPassword } from "better-auth/crypto";
+import { app } from "../src/app";
 import { auth } from "../src/auth";
-import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { env } from "../src/shared/env";
+import { seedTwoFactor } from "./check-harness";
 
 const PASSWORD = "check-admin-probe-password";
 
@@ -10,6 +11,43 @@ export interface AdminProbe {
   id: string;
   email: string;
   totpSecret: string;
+}
+
+export interface AppCall {
+  status: number;
+  body: { error?: { code?: string }; stepUpValidUntil?: string | null };
+  response: Response;
+}
+
+const ORIGIN = env.CORS_ORIGIN?.[0] ?? "http://localhost:5173";
+export function freshIp(): string {
+  const [a = 0, b = 0, c = 0] = crypto.getRandomValues(new Uint8Array(3));
+
+  return `10.${a}.${b}.${c}`;
+}
+
+export async function appCall(
+  cookie: string,
+  method: string,
+  path: string,
+  body?: unknown,
+  ip = freshIp(),
+): Promise<AppCall> {
+  const response = await app.request(
+    path,
+    {
+      method,
+      headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
+    { server: { requestIP: () => ({ address: ip, family: "IPv4", port: 1 }) } },
+  );
+
+  return { status: response.status, body: await response.clone().json(), response };
+}
+
+export function codeOf(result: AppCall): string | undefined {
+  return result.body.error?.code;
 }
 
 export function adminProbes(prefix: string) {
@@ -53,13 +91,7 @@ export function adminProbes(prefix: string) {
   }
 
   async function enrolTwoFactor(probe: AdminProbe): Promise<void> {
-    await db.insert(authSchema.twoFactor).values({
-      id: `${probe.id}-two-factor`,
-      userId: probe.id,
-      secret: await symmetricEncrypt({ key: authSecretKey(env), data: probe.totpSecret }),
-      backupCodes: "[]",
-      verified: true,
-    });
+    await seedTwoFactor(probe.id, probe.totpSecret, true);
     await db
       .update(authSchema.user)
       .set({ twoFactorEnabled: true })
@@ -89,6 +121,16 @@ export function adminProbes(prefix: string) {
     await db.delete(authSchema.user).where(inArray(authSchema.user.id, created));
   }
 
+  async function eventPayloads(type: string, userId: string): Promise<unknown[]> {
+    const { eventType, payload } = outboxSchema.outboxEvent;
+    const rows = await db
+      .select({ payload })
+      .from(outboxSchema.outboxEvent)
+      .where(sql`${eventType} = ${type} AND ${payload}->>'userId' = ${userId}`);
+
+    return rows.map((row) => row.payload);
+  }
+
   async function eventCount(type: string, userId: string): Promise<number> {
     const { eventType, payload } = outboxSchema.outboxEvent;
     const rows = await db
@@ -99,5 +141,15 @@ export function adminProbes(prefix: string) {
     return rows.length;
   }
 
-  return { user, manager, enrolTwoFactor, signIn, sessionCookie, cleanup, eventCount };
+  return {
+    password: PASSWORD,
+    user,
+    manager,
+    enrolTwoFactor,
+    signIn,
+    sessionCookie,
+    cleanup,
+    eventCount,
+    eventPayloads,
+  };
 }

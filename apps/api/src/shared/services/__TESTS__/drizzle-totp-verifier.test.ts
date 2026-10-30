@@ -10,10 +10,13 @@ const OTP = { period: 30, digits: 6 } as const;
 const NOW = new Date("2026-10-30T12:00:10Z");
 const COUNTER = Math.floor(NOW.getTime() / 30_000);
 
-function selectReturning(rows: unknown[]) {
-  const query = { toSQL: () => ({ sql: "select secret" }), execute: async () => rows };
-
-  return { select: () => ({ from: () => ({ where: () => ({ limit: () => query }) }) }) } as never;
+function selectReturning(rows: unknown[], upserted: unknown[] = [{ userId: "u1" }]) {
+  return {
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) }),
+    insert: () => ({
+      values: () => ({ onConflictDoUpdate: () => ({ returning: async () => upserted }) }),
+    }),
+  } as never;
 }
 
 async function storedSecret(plain: string) {
@@ -23,17 +26,20 @@ async function storedSecret(plain: string) {
 function verify(
   stored: unknown[],
   code: string,
-  verifier = new DrizzleTotpVerifier(new NoOpInstrumentation()),
+  verifier = new DrizzleTotpVerifier(new NoOpInstrumentation(), env.BETTER_AUTH_SECRET),
+  upserted?: unknown[],
 ) {
-  return UnitOfWorkContext.run(selectReturning(stored), () => verifier.verify("u1", code));
+  return UnitOfWorkContext.run(selectReturning(stored, upserted), () =>
+    verifier.consume("u1", code),
+  );
 }
 
 afterEach(() => {
   setSystemTime();
 });
 
-describe("DrizzleTotpVerifier.verify", () => {
-  it("answers the counter of the step the code belongs to, so a caller can refuse a replay", async () => {
+describe("DrizzleTotpVerifier.consume", () => {
+  it("accepts the current and the previous step", async () => {
     setSystemTime(NOW);
     const secret = "generated-two-factor-secret-0123456789";
     const otp = createOTP(secret, OTP);
@@ -44,8 +50,27 @@ describe("DrizzleTotpVerifier.verify", () => {
       await otp.hotp(COUNTER - 1),
     );
 
-    expect(current.getValue().unwrap()).toBe(COUNTER);
-    expect(previous.getValue().unwrap()).toBe(COUNTER - 1);
+    expect(current.getValue()).toBe("accepted");
+    expect(previous.getValue()).toBe("accepted");
+  });
+
+  it("answers replayed when the counter did not move", async () => {
+    setSystemTime(NOW);
+    const secret = "generated-two-factor-secret-0123456789";
+    const code = await createOTP(secret, OTP).hotp(COUNTER);
+
+    const result = await verify(
+      [{ secret: await storedSecret(secret) }],
+      code,
+      new DrizzleTotpVerifier(new NoOpInstrumentation(), env.BETTER_AUTH_SECRET),
+      [],
+    );
+
+    expect(result.getValue()).toBe("replayed");
+  });
+
+  it("answers not enrolled without a confirmed secret", async () => {
+    expect((await verify([], "123456")).getValue()).toBe("not_enrolled");
   });
 
   it("refuses a code outside the drift window", async () => {
@@ -55,7 +80,7 @@ describe("DrizzleTotpVerifier.verify", () => {
 
     const result = await verify([{ secret: await storedSecret(secret) }], stale);
 
-    expect(result.getValue().isNone()).toBe(true);
+    expect(result.getValue()).toBe("invalid");
   });
 
   it("accepts the current code of a base32 secret imported from another provider", async () => {
@@ -66,7 +91,7 @@ describe("DrizzleTotpVerifier.verify", () => {
 
     const result = await verify([{ secret: await storedSecret("base32:jbswy3dpehpk3pxp") }], code);
 
-    expect(result.getValue().isSome()).toBe(true);
+    expect(result.getValue()).toBe("accepted");
   });
 
   it("accepts the code of a secret enrolled before the auth secrets were rotated", async () => {
@@ -91,7 +116,7 @@ describe("DrizzleTotpVerifier.verify", () => {
       new DrizzleTotpVerifier(new NoOpInstrumentation(), afterRotation),
     );
 
-    expect(result.getValue().isSome()).toBe(true);
+    expect(result.getValue()).toBe("accepted");
   });
 
   it("refuses the code and reports the error when the stored secret cannot be decrypted", async () => {
@@ -101,10 +126,10 @@ describe("DrizzleTotpVerifier.verify", () => {
     const result = await verify(
       [{ secret: "not-an-encrypted-secret" }],
       "123456",
-      new DrizzleTotpVerifier(instrumentation),
+      new DrizzleTotpVerifier(instrumentation, env.BETTER_AUTH_SECRET),
     );
 
-    expect(result.getValue().isNone()).toBe(true);
+    expect(result.getValue()).toBe("invalid");
     expect(capture).toHaveBeenCalledTimes(1);
   });
 });

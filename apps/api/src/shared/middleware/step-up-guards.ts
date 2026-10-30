@@ -1,5 +1,6 @@
 import { type AppError, AppErrorException, type Option, type Result } from "@packages/ddd-kit";
 import { createMiddleware } from "hono/factory";
+import { assertNotImpersonated } from "./deny-impersonated.middleware";
 
 export interface StepUpGate {
   validUntil(sessionId: string): Promise<Result<Option<Date>, AppError>>;
@@ -16,17 +17,12 @@ export interface StepUpSession {
 
 export function stepUpGuards(gate: () => StepUpGate) {
   async function assertStepUp(user: StepUpUser, session: StepUpSession): Promise<void> {
-    if (session.impersonatedBy) {
-      throw new AppErrorException({
-        code: "IMPERSONATION_ACTION_FORBIDDEN",
-        message: "action unavailable while impersonating",
-      });
-    }
+    assertNotImpersonated(session);
 
     if (user.twoFactorEnabled !== true) {
       throw new AppErrorException({
-        code: "ADMIN_STAFF_MFA_FORBIDDEN",
-        message: "This action requires two-factor authentication.",
+        code: "ADMIN_STEP_UP_MFA_FORBIDDEN",
+        message: "Turn on two-factor authentication to confirm this action.",
       });
     }
 

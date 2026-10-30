@@ -64,7 +64,7 @@ describe("requireStepUp", () => {
 
     expect(await refusal(res)).toMatchObject({
       status: 403,
-      body: { error: { code: "ADMIN_STAFF_MFA_FORBIDDEN" } },
+      body: { error: { code: "ADMIN_STEP_UP_MFA_FORBIDDEN" } },
     });
   });
 
