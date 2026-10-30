@@ -282,8 +282,6 @@ export default {
   orgNew: {
     title: "Créer une organisation",
     subtitle: "Démarrez un nouvel espace de travail pour votre équipe.",
-    detailsTitle: "Détails de l'organisation",
-    detailsDescription: "Donnez un nom et un identifiant unique à votre organisation.",
     nameLabel: "Nom",
     namePlaceholder: "Acme",
     createdToast: "Organisation créée",
@@ -323,6 +321,9 @@ export default {
       month: "mois",
       year: "an",
     },
+    loading: "Chargement des forfaits…",
+    loadFailed: "Impossible de charger les forfaits. Rechargez la page pour réessayer.",
+    empty: "Aucun forfait n'est disponible pour le moment.",
     currentPlanCta: "Forfait actuel",
     getStarted: "Commencer",
     upgrade: "Mettre à niveau",

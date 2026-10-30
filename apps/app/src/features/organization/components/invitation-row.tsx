@@ -43,8 +43,8 @@ export function InvitationRow({ invitation, organizationId }: InvitationRowProps
   });
 
   return (
-    <ListRow>
-      <ListRowContent>
+    <ListRow variant="plain" className="flex-wrap">
+      <ListRowContent className="min-w-0 break-words">
         <TypographyP>{invitation.email}</TypographyP>
         <TypographyMuted>
           {t("organization.invitationExpiry", {

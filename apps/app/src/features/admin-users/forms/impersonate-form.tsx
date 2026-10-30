@@ -58,7 +58,7 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={!reason.trim() || isPending}>
+        <Button type="submit" className="self-end" disabled={!reason.trim() || isPending}>
           {t("users.impersonateForm.submit")}
         </Button>
       </form>

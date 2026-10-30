@@ -1,13 +1,6 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,6 +15,7 @@ import {
   ListRowMedia,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -40,7 +34,7 @@ import { useDeletePasskey } from "../hooks/use-delete-passkey";
 export function PasskeysCard() {
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
-  const { data, isLoading } = useQuery(passkeysQueryOptions);
+  const { data, isLoading, isError } = useQuery(passkeysQueryOptions);
   const [open, setOpen] = useState(false);
   // `/passkey` is on the BetterAuth impersonation blocklist: both registering
   // and deleting a passkey 403 while impersonating. One guard for the whole
@@ -48,55 +42,51 @@ export function PasskeysCard() {
   const guard = useImpersonationGuard();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("passkeys.title")}</CardTitle>
-        <CardDescription>{t("passkeys.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {isLoading ? (
-          <TypographyMuted>{t("passkeys.loading")}</TypographyMuted>
-        ) : data && data.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {data.map((passkey) => (
-              <PasskeyRow
-                key={passkey.id}
-                id={passkey.id}
-                name={passkey.name}
-                deviceType={passkey.deviceType}
-                backedUp={passkey.backedUp}
-                createdAt={passkey.createdAt}
-                guard={guard}
-              />
-            ))}
-          </ul>
-        ) : (
-          <TypographyMuted>{t("passkeys.empty")}</TypographyMuted>
-        )}
+    <SettingsSection title={t("passkeys.title")} description={t("passkeys.description")}>
+      {isLoading ? (
+        <TypographyMuted>{t("passkeys.loading")}</TypographyMuted>
+      ) : isError ? (
+        <TypographyMuted>{t("passkeys.loadFailed")}</TypographyMuted>
+      ) : data && data.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {data.map((passkey) => (
+            <PasskeyRow
+              key={passkey.id}
+              id={passkey.id}
+              name={passkey.name}
+              deviceType={passkey.deviceType}
+              backedUp={passkey.backedUp}
+              createdAt={passkey.createdAt}
+              guard={guard}
+            />
+          ))}
+        </ul>
+      ) : (
+        <TypographyMuted>{t("passkeys.empty")}</TypographyMuted>
+      )}
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="w-fit"
-              disabled={guard.blocked}
-              {...guard.describeProps()}
-            >
-              <PlusIcon />
-              {t("passkeys.add")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent closeLabel={tCommon("actions.close")}>
-            <DialogHeader>
-              <DialogTitle>{t("passkeys.add")}</DialogTitle>
-              <DialogDescription>{t("passkeys.addDialogDescription")}</DialogDescription>
-            </DialogHeader>
-            <AddPasskeyForm onSuccess={() => setOpen(false)} />
-          </DialogContent>
-        </Dialog>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-fit"
+            disabled={guard.blocked}
+            {...guard.describeProps()}
+          >
+            <PlusIcon />
+            {t("passkeys.add")}
+          </Button>
+        </DialogTrigger>
+        <DialogContent closeLabel={tCommon("actions.close")}>
+          <DialogHeader>
+            <DialogTitle>{t("passkeys.add")}</DialogTitle>
+            <DialogDescription>{t("passkeys.addDialogDescription")}</DialogDescription>
+          </DialogHeader>
+          <AddPasskeyForm onSuccess={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }
 
@@ -115,12 +105,12 @@ function PasskeyRow({ id, name, deviceType, backedUp, createdAt, guard }: Passke
   const mutation = useDeletePasskey();
 
   return (
-    <ListRow>
+    <ListRow variant="plain">
       <ListRowMedia>
         <KeyRoundIcon />
         <ListRowContent>
           <TypographySmall>{name ?? t("passkeys.unnamed")}</TypographySmall>
-          <ListRowMeta>
+          <ListRowMeta className="flex-wrap">
             <Badge variant="secondary">
               {deviceType === "singleDevice" ? t("passkeys.deviceBound") : t("passkeys.synced")}
             </Badge>

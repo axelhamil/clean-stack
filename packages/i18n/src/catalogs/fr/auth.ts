@@ -14,6 +14,8 @@ export default {
     createOne: "En créer un",
     passkeyButton: "Se connecter avec une clé d'accès",
     passkeyWaiting: "En attente de l'appareil…",
+    alternativesLabel: "Autres moyens de vous connecter",
+    magicLinkTrigger: "Se connecter avec un lien magique",
     magicLinkSubmit: "M'envoyer un lien magique",
     magicLinkPending: "Envoi…",
     ssoTrigger: "Se connecter avec le SSO",

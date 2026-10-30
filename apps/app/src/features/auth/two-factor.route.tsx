@@ -36,7 +36,7 @@ function TwoFactorPage() {
       <Button
         type="button"
         variant="link"
-        className="w-full"
+        className="self-start"
         onClick={() => setMethod(method === "totp" ? "backup" : "totp")}
       >
         {method === "totp" ? t("twoFactor.useRecoveryCode") : t("twoFactor.useAuthenticatorApp")}

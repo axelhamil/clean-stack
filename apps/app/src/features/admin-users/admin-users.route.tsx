@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import {
@@ -7,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
+import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -14,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -27,6 +29,8 @@ import {
 } from "./admin-user-labels";
 import { adminUsersInfiniteQueryOptions } from "./api/admin-users.queries";
 import { UserRow } from "./components/user-row";
+
+const ALL = "all";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/users")({
   component: AdminUsersPage,
@@ -41,6 +45,7 @@ function AdminUsersPage() {
   });
 
   const query = useInfiniteQuery(adminUsersInfiniteQueryOptions(filters));
+  const users = query.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
     <main className="flex flex-col gap-6">
@@ -51,13 +56,13 @@ function AdminUsersPage() {
       <div className="flex flex-wrap gap-3">
         <Input
           placeholder={t("users.searchPlaceholder")}
-          className="w-64"
+          className="w-full sm:w-64"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
 
         <Select
-          value={filters.role ?? ""}
+          value={filters.role ?? ALL}
           onValueChange={(v) =>
             setFilters((f) => ({
               ...f,
@@ -65,71 +70,79 @@ function AdminUsersPage() {
             }))
           }
         >
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder={t("users.allRolesPlaceholder")} />
+          <SelectTrigger aria-label={t("users.table.role")} className="flex-1 sm:w-44 sm:flex-none">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{t("users.allOption")}</SelectItem>
+            <SelectItem value={ALL}>{t("users.allRolesPlaceholder")}</SelectItem>
             <SelectItem value="admin">{t(PLATFORM_ROLE_LABEL_KEYS.admin)}</SelectItem>
             <SelectItem value="user">{t(PLATFORM_ROLE_LABEL_KEYS.user)}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select
-          value={filters.banned === undefined ? "" : String(filters.banned)}
+          value={filters.banned === undefined ? ALL : String(filters.banned)}
           onValueChange={(v) =>
             setFilters((f) => ({
               ...f,
-              banned: v === "" ? undefined : v === "true",
+              banned: v === ALL ? undefined : v === "true",
             }))
           }
         >
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder={t("users.allStatusesPlaceholder")} />
+          <SelectTrigger
+            aria-label={t("users.table.status")}
+            className="flex-1 sm:w-44 sm:flex-none"
+          >
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{t("users.allOption")}</SelectItem>
+            <SelectItem value={ALL}>{t("users.allStatusesPlaceholder")}</SelectItem>
             <SelectItem value="false">{t(USER_STATUS_LABEL_KEYS.active)}</SelectItem>
             <SelectItem value="true">{t(USER_STATUS_LABEL_KEYS.suspended)}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {query.isLoading ? (
-        <p>{t("users.loading")}</p>
-      ) : query.isError ? (
-        <p>{t("users.loadFailed")}</p>
-      ) : (
-        <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("users.table.email")}</TableHead>
-                <TableHead>{t("users.table.name")}</TableHead>
-                <TableHead>{t("users.table.role")}</TableHead>
-                <TableHead>{t("users.table.status")}</TableHead>
-                <TableHead>{t("users.table.created")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {query.data?.pages
-                .flatMap((p) => p.items)
-                .map((item) => (
-                  <UserRow key={item.id} item={item} />
-                ))}
-            </TableBody>
-          </Table>
+      {query.isLoading && <SkeletonTable label={t("users.loading")} columns={5} />}
 
-          {query.hasNextPage && (
-            <Button
-              variant="outline"
-              disabled={query.isFetchingNextPage}
-              onClick={() => void query.fetchNextPage()}
-            >
-              {t("users.loadMore")}
-            </Button>
-          )}
-        </>
+      {query.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>{t("users.loadFailed")}</AlertDescription>
+        </Alert>
+      )}
+
+      {query.isSuccess && users.length === 0 && (
+        <TypographyMuted>{t("users.empty")}</TypographyMuted>
+      )}
+
+      {users.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("users.table.email")}</TableHead>
+              <TableHead>{t("users.table.name")}</TableHead>
+              <TableHead>{t("users.table.role")}</TableHead>
+              <TableHead>{t("users.table.status")}</TableHead>
+              <TableHead>{t("users.table.created")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((item) => (
+              <UserRow key={item.id} item={item} />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      {query.hasNextPage && (
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={query.isFetchingNextPage}
+          onClick={() => void query.fetchNextPage()}
+        >
+          {t("users.loadMore")}
+        </Button>
       )}
     </main>
   );

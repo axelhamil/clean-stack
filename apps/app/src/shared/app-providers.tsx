@@ -1,6 +1,4 @@
-import { Button } from "@packages/ui/components/ui/button";
 import { Toaster } from "@packages/ui/components/ui/sonner";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "@tanstack/react-router";
@@ -16,6 +14,7 @@ import { sessionQueryOptions } from "./api/queries/session";
 import { queryClient } from "./api/query-client";
 import { onAuthChange } from "./auth/auth-broadcast";
 import { AnalyticsScripts } from "./components/analytics-scripts";
+import { AppErrorFallback } from "./components/app-error-fallback";
 import { CookieBanner } from "./components/cookie-banner";
 import { LocaleSync } from "./i18n/locale-sync";
 import { applyZodErrorMap } from "./i18n/zod-error-map";
@@ -78,18 +77,4 @@ function ZodLocale() {
   }, [t]);
 
   return null;
-}
-
-function AppErrorFallback() {
-  const { t } = useTranslation();
-
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <TypographyH1>{t("errorBoundary.title")}</TypographyH1>
-      <TypographyMuted>{t("errorBoundary.body")}</TypographyMuted>
-      <Button variant="outline" onClick={() => window.location.reload()}>
-        {t("actions.reload")}
-      </Button>
-    </main>
-  );
 }

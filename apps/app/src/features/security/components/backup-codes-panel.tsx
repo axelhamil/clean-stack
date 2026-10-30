@@ -1,13 +1,6 @@
 import { BackupCodeList } from "@packages/ui/components/ui/backup-code-list";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { CopyIcon, DownloadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -55,24 +48,22 @@ export function BackupCodesPanel({ codes }: BackupCodesPanelProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("backupCodes.title")}</CardTitle>
-        <CardDescription>{t("backupCodes.description")}</CardDescription>
-        <CardAction className="flex gap-1">
-          <Button type="button" variant="ghost" size="sm" onClick={copyCodes}>
-            <CopyIcon />
-            {t("backupCodes.copy")}
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={downloadCodes}>
-            <DownloadIcon />
-            {t("backupCodes.download")}
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <BackupCodeList codes={codes} />
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <TypographySmall>{t("backupCodes.title")}</TypographySmall>
+        <TypographyMuted>{t("backupCodes.description")}</TypographyMuted>
+      </div>
+      <BackupCodeList codes={codes} />
+      <div className="flex flex-wrap gap-1">
+        <Button type="button" variant="ghost" size="sm" onClick={copyCodes}>
+          <CopyIcon />
+          {t("backupCodes.copy")}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={downloadCodes}>
+          <DownloadIcon />
+          {t("backupCodes.download")}
+        </Button>
+      </div>
+    </div>
   );
 }

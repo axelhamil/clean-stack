@@ -276,8 +276,6 @@ export default {
   orgNew: {
     title: "Create organization",
     subtitle: "Spin up a new workspace for your team.",
-    detailsTitle: "Organization details",
-    detailsDescription: "Give your organization a name and a unique slug.",
     nameLabel: "Name",
     namePlaceholder: "Acme",
     createdToast: "Organization created",
@@ -317,6 +315,9 @@ export default {
       month: "month",
       year: "year",
     },
+    loading: "Loading plans…",
+    loadFailed: "Plans could not be loaded. Reload the page to try again.",
+    empty: "No plans are available yet.",
     currentPlanCta: "Current plan",
     getStarted: "Get started",
     upgrade: "Upgrade",

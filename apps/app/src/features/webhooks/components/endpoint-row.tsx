@@ -56,16 +56,18 @@ export function EndpointRow({
 
   return (
     <TableRow>
-      <TableCell className="max-w-xs truncate">
-        <TypographyInline font="mono">{endpoint.url}</TypographyInline>
+      <TableCell className="max-w-32 truncate sm:max-w-xs">
+        <TypographyInline font="mono" title={endpoint.url}>
+          {endpoint.url}
+        </TypographyInline>
       </TableCell>
       <TableCell>
         {status === "auto-disabled" ? (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="destructive" className="flex items-center gap-1">
-                  <TriangleAlertIcon className="size-3" />
+                <Badge variant="destructive">
+                  <TriangleAlertIcon />
                   {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
                 </Badge>
               </TooltipTrigger>
@@ -80,13 +82,13 @@ export function EndpointRow({
           </Badge>
         )}
       </TableCell>
-      <TableCell>{endpoint.eventTypes.length}</TableCell>
-      <TableCell>{formatDate(endpoint.createdAt)}</TableCell>
+      <TableCell className="hidden sm:table-cell">{endpoint.eventTypes.length}</TableCell>
+      <TableCell className="hidden sm:table-cell">{formatDate(endpoint.createdAt)}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
-              <MoreHorizontalIcon className="size-4" />
+              <MoreHorizontalIcon />
               <span className="sr-only">{t("settings:webhooks.endpointRow.openActions")}</span>
             </Button>
           </DropdownMenuTrigger>

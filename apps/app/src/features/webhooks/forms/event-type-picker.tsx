@@ -1,6 +1,6 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import { TypographyInline } from "@packages/ui/components/ui/typography";
+import { TypographyInline, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
@@ -45,7 +45,7 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
   };
 
   return (
-    <div className="flex max-h-[45vh] flex-col gap-4 overflow-y-auto pr-1">
+    <div className="flex max-h-96 flex-col gap-4 overflow-y-auto">
       {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
       <label className="flex items-center gap-2">
         <Checkbox
@@ -53,7 +53,7 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
           checked={allSelected}
           onCheckedChange={(c) => toggle("*", c === true)}
         />
-        <span className="font-medium">{t("webhooks.eventTypePicker.allEvents")}</span>
+        <TypographySmall>{t("webhooks.eventTypePicker.allEvents")}</TypographySmall>
       </label>
       {groups.map((g) => {
         const groupSelected = selected.has(g.wildcard);
@@ -66,14 +66,14 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                 checked={groupSelected}
                 onCheckedChange={(c) => toggle(g.wildcard, c === true)}
               />
-              <span className="font-medium capitalize">
+              <TypographySmall>
                 {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
-              </span>
+              </TypographySmall>
             </label>
             <div className="ml-6 flex flex-col gap-1">
               {g.events.map((type) => (
                 // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally
-                <label key={type} className="flex items-start gap-2 text-sm">
+                <label key={type} className="flex items-start gap-2">
                   <Checkbox
                     className="mt-0.5 shrink-0"
                     checked={groupSelected || allSelected || selected.has(type)}
@@ -81,10 +81,12 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                     onCheckedChange={(c) => toggle(type, c === true)}
                   />
                   <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                    <TypographyInline font="mono" className="break-all">
+                    <TypographyInline font="mono" size="sm" className="break-all">
                       {type}
                     </TypographyInline>
-                    <TypographyInline tone="muted">{descriptionFor(type)}</TypographyInline>
+                    <TypographyInline tone="muted" size="sm">
+                      {descriptionFor(type)}
+                    </TypographyInline>
                   </span>
                 </label>
               ))}

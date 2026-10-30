@@ -189,6 +189,7 @@ export default {
     loadOrgNotificationPreferences:
       "Échec du chargement des préférences de notification de l'organisation",
     loadPolicies: "Échec du chargement des politiques",
+    loadSession: "Échec de la vérification de votre session",
     loadSubscription: "Échec du chargement de l'abonnement",
     loadPasskeys: "Échec du chargement des clés d'accès",
     loadSessions: "Échec du chargement des sessions",

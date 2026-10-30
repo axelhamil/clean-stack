@@ -4,10 +4,10 @@ export default {
     searchPlaceholder: "Search…",
     loading: "Loading…",
     loadFailed: "Failed to load accounts.",
+    empty: "No accounts match these filters.",
     loadMore: "Load more",
     allRolesPlaceholder: "All roles",
     allStatusesPlaceholder: "All statuses",
-    allOption: "All",
     roleUser: "User",
     // Shared by the ban dialog's title and the ban form's own submit button:
     // both name the exact same action in the exact same flow.
@@ -92,6 +92,7 @@ export default {
     searchPlaceholder: "Search…",
     loading: "Loading…",
     loadFailed: "Failed to load organizations.",
+    empty: "No organizations match this search.",
     loadMore: "Load more",
     ssoEnforcementUpdatedToast: "SSO enforcement updated.",
     ssoEnforcedAriaLabel: "SSO enforced for {{name}}",
@@ -117,6 +118,7 @@ export default {
       planLabel: "Plan",
       createdLabel: "Created",
       membersTitle: "Members",
+      membersEmpty: "This organization has no members.",
       table: {
         email: "Email",
         role: "Role",
@@ -126,11 +128,13 @@ export default {
   auditLog: {
     pageTitle: "Audit log",
     allActionsPlaceholder: "All actions",
-    allOption: "All",
     actorIdPlaceholder: "Actor ID",
     organizationIdPlaceholder: "Organization ID",
     loading: "Loading…",
     loadFailed: "Failed to load audit log.",
+    empty: "No events match these filters.",
+    occurredFromLabel: "From date",
+    occurredToLabel: "To date",
     loadMore: "Load more",
     detailsAction: "Details",
     table: {

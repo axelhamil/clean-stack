@@ -1,12 +1,6 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { Switch } from "@packages/ui/components/ui/switch";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyInline, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -51,32 +45,29 @@ export function SsoEnforcementCard() {
 
   return (
     <Can requires={{ organization: ["update"] }}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("sso.enforcementCard.title")}</CardTitle>
-          <CardDescription>{t("sso.enforcementCard.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <Switch
-              aria-label={t("sso.enforcementCard.switchAriaLabel")}
-              checked={enforced}
-              disabled={otherwiseFrozen || guard.blocked}
-              {...guard.describeProps(otherwiseFrozen)}
-              onCheckedChange={(next) => setEnforcement.mutate(next)}
-            />
-            <span className="text-sm">
-              {enforced
-                ? t("sso.enforcementCard.enforcedLabel")
-                : t("sso.enforcementCard.notEnforcedLabel")}
-            </span>
-          </div>
-          {!enforced && !hasVerifiedProvider && (
-            <TypographyMuted>{t("sso.enforcementCard.verifyDomainFirst")}</TypographyMuted>
-          )}
-        </CardContent>
-      </Card>
-      <ImpersonationReason guard={guard} />
+      <SettingsSection
+        title={t("sso.enforcementCard.title")}
+        description={t("sso.enforcementCard.description")}
+      >
+        <div className="flex items-center gap-3">
+          <Switch
+            aria-label={t("sso.enforcementCard.switchAriaLabel")}
+            checked={enforced}
+            disabled={otherwiseFrozen || guard.blocked}
+            {...guard.describeProps(otherwiseFrozen)}
+            onCheckedChange={(next) => setEnforcement.mutate(next)}
+          />
+          <TypographyInline size="sm">
+            {enforced
+              ? t("sso.enforcementCard.enforcedLabel")
+              : t("sso.enforcementCard.notEnforcedLabel")}
+          </TypographyInline>
+        </div>
+        {!enforced && !hasVerifiedProvider && (
+          <TypographyMuted>{t("sso.enforcementCard.verifyDomainFirst")}</TypographyMuted>
+        )}
+        <ImpersonationReason guard={guard} />
+      </SettingsSection>
     </Can>
   );
 }

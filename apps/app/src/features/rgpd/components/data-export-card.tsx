@@ -1,11 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { DownloadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -32,29 +26,24 @@ export function DataExportCard({ lastExportRequestedAt }: DataExportCardProps) {
   const otherwiseDisabled = mutation.isPending || cooldown;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dataExport.title")}</CardTitle>
-        <CardDescription>{t("dataExport.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={otherwiseDisabled || guard.blocked}
-          {...guard.describeProps(otherwiseDisabled)}
-          onClick={() => mutation.mutate()}
-        >
-          <DownloadIcon />
-          {mutation.isPending ? t("dataExport.requesting") : t("dataExport.request")}
-        </Button>
-        {cooldown && nextAllowedAt && (
-          <TypographyMuted>
-            {t("dataExport.nextAvailable", { date: formatDateTime(nextAllowedAt) })}
-          </TypographyMuted>
-        )}
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+    <SettingsSection title={t("dataExport.title")} description={t("dataExport.description")}>
+      <Button
+        type="button"
+        variant="outline"
+        className="self-start"
+        disabled={otherwiseDisabled || guard.blocked}
+        {...guard.describeProps(otherwiseDisabled)}
+        onClick={() => mutation.mutate()}
+      >
+        <DownloadIcon />
+        {mutation.isPending ? t("dataExport.requesting") : t("dataExport.request")}
+      </Button>
+      {cooldown && nextAllowedAt && (
+        <TypographyMuted>
+          {t("dataExport.nextAvailable", { date: formatDateTime(nextAllowedAt) })}
+        </TypographyMuted>
+      )}
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }

@@ -77,8 +77,8 @@ function ApiTokensPage() {
   });
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <main className="flex flex-col gap-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <TypographyH1 variant="page">{t("apiTokens.pageTitle")}</TypographyH1>
         <Button
           onClick={() => setCreating(true)}
@@ -91,9 +91,9 @@ function ApiTokensPage() {
       <ImpersonationReason guard={guard} />
 
       {tokens.isLoading ? (
-        <p>{t("apiTokens.loading")}</p>
+        <TypographyMuted>{t("apiTokens.loading")}</TypographyMuted>
       ) : tokens.isError ? (
-        <p>{t("apiTokens.loadFailed")}</p>
+        <TypographyMuted>{t("apiTokens.loadFailed")}</TypographyMuted>
       ) : tokens.data?.items.length === 0 ? (
         <TypographyMuted>{t("apiTokens.empty")}</TypographyMuted>
       ) : (

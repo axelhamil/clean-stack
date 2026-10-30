@@ -1,7 +1,7 @@
 import { toLocale } from "@packages/i18n";
 import type { PolicyType } from "@packages/policies";
-import { Card, CardContent } from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { Separator } from "@packages/ui/components/ui/separator";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { useTranslation } from "react-i18next";
@@ -21,7 +21,7 @@ export function PolicyDocView({ type }: PolicyDocViewProps) {
   const Body = policyBodyFor(locale, type);
 
   return (
-    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-6 py-6")}>
+    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
       <header className="flex flex-col gap-2">
         <TypographyH1 variant="page">{t(POLICY_TITLE_KEYS[type])}</TypographyH1>
         <TypographyMuted>
@@ -29,13 +29,11 @@ export function PolicyDocView({ type }: PolicyDocViewProps) {
         </TypographyMuted>
       </header>
 
+      <Separator />
+
       <UntranslatedBodyBanner show={isEnglishFallback(locale, type)} />
 
-      <Card>
-        <CardContent>
-          <Body />
-        </CardContent>
-      </Card>
+      <Body />
     </main>
   );
 }

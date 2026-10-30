@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
+import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -24,6 +26,7 @@ import {
 } from "@packages/ui/components/ui/table";
 import {
   TypographyH1,
+  TypographyH2,
   TypographyInline,
   TypographyMuted,
 } from "@packages/ui/components/ui/typography";
@@ -65,6 +68,8 @@ import {
   DELIVERY_STATUS_KEYS,
   isDeliveryStatus,
 } from "./webhook-labels";
+
+const ALL_DELIVERY_STATUSES = "all";
 
 export const Route = createFileRoute("/_protected/_shell/settings/_org-scope/webhooks")({
   beforeLoad: ensureOrgPermission({ webhooks: ["read"] }),
@@ -154,6 +159,7 @@ function WebhooksPage() {
     onError: (err) => toastError(err, errorFallback("replayWebhookDelivery")),
   });
 
+  const deliveryItems = deliveries.data?.pages.flatMap((p) => p.items) ?? [];
   const dialogOpen = creating || editing !== null;
 
   const closeDialog = () => {
@@ -163,7 +169,7 @@ function WebhooksPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <TypographyH1 variant="page">{t("settings:webhooks.pageTitle")}</TypographyH1>
           <NavLink variant="plain" asChild>
@@ -182,11 +188,13 @@ function WebhooksPage() {
       </div>
       <ImpersonationReason guard={guard} />
 
-      {endpoints.isLoading ? (
-        <p>{t("settings:webhooks.loading")}</p>
+      {endpoints.isPending ? (
+        <TypographyMuted role="status">{t("settings:webhooks.loading")}</TypographyMuted>
       ) : endpoints.isError ? (
-        <p>{t("errors:fallback.loadWebhookEndpoints")}</p>
-      ) : endpoints.data?.items.length === 0 ? (
+        <Alert variant="destructive">
+          <AlertDescription>{t("errors:fallback.loadWebhookEndpoints")}</AlertDescription>
+        </Alert>
+      ) : endpoints.data.items.length === 0 ? (
         <TypographyMuted>{t("settings:webhooks.noEndpoints")}</TypographyMuted>
       ) : (
         <Table>
@@ -194,13 +202,17 @@ function WebhooksPage() {
             <TableRow>
               <TableHead>{t("settings:webhooks.endpointsTable.urlHeader")}</TableHead>
               <TableHead>{t("settings:webhooks.endpointsTable.statusHeader")}</TableHead>
-              <TableHead>{t("settings:webhooks.endpointsTable.eventsHeader")}</TableHead>
-              <TableHead>{t("settings:webhooks.endpointsTable.createdHeader")}</TableHead>
+              <TableHead className="hidden sm:table-cell">
+                {t("settings:webhooks.endpointsTable.eventsHeader")}
+              </TableHead>
+              <TableHead className="hidden sm:table-cell">
+                {t("settings:webhooks.endpointsTable.createdHeader")}
+              </TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {endpoints.data?.items.map((e) => (
+            {endpoints.data.items.map((e) => (
               <EndpointRow
                 key={e.id}
                 endpoint={e}
@@ -217,60 +229,69 @@ function WebhooksPage() {
         </Table>
       )}
 
-      <VerifySnippet />
-
       {selectedEndpointId !== null && (
         <>
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-medium">{t("settings:webhooks.deliveries.title")}</h2>
-            <Select
-              value={deliveryFilters.status ?? ""}
-              onValueChange={(v) =>
-                setDeliveryFilters((f) => ({
-                  ...f,
-                  status: isDeliveryStatus(v) ? v : undefined,
-                }))
-              }
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue
-                  placeholder={t("settings:webhooks.deliveries.allStatusesPlaceholder")}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">
-                  {t("settings:webhooks.deliveries.allStatusFilter")}
-                </SelectItem>
-                <SelectItem value="pending">{t(DELIVERY_STATUS_KEYS.pending)}</SelectItem>
-                <SelectItem value="success">{t(DELIVERY_STATUS_KEYS.success)}</SelectItem>
-                <SelectItem value="failed">{t(DELIVERY_STATUS_KEYS.failed)}</SelectItem>
-                <SelectItem value="dead_letter">{t(DELIVERY_STATUS_KEYS.dead_letter)}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Separator />
+          <section className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <TypographyH2>{t("settings:webhooks.deliveries.title")}</TypographyH2>
+              <Select
+                value={deliveryFilters.status ?? ALL_DELIVERY_STATUSES}
+                onValueChange={(v) =>
+                  setDeliveryFilters((f) => ({
+                    ...f,
+                    status: isDeliveryStatus(v) ? v : undefined,
+                  }))
+                }
+              >
+                <SelectTrigger
+                  className="w-40"
+                  aria-label={t("settings:webhooks.deliveries.statusHeader")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_DELIVERY_STATUSES}>
+                    {t("settings:webhooks.deliveries.allStatusFilter")}
+                  </SelectItem>
+                  <SelectItem value="pending">{t(DELIVERY_STATUS_KEYS.pending)}</SelectItem>
+                  <SelectItem value="success">{t(DELIVERY_STATUS_KEYS.success)}</SelectItem>
+                  <SelectItem value="failed">{t(DELIVERY_STATUS_KEYS.failed)}</SelectItem>
+                  <SelectItem value="dead_letter">{t(DELIVERY_STATUS_KEYS.dead_letter)}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {deliveries.isLoading ? (
-            <p>{t("settings:webhooks.deliveries.loading")}</p>
-          ) : deliveries.isError ? (
-            <p>{t("errors:fallback.loadWebhookDeliveries")}</p>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("settings:webhooks.deliveries.eventTypeHeader")}</TableHead>
-                    <TableHead>{t("settings:webhooks.deliveries.statusHeader")}</TableHead>
-                    <TableHead>{t("settings:webhooks.deliveries.attemptsHeader")}</TableHead>
-                    <TableHead>{t("settings:webhooks.deliveries.createdHeader")}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {deliveries.data?.pages
-                    .flatMap((p) => p.items)
-                    .map((d) => (
+            {deliveries.isPending ? (
+              <TypographyMuted role="status">
+                {t("settings:webhooks.deliveries.loading")}
+              </TypographyMuted>
+            ) : deliveries.isError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{t("errors:fallback.loadWebhookDeliveries")}</AlertDescription>
+              </Alert>
+            ) : deliveryItems.length === 0 ? (
+              <TypographyMuted>{t("settings:webhooks.deliveries.empty")}</TypographyMuted>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("settings:webhooks.deliveries.eventTypeHeader")}</TableHead>
+                      <TableHead>{t("settings:webhooks.deliveries.statusHeader")}</TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        {t("settings:webhooks.deliveries.attemptsHeader")}
+                      </TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        {t("settings:webhooks.deliveries.createdHeader")}
+                      </TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deliveryItems.map((d) => (
                       <TableRow key={d.id}>
-                        <TableCell>
+                        <TableCell className="max-w-32 truncate sm:max-w-xs">
                           <TypographyInline font="mono">{d.eventType}</TypographyInline>
                         </TableCell>
                         <TableCell>
@@ -280,8 +301,10 @@ function WebhooksPage() {
                               : d.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{d.attempts}</TableCell>
-                        <TableCell>{formatDate(d.createdAt)}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{d.attempts}</TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {formatDate(d.createdAt)}
+                        </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setSelectedDelivery(d)}>
                             {t("settings:webhooks.deliveries.detailsAction")}
@@ -289,20 +312,22 @@ function WebhooksPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
 
-              {deliveries.hasNextPage && (
-                <Button
-                  variant="outline"
-                  disabled={deliveries.isFetchingNextPage}
-                  onClick={() => void deliveries.fetchNextPage()}
-                >
-                  {t("settings:webhooks.deliveries.loadMore")}
-                </Button>
-              )}
-            </>
-          )}
+                {deliveries.hasNextPage && (
+                  <Button
+                    variant="outline"
+                    className="self-start"
+                    disabled={deliveries.isFetchingNextPage}
+                    onClick={() => void deliveries.fetchNextPage()}
+                  >
+                    {t("settings:webhooks.deliveries.loadMore")}
+                  </Button>
+                )}
+              </>
+            )}
+          </section>
 
           <DeliverySheet
             endpointId={selectedEndpointId}
@@ -314,6 +339,9 @@ function WebhooksPage() {
           />
         </>
       )}
+
+      <Separator />
+      <VerifySnippet />
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent closeLabel={t("common:actions.close")} className="sm:max-w-2xl">

@@ -296,6 +296,15 @@ html.theme-switching *::after {
   --normal-text: var(--popover-foreground);
   --normal-border: var(--border);
   --border-radius: var(--radius);
+  /* Sonner's default error text measured 4.34:1 on its tint; --destructive holds 4.82:1 in light, 6.66:1 in dark. */
+  --error-text: var(--destructive);
+}
+
+[data-sonner-toaster][data-sonner-theme="light"].toaster {
+  /* Sonner's defaults measured 4.29:1 (success), 4.35:1 (info), 3.07:1 (warning) on their tints; dark holds AA as shipped. */
+  --success-text: hsl(140, 100%, 22%); /* 5.96:1 */
+  --info-text: hsl(210, 92%, 40%); /* 5.27:1 */
+  --warning-text: hsl(31, 92%, 30%); /* 6.10:1 */
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,8 +6,8 @@ interaction checks a rule engine cannot see. Runs on every PR
 
 ## What blocks a merge
 
-- **axe**: zero `serious` / `critical` WCAG 2.1 A/AA violations on the seven
-  pages in [`pages.ts`](./pages.ts), **in light and dark**. Dark is not
+- **axe**: zero `serious` / `critical` WCAG 2.1 A/AA violations on every
+  page in [`pages.ts`](./pages.ts), **in light and dark**. Dark is not
   decoration: `--primary` failed there while light passed.
 - **Landmarks**: exactly one `<main>` and one `<h1>` per page. Already a
   CLAUDE.md rule; this is what makes it enforceable.

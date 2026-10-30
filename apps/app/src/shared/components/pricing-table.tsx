@@ -1,12 +1,18 @@
+import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { Skeleton, SkeletonGroup } from "@packages/ui/components/ui/skeleton";
+import {
+  TypographyLarge,
+  TypographyList,
+  TypographyMuted,
+} from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -27,6 +33,17 @@ export function resolvePricingCta({ isAuthenticated, tier, currentTier }: Pricin
   if (!isAuthenticated) return { kind: "login" };
   if (currentTier === tier) return { kind: "current" };
   return { kind: "upgrade" };
+}
+
+export function resolvePrimaryTier(
+  plans: readonly Pick<PlanCatalogItem, "tier" | "rank" | "unitAmount">[],
+  currentTier: string | null,
+): PlanCatalogItem["tier"] | null {
+  const currentRank = plans.find((plan) => plan.tier === currentTier)?.rank ?? -1;
+  const upgrades = plans.filter((plan) => plan.rank > currentRank && plan.unitAmount > 0);
+  const [next] = upgrades.toSorted((a, b) => a.rank - b.rank);
+
+  return next?.tier ?? null;
 }
 
 // Stripe recurring prices declare `interval` as `"day" | "week" | "month" |
@@ -77,32 +94,54 @@ interface PricingTableProps {
 
 export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: PricingTableProps) {
   const { t, i18n } = useTranslation("common");
-  const { data: plans = [] } = useQuery(plansQueryOptions);
+  const { data: plans = [], isPending, isError } = useQuery(plansQueryOptions);
   const navigate = useNavigate();
   const upgrade = useMutation(upgradeSubscriptionMutationOptions);
+
+  if (isPending) return <PricingTableSkeleton label={t("pricing.loading")} />;
+
+  if (isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{t("pricing.loadFailed")}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (plans.length === 0) return <TypographyMuted>{t("pricing.empty")}</TypographyMuted>;
+
+  const primaryTier = resolvePrimaryTier(plans, currentTier);
 
   return (
     <section className="flex flex-col gap-4 md:flex-row">
       {plans.map((plan) => {
         const cta = resolvePricingCta({ isAuthenticated, tier: plan.tier, currentTier });
+        const ctaVariant = plan.tier === primaryTier ? "default" : "outline";
+
         return (
           <Card key={plan.tier} className="flex-1">
             <CardHeader>
-              <CardTitle>{plan.name}</CardTitle>
-              <CardDescription>{formatPlanPrice(t, i18n.language, plan)}</CardDescription>
+              <CardTitle asChild>
+                <h2>{plan.name}</h2>
+              </CardTitle>
+              <TypographyLarge>{formatPlanPrice(t, i18n.language, plan)}</TypographyLarge>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              {plan.marketingFeatures.map((f) => (
-                <span key={f}>{f}</span>
-              ))}
+            <CardContent className="flex-1">
+              <TypographyList>
+                {plan.marketingFeatures.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </TypographyList>
             </CardContent>
             <CardFooter>
               {cta.kind === "current" ? (
-                <Button disabled variant="secondary">
+                <Button disabled variant="secondary" className="w-full">
                   {t("pricing.currentPlanCta")}
                 </Button>
               ) : cta.kind === "login" ? (
                 <Button
+                  variant={ctaVariant}
+                  className="w-full"
                   onClick={() =>
                     void navigate({
                       to: "/sign-in",
@@ -114,7 +153,9 @@ export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: Pric
                 </Button>
               ) : (
                 <Button
-                  disabled={!activeOrgId || plan.priceId === null}
+                  variant={ctaVariant}
+                  className="w-full"
+                  disabled={!activeOrgId || plan.priceId === null || upgrade.isPending}
                   onClick={() =>
                     activeOrgId && upgrade.mutate({ tier: plan.tier, organizationId: activeOrgId })
                   }
@@ -127,5 +168,34 @@ export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: Pric
         );
       })}
     </section>
+  );
+}
+
+const SKELETON_PLANS = ["free", "pro", "business"] as const;
+
+interface PricingTableSkeletonProps {
+  label: string;
+}
+
+function PricingTableSkeleton({ label }: PricingTableSkeletonProps) {
+  return (
+    <SkeletonGroup label={label} className="gap-4 md:flex-row">
+      {SKELETON_PLANS.map((plan) => (
+        <Card key={plan} className="flex-1">
+          <CardHeader>
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-7 w-20" />
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-4 w-2/3" />
+          </CardContent>
+          <CardFooter>
+            <Skeleton className="h-9 w-full" />
+          </CardFooter>
+        </Card>
+      ))}
+    </SkeletonGroup>
   );
 }

@@ -1,10 +1,3 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -25,15 +18,7 @@ function CreateOrgPage() {
         <TypographyH1 variant="page">{t("orgNew.title")}</TypographyH1>
         <TypographyMuted>{t("orgNew.subtitle")}</TypographyMuted>
       </header>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("orgNew.detailsTitle")}</CardTitle>
-          <CardDescription>{t("orgNew.detailsDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CreateOrgForm />
-        </CardContent>
-      </Card>
+      <CreateOrgForm />
     </main>
   );
 }

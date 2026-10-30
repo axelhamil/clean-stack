@@ -66,8 +66,8 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
   });
 
   return (
-    <ListRow>
-      <ListRowContent>
+    <ListRow variant="plain" className="flex-wrap">
+      <ListRowContent className="min-w-0 break-words">
         <TypographyP>{member.user.name ?? member.user.email}</TypographyP>
         <TypographyMuted>{member.user.email}</TypographyMuted>
       </ListRowContent>
@@ -98,7 +98,7 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
         {canManage && (
           <DestructiveActionDialog
             trigger={
-              <Button variant="destructive" size="sm" disabled={remove.isPending}>
+              <Button variant="ghost" size="sm" disabled={remove.isPending}>
                 {t("organization.removeAction")}
               </Button>
             }

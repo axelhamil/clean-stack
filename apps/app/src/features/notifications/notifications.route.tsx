@@ -1,11 +1,5 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -29,7 +23,7 @@ function NotificationsPage() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
-  const { data, isPending } = useQuery(notificationPreferencesQueryOptions);
+  const { data, isPending, isError } = useQuery(notificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
@@ -43,22 +37,23 @@ function NotificationsPage() {
     update.mutate({ category, channel, enabled, frequency });
 
   return (
-    <main className="flex flex-col gap-6">
+    <main className="flex flex-col gap-8">
       <TypographyH1 className="sr-only">{t("notifications.title")}</TypographyH1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("notifications.preferencesTitle")}</CardTitle>
-          <CardDescription>{t("notifications.preferencesDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <SettingsSection
+        title={t("notifications.preferencesTitle")}
+        description={t("notifications.preferencesDescription")}
+      >
+        {isError ? (
+          <TypographyMuted>{t("notifications.loadFailed")}</TypographyMuted>
+        ) : (
           <PreferenceMatrix
             rows={rows}
             onChange={handleChange}
             disabled={isPending}
             guard={guard}
           />
-        </CardContent>
-      </Card>
+        )}
+      </SettingsSection>
       <ImpersonationReason guard={guard} />
     </main>
   );

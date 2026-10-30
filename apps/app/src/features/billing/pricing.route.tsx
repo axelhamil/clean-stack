@@ -28,7 +28,7 @@ function PricingPage() {
   return (
     <main className={cn(pageContainerVariants(), "flex flex-col gap-8 py-8")}>
       <header className="flex flex-col gap-2">
-        <TypographyH1>{t("pricing.title")}</TypographyH1>
+        <TypographyH1 variant="page">{t("pricing.title")}</TypographyH1>
         <TypographyMuted>{t("pricing.subtitle")}</TypographyMuted>
       </header>
       <PricingTable

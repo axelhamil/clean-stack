@@ -12,7 +12,7 @@ function TextLink({
   return (
     <Comp
       data-slot="text-link"
-      className={cn("underline-offset-4 hover:underline", className)}
+      className={cn("underline underline-offset-4 hover:decoration-2", className)}
       {...props}
     />
   );

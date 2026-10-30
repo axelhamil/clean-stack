@@ -1,6 +1,8 @@
+import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import { Switch } from "@packages/ui/components/ui/switch";
 import {
   Table,
@@ -36,6 +38,7 @@ function AdminOrgsPage() {
   const guard = useImpersonationGuard();
 
   const query = useInfiniteQuery(adminOrgsInfiniteQueryOptions(search));
+  const orgs = query.data?.pages.flatMap((p) => p.items) ?? [];
 
   const ssoEnforcementMutation = useMutation({
     ...setOrgSsoEnforcementMutationOptions,
@@ -48,83 +51,84 @@ function AdminOrgsPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <header>
+      <header className="flex flex-col gap-1">
         <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
+        <TypographyMuted>{t("orgs.ssoEnforcementOffHint")}</TypographyMuted>
+        <ImpersonationReason guard={guard} />
       </header>
 
       <Input
         placeholder={t("orgs.searchPlaceholder")}
-        className="w-64"
+        className="w-full sm:w-64"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      {query.isLoading ? (
-        <p>{t("orgs.loading")}</p>
-      ) : query.isError ? (
-        <p>{t("orgs.loadFailed")}</p>
-      ) : (
-        <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("orgs.table.name")}</TableHead>
-                <TableHead>{t("orgs.table.slug")}</TableHead>
-                <TableHead>{t("orgs.table.members")}</TableHead>
-                <TableHead>{t("orgs.table.created")}</TableHead>
-                <TableHead>{t("orgs.table.ssoEnforced")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {query.data?.pages
-                .flatMap((p) => p.items)
-                .map((org) => {
-                  const saving =
-                    ssoEnforcementMutation.isPending &&
-                    ssoEnforcementMutation.variables?.id === org.id;
+      {query.isLoading && <SkeletonTable label={t("orgs.loading")} columns={5} />}
 
-                  return (
-                    <TableRow key={org.id}>
-                      <TableCell>
-                        <NavLink asChild variant="plain">
-                          <Link to="/admin/orgs/$orgId" params={{ orgId: org.id }}>
-                            {org.name}
-                          </Link>
-                        </NavLink>
-                      </TableCell>
-                      <TableCell>{org.slug}</TableCell>
-                      <TableCell>{org.memberCount}</TableCell>
-                      <TableCell>{formatDate(org.createdAt)}</TableCell>
-                      <TableCell>
-                        <Switch
-                          aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
-                          checked={org.ssoEnforced}
-                          disabled={saving || guard.blocked}
-                          {...guard.describeProps(saving)}
-                          onCheckedChange={(enforced) =>
-                            ssoEnforcementMutation.mutate({ id: org.id, enforced })
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
+      {query.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>{t("orgs.loadFailed")}</AlertDescription>
+        </Alert>
+      )}
 
-          <TypographyMuted>{t("orgs.ssoEnforcementOffHint")}</TypographyMuted>
-          <ImpersonationReason guard={guard} />
+      {query.isSuccess && orgs.length === 0 && <TypographyMuted>{t("orgs.empty")}</TypographyMuted>}
 
-          {query.hasNextPage && (
-            <Button
-              variant="outline"
-              disabled={query.isFetchingNextPage}
-              onClick={() => void query.fetchNextPage()}
-            >
-              {t("orgs.loadMore")}
-            </Button>
-          )}
-        </>
+      {orgs.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("orgs.table.name")}</TableHead>
+              <TableHead>{t("orgs.table.slug")}</TableHead>
+              <TableHead>{t("orgs.table.members")}</TableHead>
+              <TableHead>{t("orgs.table.created")}</TableHead>
+              <TableHead>{t("orgs.table.ssoEnforced")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orgs.map((org) => {
+              const saving =
+                ssoEnforcementMutation.isPending && ssoEnforcementMutation.variables?.id === org.id;
+
+              return (
+                <TableRow key={org.id}>
+                  <TableCell>
+                    <NavLink asChild variant="plain">
+                      <Link to="/admin/orgs/$orgId" params={{ orgId: org.id }}>
+                        {org.name}
+                      </Link>
+                    </NavLink>
+                  </TableCell>
+                  <TableCell>{org.slug}</TableCell>
+                  <TableCell>{org.memberCount}</TableCell>
+                  <TableCell>{formatDate(org.createdAt)}</TableCell>
+                  <TableCell>
+                    <Switch
+                      aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
+                      checked={org.ssoEnforced}
+                      disabled={saving || guard.blocked}
+                      {...guard.describeProps(saving)}
+                      onCheckedChange={(enforced) =>
+                        ssoEnforcementMutation.mutate({ id: org.id, enforced })
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+
+      {query.hasNextPage && (
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={query.isFetchingNextPage}
+          onClick={() => void query.fetchNextPage()}
+        >
+          {t("orgs.loadMore")}
+        </Button>
       )}
     </main>
   );

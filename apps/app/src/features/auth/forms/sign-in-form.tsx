@@ -3,27 +3,21 @@ import { Button } from "@packages/ui/components/ui/button";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormCheckboxField } from "@packages/ui/components/ui/form-checkbox-field";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
-import { KeyRoundIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { type SignInInput, signInSchema } from "../../../shared/auth/auth.schema";
 import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
-import { usePasskeyAutofill } from "../hooks/use-passkey-autofill";
-import { usePasskeySupported } from "../hooks/use-passkey-supported";
 import { useSignIn } from "../hooks/use-sign-in";
-import { useSignInPasskey } from "../hooks/use-sign-in-passkey";
 
 interface SignInFormProps {
   redirectTo?: string;
+  passkeyAutofill: boolean;
 }
 
-export function SignInForm({ redirectTo }: SignInFormProps = {}) {
+export function SignInForm({ redirectTo, passkeyAutofill }: SignInFormProps) {
   const { t } = useTranslation("auth");
   const revealLabels = usePasswordRevealLabels();
   const mutation = useSignIn(redirectTo);
-  const passkey = useSignInPasskey(redirectTo);
-  const support = usePasskeySupported();
-  const autofill = usePasskeyAutofill({ enabled: support.conditional, redirectTo });
 
   const form = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
@@ -42,7 +36,7 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
           name="email"
           label={t("emailField.label")}
           type="email"
-          autoComplete={support.conditional ? "username webauthn" : "username"}
+          autoComplete={passkeyAutofill ? "username webauthn" : "username"}
           placeholder={t("emailField.placeholder")}
         />
 
@@ -64,22 +58,6 @@ export function SignInForm({ redirectTo }: SignInFormProps = {}) {
         <Button type="submit" className="w-full" disabled={mutation.isPending}>
           {mutation.isPending ? t("signIn.pending") : t("signIn.submit")}
         </Button>
-
-        {support.available && (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              autofill.abort();
-              passkey.mutate();
-            }}
-            disabled={passkey.isPending}
-          >
-            <KeyRoundIcon />
-            {passkey.isPending ? t("signIn.passkeyWaiting") : t("signIn.passkeyButton")}
-          </Button>
-        )}
       </form>
     </Form>
   );

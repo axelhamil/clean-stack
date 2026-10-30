@@ -14,6 +14,8 @@ export default {
     createOne: "Create one",
     passkeyButton: "Sign in with passkey",
     passkeyWaiting: "Waiting for device…",
+    alternativesLabel: "Other ways to sign in",
+    magicLinkTrigger: "Sign in with a magic link",
     magicLinkSubmit: "Email me a magic link",
     magicLinkPending: "Sending…",
     ssoTrigger: "Sign in with SSO",

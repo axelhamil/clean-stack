@@ -24,7 +24,6 @@ export default {
     saving: "Saving…",
     nameLabel: "Name",
     saveChanges: "Save changes",
-    uploadAvatarLabel: "Upload a new avatar image",
     changeAvatar: "Change avatar",
     uploading: "Uploading…",
     avatarUpdatedToast: "Avatar updated",
@@ -66,6 +65,7 @@ export default {
     },
   },
   passkeys: {
+    loadFailed: "Could not load your passkeys. Reload the page to retry.",
     title: "Passkeys",
     description:
       "Sign in with biometrics or a hardware key. Passkeys are phishing-resistant and replace passwords.",
@@ -181,6 +181,7 @@ export default {
     },
   },
   notifications: {
+    loadFailed: "Could not load notification preferences. Reload the page to retry.",
     title: "Notifications",
     preferencesTitle: "Notification preferences",
     preferencesDescription:
@@ -204,6 +205,8 @@ export default {
     },
   },
   organization: {
+    membersLoading: "Loading…",
+    membersLoadFailed: "Could not load members. Reload the page to retry.",
     noActiveOrg: "No active organization.",
     title: "Organization settings",
     detailsTitle: "Details",
@@ -302,6 +305,7 @@ export default {
     requestFailed: "Couldn't request data export. Please try again.",
   },
   sessions: {
+    loadFailed: "Could not load your sessions. Reload the page to retry.",
     title: "Active sessions",
     description: "Devices currently signed in to your account.",
     signOutOthers: "Sign out others",
@@ -356,9 +360,9 @@ export default {
     },
     deliveries: {
       title: "Deliveries",
-      allStatusesPlaceholder: "All statuses",
       allStatusFilter: "All",
       loading: "Loading deliveries…",
+      empty: "No deliveries yet.",
       eventTypeHeader: "Event type",
       statusHeader: "Status",
       attemptsHeader: "Attempts",
@@ -440,6 +444,7 @@ export default {
   },
   sso: {
     pageTitle: "Single sign-on",
+    loading: "Loading…",
     upsell: {
       description:
         "Let members sign in through your identity provider (OIDC or SAML), provision accounts via SCIM, and enforce SSO across a verified domain.",

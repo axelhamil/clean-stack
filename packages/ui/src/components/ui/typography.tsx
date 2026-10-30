@@ -27,11 +27,29 @@ function TypographyH1({ className, variant, ...props }: TypographyH1Props) {
   );
 }
 
-function TypographyH2({ className, ...props }: React.ComponentProps<"h2">) {
+const typographyH2Variants = cva("scroll-m-20 font-semibold tracking-tight first:mt-0", {
+  variants: {
+    variant: {
+      default: "text-xl",
+      section: "text-base",
+    },
+    tone: {
+      default: "",
+      destructive: "text-destructive",
+    },
+  },
+  defaultVariants: { variant: "default", tone: "default" },
+});
+
+interface TypographyH2Props
+  extends React.ComponentProps<"h2">,
+    VariantProps<typeof typographyH2Variants> {}
+
+function TypographyH2({ className, variant, tone, ...props }: TypographyH2Props) {
   return (
     <h2
       data-slot="typography-h2"
-      className={cn("scroll-m-20 font-semibold text-xl tracking-tight first:mt-0", className)}
+      className={cn(typographyH2Variants({ variant, tone }), className)}
       {...props}
     />
   );

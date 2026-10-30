@@ -8,15 +8,9 @@ import {
   AlertDialogTrigger,
 } from "@packages/ui/components/ui/alert-dialog";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
 import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
-import { TypographyLarge, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon, TrashIcon } from "lucide-react";
@@ -60,33 +54,29 @@ function PendingState({ until }: PendingStateProps) {
   const guard = useImpersonationGuard();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle variant="destructive">{t("deletion.scheduledTitle")}</CardTitle>
-        <CardDescription>
-          {t("deletion.scheduledDescription", { date: formatDateTime(until) })}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <Alert variant="destructive">
-          <AlertTriangleIcon />
-          <AlertDescription>
-            {t("deletion.anonymizedWarning", { date: formatDate(until) })}
-          </AlertDescription>
-        </Alert>
-        <Button
-          type="button"
-          variant="outline"
-          className="self-start"
-          disabled={cancel.isPending || guard.blocked}
-          {...guard.describeProps(cancel.isPending)}
-          onClick={() => cancel.mutate()}
-        >
-          {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}
-        </Button>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+    <SettingsSection
+      tone="destructive"
+      title={t("deletion.scheduledTitle")}
+      description={t("deletion.scheduledDescription", { date: formatDateTime(until) })}
+    >
+      <Alert variant="destructive">
+        <AlertTriangleIcon />
+        <AlertDescription>
+          {t("deletion.anonymizedWarning", { date: formatDate(until) })}
+        </AlertDescription>
+      </Alert>
+      <Button
+        type="button"
+        variant="outline"
+        className="self-start"
+        disabled={cancel.isPending || guard.blocked}
+        {...guard.describeProps(cancel.isPending)}
+        onClick={() => cancel.mutate()}
+      >
+        {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}
+      </Button>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }
 
@@ -98,15 +88,13 @@ function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
   const { t } = useTranslation("settings");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle variant="destructive">{t("deletion.title")}</CardTitle>
-        <CardDescription>{t("deletion.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <DeletionPreflight twoFactorEnabled={twoFactorEnabled} />
-      </CardContent>
-    </Card>
+    <SettingsSection
+      tone="destructive"
+      title={t("deletion.title")}
+      description={t("deletion.description")}
+    >
+      <DeletionPreflight twoFactorEnabled={twoFactorEnabled} />
+    </SettingsSection>
   );
 }
 
@@ -167,9 +155,9 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
       <TypographyMuted>{t("deletion.blockingIntro")}</TypographyMuted>
       <ul className="flex flex-col gap-2">
         {orgs.map((org) => (
-          <ListRow key={org.orgId}>
-            <ListRowContent>
-              <TypographyLarge>{org.orgName}</TypographyLarge>
+          <ListRow variant="plain" key={org.orgId} className="flex-wrap">
+            <ListRowContent className="min-w-0 break-words">
+              <TypographySmall>{org.orgName}</TypographySmall>
               <TypographyMuted>
                 {t("deletion.otherMembers", { count: org.otherMembersCount })}
               </TypographyMuted>
@@ -202,7 +190,7 @@ function DeleteDialog({ twoFactorEnabled }: DeleteDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="destructive" className="self-start">
+        <Button type="button" variant="outline" className="self-start">
           <TrashIcon />
           {t("deletion.title")}
         </Button>

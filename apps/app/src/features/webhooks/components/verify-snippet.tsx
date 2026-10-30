@@ -1,5 +1,11 @@
+import { Button } from "@packages/ui/components/ui/button";
 import { CodeBlock } from "@packages/ui/components/ui/code-block";
-import { Panel } from "@packages/ui/components/ui/panel";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@packages/ui/components/ui/collapsible";
+import { ChevronRightIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const SNIPPET = `import crypto from "node:crypto";
@@ -32,15 +38,18 @@ export function VerifySnippet() {
   const { t } = useTranslation("settings");
 
   return (
-    <Panel asChild>
-      <details>
-        <summary className="cursor-pointer text-sm font-medium">
+    <Collapsible className="flex min-w-0 flex-col items-start gap-2">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="group">
+          <ChevronRightIcon className="transition-transform group-data-[state=open]:rotate-90" />
           {t("webhooks.verifySnippetHeading")}
-        </summary>
-        <CodeBlock className="mt-3">
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="w-full">
+        <CodeBlock>
           <code>{SNIPPET}</code>
         </CodeBlock>
-      </details>
-    </Panel>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

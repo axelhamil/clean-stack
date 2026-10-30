@@ -1,6 +1,6 @@
 import { toLocale } from "@packages/i18n";
-import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { Separator } from "@packages/ui/components/ui/separator";
 import { TextLink } from "@packages/ui/components/ui/text-link";
 import {
   TypographyH1,
@@ -22,80 +22,61 @@ function AccessibilityPage() {
   const { t, i18n } = useTranslation("common");
   const locale = toLocale(i18n.language);
   return (
-    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-6 py-6")}>
+    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
       <header className="flex flex-col gap-2">
-        <TypographyH1>{t("legal.accessibility.title")}</TypographyH1>
+        <TypographyH1 variant="page">{t("legal.accessibility.title")}</TypographyH1>
         <TypographyMuted>{t("legal.accessibility.subtitle")}</TypographyMuted>
       </header>
 
+      <Separator />
+
       <UntranslatedBodyBanner show={locale !== "en"} />
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Compliance status</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyP>
-            This application aims to partially conform to WCAG 2.1 Level AA per EN 301 549 v3.2.1.
-            Partial compliance means some parts do not fully conform yet (see Known limitations).
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Compliance status</TypographyH2>
+        <TypographyP>
+          This application aims to partially conform to WCAG 2.1 Level AA per EN 301 549 v3.2.1.
+          Partial compliance means some parts do not fully conform yet (see Known limitations).
+        </TypographyP>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Known limitations</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyList>
-            <li>Keyboard navigation of modal dialogs may be incomplete in some flows</li>
-            <li>Color contrast of muted text may not meet 4.5:1 in all themes</li>
-            <li>Automated audit via Lighthouse CI pending (Phase A.6)</li>
-          </TypographyList>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Known limitations</TypographyH2>
+        <TypographyList>
+          <li>Keyboard navigation of modal dialogs may be incomplete in some flows</li>
+          <li>Color contrast of muted text may not meet 4.5:1 in all themes</li>
+          <li>Automated audit via Lighthouse CI pending (Phase A.6)</li>
+        </TypographyList>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Technical specifications</TypographyH2>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <TypographyP>
-            This application relies on the following technologies: HTML5, CSS (Tailwind 4), ARIA,
-            and React 19.
-          </TypographyP>
-          <TypographyP>
-            Compatibility has been tested with the following browser and assistive technology
-            combinations: Chrome with NVDA, Firefox with NVDA, and Safari with VoiceOver.
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Technical specifications</TypographyH2>
+        <TypographyP>
+          This application relies on the following technologies: HTML5, CSS (Tailwind 4), ARIA, and
+          React 19.
+        </TypographyP>
+        <TypographyP>
+          Compatibility has been tested with the following browser and assistive technology
+          combinations: Chrome with NVDA, Firefox with NVDA, and Safari with VoiceOver.
+        </TypographyP>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Feedback and contact information</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyP>
-            If you experience an accessibility barrier, email{" "}
-            <TextLink href="mailto:accessibility@[domain]">accessibility@[domain]</TextLink>. We aim
-            to respond within 15 business days.
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Feedback and contact information</TypographyH2>
+        <TypographyP>
+          If you experience an accessibility barrier, email{" "}
+          <TextLink href="mailto:accessibility@[domain]">accessibility@[domain]</TextLink>. We aim
+          to respond within 15 business days.
+        </TypographyP>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Enforcement and escalation</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyP>
-            If our response is unsatisfactory, contact the national digital accessibility authority
-            in your country (e.g. ARCOM in France). [Replace with the authority for your
-            jurisdiction.]
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Enforcement and escalation</TypographyH2>
+        <TypographyP>
+          If our response is unsatisfactory, contact the national digital accessibility authority in
+          your country (e.g. ARCOM in France). [Replace with the authority for your jurisdiction.]
+        </TypographyP>
+      </section>
     </main>
   );
 }
