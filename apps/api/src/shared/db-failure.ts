@@ -14,21 +14,19 @@ export function createDbFailure<TCode extends ErrorCode>(code: TCode) {
     msg: string,
     ctx?: Record<string, unknown>,
   ): Result<never, AppError<TCode>> => {
-    const message = e instanceof Error ? e.message : "unknown error";
     logger.error({ err: e, ...ctx }, msg);
-    return Result.fail({ code, message });
+    return Result.fail({ code, message: msg });
   };
 }
 
 /**
  * Factory for the error a store returns when a query throws: the operation in the
- * message, the driver's text as `metadata.cause`. The store has already captured
- * the error to telemetry, so this only shapes it for the caller.
+ * message, never the driver's text. The store has already captured the error, which
+ * is where that text goes.
  */
 export function dbOperationFailure<TCode extends ErrorCode>(code: TCode) {
-  return (err: unknown, op: string): AppError<TCode> => ({
+  return (op: string): AppError<TCode> => ({
     code,
     message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
   });
 }

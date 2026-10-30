@@ -5,6 +5,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { di } from "../../container";
 import { env } from "../../shared/env";
 import type { AuthVariables } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
 import { zV } from "../../shared/validator";
 import { recordConsentDto } from "./application/dto/record-consent.dto";
@@ -18,7 +19,7 @@ const cookieOptions = {
 };
 
 export const consentRoutes = new Hono<{ Variables: AuthVariables }>()
-  .post("/", zV("json", recordConsentDto), async (c) => {
+  .post("/", denyImpersonated, zV("json", recordConsentDto), async (c) => {
     const body = c.req.valid("json");
     const userId = c.get("user")?.id;
 
@@ -57,7 +58,7 @@ export const consentRoutes = new Hono<{ Variables: AuthVariables }>()
       policyVersion: active.map((row) => row.policyVersion).toNull(),
     });
   })
-  .delete("/", async (c) => {
+  .delete("/", denyImpersonated, async (c) => {
     const subjectId = getCookie(c, CONSENT_COOKIE_NAME);
     if (!subjectId) return c.json({ withdrawn: false });
 

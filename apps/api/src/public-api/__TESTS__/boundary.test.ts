@@ -3,8 +3,15 @@ import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import * as realAuthQueries from "../../auth-queries";
 import { generateToken, hmacToken } from "../../shared/crypto/api-token";
+import { createErrorHandler } from "../../shared/middleware/error.middleware";
+import { API_TOKEN_IP_POLICY } from "../../shared/middleware/rate-limit.policies";
 import type { ApiTokenRecord, IApiTokenRepository } from "../../shared/ports/api-token.port";
-import type { RateLimitDecision, RateLimitError } from "../../shared/ports/rate-limiter.port";
+import type {
+  IRateLimiter,
+  RateLimitDecision,
+  RateLimitError,
+} from "../../shared/ports/rate-limiter.port";
+import { NoOpInstrumentation } from "../../shared/services/noop-instrumentation";
 import { createPublicApiV1 } from "../index";
 
 // ── Module mocks (only auth surface, no container/env/rate-limit.ip) ─────
@@ -220,5 +227,70 @@ describe("public API response shape", () => {
     ]) {
       expect(body.user).not.toHaveProperty(leaked);
     }
+  });
+});
+
+describe("public API rate limit order", () => {
+  const IP_BUDGET = API_TOKEN_IP_POLICY.windows[0]?.maxRequests ?? 0;
+
+  function countingApp() {
+    const counts = new Map<string, number>();
+    const limiter: IRateLimiter = {
+      consume: async (key, windows) => {
+        const count = (counts.get(key) ?? 0) + 1;
+        counts.set(key, count);
+        const limit = windows[0]?.maxRequests ?? 0;
+        return Result.ok<RateLimitDecision, RateLimitError>({
+          allowed: count <= limit,
+          limit,
+          remaining: Math.max(0, limit - count),
+          resetSeconds: 60,
+          policyName: windows[0]?.policyName ?? "unknown",
+          firstBlock: count === limit + 1,
+        });
+      },
+    };
+    const instance = new Hono().route(
+      "/api/v1",
+      createPublicApiV1({
+        repo: makeRepo(),
+        outbox: mockOutbox,
+        prefix: PREFIX,
+        pepper: PEPPER,
+        pepperVersion: 1,
+        bucketMin: 15,
+        platformAdminIds: [],
+        limiter,
+        resolveIp: () => "203.0.113.9",
+      }) as never,
+    );
+    instance.onError(createErrorHandler(new NoOpInstrumentation()));
+    return { instance, counts };
+  }
+
+  it("ends in 429 when one IP keeps presenting invalid tokens", async () => {
+    const { instance } = countingApp();
+    const statuses = new Set<number>();
+    for (let attempt = 0; attempt <= IP_BUDGET; attempt += 1) {
+      const res = await instance.request("/api/v1/me", {
+        headers: { authorization: "Bearer clean_not-a-real-token" },
+      });
+      statuses.add(res.status);
+    }
+    expect([...statuses]).toEqual([401, 429]);
+  });
+
+  it("still counts a valid token against its own budget", async () => {
+    const { instance, counts } = countingApp();
+    await instance.request("/api/v1/me", { headers: { authorization: `Bearer ${validToken}` } });
+    expect(counts.get("tok:tok-valid")).toBe(1);
+    expect(counts.get("tokip:203.0.113.9")).toBe(1);
+  });
+
+  it("answers an unknown path with a JSON 401 when no valid token is presented", async () => {
+    const { instance } = countingApp();
+    const res = await instance.request("/api/v1/nope");
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ error: { code: "HTTP_401" } });
   });
 });

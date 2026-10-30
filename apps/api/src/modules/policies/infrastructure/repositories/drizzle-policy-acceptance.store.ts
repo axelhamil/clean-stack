@@ -40,7 +40,7 @@ export class DrizzlePolicyAcceptanceStore implements IPolicyAcceptanceStore {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "insert"));
+          return Result.fail(storeFailure("insert"));
         }
       },
     );
@@ -75,7 +75,7 @@ export class DrizzlePolicyAcceptanceStore implements IPolicyAcceptanceStore {
           return Result.ok(latest);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findLatestVersions"));
+          return Result.fail(storeFailure("findLatestVersions"));
         }
       },
     );

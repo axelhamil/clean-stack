@@ -65,6 +65,8 @@ describe("surface parity", () => {
     "/consents",
     "/consents/*",
     "/billing/portal",
+    "/notifications",
+    "/notifications/*",
     "/internal/*",
     "/api/v1/*",
     "/api/token-scanning/*",

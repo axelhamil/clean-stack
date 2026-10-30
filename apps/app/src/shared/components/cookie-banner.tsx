@@ -12,8 +12,11 @@ import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toastError } from "../api/errors/toast";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { consentQueryOptions } from "../api/queries/consent";
+import { useImpersonationGuard } from "../auth/use-impersonation-guard";
+import { errorFallback } from "../i18n/get-errors-t";
 import { ConsentSettings } from "./consent-settings";
 
 export function CookieBanner() {
@@ -21,15 +24,17 @@ export function CookieBanner() {
   const queryClient = useQueryClient();
   const { data } = useQuery(consentQueryOptions);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const { blocked } = useImpersonationGuard();
 
   const record = useMutation({
     ...recordConsentMutationOptions,
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
     },
+    onError: (err) => toastError(err, errorFallback("recordConsent")),
   });
 
-  if (data === undefined) return null;
+  if (blocked || data === undefined) return null;
 
   const categories = data.categories ?? null;
   const policyVersion = data.policyVersion ?? null;

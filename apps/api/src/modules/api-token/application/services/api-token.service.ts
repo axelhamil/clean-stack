@@ -101,7 +101,6 @@ export class ApiTokenService {
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",
           message: "Failed to create API token.",
-          metadata: { cause: err instanceof Error ? err.message : String(err) },
         });
       }
     });
@@ -160,7 +159,6 @@ export class ApiTokenService {
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",
           message: "Failed to revoke API token.",
-          metadata: { cause: err instanceof Error ? err.message : String(err) },
         });
       }
     });

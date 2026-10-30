@@ -1,5 +1,4 @@
 import { Button } from "@packages/ui/components/ui/button";
-import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Skeleton, SkeletonGroup } from "@packages/ui/components/ui/skeleton";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
@@ -8,6 +7,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
 import { useEntitlements } from "../../shared/auth/use-entitlements";
+import { QueryLoadError } from "../../shared/components/query-load-error";
 import { ssoProvidersQueryOptions } from "./api/sso.queries";
 import { DomainVerificationCard } from "./components/domain-verification-card";
 import { ProviderCard } from "./components/provider-card";
@@ -35,7 +35,7 @@ function SsoPage() {
 }
 
 function SsoSections() {
-  const { t } = useTranslation(["settings", "errors", "common"]);
+  const { t } = useTranslation(["settings", "errors"]);
   const providers = useQuery(ssoProvidersQueryOptions);
 
   if (providers.isPending) {
@@ -44,18 +44,10 @@ function SsoSections() {
 
   if (providers.isLoadingError) {
     return (
-      <LoadErrorAlert
+      <QueryLoadError
         message={t("errors:fallback.loadSsoProviders")}
-        retry={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={providers.isFetching}
-            onClick={() => void providers.refetch()}
-          >
-            {t("common:actions.retry")}
-          </Button>
-        }
+        isFetching={providers.isFetching}
+        onRetry={() => void providers.refetch()}
       />
     );
   }

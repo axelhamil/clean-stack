@@ -36,7 +36,7 @@ export class DrizzleProfileStore implements IProfileStore {
         return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(storeFailure(err, "setLocale"));
+        return Result.fail(storeFailure("setLocale"));
       }
     });
   }
@@ -63,7 +63,7 @@ export class DrizzleProfileStore implements IProfileStore {
         return Result.ok(isLocale(row.locale) ? Option.some(row.locale) : Option.none());
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(storeFailure(err, op));
+        return Result.fail(storeFailure(op));
       }
     });
   }

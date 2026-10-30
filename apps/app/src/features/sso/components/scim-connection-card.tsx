@@ -12,6 +12,7 @@ import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
 import { errorFallback } from "../../../shared/i18n/get-errors-t";
@@ -27,21 +28,23 @@ import { CopyRow } from "./copy-row";
 const SCIM_BASE_URL = `${env.VITE_API_URL}/api/auth/scim/v2`;
 
 export function ScimConnectionCard() {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t } = useTranslation(["settings", "common", "errors"]);
   const qc = useQueryClient();
   const guard = useImpersonationGuard();
   const formatDate = useFormatDate();
-  const { data: org } = useQuery(activeOrgQueryOptions);
+  const orgQuery = useQuery(activeOrgQueryOptions);
+  const org = orgQuery.data;
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const { can } = useAuthorization();
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
   const provider = primaryProviderFor(providers, org?.id);
   const canManage = can({ scim: ["manage"] });
-  const { data: connection } = useQuery({
+  const connectionQuery = useQuery({
     ...scimConnectionQueryOptions,
     enabled: canManage && provider !== undefined,
   });
+  const connection = connectionQuery.data;
 
   const refreshConnection = () =>
     qc.invalidateQueries({ queryKey: scimConnectionQueryOptions.queryKey });
@@ -65,6 +68,21 @@ export function ScimConnectionCard() {
   });
 
   const pending = issue.isPending || disconnect.isPending;
+
+  if (orgQuery.isLoadingError || connectionQuery.isLoadingError) {
+    return (
+      <SettingsSection title={t("sso.scimCard.title")} description={t("sso.scimCard.description")}>
+        <QueryLoadError
+          message={t("errors:fallback.loadScimConnection")}
+          isFetching={orgQuery.isFetching || connectionQuery.isFetching}
+          onRetry={() => {
+            if (orgQuery.isLoadingError) void orgQuery.refetch();
+            if (connectionQuery.isLoadingError) void connectionQuery.refetch();
+          }}
+        />
+      </SettingsSection>
+    );
+  }
 
   return (
     <SettingsSection title={t("sso.scimCard.title")} description={t("sso.scimCard.description")}>

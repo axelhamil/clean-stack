@@ -5,5 +5,7 @@ export function shouldRedirectToLegalAccept(
   policies: Record<string, { current: boolean }> | null | undefined,
 ): boolean {
   if (isImpersonating(session)) return false;
-  return Boolean(policies && Object.values(policies).some((p) => !p.current));
+  if (!policies) return true;
+
+  return Object.values(policies).some((p) => !p.current);
 }

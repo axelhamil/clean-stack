@@ -6,7 +6,7 @@ import { authClient } from "../../../shared/auth/auth-client";
 import { SSO_REDIRECT_IN_PROGRESS } from "../../../shared/observability/error-classifier";
 import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
 
-export function useMagicLink() {
+export function useMagicLink(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
   return useMutation({
@@ -14,9 +14,11 @@ export function useMagicLink() {
     mutationFn: async (input: MagicLinkInput) => {
       const { data, error } = await authClient.signIn.magicLink({
         email: input.email,
+        callbackURL: redirectTo,
       });
       if (error) {
-        if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+        if (await redirectToSsoIfRequired(error, redirectTo))
+          throw new Error(SSO_REDIRECT_IN_PROGRESS);
         throw new Error(resolveAuthError(error, "magicLink.failed", t, tErrors));
       }
 

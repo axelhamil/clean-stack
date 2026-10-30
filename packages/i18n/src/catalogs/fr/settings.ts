@@ -47,6 +47,11 @@ export default {
     membersUsage: "{{count}} / {{max}} membres",
     membersUsageAriaLabel: "Utilisation des membres",
     manageBilling: "Gérer la facturation",
+    checkoutReturnToast: "Paiement reçu",
+    activationPending:
+      "Votre offre est en cours d'activation. Actualisez dans un instant pour la voir.",
+    refreshPlan: "Actualiser l'offre",
+    loadFailed: "Votre offre et l'utilisation des membres n'ont pas pu être chargées.",
     tier: {
       free: "Gratuit",
       pro: "Pro",
@@ -499,6 +504,7 @@ export default {
         "Échec de la vérification : l'enregistrement DNS est introuvable. La propagation des changements DNS peut prendre du temps.",
     },
     enforcementCard: {
+      loadFailed: "Le paramètre d'application n'a pas pu être chargé.",
       title: "Imposer le SSO",
       description:
         "Une fois cette option activée, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès : le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",

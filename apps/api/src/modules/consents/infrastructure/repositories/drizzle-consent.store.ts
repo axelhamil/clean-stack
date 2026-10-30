@@ -82,7 +82,7 @@ export class DrizzleConsentStore implements IConsentStore {
         return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(storeFailure(err, "insert"));
+        return Result.fail(storeFailure("insert"));
       }
     });
   }
@@ -107,7 +107,7 @@ export class DrizzleConsentStore implements IConsentStore {
           return Result.ok(Option.fromNullable(row).map(toRow));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findActiveBySubject"));
+          return Result.fail(storeFailure("findActiveBySubject"));
         }
       },
     );
@@ -133,7 +133,7 @@ export class DrizzleConsentStore implements IConsentStore {
           return Result.ok(Option.fromNullable(row).map(toRow));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findActiveByUser"));
+          return Result.fail(storeFailure("findActiveByUser"));
         }
       },
     );
@@ -163,7 +163,7 @@ export class DrizzleConsentStore implements IConsentStore {
           return Result.ok(linked.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "linkSubjectToUser"));
+          return Result.fail(storeFailure("linkSubjectToUser"));
         }
       },
     );

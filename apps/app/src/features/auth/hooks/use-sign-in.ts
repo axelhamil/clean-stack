@@ -9,6 +9,7 @@ import {
   SSO_REDIRECT_IN_PROGRESS,
 } from "../../../shared/observability/error-classifier";
 import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
+import { rememberPostVerifyRedirect } from "../post-verify-redirect";
 import { useCompleteSignIn } from "./use-complete-sign-in";
 
 export function useSignIn(redirectTo?: string) {
@@ -28,11 +29,13 @@ export function useSignIn(redirectTo?: string) {
 
       if (error) {
         if (error.code === "EMAIL_NOT_VERIFIED" || /verif/i.test(error.message ?? "")) {
+          rememberPostVerifyRedirect(redirectTo);
           void navigate({ to: "/verify-email" });
           throw new Error(EMAIL_NOT_VERIFIED_REDIRECT);
         }
 
-        if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+        if (await redirectToSsoIfRequired(error, redirectTo))
+          throw new Error(SSO_REDIRECT_IN_PROGRESS);
 
         throw new Error(resolveAuthError(error, "signIn.failed", t, tErrors));
       }

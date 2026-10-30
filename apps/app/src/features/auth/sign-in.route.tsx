@@ -11,7 +11,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Building2Icon, KeyRoundIcon, MailIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
+import { redirectSearchSchema } from "../../shared/auth/safe-redirect";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { EmailRequestForm } from "./forms/email-request-form";
 import { SignInForm } from "./forms/sign-in-form";
@@ -21,12 +21,8 @@ import { usePasskeySupported } from "./hooks/use-passkey-supported";
 import { useSignInPasskey } from "./hooks/use-sign-in-passkey";
 import { useSignInSso } from "./hooks/use-sign-in-sso";
 
-const signInSearchSchema = z.object({
-  redirect: z.string().optional(),
-});
-
 export const Route = createFileRoute("/_guest/sign-in")({
-  validateSearch: signInSearchSchema,
+  validateSearch: redirectSearchSchema,
   component: SignInPage,
 });
 
@@ -35,8 +31,8 @@ type EmailAlternative = "magicLink" | "sso";
 function SignInPage() {
   const { t } = useTranslation("auth");
   const { redirect } = Route.useSearch();
-  const magicLinkMutation = useMagicLink();
-  const ssoMutation = useSignInSso();
+  const magicLinkMutation = useMagicLink(redirect);
+  const ssoMutation = useSignInSso(redirect);
   const passkey = useSignInPasskey(redirect);
   const support = usePasskeySupported();
   const autofill = usePasskeyAutofill({ enabled: support.conditional, redirectTo: redirect });
@@ -52,7 +48,11 @@ function SignInPage() {
       footer={
         <AuthShellFooter
           lead={t("signIn.noAccountYet")}
-          link={<Link to="/sign-up">{t("signIn.createOne")}</Link>}
+          link={
+            <Link to="/sign-up" search={{ redirect }}>
+              {t("signIn.createOne")}
+            </Link>
+          }
         />
       }
     >

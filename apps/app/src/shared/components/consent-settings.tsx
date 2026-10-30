@@ -8,9 +8,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../api/errors/toast";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { withdrawConsentMutationOptions } from "../api/mutations/withdraw-consent";
 import { consentQueryOptions } from "../api/queries/consent";
+import { GuardHint } from "../auth/guard-hint";
+import { ImpersonationReason } from "../auth/impersonation-reason";
+import { useImpersonationGuard } from "../auth/use-impersonation-guard";
+import { errorFallback } from "../i18n/get-errors-t";
 
 type OptionalKey = (typeof OPTIONAL_CATEGORIES)[number];
 
@@ -23,6 +28,7 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
   const { t } = useTranslation("common");
   const queryClient = useQueryClient();
   const { data } = useQuery(consentQueryOptions);
+  const guard = useImpersonationGuard();
 
   const [enabled, setEnabled] = useState<Record<OptionalKey, boolean>>({
     functional: false,
@@ -48,11 +54,13 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
   const record = useMutation({
     ...recordConsentMutationOptions,
     onSuccess: () => settle(t("cookieConsent.savedToast")),
+    onError: (err) => toastError(err, errorFallback("recordConsent")),
   });
 
   const withdraw = useMutation({
     ...withdrawConsentMutationOptions,
     onSuccess: () => settle(t("cookieConsent.withdrawnToast")),
+    onError: (err) => toastError(err, errorFallback("withdrawConsent")),
   });
 
   const isPending = record.isPending || withdraw.isPending;
@@ -69,6 +77,7 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
   return (
     <section className="flex flex-col gap-4">
       {withTitle && <TypographyH2>{t("cookieConsent.title")}</TypographyH2>}
+      <ImpersonationReason guard={guard} />
       <div className="flex flex-col gap-4">
         {CONSENT_CATEGORIES.map((cat) => {
           const label = t(`cookieConsent.categories.${cat}.label` as const);
@@ -83,7 +92,7 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
                 </TypographyMuted>
               </div>
               <Hint
-                text={isNecessary ? t("cookieConsent.necessaryAlwaysOnHint") : undefined}
+                text={isNecessary ? t("cookieConsent.necessaryAlwaysOnHint") : guard.reason}
                 showOnTouch={false}
               >
                 <Switch
@@ -92,7 +101,8 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
                   onCheckedChange={(val) => {
                     if (!isNecessary) setEnabled((prev) => ({ ...prev, [cat]: val }));
                   }}
-                  disabled={isNecessary || isPending}
+                  disabled={isNecessary || isPending || guard.blocked}
+                  {...guard.describeProps(isNecessary || isPending)}
                   aria-label={label}
                 />
               </Hint>
@@ -101,12 +111,25 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
         })}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={handleSave} disabled={isPending}>
-          {t("cookieConsent.save")}
-        </Button>
-        <Button variant="outline" onClick={handleWithdraw} disabled={isPending}>
-          {t("cookieConsent.withdraw")}
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={isPending}>
+          <Button
+            onClick={handleSave}
+            disabled={isPending || guard.blocked}
+            {...guard.describeProps(isPending)}
+          >
+            {t("cookieConsent.save")}
+          </Button>
+        </GuardHint>
+        <GuardHint guard={guard} otherwiseDisabled={isPending}>
+          <Button
+            variant="outline"
+            onClick={handleWithdraw}
+            disabled={isPending || guard.blocked}
+            {...guard.describeProps(isPending)}
+          >
+            {t("cookieConsent.withdraw")}
+          </Button>
+        </GuardHint>
       </div>
     </section>
   );

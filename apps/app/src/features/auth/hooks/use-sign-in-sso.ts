@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { authClient } from "../../../shared/auth/auth-client";
 import type { EmailRequestInput } from "../auth.schema";
-import { resolveAuthError } from "../auth-error";
+import { resolveAuthError, ssoCallbackUrl } from "../auth-error";
 
-export function useSignInSso() {
+export function useSignInSso(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
 
@@ -17,7 +17,7 @@ export function useSignInSso() {
       // there is no local navigation to perform here.
       const { error } = await authClient.signIn.sso({
         email: input.email,
-        callbackURL: `${window.location.origin}/dashboard`,
+        callbackURL: ssoCallbackUrl(redirectTo),
       });
       if (error) throw new Error(resolveAuthError(error, "signIn.ssoFailed", t, tErrors));
     },

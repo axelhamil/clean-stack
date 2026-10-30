@@ -47,6 +47,10 @@ export default {
     membersUsage: "{{count}} / {{max}} members",
     membersUsageAriaLabel: "Members usage",
     manageBilling: "Manage billing",
+    checkoutReturnToast: "Payment received",
+    activationPending: "Your plan is being activated. Refresh in a moment to see it.",
+    refreshPlan: "Refresh plan",
+    loadFailed: "Your plan and member usage could not be loaded.",
     tier: {
       free: "Free",
       pro: "Pro",
@@ -492,6 +496,7 @@ export default {
         "Verification failed: the DNS record was not found. DNS changes can take a while to propagate.",
     },
     enforcementCard: {
+      loadFailed: "The enforcement setting could not be loaded.",
       title: "Enforce SSO",
       description:
         "When enabled, members on your verified domain can no longer sign in with a password, a magic link, or a passkey: SSO through your identity provider becomes the only way in.",

@@ -13,6 +13,7 @@ import { AuthorizationDevTool } from "../auth/authorization-devtool";
 import { NotificationBell } from "../notifications/notification-bell";
 import { CommandPalette } from "./command-palette";
 import { ContextualTabs } from "./contextual-tabs";
+import { DeletionPendingBanner } from "./deletion-pending-banner";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { LegalFooter } from "./legal-footer";
 import { LogoMark } from "./logo-mark";
@@ -106,6 +107,7 @@ export function AppShell({ user, children }: AppShellProps) {
       </header>
 
       <ImpersonationBanner />
+      <DeletionPendingBanner />
 
       <div className="flex-1">{children}</div>
 

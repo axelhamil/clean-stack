@@ -85,6 +85,8 @@ const CSRF_GUARDED_PATHS = [
   "/consents",
   "/consents/*",
   "/billing/portal",
+  "/notifications",
+  "/notifications/*",
 ] as const;
 
 // BetterAuth's credential and token-consuming endpoints, each on its own tight,

@@ -169,8 +169,9 @@ Every error the sub-app produces is JSON in one shape:
 `metadata` is present only when the code carries structured detail. `requestId` is on every error
 and is the identifier to quote in a support request.
 
-The one exception: an unknown path or an unsupported method under `/api/v1` is served by the
-framework's own handler and returns `404` with the plain-text body `404 Not Found`, not JSON.
+The one exception: for a request carrying a valid token, an unknown path or an unsupported method
+under `/api/v1` is served by the framework's own handler and returns `404` with the plain-text body
+`404 Not Found`, not JSON. Without a valid token the same request is the JSON `401` below.
 
 | Status | `code` | When | What to do |
 |---|---|---|---|
@@ -205,11 +206,12 @@ API's general per-session limit; these replace it.
 
 | Axis | Limit | Window |
 |---|---|---|
-| Per token | 600 requests | 60 s |
 | Per client IP | 1200 requests | 60 s |
+| Per token | 600 requests | 60 s |
 
 They are separate counters on purpose: rotating through several tokens does not raise the IP
-ceiling.
+ceiling. The IP window runs before the token is checked, so a request with a missing or rejected
+token consumes it too, and enough of them end in `429` instead of `401`.
 
 Responses advertise the budget with `RateLimit-Policy` and `RateLimit` (the
 [IETF draft](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) format).
@@ -217,12 +219,12 @@ Responses advertise the budget with `RateLimit-Policy` and `RateLimit` (the
 window resets:
 
 ```
-RateLimit-Policy: "api-token-ip";q=1200;w=60
-RateLimit: "api-token-ip";r=1199;t=60
+RateLimit-Policy: "api-token";q=600;w=60
+RateLimit: "api-token";r=599;t=60
 ```
 
-A successful response reports the per-IP window (the last one evaluated). A `429` reports the window
-that actually blocked, and adds `Retry-After` in seconds:
+A successful response reports the per-token window (the last one evaluated), and a `401` the per-IP
+window. A `429` reports the window that actually blocked, and adds `Retry-After` in seconds:
 
 ```
 HTTP/1.1 429 Too Many Requests

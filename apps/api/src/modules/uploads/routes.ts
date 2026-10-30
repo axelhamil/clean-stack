@@ -2,6 +2,7 @@ import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
+import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { zV } from "../../shared/validator";
 import { confirmUploadBodySchema } from "./application/dto/confirm-upload.dto";
@@ -14,6 +15,7 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
     "/presign",
     requireAuth,
     requireCurrentPolicies,
+    denyImpersonated,
     zV("json", presignUploadBodySchema),
     async (c) => {
       const result = await di.UploadService.createUploadUrl({
@@ -30,6 +32,7 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
     "/confirm",
     requireAuth,
     requireCurrentPolicies,
+    denyImpersonated,
     zV("json", confirmUploadBodySchema),
     async (c) => {
       const result = await di.UploadService.confirmUpload({
@@ -62,6 +65,7 @@ export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
     "/",
     requireAuth,
     requireCurrentPolicies,
+    denyImpersonated,
     zV("json", deleteUploadBodySchema),
     async (c) => {
       const result = await di.UploadService.deleteUpload({

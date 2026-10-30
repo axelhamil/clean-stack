@@ -59,7 +59,6 @@ export class PolicyAcceptanceService {
       return Result.fail({
         code: "POLICY_ACCEPTANCE_PROVIDER_FAILURE",
         message: "policy acceptance failed",
-        metadata: { cause: err instanceof Error ? err.message : String(err) },
       });
     }
   }

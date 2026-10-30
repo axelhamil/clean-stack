@@ -3,11 +3,12 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
+import { redirectSearchSchema } from "../../shared/auth/safe-redirect";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { useConsumeToken } from "./hooks/use-consume-token";
 import { useVerifyEmail } from "./hooks/use-verify-email";
 
-const verifyEmailSearchSchema = z.object({
+const verifyEmailSearchSchema = redirectSearchSchema.extend({
   token: z.string().min(1).optional(),
 });
 
@@ -24,17 +25,18 @@ export const Route = createFileRoute("/verify-email")({
 });
 
 function VerifyEmailPage() {
-  const { token } = Route.useSearch();
-  return token ? <ConsumeToken token={token} /> : <CheckInbox />;
+  const { token, redirect: redirectTo } = Route.useSearch();
+  return token ? <ConsumeToken token={token} redirectTo={redirectTo} /> : <CheckInbox />;
 }
 
 interface ConsumeTokenProps {
   token: string;
+  redirectTo: string | undefined;
 }
 
-function ConsumeToken({ token }: ConsumeTokenProps) {
+function ConsumeToken({ token, redirectTo }: ConsumeTokenProps) {
   const { t } = useTranslation("auth");
-  const mutation = useVerifyEmail();
+  const mutation = useVerifyEmail(redirectTo);
   useConsumeToken(token, mutation.mutate);
 
   if (mutation.isError) return <VerifyEmailError message={mutation.error.message} />;

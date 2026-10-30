@@ -21,12 +21,12 @@ import { toastError } from "../../../shared/api/errors/toast";
 import { preflightDeletionQueryOptions } from "../../../shared/api/queries/account-deletion";
 import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useCancelDeletion } from "../../../shared/auth/use-cancel-deletion";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
 import { useFormatDate, useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { RequestDeletionPasswordForm } from "../forms/request-deletion-password-form";
 import { RequestDeletionTotpForm } from "../forms/request-deletion-totp-form";
-import { useCancelDeletion } from "../hooks/use-cancel-deletion";
 
 interface RgpdDeletionCardProps {
   pendingDeletionUntil: Date | string | null | undefined;

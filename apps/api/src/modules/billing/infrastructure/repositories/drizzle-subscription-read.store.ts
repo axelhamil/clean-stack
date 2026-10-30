@@ -46,7 +46,7 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
           );
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findCustomerIdByReference"));
+          return Result.fail(storeFailure("findCustomerIdByReference"));
         }
       },
     );
@@ -75,7 +75,7 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
           return Result.ok(Option.fromNullable(row));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findActiveByReference"));
+          return Result.fail(storeFailure("findActiveByReference"));
         }
       },
     );

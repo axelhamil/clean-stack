@@ -10,6 +10,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { Bell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toastError } from "../api/errors/toast";
 import {
   markAllReadMutationOptions,
   markReadMutationOptions,
@@ -21,6 +22,7 @@ import {
 import { GuardHint } from "../auth/guard-hint";
 import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
+import { errorFallback } from "../i18n/get-errors-t";
 import { groupNotifications } from "./group-notifications";
 import {
   applyRead,
@@ -73,11 +75,13 @@ export function NotificationBell() {
   const markRead = useMutation({
     ...markReadMutationOptions,
     onSuccess: (_result, variables) => propagate({ ids: variables.ids }),
+    onError: (err) => toastError(err, errorFallback("markNotificationsRead")),
   });
 
   const markAllRead = useMutation({
     ...markAllReadMutationOptions,
     onSuccess: () => propagate({ all: true }),
+    onError: (err) => toastError(err, errorFallback("markAllNotificationsRead")),
   });
 
   const nothingToMarkRead = count === 0 || markAllRead.isPending;

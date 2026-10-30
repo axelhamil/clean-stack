@@ -47,7 +47,8 @@ describe("handleStreamChunk", () => {
       queryKey: ["notifications", "list"],
       refetchType: "none",
     });
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["billing", "subscription"] });
+    expect(invalidate).toHaveBeenCalledTimes(3);
   });
 
   test("un battement de coeur n'invalide rien", () => {
@@ -64,7 +65,7 @@ describe("handleStreamChunk", () => {
 
     handleStreamChunk("event: notification\ndata: 1\n\nevent: notification\ndata: 1\n\n", client);
 
-    expect(invalidate).toHaveBeenCalledTimes(4);
+    expect(invalidate).toHaveBeenCalledTimes(6);
   });
 
   test("un evenement coupe en deux fragments n'invalide qu'apres son terminateur", () => {
@@ -74,7 +75,7 @@ describe("handleStreamChunk", () => {
     expect(invalidate).not.toHaveBeenCalled();
 
     handleStreamChunk(`${rest}ication\ndata: 1\n\n`, client);
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledTimes(3);
   });
 
   test("le fragment residuel est rendu a l'appelant", () => {
@@ -91,7 +92,7 @@ describe("handleStreamChunk", () => {
 
     handleStreamChunk("event: notification\r\ndata: 1\r\n\r\n", client);
 
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledTimes(3);
   });
 });
 

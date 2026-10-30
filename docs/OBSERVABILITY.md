@@ -12,7 +12,7 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 - **Repository / service spans**: every Drizzle repo, S3, Resend method is wrapped with a Sentry span (`startSpan`) for distributed tracing. `tracesSampleRate=0` by default keeps overhead near zero; flip > 0 once a tracing backend consumes them.
 - **Request correlation across the stack**: each request's `X-Request-Id` (Hono `requestId()`) flows through an `AsyncLocalStorage` context (`shared/request-context.ts`) and is stamped onto every emitted event (`outbox_event.metadata.requestId`) → copied into `audit_log.request_id`. The same id tags the pino logs and the Sentry event, so an audit entry, its logs, and its error all join on one key, even for events emitted deep inside a BetterAuth hook where the Hono `c` isn't in scope.
 - **Release tracking** ties to `GIT_SHA` injected at CI build (shared with the `/livez` payload from Phase 0.2).
-- **NoOp by default**: without `SENTRY_DSN`, zero telemetry leaves the host. Binary on/off via env.
+- **Logs by default**: without `SENTRY_DSN`, captured errors go to the process log and zero telemetry leaves the host. Binary on/off via env.
 
 ## Architecture, one port, two impls, DI everywhere
 
@@ -26,7 +26,7 @@ apps/api/src/shared/
 
 packages/sentry-scrub/src/scrub-event.ts  scrubEvent + scrubBreadcrumb + scrubLog + IP_HEADERS, pure, shared by api and app
 
-apps/api/src/container.ts              Conditional binding: SentryInstrumentation if DSN, else NoOpInstrumentation
+apps/api/src/container.ts              Conditional binding: SentryInstrumentation if DSN, else LoggingInstrumentation
 ```
 
 Every repository / external-I/O service receives `IInstrumentation` via constructor injection (inwire). Same pattern as `IEmailService` / `IStorageService`: no service-locator, no module-level singleton, no DI override magic. `trash`-able provider swap = change 1 binding in `container.ts`.
@@ -110,7 +110,7 @@ export class DrizzleFooRepository implements IFooRepository {
 - **Multi-query methods** (e.g., `executeWipe` running 7+ DELETEs): keep only the outer span, 7 inner spans = noise. Single-statement methods always get an inner span.
 - **Span composition**: don't call sibling repo methods that themselves open spans from within a span, the inner spans become orphaned siblings rather than children. Inline the query instead.
 - **`setSpanAttributes(attrs)`** writes attributes onto the span currently open around the caller, for facts only known as the span closes (rows deleted, why it stopped), which `SpanOptions.attributes` can't express since that's open-time only. **The write is silently dropped when no span is active**: always for `NoOpInstrumentation`, and for `SentryInstrumentation` whenever the caller runs outside a `startSpan` callback. Call it from inside the span it's meant to annotate.
-- **Why no-op without `SENTRY_DSN`**: `IInstrumentation` resolves to `NoOpInstrumentation` (callback passthrough, no allocation). Zero cost beyond the function call.
+- **Why logs without `SENTRY_DSN`**: `IInstrumentation` resolves to `LoggingInstrumentation`, a `NoOpInstrumentation` (callback passthrough, no allocation) whose `capture` writes to the process log, because a `catch` in a repository logs nothing itself and a driver error must never vanish.
 - **Tracing dormant**: `SENTRY_TRACES_SAMPLE_RATE=0` (default) means even when `SENTRY_DSN` is set, spans aren't exported, they're recorded in memory by the SDK and dropped. Set > 0 only when a tracing backend consumes them.
 
 Applied to: `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `ResendEmailService`, `DrizzleRgpdRepository`, `S3StorageService`, `DrizzleWebhookEndpointRepository`, `DrizzleWebhookDeliveryRepository`, `AuditQueryService`. Use-case / application services are not wrapped, they orchestrate repos that already are.
@@ -147,17 +147,17 @@ Unexpected query/mutation errors (5xx, network) are already captured globally by
 
 ## Removability, flip one binding, no call-site change
 
-The whole Sentry stack is one DI binding plus one side-effect import. The call sites (`this.instrumentation.capture(...)`, `this.instrumentation.startSpan(...)`, `<ErrorBoundary>`) never change, they resolve to NoOp when Sentry is disabled.
+The whole Sentry stack is one DI binding plus one side-effect import. The call sites (`this.instrumentation.capture(...)`, `this.instrumentation.startSpan(...)`, `<ErrorBoundary>`) never change, they resolve to the logging binding when Sentry is disabled.
 
 To remove Sentry entirely:
 
-1. **API binding**: edit `apps/api/src/container.ts` → replace the `IInstrumentation` factory by `() => new NoOpInstrumentation()` (drop the conditional). `trash apps/api/src/shared/services/sentry-{init,instrumentation}.ts`. Remove the `import "./shared/services/sentry-init"` line from `index.ts`.
+1. **API binding**: edit `apps/api/src/container.ts` → replace the `IInstrumentation` factory by `() => new LoggingInstrumentation(logger)` (drop the conditional). `trash apps/api/src/shared/services/sentry-{init,instrumentation}.ts`. Remove the `import "./shared/services/sentry-init"` line from `index.ts`.
 2. **Front**: swap `from "./observability/sentry"` (or `"../observability/sentry"`) to the `noop` module in the five importers, `main.tsx`, `app-providers.tsx`, `observability/session-watcher.ts`, `observability/query-error-handler.ts`, `observability/report-caught-error.ts`. `trash apps/app/src/shared/observability/sentry.ts`. `error-classifier.ts`, `session-watcher.ts` and `query-error-handler.ts` stay, they only talk to the noop-able module.
 3. **Build plugin**: remove the `@sentry/vite-plugin` block from `apps/app/vite.config.ts` (revert to `plugins: [react(), tailwindcss()]`).
 4. **Packages**: `pnpm remove @sentry/bun --filter=api && pnpm remove @sentry/react @sentry/vite-plugin --filter=app`.
 5. **Env**: unset `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and drop the matching `.env.example` blocks if you like).
 
-**Validation**: `pnpm ci:check && pnpm type-check && pnpm test` must stay green. Every call site keeps working via NoOp. Zero refactor.
+**Validation**: `pnpm ci:check && pnpm type-check && pnpm test` must stay green. Every call site keeps working via the logging binding. Zero refactor.
 
 ## Provider swap, Sentry → GlitchTip / Highlight
 

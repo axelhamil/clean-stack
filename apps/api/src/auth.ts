@@ -8,7 +8,7 @@ import { passkey } from "@better-auth/passkey";
 import { type SCIMEndpoints, type SCIMPlugin, scim } from "@better-auth/scim";
 import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
-import { ac, isPersonalOrg, type OrgRole, roles } from "@packages/access-control";
+import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
@@ -50,10 +50,11 @@ import {
 import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
 import {
-  authorizeSubscriptionReference,
+  authorizeSubscriptionAction,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
+import { redirectQuery } from "./shared/auth/email-redirect";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { scimIdentityResolver, scimMembershipProjection } from "./shared/auth/scim-membership";
@@ -407,6 +408,24 @@ function requestClientIp(): string | null {
   return getClientIp()?.slice(0, 45) ?? null;
 }
 
+async function acceptStalePoliciesAtFirstVerification(userId: string): Promise<void> {
+  const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
+  if (stale.isFailure) {
+    logger.error(
+      { err: stale.getError(), userId },
+      "policy staleness check failed at verify-email",
+    );
+    return;
+  }
+  if (stale.getValue().length === 0) return;
+
+  const ip = requestClientIp() ?? undefined;
+  const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
+  if (recorded.isFailure) {
+    logger.error({ err: recorded.getError(), userId }, "policy acceptance failed at verify-email");
+  }
+}
+
 /**
  * `hooks.before` snapshots a provider's org/domain right before `/sso/delete-provider`
  * removes the row, the endpoint's response is `{ success: true }` with no provider
@@ -621,8 +640,11 @@ const authOptions = {
     sendOnSignUp: true,
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, token }) => {
-      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    beforeEmailVerification: async (user) => {
+      await acceptStalePoliciesAtFirstVerification(user.id);
+    },
+    sendVerificationEmail: async ({ user, url, token }) => {
+      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
       await dispatchEmail(
         "verify_email",
         user.email,
@@ -664,15 +686,12 @@ const authOptions = {
             .map((p) => ({ name: p.tier, priceId: p.priceId as string }));
         },
         authorizeReference: async ({ user, referenceId, action }) => {
-          if (
-            action !== "upgrade-subscription" &&
-            action !== "cancel-subscription" &&
-            action !== "restore-subscription"
-          ) {
-            return true;
-          }
+          if (referenceId === user.id) return true;
+
           const role = await findActiveMemberRole(user.id, referenceId);
-          return authorizeSubscriptionReference((role ?? undefined) as OrgRole | undefined);
+          const orgRole = ORG_ROLES.find((candidate) => candidate === role);
+
+          return authorizeSubscriptionAction(action, orgRole);
         },
         onSubscriptionComplete: async ({ subscription, plan }) => {
           await emitSubscriptionEvent(
@@ -714,8 +733,8 @@ const authOptions = {
     bearer(),
     twoFactor({ totpOptions: TOTP_OPTIONS }),
     magicLink({
-      sendMagicLink: async ({ email, token }) => {
-        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;
+      sendMagicLink: async ({ email, token, url }) => {
+        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
         await emit(EventTypes.USER_MAGIC_LINK_REQUESTED, "user", email, { email });
         await dispatchEmail(
           "magic_link",
@@ -1197,6 +1216,17 @@ const authOptions = {
         return;
       }
 
+      if (path === "/verify-email") {
+        const verified = ctx.context.newSession?.user;
+        if (verified?.emailVerified) {
+          await emit(EventTypes.USER_EMAIL_VERIFIED, "user", verified.id, {
+            userId: verified.id,
+            email: verified.email,
+          });
+        }
+        return;
+      }
+
       const userId = ctx.context.session?.user.id;
       if (!userId) return;
 
@@ -1227,29 +1257,6 @@ const authOptions = {
         const passkeyId = body?.id;
         if (typeof passkeyId === "string") {
           await emit(EventTypes.USER_PASSKEY_REMOVED, "user", userId, { userId, passkeyId });
-        }
-        return;
-      }
-      if (path === "/verify-email") {
-        const email = ctx.context.session?.user.email;
-        if (email) {
-          await emit(EventTypes.USER_EMAIL_VERIFIED, "user", userId, { userId, email });
-        }
-        const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
-        if (stale.isFailure) {
-          logger.error(
-            { err: stale.getError(), userId },
-            "policy staleness check failed at verify-email",
-          );
-        } else if (stale.getValue().length > 0) {
-          const ip = requestClientIp() ?? undefined;
-          const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
-          if (recorded.isFailure) {
-            logger.error(
-              { err: recorded.getError(), userId },
-              "policy acceptance failed at verify-email",
-            );
-          }
         }
         return;
       }

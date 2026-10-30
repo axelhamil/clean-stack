@@ -85,7 +85,7 @@ mock.module("../../../shared/middleware/auth.middleware", () => ({
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   requireAuth: async (c: any, next: () => Promise<void>) => {
     c.set("user", { id: "user-1" });
-    c.set("session", { activeOrganizationId: ORG_ID, activeOrganizationRole: "owner" });
+    c.set("session", { activeOrganizationId: ORG_ID });
     await next();
   },
 }));

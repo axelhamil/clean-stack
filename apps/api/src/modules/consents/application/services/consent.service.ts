@@ -149,7 +149,6 @@ export class ConsentService {
       return Result.fail({
         code: "CONSENT_PROVIDER_FAILURE",
         message: "cookie consent reconcile failed",
-        metadata: { cause: err instanceof Error ? err.message : String(err) },
       });
     }
   }
@@ -181,7 +180,6 @@ export class ConsentService {
       return Result.fail({
         code: "CONSENT_PROVIDER_FAILURE",
         message: failureMessage,
-        metadata: { cause: err instanceof Error ? err.message : String(err) },
       });
     }
   }
