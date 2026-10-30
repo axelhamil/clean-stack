@@ -100,7 +100,8 @@ export default {
     signOutFailed: "Sign-out failed",
   },
   impersonation: {
-    activeSession: "Active impersonation session: acting as <name>{{name}}</name>. {{remaining}}",
+    activeSession:
+      "Active impersonation session: acting as <name>{{name}}</name>. {{remaining}}. Changes are blocked in this session.",
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",
@@ -117,6 +118,7 @@ export default {
     preferencesTitle: "Cookie preferences",
   },
   cookieConsent: {
+    necessaryAlwaysOnHint: "Strictly necessary cookies cannot be turned off.",
     title: "Manage your cookie preferences",
     save: "Save preferences",
     withdraw: "Withdraw all consent",
@@ -243,6 +245,7 @@ export default {
   notifications: {
     title: "Notifications",
     markAllRead: "Mark all as read",
+    nothingToMarkRead: "No unread notifications.",
     empty: "You are all caught up.",
     unreadNone: "Notifications, none unread",
     unreadLabel_one: "Notifications, {{count}} unread",
@@ -302,6 +305,8 @@ export default {
       success: "Success",
       failed: "Failed",
       deadLetter: "Dead letter",
+      failedHint: "The last attempt failed, another one is scheduled.",
+      deadLetterHint: "Every retry failed, this delivery will not be attempted again.",
     },
   },
   pricing: {
@@ -321,5 +326,7 @@ export default {
     currentPlanCta: "Current plan",
     getStarted: "Get started",
     upgrade: "Upgrade",
+    upgradeNeedsOrgHint: "Select an organization to upgrade.",
+    upgradeUnavailableHint: "This plan is not available for purchase yet.",
   },
 } as const;

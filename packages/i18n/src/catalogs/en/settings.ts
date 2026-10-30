@@ -80,6 +80,9 @@ export default {
     deviceBound: "Device-bound",
     synced: "Synced",
     backedUp: "Backed up",
+    deviceBoundHint: "Stored on this device only: lost if the device is lost.",
+    syncedHint: "Synced across your devices by your passkey manager.",
+    backedUpHint: "Your passkey manager keeps a backup of this passkey.",
     added: "Added {{date}}",
     remove: "Remove passkey",
     addedToast: "Passkey added",
@@ -197,6 +200,7 @@ export default {
     inAppAriaLabel: "In-app notifications for {{category}}",
     emailAriaLabel: "Email notifications for {{category}}",
     emailFrequencyAriaLabel: "Email frequency for {{category}}",
+    emailFrequencyDisabledHint: "Turn on email for this category to choose a frequency.",
     enforceAriaLabel: "Enforce {{category}} for all members",
     frequency: {
       immediate: "Immediately",
@@ -252,6 +256,7 @@ export default {
     selectMemberPlaceholder: "Select a member…",
     currentRoleSuffix: "(current role: {{role}})",
     transferAndLeaveAction: "Transfer and leave",
+    transferSelectMemberHint: "Select the member who takes over first.",
     leftOrgToast: "Left organization",
     leaveFailed: "Failed to leave",
     transferAndLeaveFailed: "Failed to transfer and leave",
@@ -389,6 +394,8 @@ export default {
     eventTypePicker: {
       allEvents: "All events (*)",
       groupWildcard: "{{group}}.* (all {{group}} events)",
+      allEventsNote: "Every event is included. Clear this box to pick events.",
+      groupNote: "Every event in this group is included.",
     },
     form: {
       urlLabel: "Endpoint URL",

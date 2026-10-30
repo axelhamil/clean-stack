@@ -22,21 +22,18 @@ describe("describeImpersonation", () => {
 
   it("describes the control when impersonation is what freezes it", () => {
     expect(describeImpersonation(blocked)).toEqual({
-      title: "Action unavailable",
       "aria-describedby": "reason-1",
     });
   });
 
   it("stays silent when something else already disables the control", () => {
     expect(describeImpersonation(blocked, true)).toEqual({
-      title: undefined,
       "aria-describedby": undefined,
     });
   });
 
   it("stays silent when there is no impersonation", () => {
     expect(describeImpersonation(free)).toEqual({
-      title: undefined,
       "aria-describedby": undefined,
     });
   });

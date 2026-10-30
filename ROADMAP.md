@@ -17,7 +17,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | Order | Phase | Status | What | Why it survived the cut |
 |---|---|---|---|---|
 | 1 | **Phase J** | Delivered | Front redesign on shadcn/ui, one design system in `@packages/ui`: sober tool direction, every screen rebuilt | The cloner's first impression is the app shell |
-| 2 | **Tooltips pass** | Open | Tooltips and contextual help everywhere they add something: icon-only buttons, truncated values, disabled controls, technical terms | A dense pro tool must explain itself in place; today most icons and truncated values say nothing on hover or focus |
+| 2 | **Tooltips pass** | Delivered | Tooltips and contextual help everywhere they add something: icon-only buttons, truncated values, disabled controls, technical terms | A dense pro tool must explain itself in place; today most icons and truncated values say nothing on hover or focus |
 | 3 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
 | 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 
@@ -43,7 +43,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Tooltips pass
 
-- **Status**: open.
+- **Status**: delivered.
 - **Date**: after Phase J, before the review pass.
 - **Why**: icon-only buttons, truncated values and disabled controls leave the user guessing, and a sober interface hides more behind icons than a loud one.
 - **Scope**: an inventory of every screen, then the existing `Tooltip` primitive on icon-only buttons, truncated values (full value on hover and focus), disabled controls (why it is disabled), technical terms and status badges, plus keyboard shortcuts where one exists. Every text goes through `t()` with locale parity.

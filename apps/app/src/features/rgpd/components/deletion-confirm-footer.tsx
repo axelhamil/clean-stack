@@ -4,6 +4,7 @@ import {
   AlertDialogFooter,
 } from "@packages/ui/components/ui/alert-dialog";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 
@@ -19,14 +20,16 @@ export function DeletionConfirmFooter({ isPending }: DeletionConfirmFooterProps)
     <>
       <AlertDialogFooter>
         <AlertDialogCancel type="button">{t("common:actions.cancel")}</AlertDialogCancel>
-        <AlertDialogAction
-          type="submit"
-          variant="destructive"
-          disabled={isPending || guard.blocked}
-          {...guard.describeProps(isPending)}
-        >
-          {isPending ? t("deletion.submitting") : t("deletion.confirm")}
-        </AlertDialogAction>
+        <GuardHint guard={guard} otherwiseDisabled={isPending}>
+          <AlertDialogAction
+            type="submit"
+            variant="destructive"
+            disabled={isPending || guard.blocked}
+            {...guard.describeProps(isPending)}
+          >
+            {isPending ? t("deletion.submitting") : t("deletion.confirm")}
+          </AlertDialogAction>
+        </GuardHint>
       </AlertDialogFooter>
       <ImpersonationReason guard={guard} />
     </>

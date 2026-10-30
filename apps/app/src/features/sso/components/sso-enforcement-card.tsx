@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { Can } from "../../../shared/auth/can";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { errorFallback } from "../../../shared/i18n/get-errors-t";
@@ -50,13 +51,15 @@ export function SsoEnforcementCard() {
         description={t("sso.enforcementCard.description")}
       >
         <div className="flex items-center gap-3">
-          <Switch
-            aria-label={t("sso.enforcementCard.switchAriaLabel")}
-            checked={enforced}
-            disabled={otherwiseFrozen || guard.blocked}
-            {...guard.describeProps(otherwiseFrozen)}
-            onCheckedChange={(next) => setEnforcement.mutate(next)}
-          />
+          <GuardHint guard={guard} otherwiseDisabled={otherwiseFrozen}>
+            <Switch
+              aria-label={t("sso.enforcementCard.switchAriaLabel")}
+              checked={enforced}
+              disabled={otherwiseFrozen || guard.blocked}
+              {...guard.describeProps(otherwiseFrozen)}
+              onCheckedChange={(next) => setEnforcement.mutate(next)}
+            />
+          </GuardHint>
           <TypographyInline size="sm">
             {enforced
               ? t("sso.enforcementCard.enforcedLabel")

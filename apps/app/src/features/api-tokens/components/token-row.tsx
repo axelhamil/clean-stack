@@ -3,6 +3,7 @@ import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { TypographyInline } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { EMPTY_VALUE } from "../../../shared/utils";
@@ -57,15 +58,17 @@ export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: Toke
       </TableCell>
       <TableCell>
         {!isRevoked && (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={isRevoking || guard.blocked}
-            {...guard.describeProps(isRevoking)}
-            onClick={() => onRevoke(token.id)}
-          >
-            {t("apiTokens.revokeAction")}
-          </Button>
+          <GuardHint guard={guard} otherwiseDisabled={isRevoking}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isRevoking || guard.blocked}
+              {...guard.describeProps(isRevoking)}
+              onClick={() => onRevoke(token.id)}
+            >
+              {t("apiTokens.revokeAction")}
+            </Button>
+          </GuardHint>
         )}
       </TableCell>
     </TableRow>

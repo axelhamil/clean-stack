@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../shared/api/queries/org-members";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
+import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useEntitlements } from "../../shared/auth/use-entitlements";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
@@ -39,13 +40,15 @@ function BillingPage() {
         title={t("billing.pageTitle")}
         actions={
           isPaid && (
-            <Button
-              onClick={() => portal.mutate()}
-              disabled={portal.isPending || guard.blocked}
-              {...guard.describeProps(portal.isPending)}
-            >
-              {t("billing.manageBilling")}
-            </Button>
+            <GuardHint guard={guard} otherwiseDisabled={portal.isPending}>
+              <Button
+                onClick={() => portal.mutate()}
+                disabled={portal.isPending || guard.blocked}
+                {...guard.describeProps(portal.isPending)}
+              >
+                {t("billing.manageBilling")}
+              </Button>
+            </GuardHint>
           )
         }
       />

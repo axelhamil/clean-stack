@@ -1,5 +1,6 @@
 import { CONSENT_CATEGORIES, OPTIONAL_CATEGORIES } from "@packages/cookie-consent";
 import { Button } from "@packages/ui/components/ui/button";
+import { Hint } from "@packages/ui/components/ui/hint";
 import { Label } from "@packages/ui/components/ui/label";
 import { Switch } from "@packages/ui/components/ui/switch";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
@@ -81,15 +82,20 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
                   {t(`cookieConsent.categories.${cat}.description` as const)}
                 </TypographyMuted>
               </div>
-              <Switch
-                id={`consent-${cat}`}
-                checked={checked}
-                onCheckedChange={(val) => {
-                  if (!isNecessary) setEnabled((prev) => ({ ...prev, [cat]: val }));
-                }}
-                disabled={isNecessary || isPending}
-                aria-label={label}
-              />
+              <Hint
+                text={isNecessary ? t("cookieConsent.necessaryAlwaysOnHint") : undefined}
+                showOnTouch={false}
+              >
+                <Switch
+                  id={`consent-${cat}`}
+                  checked={checked}
+                  onCheckedChange={(val) => {
+                    if (!isNecessary) setEnabled((prev) => ({ ...prev, [cat]: val }));
+                  }}
+                  disabled={isNecessary || isPending}
+                  aria-label={label}
+                />
+              </Hint>
             </div>
           );
         })}

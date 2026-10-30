@@ -6,6 +6,7 @@ import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { sessionQueryOptions } from "../../../shared/api/queries/session";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useUpdateAvatar } from "../hooks/use-update-avatar";
 
@@ -64,16 +65,18 @@ export function UploadAvatar({ name, guard }: UploadAvatarProps) {
         className="hidden"
         onChange={handleFileChange}
       />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={mutation.isPending || guard.blocked}
-        {...guard.describeProps(mutation.isPending)}
-        onClick={() => inputRef.current?.click()}
-      >
-        {mutation.isPending ? t("account.uploading") : t("account.changeAvatar")}
-      </Button>
+      <GuardHint guard={guard} otherwiseDisabled={mutation.isPending}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={mutation.isPending || guard.blocked}
+          {...guard.describeProps(mutation.isPending)}
+          onClick={() => inputRef.current?.click()}
+        >
+          {mutation.isPending ? t("account.uploading") : t("account.changeAvatar")}
+        </Button>
+      </GuardHint>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
@@ -80,32 +81,36 @@ export function ScimConnectionCard() {
               : t("sso.scimCard.notConnected")}
           </TypographyMuted>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={pending || guard.blocked}
-              {...guard.describeProps(pending)}
-              onClick={() => issue.mutate()}
-            >
-              {connection ? t("sso.scimCard.rotateAction") : t("sso.scimCard.generateAction")}
-            </Button>
+            <GuardHint guard={guard} otherwiseDisabled={pending}>
+              <Button
+                variant="outline"
+                disabled={pending || guard.blocked}
+                {...guard.describeProps(pending)}
+                onClick={() => issue.mutate()}
+              >
+                {connection ? t("sso.scimCard.rotateAction") : t("sso.scimCard.generateAction")}
+              </Button>
+            </GuardHint>
             {connection && (
-              <DestructiveActionDialog
-                trigger={
-                  <Button
-                    variant="destructive"
-                    disabled={pending || guard.blocked}
-                    {...guard.describeProps(pending)}
-                  >
-                    {t("sso.scimCard.disconnectAction")}
-                  </Button>
-                }
-                title={t("sso.scimCard.disconnectDialogTitle")}
-                description={t("sso.scimCard.disconnectDialogDescription")}
-                actionLabel={t("sso.scimCard.disconnectAction")}
-                cancelLabel={t("common:actions.cancel")}
-                isPending={disconnect.isPending}
-                onConfirm={() => disconnect.mutate()}
-              />
+              <GuardHint guard={guard} otherwiseDisabled={pending}>
+                <DestructiveActionDialog
+                  trigger={
+                    <Button
+                      variant="destructive"
+                      disabled={pending || guard.blocked}
+                      {...guard.describeProps(pending)}
+                    >
+                      {t("sso.scimCard.disconnectAction")}
+                    </Button>
+                  }
+                  title={t("sso.scimCard.disconnectDialogTitle")}
+                  description={t("sso.scimCard.disconnectDialogDescription")}
+                  actionLabel={t("sso.scimCard.disconnectAction")}
+                  cancelLabel={t("common:actions.cancel")}
+                  isPending={disconnect.isPending}
+                  onConfirm={() => disconnect.mutate()}
+                />
+              </GuardHint>
             )}
           </div>
         </>

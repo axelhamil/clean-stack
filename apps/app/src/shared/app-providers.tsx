@@ -1,4 +1,5 @@
 import { Toaster } from "@packages/ui/components/ui/sonner";
+import { TooltipProvider } from "@packages/ui/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "@tanstack/react-router";
@@ -22,6 +23,8 @@ import { ErrorBoundary } from "./observability/sentry";
 import { watchSession } from "./observability/session-watcher";
 import { useTheme } from "./theme/use-theme";
 
+const TOOLTIP_OPEN_DELAY_MS = 300;
+
 watchSession(queryClient);
 
 onAuthChange(async () => {
@@ -44,9 +47,11 @@ export function AppProviders({ i18n }: AppProvidersProps) {
       <I18nextProvider i18n={i18n}>
         <ErrorBoundary fallback={<AppErrorFallback />}>
           <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
+            <TooltipProvider delayDuration={TOOLTIP_OPEN_DELAY_MS}>
+              <RouterProvider router={router} />
+              <CookieBanner />
+            </TooltipProvider>
             <ThemedToaster />
-            <CookieBanner />
             <LocaleSync />
             <ZodLocale />
             <AnalyticsScripts />

@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { toastError } from "../../../shared/api/errors/toast";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { changeLocale } from "../../../shared/i18n/i18n";
@@ -51,15 +52,17 @@ export function LanguageCard() {
           </SelectContent>
         </Select>
       </div>
-      <Button
-        variant="outline"
-        className="self-start"
-        disabled={otherwiseDisabled || guard.blocked}
-        {...guard.describeProps(otherwiseDisabled)}
-        onClick={() => mutation.mutate({ locale: pending ?? current })}
-      >
-        {t("common:actions.save")}
-      </Button>
+      <GuardHint guard={guard} otherwiseDisabled={otherwiseDisabled} className="self-start">
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={otherwiseDisabled || guard.blocked}
+          {...guard.describeProps(otherwiseDisabled)}
+          onClick={() => mutation.mutate({ locale: pending ?? current })}
+        >
+          {t("common:actions.save")}
+        </Button>
+      </GuardHint>
       <ImpersonationReason guard={guard} />
     </SettingsSection>
   );

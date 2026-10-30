@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { toastError } from "../../shared/api/errors/toast";
 import { Can } from "../../shared/auth/can";
 import { ensureOrgPermission } from "../../shared/auth/ensure-org-permission";
+import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useAuthorization } from "../../shared/auth/use-authorization";
@@ -134,13 +135,15 @@ function WebhooksPage() {
         }
         actions={
           <Can requires={{ webhooks: ["write"] }}>
-            <Button
-              onClick={() => setCreating(true)}
-              disabled={guard.blocked}
-              {...guard.describeProps()}
-            >
-              {t("settings:webhooks.addEndpoint")}
-            </Button>
+            <GuardHint guard={guard}>
+              <Button
+                onClick={() => setCreating(true)}
+                disabled={guard.blocked}
+                {...guard.describeProps()}
+              >
+                {t("settings:webhooks.addEndpoint")}
+              </Button>
+            </GuardHint>
           </Can>
         }
       />

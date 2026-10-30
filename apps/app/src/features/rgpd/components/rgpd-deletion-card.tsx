@@ -19,6 +19,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toastError } from "../../../shared/api/errors/toast";
 import { preflightDeletionQueryOptions } from "../../../shared/api/queries/account-deletion";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
@@ -66,16 +67,18 @@ function PendingState({ until }: PendingStateProps) {
           {t("deletion.anonymizedWarning", { date: formatDate(until) })}
         </AlertDescription>
       </Alert>
-      <Button
-        type="button"
-        variant="outline"
-        className="self-start"
-        disabled={cancel.isPending || guard.blocked}
-        {...guard.describeProps(cancel.isPending)}
-        onClick={() => cancel.mutate()}
-      >
-        {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}
-      </Button>
+      <GuardHint guard={guard} otherwiseDisabled={cancel.isPending} className="self-start">
+        <Button
+          type="button"
+          variant="outline"
+          className="self-start"
+          disabled={cancel.isPending || guard.blocked}
+          {...guard.describeProps(cancel.isPending)}
+          onClick={() => cancel.mutate()}
+        >
+          {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}
+        </Button>
+      </GuardHint>
       <ImpersonationReason guard={guard} />
     </SettingsSection>
   );

@@ -12,6 +12,7 @@ import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { DisableTwoFactorForm } from "../forms/disable-two-factor-form";
@@ -35,12 +36,14 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
           {enabled ? t("twoFactor.enabled") : t("twoFactor.off")}
         </Badge>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" disabled={guard.blocked} {...guard.describeProps()}>
-              {enabled ? <ShieldOffIcon /> : <ShieldCheckIcon />}
-              {action}
-            </Button>
-          </DialogTrigger>
+          <GuardHint guard={guard}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={guard.blocked} {...guard.describeProps()}>
+                {enabled ? <ShieldOffIcon /> : <ShieldCheckIcon />}
+                {action}
+              </Button>
+            </DialogTrigger>
+          </GuardHint>
           <DialogContent closeLabel={tCommon("actions.close")}>
             <DialogHeader>
               <DialogTitle>{action}</DialogTitle>

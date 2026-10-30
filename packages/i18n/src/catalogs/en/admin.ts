@@ -56,6 +56,7 @@ export default {
       roleOptionUser: "User",
       roleOptionAdmin: "Platform admin",
       changeRoleSubmit: "Change role",
+      sameRoleHint: "Choose a role different from the current one.",
       changeRoleSuccessToast: "Role updated.",
     },
     sessions: {
@@ -72,6 +73,7 @@ export default {
     banForm: {
       reasonLabel: "Reason",
       reasonPlaceholder: "Reason for suspension…",
+      reasonRequired: "Enter a reason for the suspension first.",
       durationLabel: "Duration",
       duration24h: "24 hours",
       duration7d: "7 days",
@@ -80,6 +82,7 @@ export default {
     impersonateForm: {
       reasonLabel: "Reason",
       reasonPlaceholder: "Describe the reason for impersonation…",
+      reasonRequired: "Enter a reason for the impersonation first.",
       ticketRefLabel: "Ticket reference (optional)",
       // Format example for the admin, not copy, kept identical in both
       // locales and listed in ALLOWED_IDENTICAL.
@@ -152,7 +155,11 @@ export default {
     chain: {
       checking: "Checking chain…",
       verified: "Chain verified ✓",
+      verifiedHint:
+        "Every audit entry still matches the hash of the one before it: nothing was altered.",
       broken: "Broken at #{{sequence}}",
+      brokenHint:
+        "An audit entry no longer matches the hash of the one before it: the log may have been altered.",
     },
     metadata: {
       actorLabel: "Actor",

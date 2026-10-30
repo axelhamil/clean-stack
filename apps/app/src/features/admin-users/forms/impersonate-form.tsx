@@ -8,6 +8,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@packages/ui/components/ui/form";
+import { Hint } from "@packages/ui/components/ui/hint";
 import { Input } from "@packages/ui/components/ui/input";
 import { Textarea } from "@packages/ui/components/ui/textarea";
 import { useForm } from "react-hook-form";
@@ -58,9 +59,14 @@ export function ImpersonateForm({ isPending, onSubmit }: ImpersonateFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" className="self-end" disabled={!reason.trim() || isPending}>
-          {t("users.impersonateForm.submit")}
-        </Button>
+        <Hint
+          text={!reason.trim() ? t("users.impersonateForm.reasonRequired") : undefined}
+          className="self-end"
+        >
+          <Button type="submit" className="self-end" disabled={!reason.trim() || isPending}>
+            {t("users.impersonateForm.submit")}
+          </Button>
+        </Hint>
       </form>
     </Form>
   );

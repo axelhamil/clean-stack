@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { Hint } from "@packages/ui/components/ui/hint";
 import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { Skeleton, SkeletonGroup } from "@packages/ui/components/ui/skeleton";
 import {
@@ -95,6 +96,11 @@ interface PricingTableProps {
 
 export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: PricingTableProps) {
   const { t, i18n } = useTranslation("common");
+  const upgradeHint = (organizationId: string | null | undefined, priceId: string | null) => {
+    if (!organizationId) return t("pricing.upgradeNeedsOrgHint");
+    if (priceId === null) return t("pricing.upgradeUnavailableHint");
+    return undefined;
+  };
   const { data: plans = [], isPending, isLoadingError } = useQuery(plansQueryOptions);
   const navigate = useNavigate();
   const upgrade = useMutation(upgradeSubscriptionMutationOptions);
@@ -153,16 +159,19 @@ export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: Pric
                   {t("pricing.getStarted")}
                 </Button>
               ) : (
-                <Button
-                  variant={ctaVariant}
-                  className="w-full"
-                  disabled={!activeOrgId || plan.priceId === null || upgrade.isPending}
-                  onClick={() =>
-                    activeOrgId && upgrade.mutate({ tier: plan.tier, organizationId: activeOrgId })
-                  }
-                >
-                  {t("pricing.upgrade")}
-                </Button>
+                <Hint text={upgradeHint(activeOrgId, plan.priceId)} className="w-full">
+                  <Button
+                    variant={ctaVariant}
+                    className="w-full"
+                    disabled={!activeOrgId || plan.priceId === null || upgrade.isPending}
+                    onClick={() =>
+                      activeOrgId &&
+                      upgrade.mutate({ tier: plan.tier, organizationId: activeOrgId })
+                    }
+                  >
+                    {t("pricing.upgrade")}
+                  </Button>
+                </Hint>
               )}
             </CardFooter>
           </Card>

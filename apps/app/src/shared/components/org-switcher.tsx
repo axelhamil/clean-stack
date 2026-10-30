@@ -10,6 +10,8 @@ import {
 } from "@packages/ui/components/ui/command";
 import { InitialsAvatar } from "@packages/ui/components/ui/initials-avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@packages/ui/components/ui/tooltip";
+import { useTruncationTooltip } from "@packages/ui/components/ui/truncated-text";
 import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -29,6 +31,8 @@ export function OrgSwitcher() {
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
   const { switchOrg, isPending } = useSetActiveOrg();
   const [open, setOpen] = useState(false);
+  const activeOrgLabel = activeOrg?.name ?? t("orgSwitcher.selectPlaceholder");
+  const name = useTruncationTooltip<HTMLElement>(activeOrgLabel);
 
   const handleSwitch = async (organizationId: string) => {
     setOpen(false);
@@ -44,15 +48,20 @@ export function OrgSwitcher() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-9 min-w-0 shrink gap-2 px-2">
-          <InitialsAvatar initials={activeOrg ? initialsOf(activeOrg.name) : "?"} />
-          <TypographySmall className="min-w-0 max-w-32 truncate">
-            {activeOrg?.name ?? t("orgSwitcher.selectPlaceholder")}
-          </TypographySmall>
-          <ChevronsUpDown className="size-3.5 text-muted-foreground" />
-        </Button>
-      </PopoverTrigger>
+      <Tooltip {...name.tooltipProps}>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-9 min-w-0 shrink gap-2 px-2">
+              <InitialsAvatar initials={activeOrg ? initialsOf(activeOrg.name) : "?"} />
+              <TypographySmall ref={name.ref} className="min-w-0 max-w-32 truncate">
+                {activeOrgLabel}
+              </TypographySmall>
+              <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{activeOrgLabel}</TooltipContent>
+      </Tooltip>
       <PopoverContent align="start" className="w-64 p-0">
         <Command>
           <CommandInput placeholder={t("orgSwitcher.searchPlaceholder")} />
@@ -67,7 +76,7 @@ export function OrgSwitcher() {
                   disabled={isPending}
                 >
                   <InitialsAvatar size="xs" initials={initialsOf(org.name)} />
-                  <span className="flex-1 truncate">{org.name}</span>
+                  <span className="min-w-0 flex-1 break-words">{org.name}</span>
                   {org.id === activeOrg?.id && <Check className="size-4 text-muted-foreground" />}
                 </CommandItem>
               ))}

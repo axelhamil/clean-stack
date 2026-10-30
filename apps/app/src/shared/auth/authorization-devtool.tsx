@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/ui/card";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, X } from "lucide-react";
@@ -50,9 +51,14 @@ export function AuthorizationDevTool() {
               Role: <Badge variant="secondary">{role ?? "none"}</Badge> · Org: {org?.name ?? "none"}
             </CardDescription>
             <CardAction>
-              <Button variant="ghost" size="icon" className="size-7" onClick={() => setOpen(false)}>
+              <IconButton
+                variant="ghost"
+                label="Close authorization panel"
+                className="size-7"
+                onClick={() => setOpen(false)}
+              >
                 <X className="size-3.5" />
-              </Button>
+              </IconButton>
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-xs">

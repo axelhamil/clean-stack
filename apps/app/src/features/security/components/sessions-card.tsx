@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LogOutIcon, MonitorIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import {
   type ImpersonationGuard,
@@ -76,16 +77,18 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
         <TypographyMuted>{t("sessions.empty")}</TypographyMuted>
       )}
       {others.length > 0 && (
-        <Button
-          variant="outline"
-          className="self-start"
-          onClick={() => revokeOthers.mutate()}
-          disabled={revokeOthers.isPending || guard.blocked}
-          {...guard.describeProps(revokeOthers.isPending)}
-        >
-          <LogOutIcon />
-          {t("sessions.signOutOthers")}
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={revokeOthers.isPending} className="self-start">
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={() => revokeOthers.mutate()}
+            disabled={revokeOthers.isPending || guard.blocked}
+            {...guard.describeProps(revokeOthers.isPending)}
+          >
+            <LogOutIcon />
+            {t("sessions.signOutOthers")}
+          </Button>
+        </GuardHint>
       )}
       <ImpersonationReason guard={guard} />
     </SettingsSection>
@@ -126,16 +129,18 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt, guard }
       </ListRowMedia>
       {!isCurrent && (
         <ListRowAction>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => mutation.mutate(token)}
-            disabled={mutation.isPending || guard.blocked}
-            {...guard.describeProps(mutation.isPending)}
-          >
-            {t("sessions.revoke")}
-          </Button>
+          <GuardHint guard={guard} otherwiseDisabled={mutation.isPending}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => mutation.mutate(token)}
+              disabled={mutation.isPending || guard.blocked}
+              {...guard.describeProps(mutation.isPending)}
+            >
+              {t("sessions.revoke")}
+            </Button>
+          </GuardHint>
         </ListRowAction>
       )}
     </ListRow>

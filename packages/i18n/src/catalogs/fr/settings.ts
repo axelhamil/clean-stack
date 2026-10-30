@@ -80,6 +80,9 @@ export default {
     deviceBound: "Liée à l'appareil",
     synced: "Synchronisée",
     backedUp: "Sauvegardée",
+    deviceBoundHint: "Enregistrée sur cet appareil uniquement : perdue si l'appareil est perdu.",
+    syncedHint: "Synchronisée entre vos appareils par votre gestionnaire de clés d'accès.",
+    backedUpHint: "Votre gestionnaire de clés d'accès conserve une sauvegarde de cette clé.",
     added: "Ajoutée le {{date}}",
     remove: "Supprimer la clé d'accès",
     addedToast: "Clé d'accès ajoutée",
@@ -208,6 +211,8 @@ export default {
     inAppAriaLabel: "Notifications dans l'application pour la catégorie {{category}}",
     emailAriaLabel: "Notifications par e-mail pour la catégorie {{category}}",
     emailFrequencyAriaLabel: "Fréquence des e-mails pour la catégorie {{category}}",
+    emailFrequencyDisabledHint:
+      "Activez les e-mails pour cette catégorie pour choisir une fréquence.",
     enforceAriaLabel: "Imposer la catégorie {{category}} à tous les membres",
     frequency: {
       immediate: "Immédiatement",
@@ -264,6 +269,7 @@ export default {
     selectMemberPlaceholder: "Sélectionnez un membre…",
     currentRoleSuffix: "(rôle actuel : {{role}})",
     transferAndLeaveAction: "Transférer et quitter",
+    transferSelectMemberHint: "Sélectionnez d'abord le membre qui reprend l'organisation.",
     leftOrgToast: "Organisation quittée",
     leaveFailed: "Impossible de quitter l'organisation",
     transferAndLeaveFailed: "Impossible de transférer la propriété et de quitter l'organisation",
@@ -405,6 +411,8 @@ export default {
     eventTypePicker: {
       allEvents: "Tous les événements (*)",
       groupWildcard: "{{group}}.* (tous les événements du groupe {{group}})",
+      allEventsNote: "Tous les événements sont inclus. Décochez cette case pour les choisir.",
+      groupNote: "Tous les événements de ce groupe sont inclus.",
     },
     form: {
       urlLabel: "URL du point de terminaison",

@@ -1,5 +1,4 @@
 import { Badge } from "@packages/ui/components/ui/badge";
-import { Button } from "@packages/ui/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,13 +6,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@packages/ui/components/ui/dropdown-menu";
+import { Hint } from "@packages/ui/components/ui/hint";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@packages/ui/components/ui/tooltip";
+import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
 import { TypographyInline } from "@packages/ui/components/ui/typography";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -56,29 +52,20 @@ export function EndpointRow({
 
   return (
     <TableRow>
-      <TableCell className="max-w-32 truncate sm:max-w-xs">
-        <TypographyInline font="mono" title={endpoint.url}>
-          {endpoint.url}
-        </TypographyInline>
+      <TableCell>
+        <TruncatedText value={endpoint.url} font="mono" className="max-w-32 sm:max-w-xs" />
         <TypographyInline tone="muted" size="xs" className="block sm:hidden">
           {formatDate(endpoint.createdAt)}
         </TypographyInline>
       </TableCell>
       <TableCell>
         {status === "auto-disabled" ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="destructive">
-                  <TriangleAlertIcon />
-                  {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                {t("settings:webhooks.endpointRow.autoDisabledTooltip")}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Hint text={t("settings:webhooks.endpointRow.autoDisabledTooltip")}>
+            <Badge variant="destructive">
+              <TriangleAlertIcon />
+              {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
+            </Badge>
+          </Hint>
         ) : (
           <Badge variant={status === "active" ? "default" : "secondary"}>
             {t(ENDPOINT_STATUS_KEYS[status])}
@@ -90,10 +77,9 @@ export function EndpointRow({
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <IconButton variant="ghost" label={t("settings:webhooks.endpointRow.openActions")}>
               <MoreHorizontalIcon />
-              <span className="sr-only">{t("settings:webhooks.endpointRow.openActions")}</span>
-            </Button>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onSelect(endpoint)}>

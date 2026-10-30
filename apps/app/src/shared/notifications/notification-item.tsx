@@ -8,6 +8,7 @@ import {
 } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../auth/guard-hint";
 import type { ImpersonationGuard } from "../auth/use-impersonation-guard";
 import { useFormatDate } from "../i18n/use-format-date";
 import type { NotificationGroup } from "./group-notifications";
@@ -27,19 +28,23 @@ export function NotificationItem({ group, onRead, guard }: NotificationItemProps
   return (
     <ListRow>
       <ListRowContent>
-        <ListRowButton
-          onClick={() => unread && onRead(group.ids)}
-          disabled={!unread || guard.blocked}
-          {...guard.describeProps(!unread)}
-        >
-          <TypographySmall>{labelOf(latest)}</TypographySmall>
-          <ListRowMeta>
-            <TypographyMuted>{formatDate(latest.createdAt)}</TypographyMuted>
-            {count > 1 && (
-              <TypographyMuted>{t("notifications.andMore", { count: count - 1 })}</TypographyMuted>
-            )}
-          </ListRowMeta>
-        </ListRowButton>
+        <GuardHint guard={guard} otherwiseDisabled={!unread} className="w-full">
+          <ListRowButton
+            onClick={() => unread && onRead(group.ids)}
+            disabled={!unread || guard.blocked}
+            {...guard.describeProps(!unread)}
+          >
+            <TypographySmall>{labelOf(latest)}</TypographySmall>
+            <ListRowMeta>
+              <TypographyMuted>{formatDate(latest.createdAt)}</TypographyMuted>
+              {count > 1 && (
+                <TypographyMuted>
+                  {t("notifications.andMore", { count: count - 1 })}
+                </TypographyMuted>
+              )}
+            </ListRowMeta>
+          </ListRowButton>
+        </GuardHint>
       </ListRowContent>
       <ListRowAction>
         <Badge variant={unread ? "default" : "secondary"}>

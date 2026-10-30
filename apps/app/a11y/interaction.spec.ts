@@ -93,6 +93,52 @@ test.describe("signed in", () => {
     });
   }
 
+  test("opens an icon button tooltip on keyboard focus and closes it with Escape", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard");
+
+    const toggle = page.getByRole("button", { name: /Switch to (dark|light) theme/ });
+    await tabTo(page, toggle);
+
+    const tooltip = page.getByRole("tooltip").filter({ hasText: /Switch to (dark|light) theme/ });
+    await expect(tooltip).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(tooltip).toBeHidden();
+    await expect(toggle).toBeFocused();
+  });
+
+  test("closes a dialog with one Escape while a tooltip is open inside it", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page.locator("main")).toBeVisible();
+
+    await page.keyboard.press("ControlOrMeta+k");
+    const palette = page.getByRole("dialog", { name: "Command palette" });
+    await expect(palette).toBeVisible();
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("tooltip").filter({ hasText: "Close" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(palette).toBeHidden();
+  });
+
+  test("explains a disabled control from a keyboard stop on its hint", async ({ page }) => {
+    await page.goto("/settings/privacy");
+
+    const frozen = page.getByRole("switch", { name: "Strictly necessary" });
+    await expect(frozen).toBeDisabled();
+
+    const hint = page.getByRole("group").filter({ has: frozen });
+    await expect(hint).toHaveAccessibleDescription(/cannot be turned off/);
+
+    await tabTo(page, hint.locator("[tabindex='0']"));
+    await expect(
+      page.getByRole("tooltip").filter({ hasText: /cannot be turned off/ }),
+    ).toBeVisible();
+  });
+
   test("reaches the primary navigation from the user menu on a phone", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
 

@@ -8,6 +8,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@packages/ui/components/ui/form";
+import { Hint } from "@packages/ui/components/ui/hint";
 import {
   Select,
   SelectContent,
@@ -89,14 +90,19 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
             </FormItem>
           )}
         />
-        <Button
-          type="submit"
-          variant="destructive"
+        <Hint
+          text={!reason.trim() ? t("users.banForm.reasonRequired") : undefined}
           className="self-end"
-          disabled={!reason.trim() || isPending}
         >
-          {t("users.suspendAccountTitle")}
-        </Button>
+          <Button
+            type="submit"
+            variant="destructive"
+            className="self-end"
+            disabled={!reason.trim() || isPending}
+          >
+            {t("users.suspendAccountTitle")}
+          </Button>
+        </Hint>
       </form>
     </Form>
   );

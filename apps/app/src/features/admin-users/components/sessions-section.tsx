@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
+import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
@@ -43,8 +44,8 @@ export function SessionsSection({ sessions }: SessionsSectionProps) {
             {sessions.map((session) => (
               <TableRow key={session.id}>
                 <TableCell>{session.ipAddress ?? EMPTY_VALUE}</TableCell>
-                <TableCell className="max-w-xs truncate" title={session.userAgent ?? undefined}>
-                  {session.userAgent ?? EMPTY_VALUE}
+                <TableCell>
+                  <TruncatedText value={session.userAgent ?? EMPTY_VALUE} className="max-w-xs" />
                 </TableCell>
                 <TableCell>{formatDate(session.createdAt)}</TableCell>
                 <TableCell>{formatDate(session.expiresAt)}</TableCell>
