@@ -71,13 +71,15 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "An email exhausted its delivery attempts or was rejected; a dead email is replayed every few hours while still recent.",
   [EventTypes.OUTBOX_EVENT_DEAD]:
     "A domain event exhausted its delivery attempts and is now retried every few hours.",
+  [EventTypes.ADMIN_STAFF_ADDED]: "A user joined the platform staff with a staff role.",
+  [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: "A staff manager changed a staff member's role.",
+  [EventTypes.ADMIN_STAFF_REVOKED]: "A staff manager removed a staff member's access.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
     "A platform administrator started an impersonation session.",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]:
     "A platform administrator ended an impersonation session.",
   [EventTypes.ADMIN_USER_BANNED]: "A platform administrator banned a user account.",
   [EventTypes.ADMIN_USER_UNBANNED]: "A platform administrator lifted the ban on a user account.",
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "A platform administrator changed a user's platform role.",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]:
     "A platform administrator triggered a password reset for a user.",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:

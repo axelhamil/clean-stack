@@ -36,6 +36,22 @@ const _member = _ac.newRole({
   organization: ["leave"],
 });
 
+export {
+  authorizeStaff,
+  effectivePermissions,
+  isStaffPermission,
+  isStaffRole,
+  permissionsOfRole,
+  STAFF_PERMISSIONS,
+  STAFF_ROLES,
+  type StaffAccess,
+  type StaffPermission,
+  type StaffPermissionOverride,
+  type StaffRole,
+  staffAccessSchema,
+  staffReachable,
+} from "./staff";
+
 export const ORG_ROLES = ["owner", "admin", "member"] as const;
 export const STATEMENTS = statement;
 

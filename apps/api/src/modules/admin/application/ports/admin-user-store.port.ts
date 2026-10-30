@@ -7,7 +7,6 @@ export interface AdminUserRow {
   id: string;
   email: string;
   name: string;
-  role: Option<string>;
   banned: boolean;
   banReason: Option<string>;
   banExpires: Option<Date>;

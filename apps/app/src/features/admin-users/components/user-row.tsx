@@ -4,12 +4,7 @@ import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
-import { EMPTY_VALUE } from "../../../shared/utils";
-import {
-  isPlatformRole,
-  PLATFORM_ROLE_LABEL_KEYS,
-  USER_STATUS_LABEL_KEYS,
-} from "../admin-user-labels";
+import { USER_STATUS_LABEL_KEYS } from "../admin-user-labels";
 import type { AdminUserListItem } from "../api/admin-users.queries";
 
 interface UserRowProps {
@@ -18,7 +13,7 @@ interface UserRowProps {
 
 export function UserRow({ item }: UserRowProps) {
   const formatDate = useFormatDate();
-  const { t } = useTranslation(["admin", "common"]);
+  const { t } = useTranslation("admin");
 
   return (
     <TableRow>
@@ -30,15 +25,6 @@ export function UserRow({ item }: UserRowProps) {
         </NavLink>
       </TableCell>
       <TableCell>{item.name}</TableCell>
-      <TableCell>
-        {item.role ? (
-          <Badge variant="secondary">
-            {isPlatformRole(item.role) ? t(PLATFORM_ROLE_LABEL_KEYS[item.role]) : item.role}
-          </Badge>
-        ) : (
-          EMPTY_VALUE
-        )}
-      </TableCell>
       <TableCell>
         {item.banned ? (
           <Badge variant="destructive">{t(USER_STATUS_LABEL_KEYS.suspended)}</Badge>

@@ -62,6 +62,7 @@ export * as policiesSchema from "./schema/policies";
 export * as quotaUsageSchema from "./schema/quota-usage";
 export * as rateLimitSchema from "./schema/rate-limit";
 export * as ssoSchema from "./schema/sso";
+export * as staffSchema from "./schema/staff";
 export * as sweepSchema from "./schema/sweep";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
 export * as webhooksSchema from "./schema/webhooks";

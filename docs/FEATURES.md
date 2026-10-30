@@ -219,7 +219,7 @@ PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No 
 - **Dispatcher and relay** (`outbox-dispatcher.service.ts`, `outbox-relay.ts`): in-process Bun worker, `pg.Client` LISTEN with backoff reconnect and keepalive, wake at the next due retry, 30s poll fallback. Claim by lease in one statement (`FOR UPDATE SKIP LOCKED`, multi-instance safe, no lock held while handlers run), named handlers (`audit-log`, `webhook-fanout`, `notification-fanout`, then `onEvent(type, handlerName, ...)`) each in its own short transaction with a time budget, settle guarded by `attempts`, jittered retry of the failed handlers only, dead after `OUTBOX_MAX_ATTEMPTS` with one `outbox.event_dead` and a replay every `OUTBOX_DEAD_RETRY_HOURS`. Proven by `check:outbox-lease`.
 - **Audit log** (`audit_log`): append-only (SOC2 / ISO 27001). `operational` (90d) vs `compliance` (7y) retention. Optional tamper-evidence hash chain (`AUDIT_TAMPER_EVIDENCE`). Operator UI at `/admin/audit-log` (filters, pagination, chain verify): gated `requirePlatformAdmin`.
 - **Outbound webhooks**: HMAC-SHA256 signed (Stripe-style), AEAD-encrypted secrets (XChaCha20-Poly1305 + HKDF per org), decorrelated jitter retry (1m/5m/30m/2h/12h), claimed by lease (`WEBHOOK_LEASE_SECONDS`, database clock, settle guarded by the claimed attempt, release on stop), dead-letter on the 4th failed send then replayed every `WEBHOOK_DEAD_RETRY_HOURS` (terminal when the endpoint is missing or disabled or the destination is refused), manual replay. Proven by `check:webhook-lease`. See §Outbound webhooks for the full front-end surface.
-- **Catalog** `@packages/events`: **88 events** (35 public / 53 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
+- **Catalog** `@packages/events`: **90 events** (35 public / 55 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
 - **Request correlation**: `X-Request-Id` threaded into `outbox_event.metadata` and `audit_log.request_id` via `AsyncLocalStorage`.
 
 See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler, multi-tenant safety, BetterAuth bridge, HMAC verification).
@@ -299,6 +299,8 @@ UX hub consolidating privacy, compliance, and session surfaces into `/settings/p
 
 Platform operator tooling: ban/unban users, change platform role, force password reset, revoke sessions, impersonate with justification. Every action emits a compliance-retained `admin.*` event.
 
+**Staff model**: roles `manager`, `support`, `auditor` and the permission catalog live in `@packages/access-control`. `staff_member` and `staff_permission_override` (grant or deny, with expiry) hold the data; `user.role` is only a mirror the auth plugin needs, read by no gate, and the plugin's own `/api/auth/admin/*` routes answer 404. `PLATFORM_ADMIN_IDS` is a permanent break-glass: a listed id resolves to `manager`, and its first request inserts a row (`ON CONFLICT DO NOTHING`), the real insert alone announcing `admin.staff.added`. A row that came from the env stops granting access once the id leaves the list. An impersonated session has no staff access. `requireStaff` and `requireStaffPermission` (`shared/middleware/staff.middleware.ts`) recheck on every request. `GET /admin/me`, `GET /admin/staff`, `PUT /admin/staff/:id/role` (adds or changes), `DELETE /admin/staff/:id`: the last manager and one's own access cannot change. Staff role changes only go through these routes: `PUT /admin/users/:id/role` is gone, and the back office shows no account role. `users.moderate` stops at staff: acting on an active or listed staff member also takes `staff.manage`, and the last manager cannot be banned, under the same lock as the guard, which does not count a banned, deleted or leaving manager. A revocation or a role change that loses `users.impersonate` deletes the sessions that person impersonates through, in the same unit of work; the request check still refuses a session whose impersonator lost the permission another way (env removal, ban), except on the stop route. An account wipe revokes the staff row; the last manager cannot request deletion unless listed in the env, which stays the recovery. Proven by `check:admin-staff`. Override writes come with the team screen.
+
 **Backend** `apps/api/src/modules/admin/`:
 - `AdminQueryService`: read-only platform user and org queries.
 - `AdminActionService`: ban, unban, role-change, force-password-reset, revoke-sessions. Instantiated in `routes.ts` (not inwire: real import cycle; deps from `di`).
@@ -313,7 +315,7 @@ Platform operator tooling: ban/unban users, change platform role, force password
 - `features/admin-orgs/`: `admin-orgs.{route,page}.tsx`, `admin-org-detail.{route,page}.tsx`, `api/admin-orgs.queries.ts`.
 - `shared/components/impersonation-banner.tsx`: non-dismissable, live countdown, mounts in `_shell`.
 - `shared/auth/is-impersonating.ts`: derives impersonation state from the session payload.
-- `shared/auth/can-access-platform-admin.ts`: combines `isPlatformAdmin` (role) with `twoFactorEnabled` (MFA); gates the "Admin" nav entry in `app-shell.tsx` and `ensure-platform-admin.ts`; a platform admin without 2FA active is redirected to `/settings/account`.
+- `shared/auth/staff-access.ts` (`staffOf`, `staffCan`), `ensure-staff.ts` (`ensureStaffAccess`, `ensureStaffPermission`), `use-staff-access.ts`: read `session.staff` as the server resolved it, never recompute it. Staff whose MFA requirement is unmet are redirected to `/settings/account`.
 - `router/should-redirect-to-legal-accept.ts`: returns `false` when `isImpersonating(session)` is true, so the legal acceptance gate does not trap the admin on a page whose only exit is to consent.
 - `shared/api/mutations/stop-impersonation.ts`: mutation factory used by the banner.
 
@@ -353,7 +355,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx`: name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts`: list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts`: 88-event catalog with explicit `public` / `internal` classification (35 public / 53 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts`: 90-event catalog with explicit `public` / `internal` classification (35 public / 55 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
 **Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket).
 
@@ -367,7 +369,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 Persistent inbox behind a bell, real-time over SSE, three-level preferences. No new event type: D.3 *consumes* the catalog.
 
-**Catalog projection** `packages/events/src/notification-map.ts`: third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 88 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced: `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
+**Catalog projection** `packages/events/src/notification-map.ts`: third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 90 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced: `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
 
 **Audience by capability, never by role tuple**: `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `ORG_ROLES.filter(authorizeRole)` resolves at boot, leaving `WHERE member.role = ANY($1)`.
 

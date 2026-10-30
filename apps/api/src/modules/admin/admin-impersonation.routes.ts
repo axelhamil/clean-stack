@@ -5,8 +5,8 @@ import { auth } from "../../auth";
 import { di } from "../../container";
 import { emitEvent } from "../../shared/event-emitter";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
+import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
 import { impersonateBodySchema } from "./application/dto/impersonate.dto";
 import { relaySetCookie } from "./relay-set-cookie";
@@ -17,7 +17,7 @@ export const adminImpersonationRoutes = new Hono<{ Variables: AuthVariables }>()
   .post(
     "/:id/start",
     requireAuth,
-    requirePlatformAdmin,
+    requireStaffPermission("users.impersonate"),
     zV("json", impersonateBodySchema),
     async (c) => {
       const actor = c.get("user");

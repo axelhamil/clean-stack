@@ -1,7 +1,12 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { Hono } from "hono";
 
-const getSessionSpy = mock(async () => null);
+const getSessionSpy = mock(
+  async (): Promise<{
+    user: { id: string };
+    session: { id: string; impersonatedBy: string | null };
+  } | null> => null,
+);
 
 const realAuth = await import("../../auth");
 mock.module("../../auth", () => ({
@@ -10,6 +15,7 @@ mock.module("../../auth", () => ({
 }));
 
 const { sessionMiddleware, requireAuth } = await import("../middleware/auth.middleware");
+const { di } = await import("../../container");
 
 type AuthEnv = {
   Variables: { user: { id: string } | null; session: { id: string } | null };
@@ -29,6 +35,59 @@ describe("sessionMiddleware", () => {
     expect(await a.json()).toEqual({ user: null, session: null });
     expect(await b.json()).toEqual({ user: null, session: null });
     expect(getSessionSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("sessionMiddleware under impersonation", () => {
+  const target = { id: "target" };
+  const impersonated = { id: "s1", impersonatedBy: "staff" };
+
+  function appWith(holds: boolean) {
+    getSessionSpy.mockImplementation(async () => ({ user: target, session: impersonated }));
+    const spy = spyOn(di.StaffAccessService, "impersonatorHolds").mockImplementation(
+      async () => holds,
+    );
+    const app = new Hono<AuthEnv>()
+      .use("*", sessionMiddleware)
+      .get("*", (c) => c.json({ user: c.get("user") }));
+
+    return { app, spy };
+  }
+
+  it("refuses the session once the impersonator lost the permission", async () => {
+    const { app, spy } = appWith(false);
+
+    const res = await app.request("/me");
+
+    expect(await res.json()).toEqual({ user: null });
+    expect(spy).toHaveBeenCalledWith("staff");
+  });
+
+  it("keeps the session while the impersonator holds the permission", async () => {
+    const { app } = appWith(true);
+
+    expect(await (await app.request("/me")).json()).toEqual({ user: target });
+  });
+
+  it("still lets a refused impersonator stop, so nobody is stuck in the session", async () => {
+    const { app } = appWith(false);
+
+    const res = await app.request("/admin/impersonation/stop");
+
+    expect(await res.json()).toEqual({ user: target });
+  });
+
+  it("reads nothing for a session that is not impersonated", async () => {
+    const { app, spy } = appWith(false);
+    spy.mockClear();
+    getSessionSpy.mockImplementation(async () => ({
+      user: target,
+      session: { id: "s1", impersonatedBy: null },
+    }));
+
+    await app.request("/me");
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 

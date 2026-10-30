@@ -22,6 +22,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
 import { type AuditRow, auditLogInfiniteQueryOptions } from "./api/audit-log.queries";
 import type { AuditLogFilters } from "./audit-log-filters";
 import { AuditTableRow } from "./components/audit-row";
@@ -31,6 +32,7 @@ import { MetadataSheet } from "./components/metadata-sheet";
 const ALL_ACTIONS = "all";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/audit-log")({
+  beforeLoad: ensureStaffPermission("audit.read"),
   component: AdminAuditLogPage,
 });
 

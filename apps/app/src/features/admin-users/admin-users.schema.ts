@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { platformRoleSchema } from "./admin-user-labels";
 
 export const banFormSchema = z.object({
   reason: z.string().trim().min(1).max(500),
@@ -12,8 +11,3 @@ export const impersonateFormSchema = z.object({
   ticketRef: z.string().trim().max(100).optional(),
 });
 export type ImpersonateFormInput = z.infer<typeof impersonateFormSchema>;
-
-export const setRoleFormSchema = z.object({
-  role: platformRoleSchema,
-});
-export type SetRoleFormInput = z.infer<typeof setRoleFormSchema>;

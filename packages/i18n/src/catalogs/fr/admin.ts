@@ -6,9 +6,7 @@ export default {
     loadFailed: "Échec du chargement des comptes.",
     empty: "Aucun compte ne correspond à ces filtres.",
     loadMore: "Charger plus",
-    allRolesPlaceholder: "Tous les rôles",
     allStatusesPlaceholder: "Tous les statuts",
-    roleUser: "Utilisateur",
     suspendAccountTitle: "Suspendre le compte",
     // Genuine cognate: "permanent" is spelled identically in French.
     durationPermanent: "Permanent",
@@ -19,7 +17,6 @@ export default {
     table: {
       email: "E-mail",
       name: "Nom",
-      role: "Rôle",
       status: "Statut",
       created: "Date de création",
     },
@@ -47,15 +44,6 @@ export default {
       impersonateSuccessToast: "Emprunt d'identité démarré.",
       revokeSessionsSuccessToast: "Sessions révoquées.",
       resetPasswordSuccessToast: "E-mail de réinitialisation du mot de passe envoyé.",
-      changeRole: "Changer le rôle",
-      changeRoleTitle: "Changer le rôle de ce compte",
-      changeRoleDescription:
-        "Un administrateur de la plateforme accède aux données de toutes les organisations et au journal d'audit opérateur.",
-      roleOptionUser: "Utilisateur",
-      roleOptionAdmin: "Administrateur de la plateforme",
-      changeRoleSubmit: "Changer le rôle",
-      sameRoleHint: "Choisissez un rôle différent du rôle actuel.",
-      changeRoleSuccessToast: "Rôle mis à jour.",
     },
     sessions: {
       title: "Sessions actives ({{count}})",

@@ -1,8 +1,5 @@
-import type { PlatformRole } from "./admin-user-labels";
-
 export interface UserFilters {
   search: string;
-  role: PlatformRole | undefined;
   banned: boolean | undefined;
 }
 
@@ -11,7 +8,6 @@ export function serializeUserFilters(filters: UserFilters): Record<string, strin
   const search = filters.search.trim();
 
   if (search) query.search = search;
-  if (filters.role) query.role = filters.role;
   if (filters.banned !== undefined) query.banned = String(filters.banned);
 
   return query;

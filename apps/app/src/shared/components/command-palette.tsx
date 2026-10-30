@@ -17,6 +17,7 @@
  *    (suppressed while typing in inputs/textareas/contenteditable)
  */
 
+import type { StaffPermission } from "@packages/access-control";
 import {
   CommandDialog,
   CommandEmpty,
@@ -55,11 +56,10 @@ import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useSta
 import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
-import { sessionQueryOptions } from "../api/queries/session";
-import { isPlatformAdmin } from "../auth/is-platform-admin";
 import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
+import { useStaffAccess } from "../auth/use-staff-access";
 import { LEGAL_ROUTES } from "../legal-routes";
 
 interface CommandShortcutBinding {
@@ -178,6 +178,7 @@ interface OperatorRoute {
     | "commandPalette.admin.accounts"
     | "commandPalette.admin.organizations";
   icon: LucideIcon;
+  permission: StaffPermission;
 }
 
 const OPERATOR_ROUTES: readonly OperatorRoute[] = [
@@ -186,28 +187,33 @@ const OPERATOR_ROUTES: readonly OperatorRoute[] = [
     to: "/admin/audit-log",
     labelKey: "commandPalette.admin.auditLog",
     icon: ScrollText,
+    permission: "audit.read",
   },
   {
     id: "operator:users",
     to: "/admin/users",
     labelKey: "commandPalette.admin.accounts",
     icon: Users,
+    permission: "users.read",
   },
   {
     id: "operator:orgs",
     to: "/admin/orgs",
     labelKey: "commandPalette.admin.organizations",
     icon: Building2,
+    permission: "orgs.read",
   },
 ];
 
 function useOperatorGroup(t: TFunction<"common">): CommandGroupConfig | null {
   const navigate = useNavigate();
-  const { data: session } = useQuery(sessionQueryOptions);
-  if (!isPlatformAdmin(session)) return null;
+  const { can } = useStaffAccess();
+  const reachable = OPERATOR_ROUTES.filter((route) => can(route.permission));
+  if (reachable.length === 0) return null;
+
   return {
     heading: t("commandPalette.groups.admin"),
-    items: OPERATOR_ROUTES.map((route) => ({
+    items: reachable.map((route) => ({
       id: route.id,
       label: t(route.labelKey),
       icon: route.icon,

@@ -28,6 +28,8 @@ export function buildDeletionOnError(
 
     // A blocked deletion cannot be fixed from inside the dialog, so it closes
     // and the toast says why.
-    if (code === "ACCOUNT_DELETION_BLOCKED") onClose();
+    if (code === "ACCOUNT_DELETION_BLOCKED" || code === "ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN") {
+      onClose();
+    }
   };
 }

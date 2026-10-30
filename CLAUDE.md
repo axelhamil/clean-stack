@@ -56,7 +56,7 @@ pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semanti
 
 - Postgres runs on `localhost:5433` (never pin it back to 5432, it collides with a system Postgres): `docker compose up postgres -d` for native dev. `docker compose up -d` without arguments starts postgres + api + app and collides with `pnpm dev` on ports 3000 and 5173.
 - Opt-in profiles: `--profile storage` (SeaweedFS, host port `8333`), `--profile sso` (Keycloak, host port `8080`, see `docs/SSO-LOCAL.md`).
-- After a schema change: `pnpm db:push` (dev, non-interactive) or `db:generate && db:migrate` (prod-style).
+- After a schema change: `pnpm db:push` (dev, non-interactive) or `db:generate && db:migrate` (prod-style). `db:push` applies the schema only and skips the data steps of migrations, so a local account that needs one (an existing admin who is not listed in `PLATFORM_ADMIN_IDS` gets no staff row) needs `db:migrate` or the env list.
 
 ## Release flow
 

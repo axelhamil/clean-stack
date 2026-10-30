@@ -50,6 +50,11 @@ let currentSession: Record<string, unknown> = {
   createdAt: new Date(Date.now() - 10_000),
 };
 
+mock.module("../../../shared/middleware/staff.middleware", () => ({
+  requireStaff: async (_c: unknown, next: () => Promise<void>) => next(),
+  requireStaffPermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+}));
+
 const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
 mock.module("../../../shared/middleware/auth.middleware", () => ({
   ...realAuthMiddleware,

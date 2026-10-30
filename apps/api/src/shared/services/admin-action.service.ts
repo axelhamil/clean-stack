@@ -63,27 +63,6 @@ export class AdminActionService {
     });
   }
 
-  async setRole(input: {
-    actorUserId: string;
-    userId: string;
-    role: "admin" | "user";
-    previousRole: string | null;
-    headers: Headers;
-  }): ActionResult {
-    return this.run("setRole", async () => {
-      await auth.api.setRole({
-        body: { userId: input.userId, role: input.role },
-        headers: input.headers,
-      });
-      await emitEvent(this.outbox, EventTypes.ADMIN_USER_ROLE_CHANGED, "user", input.userId, {
-        actorUserId: input.actorUserId,
-        userId: input.userId,
-        from: input.previousRole,
-        to: input.role,
-      });
-    });
-  }
-
   async revokeSessions(input: {
     actorUserId: string;
     userId: string;

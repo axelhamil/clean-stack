@@ -14,7 +14,7 @@ describe("listBackRoutes", () => {
     const keys = listBackRoutes();
     expect(keys).toContain("POST /uploads/presign");
     expect(keys).toContain("DELETE /uploads");
-    expect(keys).toContain("PUT /admin/users/:id/role");
+    expect(keys).toContain("PUT /admin/staff/:id/role");
   });
 
   it("collapses the BetterAuth wildcard into a single opaque row", () => {

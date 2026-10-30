@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
-import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
+import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
 import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
 import { zV } from "../../shared/validator";
@@ -17,19 +17,25 @@ const actionSvc = new AdminActionService(
 );
 
 export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
-  .get("/", requireAuth, requirePlatformAdmin, zV("query", listOrgsQuerySchema), async (c) => {
-    const result = await di.AdminQueryService.listOrgs(c.req.valid("query"));
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    const page = result.getValue();
-    return c.json({
-      items: page.items.map((o) => ({
-        ...o,
-        createdAt: o.createdAt.toISOString(),
-      })),
-      nextCursor: page.nextCursor.toNull(),
-    });
-  })
-  .get("/:id", requireAuth, requirePlatformAdmin, async (c) => {
+  .get(
+    "/",
+    requireAuth,
+    requireStaffPermission("orgs.read"),
+    zV("query", listOrgsQuerySchema),
+    async (c) => {
+      const result = await di.AdminQueryService.listOrgs(c.req.valid("query"));
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const page = result.getValue();
+      return c.json({
+        items: page.items.map((o) => ({
+          ...o,
+          createdAt: o.createdAt.toISOString(),
+        })),
+        nextCursor: page.nextCursor.toNull(),
+      });
+    },
+  )
+  .get("/:id", requireAuth, requireStaffPermission("orgs.read"), async (c) => {
     const result = await di.AdminQueryService.getOrg(c.req.param("id"));
     if (result.isFailure) throw new AppErrorException(result.getError());
     const found = result.getValue();
@@ -44,7 +50,7 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
   .post(
     "/:id/sso-enforcement",
     requireAuth,
-    requirePlatformAdmin,
+    requireStaffPermission("orgs.sso"),
     denyImpersonated,
     zV("json", setSsoEnforcementBodySchema),
     async (c) => {

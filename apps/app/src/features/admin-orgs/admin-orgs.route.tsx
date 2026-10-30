@@ -21,14 +21,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
 import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
+import { useStaffAccess } from "../../shared/auth/use-staff-access";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/orgs")({
+  beforeLoad: ensureStaffPermission("orgs.read"),
   component: AdminOrgsPage,
 });
 
@@ -38,6 +41,7 @@ function AdminOrgsPage() {
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
+  const { can } = useStaffAccess();
 
   const query = useInfiniteQuery(adminOrgsInfiniteQueryOptions(search));
   const orgs = query.data?.pages.flatMap((p) => p.items) ?? [];
@@ -102,7 +106,7 @@ function AdminOrgsPage() {
                       <Switch
                         aria-label={t("orgs.ssoEnforcedAriaLabel", { name: org.name })}
                         checked={org.ssoEnforced}
-                        disabled={saving || guard.blocked}
+                        disabled={saving || guard.blocked || !can("orgs.sso")}
                         {...guard.describeProps(saving)}
                         onCheckedChange={(enforced) =>
                           ssoEnforcementMutation.mutate({ id: org.id, enforced })

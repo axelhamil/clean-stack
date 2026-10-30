@@ -25,7 +25,6 @@ export interface ApiTokenDeps {
   pepperVersion: number;
   pepperPrevious?: string;
   bucketMin: number;
-  platformAdminIds: string[];
 }
 
 export function requireApiToken(
@@ -98,10 +97,7 @@ export function requireApiToken(
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
-    const user = {
-      ...userRow,
-      isPlatformAdmin: deps.platformAdminIds.includes(userRow.id) || userRow.role === "admin",
-    } as unknown as SessionUser;
+    const user = userRow as unknown as SessionUser;
 
     // apiTokenId must be set before the per-token rate-limit policy runs.
     c.set("apiTokenId", record.id);

@@ -1571,7 +1571,14 @@ export const auth = betterAuth({
       const role = session.activeOrganizationId
         ? await findActiveMemberRole(user.id, session.activeOrganizationId)
         : undefined;
-      return buildSessionPayload(user, session, env.PLATFORM_ADMIN_IDS, role);
+      const staff = await di.StaffAccessService.read(user, session);
+
+      return buildSessionPayload(
+        user,
+        session,
+        staff.isSuccess ? staff.getValue().toNull() : null,
+        role,
+      );
     }, authOptions),
   ],
 });

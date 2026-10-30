@@ -4,8 +4,8 @@ import { Hono } from "hono";
 import { di } from "../../container";
 import { emitEvent } from "../../shared/event-emitter";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
+import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
 import { listAuditEventsQuerySchema } from "./application/dto/list-audit-events.dto";
 
@@ -13,7 +13,7 @@ export const auditLogRoutes = new Hono<{ Variables: AuthVariables }>()
   .get(
     "/",
     requireAuth,
-    requirePlatformAdmin,
+    requireStaffPermission("audit.read"),
     zV("query", listAuditEventsQuerySchema),
     async (c) => {
       const filters = c.req.valid("query");
@@ -54,7 +54,7 @@ export const auditLogRoutes = new Hono<{ Variables: AuthVariables }>()
       });
     },
   )
-  .get("/verify", requireAuth, requirePlatformAdmin, async (c) => {
+  .get("/verify", requireAuth, requireStaffPermission("audit.read"), async (c) => {
     const result = await di.AuditQueryService.verifyChain();
     if (result.isFailure) throw new AppErrorException(result.getError());
     const v = result.getValue();

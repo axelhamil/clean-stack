@@ -1,4 +1,5 @@
 import { defineModule } from "inwire";
+import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
 import type { IRgpdRepository } from "./application/ports/rgpd.port";
 import { RgpdService } from "./application/services/rgpd.service";
@@ -24,6 +25,8 @@ export const rgpdModule = defineModule()((b) =>
           c.ITransactionService,
           c.IOutboxRepository,
           c.IInstrumentation,
+          c.IStaffStore,
+          env,
         ),
     ),
 );

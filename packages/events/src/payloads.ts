@@ -467,12 +467,6 @@ export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 export const AdminUserUnbannedPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
-export const AdminUserRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
-  from: z.string().nullable(),
-  to: z.string(),
-});
-export type AdminUserRoleChangedPayload = z.infer<typeof AdminUserRoleChangedPayload>;
-
 export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserPasswordResetPayload = z.infer<typeof AdminUserPasswordResetPayload>;
 
@@ -480,6 +474,24 @@ export const AdminUserSessionsRevokedPayload = ActorRef.extend(UserRef.shape).ex
   count: z.number().int().nonnegative(),
 });
 export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
+
+export const AdminStaffAddedPayload = UserRef.extend({
+  actorUserId: z.string().nullable(),
+  role: z.string(),
+  source: z.enum(["env", "console"]),
+});
+export type AdminStaffAddedPayload = z.infer<typeof AdminStaffAddedPayload>;
+
+export const AdminStaffRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
+  from: z.string(),
+  to: z.string(),
+});
+export type AdminStaffRoleChangedPayload = z.infer<typeof AdminStaffRoleChangedPayload>;
+
+export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
+  role: z.string(),
+});
+export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
 
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
@@ -708,9 +720,11 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]: AdminImpersonationStoppedPayload,
   [EventTypes.ADMIN_USER_BANNED]: AdminUserBannedPayload,
   [EventTypes.ADMIN_USER_UNBANNED]: AdminUserUnbannedPayload,
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
+  [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,
+  [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: AdminStaffRoleChangedPayload,
+  [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,

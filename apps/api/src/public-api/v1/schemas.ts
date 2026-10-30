@@ -11,9 +11,7 @@ import { z } from "zod";
  * Excluded on purpose: moderation state (`role`, `banned`, `banReason`,
  * `banExpires`), billing (`stripeCustomerId`), RGPD lifecycle
  * (`pendingDeletionUntil`, `deletedAt`, `lastExportRequestedAt`), in-flight
- * changes (`pendingEmail`), security capabilities (`twoFactorEnabled`) and the
- * middleware-computed `isPlatformAdmin`, which would expose the platform's
- * admin allowlist.
+ * changes (`pendingEmail`) and security capabilities (`twoFactorEnabled`).
  */
 const publicUserSchema = z.object({
   id: z.string(),
