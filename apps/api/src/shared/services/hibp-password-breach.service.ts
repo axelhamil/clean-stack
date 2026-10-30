@@ -1,6 +1,7 @@
 import { Result } from "@packages/ddd-kit";
 import { CryptoHasher } from "bun";
 import { env } from "../env";
+import { instrumentedFetch } from "../instrumented-fetch";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IPasswordBreachService, PasswordBreachError } from "../ports/password-breach.port";
 
@@ -22,17 +23,15 @@ export class HibpPasswordBreachService implements IPasswordBreachService {
     const suffix = hash.slice(5);
 
     try {
-      const response = await this.instrumentation.startSpan(
+      const response = await instrumentedFetch(
+        this.instrumentation,
+        this.fetchImpl,
+        `https://api.pwnedpasswords.com/range/${prefix}`,
         {
-          name: `GET https://api.pwnedpasswords.com/range/${prefix}`,
-          op: "http.client",
-          attributes: { "http.method": "GET", "http.host": "api.pwnedpasswords.com" },
+          method: "GET",
+          headers: { "Add-Padding": "true" },
+          signal: AbortSignal.timeout(env.HIBP_TIMEOUT_MS),
         },
-        () =>
-          this.fetchImpl(`https://api.pwnedpasswords.com/range/${prefix}`, {
-            headers: { "Add-Padding": "true" },
-            signal: AbortSignal.timeout(env.HIBP_TIMEOUT_MS),
-          }),
       );
 
       if (!response.ok) {

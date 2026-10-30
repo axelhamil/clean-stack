@@ -58,6 +58,10 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A password was rejected for appearing in a known breach.",
   [EventTypes.SECURITY_SIGNUP_REJECTED]: "A sign-up was rejected (e.g. disposable email).",
   [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: "A platform operator accessed the audit log.",
+  [EventTypes.SECURITY_IMPOSSIBLE_TRAVEL_DETECTED]:
+    "A sign-in came from another country than a recent session of the same user.",
+  [EventTypes.SECURITY_GEO_DENIED]:
+    "A sign-in or sign-up was refused by the country or network deny-list.",
   [EventTypes.BILLING_SUBSCRIPTION_CREATED]: "A subscription was created.",
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: "A subscription was updated.",
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: "A subscription was cancelled.",

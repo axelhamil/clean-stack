@@ -145,6 +145,31 @@ describe("requireRateLimit middleware", () => {
       expect(res.headers.get("Retry-After")).toBe("1");
     });
 
+    it("given two stacked policies, then both budgets are advertised", async () => {
+      const app = new Hono();
+      const stacked = (name: string, windowSec: number) =>
+        requireRateLimit(
+          { limiter: makeLimiter(allowDecision(name)) },
+          {
+            name,
+            keyFn: () => name,
+            windows: [{ policyName: name, windowSec, maxRequests: 10 }],
+          },
+        );
+      app.use("/ok", stacked("auth-sign-up", 3600));
+      app.use("/ok", stacked("accounts-per-visitor", 86400));
+      app.get("/ok", (c) => c.json({ ok: true }));
+
+      const res = await app.request("/ok");
+
+      expect(res.headers.get("RateLimit-Policy")).toBe(
+        '"auth-sign-up";q=10;w=3600, "accounts-per-visitor";q=10;w=86400',
+      );
+      expect(res.headers.get("RateLimit")).toBe(
+        '"auth-sign-up";r=59;t=60, "accounts-per-visitor";r=59;t=60',
+      );
+    });
+
     it("sets RateLimit headers even when blocked", async () => {
       const app = makeApp(makeLimiter(blockDecision()));
       const res = await app.request("/ok");

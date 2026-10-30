@@ -1,11 +1,16 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { UNKNOWN_VISITOR, type VisitorGeo } from "./ports/ip-geo.port";
 
 /**
  * `clientIp` is a thunk so the trusted-proxy resolution only runs for the requests
  * that read it, and so code without a Hono context (BetterAuth hooks) still gets
  * the resolved address instead of re-reading a client-supplied `X-Forwarded-For`.
  */
-type RequestContext = { requestId: string; clientIp?: () => string };
+type RequestContext = {
+  requestId: string;
+  clientIp?: () => string;
+  visitorGeo?: () => VisitorGeo;
+};
 
 const storage = new AsyncLocalStorage<RequestContext>();
 
@@ -19,4 +24,8 @@ export function getRequestId(): string | undefined {
 
 export function getClientIp(): string | undefined {
   return storage.getStore()?.clientIp?.();
+}
+
+export function getVisitorGeo(): VisitorGeo {
+  return storage.getStore()?.visitorGeo?.() ?? UNKNOWN_VISITOR;
 }

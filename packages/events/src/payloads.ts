@@ -365,6 +365,29 @@ export const SecuritySignupRejectedPayload = z.object({
 });
 export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
 
+export const SecurityImpossibleTravelDetectedPayload = z.object({
+  userId: z.string(),
+  sessionId: z.string(),
+  previousSessionId: z.string(),
+  previousCountry: z.string().max(2),
+  country: z.string().max(2),
+  ip: z.string().max(45).nullable(),
+  elapsedSeconds: z.number().int().nonnegative(),
+});
+export type SecurityImpossibleTravelDetectedPayload = z.infer<
+  typeof SecurityImpossibleTravelDetectedPayload
+>;
+
+export const SecurityGeoDeniedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45).nullable(),
+  path: z.string().max(512),
+  country: z.string().max(2).nullable(),
+  asn: z.string().max(10).nullable(),
+  reason: z.enum(["country", "asn"]),
+});
+export type SecurityGeoDeniedPayload = z.infer<typeof SecurityGeoDeniedPayload>;
+
 export const SecurityOperatorAuditAccessedPayload = z.object({
   actorUserId: z.string(),
   ip: z.string().max(45).nullable(),
@@ -674,6 +697,8 @@ export const PayloadByEventType = {
   [EventTypes.SECURITY_PASSWORD_BREACHED]: SecurityPasswordBreachedPayload,
   [EventTypes.SECURITY_SIGNUP_REJECTED]: SecuritySignupRejectedPayload,
   [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: SecurityOperatorAuditAccessedPayload,
+  [EventTypes.SECURITY_IMPOSSIBLE_TRAVEL_DETECTED]: SecurityImpossibleTravelDetectedPayload,
+  [EventTypes.SECURITY_GEO_DENIED]: SecurityGeoDeniedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CREATED]: BillingSubscriptionCreatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: BillingSubscriptionUpdatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,

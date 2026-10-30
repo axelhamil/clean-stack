@@ -1,7 +1,13 @@
 import { z } from "zod";
-import { validateEnvBounds } from "./env-bounds";
+import { validateEnvBounds, validateSecuritySignalsEnv } from "./env-bounds";
 
 declare const process: { env: Record<string, string | undefined> };
+
+const commaList = (value: string): string[] =>
+  value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 
 const envSchema = z
   .object({
@@ -11,19 +17,14 @@ const envSchema = z
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_SECRETS: z
       .string()
-      .optional()
       .transform((v) =>
-        v
-          ?.split(",")
-          .map((entry) => entry.trim())
-          .filter(Boolean)
-          .map((entry) => {
-            const separator = entry.indexOf(":");
-            return {
-              version: separator < 0 ? entry : entry.slice(0, separator).trim(),
-              value: separator < 0 ? "" : entry.slice(separator + 1).trim(),
-            };
-          }),
+        commaList(v).map((entry) => {
+          const separator = entry.indexOf(":");
+          return {
+            version: separator < 0 ? entry : entry.slice(0, separator).trim(),
+            value: separator < 0 ? "" : entry.slice(separator + 1).trim(),
+          };
+        }),
       )
       .pipe(
         z
@@ -33,9 +34,9 @@ const envSchema = z
               value: z.string().min(32),
             }),
           )
-          .min(1)
-          .optional(),
-      ),
+          .min(1),
+      )
+      .optional(),
 
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: z.coerce.number().optional(),
@@ -52,19 +53,9 @@ const envSchema = z
     INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
     INTERNAL_AUTH_LAYERS: z
       .string()
-      .optional()
-      .transform((v) =>
-        v
-          ?.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      )
-      .pipe(
-        z
-          .array(z.enum(["signature", "private-network"]))
-          .min(1)
-          .optional(),
-      ),
+      .transform(commaList)
+      .pipe(z.array(z.enum(["signature", "private-network"])).min(1))
+      .optional(),
     RGPD_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).optional(),
     RGPD_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().optional(),
     RGPD_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().optional(),
@@ -128,31 +119,32 @@ const envSchema = z
       .string()
       .optional()
       .transform((v) => v !== "false"),
-    PLATFORM_ADMIN_IDS: z
-      .string()
-      .optional()
-      .transform(
-        (v) =>
-          v
-            ?.split(",")
-            .map((s) => s.trim())
-            .filter(Boolean) ?? [],
-      ),
+    PLATFORM_ADMIN_IDS: z.string().transform(commaList).default([]),
     PLATFORM_ADMIN_REQUIRE_MFA: z
       .string()
       .optional()
       .transform((v) => v !== "false"),
     DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
     RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
-    TRUSTED_PROXIES: z
+    TRUSTED_PROXIES: z.string().transform(commaList).optional(),
+    GEO_COUNTRY_HEADER: z.string().trim().optional(),
+    GEO_ASN_HEADER: z.string().trim().optional(),
+    IMPOSSIBLE_TRAVEL_WINDOW_MINUTES: z.coerce.number().int().positive().optional(),
+    SECURITY_DENY_COUNTRIES: z
       .string()
-      .optional()
-      .transform((v) =>
-        v
-          ?.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      ),
+      .transform((v) => commaList(v).map((country) => country.toUpperCase()))
+      .default([]),
+    SECURITY_DENY_ASNS: z
+      .string()
+      .transform((v) => commaList(v).map((asn) => asn.replace(/^AS/i, "")))
+      .default([]),
+    ACCOUNTS_PER_VISITOR_MAX: z.coerce.number().int().positive().optional(),
+    ACCOUNTS_PER_VISITOR_WINDOW_SEC: z.coerce.number().int().positive().default(86_400),
+    CAPTCHA_SECRET_KEY: z.string().optional(),
+    CAPTCHA_VERIFY_URL: z
+      .url()
+      .default("https://challenges.cloudflare.com/turnstile/v0/siteverify"),
+    CAPTCHA_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     API_TOKEN_PEPPER: z.string().min(32).optional(),
@@ -166,7 +158,10 @@ const envSchema = z
     API_TOKEN_PEPPER_VERSION: z.coerce.number().int().positive().default(1),
     SCIM_CREDENTIAL_HASH_SECRET: z.string().min(32).optional(),
   })
-  .superRefine(validateEnvBounds);
+  .superRefine((value, ctx) => {
+    validateEnvBounds(value, ctx);
+    validateSecuritySignalsEnv(value, ctx);
+  });
 
 const rawEnv = Object.fromEntries(
   Object.entries(process.env).map(([k, v]) => [k, v === "" ? undefined : v]),

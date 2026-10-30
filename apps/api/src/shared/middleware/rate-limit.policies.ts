@@ -12,7 +12,10 @@ export interface PolicyConfig {
   // Set on auth/abuse-sensitive policies: a store outage must not silently disable
   // brute-force protection (OWASP A10:2025 / CWE-636). GLOBAL/CSP stay fail-open.
   failClosed?: boolean;
+  captchaAboveRatio?: number;
 }
+
+const CAPTCHA_ABOVE_RATIO = 0.8;
 
 function ipKeyFn(name: string): (c: Context) => string {
   return (c) => `${name}:${resolveClientIp(c)}`;
@@ -50,6 +53,7 @@ export const AUTH_SIGN_IN_POLICY: PolicyConfig = {
   windows: [{ policyName: "auth-sign-in", windowSec: 900, maxRequests: 5 }],
   emitSecurityEvent: true,
   failClosed: true,
+  captchaAboveRatio: CAPTCHA_ABOVE_RATIO,
 };
 
 export const AUTH_FORGOT_PASSWORD_POLICY: PolicyConfig = {
@@ -88,7 +92,28 @@ export const AUTH_SIGN_UP_POLICY: PolicyConfig = {
   windows: [{ policyName: "auth-sign-up", windowSec: 3600, maxRequests: 10 }],
   emitSecurityEvent: true,
   failClosed: true,
+  captchaAboveRatio: CAPTCHA_ABOVE_RATIO,
 };
+
+export function visitorCapRoutes(
+  maxRequests: number | undefined,
+  windowSec: number,
+): ReadonlyArray<readonly [path: string, policy: PolicyConfig]> {
+  if (maxRequests === undefined) return [];
+
+  return [
+    [
+      "/sign-up/email",
+      {
+        name: "accounts-per-visitor",
+        keyFn: ipKeyFn("accounts-per-visitor"),
+        windows: [{ policyName: "accounts-per-visitor", windowSec, maxRequests }],
+        emitSecurityEvent: true,
+        failClosed: true,
+      },
+    ],
+  ];
+}
 
 // Two-factor verify paths: /two-factor/verify-totp, /two-factor/verify-otp,
 // /two-factor/verify-backup-code (BetterAuth twoFactor plugin, confirmed via dist grep).

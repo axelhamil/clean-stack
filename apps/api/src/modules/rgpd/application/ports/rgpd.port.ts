@@ -41,6 +41,7 @@ export interface UserExportPayload {
     createdAt: string;
     expiresAt: string;
     ipAddress: string | null;
+    country: string | null;
     userAgent: string | null;
   }>;
   memberships: Array<{

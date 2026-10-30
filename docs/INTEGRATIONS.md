@@ -290,7 +290,39 @@ These aren't blockers for launch but pay off quickly:
 
 ---
 
-## 8. GitHub Secret Scanning, token leak protection
+## 8. Captcha, sign-in and sign-up near their limit
+
+Optional and off by default. The API ships the server half; the widget is yours to add, because its look and placement are a product choice.
+
+**How it behaves.** Above 80 % of the `auth-sign-in` and `auth-sign-up` windows (the 5th sign-in attempt of 5, the 9th and 10th sign-up of 10), a request without a valid token gets `401 CAPTCHA_REQUIRED`. That refusal costs no budget, so the user retries with a token. A valid token proceeds; a forged one costs one attempt. A provider outage or a rejected secret lets the request through and reports to telemetry, because a captcha outage must not lock users out.
+
+**Server.**
+
+```
+CAPTCHA_SECRET_KEY=<secret from the provider>
+# Turnstile is the default. hCaptcha has the same siteverify shape:
+# CAPTCHA_VERIFY_URL=https://api.hcaptcha.com/siteverify
+```
+
+**Client.** Render the provider's widget when a sign-in or sign-up answers `CAPTCHA_REQUIRED`, then send the same request again with the token:
+
+```ts
+await authClient.signIn.email(credentials, {
+  headers: { "X-Captcha-Token": token },
+});
+```
+
+`resolveAuthError` already shows the translated `CAPTCHA_REQUIRED` message, so the form stays honest until the widget exists. Add the provider's script and frame hosts to the CSP of `apps/app`, and extend the accessibility gate when the widget lands (root `CLAUDE.md`, rule 3).
+
+**Without the widget, do not set the secret**: users above 80 % could not pass.
+
+**Declare the provider.** Siteverify receives the visitor IP, so the provider is a sub-processor: add it to `apps/app/src/shared/sub-processors.config.ts` (and its catalog copy) before going live.
+
+**Geo signals share a trust assumption.** `GEO_COUNTRY_HEADER` and `GEO_ASN_HEADER` are read only from a peer in `TRUSTED_PROXIES`. If the origin is reachable without going through the CDN, a client can spoof the geo header and escape the deny-list, so close that path at the network level.
+
+---
+
+## 9. GitHub Secret Scanning, token leak protection
 
 GitHub scans every public repository for secrets. If a token matching your
 prefix appears in a commit or file, GitHub calls your registered webhook
@@ -352,6 +384,6 @@ publicly accessible HTTPS endpoint and a GitHub review of the integration:
 - [ ] All env vars set per §5
 - [ ] Cron service chosen and wired to `/internal/rgpd-sweep` (daily)
 - [ ] DB migrations applied; backups verified
-- [ ] GitHub Secret Scanning enrolment submitted (see §8): skip for private/internal deployments
+- [ ] GitHub Secret Scanning enrolment submitted (see §9): skip for private/internal deployments
 - [ ] `pnpm ci:check` green; smoke test on staging (signup → invite → upload →
       export → request deletion → cancel → expire grace → sweep → billing checkout)
