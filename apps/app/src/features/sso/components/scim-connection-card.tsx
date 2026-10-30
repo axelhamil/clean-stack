@@ -4,6 +4,7 @@ import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,7 +17,6 @@ import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-gu
 import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { disconnectScimMutationOptions, issueScimTokenMutationOptions } from "../api/sso.mutations";
 import {
   primaryProviderFor,

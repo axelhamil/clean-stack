@@ -20,6 +20,7 @@ import {
 import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useQuery } from "@tanstack/react-query";
 import { KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
@@ -31,7 +32,6 @@ import {
   type ImpersonationGuard,
   useImpersonationGuard,
 } from "../../../shared/auth/use-impersonation-guard";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { AddPasskeyForm } from "../forms/add-passkey-form";
 import { useDeletePasskey } from "../hooks/use-delete-passkey";
 

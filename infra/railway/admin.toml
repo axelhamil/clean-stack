@@ -8,6 +8,7 @@ watchPatterns = [
   "infra/caddy/**",
   "packages/ui/**",
   "packages/access-control/**",
+  "packages/staff-ui/**",
   "packages/web-kit/**",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",

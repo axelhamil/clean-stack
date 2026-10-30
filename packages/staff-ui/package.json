@@ -1,0 +1,44 @@
+{
+  "name": "@packages/staff-ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./staff-forms.schema": "./src/staff-forms.schema.ts",
+    "./*": "./src/*.tsx"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest watch"
+  },
+  "peerDependencies": {
+    "@hookform/resolvers": "^6.0.1",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-hook-form": "^7.91.0",
+    "react-i18next": "^17.1.9",
+    "zod": "^4.6.7",
+    "i18next": "^26.5.11"
+  },
+  "dependencies": {
+    "@packages/ui": "workspace:*",
+    "@packages/web-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^6.0.1",
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-hook-form": "^7.91.0",
+    "react-i18next": "^17.1.9",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7",
+    "i18next": "^26.5.11"
+  }
+}

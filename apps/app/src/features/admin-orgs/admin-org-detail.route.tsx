@@ -16,13 +16,13 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
 import { isOrgRole, ROLE_LABEL_KEYS } from "../../shared/auth/role-labels";
-import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { EMPTY_VALUE } from "../../shared/utils";
 import { adminOrgDetailQueryOptions } from "./api/admin-orgs.queries";
 

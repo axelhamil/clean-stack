@@ -3,6 +3,7 @@ import { meQueryOptions } from "../shared/api/queries/me";
 import { refusalRedirect } from "../shared/auth/refusal-redirect";
 import { StepUpGate } from "../shared/auth/step-up-gate";
 import { AdminShell } from "../shared/components/admin-shell";
+import { useStaffLiveUpdates } from "../shared/hooks/use-staff-live-updates";
 
 export const Route = createFileRoute("/_staff")({
   beforeLoad: async ({ context, location }) => {
@@ -18,10 +19,16 @@ export const Route = createFileRoute("/_staff")({
 
     return { me };
   },
-  component: () => (
+  component: StaffLayout,
+});
+
+function StaffLayout() {
+  useStaffLiveUpdates();
+
+  return (
     <AdminShell>
       <Outlet />
       <StepUpGate />
     </AdminShell>
-  ),
-});
+  );
+}

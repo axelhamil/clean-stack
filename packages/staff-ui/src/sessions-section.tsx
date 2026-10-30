@@ -9,15 +9,22 @@ import {
 } from "@packages/ui/components/ui/table";
 import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useTranslation } from "react-i18next";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
-import { EMPTY_VALUE } from "../../../shared/utils";
-import type { AdminUserDetail } from "../api/admin-users.queries";
 
-type Session = AdminUserDetail["sessions"][number];
+const EMPTY_VALUE = "-";
+
+export interface StaffSessionRow {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
+  impersonatedBy: string | null;
+}
 
 interface SessionsSectionProps {
-  sessions: Session[];
+  sessions: StaffSessionRow[];
 }
 
 export function SessionsSection({ sessions }: SessionsSectionProps) {
@@ -34,8 +41,12 @@ export function SessionsSection({ sessions }: SessionsSectionProps) {
           <TableHeader>
             <TableRow>
               <TableHead>{t("users.sessions.ipHeader")}</TableHead>
-              <TableHead>{t("users.sessions.browserHeader")}</TableHead>
-              <TableHead>{t("users.sessions.createdHeader")}</TableHead>
+              <TableHead className="hidden md:table-cell">
+                {t("users.sessions.browserHeader")}
+              </TableHead>
+              <TableHead className="hidden md:table-cell">
+                {t("users.sessions.createdHeader")}
+              </TableHead>
               <TableHead>{t("users.sessions.expiresHeader")}</TableHead>
               <TableHead>{t("users.sessions.typeHeader")}</TableHead>
             </TableRow>
@@ -44,10 +55,12 @@ export function SessionsSection({ sessions }: SessionsSectionProps) {
             {sessions.map((session) => (
               <TableRow key={session.id}>
                 <TableCell>{session.ipAddress ?? EMPTY_VALUE}</TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   <TruncatedText value={session.userAgent ?? EMPTY_VALUE} className="max-w-xs" />
                 </TableCell>
-                <TableCell>{formatDate(session.createdAt)}</TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {formatDate(session.createdAt)}
+                </TableCell>
                 <TableCell>{formatDate(session.expiresAt)}</TableCell>
                 <TableCell>
                   {session.impersonatedBy ? (

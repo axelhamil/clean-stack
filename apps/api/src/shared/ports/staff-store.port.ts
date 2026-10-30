@@ -10,6 +10,11 @@ export interface StaffOverrideRecord {
   expiresAt: Option<Date>;
 }
 
+export interface StaffOverrideRow extends StaffOverrideRecord {
+  id: string;
+  createdAt: Date;
+}
+
 export interface StaffRecord {
   userId: string;
   role: StaffRole;
@@ -44,4 +49,16 @@ export interface IStaffStore {
   }): Promise<Result<void, StaffStoreError>>;
   revoke(userId: string): Promise<Result<void, StaffStoreError>>;
   endImpersonationsBy(userId: string): Promise<Result<void, StaffStoreError>>;
+  listLiveOverrides(userId: string): Promise<Result<StaffOverrideRow[], StaffStoreError>>;
+  replaceOverride(input: {
+    userId: string;
+    permission: StaffPermission;
+    effect: "grant" | "deny";
+    expiresAt: Option<Date>;
+    createdBy: string;
+  }): Promise<Result<string, StaffStoreError>>;
+  revokeOverride(
+    userId: string,
+    overrideId: string,
+  ): Promise<Result<Option<StaffOverrideRecord>, StaffStoreError>>;
 }

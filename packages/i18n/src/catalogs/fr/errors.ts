@@ -157,6 +157,7 @@ export default {
     ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
       "C'est le dernier responsable. Ajoutez-en un autre avant de modifier cet accès.",
     ADMIN_STAFF_NOT_FOUND: "Cette personne ne fait pas partie de l'équipe.",
+    ADMIN_STAFF_OVERRIDE_NOT_FOUND: "Ce changement de permission n'existe plus.",
     ADMIN_USER_STAFF_TARGET_FORBIDDEN:
       "Seule une personne qui gère l'équipe peut agir sur un de ses membres.",
     IMPERSONATION_ACTION_FORBIDDEN:
@@ -274,6 +275,16 @@ export default {
     loadAdminOrgs: "Échec du chargement des organisations",
     loadAdminOrg: "Échec du chargement de l'organisation",
     updateAdminOrgSsoEnforcement: "Échec de la mise à jour de l'imposition du SSO",
+    loadStaff: "Échec du chargement de l'équipe",
+    setStaffRole: "Échec du changement de rôle",
+    revokeStaff: "Échec du retrait de l'équipe",
+    loadStaffOverrides: "Échec du chargement des changements de permissions",
+    setStaffOverride: "Échec de l'enregistrement du changement de permission",
+    removeStaffOverride: "Échec du retrait du changement de permission",
+    loadApprovals: "Échec du chargement des approbations",
+    loadApproval: "Échec du chargement de cette demande",
+    decideApproval: "Échec de l'enregistrement de la décision",
+    cancelApproval: "Échec de l'annulation de cette demande",
     loadAuditLog: "Échec du chargement du journal d'audit",
     verifyAuditChain: "Échec de la vérification de la chaîne",
     updateAvatar: "Échec de la mise à jour de l'avatar",

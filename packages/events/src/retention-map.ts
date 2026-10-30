@@ -73,6 +73,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.ADMIN_STAFF_ADDED]: "compliance",
   [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: "compliance",
   [EventTypes.ADMIN_STAFF_REVOKED]: "compliance",
+  [EventTypes.ADMIN_STAFF_OVERRIDE_SET]: "compliance",
+  [EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED]: "compliance",
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: "compliance",
   [EventTypes.ADMIN_STEP_UP_FAILED]: "compliance",
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: "compliance",

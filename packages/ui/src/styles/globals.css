@@ -4,6 +4,7 @@
 @import "@fontsource-variable/geist-mono/wght.css";
 
 @source "../../src/**/*.{js,ts,jsx,tsx}";
+@source "../../../staff-ui/src/**/*.tsx";
 
 @custom-variant dark (&:is(.dark *));
 

@@ -496,6 +496,21 @@ export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
 });
 export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
 
+export const AdminStaffOverrideSetPayload = ActorRef.extend(UserRef.shape).extend({
+  overrideId: z.string(),
+  permission: z.string(),
+  effect: z.enum(["grant", "deny"]),
+  expiresAt: z.string().nullable(),
+});
+export type AdminStaffOverrideSetPayload = z.infer<typeof AdminStaffOverrideSetPayload>;
+
+export const AdminStaffOverrideRevokedPayload = ActorRef.extend(UserRef.shape).extend({
+  overrideId: z.string(),
+  permission: z.string(),
+  effect: z.enum(["grant", "deny"]),
+});
+export type AdminStaffOverrideRevokedPayload = z.infer<typeof AdminStaffOverrideRevokedPayload>;
+
 export const AdminStepUpVerifiedPayload = UserRef.extend({
   validUntil: z.string(),
   ip: z.string().nullable(),
@@ -773,6 +788,8 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,
   [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: AdminStaffRoleChangedPayload,
   [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
+  [EventTypes.ADMIN_STAFF_OVERRIDE_SET]: AdminStaffOverrideSetPayload,
+  [EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED]: AdminStaffOverrideRevokedPayload,
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
   [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: AdminApprovalRequestedPayload,

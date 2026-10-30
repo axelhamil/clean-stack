@@ -153,6 +153,7 @@ export default {
     ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
       "This is the last manager. Add another manager before changing this access.",
     ADMIN_STAFF_NOT_FOUND: "This person is not on the staff.",
+    ADMIN_STAFF_OVERRIDE_NOT_FOUND: "This permission change no longer exists.",
     ADMIN_USER_STAFF_TARGET_FORBIDDEN:
       "Only someone who manages the staff can act on a staff member.",
     IMPERSONATION_ACTION_FORBIDDEN:
@@ -282,6 +283,16 @@ export default {
     // enforcement on an arbitrary organization, a different action from a
     // different source that happens to share the same English wording.
     updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
+    loadStaff: "Failed to load the team",
+    setStaffRole: "Failed to change this role",
+    revokeStaff: "Failed to remove this person from the team",
+    loadStaffOverrides: "Failed to load permission changes",
+    setStaffOverride: "Failed to save this permission change",
+    removeStaffOverride: "Failed to remove this permission change",
+    loadApprovals: "Failed to load approvals",
+    loadApproval: "Failed to load this request",
+    decideApproval: "Failed to record this decision",
+    cancelApproval: "Failed to cancel this request",
     loadAuditLog: "Failed to load audit log",
     verifyAuditChain: "Failed to verify chain",
     updateAvatar: "Failed to update avatar",

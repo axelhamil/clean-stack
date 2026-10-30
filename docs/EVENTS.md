@@ -485,6 +485,8 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 - `ADMIN_STAFF_ADDED` (`admin.staff.added`): a user joined the staff, or came back after a revocation. Payload: `{ actorUserId: string | null, userId: string, role: string, source: "env" | "console" }`. `actorUserId` is `null` for the bootstrap insert of an id listed in `PLATFORM_ADMIN_IDS`, which only the real insert announces.
 - `ADMIN_STAFF_ROLE_CHANGED` (`admin.staff.role_changed`): payload `{ actorUserId: string, userId: string, from: string, to: string }`.
 - `ADMIN_STAFF_REVOKED` (`admin.staff.revoked`): payload `{ actorUserId: string, userId: string, role: string }`. Also emitted by an account wipe, inside its transaction, with the member as actor since the deletion is their own request.
+- `ADMIN_STAFF_OVERRIDE_SET` (`admin.staff.override_set`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny", expiresAt: string | null }`. It replaces a live override of the same permission.
+- `ADMIN_STAFF_OVERRIDE_REVOKED` (`admin.staff.override_revoked`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny" }`.
 
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 

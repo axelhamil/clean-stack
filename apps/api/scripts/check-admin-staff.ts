@@ -11,7 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Result } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -342,6 +342,91 @@ async function proveModerationTarget(): Promise<void> {
       banListed.isFailure &&
       onPlain.isSuccess,
   );
+}
+
+async function proveOverrides(): Promise<void> {
+  const service = staffService();
+  await resetManagers([managerA, managerB]);
+
+  const denyManage = (targetUserId: string, actorUserId: string) =>
+    service.setOverride({
+      actorUserId,
+      targetUserId,
+      permission: "staff.manage",
+      effect: "deny",
+      expiresAt: Option.none(),
+    });
+
+  const racing = await Promise.all([
+    denyManage(managerA, managerB),
+    denyManage(managerB, managerA),
+  ]);
+  check(
+    "two managers denying each other staff management leave one holder",
+    racing.filter((result) => result.isSuccess).length === 1,
+  );
+
+  const [held] = await db
+    .select({ userId: staffSchema.staffPermissionOverride.userId })
+    .from(staffSchema.staffPermissionOverride)
+    .where(inArray(staffSchema.staffPermissionOverride.userId, [managerA, managerB]));
+  const denied = held?.userId ?? managerA;
+  const holder = denied === managerA ? managerB : managerA;
+  const lastHolderRevoked = await service.revoke({ actorUserId: plainUser, targetUserId: holder });
+  check(
+    "a manager denied staff management does not count as the last manager's backup",
+    lastHolderRevoked.isFailure &&
+      lastHolderRevoked.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
+  );
+
+  const live = await di.IStaffStore.listLiveOverrides(denied);
+  const [override] = live.isSuccess ? live.getValue() : [];
+  const removed = await service.removeOverride({
+    actorUserId: holder,
+    targetUserId: denied,
+    overrideId: override?.id ?? "",
+  });
+  check("removing the denial gives the backup back", removed.isSuccess);
+  const afterRemoval = await di.IStaffStore.listLiveOverrides(denied);
+  check(
+    "a removed override is no longer live",
+    afterRemoval.isSuccess && afterRemoval.getValue().length === 0,
+  );
+
+  const foreign = await service.removeOverride({
+    actorUserId: denied,
+    targetUserId: holder,
+    overrideId: override?.id ?? "",
+  });
+  check(
+    "an override id of another person answers not found",
+    foreign.isFailure && foreign.getError().code === "ADMIN_STAFF_OVERRIDE_NOT_FOUND",
+  );
+
+  await openImpersonation(holder);
+  const denyImpersonation = await service.setOverride({
+    actorUserId: denied,
+    targetUserId: holder,
+    permission: "users.impersonate",
+    effect: "deny",
+    expiresAt: Option.some(new Date(Date.now() + 60_000)),
+  });
+  check("a denial with an expiry is written", denyImpersonation.isSuccess);
+  check(
+    "a denial of impersonation ends the sessions they impersonate through",
+    (await impersonationSessionsOf(holder)) === 0,
+  );
+
+  const [event] = await db
+    .select({ payload: outboxSchema.outboxEvent.payload })
+    .from(outboxSchema.outboxEvent)
+    .where(
+      and(
+        eq(outboxSchema.outboxEvent.aggregateId, holder),
+        eq(outboxSchema.outboxEvent.eventType, EventTypes.ADMIN_STAFF_OVERRIDE_SET),
+      ),
+    );
+  check("the write announces its event in the same transaction", event !== undefined);
 }
 
 async function proveWipeRevokes(): Promise<void> {
@@ -707,6 +792,7 @@ async function main(): Promise<void> {
     await proveLastManagerHolds();
     await proveBanGuardHolds();
     await proveModerationTarget();
+    await proveOverrides();
     await proveWipeRevokes();
     await proveDeletionRefused();
   });

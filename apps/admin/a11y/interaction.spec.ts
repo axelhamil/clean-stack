@@ -29,11 +29,11 @@ function navOf(page: Page) {
 test("a signed-out visitor is sent to the app's sign-in with the page to come back to", async ({
   page,
 }) => {
-  await page.goto("/audit?from=x");
+  await page.goto("/audit?actor=x");
 
   await expect(page).toHaveURL(/\/sign-in\?redirect=/);
   const redirect = new URL(page.url()).searchParams.get("redirect");
-  expect(redirect).toMatch(/\/audit\?from=x$/);
+  expect(redirect).toMatch(/\/audit\?actor=x$/);
 });
 
 test.describe("signed in", () => {

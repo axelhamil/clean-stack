@@ -19,7 +19,7 @@ import {
 import { Textarea } from "@packages/ui/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { type BanFormInput, banFormSchema } from "../admin-users.schema";
+import { type BanFormInput, banFormSchema } from "./staff-forms.schema";
 
 function useDurationOptions() {
   const { t } = useTranslation("admin");

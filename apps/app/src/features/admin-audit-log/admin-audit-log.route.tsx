@@ -1,3 +1,5 @@
+import { AuditMetadataSheet } from "@packages/staff-ui/audit-metadata-sheet";
+import { ChainBadge } from "@packages/staff-ui/chain-badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
@@ -18,16 +20,18 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
-import { type AuditRow, auditLogInfiniteQueryOptions } from "./api/audit-log.queries";
+import {
+  type AuditRow,
+  auditLogInfiniteQueryOptions,
+  chainVerifyQueryOptions,
+} from "./api/audit-log.queries";
 import type { AuditLogFilters } from "./audit-log-filters";
 import { AuditTableRow } from "./components/audit-row";
-import { ChainBadge } from "./components/chain-badge";
-import { MetadataSheet } from "./components/metadata-sheet";
 
 const ALL_ACTIONS = "all";
 
@@ -42,11 +46,15 @@ function AdminAuditLogPage() {
   const [selected, setSelected] = useState<AuditRow | null>(null);
 
   const query = useInfiniteQuery(auditLogInfiniteQueryOptions(filters));
+  const verification = useQuery(chainVerifyQueryOptions);
   const rows = query.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
     <main className="flex flex-col gap-6">
-      <PageHeader title={t("auditLog.pageTitle")} actions={<ChainBadge />} />
+      <PageHeader
+        title={t("auditLog.pageTitle")}
+        actions={<ChainBadge verification={verification.data} />}
+      />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Select
@@ -141,7 +149,7 @@ function AdminAuditLogPage() {
         </Button>
       )}
 
-      <MetadataSheet row={selected} onClose={() => setSelected(null)} />
+      <AuditMetadataSheet row={selected} onClose={() => setSelected(null)} />
     </main>
   );
 }

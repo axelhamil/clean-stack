@@ -65,6 +65,10 @@
       "entry": ["src/**/*.ts"],
       "project": ["src/**/*.ts"]
     },
+    "packages/staff-ui": {
+      "entry": ["src/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
     "packages/test": {
       "project": ["src/**/*.ts"]
     }

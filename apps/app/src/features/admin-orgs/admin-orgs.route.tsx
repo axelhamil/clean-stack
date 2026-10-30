@@ -16,6 +16,7 @@ import {
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -26,7 +27,6 @@ import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { useStaffAccess } from "../../shared/auth/use-staff-access";
-import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { setOrgSsoEnforcementMutationOptions } from "./api/admin-orgs.mutations";
 import { adminOrgsInfiniteQueryOptions } from "./api/admin-orgs.queries";
 

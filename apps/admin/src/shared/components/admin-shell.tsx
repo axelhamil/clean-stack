@@ -19,7 +19,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { meQueryOptions } from "../api/queries/me";
 import { useSignOut } from "../auth/use-sign-out";
-import { sectionsOpenTo } from "../nav/sections";
+import { isSectionPath, sectionsOpenTo } from "../nav/sections";
 
 interface AdminShellProps {
   children: ReactNode;
@@ -42,7 +42,12 @@ function ShellNav({ onNavigate }: ShellNavProps) {
         </Link>
       </NavLink>
       {sectionsOpenTo(me.permissions).map((section) => (
-        <NavLink key={section.id} variant="pill" active={pathname === `/${section.id}`} asChild>
+        <NavLink
+          key={section.id}
+          variant="pill"
+          active={isSectionPath(pathname, section.id)}
+          asChild
+        >
           <Link to="/$section" params={{ section: section.id }} onClick={onNavigate}>
             {t(`backOffice.sections.${section.id}`)}
           </Link>

@@ -46,6 +46,16 @@ function setup(given: {
   store.assign.mockImplementation(async () => Result.ok());
   store.revoke.mockImplementation(async () => Result.ok());
   store.endImpersonationsBy.mockImplementation(async () => Result.ok());
+  store.replaceOverride.mockImplementation(async () => Result.ok("override-1"));
+  store.revokeOverride.mockImplementation(async () =>
+    Result.ok(
+      Option.some({
+        permission: "users.impersonate" as const,
+        effect: "grant" as const,
+        expiresAt: Option.none<Date>(),
+      }),
+    ),
+  );
 
   const users = mockPort<IAdminUserStore>();
   users.findUserById.mockImplementation(async () => Result.ok(given.user ?? Option.some(USER)));
@@ -65,6 +75,112 @@ const change = { actorUserId: ACTOR, targetUserId: TARGET };
 const onlyTargetManages: StaffManagerRecord[] = [{ userId: TARGET, source: "console" }];
 
 describe("StaffService", () => {
+  describe("permission overrides", () => {
+    const deny = {
+      ...change,
+      permission: "users.impersonate" as const,
+      effect: "deny" as const,
+      expiresAt: Option.none<Date>(),
+    };
+
+    it("refuses a change of one's own permissions", async () => {
+      const { store, service } = setup({ target: member("manager") });
+
+      const result = await service.setOverride({ ...deny, targetUserId: ACTOR });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_SELF_CHANGE_FORBIDDEN");
+      expect(store.replaceOverride).not.toHaveBeenCalled();
+    });
+
+    it("refuses a listed id", async () => {
+      const { store, service } = setup({ target: member("manager"), listed: [TARGET] });
+
+      const result = await service.setOverride(deny);
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_LISTED_FORBIDDEN");
+      expect(store.replaceOverride).not.toHaveBeenCalled();
+    });
+
+    it("refuses someone who is not on the staff", async () => {
+      const { service } = setup({});
+
+      const result = await service.setOverride(deny);
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_NOT_FOUND");
+    });
+
+    it("refuses to take staff management from the last manager", async () => {
+      const { store, service } = setup({
+        target: member("manager"),
+        managers: onlyTargetManages,
+      });
+
+      const result = await service.setOverride({ ...deny, permission: "staff.manage" });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_LAST_MANAGER_FORBIDDEN");
+      expect(store.replaceOverride).not.toHaveBeenCalled();
+    });
+
+    it("writes the override, announces it with the actor and the expiry", async () => {
+      const expiresAt = new Date("2030-01-01T00:00:00.000Z");
+      const { store, outbox, service } = setup({ target: member("manager") });
+
+      const result = await service.setOverride({
+        ...deny,
+        permission: "audit.read",
+        expiresAt: Option.some(expiresAt),
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.replaceOverride).toHaveBeenCalled();
+      const [event] = enqueuedEvents(outbox);
+      expect(event?.eventType).toBe(EventTypes.ADMIN_STAFF_OVERRIDE_SET);
+      expect(event?.payload).toMatchObject({
+        actorUserId: ACTOR,
+        userId: TARGET,
+        overrideId: "override-1",
+        effect: "deny",
+        expiresAt: expiresAt.toISOString(),
+      });
+    });
+
+    it("ends the impersonations of a person a write leaves without the permission", async () => {
+      const { store, service } = setup({ target: member("auditor") });
+
+      await service.setOverride(deny);
+
+      expect(store.endImpersonationsBy).toHaveBeenCalledWith(TARGET);
+    });
+
+    it("keeps the impersonations of a person who still holds the permission", async () => {
+      const { store, service } = setup({ target: member("manager") });
+
+      await service.setOverride({ ...deny, permission: "audit.read" });
+
+      expect(store.endImpersonationsBy).not.toHaveBeenCalled();
+    });
+
+    it("ends them when removing the grant that opened the permission", async () => {
+      const { store, outbox, service } = setup({ target: member("auditor") });
+
+      const result = await service.removeOverride({ ...change, overrideId: "override-1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.endImpersonationsBy).toHaveBeenCalledWith(TARGET);
+      expect(enqueuedEvents(outbox)[0]?.eventType).toBe(EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED);
+    });
+
+    it("answers not found for an override of someone else, and announces nothing", async () => {
+      const { store, outbox, service } = setup({ target: member("manager") });
+      store.revokeOverride.mockImplementation(async () => Result.ok(Option.none()));
+
+      const result = await service.removeOverride({ ...change, overrideId: "other" });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_OVERRIDE_NOT_FOUND");
+      expect(enqueuedEvents(outbox)).toEqual([]);
+    });
+  });
+
   describe("assignRole", () => {
     it("adds a user with no row and announces it with the actor", async () => {
       const { store, outbox, service } = setup({});

@@ -13,7 +13,7 @@ import { Input } from "@packages/ui/components/ui/input";
 import { Textarea } from "@packages/ui/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { type ImpersonateFormInput, impersonateFormSchema } from "../admin-users.schema";
+import { type ImpersonateFormInput, impersonateFormSchema } from "./staff-forms.schema";
 
 interface ImpersonateFormProps {
   isPending: boolean;

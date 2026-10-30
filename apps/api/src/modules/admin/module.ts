@@ -1,4 +1,4 @@
-import { type EventHandler, Result } from "@packages/ddd-kit";
+import { type EventHandler, Option, Result } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
@@ -147,6 +147,41 @@ export const adminModule = defineModule()((b) =>
           authorize: async () => Result.ok(),
           run: ({ subjectId }, actor) =>
             c.StaffService.revoke({ actorUserId: actor.userId, targetUserId: subjectId }),
+        },
+        "staff.permission_override": {
+          prepare: async ({ subjectId, params }, actor) => {
+            const refused =
+              params.op === "set"
+                ? await c.StaffService.refuseOverride({
+                    actorUserId: actor.userId,
+                    targetUserId: subjectId,
+                    permission: params.permission,
+                    effect: params.effect,
+                    expiresAt: Option.fromNullable(params.expiresAt).map((iso) => new Date(iso)),
+                  })
+                : await c.StaffService.refuseOverrideRemoval({
+                    actorUserId: actor.userId,
+                    targetUserId: subjectId,
+                    overrideId: params.overrideId,
+                  });
+
+            return refused.isFailure ? Result.fail(refused.getError()) : Result.ok(params);
+          },
+          authorize: async () => Result.ok(),
+          run: ({ subjectId, params }, actor) =>
+            params.op === "set"
+              ? c.StaffService.setOverride({
+                  actorUserId: actor.userId,
+                  targetUserId: subjectId,
+                  permission: params.permission,
+                  effect: params.effect,
+                  expiresAt: Option.fromNullable(params.expiresAt).map((iso) => new Date(iso)),
+                })
+              : c.StaffService.removeOverride({
+                  actorUserId: actor.userId,
+                  targetUserId: subjectId,
+                  overrideId: params.overrideId,
+                }),
         },
       }),
     )

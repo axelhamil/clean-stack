@@ -134,6 +134,7 @@ function setup(given: {
         given.prepared ?? Result.ok({ role: params.role, fromRole: "support" }),
     },
     "staff.revoke": handler,
+    "staff.permission_override": handler,
   };
 
   const instrumentation = new NoOpInstrumentation();

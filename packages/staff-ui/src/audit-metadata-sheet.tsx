@@ -7,10 +7,17 @@ import {
 } from "@packages/ui/components/ui/description-list";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@packages/ui/components/ui/sheet";
 import { TypographySmall } from "@packages/ui/components/ui/typography";
+import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useTranslation } from "react-i18next";
-import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
-import { EMPTY_VALUE } from "../../../shared/utils";
-import type { AuditRow } from "../api/audit-log.queries";
+
+const EMPTY_VALUE = "-";
+
+export interface AuditMetadataRow {
+  action: string;
+  actorId: string | null;
+  occurredAt: string;
+  metadata?: unknown;
+}
 
 interface MetadataDiff {
   before: unknown;
@@ -24,12 +31,12 @@ function diffOf(metadata: unknown): MetadataDiff | null {
   return { before: metadata.before, after: metadata.after };
 }
 
-interface MetadataSheetProps {
-  row: AuditRow | null;
+export interface AuditMetadataSheetProps {
+  row: AuditMetadataRow | null;
   onClose: () => void;
 }
 
-export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
+export function AuditMetadataSheet({ row, onClose }: AuditMetadataSheetProps) {
   const { t } = useTranslation("admin");
   const { t: tCommon } = useTranslation("common");
   const formatDateTime = useFormatDateTime();

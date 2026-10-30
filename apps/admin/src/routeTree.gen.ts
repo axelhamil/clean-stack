@@ -13,6 +13,14 @@ import { Route as routerStaffRouteImport } from './router/_staff'
 import { Route as featuresDeniedDeniedDotrouteRouteImport } from './features/denied/denied.route'
 import { Route as featuresHomeHomeDotrouteRouteImport } from './features/home/home.route'
 import { Route as featuresSectionsSectionDotrouteRouteImport } from './features/sections/section.route'
+import { Route as featuresApprovalsApprovalsDotrouteRouteImport } from './features/approvals/approvals.route'
+import { Route as featuresAuditAuditDotrouteRouteImport } from './features/audit/audit.route'
+import { Route as featuresOrgsOrgsDotrouteRouteImport } from './features/orgs/orgs.route'
+import { Route as featuresTeamTeamDotrouteRouteImport } from './features/team/team.route'
+import { Route as featuresUsersUsersDotrouteRouteImport } from './features/users/users.route'
+import { Route as featuresApprovalsApprovalDetailDotrouteRouteImport } from './features/approvals/approval-detail.route'
+import { Route as featuresOrgsOrgDetailDotrouteRouteImport } from './features/orgs/org-detail.route'
+import { Route as featuresUsersUserDetailDotrouteRouteImport } from './features/users/user-detail.route'
 
 const routerStaffRoute = routerStaffRouteImport.update({
   id: '/_staff',
@@ -36,16 +44,80 @@ const featuresSectionsSectionDotrouteRoute =
     path: '/$section',
     getParentRoute: () => routerStaffRoute,
   } as any)
+const featuresApprovalsApprovalsDotrouteRoute =
+  featuresApprovalsApprovalsDotrouteRouteImport.update({
+    id: '/approvals',
+    path: '/approvals',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresAuditAuditDotrouteRoute =
+  featuresAuditAuditDotrouteRouteImport.update({
+    id: '/audit',
+    path: '/audit',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresOrgsOrgsDotrouteRoute =
+  featuresOrgsOrgsDotrouteRouteImport.update({
+    id: '/orgs',
+    path: '/orgs',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresTeamTeamDotrouteRoute =
+  featuresTeamTeamDotrouteRouteImport.update({
+    id: '/team',
+    path: '/team',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresUsersUsersDotrouteRoute =
+  featuresUsersUsersDotrouteRouteImport.update({
+    id: '/users',
+    path: '/users',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresApprovalsApprovalDetailDotrouteRoute =
+  featuresApprovalsApprovalDetailDotrouteRouteImport.update({
+    id: '/approvals/$id',
+    path: '/approvals/$id',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresOrgsOrgDetailDotrouteRoute =
+  featuresOrgsOrgDetailDotrouteRouteImport.update({
+    id: '/orgs/$id',
+    path: '/orgs/$id',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresUsersUserDetailDotrouteRoute =
+  featuresUsersUserDetailDotrouteRouteImport.update({
+    id: '/users/$id',
+    path: '/users/$id',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/denied': typeof featuresDeniedDeniedDotrouteRoute
   '/': typeof featuresHomeHomeDotrouteRoute
   '/$section': typeof featuresSectionsSectionDotrouteRoute
+  '/approvals': typeof featuresApprovalsApprovalsDotrouteRoute
+  '/audit': typeof featuresAuditAuditDotrouteRoute
+  '/orgs': typeof featuresOrgsOrgsDotrouteRoute
+  '/team': typeof featuresTeamTeamDotrouteRoute
+  '/users': typeof featuresUsersUsersDotrouteRoute
+  '/approvals/$id': typeof featuresApprovalsApprovalDetailDotrouteRoute
+  '/orgs/$id': typeof featuresOrgsOrgDetailDotrouteRoute
+  '/users/$id': typeof featuresUsersUserDetailDotrouteRoute
 }
 export interface FileRoutesByTo {
   '/denied': typeof featuresDeniedDeniedDotrouteRoute
   '/': typeof featuresHomeHomeDotrouteRoute
   '/$section': typeof featuresSectionsSectionDotrouteRoute
+  '/approvals': typeof featuresApprovalsApprovalsDotrouteRoute
+  '/audit': typeof featuresAuditAuditDotrouteRoute
+  '/orgs': typeof featuresOrgsOrgsDotrouteRoute
+  '/team': typeof featuresTeamTeamDotrouteRoute
+  '/users': typeof featuresUsersUsersDotrouteRoute
+  '/approvals/$id': typeof featuresApprovalsApprovalDetailDotrouteRoute
+  '/orgs/$id': typeof featuresOrgsOrgDetailDotrouteRoute
+  '/users/$id': typeof featuresUsersUserDetailDotrouteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +125,56 @@ export interface FileRoutesById {
   '/_staff': typeof routerStaffRouteWithChildren
   '/_staff/': typeof featuresHomeHomeDotrouteRoute
   '/_staff/$section': typeof featuresSectionsSectionDotrouteRoute
+  '/_staff/approvals': typeof featuresApprovalsApprovalsDotrouteRoute
+  '/_staff/audit': typeof featuresAuditAuditDotrouteRoute
+  '/_staff/orgs': typeof featuresOrgsOrgsDotrouteRoute
+  '/_staff/team': typeof featuresTeamTeamDotrouteRoute
+  '/_staff/users': typeof featuresUsersUsersDotrouteRoute
+  '/_staff/approvals/$id': typeof featuresApprovalsApprovalDetailDotrouteRoute
+  '/_staff/orgs/$id': typeof featuresOrgsOrgDetailDotrouteRoute
+  '/_staff/users/$id': typeof featuresUsersUserDetailDotrouteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/denied' | '/' | '/$section'
+  fullPaths:
+    | '/denied'
+    | '/'
+    | '/$section'
+    | '/approvals'
+    | '/audit'
+    | '/orgs'
+    | '/team'
+    | '/users'
+    | '/approvals/$id'
+    | '/orgs/$id'
+    | '/users/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/denied' | '/' | '/$section'
-  id: '__root__' | '/denied' | '/_staff' | '/_staff/' | '/_staff/$section'
+  to:
+    | '/denied'
+    | '/'
+    | '/$section'
+    | '/approvals'
+    | '/audit'
+    | '/orgs'
+    | '/team'
+    | '/users'
+    | '/approvals/$id'
+    | '/orgs/$id'
+    | '/users/$id'
+  id:
+    | '__root__'
+    | '/denied'
+    | '/_staff'
+    | '/_staff/'
+    | '/_staff/$section'
+    | '/_staff/approvals'
+    | '/_staff/audit'
+    | '/_staff/orgs'
+    | '/_staff/team'
+    | '/_staff/users'
+    | '/_staff/approvals/$id'
+    | '/_staff/orgs/$id'
+    | '/_staff/users/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -97,17 +212,91 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof featuresSectionsSectionDotrouteRouteImport
       parentRoute: typeof routerStaffRoute
     }
+    '/_staff/approvals': {
+      id: '/_staff/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof featuresApprovalsApprovalsDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/audit': {
+      id: '/_staff/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof featuresAuditAuditDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/orgs': {
+      id: '/_staff/orgs'
+      path: '/orgs'
+      fullPath: '/orgs'
+      preLoaderRoute: typeof featuresOrgsOrgsDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/team': {
+      id: '/_staff/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof featuresTeamTeamDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/users': {
+      id: '/_staff/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof featuresUsersUsersDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/approvals/$id': {
+      id: '/_staff/approvals/$id'
+      path: '/approvals/$id'
+      fullPath: '/approvals/$id'
+      preLoaderRoute: typeof featuresApprovalsApprovalDetailDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/orgs/$id': {
+      id: '/_staff/orgs/$id'
+      path: '/orgs/$id'
+      fullPath: '/orgs/$id'
+      preLoaderRoute: typeof featuresOrgsOrgDetailDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
+    '/_staff/users/$id': {
+      id: '/_staff/users/$id'
+      path: '/users/$id'
+      fullPath: '/users/$id'
+      preLoaderRoute: typeof featuresUsersUserDetailDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
   }
 }
 
 interface routerStaffRouteChildren {
   featuresHomeHomeDotrouteRoute: typeof featuresHomeHomeDotrouteRoute
   featuresSectionsSectionDotrouteRoute: typeof featuresSectionsSectionDotrouteRoute
+  featuresApprovalsApprovalsDotrouteRoute: typeof featuresApprovalsApprovalsDotrouteRoute
+  featuresAuditAuditDotrouteRoute: typeof featuresAuditAuditDotrouteRoute
+  featuresOrgsOrgsDotrouteRoute: typeof featuresOrgsOrgsDotrouteRoute
+  featuresTeamTeamDotrouteRoute: typeof featuresTeamTeamDotrouteRoute
+  featuresUsersUsersDotrouteRoute: typeof featuresUsersUsersDotrouteRoute
+  featuresApprovalsApprovalDetailDotrouteRoute: typeof featuresApprovalsApprovalDetailDotrouteRoute
+  featuresOrgsOrgDetailDotrouteRoute: typeof featuresOrgsOrgDetailDotrouteRoute
+  featuresUsersUserDetailDotrouteRoute: typeof featuresUsersUserDetailDotrouteRoute
 }
 
 const routerStaffRouteChildren: routerStaffRouteChildren = {
   featuresHomeHomeDotrouteRoute: featuresHomeHomeDotrouteRoute,
   featuresSectionsSectionDotrouteRoute: featuresSectionsSectionDotrouteRoute,
+  featuresApprovalsApprovalsDotrouteRoute:
+    featuresApprovalsApprovalsDotrouteRoute,
+  featuresAuditAuditDotrouteRoute: featuresAuditAuditDotrouteRoute,
+  featuresOrgsOrgsDotrouteRoute: featuresOrgsOrgsDotrouteRoute,
+  featuresTeamTeamDotrouteRoute: featuresTeamTeamDotrouteRoute,
+  featuresUsersUsersDotrouteRoute: featuresUsersUsersDotrouteRoute,
+  featuresApprovalsApprovalDetailDotrouteRoute:
+    featuresApprovalsApprovalDetailDotrouteRoute,
+  featuresOrgsOrgDetailDotrouteRoute: featuresOrgsOrgDetailDotrouteRoute,
+  featuresUsersUserDetailDotrouteRoute: featuresUsersUserDetailDotrouteRoute,
 }
 
 const routerStaffRouteWithChildren = routerStaffRoute._addFileChildren(

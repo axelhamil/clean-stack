@@ -3,6 +3,7 @@ import { type AppError, Result } from "@packages/ddd-kit";
 import { z } from "zod";
 import { banUserBodySchema } from "./dto/ban-user.dto";
 import { setStaffRoleBodySchema } from "./dto/set-staff-role.dto";
+import { setStaffOverrideBodySchema } from "./dto/staff-override.dto";
 import type { ApprovalRecord } from "./ports/approval-store.port";
 
 const storedRoleChangeSchema = setStaffRoleBodySchema.extend({
@@ -11,16 +12,23 @@ const storedRoleChangeSchema = setStaffRoleBodySchema.extend({
 
 const emptyParamsSchema = z.object({});
 
+const overrideChangeSchema = z.discriminatedUnion("op", [
+  setStaffOverrideBodySchema.extend({ op: z.literal("set") }),
+  z.object({ op: z.literal("revoke"), overrideId: z.string().min(1) }),
+]);
+
 interface RequestParams {
   "user.ban_permanent": z.infer<typeof banUserBodySchema>;
   "staff.role_change": z.infer<typeof setStaffRoleBodySchema>;
   "staff.revoke": z.infer<typeof emptyParamsSchema>;
+  "staff.permission_override": z.infer<typeof overrideChangeSchema>;
 }
 
 interface StoredParams {
   "user.ban_permanent": z.infer<typeof banUserBodySchema>;
   "staff.role_change": z.infer<typeof storedRoleChangeSchema>;
   "staff.revoke": z.infer<typeof emptyParamsSchema>;
+  "staff.permission_override": z.infer<typeof overrideChangeSchema>;
 }
 
 export type ApprovedActionOf<K extends ApprovalAction> = {
@@ -74,5 +82,11 @@ export function readApprovedAction(
     }
     case "staff.revoke":
       return Result.ok({ action: record.action, subjectId, params: {} });
+    case "staff.permission_override": {
+      const parsed = overrideChangeSchema.safeParse(params);
+      if (!parsed.success) return Result.fail(invalidParams);
+
+      return Result.ok({ action: record.action, subjectId, params: parsed.data });
+    }
   }
 }
