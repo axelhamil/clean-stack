@@ -4,9 +4,11 @@ import { api } from "../api-client";
 import { throwApiError } from "../errors/api-error";
 import type { EntitlementsView } from "./billing-types";
 
+export const SUBSCRIPTION_QUERY_PREFIX = ["billing", "subscription"] as const;
+
 export const subscriptionQueryOptions = (organizationId: string | null) =>
   queryOptions({
-    queryKey: ["billing", "subscription", organizationId] as const,
+    queryKey: [...SUBSCRIPTION_QUERY_PREFIX, organizationId] as const,
     enabled: organizationId !== null,
     queryFn: async (): Promise<EntitlementsView> => {
       const res = await api.billing.subscription.$get();

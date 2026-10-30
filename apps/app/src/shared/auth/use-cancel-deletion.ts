@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { formatApiError } from "../../../shared/api/errors/messages";
-import { cancelAccountDeletionMutationOptions } from "../../../shared/api/mutations/cancel-account-deletion";
-import { useRefreshSession } from "../../../shared/auth/use-refresh-session";
+import { formatApiError } from "../api/errors/messages";
+import { cancelAccountDeletionMutationOptions } from "../api/mutations/cancel-account-deletion";
+import { useRefreshSession } from "./use-refresh-session";
 
 export function useCancelDeletion() {
   const { t } = useTranslation("settings");

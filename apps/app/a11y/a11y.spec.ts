@@ -18,6 +18,7 @@ function formatViolation(violation: Violation): string {
 }
 
 async function audit(page: Page, target: AuditedPage, expectedLocale: Locale): Promise<void> {
+  await target.prepare?.(page);
   await page.goto(target.path);
 
   // A gate redirect (missing session, stale policies) renders a page that satisfies

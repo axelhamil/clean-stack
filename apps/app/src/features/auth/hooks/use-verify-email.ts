@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { authClient } from "../../../shared/auth/auth-client";
 import { resolveAuthError } from "../auth-error";
+import { takePostVerifyRedirect } from "../post-verify-redirect";
 import { useCompleteSignIn } from "./use-complete-sign-in";
 
 export function useVerifyEmail() {
@@ -19,6 +20,6 @@ export function useVerifyEmail() {
 
       return data;
     },
-    onSuccess: () => completeSignIn(),
+    onSuccess: () => completeSignIn(takePostVerifyRedirect()),
   });
 }

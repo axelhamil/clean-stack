@@ -55,13 +55,20 @@ function AcceptInvitationPage() {
   }
 
   if (!session) {
+    const redirect = `/accept-invitation/${invitationId}`;
+
     return (
       <main className={pageClassName}>
         <TypographyH1 variant="page">{t("invitation.signInTitle")}</TypographyH1>
         <TypographyMuted>{t("invitation.signInBody")}</TypographyMuted>
         <Button asChild>
-          <Link to="/sign-in" search={{ redirect: `/accept-invitation/${invitationId}` }}>
+          <Link to="/sign-in" search={{ redirect }}>
             {tAuth("signIn.submit")}
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link to="/sign-up" search={{ redirect }}>
+            {t("invitation.createAccount")}
           </Link>
         </Button>
       </main>

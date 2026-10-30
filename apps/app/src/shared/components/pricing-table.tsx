@@ -18,9 +18,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { toastError } from "../api/errors/toast";
 import { upgradeSubscriptionMutationOptions } from "../api/mutations/upgrade-subscription";
 import { plansQueryOptions } from "../api/queries/billing-plans";
 import type { PlanCatalogItem } from "../api/queries/billing-types";
+import { errorFallback } from "../i18n/get-errors-t";
 
 export interface PricingCtaArgs {
   isAuthenticated: boolean | null;
@@ -103,7 +105,10 @@ export function PricingTable({ isAuthenticated, currentTier, activeOrgId }: Pric
   };
   const { data: plans = [], isPending, isLoadingError } = useQuery(plansQueryOptions);
   const navigate = useNavigate();
-  const upgrade = useMutation(upgradeSubscriptionMutationOptions);
+  const upgrade = useMutation({
+    ...upgradeSubscriptionMutationOptions,
+    onError: (err) => toastError(err, errorFallback("upgradeSubscription")),
+  });
 
   if (isPending) return <PricingTableSkeleton label={t("pricing.loading")} />;
 

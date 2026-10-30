@@ -211,6 +211,9 @@ export default {
       readFull: "Read the full {{title}}",
       acceptButton: "Accept and continue",
       acceptingButton: "Accepting…",
+      declineButton: "Decline and sign out",
+      loadFailed:
+        "The policies you need to accept could not be loaded. Retry, or sign out and come back later.",
     },
     routes: {
       dataRights: "Data rights (RGPD)",
@@ -286,7 +289,8 @@ export default {
   },
   invitation: {
     signInTitle: "Sign in to accept",
-    signInBody: "You need to be signed in to accept this invitation.",
+    signInBody: "Sign in or create an account with the invited email to accept this invitation.",
+    createAccount: "Create an account",
     joinTitle: "Join the organization",
     signedInAs:
       "Signed in as {{email}}. If this is the wrong account, sign out and sign back in with the invited email.",

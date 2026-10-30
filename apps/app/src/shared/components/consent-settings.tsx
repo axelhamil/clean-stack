@@ -8,9 +8,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { toastError } from "../api/errors/toast";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
 import { withdrawConsentMutationOptions } from "../api/mutations/withdraw-consent";
 import { consentQueryOptions } from "../api/queries/consent";
+import { errorFallback } from "../i18n/get-errors-t";
 
 type OptionalKey = (typeof OPTIONAL_CATEGORIES)[number];
 
@@ -48,11 +50,13 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
   const record = useMutation({
     ...recordConsentMutationOptions,
     onSuccess: () => settle(t("cookieConsent.savedToast")),
+    onError: (err) => toastError(err, errorFallback("recordConsent")),
   });
 
   const withdraw = useMutation({
     ...withdrawConsentMutationOptions,
     onSuccess: () => settle(t("cookieConsent.withdrawnToast")),
+    onError: (err) => toastError(err, errorFallback("withdrawConsent")),
   });
 
   const isPending = record.isPending || withdraw.isPending;

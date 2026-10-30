@@ -5,10 +5,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { toastError } from "../api/errors/toast";
 import { stopImpersonationMutationOptions } from "../api/mutations/stop-impersonation";
 import { sessionQueryOptions } from "../api/queries/session";
 import { broadcastAuthChange } from "../auth/auth-broadcast";
 import { isImpersonating } from "../auth/is-impersonating";
+import { errorFallback } from "../i18n/get-errors-t";
 import { displayName } from "../utils";
 
 export function ImpersonationBanner() {
@@ -25,6 +27,7 @@ export function ImpersonationBanner() {
       broadcastAuthChange({ identityChanged: true });
       void navigate({ to: "/admin/users" });
     },
+    onError: (err) => toastError(err, errorFallback("stopImpersonation")),
   });
 
   useEffect(() => {

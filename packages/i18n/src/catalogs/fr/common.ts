@@ -215,6 +215,9 @@ export default {
       readFull: "Lire « {{title}} » en intégralité",
       acceptButton: "Accepter et continuer",
       acceptingButton: "Acceptation…",
+      declineButton: "Refuser et se déconnecter",
+      loadFailed:
+        "Les politiques à accepter n'ont pas pu être chargées. Réessayez, ou déconnectez-vous et revenez plus tard.",
     },
     routes: {
       dataRights: "Droits sur les données (RGPD)",
@@ -291,7 +294,9 @@ export default {
   },
   invitation: {
     signInTitle: "Connectez-vous pour accepter",
-    signInBody: "Connectez-vous pour accepter cette invitation.",
+    signInBody:
+      "Connectez-vous ou créez un compte avec l'adresse e-mail invitée pour accepter cette invitation.",
+    createAccount: "Créer un compte",
     joinTitle: "Rejoindre l'organisation",
     signedInAs:
       "Session en cours avec {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
