@@ -10,6 +10,7 @@ import {
   lt,
   multiTenantSchema,
   or,
+  resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -19,7 +20,10 @@ import type {
   AdminSessionRow,
   AdminStoreError,
   AdminUserRow,
+  BanWrite,
+  EndedSession,
   IAdminUserStore,
+  UnbanOutcome,
 } from "../../application/ports/admin-user-store.port";
 
 const fail = createDbFailure("ADMIN_QUERY_PROVIDER_FAILURE");
@@ -73,6 +77,12 @@ function toSessionRow(row: SessionSelection): AdminSessionRow {
     userAgent: Option.fromNullable(row.userAgent),
     impersonatedBy: Option.fromNullable(row.impersonatedBy),
   };
+}
+
+function sessionsHeldOrImpersonatedBy(userId: string) {
+  const { session } = authSchema;
+
+  return or(eq(session.userId, userId), eq(session.impersonatedBy, userId));
 }
 
 export class DrizzleAdminUserStore implements IAdminUserStore {
@@ -206,6 +216,90 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "admin membership list failed");
+        }
+      },
+    );
+  }
+
+  async ban(input: BanWrite): Promise<Result<Option<EndedSession[]>, AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > ban" }, async () => {
+      try {
+        const { session, user } = authSchema;
+        const written = await exec
+          .update(user)
+          .set({
+            banned: true,
+            banReason: input.reason,
+            banExpires: input.expiresAt.toNull(),
+            updatedAt: new Date(),
+          })
+          .where(eq(user.id, input.userId))
+          .returning({ id: user.id });
+        if (written.length === 0) return Result.ok(Option.none());
+
+        const ended = await exec
+          .delete(session)
+          .where(sessionsHeldOrImpersonatedBy(input.userId))
+          .returning({ id: session.id, userId: session.userId });
+
+        return Result.ok(Option.some(ended));
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin ban failed");
+      }
+    });
+  }
+
+  async unban(userId: string): Promise<Result<UnbanOutcome, AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > unban" }, async () => {
+      try {
+        const { user } = authSchema;
+        const written = await exec
+          .update(user)
+          .set({ banned: false, banReason: null, banExpires: null, updatedAt: new Date() })
+          .where(and(eq(user.id, userId), eq(user.banned, true)))
+          .returning({ id: user.id });
+        if (written.length > 0) return Result.ok("unbanned");
+
+        const [existing] = await exec
+          .select({ id: user.id })
+          .from(user)
+          .where(eq(user.id, userId))
+          .limit(1);
+
+        return Result.ok(existing ? "not_banned" : "not_found");
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin unban failed");
+      }
+    });
+  }
+
+  async deleteSessions(userId: string): Promise<Result<EndedSession[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > deleteSessions" },
+      async () => {
+        try {
+          const { session } = authSchema;
+          const query = exec
+            .delete(session)
+            .where(sessionsHeldOrImpersonatedBy(userId))
+            .returning({ id: session.id, userId: session.userId });
+          const ended = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(ended);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin session deletion failed");
         }
       },
     );

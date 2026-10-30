@@ -403,12 +403,12 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **90 events** (35 public + 55 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **92 events** (35 public + 57 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
 - `USER_SIGNED_IN`: `databaseHooks.session.create.after`
-- `USER_SIGNED_OUT`: `databaseHooks.session.delete.after`
+- `USER_SIGNED_OUT`: `databaseHooks.session.delete.after` (null `actorUserId`), or `AdminModerationService` when an admin ended the session (the admin as `actorUserId`)
 - `USER_ACCOUNT_UNLINKED`: `databaseHooks.account.delete.after` (skip credential)
 
 ### Via `hooks.after` + `createAuthMiddleware` (path-based, plugin events)
@@ -451,16 +451,23 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 **Phase D.5: 1 new internal event** (non-subscribable, non-fanout; `retention: "operational"`):
 - `EMAIL_DELIVERY_EXHAUSTED` (`email.delivery.exhausted`): an `email_message` row exceeded the retry ceiling and was dead-lettered. Payload: `{ messageId: string, toAddress: string, kind: string, attempts: number }`. Never fans out to user webhook endpoints: it is an infrastructure signal for operator alerting.
 
-### Via `AdminActionService` / `AdminImpersonationRoutes` (Phase C.3)
+### Via `AdminModerationService` (Phase C.3, atomic since Phase K)
 
-Emitted via `emitEvent(outbox, ...)` in `modules/admin/` routes and `AdminActionService`. All 6 events carry `actorUserId` (the operator's id, distinct from `userId` which is the target): actor identification is explicit, never inferred from session state. All events have `organizationId = null` (platform-level, no org context) and `retention: "compliance"`.
+Emitted via `emitEvent(outbox, ...)` by `AdminModerationService`, inside the `uow.run` of the write. **Residual window**: impersonation only exists in the auth library, which commits on its own connection, so it runs last in the unit; a commit that fails after it leaves the action without its event. A password reset is the opposite: its event commits first and the mail follows, a failed mail is retried by the admin. All 6 events carry `actorUserId` (the operator's id, distinct from `userId` which is the target): actor identification is explicit, never inferred from session state. All events have `organizationId = null` (platform-level, no org context) and `retention: "compliance"`.
 
-- `ADMIN_IMPERSONATION_STARTED` (`admin.impersonation.started`): emitted in `POST /admin/impersonation/:id/start` after the BetterAuth impersonation session is issued. Payload: `{ actorUserId: string, userId: string, reason: string, ticketRef?: string, ip: string | null, expiresAt: string }`. `reason` is never empty (min 1 char enforced at the API boundary).
-- `ADMIN_IMPERSONATION_STOPPED` (`admin.impersonation.stopped`): emitted in `POST /admin/impersonation/stop` **only** if BetterAuth `stopImpersonating` succeeds. Payload: `{ actorUserId: string, userId: string, durationMs: number }`.
-- `ADMIN_USER_BANNED` (`admin.user.banned`): emitted by `AdminActionService.ban`. Payload: `{ actorUserId: string, userId: string, reason: string, expiresAt: string | null }`. `expiresAt: null` means a permanent ban.
-- `ADMIN_USER_UNBANNED` (`admin.user.unbanned`): emitted by `AdminActionService.unban`. Payload: `{ actorUserId: string, userId: string }`.
-- `ADMIN_USER_PASSWORD_RESET` (`admin.user.password_reset`): emitted by `AdminActionService.forcePasswordReset` (triggers a BetterAuth reset email). Payload: `{ actorUserId: string, userId: string }`.
-- `ADMIN_USER_SESSIONS_REVOKED` (`admin.user.sessions_revoked`): emitted by `AdminActionService.revokeSessions`. Payload: `{ actorUserId: string, userId: string, count: number }`. `count` is the number of sessions deleted.
+- `ADMIN_IMPERSONATION_STARTED` (`admin.impersonation.started`): emitted in the unit of `POST /admin/impersonation/:id/start`, the BetterAuth session is issued right after and a refusal rolls the event back. Payload: `{ actorUserId: string, userId: string, reason: string, ticketRef?: string, ip: string | null, expiresAt: string }`. `reason` is never empty (min 1 char enforced at the API boundary).
+- `ADMIN_IMPERSONATION_STOPPED` (`admin.impersonation.stopped`): emitted in the unit of `POST /admin/impersonation/stop`, rolled back if BetterAuth `stopImpersonating` refuses. Payload: `{ actorUserId: string, userId: string, durationMs: number }`.
+- `ADMIN_USER_BANNED` (`admin.user.banned`): emitted by `AdminModerationService.ban`, along with one `user.signed_out` per ended session. Payload: `{ actorUserId: string, userId: string, reason: string, expiresAt: string | null }`. `expiresAt: null` means a permanent ban.
+- `ADMIN_USER_UNBANNED` (`admin.user.unbanned`): emitted by `AdminModerationService.unban`, only if the user was banned, and when a sign-in clears an expired ban (null actor). Payload: `{ actorUserId: string | null, userId: string }`.
+- `ADMIN_USER_PASSWORD_RESET` (`admin.user.password_reset`): emitted by `AdminModerationService.resetPassword` (triggers a BetterAuth reset email). Payload: `{ actorUserId: string, userId: string }`.
+- `ADMIN_USER_SESSIONS_REVOKED` (`admin.user.sessions_revoked`): emitted by `AdminModerationService.revokeSessions`, along with one `user.signed_out` per ended session. Payload: `{ actorUserId: string, userId: string, count: number }`. `count` is the number of sessions deleted.
+
+### Via `StepUpService` (Phase K)
+
+Internal, compliance retention. The subject is the actor, so `userId` stands for it.
+
+- `ADMIN_STEP_UP_VERIFIED` (`admin.step_up.verified`): a code opened a confirmation for a session, in the same unit as its row. Payload: `{ userId: string, validUntil: string, ip: string | null }`.
+- `ADMIN_STEP_UP_FAILED` (`admin.step_up.failed`): a wrong or replayed code. Best effort, the refusal stands if the write fails. Payload: `{ userId: string, reason: "invalid_code" | "replayed_code", ip: string | null }`.
 
 ### Via `StaffService` / `StaffAccessService` (Phase K)
 
@@ -566,7 +573,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (90 events: 35 public + 55 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (92 events: 35 public + 57 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |

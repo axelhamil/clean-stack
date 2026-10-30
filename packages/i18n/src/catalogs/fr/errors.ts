@@ -117,6 +117,20 @@ export default {
       "Vous n'avez pas la permission d'accéder à cette organisation.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "Vous n'êtes pas membre de cette organisation.",
     ADMIN_STAFF_FORBIDDEN: "Cet espace est réservé à l'équipe de la plateforme.",
+    ADMIN_REAUTH_REQUIRED:
+      "Confirmez cette action avec un code de votre application d'authentification.",
+    ADMIN_STEP_UP_MFA_FORBIDDEN:
+      "Activez l'authentification à deux facteurs pour confirmer cette action.",
+    ADMIN_PASSWORD_RESET_UNAVAILABLE:
+      "L'email de réinitialisation n'a pas pu être envoyé. Les sessions de l'utilisateur ont été fermées, réessayez.",
+    ADMIN_STEP_UP_CODE_INVALID:
+      "Ce code n'est pas valide. Vérifiez votre application d'authentification.",
+    ADMIN_STEP_UP_REPLAY_INVALID: "Ce code a déjà servi. Attendez le suivant.",
+    ADMIN_STEP_UP_SESSION_NOT_FOUND: "Cette session est terminée. Reconnectez-vous.",
+    ADMIN_USER_NOT_FOUND: "Ce compte n'existe plus.",
+    ADMIN_USER_SELF_BAN_FORBIDDEN: "Vous ne pouvez pas suspendre votre propre compte.",
+    ADMIN_IMPERSONATION_FORBIDDEN: "Vous ne pouvez pas voir le produit avec ce compte.",
+    ADMIN_STOP_IMPERSONATION_FORBIDDEN: "L'emprunt d'identité n'a pas pu être arrêté.",
     ADMIN_STAFF_MFA_FORBIDDEN:
       "Activez l'authentification à deux facteurs pour utiliser l'espace de l'équipe.",
     ADMIN_STAFF_PERMISSION_FORBIDDEN: "Votre rôle dans l'équipe ne permet pas cette action.",
@@ -197,6 +211,7 @@ export default {
     recordConsent: "Échec de l'enregistrement du consentement",
     requestAccountDeletion: "Échec de la demande de suppression du compte",
     requestDataExport: "Échec de la demande d'export",
+    verifyStepUp: "Échec de la vérification de ce code",
     stopImpersonation: "Échec de l'arrêt de l'emprunt d'identité",
     withdrawConsent: "Échec du retrait du consentement",
     loadPlans: "Échec du chargement des forfaits",

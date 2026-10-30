@@ -116,6 +116,13 @@ export default {
       },
     },
   },
+  stepUp: {
+    title: "Confirm it's you",
+    description: "Enter the code from your authenticator app, then repeat your action.",
+    codeLabel: "Authenticator code",
+    submit: "Confirm",
+    confirmedToast: "Confirmed. You can repeat your action.",
+  },
   auditLog: {
     pageTitle: "Audit log",
     allActionsPlaceholder: "All actions",

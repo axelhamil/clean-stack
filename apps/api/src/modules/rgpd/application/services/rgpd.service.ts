@@ -9,6 +9,7 @@ import type { IInstrumentation } from "../../../../shared/ports/instrumentation.
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
+import type { ITotpVerifier } from "../../../../shared/ports/totp-verifier.port";
 import {
   grantsStaffAccess,
   isLastManager,
@@ -87,6 +88,7 @@ export class RgpdService {
     private readonly instrumentation: IInstrumentation,
     private readonly staff: IStaffStore,
     private readonly staffEnv: StaffListing,
+    private readonly totp: ITotpVerifier,
   ) {}
 
   async preflightAccountDeletion(
@@ -140,9 +142,9 @@ export class RgpdService {
               message: "two-factor TOTP code required",
             });
 
-          const totpResult = await this.rgpd.verifyTotp(input.userId, input.totpCode);
+          const totpResult = await this.totp.consume(input.userId, input.totpCode);
           if (totpResult.isFailure) return Result.fail(totpResult.getError());
-          if (!totpResult.getValue())
+          if (totpResult.getValue() !== "accepted")
             return Result.fail({ code: "TWO_FACTOR_INVALID", message: "invalid TOTP code" });
         } else {
           if (!input.password)

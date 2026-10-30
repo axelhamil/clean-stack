@@ -74,6 +74,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.ADMIN_STAFF_ADDED]: "A user joined the platform staff with a staff role.",
   [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: "A staff manager changed a staff member's role.",
   [EventTypes.ADMIN_STAFF_REVOKED]: "A staff manager removed a staff member's access.",
+  [EventTypes.ADMIN_STEP_UP_VERIFIED]: "A staff member confirmed a sensitive action with a code.",
+  [EventTypes.ADMIN_STEP_UP_FAILED]: "A staff member's confirmation code was refused.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
     "A platform administrator started an impersonation session.",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]:

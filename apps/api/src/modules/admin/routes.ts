@@ -1,21 +1,16 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { auth } from "../../auth";
 import { di } from "../../container";
+import { deliverPasswordReset } from "../../shared/auth/password-reset-delivery";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
-import { AdminActionService } from "../../shared/services/admin-action.service";
+import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
-import { banUserBodySchema } from "./application/dto/ban-user.dto";
+import { banNeedsStepUp, banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import type { AdminUserRow } from "./application/ports/admin-user-store.port";
 import type { AdminUserDetail } from "./application/services/admin-query.service";
-
-const actionSvc = new AdminActionService(
-  di.IOutboxRepository,
-  di.ITransactionService,
-  di.IInstrumentation,
-);
 
 async function findUserOr404(userId: string): Promise<AdminUserDetail> {
   const result = await di.AdminQueryService.getUser(userId);
@@ -76,15 +71,16 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       const actor = c.get("user");
       const userId = c.req.param("id");
       const body = c.req.valid("json");
+      if (banNeedsStepUp(body)) await assertStepUp(actor, c.get("session"));
+
       const result = await di.StaffService.moderateBan(
         { actorPermissions: c.get("staff").permissions, targetUserId: userId },
         () =>
-          actionSvc.ban({
+          di.AdminModerationService.ban({
             actorUserId: actor.id,
             userId,
             reason: body.reason,
             expiresIn: body.expiresIn,
-            headers: c.req.raw.headers,
           }),
       );
       if (result.isFailure) throw new AppErrorException(result.getError());
@@ -96,7 +92,7 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     const userId = c.req.param("id");
     const result = await di.StaffService.moderate(
       { actorPermissions: c.get("staff").permissions, targetUserId: userId },
-      () => actionSvc.unban({ actorUserId: actor.id, userId, headers: c.req.raw.headers }),
+      () => di.AdminModerationService.unban({ actorUserId: actor.id, userId }),
     );
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
@@ -108,12 +104,12 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     const result = await di.StaffService.moderate(
       { actorPermissions: c.get("staff").permissions, targetUserId: userId },
       () =>
-        actionSvc.resetPassword({
-          actorUserId: actor.id,
-          userId,
-          email: u.email,
-          headers: c.req.raw.headers,
-        }),
+        di.AdminModerationService.resetPassword({ actorUserId: actor.id, userId }, () =>
+          deliverPasswordReset(
+            () => auth.api.requestPasswordReset({ body: { email: u.email } }),
+            (error) => di.IInstrumentation.capture(error),
+          ),
+        ),
     );
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
@@ -121,16 +117,10 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
   .delete("/:id/sessions", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
     const actor = c.get("user");
     const userId = c.req.param("id");
-    const u = await findUserOr404(userId);
+    await findUserOr404(userId);
     const result = await di.StaffService.moderate(
       { actorPermissions: c.get("staff").permissions, targetUserId: userId },
-      () =>
-        actionSvc.revokeSessions({
-          actorUserId: actor.id,
-          userId,
-          count: u.sessions.length,
-          headers: c.req.raw.headers,
-        }),
+      () => di.AdminModerationService.revokeSessions({ actorUserId: actor.id, userId }),
     );
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });

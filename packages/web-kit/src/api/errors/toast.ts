@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { getErrorsT } from "../../i18n/get-errors-t";
 import { apiErrorFields } from "./api-error";
 import { formatApiError } from "./messages";
+import { isStepUpRefusal } from "./step-up-refusal";
 
 /**
  * Surfaces an error as a toast, resolving its copy the same way
@@ -15,10 +16,11 @@ import { formatApiError } from "./messages";
  * of silently swallowed into copy that says nothing.
  *
  * A 429 is skipped because the global query-error handler already shows the
- * single rate-limit toast, with its retry delay.
+ * single rate-limit toast, with its retry delay. A step-up refusal is skipped
+ * because the prompt it opens already says what to do.
  */
 export function toastError(err: unknown, fallback: string): void {
-  if (apiErrorFields(err).status === 429) return;
+  if (apiErrorFields(err).status === 429 || isStepUpRefusal(err)) return;
 
   toast.error(formatApiError(err, fallback, getErrorsT()));
 }

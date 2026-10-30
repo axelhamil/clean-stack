@@ -21,6 +21,7 @@ export type UserSignedInPayload = z.infer<typeof UserSignedInPayload>;
 
 export const UserSignedOutPayload = UserRef.extend({
   sessionId: z.string(),
+  actorUserId: z.string().nullable(),
 });
 export type UserSignedOutPayload = z.infer<typeof UserSignedOutPayload>;
 
@@ -464,7 +465,9 @@ export const AdminUserBannedPayload = ActorRef.extend(UserRef.shape).extend({
 });
 export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 
-export const AdminUserUnbannedPayload = ActorRef.extend(UserRef.shape);
+export const AdminUserUnbannedPayload = UserRef.extend({
+  actorUserId: z.string().nullable(),
+});
 export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
 export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);
@@ -492,6 +495,18 @@ export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
   role: z.string(),
 });
 export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
+
+export const AdminStepUpVerifiedPayload = UserRef.extend({
+  validUntil: z.string(),
+  ip: z.string().nullable(),
+});
+export type AdminStepUpVerifiedPayload = z.infer<typeof AdminStepUpVerifiedPayload>;
+
+export const AdminStepUpFailedPayload = UserRef.extend({
+  reason: z.enum(["invalid_code", "replayed_code"]),
+  ip: z.string().nullable(),
+});
+export type AdminStepUpFailedPayload = z.infer<typeof AdminStepUpFailedPayload>;
 
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
@@ -725,6 +740,8 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,
   [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: AdminStaffRoleChangedPayload,
   [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
+  [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
+  [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,

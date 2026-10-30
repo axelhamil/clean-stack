@@ -20,6 +20,8 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
   requireStaffPermission: (permission: string) => async () => {
     throw new HTTPException(GATE_STATUS, { message: permission });
   },
+  requireStepUp: async (_c: unknown, next: () => Promise<void>) => next(),
+  assertStepUp: async () => {},
 }));
 
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
@@ -41,6 +43,7 @@ app.onError((err, c) =>
 
 const REQUIRED: Record<string, string> = {
   "GET /admin/me": "staff",
+  "POST /admin/step-up": "staff",
   "GET /admin/staff": "staff.manage",
   "PUT /admin/staff/:id/role": "staff.manage",
   "DELETE /admin/staff/:id": "staff.manage",

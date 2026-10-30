@@ -6,7 +6,17 @@
  */
 
 import { Option } from "@packages/ddd-kit";
-import { and, count, desc, eq, resolveExecutor, schema, sql, ssoSchema } from "@packages/drizzle";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  lt,
+  resolveExecutor,
+  schema,
+  sql,
+  ssoSchema,
+} from "@packages/drizzle";
 import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
 
 // ── #1: ensurePersonalOrgFor queries ──────────────────────────────────────
@@ -75,6 +85,23 @@ export async function clearConfirmedPendingEmail(userId: string, email: string):
     .set({ pendingEmail: null })
     .where(and(eq(schema.user.id, userId), eq(schema.user.pendingEmail, email)))
     .returning({ id: schema.user.id });
+  return cleared.length > 0;
+}
+
+export async function clearExpiredBan(userId: string): Promise<boolean> {
+  const exec = resolveExecutor();
+  const cleared = await exec
+    .update(schema.user)
+    .set({ banned: false, banReason: null, banExpires: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.user.id, userId),
+        eq(schema.user.banned, true),
+        lt(schema.user.banExpires, new Date()),
+      ),
+    )
+    .returning({ id: schema.user.id });
+
   return cleared.length > 0;
 }
 

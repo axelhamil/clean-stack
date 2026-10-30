@@ -6,11 +6,15 @@ import { StaffAccessService } from "../../shared/services/staff-access.service";
 import { notifyImpersonatedUser } from "./application/event-handlers/notify-impersonated-user";
 import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
 import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
+import type { IStepUpStore } from "./application/ports/step-up-store.port";
+import { AdminModerationService } from "./application/services/admin-moderation.service";
 import { AdminQueryService } from "./application/services/admin-query.service";
 import { StaffService } from "./application/services/staff.service";
+import { StepUpService } from "./application/services/step-up.service";
 import { DrizzleAdminOrgStore } from "./infrastructure/repositories/drizzle-admin-org.store";
 import { DrizzleAdminUserStore } from "./infrastructure/repositories/drizzle-admin-user.store";
 import { DrizzleStaffStore } from "./infrastructure/repositories/drizzle-staff.store";
+import { DrizzleStepUpStore } from "./infrastructure/repositories/drizzle-step-up.store";
 
 declare module "inwire" {
   interface AppDeps {
@@ -20,6 +24,9 @@ declare module "inwire" {
     IStaffStore: IStaffStore;
     StaffAccessService: StaffAccessService;
     StaffService: StaffService;
+    AdminModerationService: AdminModerationService;
+    IStepUpStore: IStepUpStore;
+    StepUpService: StepUpService;
     NotifyImpersonatedUser: EventHandler;
   }
 }
@@ -43,6 +50,23 @@ export const adminModule = defineModule()((b) =>
         new StaffService(
           c.IStaffStore,
           c.IAdminUserStore,
+          c.IOutboxRepository,
+          c.ITransactionService,
+          env,
+        ),
+    )
+    .add(
+      "AdminModerationService",
+      (c) =>
+        new AdminModerationService(c.IAdminUserStore, c.IOutboxRepository, c.ITransactionService),
+    )
+    .add("IStepUpStore", (c): IStepUpStore => new DrizzleStepUpStore(c.IInstrumentation))
+    .add(
+      "StepUpService",
+      (c) =>
+        new StepUpService(
+          c.IStepUpStore,
+          c.ITotpVerifier,
           c.IOutboxRepository,
           c.ITransactionService,
           env,

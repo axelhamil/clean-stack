@@ -1,8 +1,57 @@
-import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, type Page, test } from "@playwright/test";
 import { STORAGE_STATE } from "./playwright.config";
 import { signInForm, tabTo } from "./sign-in";
 
 type ThemeProbe = Window & { __themeTransitioned?: boolean };
+
+const STEP_UP_TARGET = "a11y-step-up-target";
+
+async function fulfillAsStaffWithRefusedImpersonation(page: Page): Promise<void> {
+  const allow = (origin?: string) => ({
+    "access-control-allow-origin": origin ?? "*",
+    "access-control-allow-credentials": "true",
+  });
+
+  await page.route("**/api/auth/get-session*", async (route) => {
+    const response = await route.fetch();
+    const session = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...session,
+        staff: { role: "manager", permissions: ["users.read", "users.impersonate"], mfaOk: true },
+      },
+    });
+  });
+  await page.route(`**/admin/users/${STEP_UP_TARGET}`, (route) => {
+    if (route.request().resourceType() === "document") return route.fallback();
+
+    return route.fulfill({
+      headers: allow(route.request().headers().origin),
+      json: {
+        id: STEP_UP_TARGET,
+        name: "Step-up target",
+        email: "step-up-target@example.com",
+        emailVerified: true,
+        role: "user",
+        banned: false,
+        banReason: null,
+        banExpires: null,
+        createdAt: new Date().toISOString(),
+        sessions: [],
+        memberships: [],
+      },
+    });
+  });
+  await page.route(`**/admin/impersonation/${STEP_UP_TARGET}/start`, (route) =>
+    route.fulfill({
+      status: 403,
+      headers: allow(route.request().headers().origin),
+      json: { error: { code: "ADMIN_REAUTH_REQUIRED", message: "Confirm." } },
+    }),
+  );
+}
 
 test("reaches every sign-in control in order with the keyboard", async ({ page }) => {
   await page.goto("/sign-in");
@@ -50,6 +99,79 @@ test("reaches and operates the SSO entry with the keyboard", async ({ page }) =>
 
 test.describe("signed in", () => {
   test.use({ storageState: STORAGE_STATE });
+
+  test("opens the step-up prompt over a refused action and gives focus back on Escape", async ({
+    page,
+  }) => {
+    await fulfillAsStaffWithRefusedImpersonation(page);
+    await page.goto(`/admin/users/${STEP_UP_TARGET}`);
+
+    await page.getByRole("button", { name: "Impersonate", exact: true }).click();
+    const action = page.getByRole("dialog", { name: "Impersonate account" });
+    const reason = action.getByRole("textbox", { name: "Reason" });
+    await reason.fill("ticket 42");
+    await action.getByRole("button", { name: "Start impersonation" }).click();
+
+    const prompt = page.getByRole("dialog", { name: "Confirm it's you" });
+    const code = prompt.getByRole("textbox", { name: "Authenticator code" });
+    await expect(code).toBeFocused();
+
+    for (let press = 0; press < 8; press += 1) {
+      await page.keyboard.press("Tab");
+      const inside = await prompt.evaluate((node) => node.contains(document.activeElement));
+      expect(inside).toBe(true);
+    }
+
+    const audit = await new AxeBuilder({ page })
+      .include('[role="dialog"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const blocking = audit.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    );
+    expect(blocking).toEqual([]);
+
+    await page.keyboard.press("Escape");
+    await expect(prompt).toBeHidden();
+    await expect(action).toBeVisible();
+    const backInside = await action.evaluate((node) => node.contains(document.activeElement));
+    expect(backInside).toBe(true);
+  });
+
+  test("ignores a code refusal that lands after the prompt was cancelled", async ({ page }) => {
+    await fulfillAsStaffWithRefusedImpersonation(page);
+    await page.route("**/admin/step-up", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({
+        status: 400,
+        headers: {
+          "access-control-allow-origin": route.request().headers().origin ?? "*",
+          "access-control-allow-credentials": "true",
+        },
+        json: { error: { code: "ADMIN_STEP_UP_CODE_INVALID", message: "Invalid." } },
+      });
+    });
+    await page.goto(`/admin/users/${STEP_UP_TARGET}`);
+
+    await page.getByRole("button", { name: "Impersonate", exact: true }).click();
+    const action = page.getByRole("dialog", { name: "Impersonate account" });
+    await action.getByRole("textbox", { name: "Reason" }).fill("ticket 42");
+    const start = action.getByRole("button", { name: "Start impersonation" });
+    await start.click();
+
+    const prompt = page.getByRole("dialog", { name: "Confirm it's you" });
+    await prompt.getByRole("textbox", { name: "Authenticator code" }).fill("123456");
+    await prompt.getByRole("button", { name: "Confirm" }).click();
+    await prompt.getByRole("button", { name: "Cancel" }).click();
+    await expect(prompt).toBeHidden();
+
+    const refusal = page.waitForResponse("**/admin/step-up");
+    await refusal;
+    await start.click();
+    await expect(prompt).toBeVisible();
+    await expect(prompt.getByRole("textbox", { name: "Authenticator code" })).toHaveValue("");
+    await expect(prompt.getByText("This code is not valid")).toBeHidden();
+  });
 
   test("traps focus inside the command palette", async ({ page }) => {
     await page.goto("/dashboard");

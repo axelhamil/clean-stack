@@ -10,6 +10,15 @@ type AuthVariables = {
   session: SessionData | null;
 };
 
+export function isCurrentlyBanned(user: {
+  banned?: boolean | null;
+  banExpires?: Date | null;
+}): boolean {
+  if (user.banned !== true) return false;
+
+  return !user.banExpires || new Date(user.banExpires).getTime() > Date.now();
+}
+
 export const sessionMiddleware = createMiddleware<{
   Variables: AuthVariables;
 }>(async (c, next) => {
@@ -30,6 +39,12 @@ export const sessionMiddleware = createMiddleware<{
     c.req.path !== IMPERSONATION_STOP_PATH &&
     !(await di.StaffAccessService.impersonatorHolds(impersonator))
   ) {
+    c.set("user", null);
+    c.set("session", null);
+    return next();
+  }
+
+  if (result && isCurrentlyBanned(result.user) && c.req.path !== IMPERSONATION_STOP_PATH) {
     c.set("user", null);
     c.set("session", null);
     return next();

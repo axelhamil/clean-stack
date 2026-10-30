@@ -17,7 +17,7 @@
  */
 
 import "./check-auth-transaction.env";
-import { checkRecorder } from "./check-harness";
+import { checkRecorder, seedTwoFactor } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-auth-transaction");
@@ -40,7 +40,6 @@ import {
   type Transaction,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { symmetricEncrypt } from "better-auth/crypto";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
@@ -286,14 +285,6 @@ async function main(): Promise<void> {
         password,
       }),
     );
-  const twoFactorRow = async (userId: string, secret: string, verified: boolean) =>
-    db.insert(authSchema.twoFactor).values({
-      id: `${userId}-two-factor`,
-      userId,
-      secret: await symmetricEncrypt({ key: authContext.secretConfig, data: secret }),
-      backupCodes: "[]",
-      verified,
-    });
   const totpNow = (secret: string) => createOTP(secret, TOTP_OPTIONS).totp();
   const secret = `check-auth-transaction-secret-${crypto.randomUUID()}`;
   const GEO_DENIED = EventTypes.SECURITY_GEO_DENIED;
@@ -351,7 +342,7 @@ async function main(): Promise<void> {
     .update(authSchema.user)
     .set({ twoFactorEnabled: true })
     .where(eq(authSchema.user.id, disabling.id));
-  await twoFactorRow(disabling.id, secret, true);
+  await seedTwoFactor(disabling.id, secret, true);
   const disablingSession = await authContext.internalAdapter.createSession(disabling.id, false);
   const disabled = await call(
     "KP",
@@ -377,7 +368,7 @@ async function main(): Promise<void> {
   );
 
   const enrolling = await seededUser();
-  await twoFactorRow(enrolling.id, secret, false);
+  await seedTwoFactor(enrolling.id, secret, false);
   const enrollingSession = await authContext.internalAdapter.createSession(enrolling.id, false);
   const enrolled = await call(
     "KP",
@@ -395,7 +386,7 @@ async function main(): Promise<void> {
     .update(authSchema.user)
     .set({ twoFactorEnabled: true })
     .where(eq(authSchema.user.id, signingIn.id));
-  await twoFactorRow(signingIn.id, secret, true);
+  await seedTwoFactor(signingIn.id, secret, true);
   await asVisitor("JP", () => authContext.internalAdapter.createSession(signingIn.id, false));
   await authContext.internalAdapter.createSession(signingIn.id, false);
 

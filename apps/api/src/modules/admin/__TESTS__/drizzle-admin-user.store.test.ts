@@ -47,6 +47,7 @@ mock.module("@packages/drizzle", () => ({
   db: {
     select: () => makeDbQuery(),
   },
+  resolveExecutor: () => ({ select: () => makeDbQuery() }),
   authSchema: {
     user: {
       id: {},

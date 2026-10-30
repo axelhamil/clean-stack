@@ -15,6 +15,7 @@ import { quotaModule } from "./modules/quotas/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
+import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
 import { buildEventDispatcher } from "./shared/event-handlers";
@@ -30,6 +31,7 @@ import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.port";
 import type { ISessionGeoStore } from "./shared/ports/session-geo.port";
+import type { ITotpVerifier } from "./shared/ports/totp-verifier.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
@@ -37,6 +39,7 @@ import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service"
 import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
+import { DrizzleTotpVerifier } from "./shared/services/drizzle-totp-verifier";
 import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HeaderIpGeoService } from "./shared/services/header-ip-geo.service";
@@ -65,6 +68,7 @@ declare module "inwire" {
     ITransactionService: IUnitOfWork & OutermostUnitOfWork;
     IEmailQueue: IEmailQueue;
     IEmailService: IEmailService;
+    ITotpVerifier: ITotpVerifier;
     IOutboxRepository: IOutboxRepository;
     IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
@@ -158,6 +162,10 @@ export const di = container()
         countryHeader: env.GEO_COUNTRY_HEADER,
         asnHeader: env.GEO_ASN_HEADER,
       }),
+  )
+  .add(
+    "ITotpVerifier",
+    (c): ITotpVerifier => new DrizzleTotpVerifier(c.IInstrumentation, authSecretKey(env)),
   )
   .add("ISessionGeoStore", (c): ISessionGeoStore => new DrizzleSessionGeoStore(c.IInstrumentation))
   .add(

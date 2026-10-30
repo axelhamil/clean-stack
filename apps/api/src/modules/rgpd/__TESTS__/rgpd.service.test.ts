@@ -13,6 +13,7 @@ import type {
   StaffRecord,
 } from "../../../shared/ports/staff-store.port";
 import type { IStorageService } from "../../../shared/ports/storage.port";
+import type { ITotpVerifier } from "../../../shared/ports/totp-verifier.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   ExecuteWipeOutput,
@@ -87,7 +88,6 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
       }),
     ),
     verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(true)),
-    verifyTotp: mock(async () => Result.ok<boolean, RgpdError>(true)),
     touchExportRequestedAt: mock(async () => Result.ok<RgpdError>()),
     getUserDeletionState: mock(async () =>
       Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(baseState)),
@@ -130,6 +130,7 @@ function buildService(deps: {
   instrumentation?: IInstrumentation;
   staff?: IStaffStore;
   listed?: string[];
+  totp?: ITotpVerifier;
 }): RgpdService {
   return new RgpdService(
     deps.repo,
@@ -140,7 +141,15 @@ function buildService(deps: {
     deps.instrumentation ?? new NoOpInstrumentation(),
     deps.staff ?? makeStaff(Option.none(), []),
     { PLATFORM_ADMIN_IDS: deps.listed ?? [] },
+    deps.totp ?? acceptingTotp(),
   );
+}
+
+function acceptingTotp() {
+  const totp = mockPort<ITotpVerifier>();
+  totp.consume.mockImplementation(async () => Result.ok("accepted"));
+
+  return totp;
 }
 
 function makeStaff(row: Option<StaffRecord>, managers: StaffManagerRecord[]) {
@@ -285,9 +294,10 @@ describe("RgpdService", () => {
             Option.some({ ...baseState, twoFactorEnabled: true }),
           ),
         ),
-        verifyTotp: mock(async () => Result.ok<boolean, RgpdError>(false)),
       });
-      const service = buildService({ repo, email });
+      const totp = mockPort<ITotpVerifier>();
+      totp.consume.mockImplementation(async () => Result.ok("invalid"));
+      const service = buildService({ repo, email, totp });
 
       const result = await service.requestAccountDeletion({ userId: "u1", totpCode: "000000" });
 

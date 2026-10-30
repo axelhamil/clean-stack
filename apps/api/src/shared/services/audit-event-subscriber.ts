@@ -7,14 +7,14 @@ import type { BuiltInEventHandler } from "../event-handlers";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { DeliveredEvent } from "../ports/outbox.port";
 import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
-import { ACTOR_KEYS, readUserId } from "./event-actor";
+import { readActorId } from "./event-actor";
 
 const al = auditLogSchema.auditLog;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const CHAIN_LOCK = sql`select pg_advisory_xact_lock(hashtext('audit_log_chain'))`;
 
 function extractActor(event: DeliveredEvent): { id: string | null; type: AuditActorType } {
-  const actorId = readUserId(event.payload, ACTOR_KEYS);
+  const actorId = readActorId(event.payload);
   if (actorId.isNone()) return { id: null, type: "system" };
 
   return { id: actorId.unwrap(), type: "user" };

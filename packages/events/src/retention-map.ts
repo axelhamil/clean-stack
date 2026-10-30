@@ -73,6 +73,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.ADMIN_STAFF_ADDED]: "compliance",
   [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: "compliance",
   [EventTypes.ADMIN_STAFF_REVOKED]: "compliance",
+  [EventTypes.ADMIN_STEP_UP_VERIFIED]: "compliance",
+  [EventTypes.ADMIN_STEP_UP_FAILED]: "compliance",
   [EventTypes.API_TOKEN_CREATED]: "compliance",
   [EventTypes.API_TOKEN_REVOKED]: "compliance",
   [EventTypes.API_TOKEN_USED]: "operational",

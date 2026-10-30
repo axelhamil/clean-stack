@@ -24,15 +24,6 @@ mock.module("../../event-emitter", () => ({
   ),
 }));
 
-const authApi = {
-  banUser: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
-  unbanUser: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
-  revokeUserSessions: mock(async (_args: unknown) => ({ success: true })),
-  requestPasswordReset: mock(async (_args: unknown) => ({ status: true })),
-};
-
-mock.module("../../../auth", () => ({ auth: { api: authApi } }));
-
 const writeTransactions: unknown[] = [];
 const setOrgSsoEnforced = mock(async (_organizationId: string, _enforced: boolean) => {
   writeTransactions.push(UnitOfWorkContext.transaction());
@@ -48,120 +39,7 @@ function service(unitOfWork = mockUnitOfWork().unitOfWork) {
   return new AdminActionService({} as never, unitOfWork, instrumentation);
 }
 
-function makeHeaders(token = "tok-1") {
-  return new Headers({ authorization: `Bearer ${token}`, cookie: "session=abc" });
-}
-
 describe("AdminActionService", () => {
-  describe("ban", () => {
-    it("passes headers to auth.api.banUser", async () => {
-      authApi.banUser.mockClear();
-      const headers = makeHeaders();
-      await service().ban({ actorUserId: "admin-1", userId: "u-2", reason: "spam", headers });
-      expect(authApi.banUser).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("emits admin.user.banned with the actor distinct from the subject", async () => {
-      emitted.length = 0;
-      const result = await service().ban({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        reason: "spam",
-        headers: makeHeaders(),
-      });
-      expect(result.isSuccess).toBe(true);
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_BANNED);
-      expect(event?.payload.actorUserId).toBe("admin-1");
-      expect(event?.payload.userId).toBe("u-2");
-    });
-
-    it("fails and captures when BetterAuth rejects the ban", async () => {
-      authApi.banUser.mockImplementationOnce(async () => {
-        throw new Error("nope");
-      });
-      const result = await service().ban({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        reason: "spam",
-        headers: makeHeaders(),
-      });
-      expect(result.isFailure).toBe(true);
-      expect(instrumentation.capture).toHaveBeenCalled();
-    });
-  });
-
-  describe("unban", () => {
-    it("passes headers to auth.api.unbanUser", async () => {
-      authApi.unbanUser.mockClear();
-      const headers = makeHeaders();
-      await service().unban({ actorUserId: "admin-1", userId: "u-2", headers });
-      expect(authApi.unbanUser).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("emits admin.user.unbanned with the actor distinct from the subject", async () => {
-      emitted.length = 0;
-      const result = await service().unban({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        headers: makeHeaders(),
-      });
-      expect(result.isSuccess).toBe(true);
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_UNBANNED);
-      expect(event?.payload.actorUserId).toBe("admin-1");
-      expect(event?.payload.userId).toBe("u-2");
-    });
-  });
-
-  describe("revokeSessions", () => {
-    it("passes headers to auth.api.revokeUserSessions", async () => {
-      authApi.revokeUserSessions.mockClear();
-      const headers = makeHeaders();
-      await service().revokeSessions({ actorUserId: "admin-1", userId: "u-2", count: 3, headers });
-      expect(authApi.revokeUserSessions).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("emits admin.user.sessions_revoked with the actor distinct from the subject", async () => {
-      emitted.length = 0;
-      const result = await service().revokeSessions({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        count: 3,
-        headers: makeHeaders(),
-      });
-      expect(result.isSuccess).toBe(true);
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_SESSIONS_REVOKED);
-      expect(event?.payload.actorUserId).toBe("admin-1");
-      expect(event?.payload.userId).toBe("u-2");
-    });
-  });
-
-  describe("resetPassword", () => {
-    it("passes headers to auth.api.revokeUserSessions before the reset email", async () => {
-      authApi.revokeUserSessions.mockClear();
-      const headers = makeHeaders();
-      await service().resetPassword({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        email: "a@example.com",
-        headers,
-      });
-      expect(authApi.revokeUserSessions).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("revokes sessions before sending the reset email", async () => {
-      emitted.length = 0;
-      await service().resetPassword({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        email: "a@example.com",
-        headers: makeHeaders(),
-      });
-      expect(authApi.revokeUserSessions).toHaveBeenCalled();
-      expect(authApi.requestPasswordReset).toHaveBeenCalled();
-      expect(emitted.some((e) => e.type === EventTypes.ADMIN_USER_PASSWORD_RESET)).toBe(true);
-    });
-  });
-
   describe("setSsoEnforcement", () => {
     it("writes the flag and emits the event in one committed unit of work", async () => {
       setOrgSsoEnforced.mockClear();
