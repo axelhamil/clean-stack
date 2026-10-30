@@ -27,11 +27,14 @@ type OrgVariables = {
 };
 
 export const requireOrg = createMiddleware<{ Variables: OrgVariables }>(async (c, next) => {
-  const session = c.get("session");
-  if (!session?.activeOrganizationId)
-    throw new HTTPException(403, { message: "No active organization" });
+  const orgId = c.get("session")?.activeOrganizationId;
+  if (!orgId) throw new HTTPException(403, { message: "No active organization" });
 
-  c.set("orgId", session.activeOrganizationId);
+  const role = parseRole(await findActiveMemberRole(c.get("user").id, orgId));
+  if (!role) throw new HTTPException(403, { message: "No active organization" });
+
+  c.set("orgId", orgId);
+  c.set("orgRole", role);
   await next();
 });
 

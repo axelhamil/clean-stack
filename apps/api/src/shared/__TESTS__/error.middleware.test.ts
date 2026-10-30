@@ -2,7 +2,7 @@ import { describe, expect, it, spyOn } from "bun:test";
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { createErrorHandler } from "../middleware/error.middleware";
+import { createErrorHandler, SERVER_ERROR_MESSAGE } from "../middleware/error.middleware";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
@@ -65,8 +65,56 @@ describe("errorHandler", () => {
       error: { code: string; message: string; stack?: string };
     };
     expect(body.error.code).toBe("INTERNAL_ERROR");
-    expect(body.error.message).toBe("Internal Server Error");
+    expect(body.error.message).toBe(SERVER_ERROR_MESSAGE);
     expect(typeof body.error.stack).toBe("string");
+  });
+
+  describe("server error body", () => {
+    const DRIVER_TEXT = 'relation "user" does not exist at 10.0.0.5:5432';
+
+    it("replaces the message and drops the metadata of an AppErrorException at 5xx", async () => {
+      const app = makeApp().get("/", () => {
+        throw new AppErrorException({
+          code: "BILLING_PROVIDER_FAILURE",
+          message: DRIVER_TEXT,
+          metadata: { cause: DRIVER_TEXT },
+        });
+      });
+      const res = await app.request("/");
+      expect(res.status).toBe(502);
+      expect(await res.json()).toEqual({
+        error: {
+          code: "BILLING_PROVIDER_FAILURE",
+          message: SERVER_ERROR_MESSAGE,
+          requestId: "req-test-123",
+        },
+      });
+    });
+
+    it("replaces the message of an HTTPException at 5xx", async () => {
+      const app = makeApp().get("/", () => {
+        throw new HTTPException(503, { message: DRIVER_TEXT });
+      });
+      const res = await app.request("/");
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({
+        error: { code: "HTTP_503", message: SERVER_ERROR_MESSAGE, requestId: "req-test-123" },
+      });
+    });
+
+    it("still hands telemetry the original error with its cause", async () => {
+      const { captureSpy, instrumentation } = makeSpy();
+      const err = new AppErrorException({
+        code: "BILLING_PROVIDER_FAILURE",
+        message: DRIVER_TEXT,
+        metadata: { cause: DRIVER_TEXT },
+      });
+      const app = makeApp(instrumentation).get("/", () => {
+        throw err;
+      });
+      await app.request("/");
+      expect(captureSpy.mock.calls[0]?.[0]).toBe(err);
+    });
   });
 
   describe("capture spy, 500 errors", () => {

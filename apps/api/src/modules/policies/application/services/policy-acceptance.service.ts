@@ -2,6 +2,7 @@ import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { POLICY_TYPES, POLICY_VERSIONS, type PolicyType } from "@packages/policies";
 import { emitEvent } from "../../../../shared/event-emitter";
+import { logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IPolicyAcceptanceStore, PolicyError } from "../ports/policy-acceptance.port";
@@ -56,10 +57,10 @@ export class PolicyAcceptanceService {
       });
     } catch (err) {
       this.instrumentation.capture(err);
+      logger.error({ err }, "policy acceptance failed");
       return Result.fail({
         code: "POLICY_ACCEPTANCE_PROVIDER_FAILURE",
         message: "policy acceptance failed",
-        metadata: { cause: err instanceof Error ? err.message : String(err) },
       });
     }
   }

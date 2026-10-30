@@ -39,9 +39,11 @@ function buildApp(opts: {
 }
 
 describe("requireOrg", () => {
-  it("should set orgId on context when session has an activeOrganizationId", async () => {
+  it("should set orgId on context when the user is a member of the active organization", async () => {
+    nextRole = "member";
     const res = await buildApp({
       session: { activeOrganizationId: "org-123" },
+      user: { id: "user-1" },
       middleware: requireOrg,
     }).request("/test");
     expect(res.status).toBe(200);
@@ -51,6 +53,16 @@ describe("requireOrg", () => {
   it("should reject with 403 when no active organization is in session", async () => {
     const res = await buildApp({
       session: { activeOrganizationId: null },
+      middleware: requireOrg,
+    }).request("/test");
+    expect(res.status).toBe(403);
+  });
+
+  it("should reject with 403 when the session still names an organization the user left", async () => {
+    nextRole = null;
+    const res = await buildApp({
+      session: { activeOrganizationId: "org-123" },
+      user: { id: "kicked-user" },
       middleware: requireOrg,
     }).request("/test");
     expect(res.status).toBe(403);

@@ -30,6 +30,12 @@ mock.module("../../../shared/services/scim-connection.service", () => ({
   },
 }));
 
+const realAuthQueries = await import("../../../auth-queries");
+mock.module("../../../auth-queries", () => ({
+  ...realAuthQueries,
+  findActiveMemberRole: async () => "owner",
+}));
+
 const { organizationSettingsRoutes } = await import("../routes");
 
 function makeApp() {

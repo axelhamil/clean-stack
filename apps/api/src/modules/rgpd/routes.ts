@@ -3,8 +3,15 @@ import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
+import { requireRateLimit } from "../../shared/middleware/rate-limit.middleware";
+import { ACCOUNT_DELETE_POLICY } from "../../shared/middleware/rate-limit.policies";
 import { zV } from "../../shared/validator";
 import { requestDeletionBodySchema } from "./application/dto/request-account-deletion.dto";
+
+const accountDeleteRateLimit = requireRateLimit(
+  { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
+  ACCOUNT_DELETE_POLICY,
+);
 
 export const rgpdMeRoutes = new Hono<{ Variables: AuthVariables }>()
   .post("/export", requireAuth, denyImpersonated, async (c) => {
@@ -25,6 +32,7 @@ export const rgpdMeRoutes = new Hono<{ Variables: AuthVariables }>()
     "/delete",
     requireAuth,
     denyImpersonated,
+    accountDeleteRateLimit,
     zV("json", requestDeletionBodySchema),
     async (c) => {
       const result = await di.RgpdService.requestAccountDeletion({

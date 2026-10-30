@@ -101,6 +101,15 @@ export const AUTH_TWO_FACTOR_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
+export const ACCOUNT_DELETE_POLICY: PolicyConfig = {
+  name: "account-delete",
+  keyFn: (c) => `account-delete:${c.get("user")?.id}`,
+  windows: [{ policyName: "account-delete", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
+  failClosed: true,
+  advertiseBudget: false,
+};
+
 // /verify-email: GET with ?token= (token consumption path).
 export const AUTH_VERIFY_EMAIL_POLICY: PolicyConfig = {
   name: "auth-verify-email",
