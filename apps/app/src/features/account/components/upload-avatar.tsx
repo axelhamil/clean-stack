@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@packages/ui/components/ui/avatar";
 import { Button } from "@packages/ui/components/ui/button";
+import { Input } from "@packages/ui/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -56,13 +57,11 @@ export function UploadAvatar({ name, guard }: UploadAvatarProps) {
         {image ? <AvatarImage src={image} alt={name} /> : null}
         <AvatarFallback>{getInitials(name)}</AvatarFallback>
       </Avatar>
-      <input
+      <Input
         ref={inputRef}
         type="file"
         accept="image/*"
-        aria-label={t("account.uploadAvatarLabel")}
-        className="sr-only"
-        tabIndex={-1}
+        className="hidden"
         onChange={handleFileChange}
       />
       <Button

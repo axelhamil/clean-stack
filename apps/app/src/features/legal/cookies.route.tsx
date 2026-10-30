@@ -1,7 +1,8 @@
 import { CONSENT_CATEGORIES } from "@packages/cookie-consent";
 import { toLocale } from "@packages/i18n";
-import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
+import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -12,10 +13,8 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import {
-  TypographyH1,
   TypographyH2,
   TypographyInlineCode,
-  TypographyMuted,
   TypographyP,
 } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -56,7 +55,7 @@ function CookieTable({ cookies, caption }: CookieTableProps) {
               <TypographyInlineCode>{cookie.name}</TypographyInlineCode>
             </TableCell>
             <TableCell>{cookie.provider}</TableCell>
-            <TableCell className="whitespace-normal">{cookie.purpose}</TableCell>
+            <TableCell className="min-w-56 whitespace-normal">{cookie.purpose}</TableCell>
             <TableCell>{cookie.retention}</TableCell>
           </TableRow>
         ))}
@@ -69,26 +68,21 @@ function CookiesPage() {
   const { t, i18n } = useTranslation("common");
   const locale = toLocale(i18n.language);
   return (
-    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-6 py-6")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1>{t("legal.cookies.title")}</TypographyH1>
-        <TypographyMuted>{t("legal.cookies.subtitle")}</TypographyMuted>
-      </header>
+    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
+      <PageHeader title={t("legal.cookies.title")} description={t("legal.cookies.subtitle")} />
+
+      <Separator />
 
       <UntranslatedBodyBanner show={locale !== "en"} />
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>What are cookies?</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyP>
-            Cookies are small text files placed on your device by your browser when you visit a
-            website. They allow us to remember your preferences and measure how the service is used.
-            You can control which optional cookies are active using the preferences panel below.
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>What are cookies?</TypographyH2>
+        <TypographyP>
+          Cookies are small text files placed on your device by your browser when you visit a
+          website. They allow us to remember your preferences and measure how the service is used.
+          You can control which optional cookies are active using the preferences panel below.
+        </TypographyP>
+      </section>
 
       <ConsentSettings />
 
@@ -96,17 +90,13 @@ function CookiesPage() {
         const category = t(CATEGORY_LABEL_KEYS[cat]);
 
         return (
-          <Card key={cat}>
-            <CardHeader>
-              <TypographyH2>{category}</TypographyH2>
-            </CardHeader>
-            <CardContent>
-              <CookieTable
-                cookies={COOKIE_INVENTORY[cat]}
-                caption={t("legal.cookies.tableCaption", { category })}
-              />
-            </CardContent>
-          </Card>
+          <section key={cat} className="flex flex-col gap-3">
+            <TypographyH2>{category}</TypographyH2>
+            <CookieTable
+              cookies={COOKIE_INVENTORY[cat]}
+              caption={t("legal.cookies.tableCaption", { category })}
+            />
+          </section>
         );
       })}
     </main>

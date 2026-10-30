@@ -2,6 +2,7 @@ import "@packages/ui/globals.css";
 import { createRoot } from "react-dom/client";
 import { AppProviders } from "./shared/app-providers";
 import { initI18n } from "./shared/i18n/i18n";
+import { reportCaughtError } from "./shared/observability/report-caught-error";
 import { reactErrorHandler } from "./shared/observability/sentry";
 
 const rootEl = document.getElementById("root");
@@ -11,6 +12,6 @@ const i18n = await initI18n();
 
 createRoot(rootEl, {
   onUncaughtError: reactErrorHandler(),
-  onCaughtError: reactErrorHandler(),
+  onCaughtError: reportCaughtError,
   onRecoverableError: reactErrorHandler(),
 }).render(<AppProviders i18n={i18n} />);

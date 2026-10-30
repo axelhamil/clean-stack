@@ -1,14 +1,6 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import {
   DescriptionDetails,
   DescriptionItem,
   DescriptionList,
@@ -22,9 +14,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
+import { Separator } from "@packages/ui/components/ui/separator";
+import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -48,7 +45,7 @@ import {
   unbanUserMutationOptions,
 } from "./api/admin-users.mutations";
 import { adminUserQueryOptions } from "./api/admin-users.queries";
-import { SessionsCard } from "./components/sessions-card";
+import { SessionsSection } from "./components/sessions-section";
 import { BanForm } from "./forms/ban-form";
 import { ImpersonateForm } from "./forms/impersonate-form";
 import { SetRoleForm } from "./forms/set-role-form";
@@ -127,38 +124,71 @@ function AdminUserDetailPage() {
     onError: (err) => toastError(err, errorFallback("setUserRole")),
   });
 
-  if (query.isLoading || query.isError || !query.data) {
+  const user = query.data;
+
+  const backLink = (
+    <NavLink asChild variant="plain" className="gap-1 self-start">
+      <Link to="/admin/users">
+        <ArrowLeft className="size-4" aria-hidden />
+        {t("users.pageTitle")}
+      </Link>
+    </NavLink>
+  );
+
+  if (!user) {
     return (
       <main className="flex flex-col gap-6">
-        <header>
-          <TypographyH1 variant="page">{t("users.pageTitle")}</TypographyH1>
-        </header>
-        <p>{query.isLoading ? t("users.detail.loading") : t("users.detail.loadFailed")}</p>
+        <div className="flex flex-col gap-2">
+          {backLink}
+          <PageHeader title={t("users.pageTitle")} />
+        </div>
+        {query.isError ? (
+          <LoadErrorAlert message={t("users.detail.loadFailed")} />
+        ) : (
+          <TypographyMuted>{t("users.detail.loading")}</TypographyMuted>
+        )}
       </main>
     );
   }
 
-  const user = query.data;
-
   return (
     <main className="flex flex-col gap-6">
-      <header>
-        <TypographyH1 variant="page">{user.name}</TypographyH1>
-      </header>
+      <div className="flex flex-col gap-2">
+        {backLink}
+        <PageHeader
+          title={user.name}
+          actions={
+            <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
+              <DialogTrigger asChild>
+                <Button variant={user.banned ? "outline" : "default"}>
+                  {t("users.detail.impersonate")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent closeLabel={t("common:actions.close")}>
+                <DialogHeader>
+                  <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
+                </DialogHeader>
+                <ImpersonateForm
+                  isPending={impersonateMutation.isPending}
+                  onSubmit={(values) => impersonateMutation.mutate({ id, ...values })}
+                />
+              </DialogContent>
+            </Dialog>
+          }
+        />
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("users.detail.identityTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="grid gap-8 md:grid-cols-2">
+        <section className="flex min-w-0 flex-col gap-4">
+          <TypographyH2>{t("users.detail.identityTitle")}</TypographyH2>
           <DescriptionList layout="inline">
-            <DescriptionItem>
-              <DescriptionTerm>{t("users.table.email")}</DescriptionTerm>
-              <DescriptionDetails>{user.email}</DescriptionDetails>
+            <DescriptionItem className="gap-4">
+              <DescriptionTerm className="shrink-0">{t("users.table.email")}</DescriptionTerm>
+              <DescriptionDetails className="min-w-0 break-all">{user.email}</DescriptionDetails>
             </DescriptionItem>
-            <DescriptionItem>
-              <DescriptionTerm>{t("users.table.role")}</DescriptionTerm>
-              <DescriptionDetails>
+            <DescriptionItem className="gap-4">
+              <DescriptionTerm className="shrink-0">{t("users.table.role")}</DescriptionTerm>
+              <DescriptionDetails className="flex-wrap justify-end">
                 {user.role ? (
                   <Badge variant="secondary">
                     {isPlatformRole(user.role) ? t(PLATFORM_ROLE_LABEL_KEYS[user.role]) : user.role}
@@ -201,63 +231,10 @@ function AdminUserDetailPage() {
               <DescriptionDetails>{formatDate(user.createdAt)}</DescriptionDetails>
             </DescriptionItem>
           </DescriptionList>
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card variant={user.banned ? "destructive" : "default"}>
-        <CardHeader>
-          <CardTitle variant={user.banned ? "destructive" : "default"}>
-            {t("users.detail.accountStatusTitle")}
-          </CardTitle>
-          <CardAction>
-            <div className="flex flex-wrap gap-2">
-              {user.banned ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={unbanMutation.isPending}
-                  onClick={() => unbanMutation.mutate(id)}
-                >
-                  {t("users.detail.reactivate")}
-                </Button>
-              ) : (
-                <Dialog open={banOpen} onOpenChange={setBanOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                      {t("users.detail.suspend")}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent closeLabel={t("common:actions.close")}>
-                    <DialogHeader>
-                      <DialogTitle>{t("users.suspendAccountTitle")}</DialogTitle>
-                    </DialogHeader>
-                    <BanForm
-                      isPending={banMutation.isPending}
-                      onSubmit={(values) => banMutation.mutate({ id, ...values })}
-                    />
-                  </DialogContent>
-                </Dialog>
-              )}
-              <Dialog open={impersonateOpen} onOpenChange={setImpersonateOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    {t("users.detail.impersonate")}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent closeLabel={t("common:actions.close")}>
-                  <DialogHeader>
-                    <DialogTitle>{t("users.detail.impersonateDialogTitle")}</DialogTitle>
-                  </DialogHeader>
-                  <ImpersonateForm
-                    isPending={impersonateMutation.isPending}
-                    onSubmit={(values) => impersonateMutation.mutate({ id, ...values })}
-                  />
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
+        <section className="flex min-w-0 flex-col gap-4">
+          <TypographyH2>{t("users.detail.accountStatusTitle")}</TypographyH2>
           <DescriptionList layout="inline">
             <DescriptionItem>
               <DescriptionTerm>{t("users.table.status")}</DescriptionTerm>
@@ -270,46 +247,77 @@ function AdminUserDetailPage() {
               </DescriptionDetails>
             </DescriptionItem>
             {user.banReason && (
-              <DescriptionItem>
-                <DescriptionTerm>{t("users.detail.reasonLabel")}</DescriptionTerm>
-                <DescriptionDetails>{user.banReason}</DescriptionDetails>
+              <DescriptionItem className="gap-4">
+                <DescriptionTerm className="shrink-0">
+                  {t("users.detail.reasonLabel")}
+                </DescriptionTerm>
+                <DescriptionDetails className="min-w-0 break-words">
+                  {user.banReason}
+                </DescriptionDetails>
               </DescriptionItem>
             )}
-            {user.banExpires !== null && (
+            {user.banned && (
               <DescriptionItem>
                 <DescriptionTerm>{t("users.detail.expiresLabel")}</DescriptionTerm>
-                <DescriptionDetails>{formatDate(user.banExpires)}</DescriptionDetails>
-              </DescriptionItem>
-            )}
-            {user.banned && user.banExpires === null && (
-              <DescriptionItem>
-                <DescriptionTerm>{t("users.detail.expiresLabel")}</DescriptionTerm>
-                <DescriptionDetails>{t("users.durationPermanent")}</DescriptionDetails>
+                <DescriptionDetails>
+                  {user.banExpires === null
+                    ? t("users.durationPermanent")
+                    : formatDate(user.banExpires)}
+                </DescriptionDetails>
               </DescriptionItem>
             )}
           </DescriptionList>
-        </CardContent>
-        <CardFooter className="flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={revokeSessionsMutation.isPending}
-            onClick={() => revokeSessionsMutation.mutate(id)}
-          >
-            {t("users.detail.revokeSessions")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={resetPasswordMutation.isPending}
-            onClick={() => resetPasswordMutation.mutate(id)}
-          >
-            {t("users.detail.resetPassword")}
-          </Button>
-        </CardFooter>
-      </Card>
+          <div className="flex flex-wrap gap-2">
+            {user.banned && (
+              <Button
+                size="sm"
+                disabled={unbanMutation.isPending}
+                onClick={() => unbanMutation.mutate(id)}
+              >
+                {t("users.detail.reactivate")}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={revokeSessionsMutation.isPending}
+              onClick={() => revokeSessionsMutation.mutate(id)}
+            >
+              {t("users.detail.revokeSessions")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={resetPasswordMutation.isPending}
+              onClick={() => resetPasswordMutation.mutate(id)}
+            >
+              {t("users.detail.resetPassword")}
+            </Button>
+            {!user.banned && (
+              <Dialog open={banOpen} onOpenChange={setBanOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    {t("users.detail.suspend")}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent closeLabel={t("common:actions.close")}>
+                  <DialogHeader>
+                    <DialogTitle>{t("users.suspendAccountTitle")}</DialogTitle>
+                  </DialogHeader>
+                  <BanForm
+                    isPending={banMutation.isPending}
+                    onSubmit={(values) => banMutation.mutate({ id, ...values })}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </section>
+      </div>
 
-      <SessionsCard sessions={user.sessions} />
+      <Separator />
+
+      <SessionsSection sessions={user.sessions} />
     </main>
   );
 }

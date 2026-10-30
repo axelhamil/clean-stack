@@ -198,6 +198,7 @@ export default {
     loadNotificationPreferences: "Failed to load notification preferences",
     loadOrgNotificationPreferences: "Failed to load org notification preferences",
     loadPolicies: "Failed to load policies",
+    loadSession: "Failed to check your session",
     loadSubscription: "Failed to load subscription",
     loadPasskeys: "Failed to load passkeys",
     loadSessions: "Failed to load sessions",

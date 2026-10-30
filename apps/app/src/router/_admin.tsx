@@ -6,7 +6,7 @@ import { ensurePlatformAdmin } from "../shared/auth/ensure-platform-admin";
 export const Route = createFileRoute("/_protected/_shell/_admin")({
   beforeLoad: ensurePlatformAdmin,
   component: () => (
-    <div className={cn(pageContainerVariants(), "flex flex-col gap-6 py-10")}>
+    <div className={cn(pageContainerVariants(), "py-8")}>
       <Outlet />
     </div>
   ),

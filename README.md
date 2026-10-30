@@ -141,7 +141,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - App shell: sticky top-nav, org switcher, theme toggle, user menu, ⌘K command palette (capability-filtered)
 - TanStack Router file-based routing (`routes.ts` virtual config → generated, versioned `routeTree.gen.ts`) with a 2-file feature pattern (`route` + lazy component), near-zero TanStack Start migration
 - Route-level code-splitting + `defaultPreload: "intent"` (initial bundle ~355 KB, route chunks 1 to 43 KB)
-- TanStack Query server-state · RHF + zod forms (loose/strict schema split) · `next-themes` + View Transitions theme · `sonner` toasts
+- TanStack Query server-state · RHF + zod forms (loose/strict schema split) · View Transitions theme with a blocking init script · `sonner` toasts
 - Typed i18n (`@packages/i18n`): `en`/`fr` `.ts` catalogs bound to `t()` through `CustomTypeOptions`, so an unknown key fails `tsc`; locale from cookie then `user.locale`, never from the URL; `en`/`fr` key parity enforced by a test
 - shadcn-pure UI kit (`@packages/ui`): typography exports + custom primitives (`NavLink`, `TextLink`, `FormTextField`, `DestructiveActionDialog`, `ListRow`), theme tokens, `<Can>` authz component
 

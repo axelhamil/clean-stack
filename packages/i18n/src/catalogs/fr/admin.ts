@@ -4,10 +4,10 @@ export default {
     searchPlaceholder: "Rechercher…",
     loading: "Chargement…",
     loadFailed: "Échec du chargement des comptes.",
+    empty: "Aucun compte ne correspond à ces filtres.",
     loadMore: "Charger plus",
     allRolesPlaceholder: "Tous les rôles",
     allStatusesPlaceholder: "Tous les statuts",
-    allOption: "Tous",
     roleUser: "Utilisateur",
     suspendAccountTitle: "Suspendre le compte",
     // Genuine cognate: "permanent" is spelled identically in French.
@@ -92,6 +92,7 @@ export default {
     searchPlaceholder: "Rechercher…",
     loading: "Chargement…",
     loadFailed: "Échec du chargement des organisations.",
+    empty: "Aucune organisation ne correspond à cette recherche.",
     loadMore: "Charger plus",
     ssoEnforcementUpdatedToast: "Imposition du SSO mise à jour.",
     ssoEnforcedAriaLabel: "SSO imposé pour {{name}}",
@@ -113,6 +114,7 @@ export default {
       planLabel: "Forfait",
       createdLabel: "Date de création",
       membersTitle: "Membres",
+      membersEmpty: "Cette organisation n'a aucun membre.",
       table: {
         email: "E-mail",
         role: "Rôle",
@@ -122,11 +124,13 @@ export default {
   auditLog: {
     pageTitle: "Journal d'audit",
     allActionsPlaceholder: "Toutes les actions",
-    allOption: "Toutes",
     actorIdPlaceholder: "ID de l'acteur",
     organizationIdPlaceholder: "ID de l'organisation",
     loading: "Chargement…",
     loadFailed: "Échec du chargement du journal d'audit.",
+    empty: "Aucun événement ne correspond à ces filtres.",
+    occurredFromLabel: "Date de début",
+    occurredToLabel: "Date de fin",
     loadMore: "Charger plus",
     detailsAction: "Détails",
     table: {

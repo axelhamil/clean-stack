@@ -1,10 +1,5 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -29,50 +24,56 @@ function OrganizationPage() {
   const { t } = useTranslation("settings");
   const { data: org } = useQuery(activeOrgQueryOptions);
   const { data: membership } = useQuery(currentMembershipQueryOptions(org?.id ?? null));
-  const { data: members = [] } = useQuery(orgMembersQueryOptions(org?.id ?? null));
-  const { data: invitations = [] } = useQuery(orgInvitationsQueryOptions(org?.id ?? null));
+  const membersQuery = useQuery(orgMembersQueryOptions(org?.id ?? null));
+  const members = membersQuery.data ?? [];
+  const invitationsQuery = useQuery(orgInvitationsQueryOptions(org?.id ?? null));
+  const invitations = invitationsQuery.data ?? [];
 
-  if (!org) return <TypographyMuted>{t("organization.noActiveOrg")}</TypographyMuted>;
+  if (!org) {
+    return (
+      <main className="flex flex-col gap-8">
+        <TypographyH1 className="sr-only">{t("organization.title")}</TypographyH1>
+        <TypographyMuted>{t("organization.noActiveOrg")}</TypographyMuted>
+      </main>
+    );
+  }
 
   const pendingInvitations = invitations.filter((inv) => inv.status === "pending");
 
   return (
-    <main className="flex flex-col gap-6">
+    <main className="flex flex-col gap-8">
       <TypographyH1 className="sr-only">{t("organization.title")}</TypographyH1>
 
       <Can requires={{ organization: ["update"] }}>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("organization.detailsTitle")}</CardTitle>
-            <CardDescription>{t("organization.detailsDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <UpdateOrgForm organizationId={org.id} defaultValues={{ name: org.name }} />
-          </CardContent>
-        </Card>
+        <SettingsSection
+          title={t("organization.detailsTitle")}
+          description={t("organization.detailsDescription")}
+        >
+          <UpdateOrgForm organizationId={org.id} defaultValues={{ name: org.name }} />
+        </SettingsSection>
       </Can>
 
       <Can requires={{ invitation: ["create"] }}>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("organization.inviteTitle")}</CardTitle>
-            <CardDescription>{t("organization.inviteDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <InviteMemberForm organizationId={org.id} />
-          </CardContent>
-        </Card>
+        <SettingsSection
+          title={t("organization.inviteTitle")}
+          description={t("organization.inviteDescription")}
+        >
+          <InviteMemberForm organizationId={org.id} />
+        </SettingsSection>
       </Can>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("organization.membersTitle")}</CardTitle>
-          <CardDescription>
-            {t("organization.membersCount", { count: members.length })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col divide-y">
+      <SettingsSection
+        title={t("organization.membersTitle")}
+        description={
+          membersQuery.data ? t("organization.membersCount", { count: members.length }) : undefined
+        }
+      >
+        {membersQuery.isPending ? (
+          <TypographyMuted>{t("organization.membersLoading")}</TypographyMuted>
+        ) : membersQuery.isLoadingError ? (
+          <LoadErrorAlert message={t("organization.membersLoadFailed")} />
+        ) : (
+          <ul className="flex flex-col gap-2">
             {members.map((m) => (
               <MemberRow
                 key={m.id}
@@ -82,25 +83,28 @@ function OrganizationPage() {
               />
             ))}
           </ul>
-        </CardContent>
-      </Card>
+        )}
+      </SettingsSection>
+
+      {invitationsQuery.isLoadingError && (
+        <SettingsSection title={t("organization.pendingInvitationsTitle")}>
+          <LoadErrorAlert message={t("organization.invitationsLoadFailed")} />
+        </SettingsSection>
+      )}
 
       {pendingInvitations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("organization.pendingInvitationsTitle")}</CardTitle>
-            <CardDescription>
-              {t("organization.pendingInvitationsCount", { count: pendingInvitations.length })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-col divide-y">
-              {pendingInvitations.map((inv) => (
-                <InvitationRow key={inv.id} invitation={inv} organizationId={org.id} />
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <SettingsSection
+          title={t("organization.pendingInvitationsTitle")}
+          description={t("organization.pendingInvitationsCount", {
+            count: pendingInvitations.length,
+          })}
+        >
+          <ul className="flex flex-col gap-2">
+            {pendingInvitations.map((inv) => (
+              <InvitationRow key={inv.id} invitation={inv} organizationId={org.id} />
+            ))}
+          </ul>
+        </SettingsSection>
       )}
 
       <OrgNotificationDefaultsCard />

@@ -1,12 +1,5 @@
 import { isLocale, LOCALES, type Locale } from "@packages/i18n";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
 import { Label } from "@packages/ui/components/ui/label";
 import {
   Select,
@@ -15,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -41,37 +35,32 @@ export function LanguageCard() {
   const otherwiseDisabled = mutation.isPending || (pending ?? current) === current;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("language.title")}</CardTitle>
-        <CardDescription>{t("language.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="locale-select">{t("language.label")}</Label>
-          <Select value={pending ?? current} onValueChange={(v) => isLocale(v) && setPending(v)}>
-            <SelectTrigger id="locale-select" className="w-64">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LOCALES.map((locale) => (
-                <SelectItem key={locale} value={locale}>
-                  {t(`language.options.${locale}` as const)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button
-          className="self-start"
-          disabled={otherwiseDisabled || guard.blocked}
-          {...guard.describeProps(otherwiseDisabled)}
-          onClick={() => mutation.mutate({ locale: pending ?? current })}
-        >
-          {t("common:actions.save")}
-        </Button>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+    <SettingsSection title={t("language.title")} description={t("language.description")}>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="locale-select">{t("language.label")}</Label>
+        <Select value={pending ?? current} onValueChange={(v) => isLocale(v) && setPending(v)}>
+          <SelectTrigger id="locale-select" className="w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LOCALES.map((locale) => (
+              <SelectItem key={locale} value={locale}>
+                {t(`language.options.${locale}` as const)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Button
+        variant="outline"
+        className="self-start"
+        disabled={otherwiseDisabled || guard.blocked}
+        {...guard.describeProps(otherwiseDisabled)}
+        onClick={() => mutation.mutate({ locale: pending ?? current })}
+      >
+        {t("common:actions.save")}
+      </Button>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }

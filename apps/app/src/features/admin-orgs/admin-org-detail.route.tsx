@@ -1,10 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@packages/ui/components/ui/card";
 import {
   DescriptionDetails,
   DescriptionItem,
   DescriptionList,
   DescriptionTerm,
 } from "@packages/ui/components/ui/description-list";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { NavLink } from "@packages/ui/components/ui/nav-link";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import {
   Table,
   TableBody,
@@ -13,9 +15,10 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isOrgRole, ROLE_LABEL_KEYS } from "../../shared/auth/role-labels";
 import { useFormatDate } from "../../shared/i18n/use-format-date";
@@ -32,35 +35,47 @@ function AdminOrgDetailPage() {
   const { orgId } = Route.useParams();
 
   const query = useQuery(adminOrgDetailQueryOptions(orgId));
+  const org = query.data;
 
-  if (query.isLoading || query.isError || !query.data) {
+  const backLink = (
+    <NavLink asChild variant="plain" className="gap-1 self-start">
+      <Link to="/admin/orgs">
+        <ArrowLeft className="size-4" aria-hidden />
+        {t("orgs.pageTitle")}
+      </Link>
+    </NavLink>
+  );
+
+  if (!org) {
     return (
       <main className="flex flex-col gap-6">
-        <header>
-          <TypographyH1 variant="page">{t("orgs.pageTitle")}</TypographyH1>
-        </header>
-        <p>{query.isLoading ? t("orgs.detail.loading") : t("orgs.detail.loadFailed")}</p>
+        <div className="flex flex-col gap-2">
+          {backLink}
+          <PageHeader title={t("orgs.pageTitle")} />
+        </div>
+        {query.isError ? (
+          <LoadErrorAlert message={t("orgs.detail.loadFailed")} />
+        ) : (
+          <TypographyMuted>{t("orgs.detail.loading")}</TypographyMuted>
+        )}
       </main>
     );
   }
 
-  const org = query.data;
-
   return (
     <main className="flex flex-col gap-6">
-      <header>
-        <TypographyH1 variant="page">{org.name}</TypographyH1>
-      </header>
+      <div className="flex flex-col gap-2">
+        {backLink}
+        <PageHeader title={org.name} />
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("orgs.detail.detailsTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="grid gap-8 md:grid-cols-2">
+        <section className="flex min-w-0 flex-col gap-4">
+          <TypographyH2>{t("orgs.detail.detailsTitle")}</TypographyH2>
           <DescriptionList layout="inline">
-            <DescriptionItem>
-              <DescriptionTerm>{t("orgs.detail.slugLabel")}</DescriptionTerm>
-              <DescriptionDetails>{org.slug}</DescriptionDetails>
+            <DescriptionItem className="gap-4">
+              <DescriptionTerm className="shrink-0">{t("orgs.detail.slugLabel")}</DescriptionTerm>
+              <DescriptionDetails className="min-w-0 break-all">{org.slug}</DescriptionDetails>
             </DescriptionItem>
             <DescriptionItem>
               <DescriptionTerm>{t("orgs.detail.planLabel")}</DescriptionTerm>
@@ -71,34 +86,34 @@ function AdminOrgDetailPage() {
               <DescriptionDetails>{formatDate(org.createdAt)}</DescriptionDetails>
             </DescriptionItem>
           </DescriptionList>
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("orgs.detail.membersTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("orgs.detail.table.email")}</TableHead>
-                <TableHead>{t("orgs.detail.table.role")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {org.members.map((member) => (
-                <TableRow key={member.userId}>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    {isOrgRole(member.role) ? t(ROLE_LABEL_KEYS[member.role]) : member.role}
-                  </TableCell>
+        <section className="flex min-w-0 flex-col gap-4">
+          <TypographyH2>{t("orgs.detail.membersTitle")}</TypographyH2>
+          {org.members.length === 0 ? (
+            <TypographyMuted>{t("orgs.detail.membersEmpty")}</TypographyMuted>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("orgs.detail.table.email")}</TableHead>
+                  <TableHead>{t("orgs.detail.table.role")}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {org.members.map((member) => (
+                  <TableRow key={member.userId}>
+                    <TableCell className="break-all whitespace-normal">{member.email}</TableCell>
+                    <TableCell>
+                      {isOrgRole(member.role) ? t(ROLE_LABEL_KEYS[member.role]) : member.role}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </section>
+      </div>
     </main>
   );
 }

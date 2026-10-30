@@ -1,14 +1,23 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-function ListRow({ className, ...props }: React.ComponentProps<"li">) {
+const listRowVariants = cva("flex items-center justify-between gap-3", {
+  variants: {
+    variant: {
+      default: "rounded-md border p-3",
+      plain: "py-2",
+    },
+  },
+  defaultVariants: { variant: "default" },
+});
+
+interface ListRowProps extends React.ComponentProps<"li">, VariantProps<typeof listRowVariants> {}
+
+function ListRow({ className, variant, ...props }: ListRowProps) {
   return (
-    <li
-      data-slot="list-row"
-      className={cn("flex items-center justify-between gap-3 rounded-md border p-3", className)}
-      {...props}
-    />
+    <li data-slot="list-row" className={cn(listRowVariants({ variant }), className)} {...props} />
   );
 }
 

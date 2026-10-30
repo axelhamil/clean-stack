@@ -8,6 +8,9 @@ export const PUBLIC_PAGES: readonly AuditedPage[] = [
   { name: "sign-up", path: "/sign-up" },
   { name: "data rights", path: "/legal/data-rights" },
   { name: "accessibility statement", path: "/legal/accessibility" },
+  { name: "privacy policy", path: "/legal/privacy-policy" },
+  { name: "terms", path: "/legal/terms" },
+  { name: "pricing", path: "/pricing" },
 ];
 
 /**
@@ -22,4 +25,7 @@ export const AUTHENTICATED_PAGES: readonly AuditedPage[] = [
   { name: "api tokens settings", path: "/settings/api-tokens" },
   { name: "notification settings", path: "/settings/notifications" },
   { name: "webhook settings", path: "/settings/webhooks" },
+  { name: "organization settings", path: "/settings/organization" },
+  { name: "billing settings", path: "/settings/billing" },
+  { name: "new organization", path: "/org/new" },
 ];

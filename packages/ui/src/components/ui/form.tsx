@@ -1,5 +1,3 @@
-"use client";
-
 import type { Label as LabelPrimitive } from "radix-ui";
 import { Slot } from "radix-ui";
 import * as React from "react";

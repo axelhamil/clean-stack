@@ -65,7 +65,7 @@ export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormPr
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={update.isPending}>
+        <Button type="submit" variant="outline" className="self-start" disabled={update.isPending}>
           {t("organization.saveChanges")}
         </Button>
       </form>

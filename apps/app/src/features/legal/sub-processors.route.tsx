@@ -1,6 +1,7 @@
 import { toLocale } from "@packages/i18n";
-import { Card, CardContent, CardHeader } from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
+import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -11,12 +12,7 @@ import {
   TableRow,
 } from "@packages/ui/components/ui/table";
 import { TextLink } from "@packages/ui/components/ui/text-link";
-import {
-  TypographyH1,
-  TypographyH2,
-  TypographyMuted,
-  TypographyP,
-} from "@packages/ui/components/ui/typography";
+import { TypographyH2, TypographyP } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -59,7 +55,7 @@ function SubProcessorTable({ processors, caption }: SubProcessorTableProps) {
                 sp.name
               )}
             </TableCell>
-            <TableCell className="whitespace-normal">
+            <TableCell className="min-w-56 whitespace-normal">
               {t(SUB_PROCESSOR_KEYS[sp.id].purpose)}
             </TableCell>
             <TableCell>{t(SUB_PROCESSOR_KEYS[sp.id].region)}</TableCell>
@@ -86,67 +82,53 @@ function SubProcessorsPage() {
   const planned = SUB_PROCESSORS.filter((sp) => sp.status === "planned");
 
   return (
-    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-6 py-6")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1>{t("legal.subProcessors.title")}</TypographyH1>
-        <TypographyMuted>{t("legal.subProcessors.subtitle")}</TypographyMuted>
-      </header>
+    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
+      <PageHeader
+        title={t("legal.subProcessors.title")}
+        description={t("legal.subProcessors.subtitle")}
+      />
+
+      <Separator />
 
       <UntranslatedBodyBanner show={locale !== "en"} />
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>What is a sub-processor?</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyP>
-            A sub-processor is a third party engaged by the data controller (us) to process personal
-            data on your behalf, as defined under RGPD Art. 28. These third parties receive access
-            to personal data only to the extent necessary to operate the service. We ensure each
-            sub-processor provides sufficient guarantees to implement appropriate technical and
-            organisational measures so that processing meets RGPD requirements.
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>What is a sub-processor?</TypographyH2>
+        <TypographyP>
+          A sub-processor is a third party engaged by the data controller (us) to process personal
+          data on your behalf, as defined under RGPD Art. 28. These third parties receive access to
+          personal data only to the extent necessary to operate the service. We ensure each
+          sub-processor provides sufficient guarantees to implement appropriate technical and
+          organisational measures so that processing meets RGPD requirements.
+        </TypographyP>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Active sub-processors</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <SubProcessorTable
-            processors={active}
-            caption="Third-party processors currently used to operate the service"
-          />
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Active sub-processors</TypographyH2>
+        <SubProcessorTable
+          processors={active}
+          caption="Third-party processors currently used to operate the service"
+        />
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Planned sub-processors</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <SubProcessorTable
-            processors={planned}
-            caption="Third-party processors intended for future use, not yet active"
-          />
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Planned sub-processors</TypographyH2>
+        <SubProcessorTable
+          processors={planned}
+          caption="Third-party processors intended for future use, not yet active"
+        />
+      </section>
 
-      <Card>
-        <CardHeader>
-          <TypographyH2>Change notice</TypographyH2>
-        </CardHeader>
-        <CardContent>
-          <TypographyP>
-            In accordance with RGPD Art. 28§2, we will notify you at least 30 days before adding or
-            replacing any sub-processor. If you object to a change, you may terminate the agreement
-            before the change takes effect. Notifications are sent to the contact address on your
-            account. For questions, contact{" "}
-            <TextLink href="mailto:dpo@[domain]">dpo@[domain]</TextLink>.
-          </TypographyP>
-        </CardContent>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <TypographyH2>Change notice</TypographyH2>
+        <TypographyP>
+          In accordance with RGPD Art. 28§2, we will notify you at least 30 days before adding or
+          replacing any sub-processor. If you object to a change, you may terminate the agreement
+          before the change takes effect. Notifications are sent to the contact address on your
+          account. For questions, contact{" "}
+          <TextLink href="mailto:dpo@[domain]">dpo@[domain]</TextLink>.
+        </TypographyP>
+      </section>
     </main>
   );
 }

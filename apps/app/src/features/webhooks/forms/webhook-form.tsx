@@ -73,6 +73,7 @@ export function WebhookForm({
         />
         <Button
           type="submit"
+          className="self-end"
           disabled={isPending || guard.blocked}
           {...guard.describeProps(isPending)}
         >

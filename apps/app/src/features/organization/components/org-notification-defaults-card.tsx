@@ -1,10 +1,5 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,7 +21,9 @@ export function OrgNotificationDefaultsCard() {
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
   const organizationId = useActiveOrgId();
-  const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions(organizationId));
+  const { data, isPending, isLoadingError } = useQuery(
+    orgNotificationPreferencesQueryOptions(organizationId),
+  );
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
@@ -42,12 +39,13 @@ export function OrgNotificationDefaultsCard() {
 
   return (
     <Can requires={{ organization: ["update"] }}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("organization.notificationDefaultsTitle")}</CardTitle>
-          <CardDescription>{t("organization.notificationDefaultsDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <SettingsSection
+        title={t("organization.notificationDefaultsTitle")}
+        description={t("organization.notificationDefaultsDescription")}
+      >
+        {isLoadingError ? (
+          <LoadErrorAlert message={t("notifications.loadFailed")} />
+        ) : (
           <PreferenceMatrix
             rows={rows}
             onChange={handleChange}
@@ -55,8 +53,8 @@ export function OrgNotificationDefaultsCard() {
             disabled={isPending}
             guard={guard}
           />
-        </CardContent>
-      </Card>
+        )}
+      </SettingsSection>
       <ImpersonationReason guard={guard} />
     </Can>
   );

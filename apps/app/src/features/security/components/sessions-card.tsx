@@ -1,20 +1,14 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import {
   ListRow,
   ListRowAction,
   ListRowContent,
   ListRowMedia,
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { LogOutIcon, MonitorIcon } from "lucide-react";
@@ -48,7 +42,7 @@ interface SessionsCardProps {
 }
 
 export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
-  const { data, isLoading } = useQuery(sessionsQueryOptions);
+  const { data, isLoading, isLoadingError } = useQuery(sessionsQueryOptions);
   const revokeOthers = useRevokeOtherSessions();
   const { t } = useTranslation("settings");
   // `/revoke-session` and `/revoke-other-sessions` are on the BetterAuth
@@ -59,48 +53,42 @@ export function SessionsCard({ currentSessionToken }: SessionsCardProps) {
   const others = data?.filter((s) => s.token !== currentSessionToken) ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("sessions.title")}</CardTitle>
-        <CardDescription>{t("sessions.description")}</CardDescription>
-        {others.length > 0 && (
-          <CardAction>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => revokeOthers.mutate()}
-              disabled={revokeOthers.isPending || guard.blocked}
-              {...guard.describeProps(revokeOthers.isPending)}
-            >
-              <LogOutIcon />
-              {t("sessions.signOutOthers")}
-            </Button>
-          </CardAction>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <TypographyMuted>{t("sessions.loading")}</TypographyMuted>
-        ) : data && data.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {data.map((session) => (
-              <SessionRow
-                key={session.id}
-                token={session.token}
-                isCurrent={session.token === currentSessionToken}
-                ipAddress={session.ipAddress ?? undefined}
-                userAgent={session.userAgent ?? undefined}
-                expiresAt={session.expiresAt}
-                guard={guard}
-              />
-            ))}
-          </ul>
-        ) : (
-          <TypographyMuted>{t("sessions.empty")}</TypographyMuted>
-        )}
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+    <SettingsSection title={t("sessions.title")} description={t("sessions.description")}>
+      {isLoading ? (
+        <TypographyMuted>{t("sessions.loading")}</TypographyMuted>
+      ) : isLoadingError ? (
+        <LoadErrorAlert message={t("sessions.loadFailed")} />
+      ) : data && data.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {data.map((session) => (
+            <SessionRow
+              key={session.id}
+              token={session.token}
+              isCurrent={session.token === currentSessionToken}
+              ipAddress={session.ipAddress ?? undefined}
+              userAgent={session.userAgent ?? undefined}
+              expiresAt={session.expiresAt}
+              guard={guard}
+            />
+          ))}
+        </ul>
+      ) : (
+        <TypographyMuted>{t("sessions.empty")}</TypographyMuted>
+      )}
+      {others.length > 0 && (
+        <Button
+          variant="outline"
+          className="self-start"
+          onClick={() => revokeOthers.mutate()}
+          disabled={revokeOthers.isPending || guard.blocked}
+          {...guard.describeProps(revokeOthers.isPending)}
+        >
+          <LogOutIcon />
+          {t("sessions.signOutOthers")}
+        </Button>
+      )}
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }
 
@@ -123,7 +111,7 @@ function SessionRow({ token, isCurrent, ipAddress, userAgent, expiresAt, guard }
     : t("sessions.unknownDevice");
 
   return (
-    <ListRow>
+    <ListRow variant="plain">
       <ListRowMedia>
         <MonitorIcon />
         <ListRowContent>

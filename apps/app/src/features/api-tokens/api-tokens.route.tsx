@@ -5,6 +5,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import {
   Table,
   TableBody,
@@ -12,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -77,23 +79,25 @@ function ApiTokensPage() {
   });
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <TypographyH1 variant="page">{t("apiTokens.pageTitle")}</TypographyH1>
-        <Button
-          onClick={() => setCreating(true)}
-          disabled={guard.blocked}
-          {...guard.describeProps()}
-        >
-          {t("apiTokens.newTokenAction")}
-        </Button>
-      </div>
+    <main className="flex flex-col gap-8">
+      <PageHeader
+        title={t("apiTokens.pageTitle")}
+        actions={
+          <Button
+            onClick={() => setCreating(true)}
+            disabled={guard.blocked}
+            {...guard.describeProps()}
+          >
+            {t("apiTokens.newTokenAction")}
+          </Button>
+        }
+      />
       <ImpersonationReason guard={guard} />
 
       {tokens.isLoading ? (
-        <p>{t("apiTokens.loading")}</p>
-      ) : tokens.isError ? (
-        <p>{t("apiTokens.loadFailed")}</p>
+        <TypographyMuted>{t("apiTokens.loading")}</TypographyMuted>
+      ) : tokens.isLoadingError ? (
+        <LoadErrorAlert message={t("apiTokens.loadFailed")} />
       ) : tokens.data?.items.length === 0 ? (
         <TypographyMuted>{t("apiTokens.empty")}</TypographyMuted>
       ) : (

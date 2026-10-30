@@ -1,12 +1,6 @@
 import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -21,18 +15,49 @@ export const Route = createFileRoute("/accept-invitation/$invitationId")({
   component: AcceptInvitationPage,
 });
 
+const pageClassName = cn(pageContainerVariants({ width: "form" }), "flex flex-col gap-4 py-12");
+
 function AcceptInvitationPage() {
   const { t } = useTranslation("common");
   const { t: tAuth } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
   const { invitationId } = Route.useParams();
-  const { data: session } = useQuery(sessionQueryOptions);
+  const { data: session, isPending, isError, isFetching, refetch } = useQuery(sessionQueryOptions);
   const mutation = useAcceptInvitation();
+
+  if (isPending) {
+    return (
+      <main className={pageClassName}>
+        <TypographyH1 variant="page">{t("invitation.joinTitle")}</TypographyH1>
+      </main>
+    );
+  }
+
+  if (isError && !session) {
+    return (
+      <main className={pageClassName}>
+        <TypographyH1 variant="page">{t("invitation.joinTitle")}</TypographyH1>
+        <LoadErrorAlert
+          message={tErrors("fallback.loadSession")}
+          retry={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isFetching}
+              onClick={() => void refetch()}
+            >
+              {t("actions.retry")}
+            </Button>
+          }
+        />
+      </main>
+    );
+  }
 
   if (!session) {
     return (
-      <main className={cn(pageContainerVariants({ width: "form" }), "flex flex-col gap-4 py-6")}>
-        <TypographyH1>{t("invitation.signInTitle")}</TypographyH1>
+      <main className={pageClassName}>
+        <TypographyH1 variant="page">{t("invitation.signInTitle")}</TypographyH1>
         <TypographyMuted>{t("invitation.signInBody")}</TypographyMuted>
         <Button asChild>
           <Link to="/sign-in" search={{ redirect: `/accept-invitation/${invitationId}` }}>
@@ -44,28 +69,19 @@ function AcceptInvitationPage() {
   }
 
   return (
-    <main className={cn(pageContainerVariants({ width: "form" }), "flex flex-col gap-6 py-6")}>
-      <TypographyH1>{t("invitation.acceptInvitation")}</TypographyH1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("invitation.joinTitle")}</CardTitle>
-          <CardDescription>
-            {t("invitation.signedInAs", { email: session.user.email })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Button onClick={() => mutation.mutate({ invitationId })} disabled={mutation.isPending}>
-            {t("invitation.acceptInvitation")}
-          </Button>
-          {mutation.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {formatApiError(mutation.error, t("invitation.acceptFailed"), tErrors)}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+    <main className={pageClassName}>
+      <TypographyH1 variant="page">{t("invitation.joinTitle")}</TypographyH1>
+      <TypographyMuted>{t("invitation.signedInAs", { email: session.user.email })}</TypographyMuted>
+      <Button onClick={() => mutation.mutate({ invitationId })} disabled={mutation.isPending}>
+        {t("invitation.acceptInvitation")}
+      </Button>
+      {mutation.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {formatApiError(mutation.error, t("invitation.acceptFailed"), tErrors)}
+          </AlertDescription>
+        </Alert>
+      )}
     </main>
   );
 }

@@ -16,9 +16,10 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 | Order | Phase | Status | What | Why it survived the cut |
 |---|---|---|---|---|
-| 1 | **Phase J** | Open | Front redesign from scratch on shadcn/ui, one design system in `@packages/ui` | The cloner's first impression is the app shell; today it is a generic default with known mobile defects |
-| 2 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
-| 3 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
+| 1 | **Phase J** | Delivered | Front redesign on shadcn/ui, one design system in `@packages/ui`: sober tool direction, every screen rebuilt | The cloner's first impression is the app shell |
+| 2 | **Tooltips pass** | Open | Tooltips and contextual help everywhere they add something: icon-only buttons, truncated values, disabled controls, technical terms | A dense pro tool must explain itself in place; today most icons and truncated values say nothing on hover or focus |
+| 3 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
+| 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -30,13 +31,24 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Front redesign from scratch: **Phase J**
 
-- **Status**: open.
-- **Date**: next, before the review pass (the review reads the redesigned surface, not the one being replaced).
-- **Why**: every screen still wears the shadcn defaults it was scaffolded with, so a clone looks like every other shadcn app until someone spends a week on it. The shell also carries measured defects: at 390 px and 768 px the top-nav header overflows the viewport by 33 px (the user menu is pushed off screen on `/settings`), and the theme provider renders an inline `<script>` that React reports as an error on every navigation.
+- **Status**: delivered. Emails stayed out: their templates do not share the theme tokens. Radix stays the primitive base.
+- **Date**: before the review pass (the review reads the redesigned surface, not the one being replaced).
+- **Why**: every screen wore the shadcn defaults it was scaffolded with, so a clone looks like every other shadcn app until someone spends a week on it. The shell also carries measured defects: at 390 px and 768 px the top-nav header overflows the viewport by 33 px (the user menu is pushed off screen on `/settings`), and the theme provider renders an inline `<script>` that React reports as an error on every navigation.
 - **Scope**: a design direction chosen once (typography, color tokens light and dark, radius, density, motion) and expressed only as tokens in the global theme of `@packages/ui`; shadcn/ui components reinstalled from the current registry and left unmodified where possible; every screen of `apps/app` rebuilt on them (auth, onboarding, dashboard, settings tabs, admin, legal, command palette, emails if their templates share the tokens). Built with the repo's frontend skills: `frontend-design` for the direction, `lean-ui` on every touched file, `polish-interface-details` and `animate-interface` for states and motion, `stress-test-ui` for empty, long and error data, `review-animations` before closing.
 - **Out of scope**: new features, copy rewrites beyond what a layout change forces, a marketing site (E.2 stays cut).
 - **Done when**: no screen overflows at 390, 768 and 1440 px (measured, not eyeballed); the browser console is clean on every route; the accessibility gate stays green with no new allowlist entry; no inline style and no color or spacing value outside the theme tokens (grep); `docs/SURFACE.md` parity test unchanged; screenshots of each screen in both themes attached to the PR.
 - **References**: `packages/ui/CLAUDE.md`, `apps/app/CLAUDE.md`, `apps/app/a11y/README.md`.
+
+---
+
+## Tooltips pass
+
+- **Status**: open.
+- **Date**: after Phase J, before the review pass.
+- **Why**: icon-only buttons, truncated values and disabled controls leave the user guessing, and a sober interface hides more behind icons than a loud one.
+- **Scope**: an inventory of every screen, then the existing `Tooltip` primitive on icon-only buttons, truncated values (full value on hover and focus), disabled controls (why it is disabled), technical terms and status badges, plus keyboard shortcuts where one exists. Every text goes through `t()` with locale parity.
+- **Out of scope**: new features, onboarding tours, tooltips repeating a visible label.
+- **Done when**: no icon-only control and no truncated value lacks a tooltip (checked screen by screen); tooltips open on keyboard focus as well as hover, and touch screens lose no information; the accessibility gate stays green.
 
 ---
 

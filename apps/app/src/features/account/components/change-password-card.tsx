@@ -1,12 +1,5 @@
 import { Button } from "@packages/ui/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,6 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
@@ -27,28 +21,30 @@ export function ChangePasswordCard() {
   const guard = useImpersonationGuard();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("account.changePasswordTitle")}</CardTitle>
-        <CardDescription>{t("account.changePasswordDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" disabled={guard.blocked} {...guard.describeProps()}>
-              {t("account.changePasswordButton")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent closeLabel={tCommon("actions.close")}>
-            <DialogHeader>
-              <DialogTitle>{t("account.changePasswordDialogTitle")}</DialogTitle>
-              <DialogDescription>{t("account.changePasswordDialogDescription")}</DialogDescription>
-            </DialogHeader>
-            <ChangePasswordForm onSuccess={() => setOpen(false)} />
-          </DialogContent>
-        </Dialog>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title={t("account.changePasswordTitle")}
+      description={t("account.changePasswordDescription")}
+    >
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="self-start"
+            disabled={guard.blocked}
+            {...guard.describeProps()}
+          >
+            {t("account.changePasswordButton")}
+          </Button>
+        </DialogTrigger>
+        <DialogContent closeLabel={tCommon("actions.close")}>
+          <DialogHeader>
+            <DialogTitle>{t("account.changePasswordDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("account.changePasswordDialogDescription")}</DialogDescription>
+          </DialogHeader>
+          <ChangePasswordForm onSuccess={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }

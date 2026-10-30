@@ -4,10 +4,11 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@packages/ui/components/ui/card";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TextLink } from "@packages/ui/components/ui/text-link";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import type { ReactNode } from "react";
 import { LegalFooter } from "../../../shared/components/legal-footer";
 import { ThemeToggle } from "../../../shared/components/theme-toggle";
@@ -17,25 +18,29 @@ interface AuthShellProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  className?: string;
 }
 
-export function AuthShell({ title, description, children, footer, className }: AuthShellProps) {
+export function AuthShell({ title, description, children, footer }: AuthShellProps) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="relative flex flex-1 items-center justify-center">
-        <ThemeToggle className="absolute top-4 right-4" />
+      <header className="flex justify-end p-4">
+        <ThemeToggle />
+      </header>
 
-        <Card className="w-full max-w-sm">
+      <main
+        className={cn(
+          pageContainerVariants({ width: "form" }),
+          "flex flex-1 flex-col justify-center pb-8",
+        )}
+      >
+        <Card>
           <CardHeader>
-            <CardTitle asChild>
-              <h1>{title}</h1>
-            </CardTitle>
+            <TypographyH1 variant="page">{title}</TypographyH1>
 
             {description && <CardDescription>{description}</CardDescription>}
           </CardHeader>
 
-          <CardContent className={className}>{children}</CardContent>
+          <CardContent className="flex flex-col gap-6">{children}</CardContent>
 
           {footer && <CardFooter>{footer}</CardFooter>}
         </Card>
@@ -53,7 +58,7 @@ interface AuthShellFooterProps {
 
 export function AuthShellFooter({ lead, link }: AuthShellFooterProps) {
   return (
-    <TypographyMuted className="w-full text-center">
+    <TypographyMuted>
       {lead ? `${lead} ` : null}
       <TextLink asChild>{link}</TextLink>
     </TypographyMuted>

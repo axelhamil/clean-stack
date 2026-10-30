@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { sessionQueryOptions } from "../api/queries/session";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
 import { type DisplayUser, displayName, initialsOf } from "../utils";
+import { usePrimaryNav } from "./use-primary-nav";
 
 interface UserMenuProps {
   user: DisplayUser;
@@ -29,11 +30,12 @@ export function UserMenu({ user }: UserMenuProps) {
   const display = displayName(user);
   const { data: session } = useQuery(sessionQueryOptions);
   const image = session?.user.image;
+  const primaryNav = usePrimaryNav();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full">
+        <Button variant="ghost" size="icon">
           <Avatar className="size-8">
             {image ? <AvatarImage src={image} alt={display} /> : null}
             <AvatarFallback className="text-xs font-medium">{initialsOf(display)}</AvatarFallback>
@@ -41,12 +43,23 @@ export function UserMenu({ user }: UserMenuProps) {
           <span className="sr-only">{t("userMenu.openMenu")}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="min-w-56">
+      <DropdownMenuContent align="end" sideOffset={8} className="w-64">
         <DropdownMenuLabel weight="normal" className="flex flex-col gap-0.5">
           <TypographySmall className="truncate">{display}</TypographySmall>
           <TypographyMuted className="truncate">{user.email}</TypographyMuted>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuGroup className="md:hidden">
+          {primaryNav.map((item) => (
+            <DropdownMenuItem key={item.to} asChild>
+              <Link to={item.to}>
+                <item.icon />
+                {t(item.labelKey)}
+              </Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator className="md:hidden" />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
             <Link to="/settings/account">

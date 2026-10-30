@@ -1,13 +1,9 @@
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { Progress } from "@packages/ui/components/ui/progress";
-import { TypographyH1, TypographyP } from "@packages/ui/components/ui/typography";
+import { Separator } from "@packages/ui/components/ui/separator";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyP } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -38,28 +34,11 @@ function BillingPage() {
   const statusLabel = isSubscriptionStatus(ent.status) ? t(STATUS_KEYS[ent.status]) : ent.status;
 
   return (
-    <main className="flex flex-col gap-6">
-      <TypographyH1 className="sr-only">{t("billing.pageTitle")}</TypographyH1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("billing.currentPlanTitle", { tier: t(TIER_KEYS[ent.tier]) })}</CardTitle>
-          <CardDescription>{t("billing.statusLabel", { status: statusLabel })}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {ent.maxMembers === null ? (
-            <TypographyP>{t("billing.unlimitedMembers")}</TypographyP>
-          ) : (
-            <>
-              <TypographyP>
-                {t("billing.membersUsage", { count: memberCount, max: ent.maxMembers })}
-              </TypographyP>
-              <Progress
-                value={(memberCount / ent.maxMembers) * 100}
-                aria-label={t("billing.membersUsageAriaLabel")}
-              />
-            </>
-          )}
-          {isPaid && (
+    <main className="flex flex-col gap-8">
+      <PageHeader
+        title={t("billing.pageTitle")}
+        actions={
+          isPaid && (
             <Button
               onClick={() => portal.mutate()}
               disabled={portal.isPending || guard.blocked}
@@ -67,12 +46,37 @@ function BillingPage() {
             >
               {t("billing.manageBilling")}
             </Button>
-          )}
-        </CardContent>
-      </Card>
+          )
+        }
+      />
       <ImpersonationReason guard={guard} />
+      <SettingsSection
+        title={t("billing.currentPlanTitle", { tier: t(TIER_KEYS[ent.tier]) })}
+        description={t("billing.statusLabel", { status: statusLabel })}
+      >
+        {ent.maxMembers === null ? (
+          <TypographyP>{t("billing.unlimitedMembers")}</TypographyP>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <TypographyP>
+              {t("billing.membersUsage", { count: memberCount, max: ent.maxMembers })}
+            </TypographyP>
+            <Progress
+              value={(memberCount / ent.maxMembers) * 100}
+              aria-label={t("billing.membersUsageAriaLabel")}
+            />
+          </div>
+        )}
+      </SettingsSection>
       {!isPaid && (
-        <PricingTable isAuthenticated currentTier={ent.tier} activeOrgId={activeOrg?.id ?? null} />
+        <>
+          <Separator />
+          <PricingTable
+            isAuthenticated
+            currentTier={ent.tier}
+            activeOrgId={activeOrg?.id ?? null}
+          />
+        </>
       )}
     </main>
   );

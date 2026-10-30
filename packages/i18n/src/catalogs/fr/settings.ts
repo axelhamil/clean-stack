@@ -24,7 +24,6 @@ export default {
     saving: "Enregistrement…",
     nameLabel: "Nom",
     saveChanges: "Enregistrer les modifications",
-    uploadAvatarLabel: "Téléverser une nouvelle image d'avatar",
     changeAvatar: "Changer d'avatar",
     uploading: "Téléversement…",
     avatarUpdatedToast: "Avatar mis à jour",
@@ -66,6 +65,7 @@ export default {
     },
   },
   passkeys: {
+    loadFailed: "Impossible de charger vos clés d'accès. Rechargez la page pour réessayer.",
     title: "Clés d'accès",
     description:
       "Connectez-vous avec la biométrie ou une clé matérielle. Les clés d'accès résistent au hameçonnage et remplacent les mots de passe.",
@@ -190,6 +190,8 @@ export default {
     },
   },
   notifications: {
+    loadFailed:
+      "Impossible de charger les préférences de notification. Rechargez la page pour réessayer.",
     title: "Notifications",
     preferencesTitle: "Préférences de notification",
     preferencesDescription:
@@ -214,6 +216,10 @@ export default {
     },
   },
   organization: {
+    membersLoading: "Chargement…",
+    membersLoadFailed: "Impossible de charger les membres. Rechargez la page pour réessayer.",
+    invitationsLoadFailed:
+      "Impossible de charger les invitations en attente. Rechargez la page pour réessayer.",
     noActiveOrg: "Aucune organisation active.",
     title: "Paramètres de l'organisation",
     detailsTitle: "Détails",
@@ -315,6 +321,7 @@ export default {
     requestFailed: "Impossible de demander l'export des données. Veuillez réessayer.",
   },
   sessions: {
+    loadFailed: "Impossible de charger vos sessions. Rechargez la page pour réessayer.",
     title: "Sessions actives",
     description: "Appareils actuellement connectés à votre compte.",
     signOutOthers: "Déconnecter les autres sessions",
@@ -370,9 +377,9 @@ export default {
     },
     deliveries: {
       title: "Livraisons",
-      allStatusesPlaceholder: "Tous les statuts",
       allStatusFilter: "Tous",
       loading: "Chargement des livraisons…",
+      empty: "Aucune livraison pour l'instant.",
       eventTypeHeader: "Type d'événement",
       statusHeader: "Statut",
       attemptsHeader: "Tentatives",
@@ -448,6 +455,7 @@ export default {
   },
   sso: {
     pageTitle: "Authentification unique",
+    loading: "Chargement…",
     upsell: {
       description:
         "Permettez aux membres de se connecter via votre fournisseur d'identité (OIDC ou SAML), provisionnez les comptes via SCIM et imposez le SSO sur un domaine vérifié.",

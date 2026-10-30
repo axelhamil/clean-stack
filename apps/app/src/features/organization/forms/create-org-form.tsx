@@ -61,7 +61,7 @@ export function CreateOrgForm({ onSuccess }: CreateOrgFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={create.isPending || isSwitching}>
+        <Button type="submit" className="self-start" disabled={create.isPending || isSwitching}>
           {t("orgNew.title")}
         </Button>
       </form>

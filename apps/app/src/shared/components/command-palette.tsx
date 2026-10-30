@@ -49,7 +49,6 @@ import {
   Users,
   Webhook,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toastError, toastSuccess } from "../api/errors/toast";
@@ -61,6 +60,7 @@ import { type NavigationRequirement, useAuthorization } from "../auth/use-author
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
 import { LEGAL_ROUTES } from "../legal-routes";
+import { useTheme } from "../theme/use-theme";
 
 interface CommandShortcutBinding {
   display: string;

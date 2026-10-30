@@ -15,7 +15,9 @@ export const Route = createFileRoute("/verify-email")({
   validateSearch: verifyEmailSearchSchema,
   beforeLoad: async ({ context, search }) => {
     if (search.token) return;
-    const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
+    const session = await context.queryClient
+      .ensureQueryData(sessionQueryOptions)
+      .catch(() => null);
     if (session) throw redirect({ to: "/dashboard" });
   },
   component: VerifyEmailPage,

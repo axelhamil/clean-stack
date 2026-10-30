@@ -3,11 +3,11 @@ import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-const typographyH1Variants = cva("scroll-m-20 font-extrabold tracking-tight", {
+const typographyH1Variants = cva("scroll-m-20 font-semibold tracking-tight", {
   variants: {
     variant: {
-      hero: "text-center text-4xl text-balance",
-      page: "text-left text-3xl",
+      hero: "text-center text-3xl text-balance",
+      page: "text-left text-2xl",
     },
   },
   defaultVariants: { variant: "hero" },
@@ -27,14 +27,29 @@ function TypographyH1({ className, variant, ...props }: TypographyH1Props) {
   );
 }
 
-function TypographyH2({ className, ...props }: React.ComponentProps<"h2">) {
+const typographyH2Variants = cva("scroll-m-20 font-semibold tracking-tight first:mt-0", {
+  variants: {
+    variant: {
+      default: "text-xl",
+      section: "text-base",
+    },
+    tone: {
+      default: "",
+      destructive: "text-destructive",
+    },
+  },
+  defaultVariants: { variant: "default", tone: "default" },
+});
+
+interface TypographyH2Props
+  extends React.ComponentProps<"h2">,
+    VariantProps<typeof typographyH2Variants> {}
+
+function TypographyH2({ className, variant, tone, ...props }: TypographyH2Props) {
   return (
     <h2
       data-slot="typography-h2"
-      className={cn(
-        "scroll-m-20 border-b pb-2 font-semibold text-3xl tracking-tight first:mt-0",
-        className,
-      )}
+      className={cn(typographyH2Variants({ variant, tone }), className)}
       {...props}
     />
   );
@@ -44,7 +59,7 @@ function TypographyH3({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
       data-slot="typography-h3"
-      className={cn("scroll-m-20 font-semibold text-2xl tracking-tight", className)}
+      className={cn("scroll-m-20 font-semibold text-lg tracking-tight", className)}
       {...props}
     />
   );
@@ -54,7 +69,7 @@ function TypographyH4({ className, ...props }: React.ComponentProps<"h4">) {
   return (
     <h4
       data-slot="typography-h4"
-      className={cn("scroll-m-20 font-semibold text-xl tracking-tight", className)}
+      className={cn("scroll-m-20 font-semibold text-base tracking-tight", className)}
       {...props}
     />
   );
@@ -68,7 +83,7 @@ function TypographyLead({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="typography-lead"
-      className={cn("text-muted-foreground text-xl", className)}
+      className={cn("text-muted-foreground text-lg", className)}
       {...props}
     />
   );
@@ -159,7 +174,7 @@ function TypographyInlineCode({ className, ...props }: React.ComponentProps<"cod
     <code
       data-slot="typography-inline-code"
       className={cn(
-        "relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono font-semibold text-sm",
+        "relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono font-medium text-sm",
         className,
       )}
       {...props}

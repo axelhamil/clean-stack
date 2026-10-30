@@ -17,10 +17,12 @@ export function EventTypesTable() {
         <Panel key={type} asChild>
           <details>
             <summary className="flex cursor-pointer flex-wrap items-center gap-3">
-              <code className="text-sm">{type}</code>
+              <TypographyInline font="mono" size="sm" className="min-w-0 break-all">
+                {type}
+              </TypographyInline>
               <Badge variant="secondary">{eventGroupOf(type)}</Badge>
               <Badge variant="outline">{retentionFor(type)}</Badge>
-              <TypographyInline tone="muted" size="sm">
+              <TypographyInline tone="muted" size="sm" className="basis-full">
                 {descriptionFor(type)}
               </TypographyInline>
             </summary>

@@ -69,6 +69,40 @@ test.describe("signed in", () => {
     await expect(palette).toBeHidden();
   });
 
+  for (const width of [390, 768, 1440]) {
+    test(`keeps the shell inside a ${width} px viewport with long names`, async ({ page }) => {
+      const longName = "Compagnie Internationale des Transports Maritimes et Fluviaux";
+      await page.route(/\/api\/auth\//, async (route) => {
+        const response = await route.fetch();
+        const body = (await response.text()).replace(/"name":"[^"]*"/g, `"name":"${longName}"`);
+        await route.fulfill({ response, body });
+      });
+      await page.setViewportSize({ width, height: 800 });
+
+      await page.goto("/settings/api-tokens");
+
+      const activeTab = page
+        .getByRole("navigation", { name: "Settings sections" })
+        .locator("a[data-active]");
+      await expect(activeTab).toBeInViewport({ ratio: 1 });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+    });
+  }
+
+  test("reaches the primary navigation from the user menu on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Open user menu" }).click();
+    await page.getByRole("menuitem", { name: "Settings" }).click();
+
+    await expect(page).toHaveURL(/\/settings/);
+  });
+
   test("skips the theme view transition under reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript(() => {

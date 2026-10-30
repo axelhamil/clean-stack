@@ -1,8 +1,5 @@
-"use client";
-
 import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
 import type * as React from "react";
-
 import { cn } from "../../libs/utils";
 
 function ScrollArea({

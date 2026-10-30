@@ -1,11 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import { Panel } from "@packages/ui/components/ui/panel";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@packages/ui/components/ui/tabs";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -62,54 +55,44 @@ export function ProviderCard() {
     isSsoProviderType(type) ? t(SSO_PROVIDER_TYPE_KEYS[type]) : type;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("sso.providerCard.title")}</CardTitle>
-        <CardDescription>{t("sso.providerCard.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        {existing ? (
-          <Panel size="md" className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <TypographySmall>
-                {t("sso.providerCard.typeAndDomain", {
-                  type: typeLabel(existing.type),
-                  domain: existing.domain,
-                })}
-              </TypographySmall>
-              <TypographyMuted>{existing.issuer}</TypographyMuted>
-            </div>
-            <CopyRow
-              label={t("sso.providerCard.metadataUrlLabel")}
-              value={existing.spMetadataUrl}
+    <SettingsSection
+      title={t("sso.providerCard.title")}
+      description={t("sso.providerCard.description")}
+    >
+      {existing ? (
+        <>
+          <div className="flex flex-col gap-1">
+            <TypographySmall>
+              {t("sso.providerCard.typeAndDomain", {
+                type: typeLabel(existing.type),
+                domain: existing.domain,
+              })}
+            </TypographySmall>
+            <TypographyMuted className="break-all">{existing.issuer}</TypographyMuted>
+          </div>
+          <CopyRow label={t("sso.providerCard.metadataUrlLabel")} value={existing.spMetadataUrl} />
+          <TypographyMuted>{t("sso.providerCard.singleProviderNotice")}</TypographyMuted>
+        </>
+      ) : (
+        <Tabs value={kind} onValueChange={(v) => isSsoProviderType(v) && setKind(v)}>
+          <TabsList>
+            <TabsTrigger value="oidc">{t(SSO_PROVIDER_TYPE_KEYS.oidc)}</TabsTrigger>
+            <TabsTrigger value="saml">{t(SSO_PROVIDER_TYPE_KEYS.saml)}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="oidc">
+            <OidcProviderForm
+              isPending={registerOidc.isPending}
+              onSubmit={(values) => org && registerOidc.mutate({ organizationId: org.id, values })}
             />
-            <TypographyMuted>{t("sso.providerCard.singleProviderNotice")}</TypographyMuted>
-          </Panel>
-        ) : (
-          <Tabs value={kind} onValueChange={(v) => isSsoProviderType(v) && setKind(v)}>
-            <TabsList>
-              <TabsTrigger value="oidc">{t(SSO_PROVIDER_TYPE_KEYS.oidc)}</TabsTrigger>
-              <TabsTrigger value="saml">{t(SSO_PROVIDER_TYPE_KEYS.saml)}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="oidc">
-              <OidcProviderForm
-                isPending={registerOidc.isPending}
-                onSubmit={(values) =>
-                  org && registerOidc.mutate({ organizationId: org.id, values })
-                }
-              />
-            </TabsContent>
-            <TabsContent value="saml">
-              <SamlProviderForm
-                isPending={registerSaml.isPending}
-                onSubmit={(values) =>
-                  org && registerSaml.mutate({ organizationId: org.id, values })
-                }
-              />
-            </TabsContent>
-          </Tabs>
-        )}
-      </CardContent>
-    </Card>
+          </TabsContent>
+          <TabsContent value="saml">
+            <SamlProviderForm
+              isPending={registerSaml.isPending}
+              onSubmit={(values) => org && registerSaml.mutate({ organizationId: org.id, values })}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
+    </SettingsSection>
   );
 }

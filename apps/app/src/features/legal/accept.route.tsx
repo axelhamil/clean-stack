@@ -1,20 +1,17 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
+import { Separator } from "@packages/ui/components/ui/separator";
 import {
   TypographyH1,
+  TypographyH2,
   TypographyMuted,
   TypographySmall,
 } from "@packages/ui/components/ui/typography";
+import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { policiesQueryOptions } from "../../shared/api/queries/policies";
@@ -62,18 +59,25 @@ function AcceptPoliciesPage() {
   if (!policies || staleTypes.length === 0) return null;
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center p-4">
-      <ThemeToggle className="absolute top-4 right-4" />
+    <div className="flex min-h-dvh flex-col">
+      <header className="flex justify-end p-4">
+        <ThemeToggle />
+      </header>
 
-      <div className="flex w-full max-w-lg flex-col gap-6">
-        <header className="flex flex-col gap-2">
-          <TypographyH1>
+      <main
+        className={cn(
+          pageContainerVariants({ width: "form" }),
+          "flex flex-1 flex-col justify-center gap-6 pb-8",
+        )}
+      >
+        <div className="flex flex-col gap-2">
+          <TypographyH1 variant="page">
             {isReacceptance ? t("legal.accept.titleReacceptance") : t("legal.accept.title")}
           </TypographyH1>
           <TypographyMuted>
             {isReacceptance ? t("legal.accept.subtitleReacceptance") : t("legal.accept.subtitle")}
           </TypographyMuted>
-        </header>
+        </div>
 
         {staleTypes.map((type) => {
           const doc = POLICY_DOCS[type];
@@ -82,22 +86,21 @@ function AcceptPoliciesPage() {
           const changes = acceptedVersion ? getChangesSince(type, acceptedVersion) : [];
 
           return (
-            <Card key={type}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Fragment key={type}>
+              <Separator />
+              <section className="flex flex-col gap-2">
+                <TypographyH2 className="flex items-center gap-2">
                   {title}
                   {acceptedVersion ? (
                     <Badge variant="secondary">{t("legal.accept.updatedBadge")}</Badge>
                   ) : null}
-                </CardTitle>
-                <CardDescription>
+                </TypographyH2>
+                <TypographyMuted>
                   {t("legal.policies.versionLine", {
                     version: doc.version,
                     date: doc.effectiveDate,
                   })}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
+                </TypographyMuted>
                 {changes.map((entry) => (
                   <div key={entry.version} className="flex flex-col gap-1">
                     <TypographySmall>{entry.version}</TypographySmall>
@@ -107,8 +110,8 @@ function AcceptPoliciesPage() {
                 <TypographyMuted>
                   <PolicyLink type={type}>{t("legal.accept.readFull", { title })}</PolicyLink>
                 </TypographyMuted>
-              </CardContent>
-            </Card>
+              </section>
+            </Fragment>
           );
         })}
 
@@ -121,7 +124,7 @@ function AcceptPoliciesPage() {
           {mutation.isPending ? t("legal.accept.acceptingButton") : t("legal.accept.acceptButton")}
         </Button>
         <ImpersonationReason guard={guard} />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

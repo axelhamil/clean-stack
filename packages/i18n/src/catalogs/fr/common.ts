@@ -16,7 +16,7 @@ export default {
   },
   errorBoundary: {
     title: "Une erreur est survenue",
-    body: "Nous avons été alertés et nous examinons le problème. Essayez de recharger la page.",
+    body: "Cette page n'a pas pu se charger. Essayez de la recharger.",
   },
   nav: {
     dashboard: "Tableau de bord",
@@ -101,7 +101,7 @@ export default {
   },
   impersonation: {
     activeSession:
-      "Session d'emprunt d'identité active : agit en tant que <name></name>. {{remaining}}",
+      "Session d'emprunt d'identité active : agit en tant que <name>{{name}}</name>. {{remaining}}",
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
@@ -282,8 +282,6 @@ export default {
   orgNew: {
     title: "Créer une organisation",
     subtitle: "Démarrez un nouvel espace de travail pour votre équipe.",
-    detailsTitle: "Détails de l'organisation",
-    detailsDescription: "Donnez un nom et un identifiant unique à votre organisation.",
     nameLabel: "Nom",
     namePlaceholder: "Acme",
     createdToast: "Organisation créée",
@@ -323,6 +321,9 @@ export default {
       month: "mois",
       year: "an",
     },
+    loading: "Chargement des forfaits…",
+    loadFailed: "Impossible de charger les forfaits. Rechargez la page pour réessayer.",
+    empty: "Aucun forfait n'est disponible pour le moment.",
     currentPlanCta: "Forfait actuel",
     getStarted: "Commencer",
     upgrade: "Mettre à niveau",

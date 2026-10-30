@@ -32,8 +32,6 @@ interface MetadataSheetProps {
 export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
   const { t } = useTranslation("admin");
   const { t: tCommon } = useTranslation("common");
-  // Same reasoning as `audit-row.tsx`: an audit event's occurred-at needs
-  // date+time precision, not the date-only `useFormatDate`.
   const formatDateTime = useFormatDateTime();
   const diff = diffOf(row?.metadata);
 
@@ -43,32 +41,36 @@ export function MetadataSheet({ row, onClose }: MetadataSheetProps) {
         {row && (
           <>
             <SheetHeader>
-              <SheetTitle>{row.action}</SheetTitle>
+              <SheetTitle className="pr-6 break-words">{row.action}</SheetTitle>
             </SheetHeader>
-            <DescriptionList>
-              <DescriptionItem>
-                <DescriptionTerm>{t("auditLog.metadata.actorLabel")}</DescriptionTerm>
-                <DescriptionDetails>{row.actorId ?? EMPTY_VALUE}</DescriptionDetails>
-              </DescriptionItem>
-              <DescriptionItem>
-                <DescriptionTerm>{t("auditLog.metadata.occurredAtLabel")}</DescriptionTerm>
-                <DescriptionDetails>{formatDateTime(row.occurredAt)}</DescriptionDetails>
-              </DescriptionItem>
-            </DescriptionList>
-            {diff ? (
-              <div className="flex gap-4 overflow-x-auto">
-                <div className="flex flex-col gap-1">
-                  <TypographySmall>{t("auditLog.metadata.beforeLabel")}</TypographySmall>
-                  <CodeBlock>{JSON.stringify(diff.before, null, 2)}</CodeBlock>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <TypographySmall>{t("auditLog.metadata.afterLabel")}</TypographySmall>
-                  <CodeBlock>{JSON.stringify(diff.after, null, 2)}</CodeBlock>
-                </div>
-              </div>
-            ) : (
-              <CodeBlock>{JSON.stringify(row.metadata, null, 2)}</CodeBlock>
-            )}
+            <div className="flex min-w-0 flex-col gap-4 px-4 pb-4">
+              <DescriptionList>
+                <DescriptionItem>
+                  <DescriptionTerm>{t("auditLog.metadata.actorLabel")}</DescriptionTerm>
+                  <DescriptionDetails className="break-all">
+                    {row.actorId ?? EMPTY_VALUE}
+                  </DescriptionDetails>
+                </DescriptionItem>
+                <DescriptionItem>
+                  <DescriptionTerm>{t("auditLog.metadata.occurredAtLabel")}</DescriptionTerm>
+                  <DescriptionDetails>{formatDateTime(row.occurredAt)}</DescriptionDetails>
+                </DescriptionItem>
+              </DescriptionList>
+              {diff ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <TypographySmall>{t("auditLog.metadata.beforeLabel")}</TypographySmall>
+                    <CodeBlock>{JSON.stringify(diff.before, null, 2)}</CodeBlock>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <TypographySmall>{t("auditLog.metadata.afterLabel")}</TypographySmall>
+                    <CodeBlock>{JSON.stringify(diff.after, null, 2)}</CodeBlock>
+                  </div>
+                </>
+              ) : (
+                <CodeBlock>{JSON.stringify(row.metadata, null, 2)}</CodeBlock>
+              )}
+            </div>
           </>
         )}
       </SheetContent>

@@ -68,7 +68,7 @@ export function CookieBanner() {
           <DialogHeader>
             <DialogTitle>{t("cookieBanner.preferencesTitle")}</DialogTitle>
           </DialogHeader>
-          <ConsentSettings onSaved={() => setCustomizeOpen(false)} />
+          <ConsentSettings withTitle={false} onSaved={() => setCustomizeOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

@@ -3,7 +3,7 @@ import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-const codeBlockVariants = cva("overflow-x-auto rounded bg-muted text-xs", {
+const codeBlockVariants = cva("overflow-x-auto rounded-md bg-muted font-mono text-xs", {
   variants: {
     size: {
       sm: "p-2",

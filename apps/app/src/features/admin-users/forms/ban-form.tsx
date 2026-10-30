@@ -20,8 +20,6 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { type BanFormInput, banFormSchema } from "../admin-users.schema";
 
-// Values stay module-level; only the labels move into a hook, since `t` only
-// exists inside a component.
 function useDurationOptions() {
   const { t } = useTranslation("admin");
   return [
@@ -91,7 +89,12 @@ export function BanForm({ isPending, onSubmit }: BanFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" variant="destructive" disabled={!reason.trim() || isPending}>
+        <Button
+          type="submit"
+          variant="destructive"
+          className="self-end"
+          disabled={!reason.trim() || isPending}
+        >
           {t("users.suspendAccountTitle")}
         </Button>
       </form>

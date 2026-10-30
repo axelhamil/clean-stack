@@ -2,6 +2,7 @@ import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { cn } from "@packages/ui/libs/utils.js";
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 
@@ -54,11 +55,18 @@ export function ContextualTabs({ className }: ContextualTabsProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { canReach } = useAuthorization();
   const visibleTabs = SETTINGS_TABS.filter(canReach);
+  const activeIndex = visibleTabs.findIndex((tab) => tab.to === pathname);
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    navRef.current?.children[activeIndex]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeIndex]);
 
   return (
     <nav
+      ref={navRef}
       aria-label={t("contextualTabs.ariaLabel")}
-      className={cn("flex items-center gap-1 overflow-x-auto", className)}
+      className={cn("scrollbar-none flex items-center gap-1 overflow-x-auto", className)}
     >
       {visibleTabs.map((tab) => {
         const Icon = tab.icon;

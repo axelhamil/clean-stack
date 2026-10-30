@@ -97,7 +97,7 @@ export function InviteMemberForm({ organizationId }: InviteMemberFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={invite.isPending}>
+        <Button type="submit" className="self-start" disabled={invite.isPending}>
           {t("organization.sendInvitationAction")}
         </Button>
       </form>

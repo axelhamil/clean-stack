@@ -15,7 +15,7 @@ export function useCompleteSignIn(): (redirectTo?: string) => Promise<void> {
   return useCallback(
     async (redirectTo?: string) => {
       await refreshSession();
-      void navigate({ to: redirectTo ?? "/" });
+      void navigate({ to: redirectTo ?? "/dashboard" });
     },
     [refreshSession, navigate],
   );
