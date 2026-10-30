@@ -29,6 +29,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { openApprovalIdOf } from "../../shared/api/approval-outcome";
 import { requireSection } from "../../shared/auth/require-section";
 import { useStaff } from "../../shared/auth/use-staff";
 import { AwaitingApprovalNotice } from "../../shared/components/awaiting-approval-notice";
@@ -73,7 +74,11 @@ function UserDetailPage() {
       );
       void refresh();
     },
-    onError: (err) => toastError(err, errorFallback("banUser")),
+    onError: (err) => {
+      toastError(err, errorFallback("banUser"));
+      const openId = openApprovalIdOf(err);
+      if (openId) setAwaitingId(openId);
+    },
   });
   const unban = useMutation({
     ...unbanUserMutationOptions,

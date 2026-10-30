@@ -5,20 +5,24 @@ import {
   db,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
-  lt,
+  isNull,
+  lte,
   multiTenantSchema,
   or,
   resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
+import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListUsersInput } from "../../application/dto/list-users.dto";
 import type {
   AdminMembershipRow,
   AdminSessionRow,
   AdminStoreError,
+  AdminUserListRow,
   AdminUserRow,
   BanWrite,
   EndedSession,
@@ -56,13 +60,16 @@ type SessionSelection = Pick<
 >;
 
 function toUserRow(row: UserSelection): AdminUserRow {
+  const isBanOver = row.banExpires !== null && row.banExpires.getTime() <= Date.now();
+  const isBanned = row.banned === true && !isBanOver;
+
   return {
     id: row.id,
     email: row.email,
     name: row.name,
-    banned: row.banned === true,
-    banReason: Option.fromNullable(row.banReason),
-    banExpires: Option.fromNullable(row.banExpires),
+    banned: isBanned,
+    banReason: Option.fromNullable(isBanned ? row.banReason : null),
+    banExpires: Option.fromNullable(isBanned ? row.banExpires : null),
     twoFactorEnabled: row.twoFactorEnabled === true,
     createdAt: row.createdAt,
   };
@@ -79,6 +86,15 @@ function toSessionRow(row: SessionSelection): AdminSessionRow {
   };
 }
 
+function liveBanIs(banned: boolean) {
+  const { user } = authSchema;
+  const now = new Date();
+
+  return banned
+    ? and(eq(user.banned, true), or(isNull(user.banExpires), gt(user.banExpires, now)))
+    : or(isNull(user.banned), eq(user.banned, false), lte(user.banExpires, now));
+}
+
 function sessionsHeldOrImpersonatedBy(userId: string) {
   const { session } = authSchema;
 
@@ -88,7 +104,7 @@ function sessionsHeldOrImpersonatedBy(userId: string) {
 export class DrizzleAdminUserStore implements IAdminUserStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async listUsers(input: ListUsersInput): Promise<Result<AdminUserRow[], AdminStoreError>> {
+  async listUsers(input: ListUsersInput): Promise<Result<AdminUserListRow[], AdminStoreError>> {
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminUserStore > listUsers" },
       async () => {
@@ -101,8 +117,10 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
               or(ilike(user.email, `%${input.search}%`), ilike(user.name, `%${input.search}%`)),
             );
           }
-          if (input.banned !== undefined) conditions.push(eq(user.banned, input.banned));
-          if (input.cursor) conditions.push(lt(user.createdAt, new Date(input.cursor)));
+          if (input.banned !== undefined) conditions.push(liveBanIs(input.banned));
+          if (input.cursor) {
+            conditions.push(afterTimeIdCursor(user.createdAt, user.id, input.cursor));
+          }
           if (input.organizationId) {
             conditions.push(
               inArray(
@@ -116,10 +134,10 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
           }
 
           const query = db
-            .select(userColumns())
+            .select({ ...userColumns(), cursorAt: exactInstant(user.createdAt) })
             .from(user)
             .where(conditions.length ? and(...conditions) : undefined)
-            .orderBy(desc(user.createdAt))
+            .orderBy(desc(user.createdAt), desc(user.id))
             .limit(input.limit);
 
           const rows = await this.instrumentation.startSpan(
@@ -127,7 +145,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
             () => query.execute(),
           );
 
-          return Result.ok(rows.map(toUserRow));
+          return Result.ok(rows.map((row) => ({ ...toUserRow(row), cursorAt: row.cursorAt })));
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "admin user list failed");

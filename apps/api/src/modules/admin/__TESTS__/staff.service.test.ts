@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { StaffRole } from "@packages/access-control";
+import { permissionsOfRole, type StaffRole } from "@packages/access-control";
 import { type AppError, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
@@ -71,10 +71,108 @@ function setup(given: {
   return { store, outbox, service, outcome };
 }
 
-const change = { actorUserId: ACTOR, targetUserId: TARGET };
+const ALL_PERMISSIONS = permissionsOfRole("manager");
+const change = { actorUserId: ACTOR, targetUserId: TARGET, actorPermissions: ALL_PERMISSIONS };
 const onlyTargetManages: StaffManagerRecord[] = [{ userId: TARGET, source: "console" }];
 
 describe("StaffService", () => {
+  describe("what an actor can give away", () => {
+    const narrow = {
+      actorUserId: ACTOR,
+      targetUserId: TARGET,
+      actorPermissions: ["staff.manage" as const],
+    };
+    const grant = {
+      ...narrow,
+      permission: "users.delete" as const,
+      effect: "grant" as const,
+      expiresAt: Option.none<Date>(),
+    };
+
+    it("refuses a grant of a permission the actor lacks", async () => {
+      const { store, service } = setup({ target: member("support") });
+
+      const result = await service.setOverride(grant);
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN");
+      expect(store.replaceOverride).not.toHaveBeenCalled();
+    });
+
+    it("lets the same actor deny what they lack, which gives nothing", async () => {
+      const { store, service } = setup({ target: member("support") });
+
+      const result = await service.setOverride({ ...grant, effect: "deny" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.replaceOverride).toHaveBeenCalled();
+    });
+
+    it("refuses a role holding more than the actor", async () => {
+      const { store, service } = setup({ target: member("support") });
+
+      const result = await service.assignRole({ ...narrow, role: "manager" });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN");
+      expect(store.assign).not.toHaveBeenCalled();
+    });
+
+    it("refuses lifting a deny on a permission the actor lacks, which is a grant too", async () => {
+      const { store, service } = setup({ target: member("support") });
+      store.revokeOverride.mockImplementation(async () =>
+        Result.ok(
+          Option.some({
+            permission: "users.delete" as const,
+            effect: "deny" as const,
+            expiresAt: Option.none<Date>(),
+          }),
+        ),
+      );
+
+      const result = await service.removeOverride({ ...narrow, overrideId: "o1" });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN");
+    });
+  });
+
+  describe("what an override cannot do", () => {
+    const denyManage = {
+      ...change,
+      permission: "staff.manage" as const,
+      effect: "deny" as const,
+      expiresAt: Option.none<Date>(),
+    };
+
+    it("lets a manager already denied be denied again, nothing is lost", async () => {
+      const { service } = setup({
+        target: Option.some({
+          userId: TARGET,
+          role: "manager",
+          source: "console",
+          banned: false,
+          overrides: [
+            { permission: "staff.manage", effect: "deny", expiresAt: Option.none<Date>() },
+          ],
+        }),
+        managers: [],
+      });
+
+      const result = await service.setOverride(denyManage);
+
+      expect(result.isSuccess).toBe(true);
+    });
+
+    it("refuses an end date already past with a reason of its own", async () => {
+      const { service } = setup({ target: member("support") });
+
+      const result = await service.setOverride({
+        ...denyManage,
+        expiresAt: Option.some(new Date(Date.now() - 1000)),
+      });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT");
+    });
+  });
+
   describe("permission overrides", () => {
     const deny = {
       ...change,
@@ -248,6 +346,7 @@ describe("StaffService", () => {
 
       const result = await service.assignRole({
         actorUserId: ACTOR,
+        actorPermissions: ALL_PERMISSIONS,
         targetUserId: ACTOR,
         role: "auditor",
       });

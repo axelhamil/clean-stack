@@ -62,7 +62,10 @@ function AuditPage() {
         title={t("auditLog.pageTitle")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ChainBadge verification={verification.isFetching ? undefined : verification.data} />
+            <ChainBadge
+              verification={verification.isFetching ? undefined : verification.data}
+              failed={verification.isError && !verification.isFetching}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -74,7 +77,6 @@ function AuditPage() {
           </div>
         }
       />
-      {verification.isError && <TypographyMuted>{t("auditLog.chain.failed")}</TypographyMuted>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Select

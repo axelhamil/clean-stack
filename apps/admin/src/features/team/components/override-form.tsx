@@ -9,9 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/ui/select";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { overrideExpiryOf } from "../override-expiry";
+import { earliestExpiryDay, latestExpiryDay, overrideExpiryOf } from "../override-expiry";
 import { STAFF_PERMISSION_LABEL_KEYS } from "../team-labels";
 
 export interface OverrideFormValues {
@@ -28,9 +29,20 @@ export interface OverrideFormProps {
 export function OverrideForm({ isPending, onSubmit }: OverrideFormProps) {
   const { t } = useTranslation("admin");
   const expiryId = useId();
+  const expiryErrorId = useId();
   const [permission, setPermission] = useState<StaffPermission>("users.read");
   const [effect, setEffect] = useState<"grant" | "deny">("grant");
   const [expiry, setExpiry] = useState("");
+  const [isExpiryRefused, setIsExpiryRefused] = useState(false);
+  const today = new Date();
+
+  const submit = () => {
+    const parsed = overrideExpiryOf(expiry);
+    setIsExpiryRefused(parsed.kind === "invalid");
+    if (parsed.kind === "invalid") return;
+
+    onSubmit({ permission, effect, expiresAt: parsed.kind === "at" ? parsed.iso : null });
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,16 +85,23 @@ export function OverrideForm({ isPending, onSubmit }: OverrideFormProps) {
         <Input
           id={expiryId}
           type="date"
+          min={earliestExpiryDay(today)}
+          max={latestExpiryDay(today)}
+          aria-invalid={isExpiryRefused}
+          aria-describedby={isExpiryRefused ? expiryErrorId : undefined}
           value={expiry}
-          onChange={(event) => setExpiry(event.target.value)}
+          onChange={(event) => {
+            setExpiry(event.target.value);
+            setIsExpiryRefused(false);
+          }}
         />
+        {isExpiryRefused && (
+          <TypographyMuted id={expiryErrorId} role="alert">
+            {t("team.permissions.expiryInvalid")}
+          </TypographyMuted>
+        )}
       </div>
-      <Button
-        variant="outline"
-        className="self-start"
-        disabled={isPending}
-        onClick={() => onSubmit({ permission, effect, expiresAt: overrideExpiryOf(expiry) })}
-      >
+      <Button variant="outline" className="self-start" disabled={isPending} onClick={submit}>
         {t("team.permissions.add")}
       </Button>
     </div>

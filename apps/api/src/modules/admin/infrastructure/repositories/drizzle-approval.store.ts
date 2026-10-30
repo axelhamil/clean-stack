@@ -21,6 +21,7 @@ import {
   withSweepGuards,
 } from "../../../../shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
+import { afterTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListApprovalsInput } from "../../application/dto/list-approvals.dto";
 import {
@@ -157,12 +158,7 @@ export class DrizzleApprovalStore implements IApprovalStore {
           .where(
             and(
               input.status ? eq(table.status, input.status) : undefined,
-              input.cursor
-                ? or(
-                    lt(table.createdAt, input.cursor.createdAt),
-                    and(eq(table.createdAt, input.cursor.createdAt), lt(table.id, input.cursor.id)),
-                  )
-                : undefined,
+              input.cursor ? afterTimeIdCursor(table.createdAt, table.id, input.cursor) : undefined,
             ),
           )
           .orderBy(desc(table.createdAt), desc(table.id))

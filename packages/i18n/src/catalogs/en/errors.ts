@@ -135,6 +135,12 @@ export default {
       "The requester no longer holds this power, so the request is closed.",
     ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
       "This person's access changed since the request was made. Ask again.",
+    ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT:
+      "A different request on this person is already waiting. Decide or cancel it, then ask again.",
+    ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN:
+      "You cannot give a permission you do not hold yourself. Ask a colleague who holds it.",
+    ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT:
+      "The end date of this change has passed. Ask again with a later date.",
     ADMIN_APPROVAL_NOT_FOUND: "This approval request no longer exists.",
     ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN: "You cannot request this action on your own account.",
     ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN: "A different person must decide this request.",

@@ -82,6 +82,7 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
 
       const result = await di.StaffService.assignRole({
         actorUserId,
+        actorPermissions: c.get("staff").permissions,
         targetUserId,
         role: body.role,
       });
@@ -154,6 +155,7 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
 
       const result = await di.StaffService.setOverride({
         actorUserId,
+        actorPermissions: c.get("staff").permissions,
         targetUserId,
         permission: body.permission,
         effect: body.effect,
@@ -187,6 +189,7 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
 
       const result = await di.StaffService.removeOverride({
         actorUserId,
+        actorPermissions: c.get("staff").permissions,
         targetUserId,
         overrideId,
       });

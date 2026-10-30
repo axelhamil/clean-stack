@@ -243,6 +243,33 @@ async function proveSensitiveRoutes(): Promise<void> {
   );
 }
 
+async function proveOverrideRoutesNeedStepUp(): Promise<void> {
+  const { cookie } = await confirmedManager("override-routes");
+  const target = await probes.manager("override-routes-target");
+  const path = `/admin/staff/${target.id}/overrides`;
+  const set = await call(cookie, "POST", path, {
+    permission: "billing.override",
+    effect: "grant",
+    expiresAt: null,
+  });
+  check("an override needs a step-up", codeOf(set) === "ADMIN_REAUTH_REQUIRED", set.body);
+
+  const overrideId = crypto.randomUUID();
+  await db.insert(staffSchema.staffPermissionOverride).values({
+    id: overrideId,
+    userId: target.id,
+    permission: "billing.override",
+    effect: "grant",
+  });
+  const removed = await call(cookie, "DELETE", `${path}/${overrideId}`);
+  check("removing an override needs a step-up", codeOf(removed) === "ADMIN_REAUTH_REQUIRED");
+  const [row] = await db
+    .select({ revokedAt: staffSchema.staffPermissionOverride.revokedAt })
+    .from(staffSchema.staffPermissionOverride)
+    .where(eq(staffSchema.staffPermissionOverride.id, overrideId));
+  check("the refused removal writes nothing", row?.revokedAt === null, row);
+}
+
 async function proveLongBanNeedsPermanentRoute(): Promise<void> {
   const { cookie } = await confirmedManager("long-ban");
   const target = await probes.user("long-ban-target");
@@ -371,6 +398,7 @@ async function main(): Promise<void> {
   await proveRacingCode();
   await proveRateLimit();
   await proveSensitiveRoutes();
+  await proveOverrideRoutesNeedStepUp();
   await proveLongBanNeedsPermanentRoute();
   await proveOtherFlowsBurnTheCode();
   await proveSignInSurvivesRecordingFailure();

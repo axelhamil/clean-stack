@@ -1,6 +1,4 @@
 import { Badge } from "@packages/ui/components/ui/badge";
-import { Button } from "@packages/ui/components/ui/button";
-import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import {
@@ -20,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { requireSection } from "../../shared/auth/require-section";
 import { useStaff } from "../../shared/auth/use-staff";
 import { AwaitingApprovalNotice } from "../../shared/components/awaiting-approval-notice";
+import { LoadErrorRetry } from "../../shared/components/load-error-retry";
 import { StaffPage } from "../../shared/components/staff-page";
 import { staffQueryOptions } from "./api/team.queries";
 import { AddStaffDialog } from "./components/add-staff-dialog";
@@ -51,22 +50,11 @@ function TeamPage() {
 
       {query.isPending && <SkeletonTable label={t("team.loading")} columns={3} />}
 
-      {query.isError && (
-        <LoadErrorAlert
-          message={t("team.loadFailed")}
-          retry={
-            <Button variant="outline" size="sm" onClick={() => query.refetch()}>
-              {t("backOffice.reload")}
-            </Button>
-          }
-        />
-      )}
+      {query.isError && <LoadErrorRetry message={t("team.loadFailed")} onRetry={query.refetch} />}
 
-      {query.isSuccess && query.data.items.length === 0 && (
-        <TypographyMuted>{t("team.empty")}</TypographyMuted>
-      )}
+      {query.data?.items.length === 0 && <TypographyMuted>{t("team.empty")}</TypographyMuted>}
 
-      {query.isSuccess && query.data.items.length > 0 && (
+      {query.data && query.data.items.length > 0 && (
         <Table>
           <TableHeader>
             <TableRow>

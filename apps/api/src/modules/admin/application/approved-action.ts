@@ -1,4 +1,9 @@
-import { type ApprovalAction, STAFF_ROLES, type StaffPermission } from "@packages/access-control";
+import {
+  type ApprovalAction,
+  STAFF_PERMISSIONS,
+  STAFF_ROLES,
+  type StaffPermission,
+} from "@packages/access-control";
 import { type AppError, Result } from "@packages/ddd-kit";
 import { z } from "zod";
 import { banUserBodySchema } from "./dto/ban-user.dto";
@@ -12,23 +17,34 @@ const storedRoleChangeSchema = setStaffRoleBodySchema.extend({
 
 const emptyParamsSchema = z.object({});
 
-const overrideChangeSchema = z.discriminatedUnion("op", [
+const requestedOverrideSchema = z.discriminatedUnion("op", [
   setStaffOverrideBodySchema.extend({ op: z.literal("set") }),
   z.object({ op: z.literal("revoke"), overrideId: z.string().min(1) }),
+]);
+
+const overrideFields = {
+  permission: z.enum(STAFF_PERMISSIONS),
+  effect: z.enum(["grant", "deny"]),
+  expiresAt: z.iso.datetime().nullable(),
+};
+
+const storedOverrideSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("set"), ...overrideFields }),
+  z.object({ op: z.literal("revoke"), overrideId: z.string().min(1), ...overrideFields }),
 ]);
 
 interface RequestParams {
   "user.ban_permanent": z.infer<typeof banUserBodySchema>;
   "staff.role_change": z.infer<typeof setStaffRoleBodySchema>;
   "staff.revoke": z.infer<typeof emptyParamsSchema>;
-  "staff.permission_override": z.infer<typeof overrideChangeSchema>;
+  "staff.permission_override": z.infer<typeof requestedOverrideSchema>;
 }
 
 interface StoredParams {
   "user.ban_permanent": z.infer<typeof banUserBodySchema>;
   "staff.role_change": z.infer<typeof storedRoleChangeSchema>;
   "staff.revoke": z.infer<typeof emptyParamsSchema>;
-  "staff.permission_override": z.infer<typeof overrideChangeSchema>;
+  "staff.permission_override": z.infer<typeof storedOverrideSchema>;
 }
 
 export type ApprovedActionOf<K extends ApprovalAction> = {
@@ -51,7 +67,7 @@ export interface ApprovalHandler<K extends ApprovalAction> {
     request: { subjectId: string; params: RequestParams[K] },
     actor: ApprovalActor,
   ): Promise<Result<StoredParams[K], AppError>>;
-  authorize(subjectId: string, actor: ApprovalActor): Promise<Result<void, AppError>>;
+  authorize(approved: ApprovedActionOf<K>, actor: ApprovalActor): Promise<Result<void, AppError>>;
   run(approved: ApprovedActionOf<K>, actor: ApprovalActor): Promise<Result<void, AppError>>;
 }
 
@@ -61,6 +77,19 @@ const invalidParams: AppError<"ADMIN_APPROVAL_PARAMS_INVALID"> = {
   code: "ADMIN_APPROVAL_PARAMS_INVALID",
   message: "The stored request no longer passes validation.",
 };
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (typeof value !== "object" || value === null) return value;
+
+  return Object.entries(value)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, item]) => [key, canonical(item)]);
+}
+
+export function sameApprovalParams(a: unknown, b: unknown): boolean {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
 
 export function readApprovedAction(
   record: Pick<ApprovalRecord, "action" | "subjectId" | "params">,
@@ -83,7 +112,7 @@ export function readApprovedAction(
     case "staff.revoke":
       return Result.ok({ action: record.action, subjectId, params: {} });
     case "staff.permission_override": {
-      const parsed = overrideChangeSchema.safeParse(params);
+      const parsed = storedOverrideSchema.safeParse(params);
       if (!parsed.success) return Result.fail(invalidParams);
 
       return Result.ok({ action: record.action, subjectId, params: parsed.data });

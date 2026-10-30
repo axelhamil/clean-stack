@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { isApprovalGone } from "../api/approval-outcome";
 import { cancelApprovalMutationOptions } from "../api/mutations/cancel-approval";
 import { useStaff } from "../auth/use-staff";
 
@@ -26,7 +27,13 @@ export function AwaitingApprovalNotice({ approvalId, onClosed }: AwaitingApprova
       void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
       onClosed();
     },
-    onError: (err) => toastError(err, errorFallback("cancelApproval")),
+    onError: (err) => {
+      toastError(err, errorFallback("cancelApproval"));
+      if (!isApprovalGone(err)) return;
+
+      void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
+      onClosed();
+    },
   });
 
   return (

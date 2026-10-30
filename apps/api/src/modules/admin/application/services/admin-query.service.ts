@@ -1,12 +1,19 @@
 import { Option, Result } from "@packages/ddd-kit";
+import { encodeTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListOrgsInput } from "../dto/list-orgs.dto";
 import type { ListUsersInput } from "../dto/list-users.dto";
-import type { AdminOrgMemberRow, AdminOrgRow, IAdminOrgStore } from "../ports/admin-org-store.port";
+import type {
+  AdminOrgListRow,
+  AdminOrgMemberRow,
+  AdminOrgRow,
+  IAdminOrgStore,
+} from "../ports/admin-org-store.port";
 import type {
   AdminMembershipRow,
   AdminSessionRow,
   AdminStoreError,
+  AdminUserListRow,
   AdminUserRow,
   IAdminUserStore,
 } from "../ports/admin-user-store.port";
@@ -28,10 +35,15 @@ export interface AdminPage<T> {
   nextCursor: Option<string>;
 }
 
-function toPage<T extends { createdAt: Date }>(items: T[], limit: number): AdminPage<T> {
+function toPage<T extends { cursorAt: string; id: string }>(
+  items: T[],
+  limit: number,
+): AdminPage<T> {
   const last = items.at(-1);
   const isFull = items.length === limit && last !== undefined;
-  const nextCursor = isFull ? Option.some(last.createdAt.toISOString()) : Option.none<string>();
+  const nextCursor = isFull
+    ? Option.some(encodeTimeIdCursor(last.cursorAt, last.id))
+    : Option.none<string>();
 
   return { items, nextCursor };
 }
@@ -45,7 +57,7 @@ export class AdminQueryService {
 
   async listUsers(
     input: ListUsersInput,
-  ): Promise<Result<AdminPage<AdminUserRow>, AdminQueryError>> {
+  ): Promise<Result<AdminPage<AdminUserListRow>, AdminQueryError>> {
     return this.instrumentation.startSpan({ name: "AdminQueryService > listUsers" }, async () => {
       const rows = await this.store.listUsers(input);
       if (rows.isFailure) return Result.fail(rows.getError());
@@ -54,7 +66,9 @@ export class AdminQueryService {
     });
   }
 
-  async listOrgs(input: ListOrgsInput): Promise<Result<AdminPage<AdminOrgRow>, AdminQueryError>> {
+  async listOrgs(
+    input: ListOrgsInput,
+  ): Promise<Result<AdminPage<AdminOrgListRow>, AdminQueryError>> {
     return this.instrumentation.startSpan({ name: "AdminQueryService > listOrgs" }, async () => {
       const rows = await this.orgStore.listOrgs(input);
       if (rows.isFailure) return Result.fail(rows.getError());

@@ -29,10 +29,15 @@ export function grantsStaffAccess(
 
 export function isLastManager(
   targetUserId: string,
-  managers: ReadonlyArray<{ userId: string; source: StaffSource }>,
+  managers: ReadonlyArray<{ userId: string; source: StaffSource; manageDenied?: boolean }>,
   env: StaffListing,
 ): boolean {
-  return !managers.some((m) => m.userId !== targetUserId && grantsStaffAccess(m, env));
+  const stillManages = (manager: { userId: string; manageDenied?: boolean }) =>
+    manager.manageDenied !== true || env.PLATFORM_ADMIN_IDS.includes(manager.userId);
+
+  return !managers.some(
+    (m) => m.userId !== targetUserId && grantsStaffAccess(m, env) && stillManages(m),
+  );
 }
 
 export function permissionsOfRecord(row: StaffRecord, now: Date): StaffPermission[] {

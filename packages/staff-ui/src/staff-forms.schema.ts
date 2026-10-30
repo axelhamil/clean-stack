@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const BAN_DURATIONS = [
+  { labelKey: "users.banForm.duration24h", seconds: 86_400 },
+  { labelKey: "users.banForm.duration7d", seconds: 604_800 },
+  { labelKey: "users.banForm.duration30d", seconds: 2_592_000 },
+] as const;
+
+export function banDurationLabelKey(seconds: number) {
+  return BAN_DURATIONS.find((duration) => duration.seconds === seconds)?.labelKey ?? null;
+}
+
 export const banFormSchema = z.object({
   reason: z.string().trim().min(1).max(500),
   expiresIn: z

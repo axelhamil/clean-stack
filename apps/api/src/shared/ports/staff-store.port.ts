@@ -26,6 +26,7 @@ export interface StaffRecord {
 export interface StaffManagerRecord {
   userId: string;
   source: StaffSource;
+  manageDenied?: boolean;
 }
 
 export interface StaffListRow {

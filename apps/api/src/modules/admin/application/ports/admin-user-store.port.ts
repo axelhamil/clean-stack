@@ -3,6 +3,8 @@ import type { ListUsersInput } from "../dto/list-users.dto";
 
 export type AdminStoreError = AppError<"ADMIN_QUERY_PROVIDER_FAILURE">;
 
+export type AdminUserListRow = AdminUserRow & { cursorAt: string };
+
 export interface AdminUserRow {
   id: string;
   email: string;
@@ -43,7 +45,7 @@ export interface BanWrite {
 }
 
 export interface IAdminUserStore {
-  listUsers(input: ListUsersInput): Promise<Result<AdminUserRow[], AdminStoreError>>;
+  listUsers(input: ListUsersInput): Promise<Result<AdminUserListRow[], AdminStoreError>>;
   findUserById(id: string): Promise<Result<Option<AdminUserRow>, AdminStoreError>>;
   listSessionsFor(userId: string): Promise<Result<AdminSessionRow[], AdminStoreError>>;
   listMembershipsFor(userId: string): Promise<Result<AdminMembershipRow[], AdminStoreError>>;

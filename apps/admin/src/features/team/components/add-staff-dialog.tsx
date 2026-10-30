@@ -14,13 +14,15 @@ import { ListRow, ListRowButton } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { openApprovalIdOf } from "../../../shared/api/approval-outcome";
 import { usersInfiniteQueryOptions } from "../../../shared/api/queries/users";
 import { useDebouncedFilter } from "../../../shared/hooks/use-debounced-filter";
 import { setStaffRoleMutationOptions } from "../api/team.mutations";
+import { staffQueryOptions } from "../api/team.queries";
 import { RoleSelect } from "./role-select";
 
 export interface AddStaffDialogProps {
@@ -40,7 +42,13 @@ export function AddStaffDialog({ onAwaiting }: AddStaffDialogProps) {
     ...usersInfiniteQueryOptions({ search: term }),
     enabled: open && term.length > 0,
   });
-  const matches = users.data?.pages.flatMap((page) => page.items) ?? [];
+  const staff = useQuery({ ...staffQueryOptions, enabled: open });
+  const staffIds = new Set(staff.data?.items.map((member) => member.userId));
+  const matches = staff.isSuccess
+    ? (users.data?.pages.flatMap((page) => page.items) ?? []).filter(
+        (user) => !staffIds.has(user.id),
+      )
+    : [];
 
   const reset = (next: boolean) => {
     setOpen(next);
@@ -49,6 +57,7 @@ export function AddStaffDialog({ onAwaiting }: AddStaffDialogProps) {
     setCommitted("");
     setSearch("");
     setSelected(null);
+    setRole("support");
   };
 
   const add = useMutation({
@@ -64,7 +73,11 @@ export function AddStaffDialog({ onAwaiting }: AddStaffDialogProps) {
       toast.success(t("team.added"));
       void queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
     },
-    onError: (err) => toastError(err, errorFallback("setStaffRole")),
+    onError: (err) => {
+      toastError(err, errorFallback("setStaffRole"));
+      const openId = openApprovalIdOf(err);
+      if (openId) onAwaiting(openId);
+    },
   });
 
   return (
@@ -88,10 +101,12 @@ export function AddStaffDialog({ onAwaiting }: AddStaffDialogProps) {
           }}
         />
 
-        {term.length > 0 && users.isSuccess && matches.length === 0 && (
+        {term.length > 0 && users.isSuccess && staff.isSuccess && matches.length === 0 && (
           <TypographyMuted>{t("team.noMatches")}</TypographyMuted>
         )}
-        {users.isError && <TypographyMuted>{t("users.loadFailed")}</TypographyMuted>}
+        {(users.isError || staff.isError) && (
+          <TypographyMuted>{t("users.loadFailed")}</TypographyMuted>
+        )}
 
         {!selected && matches.length > 0 && (
           <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">

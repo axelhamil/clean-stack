@@ -82,6 +82,37 @@ export interface NotificationStreamOptions {
   connect: (signal: AbortSignal) => Promise<NotificationStreamResponse>;
   onNotification: () => void;
   onDisconnect?: (attempt: number, error: unknown) => void;
+  onReconnect?: () => void;
+}
+
+export async function runNotificationStream(
+  options: () => NotificationStreamOptions,
+  signal: AbortSignal,
+  setConnected: (connected: boolean) => void,
+): Promise<void> {
+  let attempt = 0;
+  let hasConnected = false;
+
+  while (!signal.aborted) {
+    try {
+      const res = await options().connect(signal);
+      if (!res.ok || !res.body) throw new Error(`NOTIFICATION_STREAM_${res.status}`);
+
+      attempt = 0;
+      setConnected(true);
+      if (hasConnected) options().onReconnect?.();
+      hasConnected = true;
+      await consume(res.body, () => options().onNotification());
+    } catch (err) {
+      if (!signal.aborted) options().onDisconnect?.(attempt, err);
+    } finally {
+      if (!signal.aborted) setConnected(false);
+    }
+
+    if (signal.aborted) return;
+    await sleep(backoffDelay(attempt), signal);
+    attempt += 1;
+  }
 }
 
 export function useNotificationStreamConnection(options: NotificationStreamOptions): {
@@ -93,31 +124,9 @@ export function useNotificationStreamConnection(options: NotificationStreamOptio
 
   useEffect(() => {
     const controller = new AbortController();
-    const { signal } = controller;
-    let attempt = 0;
 
-    const run = async () => {
-      while (!signal.aborted) {
-        try {
-          const res = await latest.current.connect(signal);
-          if (!res.ok || !res.body) throw new Error(`NOTIFICATION_STREAM_${res.status}`);
+    void runNotificationStream(() => latest.current, controller.signal, setConnected);
 
-          attempt = 0;
-          setConnected(true);
-          await consume(res.body, () => latest.current.onNotification());
-        } catch (err) {
-          if (!signal.aborted) latest.current.onDisconnect?.(attempt, err);
-        } finally {
-          if (!signal.aborted) setConnected(false);
-        }
-
-        if (signal.aborted) return;
-        await sleep(backoffDelay(attempt), signal);
-        attempt += 1;
-      }
-    };
-
-    void run();
     return () => controller.abort();
   }, []);
 

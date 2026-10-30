@@ -5,14 +5,16 @@
  * the decision, and who the notification reaches. Creates and removes its own probe users.
  */
 
-import { authorizeStaff } from "@packages/access-control";
+import { APPROVAL_ACTIONS, authorizeStaff } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
+  auditLogSchema,
   authSchema,
   db,
   eq,
   inArray,
+  multiTenantSchema,
   notificationSchema,
   resolveExecutor,
   sql,
@@ -23,6 +25,7 @@ import { Hono } from "hono";
 import { di } from "../src/container";
 import { adminInternalRoutes } from "../src/modules/admin/internal.routes";
 import { env } from "../src/shared/env";
+import { timeIdCursorSchema } from "../src/shared/pagination/time-id-cursor";
 import { staffRecipients } from "../src/shared/services/staff-recipients";
 import { staffAccessOf } from "../src/shared/staff-access";
 import {
@@ -463,11 +466,33 @@ async function proveOnePendingPerPair(): Promise<void> {
   );
   const target = await probes.user("pair-target");
 
-  const asked = await Promise.all(requesters.map((requester) => requestBan(requester, target.id)));
-  check("racing requests all answer the same id", new Set(asked).size === 1, asked);
+  const asked = await Promise.all(
+    requesters.map(({ cookie }) =>
+      appCall(cookie, "POST", `/admin/users/${target.id}/ban`, {
+        reason: "check-admin-approval probe",
+      }),
+    ),
+  );
+  const opened = asked.filter((answer) => answer.status === 202);
+  const refused = asked.filter((answer) => answer.status === 409);
+  check(
+    "one racing request opens the row",
+    opened.length === 1,
+    asked.map((a) => a.status),
+  );
+  check("the others are told someone else asked", refused.length === RACERS - 1);
+  const id = opened[0]?.body.approvalId ?? "";
+  check(
+    "each refusal names the open request",
+    refused.every(
+      (answer) =>
+        codeOf(answer) === "ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT" &&
+        answer.body.error?.metadata?.approvalId === id,
+    ),
+    refused[0]?.body,
+  );
   const rows = await db.select().from(adminApproval).where(eq(adminApproval.subjectId, target.id));
   check("one row is stored", rows.length === 1, rows.length);
-  const id = asked[0] ?? "";
   check(
     "one request is announced",
     (await eventsOf(EventTypes.ADMIN_APPROVAL_REQUESTED, target.id, id)).length === 1,
@@ -606,6 +631,247 @@ async function proveListKeyset(): Promise<void> {
     "two requests of the same instant are each listed once",
     ids.every((id) => seen.filter((other) => other === id).length === 1),
     seen,
+  );
+}
+
+async function requestOverride(requester: Staff, targetId: string, body: object): Promise<AppCall> {
+  return appCall(requester.cookie, "POST", `/admin/staff/${targetId}/overrides`, body);
+}
+
+async function proveOverrideThroughDecide(): Promise<void> {
+  const requester = await manager("override-requester");
+  const otherRequester = await manager("override-other");
+  const approver = await manager("override-approver");
+  const lacking = await probes.manager("override-lacking");
+  await grant(lacking.id, "billing.override", "deny");
+  const lackingApprover = await confirm(lacking);
+  const target = await probes.manager("override-target");
+  const body = { permission: "billing.override", effect: "grant", expiresAt: null };
+
+  const asked = await requestOverride(requester, target.id, body);
+  const id = asked.body.approvalId ?? "";
+  check("an override opens a request", asked.status === 202 && id !== "", asked.body);
+
+  const repeated = await requestOverride(requester, target.id, { ...body });
+  check("the same request repeated is the same id", repeated.body.approvalId === id, repeated.body);
+
+  const different = await requestOverride(requester, target.id, { ...body, effect: "deny" });
+  check(
+    "a different override on one person is refused, not dropped",
+    different.status === 409 &&
+      codeOf(different) === "ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT" &&
+      different.body.error?.metadata?.approvalId === id,
+    different.body,
+  );
+  const someoneElse = await requestOverride(otherRequester, target.id, body);
+  check(
+    "someone else asking the same is refused with the open id",
+    someoneElse.status === 409 && someoneElse.body.error?.metadata?.approvalId === id,
+    someoneElse.body,
+  );
+
+  const unheld = await decide(lackingApprover, id);
+  check(
+    "a decider who lacks the permission cannot grant it",
+    codeOf(unheld) === "ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN",
+    unheld.body,
+  );
+  check("that refusal keeps the request open", (await rowOf(id)).status === "pending");
+
+  const approved = await decide(approver, id);
+  check("the approver grants through decide", approved.status === 200, approved.body);
+  const live = await di.IStaffStore.listLiveOverrides(target.id);
+  const [written] = live.isSuccess ? live.getValue() : [];
+  check("the grant is written", written?.effect === "grant", written);
+
+  const overrideId = written?.id ?? "";
+  const revoking = await appCall(
+    requester.cookie,
+    "DELETE",
+    `/admin/staff/${target.id}/overrides/${overrideId}`,
+  );
+  const revokeId = revoking.body.approvalId ?? "";
+  check("a removal opens a request", revoking.status === 202, revoking.body);
+  const stored = await rowOf(revokeId);
+  const params = stored.params as Record<string, unknown>;
+  check(
+    "the request names what it removes, not a bare id",
+    params.overrideId === overrideId &&
+      params.permission === "billing.override" &&
+      params.effect === "grant" &&
+      params.expiresAt === null,
+    params,
+  );
+  const removed = await decide(approver, revokeId);
+  check("the approver removes through decide", removed.status === 200, removed.body);
+  const after = await di.IStaffStore.listLiveOverrides(target.id);
+  check("the override is no longer live", after.isSuccess && after.getValue().length === 0);
+
+  const timed = await requestOverride(requester, target.id, {
+    ...body,
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+  });
+  const timedId = timed.body.approvalId ?? "";
+  await db
+    .update(adminApproval)
+    .set({
+      params: {
+        op: "set",
+        permission: "billing.override",
+        effect: "grant",
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+      },
+    })
+    .where(eq(adminApproval.id, timedId));
+  await decide(approver, timedId);
+  const lapsed = await rowOf(timedId);
+  check(
+    "an end date passed while waiting gives its own reason",
+    lapsed.status === "failed" && lapsed.failureReason === "ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT",
+    lapsed.failureReason,
+  );
+}
+
+async function pagedIds(
+  list: (cursor?: string) => Promise<{ ids: string[]; next: string | null }>,
+): Promise<string[]> {
+  const seen: string[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const { ids, next } = await list(cursor);
+    seen.push(...ids);
+    if (!next) return seen;
+
+    cursor = next;
+  }
+
+  return seen;
+}
+
+async function proveExactCursors(): Promise<void> {
+  const instants = [
+    "2031-01-01 00:00:00.123456",
+    "2031-01-01 00:00:00.123456",
+    "2031-01-01 00:00:00.123100",
+  ];
+  const tag = crypto.randomUUID();
+  const users = await Promise.all(instants.map((_, n) => probes.user(`cursor-${n}`)));
+  const userIds = users.map((user) => user.id);
+  const orgIds = instants.map((_, n) => `org-${tag}-${n}`);
+  const auditIds = instants.map((_, n) => `audit-${tag}-${n}`);
+  const { organization } = multiTenantSchema;
+  const { auditLog } = auditLogSchema;
+  await db
+    .insert(organization)
+    .values(orgIds.map((id) => ({ id, name: id, slug: id, createdAt: new Date() })));
+  await db.insert(auditLog).values(
+    auditIds.map((id) => ({
+      id,
+      actorType: "system" as const,
+      action: "check.cursor",
+      targetType: "probe",
+      targetId: tag,
+      metadata: {},
+      retention: "operational" as const,
+    })),
+  );
+  for (const [n, at] of instants.entries()) {
+    await db.execute(sql`UPDATE "user" SET created_at = ${at}::timestamp WHERE id = ${userIds[n]}`);
+    await db.execute(
+      sql`UPDATE organization SET created_at = ${at}::timestamp WHERE id = ${orgIds[n]}`,
+    );
+    await db.execute(
+      sql`UPDATE audit_log SET occurred_at = ${at}::timestamp WHERE id = ${auditIds[n]}`,
+    );
+  }
+
+  const parsedCursor = (raw?: string) => (raw ? timeIdCursorSchema.parse(raw) : undefined);
+  const seenUsers = await pagedIds(async (cursor) => {
+    const page = await di.AdminQueryService.listUsers({
+      limit: 1,
+      search: "cursor-",
+      cursor: parsedCursor(cursor),
+    });
+    const { items, nextCursor } = page.getValue();
+
+    return { ids: items.map((row) => row.id), next: nextCursor.toNull() };
+  });
+  check(
+    "users of one microsecond and one millisecond are each listed once",
+    userIds.every((id) => seenUsers.filter((other) => other === id).length === 1),
+    seenUsers,
+  );
+  const seenOrgs = await pagedIds(async (cursor) => {
+    const page = await di.AdminQueryService.listOrgs({
+      limit: 1,
+      search: tag,
+      cursor: parsedCursor(cursor),
+    });
+    const { items, nextCursor } = page.getValue();
+
+    return { ids: items.map((row) => row.id), next: nextCursor.toNull() };
+  });
+  check(
+    "organizations of one microsecond and one millisecond are each listed once",
+    orgIds.every((id) => seenOrgs.filter((other) => other === id).length === 1),
+    seenOrgs,
+  );
+  const seenAudit = await pagedIds(async (cursor) => {
+    const page = await di.AuditQueryService.listForPlatform({ limit: 1, targetId: tag, cursor });
+    const { items, nextCursor } = page.getValue();
+
+    return { ids: items.map((row) => row.id), next: nextCursor.toNull() };
+  });
+  check(
+    "audit rows of one microsecond and one millisecond are each listed once",
+    auditIds.every((id) => seenAudit.filter((other) => other === id).length === 1),
+    seenAudit,
+  );
+
+  await db.delete(organization).where(inArray(organization.id, orgIds));
+  await db.delete(auditLog).where(inArray(auditLog.id, auditIds));
+}
+
+async function proveLiveBanStatus(): Promise<void> {
+  const lapsed = await probes.user("ban-lapsed");
+  const running = await probes.user("ban-running");
+  const forever = await probes.user("ban-forever");
+  const clean = await probes.user("ban-none");
+  const { user } = authSchema;
+  await db
+    .update(user)
+    .set({ banned: true, banReason: "old", banExpires: new Date(Date.now() - 60_000) })
+    .where(eq(user.id, lapsed.id));
+  await db
+    .update(user)
+    .set({ banned: true, banReason: "now", banExpires: new Date(Date.now() + 60_000) })
+    .where(eq(user.id, running.id));
+  await db.update(user).set({ banned: true }).where(eq(user.id, forever.id));
+
+  const listed = async (banned: boolean) => {
+    const page = await di.AdminQueryService.listUsers({ limit: 100, search: "-ban-", banned });
+
+    return page.getValue().items;
+  };
+  const suspended = (await listed(true)).map((row) => row.id);
+  const active = (await listed(false)).map((row) => row.id);
+  check(
+    "the suspended filter keeps live bans only",
+    suspended.includes(running.id) &&
+      suspended.includes(forever.id) &&
+      !suspended.includes(lapsed.id),
+    suspended,
+  );
+  check(
+    "the active filter holds a lapsed ban and nobody banned",
+    active.includes(lapsed.id) && active.includes(clean.id) && !active.includes(running.id),
+    active,
+  );
+  const row = (await listed(false)).find((candidate) => candidate.id === lapsed.id);
+  check(
+    "a lapsed ban reads as no ban at all",
+    row?.banned === false && row.banReason.isNone() && row.banExpires.isNone(),
+    row,
   );
 }
 
@@ -887,7 +1153,7 @@ async function proveWhoIsNotified(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  Object.assign(env, { ADMIN_APPROVAL_ENABLED: true });
+  Object.assign(env, { ADMIN_APPROVAL_ENABLED: true, ADMIN_APPROVAL_ACTIONS: APPROVAL_ACTIONS });
 
   await proveOffChangesNothing();
   await proveSelfApprovalRefused();
@@ -906,6 +1172,9 @@ async function main(): Promise<void> {
   await proveUnderpoweredDeciderKeepsTheRow();
   await proveDeletedUserKeepsTheAudit();
   await proveListKeyset();
+  await proveOverrideThroughDecide();
+  await proveExactCursors();
+  await proveLiveBanStatus();
   await proveSweepGuards();
   await proveRecipientParity();
   await probes.cleanup();

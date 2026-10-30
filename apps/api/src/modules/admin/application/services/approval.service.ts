@@ -16,6 +16,7 @@ import {
   type ApprovedActionOf,
   type RequestedAction,
   readApprovedAction,
+  sameApprovalParams,
 } from "../approved-action";
 import { approvalCursorOf, type ListApprovalsInput } from "../dto/list-approvals.dto";
 import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
@@ -158,6 +159,17 @@ export class ApprovalService {
       if (created.isFailure) return Result.fail(created.getError());
 
       const { record, created: isNew } = created.getValue();
+      const sameRequest =
+        record.requestedBy === input.requestedBy &&
+        sameApprovalParams(record.params, prepared.getValue());
+      if (!isNew && !sameRequest) {
+        return Result.fail({
+          code: "ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT",
+          message: "A different request on this person is already waiting for a decision.",
+          metadata: { approvalId: record.id },
+        });
+      }
+
       if (isNew) {
         await this.announce(EventTypes.ADMIN_APPROVAL_REQUESTED, record, {
           actorUserId: input.requestedBy,
@@ -199,8 +211,11 @@ export class ApprovalService {
 
     const actor = { userId: input.deciderUserId, permissions: input.deciderPermissions };
     if (input.decision === "approve") {
-      const authorized = await this.handlers[record.action].authorize(record.subjectId, actor);
-      if (authorized.isFailure) return Result.fail(authorized.getError());
+      const approved = readApprovedAction(record);
+      if (approved.isSuccess) {
+        const authorized = await this.authorizeAction(approved.getValue(), actor);
+        if (authorized.isFailure) return Result.fail(authorized.getError());
+      }
     }
 
     const holds = await this.requesterHolds(record);
@@ -359,6 +374,13 @@ export class ApprovalService {
     await this.recordFailure(record, input, outcome.getError().code);
 
     return outcome;
+  }
+
+  private authorizeAction<K extends ApprovalAction>(
+    approved: ApprovedActionOf<K>,
+    actor: ApprovalActor,
+  ): Promise<Result<void, AppError>> {
+    return this.handlers[approved.action].authorize(approved, actor);
   }
 
   private execute<K extends ApprovalAction>(

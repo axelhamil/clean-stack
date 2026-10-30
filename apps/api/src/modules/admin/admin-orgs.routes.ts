@@ -30,7 +30,7 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
       if (result.isFailure) throw new AppErrorException(result.getError());
       const page = result.getValue();
       return c.json({
-        items: page.items.map((o) => ({
+        items: page.items.map(({ cursorAt: _cursorAt, ...o }) => ({
           ...o,
           createdAt: o.createdAt.toISOString(),
         })),

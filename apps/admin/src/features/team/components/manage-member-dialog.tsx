@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { openApprovalIdOf } from "../../../shared/api/approval-outcome";
 import {
   removeStaffOverrideMutationOptions,
   revokeStaffMutationOptions,
@@ -96,7 +97,11 @@ function ManageMemberBody({ member, onAwaiting, onRevoked }: ManageMemberBodyPro
   const setRoleMutation = useMutation({
     ...setStaffRoleMutationOptions,
     onSuccess: (approvalId) => settled(approvalId, t("team.roleSaved")),
-    onError: (err) => toastError(err, errorFallback("setStaffRole")),
+    onError: (err) => {
+      toastError(err, errorFallback("setStaffRole"));
+      const openId = openApprovalIdOf(err);
+      if (openId) onAwaiting(openId);
+    },
   });
   const revoke = useMutation({
     ...revokeStaffMutationOptions,
@@ -104,17 +109,29 @@ function ManageMemberBody({ member, onAwaiting, onRevoked }: ManageMemberBodyPro
       settled(approvalId, t("team.revoked"));
       if (!approvalId) onRevoked();
     },
-    onError: (err) => toastError(err, errorFallback("revokeStaff")),
+    onError: (err) => {
+      toastError(err, errorFallback("revokeStaff"));
+      const openId = openApprovalIdOf(err);
+      if (openId) onAwaiting(openId);
+    },
   });
   const setOverride = useMutation({
     ...setStaffOverrideMutationOptions,
     onSuccess: (approvalId) => settled(approvalId, t("team.permissions.added")),
-    onError: (err) => toastError(err, errorFallback("setStaffOverride")),
+    onError: (err) => {
+      toastError(err, errorFallback("setStaffOverride"));
+      const openId = openApprovalIdOf(err);
+      if (openId) onAwaiting(openId);
+    },
   });
   const removeOverride = useMutation({
     ...removeStaffOverrideMutationOptions,
     onSuccess: (approvalId) => settled(approvalId, t("team.permissions.removed")),
-    onError: (err) => toastError(err, errorFallback("removeStaffOverride")),
+    onError: (err) => {
+      toastError(err, errorFallback("removeStaffOverride"));
+      const openId = openApprovalIdOf(err);
+      if (openId) onAwaiting(openId);
+    },
   });
 
   return (

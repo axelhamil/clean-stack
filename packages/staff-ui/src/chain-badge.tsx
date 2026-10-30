@@ -4,10 +4,13 @@ import { useTranslation } from "react-i18next";
 
 export interface ChainBadgeProps {
   verification: { verified: boolean; brokenAtSequence?: number | null } | undefined;
+  failed?: boolean;
 }
 
-export function ChainBadge({ verification: data }: ChainBadgeProps) {
+export function ChainBadge({ verification: data, failed = false }: ChainBadgeProps) {
   const { t } = useTranslation("admin");
+
+  if (failed) return <Badge variant="destructive">{t("auditLog.chain.failed")}</Badge>;
 
   if (!data) {
     return <Badge variant="secondary">{t("auditLog.chain.checking")}</Badge>;

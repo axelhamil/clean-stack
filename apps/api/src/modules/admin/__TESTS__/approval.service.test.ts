@@ -78,6 +78,7 @@ function setup(given: {
   claim?: Option<ApprovalRecord>;
   subjectExists?: boolean;
   created?: boolean;
+  open?: ApprovalRecord;
   requester?: Option<StaffRecord>;
   prepared?: Result<never, AppError>;
   authorized?: Result<void, AppError>;
@@ -88,7 +89,7 @@ function setup(given: {
   const store = mockPort<IApprovalStore>();
   store.find.mockImplementation(async () => Result.ok(found));
   store.create.mockImplementation(async () =>
-    Result.ok({ record: PENDING, created: given.created ?? true }),
+    Result.ok({ record: given.open ?? PENDING, created: given.created ?? true }),
   );
   store.expireDueFor.mockImplementation(async () => Result.ok([]));
   store.claim.mockImplementation(async () => Result.ok(given.claim ?? found));
@@ -134,7 +135,12 @@ function setup(given: {
         given.prepared ?? Result.ok({ role: params.role, fromRole: "support" }),
     },
     "staff.revoke": handler,
-    "staff.permission_override": handler,
+    "staff.permission_override": {
+      ...handler,
+      prepare: async () =>
+        given.prepared ??
+        Result.ok({ op: "set", permission: "users.read", effect: "grant", expiresAt: null }),
+    },
   };
 
   const instrumentation = new NoOpInstrumentation();
@@ -245,7 +251,10 @@ describe("ApprovalService.gate", () => {
   });
 
   it("answers with the request already open, without a second announcement", async () => {
-    const { service, outbox } = setup({ created: false });
+    const { service, outbox } = setup({
+      created: false,
+      open: { ...PENDING, action: "staff.revoke", params: {} },
+    });
 
     const result = await service.gate(GATE);
 
@@ -263,6 +272,74 @@ describe("ApprovalService.gate", () => {
       EventTypes.ADMIN_APPROVAL_EXPIRED,
       EventTypes.ADMIN_APPROVAL_REQUESTED,
     ]);
+  });
+});
+
+describe("ApprovalService.gate on a pair already open", () => {
+  const BAN = {
+    ...GATE,
+    action: "user.ban_permanent" as const,
+    params: { reason: "fraud", expiresIn: 60 },
+  };
+  const open = (over: Partial<ApprovalRecord>): ApprovalRecord => ({
+    ...PENDING,
+    action: "staff.revoke",
+    params: {},
+    ...over,
+  });
+
+  it("answers with the open request when the same person repeats the same change", async () => {
+    const { service } = setup({
+      enabled: true,
+      created: false,
+      open: open({ params: { expiresIn: 60, reason: "fraud" } }),
+    });
+
+    const result = await service.gate(BAN);
+
+    expect(result.getValue().unwrap()).toBe(PENDING.id);
+  });
+
+  it("refuses a different change, naming the request in the way", async () => {
+    const { service } = setup({
+      enabled: true,
+      created: false,
+      open: open({ params: { reason: "another" } }),
+    });
+
+    const result = await service.gate(BAN);
+
+    expect(result.getError().code).toBe("ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT");
+    expect(result.getError().metadata).toEqual({ approvalId: PENDING.id });
+  });
+
+  it("refuses the same change from someone else, the first requester owns it", async () => {
+    const { service } = setup({
+      enabled: true,
+      created: false,
+      open: open({ requestedBy: "someone-else" }),
+    });
+
+    const result = await service.gate(GATE);
+
+    expect(result.getError().code).toBe("ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT");
+  });
+});
+
+describe("ApprovalService.decide refused before the claim", () => {
+  it("keeps the request open when the decider cannot authorize this change", async () => {
+    const { service, store } = setup({
+      authorized: Result.fail({
+        code: "ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN",
+        message: "no",
+      }),
+    });
+
+    const result = await service.decide(DECISION);
+
+    expect(result.getError().code).toBe("ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN");
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(store.markFailed).not.toHaveBeenCalled();
   });
 });
 

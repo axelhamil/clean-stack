@@ -1,7 +1,6 @@
 import { APPROVAL_ACTION_PERMISSION, isApprovalAction } from "@packages/access-control";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
-import { CodeBlock } from "@packages/ui/components/ui/code-block";
 import {
   DescriptionDetails,
   DescriptionItem,
@@ -25,6 +24,7 @@ import { BackIcon, BackLink } from "../../shared/components/back-link";
 import { DetailState } from "../../shared/components/detail-state";
 import { approvalQueryOptions } from "./api/approvals.queries";
 import { approvalActionLabelKey } from "./approval-labels";
+import { ApprovalParamRows } from "./components/approval-param-rows";
 import { DecideDialog } from "./components/decide-dialog";
 
 export const Route = createFileRoute("/_staff/approvals/$id")({
@@ -86,6 +86,7 @@ function ApprovalDetailPage() {
       {(approval) => {
         const labelKey = approvalActionLabelKey(approval.action);
         const pending = approval.status === "pending";
+        const isOverdue = new Date(approval.expiresAt).getTime() <= Date.now();
         const isRequester = approval.requestedBy === me.id;
         const isSubject = approval.subjectId === me.id;
         const holdsActionPermission =
@@ -105,13 +106,14 @@ function ApprovalDetailPage() {
 
             {pending && (
               <div className="flex flex-wrap items-center gap-2">
-                {mayDecide && (
+                {isOverdue && <TypographyMuted>{t("approvals.detail.overdue")}</TypographyMuted>}
+                {mayDecide && !isOverdue && (
                   <>
                     <DecideDialog approvalId={approval.id} decision="approve" />
                     <DecideDialog approvalId={approval.id} decision="reject" />
                   </>
                 )}
-                {isRequester && (
+                {isRequester && !isOverdue && (
                   <>
                     <TypographyMuted>{t("approvals.detail.ownRequest")}</TypographyMuted>
                     <Button
@@ -123,10 +125,10 @@ function ApprovalDetailPage() {
                     </Button>
                   </>
                 )}
-                {!isRequester && !isSubject && !holdsActionPermission && (
+                {!isOverdue && !isRequester && !isSubject && !holdsActionPermission && (
                   <TypographyMuted>{t("approvals.detail.needsPermission")}</TypographyMuted>
                 )}
-                {isSubject && !isRequester && (
+                {!isOverdue && isSubject && !isRequester && (
                   <TypographyMuted>{t("approvals.detail.aboutYou")}</TypographyMuted>
                 )}
               </div>
@@ -177,14 +179,7 @@ function ApprovalDetailPage() {
                   </DescriptionDetails>
                 </DescriptionItem>
               )}
-              <DescriptionItem>
-                <DescriptionTerm>{t("approvals.detail.params")}</DescriptionTerm>
-                <DescriptionDetails>
-                  <CodeBlock className="whitespace-pre-wrap wrap-anywhere">
-                    {JSON.stringify(approval.params, null, 2)}
-                  </CodeBlock>
-                </DescriptionDetails>
-              </DescriptionItem>
+              <ApprovalParamRows action={approval.action} params={approval.params} />
             </DescriptionList>
           </>
         );

@@ -9,11 +9,16 @@ import {
   isNotNull,
   isNull,
   like,
-  lt,
   lte,
   resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../db-failure";
+import {
+  afterTimeIdCursor,
+  encodeTimeIdCursor,
+  exactInstant,
+  timeIdCursorSchema,
+} from "../pagination/time-id-cursor";
 import type {
   AuditEntry,
   AuditError,
@@ -108,18 +113,16 @@ export class DrizzleAuditRepository implements IAuditPort {
       if (filters.actionPrefix) conds.push(like(al.action, `${filters.actionPrefix}%`));
       if (filters.occurredFrom) conds.push(gte(al.occurredAt, filters.occurredFrom));
       if (filters.occurredTo) conds.push(lte(al.occurredAt, filters.occurredTo));
-      if (filters.cursor) {
-        const cursorDate = new Date(filters.cursor);
-        if (!Number.isNaN(cursorDate.getTime())) conds.push(lt(al.occurredAt, cursorDate));
-      }
+      const cursor = timeIdCursorSchema.safeParse(filters.cursor);
+      if (cursor.success) conds.push(afterTimeIdCursor(al.occurredAt, al.id, cursor.data));
       const where = conds.length > 0 ? and(...conds) : undefined;
 
       try {
         const query = exec
-          .select()
+          .select({ row: al, cursorAt: exactInstant(al.occurredAt) })
           .from(al)
           .where(where)
-          .orderBy(desc(al.occurredAt))
+          .orderBy(desc(al.occurredAt), desc(al.id))
           .limit(limit + 1);
         const rows = await this.instrumentation.startSpan(
           { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
@@ -127,10 +130,13 @@ export class DrizzleAuditRepository implements IAuditPort {
         );
 
         const hasMore = rows.length > limit;
-        const items = rows.slice(0, limit).map(toRecord);
-        const last = items.at(-1);
+        const page = rows.slice(0, limit);
+        const items = page.map(({ row }) => toRecord(row));
+        const last = page.at(-1);
         const nextCursor =
-          hasMore && last ? Option.some(last.occurredAt.toISOString()) : Option.none<string>();
+          hasMore && last
+            ? Option.some(encodeTimeIdCursor(last.cursorAt, last.row.id))
+            : Option.none<string>();
         return Result.ok({ items, nextCursor });
       } catch (e) {
         this.instrumentation.capture(e);

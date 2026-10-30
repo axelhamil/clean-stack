@@ -235,9 +235,7 @@ export class DrizzleStaffStore implements IStaffStore {
             .where(inArray(user.id, lockedIds));
 
           const counted = new Set(
-            owners
-              .filter((owner) => stillCountsAsManager(owner, now) && !denied.has(owner.id))
-              .map((owner) => owner.id),
+            owners.filter((owner) => stillCountsAsManager(owner, now)).map((owner) => owner.id),
           );
 
           return Result.ok(
@@ -245,7 +243,7 @@ export class DrizzleStaffStore implements IStaffStore {
               const parsed = sourceOf(source);
               if (!counted.has(userId) || parsed.isNone()) return [];
 
-              return [{ userId, source: parsed.unwrap() }];
+              return [{ userId, source: parsed.unwrap(), manageDenied: denied.has(userId) }];
             }),
           );
         } catch (err) {

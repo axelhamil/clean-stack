@@ -24,7 +24,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { z } from "zod";
-import { decideApprovalMutationOptions } from "../api/approvals.mutations";
+import { decideApprovalMutationOptions, refreshAfterDecision } from "../api/approvals.mutations";
 
 const decideSchema = z.object({ note: z.string().trim().min(1).max(500) });
 
@@ -49,11 +49,12 @@ export function DecideDialog({ approvalId, decision }: DecideDialogProps) {
       setOpen(false);
       form.reset();
       toast.success(t(`approvals.detail.${decision}Done`));
-      for (const scope of ["approvals", "users", "staff"]) {
-        void queryClient.invalidateQueries({ queryKey: ["admin", scope] });
-      }
+      refreshAfterDecision(queryClient);
     },
-    onError: (err) => toastError(err, errorFallback("decideApproval")),
+    onError: (err) => {
+      toastError(err, errorFallback("decideApproval"));
+      refreshAfterDecision(queryClient);
+    },
   });
 
   return (

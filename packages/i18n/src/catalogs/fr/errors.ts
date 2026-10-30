@@ -133,6 +133,12 @@ export default {
       "Le demandeur n'a plus ce pouvoir, la demande est donc close.",
     ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
       "Les accès de cette personne ont changé depuis la demande. Refaites-la.",
+    ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT:
+      "Une autre demande sur cette personne est déjà en attente. Décidez-la ou annulez-la, puis recommencez.",
+    ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN:
+      "Vous ne pouvez pas donner une permission que vous n'avez pas. Demandez à un collègue qui la détient.",
+    ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT:
+      "La date de fin de ce changement est passée. Recommencez avec une date ultérieure.",
     ADMIN_APPROVAL_NOT_FOUND: "Cette demande d'approbation n'existe plus.",
     ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN:
       "Vous ne pouvez pas demander cette action sur votre propre compte.",

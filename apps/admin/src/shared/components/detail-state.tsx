@@ -1,10 +1,8 @@
-import { Button } from "@packages/ui/components/ui/button";
-import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import type { ReactNode } from "react";
-import { useTranslation } from "react-i18next";
+import { LoadErrorRetry } from "./load-error-retry";
 import { StaffPage } from "./staff-page";
 
 export interface DetailQuery<T> {
@@ -30,8 +28,6 @@ export function DetailState<T>({
   errorMessage,
   children,
 }: DetailStateProps<T>) {
-  const { t } = useTranslation("admin");
-
   if (query.data) {
     return (
       <StaffPage>
@@ -46,14 +42,7 @@ export function DetailState<T>({
       <StaffPage>
         {back}
         <PageHeader title={fallbackTitle} />
-        <LoadErrorAlert
-          message={errorMessage}
-          retry={
-            <Button variant="outline" size="sm" onClick={() => query.refetch()}>
-              {t("backOffice.reload")}
-            </Button>
-          }
-        />
+        <LoadErrorRetry message={errorMessage} onRetry={query.refetch} />
       </StaffPage>
     );
   }

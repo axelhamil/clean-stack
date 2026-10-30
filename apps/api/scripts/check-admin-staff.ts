@@ -11,6 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { permissionsOfRole } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
@@ -33,6 +34,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-admin-staff");
 
+const MANAGER_PERMISSIONS = permissionsOfRole("manager");
 const RACERS = 20;
 const ROUNDS = 10;
 const prefix = `check-admin-staff-${crypto.randomUUID()}`;
@@ -351,6 +353,7 @@ async function proveOverrides(): Promise<void> {
   const denyManage = (targetUserId: string, actorUserId: string) =>
     service.setOverride({
       actorUserId,
+      actorPermissions: MANAGER_PERMISSIONS,
       targetUserId,
       permission: "staff.manage",
       effect: "deny",
@@ -383,6 +386,7 @@ async function proveOverrides(): Promise<void> {
   const [override] = live.isSuccess ? live.getValue() : [];
   const removed = await service.removeOverride({
     actorUserId: holder,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: denied,
     overrideId: override?.id ?? "",
   });
@@ -395,6 +399,7 @@ async function proveOverrides(): Promise<void> {
 
   const foreign = await service.removeOverride({
     actorUserId: denied,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: holder,
     overrideId: override?.id ?? "",
   });
@@ -406,6 +411,7 @@ async function proveOverrides(): Promise<void> {
   await openImpersonation(holder);
   const denyImpersonation = await service.setOverride({
     actorUserId: denied,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: holder,
     permission: "users.impersonate",
     effect: "deny",
@@ -427,6 +433,49 @@ async function proveOverrides(): Promise<void> {
       ),
     );
   check("the write announces its event in the same transaction", event !== undefined);
+}
+
+async function proveStaleDenyOfListedManager(): Promise<void> {
+  await resetManagers([managerA, managerB]);
+  await db.insert(staffSchema.staffPermissionOverride).values({
+    id: crypto.randomUUID(),
+    userId: managerA,
+    permission: "staff.manage",
+    effect: "deny",
+  });
+
+  const service = staffService([managerA]);
+  const removal = await service.revoke({ actorUserId: plainUser, targetUserId: managerB });
+  check(
+    "a stale denial on a listed manager does not make the other one unremovable",
+    removal.isSuccess,
+  );
+
+  await resetManagers([managerB]);
+  const redenied = await staffService().setOverride({
+    actorUserId: plainUser,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: managerB,
+    permission: "users.moderate",
+    effect: "deny",
+    expiresAt: Option.none(),
+  });
+  check("a denial of another permission leaves the last manager free", redenied.isSuccess);
+  const lockedOut = await staffService().setOverride({
+    actorUserId: plainUser,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: managerB,
+    permission: "staff.manage",
+    effect: "deny",
+    expiresAt: Option.none(),
+  });
+  check(
+    "the last manager still cannot lose staff management",
+    lockedOut.isFailure && lockedOut.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
+  );
+  await db
+    .delete(staffSchema.staffPermissionOverride)
+    .where(inArray(staffSchema.staffPermissionOverride.userId, [managerA, managerB]));
 }
 
 async function proveWipeRevokes(): Promise<void> {
@@ -582,6 +631,7 @@ async function proveReviveAndRegrant(): Promise<void> {
     .values({ userId: formerListed, role: "manager", source: "env" });
   const regranted = await staffService().assignRole({
     actorUserId: managerA,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: formerListed,
     role: "manager",
   });
@@ -651,6 +701,7 @@ async function proveImpersonationsEnd(): Promise<void> {
 
   await service.assignRole({
     actorUserId: managerB,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: supportActor,
     role: "manager",
   });
@@ -665,6 +716,7 @@ async function proveImpersonationsEnd(): Promise<void> {
 
   await service.assignRole({
     actorUserId: managerB,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: supportActor,
     role: "auditor",
   });
@@ -793,6 +845,7 @@ async function main(): Promise<void> {
     await proveBanGuardHolds();
     await proveModerationTarget();
     await proveOverrides();
+    await proveStaleDenyOfListedManager();
     await proveWipeRevokes();
     await proveDeletionRefused();
   });

@@ -18,7 +18,7 @@ export interface AdminProbe {
 export interface AppCall {
   status: number;
   body: {
-    error?: { code?: string };
+    error?: { code?: string; metadata?: { approvalId?: string } };
     stepUpValidUntil?: string | null;
     approvalId?: string;
     items?: { id: string }[];
