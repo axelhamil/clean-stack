@@ -21,9 +21,24 @@ function toSameOriginPath(value: string | null): string | undefined {
   }
 }
 
-export function redirectQuery(authUrl: string): string {
-  const path = toSameOriginPath(callbackParam(authUrl));
-  if (!path || path === "/") return "";
+function toAllowedExternal(value: string | null, externalOrigin?: string): string | undefined {
+  if (!value || !externalOrigin) return undefined;
+  if (value !== externalOrigin && !value.startsWith(`${externalOrigin}/`)) return undefined;
 
-  return `&redirect=${encodeURIComponent(path)}`;
+  try {
+    const parsed = new URL(value);
+    if (parsed.origin !== externalOrigin || parsed.username || parsed.password) return undefined;
+
+    return `${parsed.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return undefined;
+  }
+}
+
+export function redirectQuery(authUrl: string, externalOrigin?: string): string {
+  const callback = callbackParam(authUrl);
+  const target = toSameOriginPath(callback) ?? toAllowedExternal(callback, externalOrigin);
+  if (!target || target === "/") return "";
+
+  return `&redirect=${encodeURIComponent(target)}`;
 }

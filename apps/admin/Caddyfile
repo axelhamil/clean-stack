@@ -1,0 +1,45 @@
+{
+    auto_https off
+    admin off
+    persist_config off
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
+# Stricter than the customer app: no third-party image or script ever, connections to the API only.
+# CSP_CONNECT_EXTRA adds an origin the page must reach (the Sentry ingest host when a DSN is set).
+:{$PORT:80} {
+    root * /srv
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-Robots-Tag "noindex, nofollow"
+        Referrer-Policy strict-origin-when-cross-origin
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'nonce-{http.request.uuid}' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' {$VITE_API_URL:http://localhost:3000} {$CSP_CONNECT_EXTRA:}; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri {$VITE_API_URL:http://localhost:3000}/csp-report; report-to csp-endpoint"
+        Reporting-Endpoints `csp-endpoint="{$VITE_API_URL:http://localhost:3000}/csp-report"`
+        -Server
+    }
+
+    @assets path /assets/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    @nonAssets not path /assets/*
+    header @nonAssets Cache-Control "no-cache, no-store, must-revalidate"
+
+    handle /health {
+        respond "OK" 200
+    }
+
+    handle {
+        templates {
+            mime text/html
+        }
+        try_files {path} /index.html
+        file_server
+    }
+}

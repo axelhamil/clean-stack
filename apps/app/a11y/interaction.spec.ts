@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
+import { signInForm, tabTo } from "@packages/test/a11y";
 import { expect, type Page, test } from "@playwright/test";
 import { STORAGE_STATE } from "./playwright.config";
-import { signInForm, tabTo } from "./sign-in";
 
 type ThemeProbe = Window & { __themeTransitioned?: boolean };
 

@@ -1,5 +1,6 @@
+import { totpCodeSchema } from "@packages/web-kit/auth/totp-code.schema";
 import { z } from "zod";
-import { passwordSchema, totpCodeSchema } from "../../shared/auth/auth.schema";
+import { passwordSchema } from "../../shared/auth/auth.schema";
 
 export const requestDeletionWithPasswordSchema = z.object({
   password: passwordSchema,

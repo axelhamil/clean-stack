@@ -2,6 +2,7 @@ import { authSchema, db, eq } from "@packages/drizzle";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { seedEmail } from "./seed-account";
+import { seedDevStaff } from "./seed-staff";
 
 // `.test` is reserved and can never carry an MX record, which the disposable-email
 // guard reads as throwaway; the password must avoid the email local part, the user
@@ -39,6 +40,8 @@ if (seeded) {
     await di.PolicyAcceptanceService.accept(seeded.id, stale.getValue());
   }
 }
+
+await seedDevStaff(password);
 
 console.log(JSON.stringify({ seeded, password }, null, 2));
 process.exit(0);

@@ -211,6 +211,115 @@ importers:
         specifier: ^2.11.10
         version: 2.11.10
 
+  apps/admin:
+    dependencies:
+      '@hookform/resolvers':
+        specifier: ^6.0.1
+        version: 6.0.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
+      '@packages/access-control':
+        specifier: workspace:*
+        version: link:../../packages/access-control
+      '@packages/sentry-scrub':
+        specifier: workspace:*
+        version: link:../../packages/sentry-scrub
+      '@packages/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@packages/web-kit':
+        specifier: workspace:*
+        version: link:../../packages/web-kit
+      '@sentry/react':
+        specifier: ^11.9.0
+        version: 11.9.0(react@19.3.1)
+      '@tanstack/react-query':
+        specifier: ^5.105.0
+        version: 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@tanstack/react-router':
+        specifier: ^1.170.46
+        version: 1.170.46(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      api:
+        specifier: workspace:*
+        version: link:../api
+      better-auth:
+        specifier: 1.7.14
+        version: 1.7.14(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(solid-js@1.9.15)(vitest@5.0.5)
+      i18next:
+        specifier: ^26.5.11
+        version: 26.5.11(typescript@7.0.2)
+      lucide-react:
+        specifier: ^1.62.0
+        version: 1.62.0(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+      react-hook-form:
+        specifier: ^7.91.0
+        version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
+      react-i18next:
+        specifier: ^17.1.9
+        version: 17.1.9(i18next@26.5.11(typescript@7.0.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2)
+      sonner:
+        specifier: ^2.0.8
+        version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@axe-core/playwright':
+        specifier: ^4.14.0
+        version: 4.14.0(playwright-core@1.64.1)
+      '@better-auth/utils':
+        specifier: 0.5.1
+        version: 0.5.1
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.64.1
+      '@sentry/vite-plugin':
+        specifier: ^11.9.0
+        version: 11.9.0(rollup@4.65.1)
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      '@tanstack/router-plugin':
+        specifier: ^1.168.48
+        version: 1.168.48(@tanstack/react-router@1.170.46(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(esbuild@0.28.2)(rolldown@1.2.15)(rollup@4.65.1)(supports-color@8.1.1)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      '@tanstack/virtual-file-routes':
+        specifier: ^1.162.0
+        version: 1.162.0
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.1.2
+        version: 6.1.2(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.3.5
+        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/api:
     dependencies:
       '@aws-sdk/client-s3':
@@ -419,6 +528,9 @@ importers:
       '@axe-core/playwright':
         specifier: ^4.14.0
         version: 4.14.0(playwright-core@1.64.1)
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
       '@packages/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -681,9 +793,15 @@ importers:
         specifier: workspace:*
         version: link:../ddd-kit
     devDependencies:
+      '@axe-core/playwright':
+        specifier: ^4.14.0
+        version: 4.14.0(playwright-core@1.64.1)
       '@packages/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.64.1
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -763,6 +881,9 @@ importers:
         specifier: workspace:*
         version: link:../i18n
     devDependencies:
+      '@hookform/resolvers':
+        specifier: ^6.0.1
+        version: 6.0.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@packages/test':
         specifier: workspace:*
         version: link:../test
@@ -784,6 +905,12 @@ importers:
       react:
         specifier: ^19.3.1
         version: 19.3.1
+      react-hook-form:
+        specifier: ^7.91.0
+        version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
+      react-i18next:
+        specifier: ^17.1.9
+        version: 17.1.9(i18next@26.5.11(typescript@7.0.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2)
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -4649,10 +4776,6 @@ packages:
   engine.io@6.6.11:
     resolution: {integrity: sha512-z34mGpLoY/82ZbkX1LqGMIaf3wjVMPL6gVC681QDqnmzJ26synI8qAE32P+a7UazmpJZ8UGrFIeAavgRfXzYrg==}
     engines: {node: '>=10.2.0'}
-
-  enhanced-resolve@5.25.1:
-    resolution: {integrity: sha512-nGXts5znJzmWPu+mIE9izCOzdg63oJca2mDzGWWTth7sr4aCToKcoyFVBQwN75Ij5Pf6p510EwkTqViTRzDV+w==}
-    engines: {node: '>=10.13.0'}
 
   enhanced-resolve@5.26.0:
     resolution: {integrity: sha512-9vhedylFonb2YGogzUKX6+Ja72gOJbN1QHAqdrvqLwhdl/QWbKopzoUC9EbQNVsAns/bx/4uyqalrQAoy1IByw==}
@@ -9436,7 +9559,7 @@ snapshots:
   '@tailwindcss/node@4.3.3':
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      enhanced-resolve: 5.25.1
+      enhanced-resolve: 5.26.0
       jiti: 2.7.0
       lightningcss: 1.32.0
       magic-string: 0.30.21
@@ -10329,11 +10452,6 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
-
-  enhanced-resolve@5.25.1:
-    dependencies:
-      graceful-fs: 4.2.11
-      tapable: 2.3.3
 
   enhanced-resolve@5.26.0:
     dependencies:

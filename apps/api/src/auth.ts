@@ -77,7 +77,7 @@ import {
 import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
-import { env } from "./shared/env";
+import { env, FRONT_ORIGINS } from "./shared/env";
 import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
@@ -691,7 +691,7 @@ const authOptions = {
     },
   },
 
-  trustedOrigins: env.CORS_ORIGIN,
+  trustedOrigins: FRONT_ORIGINS,
 
   emailAndPassword: {
     enabled: true,
@@ -725,7 +725,7 @@ const authOptions = {
       await acceptStalePoliciesAtFirstVerification(user.id);
     },
     sendVerificationEmail: async ({ user, url, token }) => {
-      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
+      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}${redirectQuery(url, env.ADMIN_URL)}`;
       await dispatchEmail(
         "verify_email",
         user.email,
@@ -747,6 +747,9 @@ const authOptions = {
   },
 
   advanced: {
+    ...(env.AUTH_COOKIE_DOMAIN
+      ? { crossSubDomainCookies: { enabled: true, domain: env.AUTH_COOKIE_DOMAIN } }
+      : {}),
     defaultCookieAttributes: {
       httpOnly: true,
       secure: isProd,
@@ -819,7 +822,7 @@ const authOptions = {
     securitySignalsPlugin,
     magicLink({
       sendMagicLink: async ({ email, token, url }) => {
-        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
+        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}${redirectQuery(url, env.ADMIN_URL)}`;
         await emit(EventTypes.USER_MAGIC_LINK_REQUESTED, "user", email, { email });
         await dispatchEmail(
           "magic_link",

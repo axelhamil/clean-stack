@@ -1,6 +1,12 @@
 import { APPROVAL_ACTIONS } from "@packages/access-control";
 import { z } from "zod";
-import { validateApprovalEnv, validateEnvBounds, validateSecuritySignalsEnv } from "./env-bounds";
+import {
+  frontOrigins,
+  validateApprovalEnv,
+  validateEnvBounds,
+  validateHostsEnv,
+  validateSecuritySignalsEnv,
+} from "./env-bounds";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -49,6 +55,8 @@ const envSchema = z
       .optional()
       .transform((v) => v?.split(",").map((s) => s.trim())),
     APP_URL: z.url(),
+    ADMIN_URL: z.url().optional(),
+    AUTH_COOKIE_DOMAIN: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM: z.string().optional(),
     INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
@@ -173,6 +181,7 @@ const envSchema = z
   .superRefine((value, ctx) => {
     validateEnvBounds(value, ctx);
     validateApprovalEnv(value, ctx);
+    validateHostsEnv(value, ctx);
     validateSecuritySignalsEnv(value, ctx);
   });
 
@@ -181,6 +190,8 @@ const rawEnv = Object.fromEntries(
 );
 
 export const env = envSchema.parse(rawEnv);
+
+export const FRONT_ORIGINS = frontOrigins(env);
 
 // Bootstrap ships these as long-enough placeholders so local dev and CI checks
 // (check:sweep-lock, check:fanout) work out of the box, but "long enough" also

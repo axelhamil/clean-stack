@@ -7,6 +7,7 @@ function blankAsAbsent<T extends z.ZodType>(schema: T) {
 
 const envSchema = z.object({
   VITE_API_URL: z.url().default("http://localhost:3000"),
+  VITE_ADMIN_URL: blankAsAbsent(z.url()),
   VITE_SENTRY_DSN: blankAsAbsent(z.url()),
   VITE_SENTRY_ENVIRONMENT: blankAsAbsent(z.string()),
   VITE_GIT_SHA: blankAsAbsent(z.string()),

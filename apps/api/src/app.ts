@@ -28,7 +28,7 @@ import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
-import { env } from "./shared/env";
+import { env, FRONT_ORIGINS } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-notification-emails.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
@@ -74,7 +74,7 @@ type AppEnv = {
 
 const app = new Hono<AppEnv>();
 
-const allowedOrigins = env.CORS_ORIGIN ?? ["http://localhost:5173"];
+const allowedOrigins = FRONT_ORIGINS;
 const apiTokenPepper = env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use";
 
 /** A rate limit whose first block also lands on the security event rail. */
@@ -129,7 +129,10 @@ app.route("/", healthRoutes);
 // and must not inherit the same-origin CORP that secureHeaders sets, that would block the report POST.
 app.use("/csp-report", cspReportCors);
 app.use("/csp-report", securityRateLimit(CSP_REPORT_POLICY));
-app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
+app.route(
+  "/",
+  makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL, adminUrl: env.ADMIN_URL }),
+);
 
 app.use("*", requestId());
 app.use("*", (c, next) => {

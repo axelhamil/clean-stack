@@ -52,12 +52,15 @@ const ReportsJsonSchema = z.array(ReportItemSchema);
 export interface CspReportDeps {
   outbox: IOutboxRepository;
   appUrl?: string;
+  adminUrl?: string;
 }
 
-function isFromOurApp(documentUri: string, appUrl: string | undefined): boolean {
-  if (!appUrl) return true;
+function isFromOurApp(documentUri: string, deps: CspReportDeps): boolean {
+  if (!deps.appUrl) return true;
   try {
-    return new URL(documentUri).origin === new URL(appUrl).origin;
+    const origin = new URL(documentUri).origin;
+
+    return [deps.appUrl, deps.adminUrl].some((url) => url && new URL(url).origin === origin);
   } catch {
     return false;
   }
@@ -133,7 +136,7 @@ export function makeCspReportApp(deps: CspReportDeps) {
 
         const body = violation.body;
         const documentUri = (body.documentURL ?? "").slice(0, 2048);
-        if (!isFromOurApp(documentUri, deps.appUrl)) {
+        if (!isFromOurApp(documentUri, deps)) {
           return c.body(null, 204);
         }
         const blockedUri = (body.blockedURL ?? "").slice(0, 2048);
@@ -161,7 +164,7 @@ export function makeCspReportApp(deps: CspReportDeps) {
       }
 
       const report = result.data["csp-report"];
-      if (!isFromOurApp(report["document-uri"], deps.appUrl)) {
+      if (!isFromOurApp(report["document-uri"], deps)) {
         return c.body(null, 204);
       }
       await emitCspEvent(deps.outbox, ip, {

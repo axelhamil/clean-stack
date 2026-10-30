@@ -1,10 +1,5 @@
+import type { AuditedPage } from "@packages/test/a11y";
 import type { Page } from "@playwright/test";
-
-export interface AuditedPage {
-  readonly name: string;
-  readonly path: string;
-  readonly prepare?: (page: Page) => Promise<void>;
-}
 
 /**
  * The seeded user has already accepted every policy, so `/legal/accept` would

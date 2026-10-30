@@ -1,8 +1,8 @@
 import { Button } from "@packages/ui/components/ui/button";
-import { redirectSearchSchema } from "@packages/web-kit/auth/safe-redirect";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { redirectSearchSchema } from "../../shared/auth/safe-redirect";
 import { AuthShell } from "./components/auth-shell";
 import { BackupCodeForm } from "./forms/backup-code-form";
 import { TwoFactorForm } from "./forms/two-factor-form";

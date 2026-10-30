@@ -1,9 +1,9 @@
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { redirectSearchSchema } from "@packages/web-kit/auth/safe-redirect";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
+import { redirectSearchSchema } from "../../shared/auth/safe-redirect";
 import { AuthShell, AuthShellFooter } from "./components/auth-shell";
 import { useConsumeToken } from "./hooks/use-consume-token";
 import { useVerifyEmail } from "./hooks/use-verify-email";

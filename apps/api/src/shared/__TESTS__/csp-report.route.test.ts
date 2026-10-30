@@ -202,6 +202,30 @@ describe("POST /csp-report", () => {
       expect(outbox.enqueue).not.toHaveBeenCalled();
     });
 
+    it("keeps a report from the back office host", async () => {
+      const outbox = makeOutbox();
+      const app = makeCspReportApp({
+        outbox,
+        appUrl: "https://app.example.com",
+        adminUrl: "https://admin.example.com",
+      });
+
+      await app.request("/csp-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/csp-report" },
+        body: JSON.stringify({
+          "csp-report": {
+            "document-uri": "https://admin.example.com/users",
+            "blocked-uri": "inline",
+            "violated-directive": "script-src",
+            "effective-directive": "script-src",
+          },
+        }),
+      });
+
+      expect(outbox.enqueue).toHaveBeenCalled();
+    });
+
     it("keeps a report whose document-uri matches our app origin → event emitted", async () => {
       const outbox = makeOutbox();
       const app = makeCspReportApp({ outbox, appUrl: "https://app.example.com" });
