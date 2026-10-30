@@ -1,6 +1,6 @@
 # App rules
 
-Vite 8 + React 19 + TanStack Router/Query + Tailwind 4 + shadcn (`@packages/ui`) + `sonner` + `next-themes`; i18n with `i18next` + `react-i18next` (typed catalogs in `@packages/i18n`, locale from cookie then `user.locale`, never from the URL); Hono RPC client; BetterAuth client. Auto-loaded under `apps/app/`. Cross-cutting rules: `/CLAUDE.md`. Package rules it builds on: `packages/ui`, `packages/i18n`, `packages/access-control` (each has its own `CLAUDE.md`). Server counterpart: `apps/api/CLAUDE.md`.
+Vite 8 + React 19 + TanStack Router/Query + Tailwind 4 + shadcn (`@packages/ui`) + `sonner`; i18n with `i18next` + `react-i18next` (typed catalogs in `@packages/i18n`, locale from cookie then `user.locale`, never from the URL); Hono RPC client; BetterAuth client. Auto-loaded under `apps/app/`. Cross-cutting rules: `/CLAUDE.md`. Package rules it builds on: `packages/ui`, `packages/i18n`, `packages/access-control` (each has its own `CLAUDE.md`). Server counterpart: `apps/api/CLAUDE.md`.
 
 ## Layout
 
@@ -70,7 +70,7 @@ One client in `shared/api/api-client.ts`: `hcWithType(baseUrl, { init: { credent
 - Types: `InferRequestType<typeof $endpoint>["json"]` + `InferResponseType<typeof $endpoint, 200>`.
 - **Errors stay `throw on !res.ok`**: `ApplyGlobalResponse` widens response types but gives no discriminated union.
 - **CSRF is transparent**: the API validates `Origin` (no double-submit token, no `X-CSRF-Token`); the browser sends `Origin` itself. Do not add CSRF header injection.
-- **CSP nonce**: Vite's `html.cspNonce` (`vite.config.ts`) emits a `<meta property="csp-nonce">` and nonce attributes carrying a Caddy placeholder; Caddy's `templates` resolves it per request and sends the matching CSP header (`Caddyfile`). `index.html` holds no meta. `app-providers.tsx` reads it with `getAttribute("nonce")` (the IDL `.nonce` is empty on `<meta>`) and passes it to `ThemeProvider`. Never read via `.nonce`, never inline the nonce in JS.
+- **CSP nonce**: Vite's `html.cspNonce` (`vite.config.ts`) emits a `<meta property="csp-nonce">` and nonce attributes carrying a Caddy placeholder; Caddy's `templates` resolves it per request and sends the matching CSP header (`Caddyfile`). `index.html` holds no meta; the same mechanism stamps the blocking `/theme-init.js`, the only classic script, which is why it runs under `'strict-dynamic'`. Never inline the nonce in JS.
 
 ## Queries and mutations
 
@@ -112,7 +112,7 @@ Primitives, tokens and their authoring rules live in `packages/ui/CLAUDE.md`. As
 5. **Impersonation freeze**: any control that mutates account, org or billing state disables itself under impersonation via `useImpersonationGuard()`; spread `guard.describeProps(otherwiseDisabled)` on it, passing whatever else holds it shut (`isPending`, cooldown) so the freeze is never named as the cause of an unrelated disable.
 6. **Typography**: text goes through the shadcn typography exports (named, not namespace). The page title is `<TypographyH1 variant="page">`; a settings tab whose card already carries the visible title renders `<TypographyH1 className="sr-only">` so the page keeps exactly one `<h1>`. Never a raw `<h1 className="text-2xl ...">`.
 7. **Page width**: `pageContainerVariants({ width })`; call sites add only `flex`/`gap-*`/`py-*`, never a hand-picked `max-w-*` or `px-*`.
-8. **Theme and dark mode**: `next-themes` (`attribute="class"`, `defaultTheme="system"`, `disableTransitionOnChange`). The toggle uses the View Transitions API with a `prefers-reduced-motion` fallback; the view-transition CSS is in `globals.css`.
+8. **Theme and dark mode**: `public/theme-init.js` sets `.dark` before first paint, `shared/theme/use-theme.ts` owns the choice afterwards; both read the same storage key, stored choice first, system otherwise. **Why a blocking script file and no React-rendered script**: a script tag in the tree needs the nonce threaded through JS, a same-origin file only needs the one Vite already stamps. The toggle uses the View Transitions API with a `prefers-reduced-motion` fallback; the view-transition CSS is in `globals.css`.
 
 ## Accessibility gate
 

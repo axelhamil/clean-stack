@@ -7,13 +7,12 @@ The shadcn component library and the design tokens of the whole product. Auto-lo
 ```
 src/
   components/ui/<name>.tsx   one primitive per file (shadcn and house primitives side by side)
-  hooks/                     shared hooks
   libs/                      `utils` (`cn`)
   styles/globals.css         the only place tokens live: `:root` / `.dark` variables and `@theme inline`
 components.json              shadcn config (style new-york, lucide, neutral base)
 ```
 
-`exports` map: `./globals.css`, `./components/ui/*`, `./hooks/*`, `./libs/*.js`. Consumers import `@packages/ui/components/ui/<name>`; there is no barrel.
+`exports` map: `./globals.css`, `./components/ui/*`, `./libs/*.js`. Consumers import `@packages/ui/components/ui/<name>`; there is no barrel.
 
 ## Rules
 

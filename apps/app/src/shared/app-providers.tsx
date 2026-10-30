@@ -6,7 +6,6 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { i18n as I18nInstance } from "i18next";
-import { ThemeProvider } from "next-themes";
 import { StrictMode, useEffect } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import { router } from "../router";
@@ -22,17 +21,9 @@ import { LocaleSync } from "./i18n/locale-sync";
 import { applyZodErrorMap } from "./i18n/zod-error-map";
 import { ErrorBoundary } from "./observability/sentry";
 import { watchSession } from "./observability/session-watcher";
+import { useTheme } from "./theme/use-theme";
 
 watchSession(queryClient);
-
-const cspNonce = (() => {
-  if (typeof document === "undefined") return undefined;
-  // <meta> is not a nonceable element, so the IDL .nonce property stays empty: read the attribute.
-  return (
-    document.querySelector<HTMLMetaElement>('meta[property="csp-nonce"]')?.getAttribute("nonce") ??
-    undefined
-  );
-})();
 
 onAuthChange(async () => {
   await Promise.all([
@@ -53,32 +44,30 @@ export function AppProviders({ i18n }: AppProvidersProps) {
     <StrictMode>
       <I18nextProvider i18n={i18n}>
         <ErrorBoundary fallback={<AppErrorFallback />}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            nonce={cspNonce}
-          >
-            <QueryClientProvider client={queryClient}>
-              <RouterProvider router={router} />
-              <Toaster richColors closeButton />
-              <CookieBanner />
-              <LocaleSync />
-              <ZodLocale />
-              <AnalyticsScripts />
-              {import.meta.env.DEV && (
-                <>
-                  <TanStackRouterDevtools router={router} position="bottom-left" />
-                  <ReactQueryDevtools buttonPosition="bottom-right" />
-                </>
-              )}
-            </QueryClientProvider>
-          </ThemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <RouterProvider router={router} />
+            <ThemedToaster />
+            <CookieBanner />
+            <LocaleSync />
+            <ZodLocale />
+            <AnalyticsScripts />
+            {import.meta.env.DEV && (
+              <>
+                <TanStackRouterDevtools router={router} position="bottom-left" />
+                <ReactQueryDevtools buttonPosition="bottom-right" />
+              </>
+            )}
+          </QueryClientProvider>
         </ErrorBoundary>
       </I18nextProvider>
     </StrictMode>
   );
+}
+
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+
+  return <Toaster theme={resolvedTheme} richColors closeButton />;
 }
 
 function ZodLocale() {

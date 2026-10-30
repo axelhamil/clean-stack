@@ -1,9 +1,9 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { cn } from "@packages/ui/libs/utils.js";
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useTheme } from "../theme/use-theme";
 
 type DocWithVT = Document & {
   startViewTransition?: (cb: () => void | Promise<void>) => {
@@ -19,14 +19,7 @@ interface ThemeToggleProps {
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { t } = useTranslation("common");
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return <Button variant="outline" size="icon" aria-hidden disabled />;
 
   const isDark = resolvedTheme === "dark";
   const next = isDark ? "light" : "dark";
@@ -63,8 +56,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`],
         },
         {
-          duration: 550,
-          easing: "cubic-bezier(0.65, 0, 0.35, 1)",
+          duration: 200,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
           pseudoElement: "::view-transition-new(root)",
         },
       );
