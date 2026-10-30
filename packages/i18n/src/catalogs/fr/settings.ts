@@ -49,7 +49,7 @@ export default {
     manageBilling: "Gérer la facturation",
     checkoutReturnToast: "Paiement reçu",
     activationPending:
-      "Votre offre est en cours d'activation. Cette page se met à jour dès qu'elle est prête, ou vous pouvez l'actualiser maintenant.",
+      "Votre offre est en cours d'activation. Actualisez dans un instant pour la voir.",
     refreshPlan: "Actualiser l'offre",
     loadFailed: "Votre offre et l'utilisation des membres n'ont pas pu être chargées.",
     tier: {

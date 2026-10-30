@@ -28,6 +28,10 @@ export function resolveAuthError(
   return t(fallbackKey as never);
 }
 
+export function ssoCallbackUrl(redirectTo?: string): string {
+  return `${window.location.origin}${redirectTo ?? "/dashboard"}`;
+}
+
 /**
  * The user did nothing wrong: their organization enforces SSO for this domain.
  * Every email-bearing sign-in/sign-up path can reject with the same `SSO_REQUIRED`
@@ -38,12 +42,15 @@ export function resolveAuthError(
  * caller should throw `SSO_REDIRECT_IN_PROGRESS` and swallow it in `onError` so no
  * error toast flashes before the browser navigates away.
  */
-export async function redirectToSsoIfRequired(error: BetterAuthError): Promise<boolean> {
+export async function redirectToSsoIfRequired(
+  error: BetterAuthError,
+  redirectTo?: string,
+): Promise<boolean> {
   if (error.message !== "SSO_REQUIRED" || !error.providerId) return false;
 
   const { error: ssoError } = await authClient.signIn.sso({
     providerId: error.providerId,
-    callbackURL: `${window.location.origin}/dashboard`,
+    callbackURL: ssoCallbackUrl(redirectTo),
   });
 
   return !ssoError;

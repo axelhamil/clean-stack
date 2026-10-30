@@ -9,7 +9,7 @@ description: Use when working on BetterAuth server-side, the request pipeline, s
 
 ## Server pipeline (in order, `index.ts`)
 
-`/csp-report` (own cors + rate-limit, before globals to preserve cross-origin CORP) → `requestId()` → `httpLogger` → `secureHeaders()`+`cors()` → `sessionMiddleware` (single `auth.api.getSession()`, stores user/session on ctx, skips `/api/auth/*`) → `requireRateLimit(GLOBAL_POLICY)` + auth-burst per-route → `requireCsrf` on mutation prefixes (`/me`,`/uploads`,`/settings`,`/admin`) → `app.on(["GET","POST"], "/api/auth/*", auth.handler)` → business routes → `app.onError(errorHandler)`.
+`/csp-report` (own cors + rate-limit, before globals to preserve cross-origin CORP) → `requestId()` → `httpLogger` → `secureHeaders()`+`cors()` → `sessionMiddleware` (single `auth.api.getSession()`, stores user/session on ctx, skips `/api/auth/*`) → `requireRateLimit(GLOBAL_POLICY)` + auth-burst per-route → `requireCsrf` on `CSRF_GUARDED_PATHS` in `app.ts` (`/me`,`/uploads`,`/settings`,`/admin`,`/consents`,`/billing/portal`,`/notifications`) → `app.on(["GET","POST"], "/api/auth/*", auth.handler)` → business routes → `app.onError(errorHandler)`.
 
 Protected handlers compose `requireAuth`. **Never re-call `auth.api.getSession()` per handler.**
 
@@ -26,7 +26,7 @@ Protected handlers compose `requireAuth`. **Never re-call `auth.api.getSession()
 
 ## Email URLs route through the app
 
-`${env.APP_URL}/<route>?token=...` (opaque) or `${env.APP_URL}/<route>/<id>`. **Why**: branded UX; Outlook/Gmail mangle `?callbackURL=...` in API URLs. Don't pass `redirectTo`/`callbackURL` to auth-client methods when a `send*` server hook already builds the URL, silently overrides the canonical URL.
+`${env.APP_URL}/<route>?token=...` (opaque) or `${env.APP_URL}/<route>/<id>`. **Why**: branded UX; Outlook/Gmail mangle `?callbackURL=...` in API URLs. Don't pass `redirectTo`/`callbackURL` to auth-client methods when a `send*` server hook already builds the URL, silently overrides the canonical URL. One exception: `sendVerificationEmail` and `sendMagicLink` read `callbackURL` to carry a same-origin path as `redirect` on the app URL (`shared/auth/email-redirect.ts`), which the front revalidates. Never pass it to `signIn.email`: its response then makes the client hard-navigate.
 
 ## Don't re-implement the organization plugin
 

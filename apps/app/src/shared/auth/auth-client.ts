@@ -6,6 +6,7 @@ import type { BetterAuthClientPlugin } from "better-auth/client";
 import { magicLinkClient, organizationClient, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { env } from "../env";
+import { twoFactorPath } from "./safe-redirect";
 
 // Cast erases the $InferServerPlugin field that transitively references stripe SDK
 // types through apps/api/node_modules, preventing TS2883 without a stripe devDep.
@@ -25,7 +26,7 @@ export const authClient = createAuthClient({
   plugins: [
     twoFactorClient({
       onTwoFactorRedirect() {
-        window.location.href = "/two-factor";
+        window.location.href = twoFactorPath(window.location.search);
       },
     }),
     magicLinkClient(),

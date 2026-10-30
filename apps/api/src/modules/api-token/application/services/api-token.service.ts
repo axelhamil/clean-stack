@@ -2,7 +2,6 @@ import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { generateToken, hmacToken } from "../../../../shared/crypto/api-token";
 import { emitEvent } from "../../../../shared/event-emitter";
-import { logger } from "../../../../shared/logger";
 import {
   type ApiTokenError,
   type ApiTokenRecord,
@@ -99,7 +98,6 @@ export class ApiTokenService {
         return Result.ok({ record, raw });
       } catch (err) {
         this.instrumentation.capture(err);
-        logger.error({ err }, "Failed to create API token.");
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",
           message: "Failed to create API token.",
@@ -158,7 +156,6 @@ export class ApiTokenService {
         });
       } catch (err) {
         this.instrumentation.capture(err);
-        logger.error({ err }, "Failed to revoke API token.");
         return Result.fail({
           code: "API_TOKEN_PROVIDER_FAILURE",
           message: "Failed to revoke API token.",

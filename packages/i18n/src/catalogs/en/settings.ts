@@ -48,8 +48,7 @@ export default {
     membersUsageAriaLabel: "Members usage",
     manageBilling: "Manage billing",
     checkoutReturnToast: "Payment received",
-    activationPending:
-      "Your plan is being activated. This page updates once it is ready, or you can refresh it now.",
+    activationPending: "Your plan is being activated. Refresh in a moment to see it.",
     refreshPlan: "Refresh plan",
     loadFailed: "Your plan and member usage could not be loaded.",
     tier: {

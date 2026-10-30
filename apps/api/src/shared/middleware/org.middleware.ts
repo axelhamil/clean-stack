@@ -4,7 +4,6 @@ import {
   type OrgPermissions,
   type OrgRole,
 } from "@packages/access-control";
-import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -38,26 +37,6 @@ export const requireOrg = createMiddleware<{ Variables: OrgVariables }>(async (c
   await next();
 });
 
-async function resolveRole(
-  c: Context<{ Variables: OrgVariables }>,
-  orgId: string,
-  userId: string,
-): Promise<OrgRole | undefined> {
-  const cached = c.get("orgRole");
-  if (cached) return cached;
-
-  const session = c.get("session") as
-    | (SessionData & { activeOrganizationRole?: string | null })
-    | null
-    | undefined;
-  if (session?.activeOrganizationId === orgId) {
-    const fromSession = parseRole(session.activeOrganizationRole);
-    if (fromSession) return fromSession;
-  }
-
-  return parseRole(await findActiveMemberRole(userId, orgId));
-}
-
 export const requireOrgPermission = (permissions: OrgPermissions) =>
   createMiddleware<{ Variables: OrgVariables }>(async (c, next) => {
     const orgId = c.get("orgId");
@@ -66,7 +45,7 @@ export const requireOrgPermission = (permissions: OrgPermissions) =>
         message: "requireOrgPermission: orgId missing, chain requireOrg before",
       });
 
-    const role = await resolveRole(c, orgId, c.get("user").id);
+    const role = c.get("orgRole") ?? parseRole(await findActiveMemberRole(c.get("user").id, orgId));
     if (!authorizeRole(role, permissions))
       throw new HTTPException(403, { message: "Insufficient permission" });
 

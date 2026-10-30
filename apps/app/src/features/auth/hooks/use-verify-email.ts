@@ -5,7 +5,7 @@ import { resolveAuthError } from "../auth-error";
 import { takePostVerifyRedirect } from "../post-verify-redirect";
 import { useCompleteSignIn } from "./use-complete-sign-in";
 
-export function useVerifyEmail() {
+export function useVerifyEmail(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
   const completeSignIn = useCompleteSignIn();
@@ -20,6 +20,10 @@ export function useVerifyEmail() {
 
       return data;
     },
-    onSuccess: () => completeSignIn(takePostVerifyRedirect()),
+    onSuccess: () => {
+      const remembered = takePostVerifyRedirect();
+
+      return completeSignIn(redirectTo ?? remembered);
+    },
   });
 }

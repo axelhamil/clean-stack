@@ -60,7 +60,7 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
           return Result.ok(row?.used ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(failure(err, "increment"));
+          return Result.fail(failure("increment"));
         }
       },
     );
@@ -90,7 +90,7 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
           return Result.ok(row?.used ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(failure(err, "current"));
+          return Result.fail(failure("current"));
         }
       },
     );
@@ -118,7 +118,7 @@ export class DrizzleQuotaUsageStore implements IQuotaUsageStore {
         return Result.ok();
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(failure(err, "reset"));
+        return Result.fail(failure("reset"));
       }
     });
   }

@@ -34,7 +34,8 @@ export function useSignIn(redirectTo?: string) {
           throw new Error(EMAIL_NOT_VERIFIED_REDIRECT);
         }
 
-        if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+        if (await redirectToSsoIfRequired(error, redirectTo))
+          throw new Error(SSO_REDIRECT_IN_PROGRESS);
 
         throw new Error(resolveAuthError(error, "signIn.failed", t, tErrors));
       }

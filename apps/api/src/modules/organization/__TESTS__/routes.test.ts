@@ -48,7 +48,6 @@ function makeApp() {
         id: "session-1",
         impersonatedBy: null,
         activeOrganizationId: "org-1",
-        activeOrganizationRole: "owner",
       } as never,
     );
     await next();

@@ -126,7 +126,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             { err, userId },
             "RgpdRepository.findSoleOwnedNonPersonalOrgsWithMembers failed",
           );
-          return Result.fail(repositoryFailure(err, "findSoleOwnedNonPersonalOrgsWithMembers"));
+          return Result.fail(repositoryFailure("findSoleOwnedNonPersonalOrgsWithMembers"));
         }
       },
     );
@@ -226,7 +226,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.collectUserDataForExport failed");
-          return Result.fail(repositoryFailure(err, "collectUserDataForExport"));
+          return Result.fail(repositoryFailure("collectUserDataForExport"));
         }
       },
     );
@@ -250,7 +250,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.markPendingDeletion failed");
-          return Result.fail(repositoryFailure(err, "markPendingDeletion"));
+          return Result.fail(repositoryFailure("markPendingDeletion"));
         }
       },
     );
@@ -274,7 +274,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.clearPendingDeletion failed");
-          return Result.fail(repositoryFailure(err, "clearPendingDeletion"));
+          return Result.fail(repositoryFailure("clearPendingDeletion"));
         }
       },
     );
@@ -310,7 +310,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, limit }, "RgpdRepository.findUsersReadyForWipe failed");
-          return Result.fail(repositoryFailure(err, "findUsersReadyForWipe"));
+          return Result.fail(repositoryFailure("findUsersReadyForWipe"));
         }
       },
     );
@@ -387,7 +387,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.executeWipe failed");
-          return Result.fail(repositoryFailure(err, "executeWipe"));
+          return Result.fail(repositoryFailure("executeWipe"));
         }
       },
     );
@@ -416,7 +416,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.verifyPassword failed");
-          return Result.fail(repositoryFailure(err, "verifyPassword"));
+          return Result.fail(repositoryFailure("verifyPassword"));
         }
       },
     );
@@ -454,7 +454,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.verifyTotp failed");
-          return Result.fail(repositoryFailure(err, "verifyTotp"));
+          return Result.fail(repositoryFailure("verifyTotp"));
         }
       },
     );
@@ -478,7 +478,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.touchExportRequestedAt failed");
-          return Result.fail(repositoryFailure(err, "touchExportRequestedAt"));
+          return Result.fail(repositoryFailure("touchExportRequestedAt"));
         }
       },
     );
@@ -524,7 +524,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.getUserDeletionState failed");
-          return Result.fail(repositoryFailure(err, "getUserDeletionState"));
+          return Result.fail(repositoryFailure("getUserDeletionState"));
         }
       },
     );

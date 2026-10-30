@@ -36,7 +36,7 @@ import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.servic
 import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
-import { NoOpInstrumentation } from "./shared/services/noop-instrumentation";
+import { LoggingInstrumentation } from "./shared/services/logging-instrumentation";
 import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
 import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
 import {
@@ -77,7 +77,7 @@ export const di = container()
   .add(
     "IInstrumentation",
     (): IInstrumentation =>
-      env.SENTRY_DSN ? new SentryInstrumentation() : new NoOpInstrumentation(),
+      env.SENTRY_DSN ? new SentryInstrumentation() : new LoggingInstrumentation(logger),
   )
   .add(
     "IOutboxRepository",

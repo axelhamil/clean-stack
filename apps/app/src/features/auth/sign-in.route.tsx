@@ -31,8 +31,8 @@ type EmailAlternative = "magicLink" | "sso";
 function SignInPage() {
   const { t } = useTranslation("auth");
   const { redirect } = Route.useSearch();
-  const magicLinkMutation = useMagicLink();
-  const ssoMutation = useSignInSso();
+  const magicLinkMutation = useMagicLink(redirect);
+  const ssoMutation = useSignInSso(redirect);
   const passkey = useSignInPasskey(redirect);
   const support = usePasskeySupported();
   const autofill = usePasskeyAutofill({ enabled: support.conditional, redirectTo: redirect });

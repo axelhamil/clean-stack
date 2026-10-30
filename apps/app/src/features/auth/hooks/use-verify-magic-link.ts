@@ -4,7 +4,7 @@ import { authClient } from "../../../shared/auth/auth-client";
 import { resolveAuthError } from "../auth-error";
 import { useCompleteSignIn } from "./use-complete-sign-in";
 
-export function useVerifyMagicLink() {
+export function useVerifyMagicLink(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
   const completeSignIn = useCompleteSignIn();
@@ -19,6 +19,6 @@ export function useVerifyMagicLink() {
 
       return data;
     },
-    onSuccess: () => completeSignIn(),
+    onSuccess: () => completeSignIn(redirectTo),
   });
 }

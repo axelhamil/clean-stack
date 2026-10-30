@@ -12,7 +12,6 @@ import {
   type UserCookieConsentWithdrawnPayload,
 } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
-import { logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ConsentError, ConsentRecordRow, IConsentStore } from "../ports/consent.port";
@@ -147,7 +146,6 @@ export class ConsentService {
       });
     } catch (err) {
       this.instrumentation.capture(err);
-      logger.error({ err }, "cookie consent reconcile failed");
       return Result.fail({
         code: "CONSENT_PROVIDER_FAILURE",
         message: "cookie consent reconcile failed",
@@ -179,7 +177,6 @@ export class ConsentService {
       });
     } catch (err) {
       this.instrumentation.capture(err);
-      logger.error({ err }, failureMessage);
       return Result.fail({
         code: "CONSENT_PROVIDER_FAILURE",
         message: failureMessage,

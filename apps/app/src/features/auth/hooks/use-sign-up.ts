@@ -19,9 +19,11 @@ export function useSignUp(redirectTo?: string) {
         email: input.email,
         password: input.password,
         name: input.name,
+        callbackURL: redirectTo,
       });
       if (error) {
-        if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+        if (await redirectToSsoIfRequired(error, redirectTo))
+          throw new Error(SSO_REDIRECT_IN_PROGRESS);
         throw new Error(resolveAuthError(error, "signUp.failed", t, tErrors));
       }
 

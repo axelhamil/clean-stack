@@ -1,6 +1,5 @@
 import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
-import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -9,6 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { formatApiError } from "../../shared/api/errors/messages";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
+import { QueryLoadError } from "../../shared/components/query-load-error";
 import { useAcceptInvitation } from "./hooks/use-accept-invitation";
 
 export const Route = createFileRoute("/accept-invitation/$invitationId")({
@@ -37,18 +37,10 @@ function AcceptInvitationPage() {
     return (
       <main className={pageClassName}>
         <TypographyH1 variant="page">{t("invitation.joinTitle")}</TypographyH1>
-        <LoadErrorAlert
+        <QueryLoadError
           message={tErrors("fallback.loadSession")}
-          retry={
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isFetching}
-              onClick={() => void refetch()}
-            >
-              {t("actions.retry")}
-            </Button>
-          }
+          isFetching={isFetching}
+          onRetry={() => void refetch()}
         />
       </main>
     );

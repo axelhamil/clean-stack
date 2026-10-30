@@ -50,7 +50,7 @@ export class DrizzleNotificationStore implements INotificationStore {
         return Result.ok(rows.map((row) => this.toRecord(row)));
       } catch (err) {
         this.instrumentation.capture(err);
-        return Result.fail(readFailure(err, "list"));
+        return Result.fail(readFailure("list"));
       }
     });
   }
@@ -73,7 +73,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows[0]?.count ?? 0);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(readFailure(err, "unreadCount"));
+          return Result.fail(readFailure("unreadCount"));
         }
       },
     );
@@ -102,7 +102,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(writeFailure(err, "markRead"));
+          return Result.fail(writeFailure("markRead"));
         }
       },
     );
@@ -127,7 +127,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows.map((row) => row.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(writeFailure(err, "markAllRead"));
+          return Result.fail(writeFailure("markAllRead"));
         }
       },
     );
@@ -154,7 +154,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok(rows.map((row) => this.toPreference(row)));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(readFailure(err, "listPreferences"));
+          return Result.fail(readFailure("listPreferences"));
         }
       },
     );
@@ -196,7 +196,7 @@ export class DrizzleNotificationStore implements INotificationStore {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(writeFailure(err, "upsertPreference"));
+          return Result.fail(writeFailure("upsertPreference"));
         }
       },
     );

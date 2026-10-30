@@ -54,6 +54,7 @@ import {
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
+import { redirectQuery } from "./shared/auth/email-redirect";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
 import { scimIdentityResolver, scimMembershipProjection } from "./shared/auth/scim-membership";
@@ -407,14 +408,6 @@ function requestClientIp(): string | null {
   return getClientIp()?.slice(0, 45) ?? null;
 }
 
-/**
- * `hooks.before` snapshots a provider's org/domain right before `/sso/delete-provider`
- * removes the row, the endpoint's response is `{ success: true }` with no provider
- * data, and the row is already gone by the time `hooks.after` runs. Keyed on
- * `providerId` (unique per row) rather than the hook's `ctx.context`, since better-call
- * rebuilds parts of that object between `hooks.before` and `hooks.after` and reference
- * identity across the two isn't guaranteed. Read-and-delete in the after hook.
- */
 async function acceptStalePoliciesAtFirstVerification(userId: string): Promise<void> {
   const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
   if (stale.isFailure) {
@@ -433,6 +426,14 @@ async function acceptStalePoliciesAtFirstVerification(userId: string): Promise<v
   }
 }
 
+/**
+ * `hooks.before` snapshots a provider's org/domain right before `/sso/delete-provider`
+ * removes the row, the endpoint's response is `{ success: true }` with no provider
+ * data, and the row is already gone by the time `hooks.after` runs. Keyed on
+ * `providerId` (unique per row) rather than the hook's `ctx.context`, since better-call
+ * rebuilds parts of that object between `hooks.before` and `hooks.after` and reference
+ * identity across the two isn't guaranteed. Read-and-delete in the after hook.
+ */
 const ssoProviderDeleteSnapshots = new RequestSnapshots<{
   organizationId: string | null;
   domain: string;
@@ -642,8 +643,8 @@ const authOptions = {
     beforeEmailVerification: async (user) => {
       await acceptStalePoliciesAtFirstVerification(user.id);
     },
-    sendVerificationEmail: async ({ user, token }) => {
-      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    sendVerificationEmail: async ({ user, url, token }) => {
+      const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
       await dispatchEmail(
         "verify_email",
         user.email,
@@ -732,8 +733,8 @@ const authOptions = {
     bearer(),
     twoFactor({ totpOptions: TOTP_OPTIONS }),
     magicLink({
-      sendMagicLink: async ({ email, token }) => {
-        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}`;
+      sendMagicLink: async ({ email, token, url }) => {
+        const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
         await emit(EventTypes.USER_MAGIC_LINK_REQUESTED, "user", email, { email });
         await dispatchEmail(
           "magic_link",

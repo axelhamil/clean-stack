@@ -87,7 +87,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "insert"));
+          return Result.fail(storeFailure("insert"));
         }
       },
     );
@@ -107,7 +107,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(rows.map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "listByOwner"));
+          return Result.fail(storeFailure("listByOwner"));
         }
       },
     );
@@ -134,7 +134,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(Option.fromNullable(row).map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findByIdForOwner"));
+          return Result.fail(storeFailure("findByIdForOwner"));
         }
       },
     );
@@ -154,7 +154,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(Option.fromNullable(row).map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findByHmac"));
+          return Result.fail(storeFailure("findByHmac"));
         }
       },
     );
@@ -177,7 +177,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "revoke"));
+          return Result.fail(storeFailure("revoke"));
         }
       },
     );
@@ -206,7 +206,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(rows.map((r) => r.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "revokeAllForMembership"));
+          return Result.fail(storeFailure("revokeAllForMembership"));
         }
       },
     );
@@ -230,7 +230,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(rows.length > 0);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "touchLastUsed"));
+          return Result.fail(storeFailure("touchLastUsed"));
         }
       },
     );
@@ -254,7 +254,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "rehash"));
+          return Result.fail(storeFailure("rehash"));
         }
       },
     );

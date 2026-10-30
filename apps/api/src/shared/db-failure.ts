@@ -21,14 +21,12 @@ export function createDbFailure<TCode extends ErrorCode>(code: TCode) {
 
 /**
  * Factory for the error a store returns when a query throws: the operation in the
- * message, the driver's text in the log only. The store has already captured the
- * error to telemetry.
+ * message, never the driver's text. The store has already captured the error, which
+ * is where that text goes.
  */
 export function dbOperationFailure<TCode extends ErrorCode>(code: TCode) {
-  return (err: unknown, op: string): AppError<TCode> => {
-    const message = `database operation failed: ${op}`;
-    logger.error({ err, op }, message);
-
-    return { code, message };
-  };
+  return (op: string): AppError<TCode> => ({
+    code,
+    message: `database operation failed: ${op}`,
+  });
 }
