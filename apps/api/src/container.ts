@@ -197,6 +197,7 @@ export const di = container()
         c.ITransactionService,
         c.IInstrumentation,
         env.NOTIFICATION_DIGEST_HOUR_UTC,
+        env,
       ),
   )
   .add(

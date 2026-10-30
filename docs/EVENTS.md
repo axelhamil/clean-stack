@@ -380,7 +380,7 @@ export const NOTIFICATION_MAP = {
 ```
 
 **Ce que cette projection projette.** Pour chaque type d'événement listé, elle déclare :
-- `audience` : qui doit recevoir la notification : `"self"` (l'utilisateur concerné), `"actor"`, `"org:all"`, ou `{ can: OrgPermissions }` (les membres dont le rôle porte la capability). La résolution capability→roles est faite par `rolesWith(audience.can)` (`@packages/access-control`) et reste cohérente avec le reste des gates de l'app.
+- `audience` : qui doit recevoir la notification : `"self"` (l'utilisateur concerné), `"actor"`, `"org:all"`, `{ staff: <permission> }` (le staff qui détient cette permission et le demandeur, sans l'auteur), ou `{ can: OrgPermissions }` (les membres dont le rôle porte la capability). La résolution capability→roles est faite par `rolesWith(audience.can)` (`@packages/access-control`) et reste cohérente avec le reste des gates de l'app.
 - `category`: regroupement UI (`security`, `org`, `billing`, `activity`).
 - `forced?: true` : contourne les préférences utilisateur et le batching email (bypass critique du SOTA).
 - `groupBy` et `dedupWindow` : fenêtre de déduplication et clé de regroupement lecteur (style Linear "X et 3 autres").
@@ -403,7 +403,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **92 events** (35 public + 57 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **98 events** (35 public + 63 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
@@ -468,6 +468,17 @@ Internal, compliance retention. The subject is the actor, so `userId` stands for
 
 - `ADMIN_STEP_UP_VERIFIED` (`admin.step_up.verified`): a code opened a confirmation for a session, in the same unit as its row. Payload: `{ userId: string, validUntil: string, ip: string | null }`.
 - `ADMIN_STEP_UP_FAILED` (`admin.step_up.failed`): a wrong or replayed code. Best effort, the refusal stands if the write fails. Payload: `{ userId: string, reason: "invalid_code" | "replayed_code", ip: string | null }`.
+
+### Via `ApprovalService` (Phase K)
+
+Internal, compliance retention, forced notifications to whoever holds `approvals.decide` and the requester, minus the actor and the subject (audience `{ staff: "approvals.decide" }`). `userId` is the subject of the action, `requesterUserId` who asked, `actorUserId` who acted. Base payload: `{ actorUserId: string, userId: string, approvalId: string, action: string, requesterUserId: string }`. The action's own event (`admin.user.banned`, `admin.staff.role_changed`, `admin.staff.revoked`) names the approver as its actor.
+
+- `ADMIN_APPROVAL_REQUESTED` (`admin.approval.requested`): a gated route stored a pending request instead of acting.
+- `ADMIN_APPROVAL_DECIDED` (`admin.approval.decided`): approved or rejected, in the unit of the claim. Adds `outcome: "approved" | "rejected"`, `note: string`. Rolled back with an action that fails, `failed` then speaks for the decision.
+- `ADMIN_APPROVAL_CANCELLED` (`admin.approval.cancelled`): the requester withdrew their own request, or the requester or subject was deleted (system action, `actorUserId: null`).
+- `ADMIN_APPROVAL_EXPIRED` (`admin.approval.expired`): `POST /internal/sweep-admin-approvals` passed the deadline. System action, `actorUserId: null`.
+- `ADMIN_APPROVAL_EXECUTED` (`admin.approval.executed`): the action ran, same unit as the action and its own event.
+- `ADMIN_APPROVAL_FAILED` (`admin.approval.failed`): the action or its stored params were refused at execution; the first unit rolled back and a second one wrote this. Adds `reason: string` (the error code).
 
 ### Via `StaffService` / `StaffAccessService` (Phase K)
 
@@ -573,7 +584,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (92 events: 35 public + 57 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (98 events: 35 public + 63 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |

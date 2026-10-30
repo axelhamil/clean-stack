@@ -1,7 +1,9 @@
+import { createOTP } from "@better-auth/utils/otp";
 import { authSchema, db, eq, inArray, or, outboxSchema, sql, staffSchema } from "@packages/drizzle";
 import { hashPassword } from "better-auth/crypto";
 import { app } from "../src/app";
 import { auth } from "../src/auth";
+import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
 import { seedTwoFactor } from "./check-harness";
 
@@ -15,7 +17,13 @@ export interface AdminProbe {
 
 export interface AppCall {
   status: number;
-  body: { error?: { code?: string }; stepUpValidUntil?: string | null };
+  body: {
+    error?: { code?: string };
+    stepUpValidUntil?: string | null;
+    approvalId?: string;
+    items?: { id: string }[];
+    nextCursor?: string | null;
+  };
   response: Response;
 }
 
@@ -44,6 +52,14 @@ export async function appCall(
   );
 
   return { status: response.status, body: await response.clone().json(), response };
+}
+
+export function currentCounter(): number {
+  return Math.floor(Date.now() / 1000 / (TOTP_OPTIONS.period ?? 30));
+}
+
+export function codeAt(probe: AdminProbe, counter: number): Promise<string> {
+  return createOTP(probe.totpSecret, TOTP_OPTIONS).hotp(counter);
 }
 
 export function codeOf(result: AppCall): string | undefined {
@@ -118,6 +134,12 @@ export function adminProbes(prefix: string) {
     await db.execute(
       sql`DELETE FROM email_message WHERE ${or(...created.map((id) => sql`to_address = ${`${id}@example.com`}`))}`,
     );
+    const { adminApproval } = staffSchema;
+    await db
+      .delete(adminApproval)
+      .where(
+        or(inArray(adminApproval.subjectId, created), inArray(adminApproval.requestedBy, created)),
+      );
     await db.delete(authSchema.user).where(inArray(authSchema.user.id, created));
   }
 

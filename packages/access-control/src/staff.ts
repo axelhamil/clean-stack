@@ -33,6 +33,28 @@ const ROLE_PERMISSIONS: Record<StaffRole, readonly StaffPermission[]> = {
   auditor: ["users.read", "orgs.read", "audit.read", "ops.read"],
 };
 
+export const APPROVAL_ACTIONS = [
+  "user.ban_permanent",
+  "staff.role_change",
+  "staff.revoke",
+] as const;
+
+export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
+
+export const APPROVAL_ACTION_PERMISSION: Record<ApprovalAction, StaffPermission> = {
+  "user.ban_permanent": "users.moderate",
+  "staff.role_change": "staff.manage",
+  "staff.revoke": "staff.manage",
+};
+
+export function isApprovalAction(value: string): value is ApprovalAction {
+  return APPROVAL_ACTIONS.some((action) => action === value);
+}
+
+export function rolesWithStaffPermission(permission: StaffPermission): StaffRole[] {
+  return STAFF_ROLES.filter((role) => ROLE_PERMISSIONS[role].includes(permission));
+}
+
 export function isStaffRole(value: string): value is StaffRole {
   return STAFF_ROLES.some((role) => role === value);
 }

@@ -130,6 +130,18 @@ export default {
     ADMIN_STEP_UP_REPLAY_INVALID: "This code was already used. Wait for the next one.",
     ADMIN_STEP_UP_SESSION_NOT_FOUND: "This session has ended. Sign in again.",
     ADMIN_USER_NOT_FOUND: "This account no longer exists.",
+    ADMIN_APPROVAL_SUBJECT_DECISION_FORBIDDEN: "Nobody decides a request about their own account.",
+    ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT:
+      "The requester no longer holds this power, so the request is closed.",
+    ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
+      "This person's access changed since the request was made. Ask again.",
+    ADMIN_APPROVAL_NOT_FOUND: "This approval request no longer exists.",
+    ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN: "You cannot request this action on your own account.",
+    ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN: "A different person must decide this request.",
+    ADMIN_APPROVAL_PERMISSION_FORBIDDEN: "You no longer hold the permission this request needs.",
+    ADMIN_APPROVAL_DECIDED_CONFLICT: "This request has already been settled.",
+    ADMIN_APPROVAL_EXPIRED_CONFLICT: "This request has expired. Ask again if it is still needed.",
+    ADMIN_APPROVAL_PARAMS_INVALID: "The stored request is no longer valid.",
     ADMIN_USER_SELF_BAN_FORBIDDEN: "You cannot suspend your own account.",
     ADMIN_IMPERSONATION_FORBIDDEN: "You cannot view the product as this account.",
     ADMIN_STOP_IMPERSONATION_FORBIDDEN: "The impersonation could not be stopped.",

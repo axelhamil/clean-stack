@@ -1,7 +1,12 @@
-import type { OrgPermissions } from "@packages/access-control";
+import type { OrgPermissions, StaffPermission } from "@packages/access-control";
 import type { EventType } from "./event-types";
 
-export type Audience = "self" | "actor" | "org:all" | { can: OrgPermissions };
+export type Audience =
+  | "self"
+  | "actor"
+  | "org:all"
+  | { can: OrgPermissions }
+  | { staff: StaffPermission };
 
 export const NOTIFICATION_CHANNELS = ["in_app", "email"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -34,7 +39,26 @@ export type NotificationConfig = {
   dedupWindow?: "hour" | "day";
 };
 
+const APPROVAL_NOTICE = {
+  audience: { staff: "approvals.decide" },
+  category: "security",
+  forced: true,
+  payloadFields: ["approvalId", "action", "userId"],
+} as const;
+
 const _map = {
+  "admin.approval.requested": APPROVAL_NOTICE,
+  "admin.approval.cancelled": APPROVAL_NOTICE,
+  "admin.approval.expired": APPROVAL_NOTICE,
+  "admin.approval.executed": APPROVAL_NOTICE,
+  "admin.approval.decided": {
+    ...APPROVAL_NOTICE,
+    payloadFields: ["approvalId", "action", "userId", "outcome"],
+  },
+  "admin.approval.failed": {
+    ...APPROVAL_NOTICE,
+    payloadFields: ["approvalId", "action", "userId", "reason"],
+  },
   "user.password_changed": {
     audience: "self",
     category: "security",

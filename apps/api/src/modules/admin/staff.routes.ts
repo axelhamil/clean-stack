@@ -12,6 +12,7 @@ import {
 import { zV } from "../../shared/validator";
 import { setStaffRoleBodySchema } from "./application/dto/set-staff-role.dto";
 import { stepUpBodySchema } from "./application/dto/step-up.dto";
+import { gateOr202 } from "./approval-response";
 
 export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
   .get("/me", requireAuth, requireStaff, async (c) => {
@@ -63,10 +64,25 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
     requireStepUp,
     zV("json", setStaffRoleBodySchema),
     async (c) => {
+      const actorUserId = c.get("user").id;
+      const targetUserId = c.req.param("id");
+      const body = c.req.valid("json");
+      const pending = gateOr202(
+        c,
+        await di.ApprovalService.gate({
+          action: "staff.role_change",
+          subjectId: targetUserId,
+          params: body,
+          requestedBy: actorUserId,
+          requesterPermissions: c.get("staff").permissions,
+        }),
+      );
+      if (pending) return pending;
+
       const result = await di.StaffService.assignRole({
-        actorUserId: c.get("user").id,
-        targetUserId: c.req.param("id"),
-        role: c.req.valid("json").role,
+        actorUserId,
+        targetUserId,
+        role: body.role,
       });
       if (result.isFailure) throw new AppErrorException(result.getError());
 
@@ -79,10 +95,21 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
     requireStaffPermission("staff.manage"),
     requireStepUp,
     async (c) => {
-      const result = await di.StaffService.revoke({
-        actorUserId: c.get("user").id,
-        targetUserId: c.req.param("id"),
-      });
+      const actorUserId = c.get("user").id;
+      const targetUserId = c.req.param("id");
+      const pending = gateOr202(
+        c,
+        await di.ApprovalService.gate({
+          action: "staff.revoke",
+          subjectId: targetUserId,
+          params: {},
+          requestedBy: actorUserId,
+          requesterPermissions: c.get("staff").permissions,
+        }),
+      );
+      if (pending) return pending;
+
+      const result = await di.StaffService.revoke({ actorUserId, targetUserId });
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       return c.json({ ok: true });

@@ -42,6 +42,7 @@ export default {
       revokeSessions: "Revoke sessions",
       resetPassword: "Reset password",
       banSuccessToast: "Account suspended.",
+      banPendingToast: "Request sent. A colleague must approve this suspension.",
       unbanSuccessToast: "Account reactivated.",
       impersonateSuccessToast: "Impersonation started.",
       revokeSessionsSuccessToast: "Sessions revoked.",

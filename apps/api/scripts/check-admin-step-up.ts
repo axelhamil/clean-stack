@@ -6,19 +6,19 @@
  * probe users.
  */
 
-import { createOTP } from "@better-auth/utils/otp";
 import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { di } from "../src/container";
-import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
 import {
   type AdminProbe,
   type AppCall,
   adminProbes,
   appCall,
+  codeAt,
   codeOf,
+  currentCounter,
   freshIp,
 } from "./admin-probes";
 import { checkRecorder } from "./check-harness";
@@ -34,14 +34,6 @@ const RACERS = 8;
 const DAY_SECONDS = 24 * 60 * 60;
 
 const call = appCall;
-
-function currentCounter(): number {
-  return Math.floor(Date.now() / 1000 / (TOTP_OPTIONS.period ?? 30));
-}
-
-function codeAt(probe: AdminProbe, counter: number): Promise<string> {
-  return createOTP(probe.totpSecret, TOTP_OPTIONS).hotp(counter);
-}
 
 function submit(cookie: string, code: string, ip?: string): Promise<AppCall> {
   return call(cookie, "POST", "/admin/step-up", { code }, ip);

@@ -40,6 +40,7 @@ export default {
       // "Compte" agrees masculine: these describe the account, never the
       // person, so no gender is imposed on someone whose gender is unknown.
       banSuccessToast: "Compte suspendu.",
+      banPendingToast: "Demande envoyée. Un collègue doit approuver cette suspension.",
       unbanSuccessToast: "Compte réactivé.",
       impersonateSuccessToast: "Emprunt d'identité démarré.",
       revokeSessionsSuccessToast: "Sessions révoquées.",

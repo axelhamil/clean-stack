@@ -24,6 +24,7 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
   assertStepUp: async () => {},
 }));
 
+const { adminApprovalRoutes } = await import("../approvals.routes");
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
 const { adminOrgRoutes } = await import("../admin-orgs.routes");
 const { adminUserRoutes } = await import("../routes");
@@ -33,6 +34,7 @@ const { listBackRoutes } = await import("../../../shared/surface/back-routes");
 
 const app = new Hono()
   .route("/admin", adminStaffRoutes)
+  .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
@@ -47,6 +49,10 @@ const REQUIRED: Record<string, string> = {
   "GET /admin/staff": "staff.manage",
   "PUT /admin/staff/:id/role": "staff.manage",
   "DELETE /admin/staff/:id": "staff.manage",
+  "GET /admin/approvals": "approvals.decide",
+  "GET /admin/approvals/:id": "approvals.decide",
+  "POST /admin/approvals/:id/decide": "approvals.decide",
+  "POST /admin/approvals/:id/cancel": "staff",
   "GET /admin/users": "users.read",
   "GET /admin/users/:id": "users.read",
   "POST /admin/users/:id/ban": "users.moderate",

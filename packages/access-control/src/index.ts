@@ -37,11 +37,16 @@ const _member = _ac.newRole({
 });
 
 export {
+  APPROVAL_ACTION_PERMISSION,
+  APPROVAL_ACTIONS,
+  type ApprovalAction,
   authorizeStaff,
   effectivePermissions,
+  isApprovalAction,
   isStaffPermission,
   isStaffRole,
   permissionsOfRole,
+  rolesWithStaffPermission,
   STAFF_PERMISSIONS,
   STAFF_ROLES,
   type StaffAccess,

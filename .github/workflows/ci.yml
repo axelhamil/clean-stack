@@ -185,6 +185,11 @@ jobs:
         # its own probe users.
         run: pnpm --filter api check:admin-step-up
 
+      - name: Check four-eyes approvals on the real route stack
+        # The claim, the expiry and the self-approval CHECK live in SQL, the rollback then
+        # second unit needs a real transaction. Creates and removes its own probe users.
+        run: pnpm --filter api check:admin-approval
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

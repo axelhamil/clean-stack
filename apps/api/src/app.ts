@@ -8,6 +8,8 @@ import { findUserById } from "./auth-queries";
 import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
+import { adminApprovalRoutes } from "./modules/admin/approvals.routes";
+import { adminInternalRoutes } from "./modules/admin/internal.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { adminStaffRoutes } from "./modules/admin/staff.routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
@@ -191,6 +193,7 @@ app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.han
 
 app.route("/internal", healthInternalRoutes);
 app.route("/internal", rgpdInternalRoutes);
+app.route("/internal", adminInternalRoutes);
 app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
@@ -240,6 +243,7 @@ const routes = app
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
   .route("/admin", adminStaffRoutes)
+  .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)

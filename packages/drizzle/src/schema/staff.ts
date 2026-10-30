@@ -1,5 +1,15 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { session, user } from "./auth";
 
 export const staffMember = pgTable(
@@ -54,3 +64,38 @@ export const adminTotpCounter = pgTable("admin_totp_counter", {
     .references(() => user.id, { onDelete: "cascade" }),
   lastCounter: bigint("last_counter", { mode: "number" }).notNull(),
 });
+
+export const adminApproval = pgTable(
+  "admin_approval",
+  {
+    id: text("id").primaryKey(),
+    action: text("action").notNull(),
+    subjectId: text("subject_id").notNull(),
+    params: jsonb("params").notNull(),
+    requestedBy: text("requested_by").notNull(),
+    status: text("status").notNull().default("pending"),
+    decidedBy: text("decided_by"),
+    decisionNote: text("decision_note"),
+    failureReason: text("failure_reason"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+    version: integer("version").notNull().default(0),
+  },
+  (table) => [
+    index("admin_approval_status_expires_idx").on(table.status, table.expiresAt),
+    index("admin_approval_status_created_idx").on(table.status, table.createdAt, table.id),
+    uniqueIndex("admin_approval_one_pending_uq")
+      .on(table.action, table.subjectId)
+      .where(sql`${table.status} = 'pending'`),
+    check("admin_approval_four_eyes_check", sql`${table.decidedBy} <> ${table.requestedBy}`),
+    check(
+      "admin_approval_status_check",
+      sql`${table.status} IN ('pending', 'approved', 'rejected', 'cancelled', 'expired', 'executed', 'failed')`,
+    ),
+    check(
+      "admin_approval_action_check",
+      sql`${table.action} IN ('user.ban_permanent', 'staff.role_change', 'staff.revoke')`,
+    ),
+  ],
+);

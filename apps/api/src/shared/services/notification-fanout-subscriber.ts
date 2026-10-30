@@ -1,5 +1,4 @@
 import type { IUnitOfWork } from "@packages/ddd-kit";
-
 import {
   and,
   eq,
@@ -14,8 +13,10 @@ import { type NotificationChannel, notificationConfigOf } from "@packages/events
 import type { BuiltInEventHandler } from "../event-handlers";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { DeliveredEvent } from "../ports/outbox.port";
+import type { StaffEnv } from "../staff-access";
 import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";
 import { resolveAudience } from "./resolve-audience";
+import { staffRecipients } from "./staff-recipients";
 
 function dedupKeyFor(
   event: DeliveredEvent,
@@ -120,6 +121,10 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
     private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
     private readonly digestHourUtc: number = DEFAULT_DIGEST_HOUR_UTC,
+    private readonly staffEnv: StaffEnv = {
+      PLATFORM_ADMIN_IDS: [],
+      PLATFORM_ADMIN_REQUIRE_MFA: false,
+    },
   ) {}
 
   async handle(event: DeliveredEvent): Promise<void> {
@@ -141,16 +146,18 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
           const organizationId = event.organizationId ?? null;
 
           const recipients =
-            target.kind === "user"
-              ? sql`(SELECT ${target.userId}::text AS user_id)`
-              : sql`(SELECT ${m.userId} AS user_id FROM ${m} WHERE ${
-                  target.roles === "all"
-                    ? eq(m.organizationId, target.organizationId)
-                    : and(
-                        eq(m.organizationId, target.organizationId),
-                        inArray(m.role, target.roles),
-                      )
-                })`;
+            target.kind === "staff"
+              ? staffRecipients(target, this.staffEnv)
+              : target.kind === "user"
+                ? sql`(SELECT ${target.userId}::text AS user_id)`
+                : sql`(SELECT ${m.userId} AS user_id FROM ${m} WHERE ${
+                    target.roles === "all"
+                      ? eq(m.organizationId, target.organizationId)
+                      : and(
+                          eq(m.organizationId, target.organizationId),
+                          inArray(m.role, target.roles),
+                        )
+                  })`;
 
           const rules = deliveryRules(config.category, organizationId, config.forced === true);
 
