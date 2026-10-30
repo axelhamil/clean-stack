@@ -4,14 +4,24 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/scrub-event.ts"
+    ".": "./src/scrub-event.ts",
+    "./react": "./src/react.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest watch"
   },
+  "peerDependencies": {
+    "@sentry/react": "*"
+  },
+  "peerDependenciesMeta": {
+    "@sentry/react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@sentry/react": "^11.9.0",
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "typescript": "^7.0.2",

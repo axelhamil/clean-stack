@@ -12,6 +12,7 @@ One guide per app and per package that carries rules of its own. Read the one yo
 |---|---|---|
 | API | `apps/api/CLAUDE.md` | server architecture, module layers, DI, CQRS, RPC contract, auth, org scoping, logging, observability, tests, real-database checks |
 | App | `apps/app/CLAUDE.md` | client layout, routing, features, queries and mutations, forms, i18n, gates, theme, accessibility gate |
+| Admin | `apps/admin/CLAUDE.md` | what the staff back office does differently: nav from server permissions, no auth screen, denied page, stricter CSP |
 | `packages/ddd-kit` | `packages/ddd-kit/CLAUDE.md` | `Result`, `Option`, aggregates, value objects, repository and unit-of-work contracts |
 | `packages/drizzle` | `packages/drizzle/CLAUDE.md` | schema, migrations, query rules, transaction service |
 | `packages/access-control` | `packages/access-control/CLAUDE.md` | capability model shared by server, route gates and UI |
@@ -52,9 +53,9 @@ pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semanti
 
 ## Scripts & local infrastructure
 
-`pnpm bootstrap` (copies `.env.example` → `.env` in `apps/api`, `apps/app` and `packages/drizzle`, idempotent) · `pnpm dev` (Turbo TUI, `--filter=<app>` to scope) · `dev:docker` (`docker compose up --watch`, fully containerized hot reload) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` · `check:unused` · `ui:add` · `db:push` / `db:generate` / `db:migrate` / `db:seed` / `db:studio` · `clean`.
+`pnpm bootstrap` (copies `.env.example` → `.env` in `apps/api`, `apps/app`, `apps/admin` and `packages/drizzle`, idempotent) · `pnpm dev` (Turbo TUI, `--filter=<app>` to scope) · `dev:docker` (`docker compose up --watch`, fully containerized hot reload) · `build` · `test` · `type-check` · `check` (Biome) · `fix` · `ci:check` · `check:duplication` · `check:unused` · `ui:add` · `db:push` / `db:generate` / `db:migrate` / `db:seed` / `db:studio` · `clean`.
 
-- Postgres runs on `localhost:5433` (never pin it back to 5432, it collides with a system Postgres): `docker compose up postgres -d` for native dev. `docker compose up -d` without arguments starts postgres + api + app and collides with `pnpm dev` on ports 3000 and 5173.
+- Postgres runs on `localhost:5433` (never pin it back to 5432, it collides with a system Postgres): `docker compose up postgres -d` for native dev. `docker compose up -d` without arguments starts postgres + api + app + admin and collides with `pnpm dev` on ports 3000, 5173 and 5174.
 - Opt-in profiles: `--profile storage` (SeaweedFS, host port `8333`), `--profile sso` (Keycloak, host port `8080`, see `docs/SSO-LOCAL.md`).
 - After a schema change: `pnpm db:push` (dev, non-interactive) or `db:generate && db:migrate` (prod-style). `db:push` applies the schema only and skips the data steps of migrations, so a local account that needs one (an existing admin who is not listed in `PLATFORM_ADMIN_IDS` gets no staff row) needs `db:migrate` or the env list.
 

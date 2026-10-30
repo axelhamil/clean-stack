@@ -5,7 +5,7 @@ that calls it or the reason it has no UI consumer. It is the answer to "is this 
 from the product, and if not, why not".
 
 **It cannot rot.** `surface-parity.test.ts` reads the *live* route table off the Hono app
-(`app.routes`), scans `apps/app/src` for client call sites, and fails when a route is missing from
+(`app.routes`), scans `apps/app/src` and `apps/admin/src` for client call sites, and fails when a route is missing from
 the map, when the map names a route that no longer exists, when a route declared UI-less turns out
 to be called, or when a declared consumer stops calling it. Adding a route without declaring it
 breaks the build.

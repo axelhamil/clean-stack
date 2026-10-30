@@ -15,6 +15,8 @@
     "DATABASE_URL",
     "CORS_ORIGIN",
     "APP_URL",
+    "ADMIN_URL",
+    "AUTH_COOKIE_DOMAIN",
     "BETTER_AUTH_*",
     "RESEND_*",
     "INTERNAL_*",
@@ -81,7 +83,7 @@
     "check:a11y": {
       "dependsOn": ["build"],
       "cache": false,
-      "env": ["A11Y_BASE_URL", "SEED_EMAIL", "SEED_PASSWORD"]
+      "env": ["A11Y_BASE_URL", "A11Y_APP_URL", "SEED_EMAIL", "SEED_PASSWORD"]
     },
     "format": {
       "outputs": []

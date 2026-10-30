@@ -3,9 +3,11 @@ import { z } from "zod";
 import {
   EMAIL_SEND_TIMEOUT_SECONDS,
   EMAIL_SETTLE_MARGIN_SECONDS,
+  frontOrigins,
   OUTBOX_SETTLE_MARGIN_SECONDS,
   validateApprovalEnv,
   validateEnvBounds,
+  validateHostsEnv,
   WEBHOOK_DNS_TIMEOUT_SECONDS,
   WEBHOOK_FETCH_TIMEOUT_SECONDS,
   WEBHOOK_SETTLE_MARGIN_SECONDS,
@@ -223,5 +225,99 @@ describe("validateApprovalEnv", () => {
     const parsed = schema.safeParse({ ADMIN_APPROVAL_ENABLED: false, ADMIN_APPROVAL_ACTIONS: [] });
 
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe("validateHostsEnv", () => {
+  const schema = z
+    .object({
+      NODE_ENV: z.string(),
+      ADMIN_URL: z.string().optional(),
+      APP_URL: z.string(),
+      BETTER_AUTH_URL: z.string(),
+      AUTH_COOKIE_DOMAIN: z.string().optional(),
+    })
+    .superRefine(validateHostsEnv);
+  it.each([
+    [
+      "up.railway.app",
+      "https://app.up.railway.app",
+      "https://api.up.railway.app",
+      "https://admin.up.railway.app",
+    ],
+    [
+      "co.uk",
+      "https://app.example.co.uk",
+      "https://api.example.co.uk",
+      "https://admin.example.co.uk",
+    ],
+  ])(
+    "refuses the public suffix %s as a cookie domain",
+    (domain, APP_URL, BETTER_AUTH_URL, ADMIN_URL) => {
+      const parsed = schema.safeParse({
+        NODE_ENV: "production",
+        APP_URL,
+        BETTER_AUTH_URL,
+        ADMIN_URL,
+        AUTH_COOKIE_DOMAIN: domain,
+      });
+
+      expect(parsed.error?.issues[0]?.message).toContain("public suffix");
+    },
+  );
+
+  const hosts = {
+    NODE_ENV: "production",
+    ADMIN_URL: "https://admin.example.com",
+    APP_URL: "https://app.example.com",
+    BETTER_AUTH_URL: "https://api.example.com",
+  };
+
+  it("accepts a parent domain of every host", () => {
+    expect(schema.safeParse({ ...hosts, AUTH_COOKIE_DOMAIN: "example.com" }).success).toBe(true);
+  });
+
+  it("accepts no admin host and no cookie domain", () => {
+    const { ADMIN_URL: _admin, ...withoutAdmin } = hosts;
+
+    expect(schema.safeParse(withoutAdmin).success).toBe(true);
+  });
+
+  it.each([
+    ["a host outside the parent", { AUTH_COOKIE_DOMAIN: "other.example" }],
+    ["a suffix that is not a parent", { AUTH_COOKIE_DOMAIN: "ample.com" }],
+    ["a leading dot", { AUTH_COOKIE_DOMAIN: ".example.com" }],
+    ["a bare top-level name", { AUTH_COOKIE_DOMAIN: "localhost" }],
+    ["an admin url with a path", { ADMIN_URL: "https://admin.example.com/back" }],
+    ["an admin url with a trailing slash", { ADMIN_URL: "https://admin.example.com/" }],
+    ["a cleartext admin url in production", { ADMIN_URL: "http://admin.example.com" }],
+  ])("refuses %s", (_label, override) => {
+    expect(schema.safeParse({ ...hosts, ...override }).success).toBe(false);
+  });
+
+  it("lets a cleartext admin url stand outside production", () => {
+    const parsed = schema.safeParse({
+      ...hosts,
+      NODE_ENV: "development",
+      ADMIN_URL: "http://localhost:5174",
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+});
+
+describe("frontOrigins", () => {
+  it("adds the admin origin to the allowlist once", () => {
+    const admin = "https://admin.example.com";
+
+    expect(frontOrigins({ CORS_ORIGIN: ["https://app.example.com"], ADMIN_URL: admin })).toEqual([
+      "https://app.example.com",
+      admin,
+    ]);
+    expect(frontOrigins({ CORS_ORIGIN: [admin], ADMIN_URL: admin })).toEqual([admin]);
+  });
+
+  it("keeps the local fallback without any configuration", () => {
+    expect(frontOrigins({})).toEqual(["http://localhost:5173"]);
   });
 });

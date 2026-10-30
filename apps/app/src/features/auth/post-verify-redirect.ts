@@ -1,4 +1,4 @@
-import { toSafeRedirect } from "@packages/web-kit/auth/safe-redirect";
+import { toAppRedirect } from "../../shared/auth/safe-redirect";
 
 const STORAGE_KEY = "post-verify-redirect";
 
@@ -15,7 +15,7 @@ export function takePostVerifyRedirect(): string | undefined {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_KEY);
-    return toSafeRedirect(stored ?? undefined);
+    return toAppRedirect(stored ?? undefined);
   } catch {
     return undefined;
   }

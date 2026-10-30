@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { getPublicSuffix } from "tldts";
 import type { z } from "zod";
 import {
   DEADLINE_FLUSH_TIMEOUT_MS,
@@ -212,4 +213,82 @@ export function validateSecuritySignalsEnv(
       message: "SECURITY_DENY_ASNS needs GEO_ASN_HEADER, or nothing is ever denied.",
     });
   }
+}
+
+const COOKIE_DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+
+function hostOf(url: string): string {
+  return new URL(url).hostname;
+}
+
+function coversHost(domain: string, host: string): boolean {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+/**
+ * Both values fail quietly in a browser: an admin URL with a path never equals an `Origin`
+ * header, and a cookie domain that is not a parent of every host is dropped, which signs
+ * everyone out with no error anywhere. Refusing the boot is the only signal that gets read.
+ */
+export function validateHostsEnv(
+  value: {
+    NODE_ENV: string;
+    ADMIN_URL?: string;
+    APP_URL: string;
+    BETTER_AUTH_URL: string;
+    AUTH_COOKIE_DOMAIN?: string;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const { ADMIN_URL: adminUrl, AUTH_COOKIE_DOMAIN: cookieDomain } = value;
+
+  if (adminUrl && new URL(adminUrl).origin !== adminUrl) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["ADMIN_URL"],
+      message: `ADMIN_URL (${adminUrl}) must be an origin: scheme and host, no path and no trailing slash, or it never matches a browser Origin header.`,
+    });
+  }
+  if (adminUrl && value.NODE_ENV === "production" && !adminUrl.startsWith("https://")) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["ADMIN_URL"],
+      message: "ADMIN_URL must use https in production: session cookies are Secure there.",
+    });
+  }
+  if (!cookieDomain) return;
+
+  if (!COOKIE_DOMAIN.test(cookieDomain)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["AUTH_COOKIE_DOMAIN"],
+      message: `AUTH_COOKIE_DOMAIN (${cookieDomain}) must be a bare lowercase parent domain, e.g. example.com.`,
+    });
+    return;
+  }
+
+  if (getPublicSuffix(cookieDomain, { allowPrivateDomains: true }) === cookieDomain) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["AUTH_COOKIE_DOMAIN"],
+      message: `AUTH_COOKIE_DOMAIN (${cookieDomain}) is a public suffix: browsers reject the cookie, which signs everyone out. Use a domain you own, or leave it empty.`,
+    });
+    return;
+  }
+
+  const hosts = [value.APP_URL, value.BETTER_AUTH_URL, ...(adminUrl ? [adminUrl] : [])].map(hostOf);
+  const outside = hosts.filter((host) => !coversHost(cookieDomain, host));
+  if (outside.length === 0) return;
+
+  ctx.addIssue({
+    code: "custom",
+    path: ["AUTH_COOKIE_DOMAIN"],
+    message: `AUTH_COOKIE_DOMAIN (${cookieDomain}) is not a parent of ${outside.join(", ")}: the browser would drop the session cookie and lock staff out.`,
+  });
+}
+
+export function frontOrigins(value: { CORS_ORIGIN?: string[]; ADMIN_URL?: string }): string[] {
+  const origins = value.CORS_ORIGIN ?? ["http://localhost:5173"];
+
+  return value.ADMIN_URL ? [...new Set([...origins, value.ADMIN_URL])] : origins;
 }

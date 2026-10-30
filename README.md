@@ -31,7 +31,7 @@ pnpm bootstrap          # copies .env.example → .env in each workspace
 docker compose up postgres -d   # only Postgres on :5433 (api/app run natively below)
 # uploads need the bucket: add --profile storage (SeaweedFS on :8333)
 pnpm db:migrate         # apply migrations
-pnpm dev                # API :3000, App :5173
+pnpm dev                # API :3000, App :5173, Admin :5174
 ```
 
 ### Option B: Fully containerized (Docker only)
@@ -266,6 +266,7 @@ Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `app
 | `postgres` | `postgres:18-alpine` | `5433` | default | `postgres_data` |
 | `api` | built (`apps/api/dev.Dockerfile`) | `3000` | default | n/a |
 | `app` | built (`apps/app/dev.Dockerfile`) | `5173` | default | n/a |
+| `admin` | built (`apps/admin/dev.Dockerfile`) | `5174` | default | n/a |
 | `seaweedfs` | `chrislusf/seaweedfs` | `8333` | `storage` | `seaweedfs_data` |
 | `seaweedfs-init` | `chrislusf/seaweedfs` | n/a | `storage` | n/a |
 

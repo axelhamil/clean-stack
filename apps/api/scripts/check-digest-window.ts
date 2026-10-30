@@ -38,6 +38,11 @@ const { check } = checks;
 const email = seedEmail();
 const userId = await findSeededUserId();
 
+// The flush covers every user's due rows, so what another account left behind would
+// skew each count below. Local database only, guarded above.
+await db.execute(sql`DELETE FROM notification`);
+await db.execute(sql`DELETE FROM email_message`);
+
 const DIGEST_HOUR_UTC = 8;
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const subscriber = new NotificationFanoutSubscriber(

@@ -1,18 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
+import { corsHeaders, signInForm, tabTo } from "@packages/test/a11y";
 import { expect, type Page, test } from "@playwright/test";
 import { STORAGE_STATE } from "./playwright.config";
-import { signInForm, tabTo } from "./sign-in";
 
 type ThemeProbe = Window & { __themeTransitioned?: boolean };
 
 const STEP_UP_TARGET = "a11y-step-up-target";
 
 async function fulfillAsStaffWithRefusedImpersonation(page: Page): Promise<void> {
-  const allow = (origin?: string) => ({
-    "access-control-allow-origin": origin ?? "*",
-    "access-control-allow-credentials": "true",
-  });
-
   await page.route("**/api/auth/get-session*", async (route) => {
     const response = await route.fetch();
     const session = await response.json();
@@ -28,7 +23,7 @@ async function fulfillAsStaffWithRefusedImpersonation(page: Page): Promise<void>
     if (route.request().resourceType() === "document") return route.fallback();
 
     return route.fulfill({
-      headers: allow(route.request().headers().origin),
+      headers: corsHeaders(route.request().headers().origin),
       json: {
         id: STEP_UP_TARGET,
         name: "Step-up target",
@@ -47,7 +42,7 @@ async function fulfillAsStaffWithRefusedImpersonation(page: Page): Promise<void>
   await page.route(`**/admin/impersonation/${STEP_UP_TARGET}/start`, (route) =>
     route.fulfill({
       status: 403,
-      headers: allow(route.request().headers().origin),
+      headers: corsHeaders(route.request().headers().origin),
       json: { error: { code: "ADMIN_REAUTH_REQUIRED", message: "Confirm." } },
     }),
   );
@@ -144,10 +139,7 @@ test.describe("signed in", () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       await route.fulfill({
         status: 400,
-        headers: {
-          "access-control-allow-origin": route.request().headers().origin ?? "*",
-          "access-control-allow-credentials": "true",
-        },
+        headers: corsHeaders(route.request().headers().origin),
         json: { error: { code: "ADMIN_STEP_UP_CODE_INVALID", message: "Invalid." } },
       });
     });

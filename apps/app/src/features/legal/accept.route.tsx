@@ -9,7 +9,7 @@ import {
   TypographySmall,
 } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
-import { redirectSearchSchema } from "@packages/web-kit/auth/safe-redirect";
+import { createRedirectSearchSchema } from "@packages/web-kit/auth/safe-redirect";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Fragment, type ReactNode, useEffect } from "react";
@@ -27,7 +27,7 @@ import { useAcceptPolicies } from "./hooks/use-accept-policies";
 import { getChangesSince, POLICY_DOCS } from "./policies.config";
 
 export const Route = createFileRoute("/_protected/legal/accept")({
-  validateSearch: redirectSearchSchema,
+  validateSearch: createRedirectSearchSchema(),
   component: AcceptPoliciesPage,
 });
 

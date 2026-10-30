@@ -43,7 +43,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "GET /admin/audit-log/verify": {
     consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
   },
-  "GET /admin/me": { uiLess: "dormant-by-design" },
+  "GET /admin/me": { consumer: "apps/admin/src/shared/api/queries/me.ts" },
   "POST /admin/step-up": { consumer: "apps/app/src/shared/api/mutations/verify-step-up.ts" },
   "GET /admin/orgs": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
   "GET /admin/orgs/:id": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },

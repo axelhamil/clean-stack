@@ -117,6 +117,40 @@ export default {
       },
     },
   },
+  backOffice: {
+    brand: "Back office",
+    nav: {
+      label: "Back office sections",
+      open: "Open the menu",
+      description: "The sections your access opens.",
+    },
+    home: {
+      title: "Home",
+      empty: "Nothing to show here yet. The menu lists what your access opens.",
+    },
+    sectionNotBuilt: "This screen is not built yet.",
+    sections: {
+      users: "Accounts",
+      orgs: "Organizations",
+      audit: "Audit log",
+      operations: "Operations",
+      approvals: "Approvals",
+      team: "Team",
+    },
+    denied: {
+      title: "This account cannot open the back office",
+      description: "Sign in with another account, or go back to the app.",
+      needsTwoFactor: "Turn on two-factor authentication in your account settings, then come back.",
+      needsPolicies: "Accept the updated policies in the app, then come back.",
+      backToApp: "Go to the app",
+      retry: "Try again",
+    },
+    notFound: {
+      title: "Page not found",
+      description: "This page does not exist or your access does not open it.",
+      backHome: "Back to home",
+    },
+  },
   stepUp: {
     title: "Confirm it's you",
     description: "Enter the code from your authenticator app, then repeat your action.",

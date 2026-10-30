@@ -62,12 +62,20 @@ module.exports = {
       },
     },
     {
-      name: "app-never-imports-api",
+      name: "front-never-imports-api",
       comment:
-        "The front reaches the api only through the typed Hono RPC client factory (api/client), never its internals.",
+        "A front reaches the api only through the typed Hono RPC client factory (api/client), never its internals.",
       severity: "error",
-      from: { path: "^apps/app/" },
+      from: { path: "^apps/(app|admin)/" },
       to: { path: "^apps/api/", pathNot: "^apps/api/src/client\\.ts$" },
+    },
+    {
+      name: "admin-never-imports-app",
+      comment:
+        "The back office shares through packages only: an import of the customer app would pull its session, gates and bundle onto the staff host.",
+      severity: "error",
+      from: { path: "^apps/admin/" },
+      to: { path: "^apps/app/" },
     },
   ],
   options: {

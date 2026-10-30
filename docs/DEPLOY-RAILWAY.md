@@ -2,7 +2,7 @@
 
 Runbook for shipping clean-stack on Railway. Config-as-code lives under `infra/railway/*.toml`. The provider switch out (Fly.io, Render, Cloud Run) is documented at the bottom, Dockerfiles are portable.
 
-> **TL;DR**: 3 services (`api`, `app`, `cron`) + 1 Postgres add-on + 1 Cloudflare R2 bucket (external). Each service points at `infra/railway/<service>.toml`. Shared secrets centralized via Railway **Shared Variables**, referenced as `${{shared.NAME}}`.
+> **TL;DR**: 4 services (`api`, `app`, `admin`, `cron`) + 1 Postgres add-on + 1 Cloudflare R2 bucket (external). Each service points at `infra/railway/<service>.toml`. Shared secrets centralized via Railway **Shared Variables**, referenced as `${{shared.NAME}}`.
 
 ---
 
@@ -78,9 +78,9 @@ The add-on exposes `${{Postgres.DATABASE_URL}}` to other services, never copy th
 
 ---
 
-## 3. Create the 3 services
+## 3. Create the 4 services
 
-For **each** service (`api`, `app`, `cron`): either via dashboard (recommended for first deploy) or CLI:
+For **each** service (`api`, `app`, `admin`, `cron`): either via dashboard (recommended for first deploy) or CLI:
 
 ### Dashboard flow
 
@@ -185,6 +185,24 @@ The pepper is the HMAC key for token storage, a compromised pepper means a DB du
 
 **Build args** (`VITE_*`) are baked into the bundle at build time. Set them under **Settings → Build → Build Args** (not Variables). Changing them requires a fresh build.
 
+**`admin`** service (same image rules as `app`: leave the Start Command empty):
+
+| Var                     | Value                                | Type          |
+| ----------------------- | ------------------------------------ | ------------- |
+| `VITE_API_URL`          | `https://api.<your-domain>`          | **Build arg and runtime** (Caddy reads it for the CSP) |
+| `VITE_APP_URL`          | `https://app.<your-domain>`          | **Build arg** |
+| `VITE_SENTRY_DSN`       | Sentry admin project DSN (EU)        | Build arg     |
+| `CSP_CONNECT_EXTRA`     | Sentry ingest origin, when a DSN is set | Runtime    |
+| `PORT`                  | (Railway injects)                    | Runtime       |
+
+The `app` service also takes `VITE_ADMIN_URL=https://admin.<your-domain>` as a build arg (the only external target sign-in may return to), and `api` takes `ADMIN_URL` with the same value (joins CORS and CSRF), plus `AUTH_COOKIE_DOMAIN=<your-domain>` when the session must span the subdomains.
+
+**`AUTH_COOKIE_DOMAIN` is off by default, leave it empty unless staff must share the session across subdomains.** Once set, every host under that domain receives the session cookie: never set it if a subdomain serves user content or a third party (status page, docs host, marketing tool), since any of them could read or fixate the session. A public suffix refuses the boot.
+
+**Existing `.env` files** predate `ADMIN_URL` (`apps/api`) and `VITE_ADMIN_URL` (`apps/app`), and `pnpm bootstrap` never overwrites a file: add both by hand, or sign-in will not return to the back office. Same for build args on a service that already exists.
+
+**`admin` needs a custom domain in production.** On `*.up.railway.app` the hosts are different sites under a public suffix, so no cookie domain can span them and a staff session would rest on third-party cookies. A value of `AUTH_COOKIE_DOMAIN` that is not a parent of `APP_URL`, `BETTER_AUTH_URL` and `ADMIN_URL` refuses the boot. If a cookie change still locks staff out, the break-glass path is `PLATFORM_ADMIN_IDS` plus removing `AUTH_COOKIE_DOMAIN`.
+
 **`cron`** service:
 
 ```env
@@ -254,8 +272,9 @@ If you choose Railway Bucket: `railway add --bucket <name>`, region `europe-west
 1. **Service → Networking → Custom Domain**:
    - `api`: `api.<your-domain>` → CNAME points to Railway-provided target
    - `app`: `app.<your-domain>` → CNAME points to Railway-provided target
+   - `admin`: `admin.<your-domain>` → CNAME points to Railway-provided target
 2. TLS via Let's Encrypt auto (Railway-managed). Wait ~60s for cert issuance.
-3. Update `BETTER_AUTH_URL`, `APP_URL`, `CORS_ORIGIN`, `VITE_API_URL` (build arg) accordingly, **redeploy app** (build arg change requires rebuild).
+3. Update `BETTER_AUTH_URL`, `APP_URL`, `ADMIN_URL`, `CORS_ORIGIN`, `VITE_API_URL`, `VITE_APP_URL`, `VITE_ADMIN_URL` (build args) accordingly, **redeploy app and admin** (build arg change requires rebuild).
 
 If you skip custom domains: use the `${{RAILWAY_PUBLIC_DOMAIN}}` reference var (auto-resolves to the `*.up.railway.app` URL).
 

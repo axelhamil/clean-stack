@@ -29,6 +29,8 @@ minutes of CI and one more source of flake.
 
 ## Running it locally
 
+The back office has its own gate on port 4174 (`apps/admin/a11y/`), sharing the helpers in `@packages/test/a11y`.
+
 The gate audits the **preview build** on port 4173, against a live API:
 
 ```sh

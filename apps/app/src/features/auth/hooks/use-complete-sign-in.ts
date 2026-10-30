@@ -1,3 +1,4 @@
+import { isExternalRedirect } from "@packages/web-kit/auth/safe-redirect";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { useRefreshSession } from "../../../shared/auth/use-refresh-session";
@@ -15,6 +16,11 @@ export function useCompleteSignIn(): (redirectTo?: string) => Promise<void> {
   return useCallback(
     async (redirectTo?: string) => {
       await refreshSession();
+      if (redirectTo && isExternalRedirect(redirectTo)) {
+        window.location.assign(redirectTo);
+        return;
+      }
+
       void navigate({ to: redirectTo ?? "/dashboard" });
     },
     [refreshSession, navigate],

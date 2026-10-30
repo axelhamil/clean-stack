@@ -1,4 +1,5 @@
 import { messageFromCode, rateLimitedMessage } from "@packages/web-kit/api/errors/messages";
+import { isExternalRedirect } from "@packages/web-kit/auth/safe-redirect";
 import type { TFunction } from "i18next";
 import { authClient } from "../../shared/auth/auth-client";
 
@@ -31,6 +32,8 @@ export function resolveAuthError(
 }
 
 export function ssoCallbackUrl(redirectTo?: string): string {
+  if (redirectTo && isExternalRedirect(redirectTo)) return redirectTo;
+
   return `${window.location.origin}${redirectTo ?? "/dashboard"}`;
 }
 

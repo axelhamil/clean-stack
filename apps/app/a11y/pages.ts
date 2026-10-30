@@ -1,10 +1,5 @@
+import { type AuditedPage, corsHeaders } from "@packages/test/a11y";
 import type { Page } from "@playwright/test";
-
-export interface AuditedPage {
-  readonly name: string;
-  readonly path: string;
-  readonly prepare?: (page: Page) => Promise<void>;
-}
 
 /**
  * The seeded user has already accepted every policy, so `/legal/accept` would
@@ -20,10 +15,7 @@ async function servePoliciesAsStale(page: Page): Promise<void> {
   await page.route("**/me/policies", (route) =>
     route.fulfill({
       json: STALE_POLICIES,
-      headers: {
-        "access-control-allow-origin": route.request().headers().origin ?? "*",
-        "access-control-allow-credentials": "true",
-      },
+      headers: corsHeaders(route.request().headers().origin),
     }),
   );
 }

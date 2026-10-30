@@ -115,6 +115,7 @@ services:
       - "5173:5173"
     environment:
       VITE_API_URL: http://localhost:3000
+      VITE_ADMIN_URL: http://localhost:5174
     depends_on:
       api:
         condition: service_healthy
@@ -140,6 +141,42 @@ services:
           path: ./pnpm-workspace.yaml
         - action: rebuild
           path: ./apps/app/package.json
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/dev.Dockerfile
+    container_name: clean-stack-admin-dev
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_API_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:5173
+    depends_on:
+      api:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/admin/src
+          target: /repo/apps/admin/src
+        - action: sync
+          path: ./apps/admin/index.html
+          target: /repo/apps/admin/index.html
+        - action: sync
+          path: ./packages
+          target: /repo/packages
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+        - action: rebuild
+          path: ./turbo.json
+        - action: rebuild
+          path: ./pnpm-workspace.yaml
+        - action: rebuild
+          path: ./apps/admin/package.json
 
 volumes:
   postgres_data:

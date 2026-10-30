@@ -1,14 +1,4 @@
-import { throwApiError } from "@packages/web-kit/api/errors/api-error";
-import { mutationOptions } from "@tanstack/react-query";
+import { verifyStepUpOptions } from "@packages/web-kit/auth/verify-step-up-options";
 import { api } from "../api-client";
 
-const $verify = api.admin["step-up"].$post;
-
-export const verifyStepUpMutationOptions = mutationOptions({
-  mutationKey: ["admin", "step-up"] as const,
-  mutationFn: async (json: { code: string }) => {
-    const res = await $verify({ json });
-    if (!res.ok) await throwApiError(res, "verifyStepUp");
-    return res.json();
-  },
-});
+export const verifyStepUpMutationOptions = verifyStepUpOptions(api.admin["step-up"].$post);

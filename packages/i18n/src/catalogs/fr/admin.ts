@@ -113,6 +113,41 @@ export default {
       },
     },
   },
+  backOffice: {
+    brand: "Administration",
+    nav: {
+      label: "Sections du back office",
+      open: "Ouvrir le menu",
+      description: "Les sections que vos accès ouvrent.",
+    },
+    home: {
+      title: "Accueil",
+      empty: "Rien à afficher ici pour l'instant. Le menu liste ce que vos accès ouvrent.",
+    },
+    sectionNotBuilt: "Cet écran n'est pas encore construit.",
+    sections: {
+      users: "Comptes",
+      orgs: "Organisations",
+      audit: "Journal d'audit",
+      operations: "Opérations",
+      approvals: "Approbations",
+      team: "Équipe",
+    },
+    denied: {
+      title: "Ce compte ne peut pas ouvrir le back office",
+      description: "Connectez-vous avec un autre compte ou retournez sur l'application.",
+      needsTwoFactor:
+        "Activez l'authentification à deux facteurs dans les réglages de votre compte, puis revenez.",
+      needsPolicies: "Acceptez les politiques mises à jour dans l'application, puis revenez.",
+      backToApp: "Aller sur l'application",
+      retry: "Réessayer",
+    },
+    notFound: {
+      title: "Page introuvable",
+      description: "Cette page n'existe pas ou vos accès ne l'ouvrent pas.",
+      backHome: "Retour à l'accueil",
+    },
+  },
   stepUp: {
     title: "Confirmez que c'est vous",
     description:

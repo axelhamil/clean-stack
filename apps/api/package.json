@@ -70,6 +70,7 @@
     "rate-limiter-flexible": "^11.2.3",
     "resend": "^6.35.0",
     "stripe": "^23.0.1",
+    "tldts": "^7.4.19",
     "zod": "^4.6.7"
   },
   "devDependencies": {

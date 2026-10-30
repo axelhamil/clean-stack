@@ -1,4 +1,9 @@
-import { authorizeStaff, type StaffAccess, type StaffPermission } from "@packages/access-control";
+import {
+  authorizeStaff,
+  STAFF_REFUSAL,
+  type StaffAccess,
+  type StaffPermission,
+} from "@packages/access-control";
 import { AppErrorException, type Option, type Result } from "@packages/ddd-kit";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -28,7 +33,7 @@ export function staffGuards(gate: () => StaffGate) {
     const access = decided.getValue();
     if (access.isNone()) {
       throw new AppErrorException({
-        code: "ADMIN_STAFF_FORBIDDEN",
+        code: STAFF_REFUSAL.notStaff,
         message: "Staff access required.",
       });
     }
@@ -36,7 +41,7 @@ export function staffGuards(gate: () => StaffGate) {
     const staff = access.unwrap();
     if (!staff.mfaOk) {
       throw new AppErrorException({
-        code: "ADMIN_STAFF_MFA_FORBIDDEN",
+        code: STAFF_REFUSAL.mfaMissing,
         message: "Staff access requires two-factor authentication.",
       });
     }
@@ -56,7 +61,7 @@ export function staffGuards(gate: () => StaffGate) {
         const staff = await resolve(c);
         if (!authorizeStaff(staff, permission)) {
           throw new AppErrorException({
-            code: "ADMIN_STAFF_PERMISSION_FORBIDDEN",
+            code: STAFF_REFUSAL.permissionMissing,
             message: `This action requires the ${permission} permission.`,
           });
         }
