@@ -1,9 +1,9 @@
 import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../../../shared/api/errors/toast";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
 import { Can } from "../../../shared/auth/can";

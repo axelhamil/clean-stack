@@ -19,14 +19,14 @@ import {
 } from "@packages/ui/components/ui/table";
 import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { replayDeliveryMutationOptions } from "../api/webhooks.mutations";
 import type { DeliveryListItem } from "../api/webhooks.queries";

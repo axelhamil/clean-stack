@@ -29,6 +29,8 @@ import {
   CommandShortcut,
 } from "@packages/ui/components/ui/command";
 import { CommandHint } from "@packages/ui/components/ui/command-hint";
+import { toastError, toastSuccess } from "@packages/web-kit/api/errors/toast";
+import { useTheme } from "@packages/web-kit/theme/use-theme";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -52,7 +54,6 @@ import {
 } from "lucide-react";
 import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError, toastSuccess } from "../api/errors/toast";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
@@ -60,7 +61,6 @@ import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
 import { useStaffAccess } from "../auth/use-staff-access";
 import { LEGAL_ROUTES } from "../legal-routes";
-import { useTheme } from "../theme/use-theme";
 
 interface CommandShortcutBinding {
   display: string;

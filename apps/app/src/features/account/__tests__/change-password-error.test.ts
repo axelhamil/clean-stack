@@ -1,7 +1,7 @@
 import { createI18n, enCatalog } from "@packages/i18n";
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
 import type { TFunction } from "i18next";
 import { beforeAll, describe, expect, it } from "vitest";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
 import { resolveChangePasswordError } from "../change-password-error";
 
 let tErrors: TFunction<"errors">;

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
+import { LOCALE_COOKIE } from "@packages/web-kit/i18n/locale-cookie";
 import { expect, type Page, test } from "@playwright/test";
-import { LOCALE_COOKIE } from "../src/shared/i18n/locale-cookie";
 import { AUTHENTICATED_PAGES, type AuditedPage, PUBLIC_PAGES } from "./pages";
 import { BASE_URL, STORAGE_STATE } from "./playwright.config";
 

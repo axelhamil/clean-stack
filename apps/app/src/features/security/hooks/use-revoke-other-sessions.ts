@@ -1,12 +1,12 @@
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
-import { toastError } from "../../../shared/api/errors/toast";
 import { sessionsQueryOptions } from "../../../shared/api/queries/sessions";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 
 export function useRevokeOtherSessions() {
   const { t } = useTranslation("settings");

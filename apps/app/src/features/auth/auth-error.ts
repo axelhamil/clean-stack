@@ -1,5 +1,5 @@
+import { messageFromCode, rateLimitedMessage } from "@packages/web-kit/api/errors/messages";
 import type { TFunction } from "i18next";
-import { messageFromCode, rateLimitedMessage } from "../../shared/api/errors/messages";
 import { authClient } from "../../shared/auth/auth-client";
 
 interface BetterAuthError {

@@ -1,9 +1,9 @@
+import { changeLocale } from "@packages/web-kit/i18n/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { sessionQueryOptions } from "../api/queries/session";
 import { isImpersonating } from "../auth/is-impersonating";
-import { changeLocale } from "./i18n";
 import { getChosenLocale, reconcileLocale } from "./locale-reconciliation";
 import { useSetLocaleMutation } from "./use-set-locale-mutation";
 

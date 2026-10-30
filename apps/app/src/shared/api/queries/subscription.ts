@@ -1,7 +1,7 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { queryOptions } from "@tanstack/react-query";
 import { AUTH_QUERY_STALE_TIME_MS } from "../../auth/auth-stale-time";
 import { api } from "../api-client";
-import { throwApiError } from "../errors/api-error";
 import type { EntitlementsView } from "./billing-types";
 
 export const SUBSCRIPTION_QUERY_PREFIX = ["billing", "subscription"] as const;

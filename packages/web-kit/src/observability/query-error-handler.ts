@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { apiErrorFields } from "../api/errors/api-error";
 import { rateLimitedMessage } from "../api/errors/messages";
 import { getErrorsT } from "../i18n/get-errors-t";
+import type { CaptureError } from "./capture-error";
 import { isUnexpectedError, isUnexpectedMutationError } from "./error-classifier";
-import { captureError } from "./sentry";
 
 function errorContext(error: unknown): { status?: number; code?: string } {
   const { status, code } = apiErrorFields(error);
@@ -38,22 +38,26 @@ function notifyIfRateLimited(error: unknown): boolean {
   return true;
 }
 
-export function onQueryError(error: unknown, query: Query<unknown, unknown>): void {
-  if (notifyIfRateLimited(error)) return;
-  if (!isUnexpectedError(error)) return;
-  captureError(error, { queryKey: query.queryKey, ...errorContext(error) });
-}
+export function createQueryErrorHandlers(captureError: CaptureError) {
+  return {
+    onQueryError(error: unknown, query: Query<unknown, unknown>): void {
+      if (notifyIfRateLimited(error)) return;
+      if (!isUnexpectedError(error)) return;
+      captureError(error, { queryKey: query.queryKey, ...errorContext(error) });
+    },
 
-export function onMutationError(
-  error: unknown,
-  _variables: unknown,
-  _onMutateResult: unknown,
-  mutation: Mutation<unknown, unknown>,
-): void {
-  if (notifyIfRateLimited(error)) return;
-  if (!isUnexpectedMutationError(error)) return;
-  captureError(error, {
-    mutationKey: mutation.options.mutationKey ?? null,
-    ...errorContext(error),
-  });
+    onMutationError(
+      error: unknown,
+      _variables: unknown,
+      _onMutateResult: unknown,
+      mutation: Mutation<unknown, unknown>,
+    ): void {
+      if (notifyIfRateLimited(error)) return;
+      if (!isUnexpectedMutationError(error)) return;
+      captureError(error, {
+        mutationKey: mutation.options.mutationKey ?? null,
+        ...errorContext(error),
+      });
+    },
+  };
 }

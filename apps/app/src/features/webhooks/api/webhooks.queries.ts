@@ -1,7 +1,7 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError } from "../../../shared/api/errors/api-error";
 import { type DeliveryFilters, serializeDeliveryFilters } from "../webhook-delivery-filters";
 
 const $listEndpoints = api.settings.webhooks.$get;

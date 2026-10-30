@@ -1,7 +1,7 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../api-client";
-import { throwApiError } from "../errors/api-error";
 
 const $request = api.me.export.$post;
 

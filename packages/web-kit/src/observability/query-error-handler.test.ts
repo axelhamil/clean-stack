@@ -1,11 +1,9 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { onMutationError, onQueryError } from "./query-error-handler";
-import { captureError } from "./sentry";
+import { createQueryErrorHandlers } from "./query-error-handler";
 
-vi.mock("./sentry", () => ({
-  captureError: vi.fn(),
-}));
+const captureError = vi.fn();
+const { onQueryError, onMutationError } = createQueryErrorHandlers(captureError);
 
 function makeClient(): QueryClient {
   return new QueryClient({

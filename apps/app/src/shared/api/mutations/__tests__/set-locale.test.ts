@@ -6,7 +6,7 @@ vi.mock("../../api-client", () => ({
   api: { me: { locale: { $put: (...args: unknown[]) => put(...args) } } },
 }));
 
-import { isUnexpectedMutationError } from "../../../observability/error-classifier";
+import { isUnexpectedMutationError } from "@packages/web-kit/observability/error-classifier";
 import { setLocaleMutationOptions } from "../set-locale";
 
 type SetLocaleFn = (input: { locale: "en" | "fr" }) => Promise<unknown>;

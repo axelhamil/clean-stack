@@ -1,6 +1,6 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { mutationOptions } from "@tanstack/react-query";
 import { api } from "../api-client";
-import { throwApiError } from "../errors/api-error";
 
 const $cancel = api.me.delete.$delete;
 

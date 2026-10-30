@@ -7,6 +7,7 @@ watchPatterns = [
   "apps/app/**",
   "packages/ui/**",
   "packages/access-control/**",
+  "packages/web-kit/**",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
 ]

@@ -2,11 +2,11 @@ import { passkeyClient } from "@better-auth/passkey/client";
 import { ssoClient } from "@better-auth/sso/client";
 import { stripeClient } from "@better-auth/stripe/client";
 import { ac, roles } from "@packages/access-control";
+import { twoFactorPath } from "@packages/web-kit/auth/safe-redirect";
 import type { BetterAuthClientPlugin } from "better-auth/client";
 import { magicLinkClient, organizationClient, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { env } from "../env";
-import { twoFactorPath } from "./safe-redirect";
 
 // Cast erases the $InferServerPlugin field that transitively references stripe SDK
 // types through apps/api/node_modules, preventing TS2883 without a stripe devDep.

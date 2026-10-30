@@ -1,16 +1,14 @@
 import enCatalog from "@packages/i18n/src/catalogs/en";
 import frCatalog from "@packages/i18n/src/catalogs/fr";
 import { describe, expect, it } from "vitest";
-import { signInSchema } from "../../auth/auth.schema";
+import { z } from "zod";
 import { applyZodErrorMap } from "../zod-error-map";
 import { catalogT } from "./catalog-t";
 
+const passwordSchema = z.object({ password: z.string().min(1) });
+
 function passwordIssueMessage() {
-  const result = signInSchema.safeParse({
-    email: "a@b.com",
-    password: "",
-    rememberMe: false,
-  });
+  const result = passwordSchema.safeParse({ password: "" });
   if (result.success) throw new Error("expected the empty password to fail validation");
   const passwordIssue = result.error.issues.find((issue) => issue.path[0] === "password");
   if (!passwordIssue) throw new Error("expected a password issue");

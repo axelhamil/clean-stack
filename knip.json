@@ -51,6 +51,10 @@
       "entry": ["src/**/*.tsx", "src/**/*.ts"],
       "project": ["src/**/*.ts", "src/**/*.tsx"]
     },
+    "packages/web-kit": {
+      "entry": ["src/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "packages/test": {
       "project": ["src/**/*.ts"]
     }

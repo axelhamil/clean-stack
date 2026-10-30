@@ -2,11 +2,12 @@ import { Button } from "@packages/ui/components/ui/button";
 import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-action-dialog";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
@@ -15,7 +16,6 @@ import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-gu
 import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { disconnectScimMutationOptions, issueScimTokenMutationOptions } from "../api/sso.mutations";
 import {

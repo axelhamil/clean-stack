@@ -14,15 +14,15 @@ import {
   TypographyList,
   TypographyMuted,
 } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../api/errors/toast";
 import { upgradeSubscriptionMutationOptions } from "../api/mutations/upgrade-subscription";
 import { plansQueryOptions } from "../api/queries/billing-plans";
 import type { PlanCatalogItem } from "../api/queries/billing-types";
-import { errorFallback } from "../i18n/get-errors-t";
 
 export interface PricingCtaArgs {
   isAuthenticated: boolean | null;

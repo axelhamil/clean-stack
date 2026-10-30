@@ -9,14 +9,14 @@ import {
   SelectValue,
 } from "@packages/ui/components/ui/select";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { changeLocale } from "@packages/web-kit/i18n/i18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
-import { changeLocale } from "../../../shared/i18n/i18n";
 import { useSetLocaleMutation } from "../../../shared/i18n/use-set-locale-mutation";
 
 export function LanguageCard() {

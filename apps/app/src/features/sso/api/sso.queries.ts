@@ -1,9 +1,9 @@
+import { throwApiError, toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError, toAuthClientError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
-import { errorFallback } from "../../../shared/i18n/get-errors-t";
 
 export interface SsoProviderSummary {
   providerId: string;

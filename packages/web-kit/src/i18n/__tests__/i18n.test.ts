@@ -1,6 +1,5 @@
 import { createI18n, loadCatalog, resolveLocale } from "@packages/i18n";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { captureError } from "../../observability/sentry";
 import { initI18n } from "../i18n";
 
 vi.mock("@packages/i18n", () => ({
@@ -10,12 +9,12 @@ vi.mock("@packages/i18n", () => ({
   DEFAULT_LOCALE: "en",
 }));
 
-vi.mock("../../observability/sentry", () => ({ captureError: vi.fn() }));
-
 vi.mock("../locale-cookie", () => ({
   readLocaleCookie: vi.fn(() => undefined),
   writeLocaleCookie: vi.fn(),
 }));
+
+const captureError = vi.fn();
 
 function fakeInstance() {
   return { on: vi.fn(), language: "en" };
@@ -34,7 +33,7 @@ describe("initI18n", () => {
     const instance = fakeInstance();
     vi.mocked(createI18n).mockResolvedValue(instance as never);
 
-    const result = await initI18n();
+    const result = await initI18n(captureError);
 
     expect(result).toBe(instance);
     expect(captureError).not.toHaveBeenCalled();
@@ -50,7 +49,7 @@ describe("initI18n", () => {
     const fallbackInstance = fakeInstance();
     vi.mocked(createI18n).mockResolvedValue(fallbackInstance as never);
 
-    const result = await initI18n();
+    const result = await initI18n(captureError);
 
     expect(result).toBe(fallbackInstance);
     expect(captureError).toHaveBeenCalledTimes(1);
@@ -64,7 +63,7 @@ describe("initI18n", () => {
     const second = new Error("fallback failure");
     vi.mocked(loadCatalog).mockRejectedValueOnce(first).mockRejectedValueOnce(second);
 
-    await expect(initI18n()).rejects.toThrow(second);
+    await expect(initI18n(captureError)).rejects.toThrow(second);
     expect(captureError).toHaveBeenCalledTimes(2);
     expect(captureError).toHaveBeenNthCalledWith(1, first, { stage: "i18n-init" });
     expect(captureError).toHaveBeenNthCalledWith(2, second, { stage: "i18n-init-fallback" });

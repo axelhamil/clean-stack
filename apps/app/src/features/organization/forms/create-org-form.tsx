@@ -9,12 +9,12 @@ import {
   FormMessage,
 } from "@packages/ui/components/ui/form";
 import { Input } from "@packages/ui/components/ui/input";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { createOrgMutationOptions } from "../../../shared/api/mutations/create-org";
 import { type CreateOrgInput, createOrgSchema } from "../../../shared/auth/organization.schema";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
