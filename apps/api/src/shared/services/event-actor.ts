@@ -19,3 +19,16 @@ export function readUserId(payload: unknown, keys: readonly string[]): Option<st
   }
   return Option.none();
 }
+
+/** An explicit null `actorUserId` declares a system action, so `userId` stays the subject. */
+export function readActorId(payload: unknown): Option<string> {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "actorUserId" in payload &&
+    payload.actorUserId === null
+  )
+    return Option.none();
+
+  return readUserId(payload, ACTOR_KEYS);
+}

@@ -133,6 +133,12 @@ describe("AuditEventSubscriber", () => {
     expect(stored[0]).toMatchObject({ actorId: "inviter", actorType: "user" });
   });
 
+  it("keeps a system actor when the payload declares a null actor beside its subject", async () => {
+    await handler().handle(event("e5", { actorUserId: null, userId: "subject" }));
+
+    expect(stored[0]).toMatchObject({ actorId: null, actorType: "system" });
+  });
+
   it("falls back to a system actor when no actor key holds a user id", async () => {
     await handler().handle(event("e5", { actorUserId: "", foo: "bar" }));
 

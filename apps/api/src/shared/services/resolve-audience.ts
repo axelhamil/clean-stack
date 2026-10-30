@@ -3,7 +3,7 @@ import { Option } from "@packages/ddd-kit";
 
 import type { Audience } from "@packages/events";
 import type { DeliveredEvent } from "../ports/outbox.port";
-import { ACTOR_KEYS, readUserId } from "./event-actor";
+import { readActorId, readUserId } from "./event-actor";
 
 export type AudienceTarget =
   | { kind: "user"; userId: string }
@@ -15,7 +15,7 @@ const toUser = (userId: string): AudienceTarget => ({ kind: "user", userId });
 
 export function resolveAudience(audience: Audience, event: DeliveredEvent): Option<AudienceTarget> {
   if (audience === "self") return readUserId(event.payload, SELF_KEYS).map(toUser);
-  if (audience === "actor") return readUserId(event.payload, ACTOR_KEYS).map(toUser);
+  if (audience === "actor") return readActorId(event.payload).map(toUser);
 
   return Option.fromNullable(event.organizationId).map(
     (organizationId): AudienceTarget => ({

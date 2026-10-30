@@ -1578,7 +1578,7 @@ const authOptions = {
           await emit(EventTypes.USER_SIGNED_OUT, "session", session.id, {
             userId: session.userId,
             sessionId: session.id,
-            actorUserId: null,
+            actorUserId: session.userId,
           });
         },
       },
