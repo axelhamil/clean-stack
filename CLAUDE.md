@@ -47,7 +47,7 @@ pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semanti
 
 ## Turborepo
 
-`ui: "tui"`; the daemon is auto-managed. `globalDependencies` (`biome.json`, `pnpm-workspace.yaml`, `.env*`) bust every cache; `inputs` are scoped per task so README and doc edits don't invalidate code caches. `build` declares `with: ["type-check"]` (parallel for free). `dev`, `test:watch` and `db:studio` are `interruptible`.
+`ui: "tui"`; the daemon is auto-managed. `globalDependencies` (`biome.json`, `pnpm-workspace.yaml`, `.env*`) bust every cache; `inputs` are scoped per task so README and doc edits don't invalidate code caches. `type-check` stays an independent task, never a `with` sibling of `build`: the sibling is terminated when `build` exits, so a slow type-check dies without failing the run and the gate passes on broken types. `dev`, `test:watch` and `db:studio` are `interruptible`.
 
 ## Scripts & local infrastructure
 
