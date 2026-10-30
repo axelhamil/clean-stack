@@ -6,9 +6,18 @@ import {
 import { type AppError, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { type EventType, EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import { type ApprovedAction, readApprovedAction } from "../approved-action";
-import type { ListApprovalsInput } from "../dto/list-approvals.dto";
+import type { IStaffStore, StaffStoreError } from "../../../../shared/ports/staff-store.port";
+import { type StaffEnv, staffAccessOf } from "../../../../shared/staff-access";
+import {
+  type ApprovalActor,
+  type ApprovalHandlers,
+  type ApprovedActionOf,
+  type RequestedAction,
+  readApprovedAction,
+} from "../approved-action";
+import { approvalCursorOf, type ListApprovalsInput } from "../dto/list-approvals.dto";
 import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
 import type {
   ApprovalRecord,
@@ -16,20 +25,25 @@ import type {
   IApprovalStore,
 } from "../ports/approval-store.port";
 
-export interface ApprovalEnv {
+export interface ApprovalEnv extends StaffEnv {
   ADMIN_APPROVAL_ENABLED: boolean;
   ADMIN_APPROVAL_ACTIONS: readonly ApprovalAction[];
   ADMIN_APPROVAL_TTL_HOURS: number;
 }
 
 export type ApprovalRequestError =
+  | AppError
   | ApprovalStoreError
   | AdminStoreError
   | AppError<"ADMIN_USER_NOT_FOUND">
   | AppError<"ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN">;
 
 export type ApprovalDecisionError =
+  | AppError
   | ApprovalStoreError
+  | StaffStoreError
+  | AppError<"ADMIN_APPROVAL_SUBJECT_DECISION_FORBIDDEN">
+  | AppError<"ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT">
   | AppError<"ADMIN_APPROVAL_NOT_FOUND">
   | AppError<"ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN">
   | AppError<"ADMIN_APPROVAL_PERMISSION_FORBIDDEN">
@@ -37,11 +51,14 @@ export type ApprovalDecisionError =
   | AppError<"ADMIN_APPROVAL_EXPIRED_CONFLICT">
   | AppError<"ADMIN_APPROVAL_PARAMS_INVALID">;
 
-interface ApprovalRequest {
-  action: ApprovalAction;
-  subjectId: string;
-  params: unknown;
+type ApprovalRequest<K extends ApprovalAction> = RequestedAction<K> & {
   requestedBy: string;
+  requesterPermissions: readonly StaffPermission[];
+};
+
+export interface ApprovalPage {
+  items: ApprovalRecord[];
+  nextCursor: Option<string>;
 }
 
 interface ApprovalDecision {
@@ -55,6 +72,11 @@ interface ApprovalDecision {
 const notFound: AppError<"ADMIN_APPROVAL_NOT_FOUND"> = {
   code: "ADMIN_APPROVAL_NOT_FOUND",
   message: "This approval request does not exist.",
+};
+
+const requesterLost: AppError<"ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT"> = {
+  code: "ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT",
+  message: "The person who asked no longer holds this power, so the request is closed.",
 };
 
 const alreadyDecided: AppError<"ADMIN_APPROVAL_DECIDED_CONFLICT"> = {
@@ -84,15 +106,26 @@ export class ApprovalService {
   constructor(
     private readonly store: IApprovalStore,
     private readonly users: IAdminUserStore,
+    private readonly staff: IStaffStore,
     private readonly outbox: IOutboxRepository,
     private readonly uow: IUnitOfWork,
+    private readonly instrumentation: IInstrumentation,
+    private readonly handlers: ApprovalHandlers,
     private readonly env: ApprovalEnv,
   ) {}
 
-  async gate(input: ApprovalRequest): Promise<Result<Option<string>, ApprovalRequestError>> {
+  async gate<K extends ApprovalAction>(
+    input: ApprovalRequest<K>,
+  ): Promise<Result<Option<string>, ApprovalRequestError>> {
     const listed =
       this.env.ADMIN_APPROVAL_ENABLED && this.env.ADMIN_APPROVAL_ACTIONS.includes(input.action);
     if (!listed) return Result.ok(Option.none());
+
+    const prepared = await this.handlers[input.action].prepare(input, {
+      userId: input.requestedBy,
+      permissions: input.requesterPermissions,
+    });
+    if (prepared.isFailure) return Result.fail(prepared.getError());
 
     if (input.subjectId === input.requestedBy) {
       return Result.fail({
@@ -108,23 +141,45 @@ export class ApprovalService {
     }
 
     return this.uow.run(async (): Promise<Result<Option<string>, ApprovalRequestError>> => {
+      const overdue = await this.store.expireDueFor(input.action, input.subjectId);
+      if (overdue.isFailure) return Result.fail(overdue.getError());
+
+      for (const record of overdue.getValue()) {
+        await this.announce(EventTypes.ADMIN_APPROVAL_EXPIRED, record, { actorUserId: null });
+      }
+
       const created = await this.store.create({
-        ...input,
+        action: input.action,
+        subjectId: input.subjectId,
+        params: prepared.getValue(),
+        requestedBy: input.requestedBy,
         ttlHours: this.env.ADMIN_APPROVAL_TTL_HOURS,
       });
       if (created.isFailure) return Result.fail(created.getError());
 
-      const record = created.getValue();
-      await this.announce(EventTypes.ADMIN_APPROVAL_REQUESTED, record, {
-        actorUserId: input.requestedBy,
-      });
+      const { record, created: isNew } = created.getValue();
+      if (isNew) {
+        await this.announce(EventTypes.ADMIN_APPROVAL_REQUESTED, record, {
+          actorUserId: input.requestedBy,
+        });
+      }
 
       return Result.ok(Option.some(record.id));
     });
   }
 
-  list(input: ListApprovalsInput): Promise<Result<ApprovalRecord[], ApprovalStoreError>> {
-    return this.store.list(input);
+  async list(input: ListApprovalsInput): Promise<Result<ApprovalPage, ApprovalStoreError>> {
+    const found = await this.store.list(input);
+    if (found.isFailure) return Result.fail(found.getError());
+
+    const items = found.getValue();
+    const last = Option.fromNullable(items.at(-1));
+    const isFull = items.length === input.limit;
+
+    return Result.ok({
+      items,
+      nextCursor: last.filter(() => isFull).map(approvalCursorOf),
+    });
   }
 
   async get(id: string): Promise<Result<ApprovalRecord, ApprovalDecisionError>> {
@@ -134,10 +189,7 @@ export class ApprovalService {
     return found.getValue().toResult(notFound);
   }
 
-  async decide<E extends AppError>(
-    input: ApprovalDecision,
-    execute: (approved: ApprovedAction) => Promise<Result<void, E>>,
-  ): Promise<Result<void, ApprovalDecisionError | E>> {
+  async decide(input: ApprovalDecision): Promise<Result<void, ApprovalDecisionError>> {
     const loaded = await this.get(input.approvalId);
     if (loaded.isFailure) return Result.fail(loaded.getError());
 
@@ -145,9 +197,23 @@ export class ApprovalService {
     const refused = this.refusal(record, input);
     if (refused.isSome()) return Result.fail(refused.unwrap());
 
+    const actor = { userId: input.deciderUserId, permissions: input.deciderPermissions };
+    if (input.decision === "approve") {
+      const authorized = await this.handlers[record.action].authorize(record.subjectId, actor);
+      if (authorized.isFailure) return Result.fail(authorized.getError());
+    }
+
+    const holds = await this.requesterHolds(record);
+    if (holds.isFailure) return Result.fail(holds.getError());
+    if (!holds.getValue()) {
+      await this.recordFailure(record, input, requesterLost.code);
+
+      return Result.fail(requesterLost);
+    }
+
     return input.decision === "reject"
       ? this.reject(record, input)
-      : this.approve(record, input, execute);
+      : this.approve(record, input, actor);
   }
 
   async cancel(input: {
@@ -191,11 +257,31 @@ export class ApprovalService {
     return this.store.countDue();
   }
 
+  async closeForDeletedUser(userId: string): Promise<Result<void, ApprovalStoreError>> {
+    return this.uow.run(async (): Promise<Result<void, ApprovalStoreError>> => {
+      const closed = await this.store.closeForDeletedUser(userId);
+      if (closed.isFailure) return Result.fail(closed.getError());
+
+      for (const record of closed.getValue()) {
+        await this.announce(EventTypes.ADMIN_APPROVAL_CANCELLED, record, { actorUserId: null });
+      }
+
+      return Result.ok();
+    });
+  }
+
   private refusal(record: ApprovalRecord, input: ApprovalDecision): Option<ApprovalDecisionError> {
     if (record.requestedBy === input.deciderUserId) {
       return Option.some({
         code: "ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN",
         message: "A different person must decide this request.",
+      });
+    }
+
+    if (record.subjectId === input.deciderUserId) {
+      return Option.some({
+        code: "ADMIN_APPROVAL_SUBJECT_DECISION_FORBIDDEN",
+        message: "Nobody decides a request about their own account.",
       });
     }
 
@@ -213,6 +299,20 @@ export class ApprovalService {
     return Option.none();
   }
 
+  private async requesterHolds(record: ApprovalRecord): Promise<Result<boolean, StaffStoreError>> {
+    const found = await this.staff.findActive(record.requestedBy);
+    if (found.isFailure) return Result.fail(found.getError());
+
+    const unbanned = found.getValue().filter((row) => !row.banned);
+    const permission = APPROVAL_ACTION_PERMISSION[record.action];
+
+    return Result.ok(
+      staffAccessOf({ id: record.requestedBy }, unbanned, this.env)
+        .map((access) => access.permissions.includes(permission))
+        .unwrapOr(false),
+    );
+  }
+
   private reject(
     record: ApprovalRecord,
     input: ApprovalDecision,
@@ -225,42 +325,47 @@ export class ApprovalService {
     });
   }
 
-  private async approve<E extends AppError>(
+  private async approve(
     record: ApprovalRecord,
     input: ApprovalDecision,
-    execute: (approved: ApprovedAction) => Promise<Result<void, E>>,
-  ): Promise<Result<void, ApprovalDecisionError | E>> {
+    actor: ApprovalActor,
+  ): Promise<Result<void, ApprovalDecisionError>> {
     const progress = { claimed: false };
 
-    const outcome = await this.uow.run(
-      async (): Promise<Result<void, ApprovalDecisionError | E>> => {
-        const claimed = await this.claim(record, input, "approved");
-        if (claimed.isFailure) return Result.fail(claimed.getError());
-        progress.claimed = true;
+    const outcome = await this.uow.run(async (): Promise<Result<void, ApprovalDecisionError>> => {
+      const claimed = await this.claim(record, input, "approved");
+      if (claimed.isFailure) return Result.fail(claimed.getError());
+      progress.claimed = true;
 
-        const approved = readApprovedAction(claimed.getValue());
-        if (approved.isFailure) return Result.fail(approved.getError());
+      const approved = readApprovedAction(claimed.getValue());
+      if (approved.isFailure) return Result.fail(approved.getError());
 
-        const executed = await execute(approved.getValue());
-        if (executed.isFailure) return Result.fail(executed.getError());
+      const executed = await this.execute(approved.getValue(), actor);
+      if (executed.isFailure) return Result.fail(executed.getError());
 
-        const { id, version } = claimed.getValue();
-        const marked = await this.store.markExecuted(id, version);
-        if (marked.isFailure) return Result.fail(marked.getError());
-        if (!marked.getValue()) return Result.fail(alreadyDecided);
+      const { id, version } = claimed.getValue();
+      const marked = await this.store.markExecuted(id, version);
+      if (marked.isFailure) return Result.fail(marked.getError());
+      if (!marked.getValue()) return Result.fail(alreadyDecided);
 
-        await this.announce(EventTypes.ADMIN_APPROVAL_EXECUTED, record, {
-          actorUserId: input.deciderUserId,
-        });
+      await this.announce(EventTypes.ADMIN_APPROVAL_EXECUTED, record, {
+        actorUserId: input.deciderUserId,
+      });
 
-        return Result.ok();
-      },
-    );
+      return Result.ok();
+    });
     if (outcome.isSuccess || !progress.claimed) return outcome;
 
     await this.recordFailure(record, input, outcome.getError().code);
 
     return outcome;
+  }
+
+  private execute<K extends ApprovalAction>(
+    approved: ApprovedActionOf<K>,
+    actor: ApprovalActor,
+  ): Promise<Result<void, AppError>> {
+    return this.handlers[approved.action].run(approved, actor);
   }
 
   private async claim(
@@ -291,23 +396,28 @@ export class ApprovalService {
     input: ApprovalDecision,
     reason: string,
   ): Promise<void> {
-    await this.uow.run(async (): Promise<Result<void, ApprovalStoreError>> => {
-      const marked = await this.store.markFailed({
-        id: record.id,
-        decidedBy: input.deciderUserId,
-        note: input.note,
-        reason,
-      });
-      if (marked.isFailure) return Result.fail(marked.getError());
-      if (!marked.getValue()) return Result.ok();
+    try {
+      const recorded = await this.uow.run(async (): Promise<Result<void, ApprovalStoreError>> => {
+        const marked = await this.store.markFailed({
+          id: record.id,
+          decidedBy: input.deciderUserId,
+          note: input.note,
+          reason,
+        });
+        if (marked.isFailure) return Result.fail(marked.getError());
+        if (!marked.getValue()) return Result.ok();
 
-      await this.announce(EventTypes.ADMIN_APPROVAL_FAILED, record, {
-        actorUserId: input.deciderUserId,
-        reason,
-      });
+        await this.announce(EventTypes.ADMIN_APPROVAL_FAILED, record, {
+          actorUserId: input.deciderUserId,
+          reason,
+        });
 
-      return Result.ok();
-    });
+        return Result.ok();
+      });
+      if (recorded.isFailure) this.instrumentation.capture(recorded.getError());
+    } catch (err) {
+      this.instrumentation.capture(err);
+    }
   }
 
   private async announce(

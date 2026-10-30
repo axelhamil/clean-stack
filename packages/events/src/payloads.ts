@@ -523,7 +523,9 @@ export const AdminApprovalDecidedPayload = ActorRef.extend(ApprovalRef.shape).ex
 });
 export type AdminApprovalDecidedPayload = z.infer<typeof AdminApprovalDecidedPayload>;
 
-export const AdminApprovalCancelledPayload = ActorRef.extend(ApprovalRef.shape);
+export const AdminApprovalCancelledPayload = ApprovalRef.extend({
+  actorUserId: z.string().nullable(),
+});
 export type AdminApprovalCancelledPayload = z.infer<typeof AdminApprovalCancelledPayload>;
 
 export const AdminApprovalExpiredPayload = ApprovalRef.extend({

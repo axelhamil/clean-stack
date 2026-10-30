@@ -1,6 +1,6 @@
 import { APPROVAL_ACTIONS } from "@packages/access-control";
 import { z } from "zod";
-import { validateEnvBounds, validateSecuritySignalsEnv } from "./env-bounds";
+import { validateApprovalEnv, validateEnvBounds, validateSecuritySignalsEnv } from "./env-bounds";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -127,7 +127,7 @@ const envSchema = z
       .transform((v) => v !== "false"),
     ADMIN_STEP_UP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     ADMIN_APPROVAL_ENABLED: z
-      .string()
+      .enum(["true", "false"])
       .optional()
       .transform((v) => v === "true"),
     ADMIN_APPROVAL_ACTIONS: z
@@ -172,6 +172,7 @@ const envSchema = z
   })
   .superRefine((value, ctx) => {
     validateEnvBounds(value, ctx);
+    validateApprovalEnv(value, ctx);
     validateSecuritySignalsEnv(value, ctx);
   });
 

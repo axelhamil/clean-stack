@@ -1,8 +1,10 @@
-import type { EventHandler } from "@packages/ddd-kit";
+import { type EventHandler, Result } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
 import { StaffAccessService } from "../../shared/services/staff-access.service";
+import type { ApprovalHandlers } from "./application/approved-action";
+import { closeApprovalsOfDeletedUser } from "./application/event-handlers/close-approvals-of-deleted-user";
 import { notifyImpersonatedUser } from "./application/event-handlers/notify-impersonated-user";
 import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
 import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
@@ -31,7 +33,9 @@ declare module "inwire" {
     IStepUpStore: IStepUpStore;
     StepUpService: StepUpService;
     IApprovalStore: IApprovalStore;
+    ApprovalHandlers: ApprovalHandlers;
     ApprovalService: ApprovalService;
+    CloseApprovalsOfDeletedUser: EventHandler;
     NotifyImpersonatedUser: EventHandler;
   }
 }
@@ -77,17 +81,91 @@ export const adminModule = defineModule()((b) =>
           env,
         ),
     )
-    .add("IApprovalStore", (c): IApprovalStore => new DrizzleApprovalStore(c.IInstrumentation))
+    .add(
+      "IApprovalStore",
+      (c): IApprovalStore => new DrizzleApprovalStore(c.IInstrumentation, c.ITransactionService),
+    )
+    .add(
+      "ApprovalHandlers",
+      (c): ApprovalHandlers => ({
+        "user.ban_permanent": {
+          prepare: async ({ subjectId, params }, actor) => {
+            const refused = await c.StaffService.refuseBan({
+              actorPermissions: actor.permissions,
+              targetUserId: subjectId,
+            });
+
+            return refused.isFailure ? Result.fail(refused.getError()) : Result.ok(params);
+          },
+          authorize: (subjectId, actor) =>
+            c.StaffService.refuseTarget({
+              actorPermissions: actor.permissions,
+              targetUserId: subjectId,
+            }),
+          run: ({ subjectId, params }, actor) =>
+            c.StaffService.moderateBan(
+              { actorPermissions: actor.permissions, targetUserId: subjectId },
+              () =>
+                c.AdminModerationService.ban({
+                  actorUserId: actor.userId,
+                  userId: subjectId,
+                  reason: params.reason,
+                  expiresIn: params.expiresIn,
+                }),
+            ),
+        },
+        "staff.role_change": {
+          prepare: async ({ subjectId, params }, actor) => {
+            const from = await c.StaffService.refuseRoleChange({
+              actorUserId: actor.userId,
+              targetUserId: subjectId,
+              role: params.role,
+            });
+
+            return from.isFailure
+              ? Result.fail(from.getError())
+              : Result.ok({ role: params.role, fromRole: from.getValue().toNull() });
+          },
+          authorize: async () => Result.ok(),
+          run: ({ subjectId, params }, actor) =>
+            c.StaffService.assignRole({
+              actorUserId: actor.userId,
+              targetUserId: subjectId,
+              role: params.role,
+              expectedRole: params.fromRole,
+            }),
+        },
+        "staff.revoke": {
+          prepare: async ({ subjectId, params }, actor) => {
+            const refused = await c.StaffService.refuseRevoke({
+              actorUserId: actor.userId,
+              targetUserId: subjectId,
+            });
+
+            return refused.isFailure ? Result.fail(refused.getError()) : Result.ok(params);
+          },
+          authorize: async () => Result.ok(),
+          run: ({ subjectId }, actor) =>
+            c.StaffService.revoke({ actorUserId: actor.userId, targetUserId: subjectId }),
+        },
+      }),
+    )
     .add(
       "ApprovalService",
       (c) =>
         new ApprovalService(
           c.IApprovalStore,
           c.IAdminUserStore,
+          c.IStaffStore,
           c.IOutboxRepository,
           c.ITransactionService,
+          c.IInstrumentation,
+          c.ApprovalHandlers,
           env,
         ),
+    )
+    .add("CloseApprovalsOfDeletedUser", (c) =>
+      closeApprovalsOfDeletedUser({ ApprovalService: c.ApprovalService }),
     )
     .add("NotifyImpersonatedUser", (c) =>
       notifyImpersonatedUser({

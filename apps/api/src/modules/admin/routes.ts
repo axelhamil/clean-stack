@@ -7,11 +7,11 @@ import { deliverPasswordReset } from "../../shared/auth/password-reset-delivery"
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
-import { banNeedsStepUp, banUserBodySchema } from "./application/dto/ban-user.dto";
+import { banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import type { AdminUserRow } from "./application/ports/admin-user-store.port";
 import type { AdminUserDetail } from "./application/services/admin-query.service";
-import { approvalGate } from "./approval-gate";
+import { gateOr202 } from "./approval-response";
 
 async function findUserOr404(userId: string): Promise<AdminUserDetail> {
   const result = await di.AdminQueryService.getUser(userId);
@@ -72,16 +72,26 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
       const actor = c.get("user");
       const userId = c.req.param("id");
       const body = c.req.valid("json");
-      if (banNeedsStepUp(body)) {
+      const sensitive = await di.StaffService.banIsSensitive({
+        targetUserId: userId,
+        expiresIn: body.expiresIn,
+      });
+      if (sensitive.isFailure) throw new AppErrorException(sensitive.getError());
+
+      if (sensitive.getValue()) {
         await assertStepUp(actor, c.get("session"));
 
-        const pending = await approvalGate({
-          action: "user.ban_permanent",
-          subjectId: userId,
-          params: body,
-          requestedBy: actor.id,
-        });
-        if (pending.isSome()) return c.json({ approvalId: pending.unwrap() }, 202);
+        const pending = gateOr202(
+          c,
+          await di.ApprovalService.gate({
+            action: "user.ban_permanent",
+            subjectId: userId,
+            params: body,
+            requestedBy: actor.id,
+            requesterPermissions: c.get("staff").permissions,
+          }),
+        );
+        if (pending) return pending;
       }
 
       const result = await di.StaffService.moderateBan(

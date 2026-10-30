@@ -110,6 +110,20 @@ export function validateEnvBounds(
   }
 }
 
+export function validateApprovalEnv(
+  value: { ADMIN_APPROVAL_ENABLED: boolean; ADMIN_APPROVAL_ACTIONS: readonly string[] },
+  ctx: z.RefinementCtx,
+): void {
+  if (!value.ADMIN_APPROVAL_ENABLED || value.ADMIN_APPROVAL_ACTIONS.length > 0) return;
+
+  ctx.addIssue({
+    code: "custom",
+    path: ["ADMIN_APPROVAL_ACTIONS"],
+    message:
+      "ADMIN_APPROVAL_ACTIONS is empty while ADMIN_APPROVAL_ENABLED is true: four-eyes would look on and gate nothing.",
+  });
+}
+
 const HTTP_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const DENY_COUNTRY = /^[A-Z][A-Z0-9]$/;
 const DENY_ASN = /^\d{1,10}$/;

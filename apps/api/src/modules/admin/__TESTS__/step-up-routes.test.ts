@@ -36,6 +36,8 @@ mock.module("../../../container", () => ({
     },
     StaffService: {
       moderateBan: async () => Result.ok(),
+      banIsSensitive: async (input: { targetUserId: string; expiresIn?: number }) =>
+        Result.ok(input.expiresIn === undefined || input.targetUserId === "staff-target"),
       assignRole: allowed,
       revoke: allowed,
     },
@@ -76,6 +78,12 @@ function send(method: string, path: string, body?: unknown) {
 
 const GATED: [string, string, string, unknown][] = [
   ["a permanent ban", "POST", "/admin/users/x/ban", { reason: "spam" }],
+  [
+    "a timed ban of a staff member",
+    "POST",
+    "/admin/users/staff-target/ban",
+    { reason: "spam", expiresIn: 3600 },
+  ],
   ["a role change", "PUT", "/admin/staff/x/role", { role: "support" }],
   ["a staff revocation", "DELETE", "/admin/staff/x", undefined],
   ["an impersonation start", "POST", "/admin/impersonation/x/start", { reason: "ticket 42" }],

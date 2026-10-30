@@ -3,14 +3,17 @@ import type { AnyPgColumn, AnyPgTable, SQL } from "@packages/drizzle";
 import { inArray, resolveExecutor, sql } from "@packages/drizzle";
 import type { SweepSpans } from "./sweep-span";
 
-export type PurgeBatchOptions = {
+export type SweepBatch = {
   table: AnyPgTable;
-  /** The primary key, selected by the locking subquery and matched by the delete. */
+  /** The primary key, selected by the locking subquery and matched by the write. */
   idColumn: AnyPgColumn;
   where: SQL;
   /** Oldest-first column, so a truncated run resumes where it stopped. */
   orderBy: AnyPgColumn;
   batchSize: number;
+};
+
+export type PurgeBatchOptions = SweepBatch & {
   spans: SweepSpans;
   uow: IUnitOfWork;
   /**
@@ -57,33 +60,53 @@ export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<nu
   if (!opts.where) {
     throw new Error("purgeBatchWithTimeout: refusing an unfiltered delete");
   }
-  return opts.uow.run(async () => {
+  return withSweepGuards(
+    opts.uow,
+    async (exec) => {
+      const query = exec
+        .delete(opts.table)
+        .where(inArray(opts.idColumn, lockedBatch(exec, opts)))
+        .returning({ id: opts.idColumn });
+
+      const deleted = await opts.spans.db(
+        () => query.toSQL().sql,
+        () => query.execute(),
+      );
+      return deleted.length;
+    },
+    opts.assertGuards,
+  );
+}
+
+/**
+ * The three `SET LOCAL` guards a batched sweep write runs under, for a sweep that writes
+ * something other than a delete. They stay on the surrounding transaction when this joins one.
+ */
+export function withSweepGuards<T>(
+  uow: IUnitOfWork,
+  work: (exec: ReturnType<typeof resolveExecutor>) => Promise<T>,
+  assertGuards?: () => Promise<void>,
+): Promise<T> {
+  return uow.run(async () => {
     const exec = resolveExecutor();
     await exec.execute(sql`SET LOCAL statement_timeout = '5s'`);
     await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
     await exec.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
 
-    if (opts.assertGuards) {
-      await opts.assertGuards();
+    if (assertGuards) {
+      await assertGuards();
     }
 
-    const subq = exec
-      .select({ id: opts.idColumn })
-      .from(opts.table)
-      .where(opts.where)
-      .orderBy(opts.orderBy)
-      .limit(opts.batchSize)
-      .for("update", { skipLocked: true });
-
-    const query = exec
-      .delete(opts.table)
-      .where(inArray(opts.idColumn, subq))
-      .returning({ id: opts.idColumn });
-
-    const deleted = await opts.spans.db(
-      () => query.toSQL().sql,
-      () => query.execute(),
-    );
-    return deleted.length;
+    return work(exec);
   });
+}
+
+export function lockedBatch(exec: ReturnType<typeof resolveExecutor>, batch: SweepBatch) {
+  return exec
+    .select({ id: batch.idColumn })
+    .from(batch.table)
+    .where(batch.where)
+    .orderBy(batch.orderBy)
+    .limit(batch.batchSize)
+    .for("update", { skipLocked: true });
 }

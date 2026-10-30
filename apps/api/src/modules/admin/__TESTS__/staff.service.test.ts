@@ -493,4 +493,65 @@ describe("StaffService", () => {
       expect(listed).toEqual(["kept", "hired"]);
     });
   });
+
+  describe("what a request is refused or stamped with before it queues", () => {
+    it("a timed ban is sensitive on a staff member and over a permanent ban, not otherwise", async () => {
+      const timed = { targetUserId: TARGET, expiresIn: 3600 };
+      const onStaff = await setup({ target: member("support") }).service.banIsSensitive(timed);
+      const overPermanent = await setup({
+        user: Option.some({ ...USER, banned: true }),
+      }).service.banIsSensitive(timed);
+      const overTimed = await setup({
+        user: Option.some({ ...USER, banned: true, banExpires: Option.some(new Date()) }),
+      }).service.banIsSensitive(timed);
+      const onPlainUser = await setup({}).service.banIsSensitive(timed);
+
+      expect(onStaff.getValue()).toBe(true);
+      expect(overPermanent.getValue()).toBe(true);
+      expect(overTimed.getValue()).toBe(false);
+      expect(onPlainUser.getValue()).toBe(false);
+    });
+
+    it("refuses to queue a ban of staff from someone who cannot manage staff", async () => {
+      const { service } = setup({ target: member("manager") });
+
+      const refused = await service.refuseBan({
+        actorPermissions: ["users.moderate"],
+        targetUserId: TARGET,
+      });
+
+      expect(refused.getError().code).toBe("ADMIN_USER_STAFF_TARGET_FORBIDDEN");
+    });
+
+    it("refuses to queue the last manager's demotion and returns the current role otherwise", async () => {
+      const last = setup({ target: member("manager"), managers: onlyTargetManages });
+      const refused = await last.service.refuseRoleChange({ ...change, role: "support" });
+      const open = setup({ target: member("support") });
+      const from = await open.service.refuseRoleChange({ ...change, role: "manager" });
+
+      expect(refused.getError().code).toBe("ADMIN_STAFF_LAST_MANAGER_FORBIDDEN");
+      expect(from.getValue().unwrap()).toBe("support");
+    });
+
+    it("refuses to queue a revocation of someone who is not staff", async () => {
+      const refused = await setup({}).service.refuseRevoke(change);
+
+      expect(refused.getError().code).toBe("ADMIN_STAFF_NOT_FOUND");
+    });
+  });
+
+  describe("assignRole from an approved request", () => {
+    it("fails when the role moved since the request, so a revoked person stays out", async () => {
+      const { store, service } = setup({});
+
+      const result = await service.assignRole({
+        ...change,
+        role: "manager",
+        expectedRole: "support",
+      });
+
+      expect(result.getError().code).toBe("ADMIN_STAFF_ROLE_CHANGED_CONFLICT");
+      expect(store.assign).not.toHaveBeenCalled();
+    });
+  });
 });

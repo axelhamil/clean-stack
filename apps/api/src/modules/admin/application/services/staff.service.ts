@@ -25,6 +25,7 @@ export type StaffChangeError =
   | AppError<"ADMIN_STAFF_LISTED_FORBIDDEN">
   | AppError<"ADMIN_STAFF_LAST_MANAGER_FORBIDDEN">
   | AppError<"ADMIN_STAFF_NOT_FOUND">
+  | AppError<"ADMIN_STAFF_ROLE_CHANGED_CONFLICT">
   | AppError<"ADMIN_USER_NOT_FOUND">;
 
 export type StaffModerationError = StaffStoreError | AppError<"ADMIN_USER_STAFF_TARGET_FORBIDDEN">;
@@ -61,7 +62,7 @@ export class StaffService {
     input: StaffModeration,
     action: () => Promise<Result<void, E>>,
   ): Promise<Result<void, StaffModerationError | E>> {
-    const refused = await this.refusedTarget(input);
+    const refused = await this.refuseTarget(input);
     if (refused.isFailure) return Result.fail(refused.getError());
 
     return action();
@@ -72,31 +73,79 @@ export class StaffService {
     ban: () => Promise<Result<void, E>>,
   ): Promise<Result<void, StaffBanError | E>> {
     return this.uow.run(async (): Promise<Result<void, StaffBanError | E>> => {
-      const managers = await this.store.lockActiveManagers();
-      if (managers.isFailure) return Result.fail(managers.getError());
-
-      const target = await this.grantingRow(input.targetUserId);
-      if (target.isFailure) return Result.fail(target.getError());
-
-      const refused = this.refusedOn(input, target.getValue());
+      const refused = await this.banRefusal(input);
       if (refused.isFailure) return Result.fail(refused.getError());
-
-      const isManager =
-        this.isListed(input.targetUserId) ||
-        target
-          .getValue()
-          .filter((row) => row.role === "manager")
-          .isSome();
-      if (isManager && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
-        return Result.fail(lastManager());
-      }
 
       return ban();
     });
   }
 
-  async assignRole(
+  refuseBan(input: StaffModeration): Promise<Result<void, StaffBanError>> {
+    return this.uow.run(() => this.banRefusal(input));
+  }
+
+  async banIsSensitive(input: {
+    targetUserId: string;
+    expiresIn?: number;
+  }): Promise<Result<boolean, StaffStoreError | AdminStoreError>> {
+    if (input.expiresIn === undefined || this.isListed(input.targetUserId)) return Result.ok(true);
+
+    const staff = await this.grantingRow(input.targetUserId);
+    if (staff.isFailure) return Result.fail(staff.getError());
+    if (staff.getValue().isSome()) return Result.ok(true);
+
+    const found = await this.users.findUserById(input.targetUserId);
+    if (found.isFailure) return Result.fail(found.getError());
+
+    return Result.ok(
+      found
+        .getValue()
+        .map((user) => user.banned && user.banExpires.isNone())
+        .unwrapOr(false),
+    );
+  }
+
+  async refuseRoleChange(
     input: StaffChange & { role: StaffRole },
+  ): Promise<Result<Option<StaffRole>, StaffChangeError>> {
+    const refused = this.refusedChange(input);
+    if (refused.isFailure) return Result.fail(refused.getError());
+
+    return this.uow.run(async (): Promise<Result<Option<StaffRole>, StaffChangeError>> => {
+      const managers = await this.store.lockActiveManagers();
+      if (managers.isFailure) return Result.fail(managers.getError());
+
+      const found = await this.grantingRow(input.targetUserId);
+      if (found.isFailure) return Result.fail(found.getError());
+
+      const from = found.getValue().map((row) => row.role);
+      const demotesManager = from.filter((role) => role === "manager").isSome();
+      if (
+        demotesManager &&
+        input.role !== "manager" &&
+        isLastManager(input.targetUserId, managers.getValue(), this.env)
+      ) {
+        return Result.fail(lastManager());
+      }
+
+      return Result.ok(from);
+    });
+  }
+
+  async refuseRevoke(input: StaffChange): Promise<Result<void, StaffChangeError>> {
+    const refused = this.refusedChange(input);
+    if (refused.isFailure) return refused;
+
+    return this.uow.run(async (): Promise<Result<void, StaffChangeError>> => {
+      const role = await this.revocableRole(input);
+      if (role.isFailure) return Result.fail(role.getError());
+
+      return Result.ok();
+    });
+  }
+
+  async assignRole(
+    input: StaffChange & { role: StaffRole; expectedRole?: StaffRole | null },
   ): Promise<Result<void, StaffChangeError>> {
     const refused = this.refusedChange(input);
     if (refused.isFailure) return refused;
@@ -107,6 +156,17 @@ export class StaffService {
 
       const found = await this.grantingRow(input.targetUserId);
       if (found.isFailure) return Result.fail(found.getError());
+
+      const current = found
+        .getValue()
+        .map((row) => row.role)
+        .toNull();
+      if (input.expectedRole !== undefined && input.expectedRole !== current) {
+        return Result.fail({
+          code: "ADMIN_STAFF_ROLE_CHANGED_CONFLICT",
+          message: "This person's access changed since the request was made. Ask again.",
+        });
+      }
 
       if (found.getValue().isNone()) return this.add(input);
 
@@ -156,21 +216,10 @@ export class StaffService {
     if (refused.isFailure) return refused;
 
     return this.uow.run(async (): Promise<Result<void, StaffChangeError>> => {
-      const managers = await this.store.lockActiveManagers();
-      if (managers.isFailure) return Result.fail(managers.getError());
+      const revocable = await this.revocableRole(input);
+      if (revocable.isFailure) return Result.fail(revocable.getError());
 
-      const found = await this.grantingRow(input.targetUserId);
-      if (found.isFailure) return Result.fail(found.getError());
-
-      if (found.getValue().isNone()) {
-        return Result.fail({ code: "ADMIN_STAFF_NOT_FOUND", message: "Not a staff member." });
-      }
-
-      const { role } = found.getValue().unwrap();
-      if (role === "manager" && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
-        return Result.fail(lastManager());
-      }
-
+      const role = revocable.getValue();
       const revoked = await this.store.revoke(input.targetUserId);
       if (revoked.isFailure) return Result.fail(revoked.getError());
 
@@ -182,6 +231,48 @@ export class StaffService {
 
       return Result.ok();
     });
+  }
+
+  private async banRefusal(input: StaffModeration): Promise<Result<void, StaffBanError>> {
+    const managers = await this.store.lockActiveManagers();
+    if (managers.isFailure) return Result.fail(managers.getError());
+
+    const target = await this.grantingRow(input.targetUserId);
+    if (target.isFailure) return Result.fail(target.getError());
+
+    const refused = this.refusedOn(input, target.getValue());
+    if (refused.isFailure) return Result.fail(refused.getError());
+
+    const isManager =
+      this.isListed(input.targetUserId) ||
+      target
+        .getValue()
+        .filter((row) => row.role === "manager")
+        .isSome();
+    if (isManager && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
+      return Result.fail(lastManager());
+    }
+
+    return Result.ok();
+  }
+
+  private async revocableRole(input: StaffChange): Promise<Result<StaffRole, StaffChangeError>> {
+    const managers = await this.store.lockActiveManagers();
+    if (managers.isFailure) return Result.fail(managers.getError());
+
+    const found = await this.grantingRow(input.targetUserId);
+    if (found.isFailure) return Result.fail(found.getError());
+
+    if (found.getValue().isNone()) {
+      return Result.fail({ code: "ADMIN_STAFF_NOT_FOUND", message: "Not a staff member." });
+    }
+
+    const { role } = found.getValue().unwrap();
+    if (role === "manager" && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
+      return Result.fail(lastManager());
+    }
+
+    return Result.ok(role);
   }
 
   private async add(
@@ -240,7 +331,7 @@ export class StaffService {
     return Result.ok(found.getValue().filter((row) => grantsStaffAccess(row, this.env)));
   }
 
-  private async refusedTarget(input: StaffModeration): Promise<Result<void, StaffModerationError>> {
+  async refuseTarget(input: StaffModeration): Promise<Result<void, StaffModerationError>> {
     const target = await this.grantingRow(input.targetUserId);
     if (target.isFailure) return Result.fail(target.getError());
 

@@ -471,11 +471,11 @@ Internal, compliance retention. The subject is the actor, so `userId` stands for
 
 ### Via `ApprovalService` (Phase K)
 
-Internal, compliance retention, forced notifications to whoever holds `approvals.decide` and the requester, minus the actor (audience `{ staff: "approvals.decide" }`). `userId` is the subject of the action, `requesterUserId` who asked, `actorUserId` who acted. Base payload: `{ actorUserId: string, userId: string, approvalId: string, action: string, requesterUserId: string }`. The action's own event (`admin.user.banned`, `admin.staff.role_changed`, `admin.staff.revoked`) names the approver as its actor.
+Internal, compliance retention, forced notifications to whoever holds `approvals.decide` and the requester, minus the actor and the subject (audience `{ staff: "approvals.decide" }`). `userId` is the subject of the action, `requesterUserId` who asked, `actorUserId` who acted. Base payload: `{ actorUserId: string, userId: string, approvalId: string, action: string, requesterUserId: string }`. The action's own event (`admin.user.banned`, `admin.staff.role_changed`, `admin.staff.revoked`) names the approver as its actor.
 
 - `ADMIN_APPROVAL_REQUESTED` (`admin.approval.requested`): a gated route stored a pending request instead of acting.
 - `ADMIN_APPROVAL_DECIDED` (`admin.approval.decided`): approved or rejected, in the unit of the claim. Adds `outcome: "approved" | "rejected"`, `note: string`. Rolled back with an action that fails, `failed` then speaks for the decision.
-- `ADMIN_APPROVAL_CANCELLED` (`admin.approval.cancelled`): the requester withdrew their own request.
+- `ADMIN_APPROVAL_CANCELLED` (`admin.approval.cancelled`): the requester withdrew their own request, or the requester or subject was deleted (system action, `actorUserId: null`).
 - `ADMIN_APPROVAL_EXPIRED` (`admin.approval.expired`): `POST /internal/sweep-admin-approvals` passed the deadline. System action, `actorUserId: null`.
 - `ADMIN_APPROVAL_EXECUTED` (`admin.approval.executed`): the action ran, same unit as the action and its own event.
 - `ADMIN_APPROVAL_FAILED` (`admin.approval.failed`): the action or its stored params were refused at execution; the first unit rolled back and a second one wrote this. Adds `reason: string` (the error code).

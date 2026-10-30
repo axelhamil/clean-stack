@@ -1,23 +1,32 @@
+import type { ApprovalAction } from "@packages/access-control";
 import { isApprovalAction } from "@packages/access-control";
-import { Option, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import {
   and,
-  count,
   desc,
   eq,
   gt,
   inArray,
   lt,
+  or,
   resolveExecutor,
   sql,
   staffSchema,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
+import { countEligibleWithTimeout } from "../../../../shared/internal-routes/sweep-count";
+import {
+  lockedBatch,
+  requireFilter,
+  withSweepGuards,
+} from "../../../../shared/internal-routes/sweep-purge";
+import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListApprovalsInput } from "../../application/dto/list-approvals.dto";
 import {
   APPROVAL_STATUSES,
   type ApprovalClaim,
+  type ApprovalCreation,
   type ApprovalFailure,
   type ApprovalRecord,
   type ApprovalStatus,
@@ -72,28 +81,62 @@ function firstOf(rows: (typeof table.$inferSelect)[]): Option<ApprovalRecord> {
 }
 
 const pendingAndLive = and(eq(table.status, "pending"), gt(table.expiresAt, DB_NOW));
-const pendingAndDue = and(eq(table.status, "pending"), lt(table.expiresAt, DB_NOW));
+const pendingAndDue = requireFilter(
+  and(eq(table.status, "pending"), lt(table.expiresAt, DB_NOW)),
+  "sweep-admin-approvals",
+);
+const CREATE_ATTEMPTS = 3;
+const EXPIRED = { status: "expired", decidedAt: DB_NOW, version: NEXT_VERSION };
 
 export class DrizzleApprovalStore implements IApprovalStore {
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  constructor(
+    private readonly instrumentation: IInstrumentation,
+    private readonly uow: IUnitOfWork,
+  ) {}
 
-  create(input: ApprovalWrite): Promise<Result<ApprovalRecord, ApprovalStoreError>> {
+  create(input: ApprovalWrite): Promise<Result<ApprovalCreation, ApprovalStoreError>> {
     return this.traced("create", "approval create failed", async (exec) => {
-      const rows = await this.query(
-        exec
-          .insert(table)
-          .values({
-            id: crypto.randomUUID(),
-            action: input.action,
-            subjectId: input.subjectId,
-            params: input.params,
-            requestedBy: input.requestedBy,
-            expiresAt: sql`now() + make_interval(hours => ${input.ttlHours}::int)`,
-          })
-          .returning(),
-      );
+      for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
+        const inserted = firstOf(
+          await this.query(
+            exec
+              .insert(table)
+              .values({
+                id: crypto.randomUUID(),
+                action: input.action,
+                subjectId: input.subjectId,
+                params: input.params,
+                requestedBy: input.requestedBy,
+                expiresAt: sql`now() + make_interval(hours => ${input.ttlHours}::int)`,
+              })
+              .onConflictDoNothing({
+                target: [table.action, table.subjectId],
+                where: eq(table.status, "pending"),
+              })
+              .returning(),
+          ),
+        );
+        if (inserted.isSome()) return { record: inserted.unwrap(), created: true };
 
-      return firstOf(rows).unwrap();
+        const open = firstOf(
+          await this.query(
+            exec
+              .select()
+              .from(table)
+              .where(
+                and(
+                  eq(table.action, input.action),
+                  eq(table.subjectId, input.subjectId),
+                  eq(table.status, "pending"),
+                ),
+              )
+              .limit(1),
+          ),
+        );
+        if (open.isSome()) return { record: open.unwrap(), created: false };
+      }
+
+      throw new Error("the open request kept settling while a new one was being stored");
     });
   }
 
@@ -114,10 +157,15 @@ export class DrizzleApprovalStore implements IApprovalStore {
           .where(
             and(
               input.status ? eq(table.status, input.status) : undefined,
-              input.cursor ? lt(table.createdAt, new Date(input.cursor)) : undefined,
+              input.cursor
+                ? or(
+                    lt(table.createdAt, input.cursor.createdAt),
+                    and(eq(table.createdAt, input.cursor.createdAt), lt(table.id, input.cursor.id)),
+                  )
+                : undefined,
             ),
           )
-          .orderBy(desc(table.createdAt))
+          .orderBy(desc(table.createdAt), desc(table.id))
           .limit(input.limit),
       );
 
@@ -198,23 +246,34 @@ export class DrizzleApprovalStore implements IApprovalStore {
   }
 
   expireDue(limit: number): Promise<Result<ApprovalRecord[], ApprovalStoreError>> {
-    return this.traced("expireDue", "approval expiry failed", async (exec) => {
+    return this.traced("expireDue", "approval expiry failed", () =>
+      withSweepGuards(this.uow, async (exec) => {
+        const batch = lockedBatch(exec, {
+          table,
+          idColumn: table.id,
+          where: pendingAndDue,
+          orderBy: table.expiresAt,
+          batchSize: limit,
+        });
+        const rows = await this.query(
+          exec.update(table).set(EXPIRED).where(inArray(table.id, batch)).returning(),
+        );
+
+        return recordsOf(rows);
+      }),
+    );
+  }
+
+  expireDueFor(
+    action: ApprovalAction,
+    subjectId: string,
+  ): Promise<Result<ApprovalRecord[], ApprovalStoreError>> {
+    return this.traced("expireDueFor", "approval expiry failed", async (exec) => {
       const rows = await this.query(
         exec
           .update(table)
-          .set({ status: "expired", decidedAt: DB_NOW, version: NEXT_VERSION })
-          .where(
-            inArray(
-              table.id,
-              exec
-                .select({ id: table.id })
-                .from(table)
-                .where(pendingAndDue)
-                .orderBy(table.expiresAt)
-                .limit(limit)
-                .for("update", { skipLocked: true }),
-            ),
-          )
+          .set(EXPIRED)
+          .where(and(eq(table.action, action), eq(table.subjectId, subjectId), pendingAndDue))
           .returning(),
       );
 
@@ -223,12 +282,29 @@ export class DrizzleApprovalStore implements IApprovalStore {
   }
 
   countDue(): Promise<Result<number, ApprovalStoreError>> {
-    return this.traced("countDue", "approval count failed", async (exec) => {
-      const [row] = await this.query(
-        exec.select({ value: count() }).from(table).where(pendingAndDue),
-      );
+    return this.traced("countDue", "approval count failed", () =>
+      countEligibleWithTimeout(table, pendingAndDue, sweepSpans(this.instrumentation), this.uow),
+    );
+  }
 
-      return row?.value ?? 0;
+  closeForDeletedUser(userId: string): Promise<Result<ApprovalRecord[], ApprovalStoreError>> {
+    return this.traced("closeForDeletedUser", "approval closure failed", async (exec) => {
+      const rows = await exec
+        .update(table)
+        .set({ status: "cancelled", decidedAt: DB_NOW, version: NEXT_VERSION })
+        .where(
+          and(
+            eq(table.status, "pending"),
+            or(eq(table.subjectId, userId), eq(table.requestedBy, userId)),
+          ),
+        )
+        .returning();
+      await exec
+        .update(table)
+        .set({ params: {}, decisionNote: null })
+        .where(eq(table.subjectId, userId));
+
+      return recordsOf(rows);
     });
   }
 

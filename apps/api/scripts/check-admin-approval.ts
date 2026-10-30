@@ -5,15 +5,35 @@
  * the decision, and who the notification reaches. Creates and removes its own probe users.
  */
 
-import { createOTP } from "@better-auth/utils/otp";
-import { and, authSchema, db, eq, notificationSchema, staffSchema } from "@packages/drizzle";
+import { authorizeStaff } from "@packages/access-control";
+import { Option, Result } from "@packages/ddd-kit";
+import {
+  and,
+  authSchema,
+  db,
+  eq,
+  inArray,
+  notificationSchema,
+  resolveExecutor,
+  sql,
+  staffSchema,
+} from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { di } from "../src/container";
 import { adminInternalRoutes } from "../src/modules/admin/internal.routes";
-import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
-import { type AdminProbe, type AppCall, adminProbes, appCall, codeOf } from "./admin-probes";
+import { staffRecipients } from "../src/shared/services/staff-recipients";
+import { staffAccessOf } from "../src/shared/staff-access";
+import {
+  type AdminProbe,
+  type AppCall,
+  adminProbes,
+  appCall,
+  codeAt,
+  codeOf,
+  currentCounter,
+} from "./admin-probes";
 import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
@@ -36,8 +56,7 @@ interface Staff {
 async function confirm(probe: AdminProbe): Promise<Staff> {
   const cookie = await probes.sessionCookie(probe);
   await probes.enrolTwoFactor(probe);
-  const counter = Math.floor(Date.now() / 1000 / (TOTP_OPTIONS.period ?? 30));
-  const code = await createOTP(probe.totpSecret, TOTP_OPTIONS).hotp(counter);
+  const code = await codeAt(probe, currentCounter());
   const confirmed = await appCall(cookie, "POST", "/admin/step-up", { code });
   if (confirmed.status !== 200) throw new Error(`step-up refused: ${confirmed.status}`);
 
@@ -253,18 +272,34 @@ async function proveExpiry(): Promise<void> {
 
 async function proveFailureRollsBackThenMarks(): Promise<void> {
   const requester = await manager("failure-requester");
-  const approver = await moderatorApprover("failure-approver");
+  const approver = await manager("failure-approver");
   const target = await probes.user("failure-target");
-  const id = await requestBan(requester, target.id);
   await db.insert(staffMember).values({ userId: target.id, role: "support", source: "console" });
+  const asked = await appCall(requester.cookie, "PUT", `/admin/staff/${target.id}/role`, {
+    role: "manager",
+  });
+  const id = asked.body.approvalId ?? "";
+  check(
+    "the request stores the role it starts from",
+    JSON.stringify((await rowOf(id)).params).includes('"fromRole":"support"'),
+  );
+  await db
+    .update(staffMember)
+    .set({ revokedAt: new Date() })
+    .where(eq(staffMember.userId, target.id));
 
   const refused = await decide(approver, id);
   check(
-    "the staff target guard runs at execution",
-    codeOf(refused) === "ADMIN_USER_STAFF_TARGET_FORBIDDEN",
+    "an old request cannot resurrect a revoked person",
+    codeOf(refused) === "ADMIN_STAFF_ROLE_CHANGED_CONFLICT",
     refused.body,
   );
-  check("the action left nothing", (await banOf(target.id)) === false);
+  check("the action left nothing", (await staffRole(target.id)) === "support");
+  const [held] = await db
+    .select({ revokedAt: staffMember.revokedAt })
+    .from(staffMember)
+    .where(eq(staffMember.userId, target.id));
+  check("the person stays revoked", held?.revokedAt instanceof Date);
   check(
     "the rolled back decision left no event",
     (await eventsOf(EventTypes.ADMIN_APPROVAL_DECIDED, target.id, id)).length === 0,
@@ -274,7 +309,7 @@ async function proveFailureRollsBackThenMarks(): Promise<void> {
   check("a second unit marks it failed", row.status === "failed", row.status);
   check(
     "the reason is stored",
-    row.failureReason === "ADMIN_USER_STAFF_TARGET_FORBIDDEN",
+    row.failureReason === "ADMIN_STAFF_ROLE_CHANGED_CONFLICT",
     row.failureReason,
   );
   check("the failure names who decided", row.decidedBy === approver.probe.id);
@@ -284,6 +319,396 @@ async function proveFailureRollsBackThenMarks(): Promise<void> {
   );
   const again = await decide(await manager("failure-second"), id);
   check("a failed request stays closed", codeOf(again) === "ADMIN_APPROVAL_DECIDED_CONFLICT");
+}
+
+async function moderator(name: string): Promise<Staff> {
+  const probe = await probes.manager(name);
+  await db.update(staffMember).set({ role: "support" }).where(eq(staffMember.userId, probe.id));
+
+  return confirm(probe);
+}
+
+async function proveSubjectStaysOut(): Promise<void> {
+  const requester = await manager("subject-requester");
+  const subject = await manager("subject-target");
+  const id = await requestBan(requester, subject.probe.id);
+
+  for (const decision of ["approve", "reject"]) {
+    const refused = await decide(subject, id, decision);
+    check(
+      `the subject cannot ${decision} a request about themselves`,
+      codeOf(refused) === "ADMIN_APPROVAL_SUBJECT_DECISION_FORBIDDEN",
+      refused.body,
+    );
+  }
+  check("the subject's refusal leaves it pending", (await rowOf(id)).status === "pending");
+
+  const requested = EventTypes.ADMIN_APPROVAL_REQUESTED;
+  await di.NotificationFanoutSubscriber.handle({
+    eventId: crypto.randomUUID(),
+    eventType: requested,
+    aggregateId: id,
+    aggregateType: "admin_approval",
+    payload: {
+      approvalId: id,
+      action: "user.ban_permanent",
+      requesterUserId: requester.probe.id,
+      userId: subject.probe.id,
+      actorUserId: requester.probe.id,
+    },
+    dateOccurred: new Date(),
+  });
+  check(
+    "a staff subject is left out of the notice",
+    !(await hasNotification(subject.probe.id, requested)),
+  );
+}
+
+async function proveBanGateCoversEveryBypass(): Promise<void> {
+  const requester = await manager("bypass-requester");
+  const staffTarget = await probes.manager("bypass-staff");
+  const timed = { reason: "probe", expiresIn: 3600 };
+
+  const onStaff = await appCall(
+    requester.cookie,
+    "POST",
+    `/admin/users/${staffTarget.id}/ban`,
+    timed,
+  );
+  check("a timed ban of staff waits for a colleague", onStaff.status === 202, onStaff.body);
+  check("the timed ban of staff has not landed", (await banOf(staffTarget.id)) === false);
+
+  const unconfirmedManager = await probes.manager("bypass-unconfirmed");
+  const unconfirmed = await appCall(
+    await probes.sessionCookie(unconfirmedManager),
+    "POST",
+    `/admin/users/${staffTarget.id}/ban`,
+    timed,
+  );
+  check("a timed ban of staff asks for a step-up", unconfirmed.status === 403, unconfirmed.status);
+
+  const permanent = await probes.user("bypass-permanent");
+  await db
+    .update(authSchema.user)
+    .set({ banned: true, banExpires: null })
+    .where(eq(authSchema.user.id, permanent.id));
+  const replaced = await appCall(
+    requester.cookie,
+    "POST",
+    `/admin/users/${permanent.id}/ban`,
+    timed,
+  );
+  check("a timed ban over a permanent one waits", replaced.status === 202, replaced.body);
+  const [still] = await db
+    .select({ banExpires: authSchema.user.banExpires })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, permanent.id));
+  check("the permanent ban stands meanwhile", still?.banExpires === null);
+
+  const plain = await probes.user("bypass-plain");
+  const open = await appCall(requester.cookie, "POST", `/admin/users/${plain.id}/ban`, timed);
+  check("a timed ban of a plain user stays direct", open.status === 200, open.body);
+}
+
+async function proveImpossibleRequestsAreNotQueued(): Promise<void> {
+  const support = await moderator("queue-support");
+  const staffTarget = await probes.manager("queue-staff");
+  const fromSupport = await appCall(support.cookie, "POST", `/admin/users/${staffTarget.id}/ban`, {
+    reason: "probe",
+  });
+  check(
+    "support cannot queue a ban of a manager",
+    codeOf(fromSupport) === "ADMIN_USER_STAFF_TARGET_FORBIDDEN",
+    fromSupport.body,
+  );
+
+  const requester = await manager("queue-requester");
+  const plain = await probes.user("queue-plain");
+  const notStaff = await appCall(requester.cookie, "DELETE", `/admin/staff/${plain.id}`);
+  check(
+    "a revocation of a non staff is refused at once",
+    codeOf(notStaff) === "ADMIN_STAFF_NOT_FOUND",
+    notStaff.body,
+  );
+
+  const self = await appCall(requester.cookie, "DELETE", `/admin/staff/${requester.probe.id}`);
+  check(
+    "a self revocation keeps its own code",
+    codeOf(self) === "ADMIN_STAFF_SELF_CHANGE_FORBIDDEN",
+    self.body,
+  );
+
+  const listedId = requester.probe.id;
+  const colleague = await manager("queue-colleague");
+  const previous = env.PLATFORM_ADMIN_IDS;
+  Object.assign(env, { PLATFORM_ADMIN_IDS: [listedId] });
+  const onListed = await appCall(colleague.cookie, "DELETE", `/admin/staff/${listedId}`);
+  Object.assign(env, { PLATFORM_ADMIN_IDS: previous });
+  check(
+    "a listed id cannot be queued for revocation",
+    codeOf(onListed) === "ADMIN_STAFF_LISTED_FORBIDDEN",
+    onListed.body,
+  );
+
+  const rows = await db
+    .select({ id: adminApproval.id })
+    .from(adminApproval)
+    .where(inArray(adminApproval.subjectId, [staffTarget.id, plain.id, listedId]));
+  check("none of them stored a request", rows.length === 0, rows);
+}
+
+async function proveOnePendingPerPair(): Promise<void> {
+  const requesters = await Promise.all(
+    Array.from({ length: RACERS }, (_, n) => manager(`pair-requester-${n}`)),
+  );
+  const target = await probes.user("pair-target");
+
+  const asked = await Promise.all(requesters.map((requester) => requestBan(requester, target.id)));
+  check("racing requests all answer the same id", new Set(asked).size === 1, asked);
+  const rows = await db.select().from(adminApproval).where(eq(adminApproval.subjectId, target.id));
+  check("one row is stored", rows.length === 1, rows.length);
+  const id = asked[0] ?? "";
+  check(
+    "one request is announced",
+    (await eventsOf(EventTypes.ADMIN_APPROVAL_REQUESTED, target.id, id)).length === 1,
+  );
+
+  const atDatabase = await db
+    .insert(adminApproval)
+    .values({
+      id: crypto.randomUUID(),
+      action: "user.ban_permanent",
+      subjectId: target.id,
+      params: {},
+      requestedBy: requesters[0]?.probe.id ?? "",
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    .then(
+      () => "written",
+      (err: { cause?: { constraint?: string } }) => err.cause?.constraint,
+    );
+  check(
+    "the database refuses a second one",
+    atDatabase === "admin_approval_one_pending_uq",
+    atDatabase,
+  );
+
+  await db
+    .update(adminApproval)
+    .set({ expiresAt: new Date(Date.now() - 60_000) })
+    .where(eq(adminApproval.id, id));
+  const fresh = requesters[0] ? await requestBan(requesters[0], target.id) : "";
+  check("an overdue request does not block a new one", fresh !== id);
+  check("the overdue one is closed", (await rowOf(id)).status === "expired");
+  check(
+    "its expiry is announced",
+    (await eventsOf(EventTypes.ADMIN_APPROVAL_EXPIRED, target.id, id)).length === 1,
+  );
+}
+
+async function proveStaleRequesterClosesTheRow(): Promise<void> {
+  const requester = await manager("stale-requester");
+  const approver = await manager("stale-approver");
+  const target = await probes.user("stale-target");
+  const id = await requestBan(requester, target.id);
+  await db
+    .update(staffMember)
+    .set({ revokedAt: new Date() })
+    .where(eq(staffMember.userId, requester.probe.id));
+
+  const refused = await decide(approver, id);
+  check(
+    "a revoked requester's request dies",
+    codeOf(refused) === "ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT",
+    refused.body,
+  );
+  const row = await rowOf(id);
+  check(
+    "the row closes as failed with that reason",
+    row.status === "failed" && row.failureReason === "ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT",
+    row,
+  );
+  check("the stale request ran nothing", (await banOf(target.id)) === false);
+}
+
+async function proveUnderpoweredDeciderKeepsTheRow(): Promise<void> {
+  const requester = await manager("power-requester");
+  const approver = await moderatorApprover("power-approver");
+  const target = await probes.user("power-target");
+  const id = await requestBan(requester, target.id);
+  await db.insert(staffMember).values({ userId: target.id, role: "support", source: "console" });
+
+  const refused = await decide(approver, id);
+  check(
+    "a decider without power over the target is refused",
+    codeOf(refused) === "ADMIN_USER_STAFF_TARGET_FORBIDDEN",
+    refused.body,
+  );
+  check("the row stays pending", (await rowOf(id)).status === "pending");
+  const winner = await manager("power-winner");
+  check("a colleague with the power can still decide", (await decide(winner, id)).status === 200);
+}
+
+async function proveDeletedUserKeepsTheAudit(): Promise<void> {
+  const requester = await manager("gone-requester");
+  const approver = await manager("gone-approver");
+  const settled = await probes.user("gone-settled");
+  const open = await probes.user("gone-open");
+  const decided = await requestBan(requester, settled.id);
+  await decide(approver, decided, "reject");
+  const pending = await requestBan(requester, open.id);
+
+  const close = di.CloseApprovalsOfDeletedUser;
+  await close.handle({
+    eventId: crypto.randomUUID(),
+    eventType: EventTypes.USER_DELETED,
+    aggregateId: open.id,
+    dateOccurred: new Date(),
+    payload: { userId: open.id, deletedAt: new Date() },
+  });
+  const row = await rowOf(pending);
+  check("a deleted subject's open request is cancelled", row.status === "cancelled", row.status);
+  check("its free text is erased", JSON.stringify(row.params) === "{}", row.params);
+  check(
+    "the cancellation is announced with no actor",
+    JSON.stringify(await eventsOf(EventTypes.ADMIN_APPROVAL_CANCELLED, open.id, pending)).includes(
+      '"actorUserId":null',
+    ),
+  );
+
+  await db.delete(authSchema.user).where(eq(authSchema.user.id, settled.id));
+  await db.delete(authSchema.user).where(eq(authSchema.user.id, approver.probe.id));
+  const kept = await rowOf(decided);
+  check("a removed user row leaves the history", kept.subjectId === settled.id);
+  check("the decider's id stays on it", kept.decidedBy === approver.probe.id);
+}
+
+async function proveListKeyset(): Promise<void> {
+  const requester = await manager("page-requester");
+  const targets = await Promise.all([probes.user("page-a"), probes.user("page-b")]);
+  const ids = await Promise.all(targets.map((target) => requestBan(requester, target.id)));
+  const sameInstant = new Date();
+  await db
+    .update(adminApproval)
+    .set({ createdAt: sameInstant })
+    .where(inArray(adminApproval.id, ids));
+
+  const seen: string[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 2; page++) {
+    const query: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+    const answer = await appCall(requester.cookie, "GET", `/admin/approvals?limit=1${query}`);
+    const { items = [], nextCursor = null } = answer.body;
+    seen.push(...items.map((item) => item.id));
+    cursor = nextCursor;
+  }
+  check(
+    "two requests of the same instant are each listed once",
+    ids.every((id) => seen.filter((other) => other === id).length === 1),
+    seen,
+  );
+}
+
+async function proveSweepGuards(): Promise<void> {
+  const settings = await di.ITransactionService.run(async () => {
+    await di.IApprovalStore.expireDue(1);
+    const exec = resolveExecutor();
+    const expiry = await exec.execute(sql`SELECT current_setting('lock_timeout') AS value`);
+    await di.IApprovalStore.countDue();
+    const counted = await exec.execute(sql`SELECT current_setting('statement_timeout') AS value`);
+
+    return Result.ok({ expiry: expiry.rows[0], counted: counted.rows[0] });
+  });
+  const value = settings.getValue();
+  check("the expiry runs under the lock guard", value.expiry?.value === "500ms", value.expiry);
+  check("the count runs under its timeout", value.counted?.value === "10s", value.counted);
+}
+
+async function proveRecipientParity(): Promise<void> {
+  const permission = "approvals.decide";
+  const now = new Date();
+  const past = new Date(now.getTime() - 60_000);
+  const fixtures = await Promise.all(
+    ["role", "no-role", "grant", "deny", "expired", "revoked", "env", "listed", "listed-env"].map(
+      (name) => probes.user(`parity-${name}`),
+    ),
+  );
+  const named = (name: string) => {
+    const found = fixtures.find((fixture) => fixture.id.endsWith(`parity-${name}`));
+    if (!found) throw new Error(`no fixture ${name}`);
+
+    return found.id;
+  };
+  const row = (name: string, role: "manager" | "auditor", source: "console" | "env") => ({
+    userId: named(name),
+    role,
+    source,
+  });
+  await db
+    .insert(staffMember)
+    .values([
+      row("role", "manager", "console"),
+      row("no-role", "auditor", "console"),
+      row("grant", "auditor", "console"),
+      row("deny", "manager", "console"),
+      row("expired", "auditor", "console"),
+      { ...row("revoked", "manager", "console"), revokedAt: past },
+      row("env", "manager", "env"),
+      row("listed-env", "manager", "env"),
+    ]);
+  await grant(named("grant"), permission, "grant");
+  await grant(named("deny"), permission, "deny");
+  await db.insert(staffPermissionOverride).values({
+    id: crypto.randomUUID(),
+    userId: named("expired"),
+    permission,
+    effect: "grant",
+    expiresAt: past,
+  });
+  await db
+    .update(authSchema.user)
+    .set({ twoFactorEnabled: true })
+    .where(inArray(authSchema.user.id, [named("role"), named("listed")]));
+
+  const ids = fixtures.map((fixture) => fixture.id);
+  for (const requireMfa of [false, true]) {
+    const staffEnv = {
+      PLATFORM_ADMIN_IDS: [named("listed"), named("listed-env")],
+      PLATFORM_ADMIN_REQUIRE_MFA: requireMfa,
+    };
+    const recipients = staffRecipients(
+      {
+        kind: "staff",
+        permission,
+        requesterUserId: Option.none(),
+        actorUserId: Option.none(),
+        subjectUserId: Option.none(),
+      },
+      staffEnv,
+    );
+    const answered = await db.execute(sql`SELECT user_id FROM ${recipients} AS r`);
+    const fromSql = answered.rows
+      .map((rowOfSql) => String(rowOfSql.user_id))
+      .filter((id) => ids.includes(id))
+      .sort();
+
+    const decided: string[] = [];
+    for (const id of ids) {
+      const [user] = await db
+        .select({ twoFactorEnabled: authSchema.user.twoFactorEnabled })
+        .from(authSchema.user)
+        .where(eq(authSchema.user.id, id));
+      const found = await di.IStaffStore.findActive(id);
+      const access = staffAccessOf({ id, ...user }, found.getValue(), staffEnv).toNull();
+      if (authorizeStaff(access, permission)) decided.push(id);
+    }
+
+    check(
+      `the audience matches staffAccessOf with MFA ${requireMfa ? "required" : "optional"}`,
+      JSON.stringify(fromSql) === JSON.stringify(decided.sort()),
+      { fromSql, decided },
+    );
+  }
 }
 
 async function proveParamsRevalidated(): Promise<void> {
@@ -473,6 +898,16 @@ async function main(): Promise<void> {
   await provePermissionLost();
   await proveRejectCancelAndRoleChange();
   await proveWhoIsNotified();
+  await proveSubjectStaysOut();
+  await proveBanGateCoversEveryBypass();
+  await proveImpossibleRequestsAreNotQueued();
+  await proveOnePendingPerPair();
+  await proveStaleRequesterClosesTheRow();
+  await proveUnderpoweredDeciderKeepsTheRow();
+  await proveDeletedUserKeepsTheAudit();
+  await proveListKeyset();
+  await proveSweepGuards();
+  await proveRecipientParity();
   await probes.cleanup();
 
   if (checks.failures > 0) {

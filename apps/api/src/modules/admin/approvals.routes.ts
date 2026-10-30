@@ -11,7 +11,6 @@ import { zV } from "../../shared/validator";
 import { decideApprovalBodySchema } from "./application/dto/decide-approval.dto";
 import { listApprovalsQuerySchema } from "./application/dto/list-approvals.dto";
 import type { ApprovalRecord } from "./application/ports/approval-store.port";
-import { runApprovedAction } from "./approved-action-runner";
 
 function serializeApproval(record: ApprovalRecord) {
   return {
@@ -42,13 +41,9 @@ export const adminApprovalRoutes = new Hono<{ Variables: AuthVariables }>()
       const result = await di.ApprovalService.list(input);
       if (result.isFailure) throw new AppErrorException(result.getError());
 
-      const items = result.getValue();
-      const last = items.at(-1);
+      const { items, nextCursor } = result.getValue();
 
-      return c.json({
-        items: items.map(serializeApproval),
-        nextCursor: items.length === input.limit && last ? last.createdAt.toISOString() : null,
-      });
+      return c.json({ items: items.map(serializeApproval), nextCursor: nextCursor.toNull() });
     },
   )
   .get("/:id", requireAuth, requireStaffPermission("approvals.decide"), async (c) => {
@@ -64,16 +59,12 @@ export const adminApprovalRoutes = new Hono<{ Variables: AuthVariables }>()
     requireStepUp,
     zV("json", decideApprovalBodySchema),
     async (c) => {
-      const decider = { userId: c.get("user").id, permissions: c.get("staff").permissions };
-      const result = await di.ApprovalService.decide(
-        {
-          approvalId: c.req.param("id"),
-          deciderUserId: decider.userId,
-          deciderPermissions: decider.permissions,
-          ...c.req.valid("json"),
-        },
-        (approved) => runApprovedAction(approved, decider),
-      );
+      const result = await di.ApprovalService.decide({
+        approvalId: c.req.param("id"),
+        deciderUserId: c.get("user").id,
+        deciderPermissions: c.get("staff").permissions,
+        ...c.req.valid("json"),
+      });
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       return c.json({ ok: true });

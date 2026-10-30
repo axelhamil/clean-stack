@@ -1,5 +1,5 @@
 {
-  "id": "50d6bef4-8943-42c5-9946-66972fa51a75",
+  "id": "cbe14269-ef8a-4b87-80b8-4d91fc9e87c4",
   "prevId": "8415b6ce-e39e-4c1f-a860-dd424f7a126e",
   "version": "7",
   "dialect": "postgresql",
@@ -4263,7 +4263,7 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp with time zone",
+          "type": "timestamp (3) with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
@@ -4312,55 +4312,43 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "admin_approval_one_pending_uq": {
+          "name": "admin_approval_one_pending_uq",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "subject_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"admin_approval\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
-      "foreignKeys": {
-        "admin_approval_subject_id_user_id_fk": {
-          "name": "admin_approval_subject_id_user_id_fk",
-          "tableFrom": "admin_approval",
-          "tableTo": "user",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "admin_approval_requested_by_user_id_fk": {
-          "name": "admin_approval_requested_by_user_id_fk",
-          "tableFrom": "admin_approval",
-          "tableTo": "user",
-          "columnsFrom": [
-            "requested_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "admin_approval_decided_by_user_id_fk": {
-          "name": "admin_approval_decided_by_user_id_fk",
-          "tableFrom": "admin_approval",
-          "tableTo": "user",
-          "columnsFrom": [
-            "decided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

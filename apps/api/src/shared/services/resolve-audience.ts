@@ -13,6 +13,7 @@ export type AudienceTarget =
       permission: StaffPermission;
       requesterUserId: Option<string>;
       actorUserId: Option<string>;
+      subjectUserId: Option<string>;
     };
 
 const SELF_KEYS = ["userId", "ownerUserId"] as const;
@@ -28,6 +29,7 @@ export function resolveAudience(audience: Audience, event: DeliveredEvent): Opti
       permission: audience.staff,
       requesterUserId: readUserId(event.payload, ["requesterUserId"]),
       actorUserId: readActorId(event.payload),
+      subjectUserId: readUserId(event.payload, ["userId"]),
     });
   }
 

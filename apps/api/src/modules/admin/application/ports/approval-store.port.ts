@@ -54,8 +54,13 @@ export interface ApprovalFailure {
   reason: string;
 }
 
+export interface ApprovalCreation {
+  record: ApprovalRecord;
+  created: boolean;
+}
+
 export interface IApprovalStore {
-  create(input: ApprovalWrite): Promise<Result<ApprovalRecord, ApprovalStoreError>>;
+  create(input: ApprovalWrite): Promise<Result<ApprovalCreation, ApprovalStoreError>>;
   find(id: string): Promise<Result<Option<ApprovalRecord>, ApprovalStoreError>>;
   list(input: ListApprovalsInput): Promise<Result<ApprovalRecord[], ApprovalStoreError>>;
   claim(input: ApprovalClaim): Promise<Result<Option<ApprovalRecord>, ApprovalStoreError>>;
@@ -66,5 +71,10 @@ export interface IApprovalStore {
   markExecuted(id: string, version: number): Promise<Result<boolean, ApprovalStoreError>>;
   markFailed(input: ApprovalFailure): Promise<Result<boolean, ApprovalStoreError>>;
   expireDue(limit: number): Promise<Result<ApprovalRecord[], ApprovalStoreError>>;
+  expireDueFor(
+    action: ApprovalAction,
+    subjectId: string,
+  ): Promise<Result<ApprovalRecord[], ApprovalStoreError>>;
+  closeForDeletedUser(userId: string): Promise<Result<ApprovalRecord[], ApprovalStoreError>>;
   countDue(): Promise<Result<number, ApprovalStoreError>>;
 }

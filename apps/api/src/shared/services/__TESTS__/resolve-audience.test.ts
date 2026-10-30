@@ -69,6 +69,7 @@ describe("resolveAudience", () => {
     if (target?.kind !== "staff") throw new Error("expected a staff target");
     expect(target.requesterUserId.unwrap()).toBe("r");
     expect(target.actorUserId.isNone()).toBe(true);
+    expect(target.subjectUserId.unwrap()).toBe("subject");
   });
 
   test("an org audience without organizationId targets nobody", () => {

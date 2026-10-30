@@ -127,6 +127,12 @@ export default {
       "Ce code n'est pas valide. Vérifiez votre application d'authentification.",
     ADMIN_STEP_UP_REPLAY_INVALID: "Ce code a déjà servi. Attendez le suivant.",
     ADMIN_STEP_UP_SESSION_NOT_FOUND: "Cette session est terminée. Reconnectez-vous.",
+    ADMIN_APPROVAL_SUBJECT_DECISION_FORBIDDEN:
+      "Personne ne décide une demande qui concerne son propre compte.",
+    ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT:
+      "Le demandeur n'a plus ce pouvoir, la demande est donc close.",
+    ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
+      "Les accès de cette personne ont changé depuis la demande. Refaites-la.",
     ADMIN_APPROVAL_NOT_FOUND: "Cette demande d'approbation n'existe plus.",
     ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN:
       "Vous ne pouvez pas demander cette action sur votre propre compte.",

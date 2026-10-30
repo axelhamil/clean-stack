@@ -4,6 +4,7 @@ import {
   EMAIL_SEND_TIMEOUT_SECONDS,
   EMAIL_SETTLE_MARGIN_SECONDS,
   OUTBOX_SETTLE_MARGIN_SECONDS,
+  validateApprovalEnv,
   validateEnvBounds,
   WEBHOOK_DNS_TIMEOUT_SECONDS,
   WEBHOOK_FETCH_TIMEOUT_SECONDS,
@@ -201,5 +202,26 @@ describe("validateEnvBounds", () => {
 
     expect(atFloor.success).toBe(true);
     expect(below.success).toBe(false);
+  });
+});
+
+describe("validateApprovalEnv", () => {
+  const schema = z
+    .object({
+      ADMIN_APPROVAL_ENABLED: z.boolean(),
+      ADMIN_APPROVAL_ACTIONS: z.array(z.string()),
+    })
+    .superRefine(validateApprovalEnv);
+
+  it("refuses four-eyes switched on with nothing to gate", () => {
+    const parsed = schema.safeParse({ ADMIN_APPROVAL_ENABLED: true, ADMIN_APPROVAL_ACTIONS: [] });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("lets an empty list stand while four-eyes is off", () => {
+    const parsed = schema.safeParse({ ADMIN_APPROVAL_ENABLED: false, ADMIN_APPROVAL_ACTIONS: [] });
+
+    expect(parsed.success).toBe(true);
   });
 });
