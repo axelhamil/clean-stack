@@ -18,7 +18,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 |---|---|---|---|---|
 | 1 | **Phase J** | Delivered | Front redesign on shadcn/ui, one design system in `@packages/ui`: sober tool direction, every screen rebuilt | The cloner's first impression is the app shell |
 | 2 | **Tooltips pass** | Delivered | Tooltips and contextual help everywhere they add something: icon-only buttons, truncated values, disabled controls, technical terms | A dense pro tool must explain itself in place; today most icons and truncated values say nothing on hover or focus |
-| 3 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
+| 3 | **Review pass** | Delivered | End-to-end review of the server surface, the customer screens and the clone path, defects fixed | The only thing between "feature-complete" and "clone-ready" |
 | 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Open | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 
@@ -55,10 +55,10 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Review pass
 
-- **Status**: open, not a code task.
+- **Status**: delivered. Open: admin actions commit before their event is written, handled in Phase K.
 - **Date**: after Phase J.
 - **Why**: the shipped surface has been audited by phase and by tooling, never read end to end by its owner.
-- **Scope**: full manual review of the shipped surface, owned by @axelhamil.
+- **Scope**: delegated review of the server surface, the customer screens and the clone path, each defect verified then fixed with its test.
 - **References**: [`docs/SURFACE.md`](docs/SURFACE.md), [`docs/FEATURES.md`](docs/FEATURES.md).
 
 ---
@@ -88,7 +88,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
   - **Step-up**: sensitive actions require a recent sign-in and answer a typed error that opens a confirmation dialog.
   - **Four-eyes**: a pending decision approved by a different person, with expiry and an override that requires a note, applied to account deletion, mass ban and role change. Thresholds are configuration.
   - **Screens**: inbox of what waits for the team, accounts and organizations with a 360 detail and staff notes, audit viewer with chain verify, platform operations (dead outbox events and their requeue, Stripe event replay, job heartbeats), plan override with an end date, team, `Ctrl K` palette, saved views, live updates over SSE.
-  - **Rails**: every staff action emits a typed event carrying `actorUserId` in the same transaction, like any other state change.
+  - **Rails**: every staff action emits a typed event carrying `actorUserId` in the same transaction, like any other state change. Today ban, role change and impersonation commit on the auth library's connection and emit afterwards, so a failed emit leaves the action with no audit row; this phase closes that.
 - **Out of scope**: moderation cases and lanes, QA calibration, moderator wellbeing, holds and takedowns, linked-account clusters, content workspace, growth prospects, integrations rollout, AI support assistant, Discord commands: all OpenUp business.
 - **Done when**: no admin route or screen remains in `apps/app`; a test covers each permission against each staff route, refusal included; the accessibility gate and `docs/SURFACE.md` parity cover the new app; a real two-person approval and a real step-up are proved in the browser at 390, 768 and 1440 px.
 - **References**: [`docs/FEATURES.md`](docs/FEATURES.md), `apps/api/src/modules/admin/`, `apps/api/src/shared/middleware/platform-admin.middleware.ts`.
