@@ -7,6 +7,7 @@ interface BetterAuthError {
   message?: string;
   code?: string;
   providerId?: string;
+  error?: { code?: string };
 }
 
 /**
@@ -21,8 +22,9 @@ export function resolveAuthError(
   tErrors: TFunction<"errors">,
 ): string {
   if (error.status === 429) return rateLimitedMessage(tErrors);
-  if (error.code) {
-    const mapped = messageFromCode(error.code, tErrors);
+  const code = error.code ?? error.error?.code;
+  if (code) {
+    const mapped = messageFromCode(code, tErrors);
     if (mapped) return mapped;
   }
   return t(fallbackKey as never);

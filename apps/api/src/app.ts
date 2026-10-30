@@ -56,7 +56,10 @@ import {
   GLOBAL_POLICY,
   type PolicyConfig,
   SCIM_POLICY,
+  visitorCapRoutes,
 } from "./shared/middleware/rate-limit.policies";
+import { resolveVisitorGeo } from "./shared/middleware/visitor-geo";
+import type { VisitorGeo } from "./shared/ports/ip-geo.port";
 import { runWithRequestContext } from "./shared/request-context";
 
 type AppEnv = {
@@ -72,7 +75,14 @@ const apiTokenPepper = env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-producti
 
 /** A rate limit whose first block also lands on the security event rail. */
 const securityRateLimit = (policy: PolicyConfig) =>
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, policy);
+  requireRateLimit(
+    {
+      limiter: di.IRateLimiter,
+      outbox: di.IOutboxRepository,
+      captcha: { service: di.ICaptchaService, usage: di.IRateLimiter },
+    },
+    policy,
+  );
 
 // Cookie-authenticated mutation surfaces: every one gets the Origin check.
 const CSRF_GUARDED_PATHS = [
@@ -106,6 +116,7 @@ const AUTH_RATE_LIMITS: ReadonlyArray<readonly [path: string, policy: PolicyConf
   ["/reset-password", AUTH_RESET_PASSWORD_POLICY],
   ["/passkey/verify-authentication", AUTH_PASSKEY_POLICY],
   ["/scim/*", SCIM_POLICY],
+  ...visitorCapRoutes(env.ACCOUNTS_PER_VISITOR_MAX, env.ACCOUNTS_PER_VISITOR_WINDOW_SEC),
 ];
 
 app.route("/", healthRoutes);
@@ -119,9 +130,11 @@ app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_
 app.use("*", requestId());
 app.use("*", (c, next) => {
   let clientIp: string | undefined;
+  let visitorGeo: VisitorGeo | undefined;
   const context = {
     requestId: c.get("requestId"),
     clientIp: () => (clientIp ??= resolveClientIp(c)),
+    visitorGeo: () => (visitorGeo ??= resolveVisitorGeo(c, di.IIpGeoService)),
   };
 
   return runWithRequestContext(context, next);

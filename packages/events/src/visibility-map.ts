@@ -58,6 +58,8 @@ export const VISIBILITY = {
   "security.password.breached": "internal",
   "security.signup.rejected": "internal",
   "security.operator.audit_accessed": "internal",
+  "security.impossible_travel.detected": "internal",
+  "security.geo.denied": "internal",
   "billing.subscription.created": "public",
   "billing.subscription.updated": "public",
   "billing.subscription.cancelled": "public",

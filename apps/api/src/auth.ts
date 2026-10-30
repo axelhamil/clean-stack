@@ -13,7 +13,12 @@ import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
-import { type BetterAuthOptions, betterAuth } from "better-auth";
+import {
+  type BetterAuthOptions,
+  type BetterAuthPlugin,
+  betterAuth,
+  type GenericEndpointContext,
+} from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import {
@@ -80,9 +85,10 @@ import {
 } from "./shared/middleware/impersonation-blocklist";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
 import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
-import { getClientIp } from "./shared/request-context";
+import { getClientIp, getVisitorGeo } from "./shared/request-context";
 
 const isProd = env.NODE_ENV === "production";
+const OAUTH_CALLBACK_PATH = "/callback/:id";
 
 /**
  * Derives a stable idempotency key from an opaque BetterAuth token so that
@@ -408,6 +414,53 @@ function requestClientIp(): string | null {
   return getClientIp()?.slice(0, 45) ?? null;
 }
 
+async function refuseDeniedVisitor(path: string, actorUserId: string | null): Promise<void> {
+  const refusal = await di.SecuritySignalsService.refuseDenied({
+    visitor: getVisitorGeo(),
+    ip: requestClientIp(),
+    path,
+    actorUserId,
+  });
+  if (refusal.isSuccess) return;
+
+  const { code, message } = refusal.getError();
+  throw new APIError("FORBIDDEN", { code, message });
+}
+
+function renewsOwnSession(context: GenericEndpointContext | null, userId: string): boolean {
+  return context?.context.session?.user.id === userId;
+}
+
+function provisionsForSomeoneElse(path: string | undefined): boolean {
+  return path === "/admin/create-user" || path === SCIM_PATHS.users;
+}
+
+const securitySignalsPlugin = {
+  id: "security-signals",
+  hooks: {
+    after: [
+      {
+        matcher: () => true,
+        handler: createAuthMiddleware(async (ctx) => {
+          const signedIn = ctx.context.newSession;
+          if (!signedIn || ctx.path === IMPERSONATE_PATH) return;
+          if (renewsOwnSession(ctx, signedIn.user.id)) return;
+
+          const { returned } = ctx.context;
+          if (returned instanceof APIError && Number(returned.statusCode) >= 400) return;
+
+          await di.SecuritySignalsService.reportImpossibleTravel({
+            userId: signedIn.user.id,
+            sessionId: signedIn.session.id,
+            ip: signedIn.session.ipAddress ?? null,
+            visitor: getVisitorGeo(),
+          });
+        }),
+      },
+    ],
+  },
+} satisfies BetterAuthPlugin;
+
 async function acceptStalePoliciesAtFirstVerification(userId: string): Promise<void> {
   const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
   if (stale.isFailure) {
@@ -660,6 +713,9 @@ const authOptions = {
       enabled: true,
       maxAge: 60,
     },
+    additionalFields: {
+      country: { type: "string", required: false, returned: false, input: false },
+    },
   },
 
   advanced: {
@@ -732,6 +788,7 @@ const authOptions = {
     }),
     bearer(),
     twoFactor({ totpOptions: TOTP_OPTIONS }),
+    securitySignalsPlugin,
     magicLink({
       sendMagicLink: async ({ email, token, url }) => {
         const magicUrl = `${env.APP_URL}/magic-link?token=${encodeURIComponent(token)}${redirectQuery(url)}`;
@@ -962,12 +1019,20 @@ const authOptions = {
         }
       }
 
+      const emailBearingPaths = ["/sign-in/email", "/sign-up/email", "/sign-in/magic-link"];
+      if (
+        emailBearingPaths.includes(path) ||
+        isSsoCallbackPath(path) ||
+        path === OAUTH_CALLBACK_PATH
+      ) {
+        await refuseDeniedVisitor(path, null);
+      }
+
       // SSO enforcement: an org whose domain is verified and enforced rejects every
       // non-SSO email-bearing sign-in/sign-up path. Placed before the rate-limit
       // branch below, that branch `return`s for "/sign-in/email", so anything
       // added after it never runs for that path. Passkey (no email) is closed
       // separately in `databaseHooks.session.create.before`.
-      const emailBearingPaths = ["/sign-in/email", "/sign-up/email", "/sign-in/magic-link"];
       if (emailBearingPaths.includes(path)) {
         const candidateEmail = body?.email as string | undefined;
         if (candidateEmail) {
@@ -1377,6 +1442,11 @@ const authOptions = {
   databaseHooks: {
     user: {
       create: {
+        before: async (_user, context) => {
+          if (provisionsForSomeoneElse(context?.path)) return;
+
+          await refuseDeniedVisitor(context?.path ?? "user", null);
+        },
         after: async (user) => {
           try {
             await ensurePersonalOrgFor(user.id, { email: user.email, name: user.name });
@@ -1422,6 +1492,10 @@ const authOptions = {
           // Impersonation is exempt because it is not the enforced user authenticating:
           // the session is minted for a platform admin who already passed the admin
           // gate, and blocking it would only remove a support capability.
+          if (context?.path !== IMPERSONATE_PATH && !renewsOwnSession(context, session.userId)) {
+            await refuseDeniedVisitor(context?.path ?? "session", session.userId);
+          }
+
           const createdBySso =
             isSsoCallbackPath(context?.path) || context?.path === IMPERSONATE_PATH;
           if (!createdBySso) {
@@ -1438,7 +1512,11 @@ const authOptions = {
           }
 
           // BetterAuth fills ipAddress from raw X-Forwarded-For; keep the trusted-proxy value instead.
-          const trusted = { ...session, ipAddress: requestClientIp() };
+          const trusted = {
+            ...session,
+            ipAddress: requestClientIp(),
+            ...di.SecuritySignalsService.sessionFields(getVisitorGeo()),
+          };
           if (session.activeOrganizationId) return { data: trusted };
 
           try {

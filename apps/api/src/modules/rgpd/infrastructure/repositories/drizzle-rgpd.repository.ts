@@ -153,6 +153,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               createdAt: schema.session.createdAt,
               expiresAt: schema.session.expiresAt,
               ipAddress: schema.session.ipAddress,
+              country: schema.session.country,
               userAgent: schema.session.userAgent,
             })
             .from(schema.session)
@@ -205,6 +206,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               createdAt: s.createdAt.toISOString(),
               expiresAt: s.expiresAt.toISOString(),
               ipAddress: s.ipAddress,
+              country: s.country,
               userAgent: s.userAgent,
             })),
             memberships: memberships.map((m) => ({

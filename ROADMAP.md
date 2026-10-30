@@ -2,7 +2,7 @@
 
 What is left for clean-stack, then one line per shipped phase. Every phase follows the same shape: title, status, date, why, scope, references. As-built detail lives in [`docs/HISTORY.md`](docs/HISTORY.md), the current inventory in [`docs/FEATURES.md`](docs/FEATURES.md) and the guided tour in [`docs/OVERVIEW.md`](docs/OVERVIEW.md). DDD stays reserved for the pure business domain.
 
-Event catalog today: 86 events, 35 public, 51 internal (counted from `packages/events/src/event-types.ts` and `visibility-map.ts`). Phases below give the events they added, never a running total.
+Event catalog today: 88 events, 35 public, 53 internal (counted from `packages/events/src/event-types.ts` and `visibility-map.ts`). Phases below give the events they added, never a running total.
 
 > **Boilerplate target**: clone, then ship any SaaS without re-coding plumbing. Anything below that is not shipped is friction the cloner inherits, which is why the open list stays short.
 
@@ -19,7 +19,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 1 | **Phase J** | Delivered | Front redesign on shadcn/ui, one design system in `@packages/ui`: sober tool direction, every screen rebuilt | The cloner's first impression is the app shell |
 | 2 | **Tooltips pass** | Delivered | Tooltips and contextual help everywhere they add something: icon-only buttons, truncated values, disabled controls, technical terms | A dense pro tool must explain itself in place; today most icons and truncated values say nothing on hover or focus |
 | 3 | **Review pass** | Delivered | End-to-end review of the server surface, the customer screens and the clone path, defects fixed | The only thing between "feature-complete" and "clone-ready" |
-| 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
+| 4 | **C.1 remainder** | Delivered | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Open | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
@@ -65,12 +65,12 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Security perimeter remainder: **Phase C.1**
 
-- **Status**: open, S1 to S5a shipped (see the table below).
-- **Date**: when real traffic exists.
-- **Why**: both items need real traffic to calibrate the false-positive rate (VPN and carrier NAT break geo heuristics; device fingerprints are bypassable).
+- **Status**: delivered, every signal off by default. Open: the thresholds are starting points, to calibrate on real traffic.
+- **Date**: Oct 2026, ahead of real traffic, so that a cloner only has to switch the flags on.
+- **Why**: both items need real traffic to calibrate their false-positive rate, hence off by default (VPN and carrier NAT break geo heuristics; device fingerprints are bypassable).
 - **Scope**:
   - **Behavioural signals (S5b)**: impossible travel on sign-in (`session.ipAddress` and `userAgent` are already stored), accounts-per-visitor cap, env-driven country and ASN deny-list. Each emits a `security.*` event.
-  - **Captcha hook (S6)**: `ICaptchaService` port (Turnstile or hCaptcha free tier), invoked when `requireRateLimit` enters a near-cap state (above 80 % of the window), env-flagged.
+  - **Captcha hook (S6)**: `ICaptchaService` port (Turnstile or hCaptcha free tier), invoked when `requireRateLimit` enters a near-cap state (above 80 % of the window), env-flagged. The widget is left to the cloner ([`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)).
 - **References**: [Security perimeter C.1](docs/HISTORY.md#security-perimeter-rate-limit--csp--csrf--phase-c1--jun-2026).
 
 ---
@@ -113,7 +113,7 @@ Status is shipped for every row. "Detail" links the as-built record.
 | **App shell and command palette** | Jun 2026 | One navigation model | Top nav, settings tabs, view-transition theme, command palette | [HISTORY](docs/HISTORY.md#app-shell-top-nav--k-command-palette-) |
 | **A.1: Profile and NIST password** | Jun 2026 | Rectification (Art. 16) and a modern password policy | `ProfileCard`, `ChangePasswordCard`, HIBP k-anonymity, 15 characters minimum, ban list, 2 compliance events | [HISTORY](docs/HISTORY.md#right-to-rectification-art-16--nist-800-63b-4--phase-a1--jun-2026) |
 | **A.2: Privacy and Terms versioning** | Jun 2026 | Prove which version a user accepted | `@packages/policies`, `policy_acceptance`, `/legal/accept` gate, `requireCurrentPolicies`, 1 event | [HISTORY](docs/HISTORY.md#privacy--terms-versioning--phase-a2--jun-2026) |
-| **C.1: Security perimeter (S1 to S5a)** | Jun to Jul 2026 | Abuse resistance by default | Fail-closed rate limit with IETF headers, strict CSP through Caddy nonce, Origin-based CSRF, per-account counter, disposable-email block, HIBP telemetry, 5 `security.*` events. S5b and S6 remain above | [HISTORY](docs/HISTORY.md#security-perimeter-rate-limit--csp--csrf--phase-c1--jun-2026) |
+| **C.1: Security perimeter (S1 to S5a)** | Jun to Jul 2026 | Abuse resistance by default | Fail-closed rate limit with IETF headers, strict CSP through Caddy nonce, Origin-based CSRF, per-account counter, disposable-email block, HIBP telemetry, 5 `security.*` events. S5b and S6 delivered later, see above | [HISTORY](docs/HISTORY.md#security-perimeter-rate-limit--csp--csrf--phase-c1--jun-2026) |
 | **A.3: Compliance docs bundle** | Jul 2026 | Documents a buyer asks for | `/legal/sub-processors`, `/legal/accessibility`, DPA and DORA templates, `docs/legal/README.md` | [HISTORY](docs/HISTORY.md#compliance-docs-bundle--phase-a3--jul-2026) |
 | **A.4: Cookie consent** | Jul 2026 | Opt-in consent with proof | `@packages/cookie-consent`, `consent_record`, `/consents` routes, banner, gate, analytics loader, 2 events | [HISTORY](docs/HISTORY.md#cookie-consent--consent-management--phase-a4--jul-2026) |
 | **B.1: Billing (Stripe)** | Jul 2026 | Revenue without a billing backoffice | Checkout, Billing Portal, seat gate, 3-tier `ENTITLEMENTS` (`apps/api/src/shared/entitlements.ts`), `/pricing`, `/settings/billing`, 4 events | [HISTORY](docs/HISTORY.md#billing-stripe-subscriptions--featureseat-gating--phase-b1--jul-2026) |

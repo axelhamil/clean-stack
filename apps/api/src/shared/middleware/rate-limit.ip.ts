@@ -69,6 +69,13 @@ function isTrusted(ip: string, list: BlockList): boolean {
   return false;
 }
 
+export function isFromTrustedProxy(c: Context): boolean {
+  const list = trustedList();
+  if (!list) return false;
+
+  return isTrusted(normalizeHop(getConnInfo(c).remote.address ?? ""), list);
+}
+
 export function resolveClientIp(c: Context): string {
   const rawSocket = getConnInfo(c).remote.address ?? "";
   const socketAddr = normalizeHop(rawSocket);

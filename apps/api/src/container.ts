@@ -20,23 +20,29 @@ import { env } from "./shared/env";
 import { buildEventDispatcher } from "./shared/event-handlers";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
+import type { ICaptchaService } from "./shared/ports/captcha.port";
 import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
 import type { IEmailService } from "./shared/ports/email.port";
 import type { IEmailQueue } from "./shared/ports/email-queue.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
+import type { IIpGeoService } from "./shared/ports/ip-geo.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
-import type { IRateLimiter } from "./shared/ports/rate-limiter.port";
+import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.port";
+import type { ISessionGeoStore } from "./shared/ports/session-geo.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
+import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
 import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
+import { HeaderIpGeoService } from "./shared/services/header-ip-geo.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { LoggingInstrumentation } from "./shared/services/logging-instrumentation";
+import { NoopCaptchaService } from "./shared/services/noop-captcha.service";
 import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
 import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
 import {
@@ -49,7 +55,9 @@ import {
   RateLimiterFlexibleAdapter,
   storeFactoryFor,
 } from "./shared/services/rate-limiter-flexible.adapter";
+import { SecuritySignalsService } from "./shared/services/security-signals.service";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
+import { SiteverifyCaptchaService } from "./shared/services/siteverify-captcha.service";
 import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscriber";
 
 declare module "inwire" {
@@ -62,7 +70,11 @@ declare module "inwire" {
     IInstrumentation: IInstrumentation;
     IPasswordBreachService: IPasswordBreachService;
     IDisposableEmailService: IDisposableEmailService;
-    IRateLimiter: IRateLimiter;
+    IRateLimiter: IRateLimiter & IRateLimitUsage;
+    ICaptchaService: ICaptchaService;
+    IIpGeoService: IIpGeoService;
+    ISessionGeoStore: ISessionGeoStore;
+    SecuritySignalsService: SecuritySignalsService;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     NotificationFanoutSubscriber: NotificationFanoutSubscriber;
@@ -122,11 +134,40 @@ export const di = container()
   )
   .add(
     "IRateLimiter",
-    (c): IRateLimiter =>
+    (c): IRateLimiter & IRateLimitUsage =>
       new RateLimiterFlexibleAdapter(
         c.IInstrumentation,
         storeFactoryFor(env.RATE_LIMIT_STORE, getRateLimitDbClient),
       ),
+  )
+  .add(
+    "ICaptchaService",
+    (c): ICaptchaService =>
+      env.CAPTCHA_SECRET_KEY
+        ? new SiteverifyCaptchaService(c.IInstrumentation, {
+            secretKey: env.CAPTCHA_SECRET_KEY,
+            verifyUrl: env.CAPTCHA_VERIFY_URL,
+            timeoutMs: env.CAPTCHA_TIMEOUT_MS,
+          })
+        : new NoopCaptchaService(),
+  )
+  .add(
+    "IIpGeoService",
+    (): IIpGeoService =>
+      new HeaderIpGeoService({
+        countryHeader: env.GEO_COUNTRY_HEADER,
+        asnHeader: env.GEO_ASN_HEADER,
+      }),
+  )
+  .add("ISessionGeoStore", (c): ISessionGeoStore => new DrizzleSessionGeoStore(c.IInstrumentation))
+  .add(
+    "SecuritySignalsService",
+    (c) =>
+      new SecuritySignalsService(c.ISessionGeoStore, c.IOutboxRepository, {
+        denyCountries: env.SECURITY_DENY_COUNTRIES,
+        denyAsns: env.SECURITY_DENY_ASNS,
+        impossibleTravelWindowMinutes: env.IMPOSSIBLE_TRAVEL_WINDOW_MINUTES,
+      }),
   )
   .add(
     "AuditEventSubscriber",

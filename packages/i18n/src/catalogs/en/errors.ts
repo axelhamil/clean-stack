@@ -122,6 +122,9 @@ export default {
     IMPERSONATION_ACTION_FORBIDDEN:
       "This action is unavailable while you are impersonating another user.",
     POLICY_ACCEPTANCE_REQUIRED: "Our terms have been updated. Accept the new version to continue.",
+    CAPTCHA_REQUIRED: "Complete the captcha, then try again.",
+    SECURITY_GEO_FORBIDDEN:
+      "Access is not available from your network or region. Turn off any VPN or proxy and try again, or contact support.",
   },
   // Covers `HTTP_<status>` codes (raised by `HTTPException` sites with no
   // business code, see `error.middleware.ts`) for statuses the API actually

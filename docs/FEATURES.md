@@ -219,7 +219,7 @@ PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No 
 - **Dispatcher and relay** (`outbox-dispatcher.service.ts`, `outbox-relay.ts`): in-process Bun worker, `pg.Client` LISTEN with backoff reconnect and keepalive, wake at the next due retry, 30s poll fallback. Claim by lease in one statement (`FOR UPDATE SKIP LOCKED`, multi-instance safe, no lock held while handlers run), named handlers (`audit-log`, `webhook-fanout`, `notification-fanout`, then `onEvent(type, handlerName, ...)`) each in its own short transaction with a time budget, settle guarded by `attempts`, jittered retry of the failed handlers only, dead after `OUTBOX_MAX_ATTEMPTS` with one `outbox.event_dead` and a replay every `OUTBOX_DEAD_RETRY_HOURS`. Proven by `check:outbox-lease`.
 - **Audit log** (`audit_log`): append-only (SOC2 / ISO 27001). `operational` (90d) vs `compliance` (7y) retention. Optional tamper-evidence hash chain (`AUDIT_TAMPER_EVIDENCE`). Operator UI at `/admin/audit-log` (filters, pagination, chain verify): gated `requirePlatformAdmin`.
 - **Outbound webhooks**: HMAC-SHA256 signed (Stripe-style), AEAD-encrypted secrets (XChaCha20-Poly1305 + HKDF per org), decorrelated jitter retry (1m/5m/30m/2h/12h), claimed by lease (`WEBHOOK_LEASE_SECONDS`, database clock, settle guarded by the claimed attempt, release on stop), dead-letter on the 4th failed send then replayed every `WEBHOOK_DEAD_RETRY_HOURS` (terminal when the endpoint is missing or disabled or the destination is refused), manual replay. Proven by `check:webhook-lease`. See §Outbound webhooks for the full front-end surface.
-- **Catalog** `@packages/events`: **86 events** (35 public / 51 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
+- **Catalog** `@packages/events`: **88 events** (35 public / 53 internal) with Zod payloads + `RETENTION_MAP`. BetterAuth bridge alone covers 25 events; other services add the rest.
 - **Request correlation**: `X-Request-Id` threaded into `outbox_event.metadata` and `audit_log.request_id` via `AsyncLocalStorage`.
 
 See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler, multi-tenant safety, BetterAuth bridge, HMAC verification).
@@ -240,9 +240,11 @@ Deploy-safe perimeter: rate-limit, strict CSP, and stateless CSRF, wired before 
 
 **Abuse prevention**: disposable-email block (~90k static list + DNS MX, fail-open, `DISPOSABLE_EMAIL_BLOCK_ENABLED`) + HIBP-hit telemetry event (`security.password.breached`: request already rejected, this makes it observable in the audit trail).
 
+**Behavioural signals and captcha** (C.1 S5b and S6), all off by default, thresholds to calibrate on real traffic: country and ASN come from `IIpGeoService` (`HeaderIpGeoService`, `GEO_COUNTRY_HEADER`, `GEO_ASN_HEADER`, read only when named and only from a trusted proxy). `SecuritySignalsService`: impossible travel on sign-in (`IMPOSSIBLE_TRAVEL_WINDOW_MINUTES`, `session.country`, `security.impossible_travel.detected`, never blocks) and deny-list on sign-in and sign-up (`SECURITY_DENY_COUNTRIES`, `SECURITY_DENY_ASNS`, 403 `SECURITY_GEO_FORBIDDEN`, `security.geo.denied`). Accounts-per-visitor cap (`ACCOUNTS_PER_VISITOR_MAX`, `ACCOUNTS_PER_VISITOR_WINDOW_SEC`): a `requireRateLimit` policy on `/sign-up/email` only, counting attempts; accounts created through a magic link, OAuth or SSO are not counted. Captcha: `ICaptchaService` (`SiteverifyCaptchaService` for Turnstile or hCaptcha, `NoopCaptchaService` when `CAPTCHA_SECRET_KEY` is unset), asked by `requireRateLimit` above 80 % of the sign-in and sign-up windows, `CAPTCHA_REQUIRED` without a valid token, fails open on a provider outage. Widget left to the cloner: [`INTEGRATIONS.md`](INTEGRATIONS.md).
+
 **Prod boot guard**: api `process.exit(1)` on missing `CORS_ORIGIN` (empty allowlist = CSRF no-op).
 
-**Events** (`operational` retention): 5 events covering rate-limit, CSP violation, CSRF rejection, disposable-email block, and HIBP breach telemetry.
+**Events** (`operational` retention): 7 events covering rate-limit, CSP violation, CSRF rejection, disposable-email block, HIBP breach telemetry, impossible travel, and geo denial.
 
 ---
 
@@ -351,7 +353,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 - `forms/token-form.tsx`: name + scope checkboxes + optional expiry. Created token shown once via `<SecretRevealDialog>`.
 - `api/api-tokens.{queries,mutations}.ts`: list + create + revoke.
 
-**Event visibility** `packages/events/src/visibility-map.ts`: 86-event catalog with explicit `public` / `internal` classification (35 public / 51 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
+**Event visibility** `packages/events/src/visibility-map.ts`: 88-event catalog with explicit `public` / `internal` classification (35 public / 53 internal). Three consumers: `WebhookFanoutSubscriber` (only fans out public events), `/developers/events` catalog page (only lists public events), and webhook subscription picker (only offers public events).
 
 **Events** (3, `operational` retention): `api_token.created` (public), `api_token.revoked` (public), `api_token.used` (internal, sampled via bucket).
 
@@ -365,7 +367,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 Persistent inbox behind a bell, real-time over SSE, three-level preferences. No new event type: D.3 *consumes* the catalog.
 
-**Catalog projection** `packages/events/src/notification-map.ts`: third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 86 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced: `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
+**Catalog projection** `packages/events/src/notification-map.ts`: third projection after `visibility-map` (webhooks) and `retention-map` (purge). 21 of the 88 events are notifiable; an absent event produces nothing. Each entry declares `audience`, `category`, and optionally `forced` / `groupBy` / `dedupWindow`. `forcedLevelOf(category)` reports whether a category is `all` / `some` / `none` forced: `security` is fully forced, `billing` only partly, which a per-category boolean could not express.
 
 **Audience by capability, never by role tuple**: `"self" | "actor" | "org:all" | { can: OrgPermissions }`. `ORG_ROLES.filter(authorizeRole)` resolves at boot, leaving `WHERE member.role = ANY($1)`.
 
@@ -487,4 +489,3 @@ See [`../ROADMAP.md`](../ROADMAP.md): the list is short by design; anything not 
 - Dependency refresh Oct 2026 (Node 26 LTS, Bun 1.4.4, pnpm 12), in progress.
 - Phase I: resync on the OpenUp foundations (kit, guardrails, telemetry hygiene, ambient unit of work, leased outbox).
 - Manual review pass over the shipped surface.
-- C.1 S5b/S6: abuse signals + captcha hook, pending real traffic to calibrate.

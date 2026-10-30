@@ -3,14 +3,40 @@ import { EventTypes } from "@packages/events";
 import { createMiddleware } from "hono/factory";
 import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
+import type { ICaptchaService } from "../ports/captcha.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
-import type { IRateLimiter } from "../ports/rate-limiter.port";
+import type { IRateLimiter, IRateLimitUsage, WindowConfig } from "../ports/rate-limiter.port";
 import { resolveClientIp } from "./rate-limit.ip";
 import type { PolicyConfig } from "./rate-limit.policies";
+
+export const CAPTCHA_TOKEN_HEADER = "X-Captcha-Token";
 
 export interface RateLimitDeps {
   limiter: IRateLimiter;
   outbox?: IOutboxRepository;
+  captcha?: { service: ICaptchaService; usage: IRateLimitUsage };
+}
+
+function captchaRequired(): AppErrorException {
+  return new AppErrorException({
+    code: "CAPTCHA_REQUIRED",
+    message: "Complete the captcha, then send your request again.",
+  });
+}
+
+async function needsCaptcha(
+  usage: IRateLimitUsage,
+  key: string,
+  windows: WindowConfig[],
+  ratio: number,
+): Promise<boolean> {
+  const result = await usage.usage(key, windows);
+  if (result.isFailure) return false;
+
+  const usages = result.getValue();
+  if (usages.some(({ used, limit }) => used >= limit)) return false;
+
+  return usages.some(({ used, limit }) => (used + 1) / limit > ratio);
 }
 
 export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
@@ -21,8 +47,19 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
     );
   }
 
+  const captchaRatio = policy.captchaAboveRatio;
+  const captcha = captchaRatio !== undefined && deps.captcha?.service.enabled ? deps.captcha : null;
+
   return createMiddleware(async (c, next) => {
     const key = policy.keyFn(c);
+    const token = c.req.header(CAPTCHA_TOKEN_HEADER);
+    const guarded =
+      captcha !== null &&
+      captchaRatio !== undefined &&
+      (await needsCaptcha(captcha.usage, key, policy.windows, captchaRatio));
+
+    if (guarded && !token) throw captchaRequired();
+
     const result = await deps.limiter.consume(key, policy.windows);
 
     if (result.isFailure) {
@@ -45,10 +82,11 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
       const policyHeader = policy.windows
         .map((w) => `"${w.policyName}";q=${w.maxRequests};w=${w.windowSec}`)
         .join(", ");
-      c.header("RateLimit-Policy", policyHeader);
+      c.header("RateLimit-Policy", policyHeader, { append: true });
       c.header(
         "RateLimit",
         `"${decision.policyName}";r=${decision.remaining};t=${decision.resetSeconds}`,
+        { append: true },
       );
     }
 
@@ -82,6 +120,15 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
         message: "Too many requests",
         metadata: { retryAfter },
       });
+    }
+
+    if (guarded && token) {
+      const verdict = await captcha.service.verify(token, resolveClientIp(c));
+      if (verdict.isFailure) {
+        logger.warn({ policy: policy.name }, "captcha provider unavailable, failing open");
+      } else if (!verdict.getValue()) {
+        throw captchaRequired();
+      }
     }
 
     await next();

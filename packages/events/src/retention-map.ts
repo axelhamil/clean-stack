@@ -55,6 +55,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.SECURITY_PASSWORD_BREACHED]: "operational",
   [EventTypes.SECURITY_SIGNUP_REJECTED]: "operational",
   [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: "compliance",
+  [EventTypes.SECURITY_IMPOSSIBLE_TRAVEL_DETECTED]: "operational",
+  [EventTypes.SECURITY_GEO_DENIED]: "operational",
   [EventTypes.BILLING_SUBSCRIPTION_CREATED]: "compliance",
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: "compliance",
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: "compliance",

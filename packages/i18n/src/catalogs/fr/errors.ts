@@ -118,6 +118,9 @@ export default {
       "Cette action est indisponible pendant l'emprunt d'identité d'un autre utilisateur.",
     POLICY_ACCEPTANCE_REQUIRED:
       "Nos conditions ont été mises à jour. Acceptez la nouvelle version pour continuer.",
+    CAPTCHA_REQUIRED: "Validez le captcha, puis réessayez.",
+    SECURITY_GEO_FORBIDDEN:
+      "L'accès n'est pas disponible depuis votre réseau ou votre région. Désactivez tout VPN ou proxy et réessayez, ou contactez le support.",
   },
   byStatus: {
     "400": "Certaines informations saisies sont invalides. Vérifiez le formulaire et réessayez.",
