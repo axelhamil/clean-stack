@@ -29,6 +29,7 @@ cd my-saas
 pnpm install
 pnpm bootstrap          # copies .env.example → .env in each workspace
 docker compose up postgres -d   # only Postgres on :5433 (api/app run natively below)
+# uploads need the bucket: add --profile storage (SeaweedFS on :8333)
 pnpm db:migrate         # apply migrations
 pnpm dev                # API :3000, App :5173
 ```
@@ -57,9 +58,10 @@ git clone https://github.com/axelhamil/clean-stack my-saas
 cd my-saas
 bash scripts/bootstrap.sh              # copies .env.example → .env in each workspace
 docker compose up --watch              # api runs migrations on boot, then starts
+# uploads need the bucket: docker compose --profile storage up --watch
 ```
 
-Open [`http://localhost:5173`](http://localhost:5173), sign up with any email, you're in.
+Open [`http://localhost:5173`](http://localhost:5173). Sign-up requires email verification, and without `RESEND_API_KEY` mails are only logged (recipient and subject, not the link), so seed an account instead: `pnpm db:seed`, then sign in with it. Override the account with `SEED_EMAIL`, `SEED_NAME` and `SEED_PASSWORD`; defaults are in [`apps/api/scripts/seed-dev-user.ts`](apps/api/scripts/seed-dev-user.ts).
 
 ---
 
@@ -281,7 +283,7 @@ Three `.env` files, on purpose. **Do not collapse them into one at the root**: i
 
 `pnpm bootstrap` (or `bash scripts/bootstrap.sh`) copies each `.env.example` → `.env` if missing. Idempotent, never overwrites.
 
-Only three variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), `WEBHOOK_MASTER_KEY`, `API_TOKEN_PEPPER` or `SCIM_CREDENTIAL_HASH_SECRET` is missing: a silent fallback there is worse than a refused boot. `API_TOKEN_PEPPER` (min 32 chars, `openssl rand -hex 32`) is the server secret that makes a database dump insufficient to forge tokens; `API_TOKEN_PREFIX` should be unique per clone (e.g. `myapp_`). Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
+Only four variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `APP_URL`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), `WEBHOOK_MASTER_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) section 4), `API_TOKEN_PEPPER` or `SCIM_CREDENTIAL_HASH_SECRET` is missing: a silent fallback there is worse than a refused boot. `API_TOKEN_PEPPER` (min 32 chars, `openssl rand -hex 32`) is the server secret that makes a database dump insufficient to forge tokens; `API_TOKEN_PREFIX` should be unique per clone (e.g. `myapp_`). Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
 
 ---
 
