@@ -26,7 +26,6 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "with": ["type-check"],
       "inputs": [
         "src/**",
         "common/**",
