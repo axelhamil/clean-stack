@@ -74,6 +74,8 @@ export const VISIBILITY = {
   "admin.staff.added": "internal",
   "admin.staff.role_changed": "internal",
   "admin.staff.revoked": "internal",
+  "admin.step_up.verified": "internal",
+  "admin.step_up.failed": "internal",
   "email.delivery.exhausted": "internal",
   "outbox.event_dead": "internal",
   "notification.preference.updated": "internal",

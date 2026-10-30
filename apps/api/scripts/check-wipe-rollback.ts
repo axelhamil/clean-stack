@@ -36,6 +36,7 @@ import { logger } from "../src/shared/logger";
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
+import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";
 import { QueuedEmailService } from "../src/shared/services/email.service";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
@@ -102,6 +103,7 @@ async function main(): Promise<void> {
     instrumentation,
     new DrizzleStaffStore(instrumentation),
     { PLATFORM_ADMIN_IDS: [] },
+    new DrizzleTotpVerifier(instrumentation),
   );
 
   const result = await service.executeAccountWipe({ userId });

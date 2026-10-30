@@ -112,6 +112,14 @@ export default {
       },
     },
   },
+  stepUp: {
+    title: "Confirmez que c'est vous",
+    description:
+      "Saisissez le code de votre application d'authentification, puis refaites votre action.",
+    codeLabel: "Code d'authentification",
+    submit: "Confirmer",
+    confirmedToast: "Confirmé. Vous pouvez refaire votre action.",
+  },
   auditLog: {
     pageTitle: "Journal d'audit",
     allActionsPlaceholder: "Toutes les actions",

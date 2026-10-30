@@ -493,6 +493,18 @@ export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
 });
 export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
 
+export const AdminStepUpVerifiedPayload = UserRef.extend({
+  validUntil: z.string(),
+  ip: z.string().nullable(),
+});
+export type AdminStepUpVerifiedPayload = z.infer<typeof AdminStepUpVerifiedPayload>;
+
+export const AdminStepUpFailedPayload = UserRef.extend({
+  reason: z.enum(["invalid_code", "replayed_code"]),
+  ip: z.string().nullable(),
+});
+export type AdminStepUpFailedPayload = z.infer<typeof AdminStepUpFailedPayload>;
+
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
   actorUserId: z.string(),
@@ -725,6 +737,8 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,
   [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: AdminStaffRoleChangedPayload,
   [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
+  [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
+  [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,

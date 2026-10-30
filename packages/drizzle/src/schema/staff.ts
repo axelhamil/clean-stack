@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { user } from "./auth";
+import { bigint, check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { session, user } from "./auth";
 
 export const staffMember = pgTable(
   "staff_member",
@@ -40,3 +40,17 @@ export const staffPermissionOverride = pgTable(
     check("staff_permission_override_effect_check", sql`${table.effect} IN ('grant', 'deny')`),
   ],
 );
+
+export const adminStepUp = pgTable("admin_step_up", {
+  sessionId: text("session_id")
+    .primaryKey()
+    .references(() => session.id, { onDelete: "cascade" }),
+  verifiedAt: timestamp("verified_at").notNull(),
+});
+
+export const adminTotpCounter = pgTable("admin_totp_counter", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  lastCounter: bigint("last_counter", { mode: "number" }).notNull(),
+});

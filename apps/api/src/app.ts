@@ -176,6 +176,8 @@ for (const [path, policy] of AUTH_RATE_LIMITS) {
   app.use(`/api/auth${path}`, securityRateLimit(policy));
 }
 
+app.use("/admin/step-up", securityRateLimit(AUTH_TWO_FACTOR_POLICY));
+
 app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/admin/*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Not found." } }, 404),
 );

@@ -29,9 +29,23 @@ export interface AdminMembershipRow {
   role: string;
 }
 
+export interface EndedSession {
+  id: string;
+  userId: string;
+}
+
+export interface BanWrite {
+  userId: string;
+  reason: string;
+  expiresAt: Option<Date>;
+}
+
 export interface IAdminUserStore {
   listUsers(input: ListUsersInput): Promise<Result<AdminUserRow[], AdminStoreError>>;
   findUserById(id: string): Promise<Result<Option<AdminUserRow>, AdminStoreError>>;
   listSessionsFor(userId: string): Promise<Result<AdminSessionRow[], AdminStoreError>>;
   listMembershipsFor(userId: string): Promise<Result<AdminMembershipRow[], AdminStoreError>>;
+  ban(input: BanWrite): Promise<Result<Option<EndedSession[]>, AdminStoreError>>;
+  unban(userId: string): Promise<Result<boolean, AdminStoreError>>;
+  deleteSessions(userId: string): Promise<Result<EndedSession[], AdminStoreError>>;
 }

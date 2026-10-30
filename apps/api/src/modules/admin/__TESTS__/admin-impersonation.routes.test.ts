@@ -1,12 +1,29 @@
 import { describe, expect, it, mock } from "bun:test";
 import { EventTypes } from "@packages/events";
+import { mockPort } from "@packages/test/bun";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
+import type { IAdminUserStore } from "../application/ports/admin-user-store.port";
 
 mock.module("hono/bun", () => ({
   getConnInfo: () => ({ remote: { address: "127.0.0.1" } }),
 }));
 
+const { AdminModerationService } = await import("../application/services/admin-moderation.service");
+const { unitOfWork, outcome } = mockUnitOfWork();
+
 mock.module("../../../container", () => ({
-  di: { IOutboxRepository: {}, IInstrumentation: { setSpanAttributes: () => {} } },
+  di: {
+    IOutboxRepository: {},
+    IInstrumentation: { setSpanAttributes: () => {} },
+    get AdminModerationService() {
+      return new AdminModerationService(
+        mockPort<IAdminUserStore>(),
+        mockPort<IOutboxRepository>(),
+        unitOfWork,
+      );
+    },
+  },
 }));
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
@@ -53,6 +70,7 @@ let currentSession: Record<string, unknown> = {
 mock.module("../../../shared/middleware/staff.middleware", () => ({
   requireStaff: async (_c: unknown, next: () => Promise<void>) => next(),
   requireStaffPermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+  requireStepUp: async (_c: unknown, next: () => Promise<void>) => next(),
 }));
 
 const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
@@ -138,7 +156,7 @@ describe("POST /admin/impersonation/stop", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 403 and emits no event when BetterAuth refuses stop", async () => {
+  it("returns 403 and rolls the stop event back when BetterAuth refuses stop", async () => {
     emitted.length = 0;
     currentSession = {
       impersonatedBy: "admin-1",
@@ -152,7 +170,7 @@ describe("POST /admin/impersonation/stop", () => {
       method: "POST",
     });
     expect(res.status).toBe(403);
-    expect(emitted.some((e) => e.type === EventTypes.ADMIN_IMPERSONATION_STOPPED)).toBe(false);
+    expect(outcome()).toBe("rolled_back");
   });
 
   it("relays the restore cookie and emits the stop event", async () => {

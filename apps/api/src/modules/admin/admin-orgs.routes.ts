@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
-import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
+import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { AdminActionService } from "../../shared/services/admin-action.service";
 import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
 import { zV } from "../../shared/validator";
@@ -54,9 +54,12 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
     denyImpersonated,
     zV("json", setSsoEnforcementBodySchema),
     async (c) => {
+      const { enforced } = c.req.valid("json");
+      if (!enforced) await assertStepUp(c.get("user"), c.get("session"));
+
       const result = await actionSvc.setSsoEnforcement({
         organizationId: c.req.param("id"),
-        enforced: c.req.valid("json").enforced,
+        enforced,
         actorUserId: c.get("user").id,
         viaPlatformAdmin: true,
       });

@@ -27,6 +27,7 @@ export const rgpdModule = defineModule()((b) =>
           c.IInstrumentation,
           c.IStaffStore,
           env,
+          c.ITotpVerifier,
         ),
     ),
 );

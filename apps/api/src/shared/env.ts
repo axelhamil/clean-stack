@@ -124,6 +124,7 @@ const envSchema = z
       .string()
       .optional()
       .transform((v) => v !== "false"),
+    ADMIN_STEP_UP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
     RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
     TRUSTED_PROXIES: z.string().transform(commaList).optional(),

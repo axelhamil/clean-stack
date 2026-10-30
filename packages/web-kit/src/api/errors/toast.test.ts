@@ -32,6 +32,15 @@ describe("toastError", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("skips a step-up refusal, the prompt it opens already says what to do", () => {
+    const err: ApiError = Object.assign(new Error("Confirm"), {
+      status: 403,
+      code: "ADMIN_REAUTH_REQUIRED",
+    });
+    toastError(err, "fallback");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it("calls toast.error for non-429 ApiError with formatApiError copy", () => {
     const err: ApiError = Object.assign(new Error("original message"), {
       status: 400,

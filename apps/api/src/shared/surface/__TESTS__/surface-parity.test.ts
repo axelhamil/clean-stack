@@ -62,6 +62,7 @@ describe("surface parity", () => {
     "/uploads/*",
     "/settings/*",
     "/admin/*",
+    "/admin/step-up",
     "/consents",
     "/consents/*",
     "/billing/portal",

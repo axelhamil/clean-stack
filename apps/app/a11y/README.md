@@ -15,6 +15,10 @@ interaction checks a rule engine cannot see. Runs on every PR
   setup itself signs in without a mouse.
 - **Focus trap**: the command palette keeps focus for ten Tab presses and
   releases it on Escape.
+- **Step-up prompt**: opened over a refused admin action, it takes focus, keeps
+  it for eight Tab presses, passes axe, and on Escape closes alone and gives
+  focus back to the action's dialog. The refusal and the staff session are
+  fulfilled by the test, the seeded user is not staff.
 - **Reduced motion**: `prefers-reduced-motion: reduce` skips the theme view
   transition entirely (asserted through a `MutationObserver`, since the
   transition leaves no trace once it ends).

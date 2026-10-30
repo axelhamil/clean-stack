@@ -10,6 +10,7 @@ import {
   lt,
   multiTenantSchema,
   or,
+  resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -19,6 +20,8 @@ import type {
   AdminSessionRow,
   AdminStoreError,
   AdminUserRow,
+  BanWrite,
+  EndedSession,
   IAdminUserStore,
 } from "../../application/ports/admin-user-store.port";
 
@@ -206,6 +209,87 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "admin membership list failed");
+        }
+      },
+    );
+  }
+
+  async ban(input: BanWrite): Promise<Result<Option<EndedSession[]>, AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > ban" }, async () => {
+      try {
+        const { session, user } = authSchema;
+        const written = await exec
+          .update(user)
+          .set({
+            banned: true,
+            banReason: input.reason,
+            banExpires: input.expiresAt.toNull(),
+            updatedAt: new Date(),
+          })
+          .where(eq(user.id, input.userId))
+          .returning({ id: user.id });
+        if (written.length === 0) return Result.ok(Option.none());
+
+        const ended = await exec
+          .delete(session)
+          .where(or(eq(session.userId, input.userId), eq(session.impersonatedBy, input.userId)))
+          .returning({ id: session.id, userId: session.userId });
+
+        return Result.ok(Option.some(ended));
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin ban failed");
+      }
+    });
+  }
+
+  async unban(userId: string): Promise<Result<boolean, AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > unban" }, async () => {
+      try {
+        const { user } = authSchema;
+        const query = exec
+          .update(user)
+          .set({ banned: false, banReason: null, banExpires: null, updatedAt: new Date() })
+          .where(eq(user.id, userId))
+          .returning({ id: user.id });
+        const written = await this.instrumentation.startSpan(
+          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+          () => query.execute(),
+        );
+
+        return Result.ok(written.length > 0);
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin unban failed");
+      }
+    });
+  }
+
+  async deleteSessions(userId: string): Promise<Result<EndedSession[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > deleteSessions" },
+      async () => {
+        try {
+          const { session } = authSchema;
+          const query = exec
+            .delete(session)
+            .where(eq(session.userId, userId))
+            .returning({ id: session.id, userId: session.userId });
+          const ended = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(ended);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin session deletion failed");
         }
       },
     );

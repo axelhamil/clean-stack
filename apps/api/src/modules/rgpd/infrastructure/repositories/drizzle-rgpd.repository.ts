@@ -1,5 +1,3 @@
-import { base32 } from "@better-auth/utils/base32";
-import { createOTP } from "@better-auth/utils/otp";
 import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
@@ -16,15 +14,8 @@ import {
   schema,
 } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
-import {
-  type SecretConfig,
-  symmetricDecrypt,
-  verifyPassword as verifyHash,
-} from "better-auth/crypto";
-import { authSecretKey } from "../../../../shared/auth/auth-secrets";
-import { TOTP_OPTIONS } from "../../../../shared/auth/totp-options";
+import { verifyPassword as verifyHash } from "better-auth/crypto";
 import { dbOperationFailure } from "../../../../shared/db-failure";
-import { env } from "../../../../shared/env";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
@@ -43,23 +34,10 @@ const ANONYMIZED_NAME = "[deleted]";
 
 const repositoryFailure = dbOperationFailure("RGPD_REPOSITORY_PROVIDER_FAILURE");
 
-const IMPORTED_TOTP_SECRET_PREFIX = "base32:";
-
-async function decryptTotpSecret(
-  key: string | SecretConfig,
-  encrypted: string,
-): Promise<string | Uint8Array> {
-  const secret = await symmetricDecrypt({ key, data: encrypted });
-  if (!secret.startsWith(IMPORTED_TOTP_SECRET_PREFIX)) return secret;
-
-  return base32.decode(secret.slice(IMPORTED_TOTP_SECRET_PREFIX.length).toUpperCase());
-}
-
 export class DrizzleRgpdRepository implements IRgpdRepository {
   constructor(
     private readonly logger: Logger,
     private readonly instrumentation: IInstrumentation,
-    private readonly authSecret: string | SecretConfig = authSecretKey(env),
   ) {}
 
   async findSoleOwnedNonPersonalOrgsWithMembers(
@@ -419,44 +397,6 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.verifyPassword failed");
           return Result.fail(repositoryFailure("verifyPassword"));
-        }
-      },
-    );
-  }
-
-  async verifyTotp(userId: string, code: string): Promise<Result<boolean, RgpdError>> {
-    const exec = resolveExecutor();
-    return this.instrumentation.startSpan(
-      { name: "DrizzleRgpdRepository > verifyTotp" },
-      async () => {
-        try {
-          const tfQuery = exec
-            .select({ secret: schema.twoFactor.secret })
-            .from(schema.twoFactor)
-            .where(
-              and(
-                eq(schema.twoFactor.userId, userId),
-                or(eq(schema.twoFactor.verified, true), isNull(schema.twoFactor.verified)),
-              ),
-            )
-            .limit(1);
-          const [tf] = await this.instrumentation.startSpan(
-            { name: tfQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => tfQuery.execute(),
-          );
-          if (!tf?.secret) return Result.ok(false);
-          try {
-            const decrypted = await decryptTotpSecret(this.authSecret, tf.secret);
-            const ok = await createOTP(decrypted, TOTP_OPTIONS).verify(code);
-            return Result.ok(ok);
-          } catch (err) {
-            this.instrumentation.capture(err);
-            return Result.ok(false);
-          }
-        } catch (err) {
-          this.instrumentation.capture(err);
-          this.logger.error({ err, userId }, "RgpdRepository.verifyTotp failed");
-          return Result.fail(repositoryFailure("verifyTotp"));
         }
       },
     );

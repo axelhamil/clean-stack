@@ -12,6 +12,7 @@ export type RgpdError = AppError<
   | "ACCOUNT_WIPE_PROVIDER_FAILURE"
   | "ADMIN_STAFF_PROVIDER_FAILURE"
   | "RGPD_REPOSITORY_PROVIDER_FAILURE"
+  | "TOTP_VERIFIER_PROVIDER_FAILURE"
   | "TWO_FACTOR_REQUIRED"
   | "TWO_FACTOR_INVALID"
 >;
@@ -101,8 +102,6 @@ export interface IRgpdRepository {
   executeWipe(userId: string): Promise<Result<ExecuteWipeOutput, RgpdError>>;
 
   verifyPassword(userId: string, password: string): Promise<Result<boolean, RgpdError>>;
-
-  verifyTotp(userId: string, code: string): Promise<Result<boolean, RgpdError>>;
 
   touchExportRequestedAt(userId: string): Promise<Result<void, RgpdError>>;
 

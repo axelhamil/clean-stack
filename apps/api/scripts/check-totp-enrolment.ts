@@ -3,7 +3,7 @@
  * two-factor enrolment, the rule better-auth applies at sign-in (`verified === false` is
  * refused, a legacy `NULL` is not).
  *
- * The filter lives in the `WHERE` of `DrizzleRgpdRepository.verifyTotp`, which a mocked
+ * The filter lives in the `WHERE` of `DrizzleTotpVerifier.verify`, which a mocked
  * transaction never evaluates: only Postgres can show that an unconfirmed row is skipped.
  * Creates and removes its own probe user.
  */
@@ -16,11 +16,10 @@ requireLocalDatabase("check-totp-enrolment");
 import { createOTP } from "@better-auth/utils/otp";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { symmetricEncrypt } from "better-auth/crypto";
-import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
-import { logger } from "../src/shared/logger";
+import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const userId = `check-totp-enrolment-${crypto.randomUUID()}`;
@@ -59,12 +58,9 @@ async function setVerified(verified: boolean | null): Promise<void> {
 
 async function verifiesCurrentCode(): Promise<boolean> {
   const code = await createOTP(totpSecret, TOTP_OPTIONS).totp();
-  const result = await new DrizzleRgpdRepository(logger, new NoOpInstrumentation()).verifyTotp(
-    userId,
-    code,
-  );
+  const result = await new DrizzleTotpVerifier(new NoOpInstrumentation()).verify(userId, code);
 
-  return result.isSuccess && result.getValue();
+  return result.isSuccess && result.getValue().isSome();
 }
 
 async function main(): Promise<void> {

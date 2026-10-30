@@ -2,7 +2,7 @@
 
 What is left for clean-stack, then one line per shipped phase. Every phase follows the same shape: title, status, date, why, scope, references. As-built detail lives in [`docs/HISTORY.md`](docs/HISTORY.md), the current inventory in [`docs/FEATURES.md`](docs/FEATURES.md) and the guided tour in [`docs/OVERVIEW.md`](docs/OVERVIEW.md). DDD stays reserved for the pure business domain.
 
-Event catalog today: 90 events, 35 public, 55 internal (counted from `packages/events/src/event-types.ts` and `visibility-map.ts`). Phases below give the events they added, never a running total.
+Event catalog today: 92 events, 35 public, 57 internal (counted from `packages/events/src/event-types.ts` and `visibility-map.ts`). Phases below give the events they added, never a running total.
 
 > **Boilerplate target**: clone, then ship any SaaS without re-coding plumbing. Anything below that is not shipped is friction the cloner inherits, which is why the open list stays short.
 
@@ -55,7 +55,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Review pass
 
-- **Status**: delivered. Open: admin actions commit before their event is written, handled in Phase K.
+- **Status**: delivered. Admin writes and their events commit together since Phase K lot 2.
 - **Date**: after Phase J.
 - **Why**: the shipped surface has been audited by phase and by tooling, never read end to end by its owner.
 - **Scope**: delegated review of the server surface, the customer screens and the clone path, each defect verified then fixed with its test.
@@ -77,7 +77,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Back office: **Phase K**
 
-- **Status**: open. Lot 1 of 7 delivered: staff roles and permissions behind every `/admin/*` route, `session.staff`, staff list, role and revoke routes, `check:admin-staff`, 3 events `admin.staff.{added,role_changed,revoked}`; `PUT /admin/users/:id/role` and `admin.user.role_changed` removed. Open: override write routes and the team screen (lot 6), step-up and atomic admin writes (lot 2), four-eyes (lot 3), `apps/admin` (lots 4, 5, 6, 7).
+- **Status**: open. Lots 1 and 2 of 7 delivered. Lot 2: `ban`, `unban` and session revocation write in one unit of work with their event, a ban also ends the sessions the banned user impersonates through; `POST /admin/step-up` and `ADMIN_REAUTH_REQUIRED` on permanent ban, staff changes, impersonation start and SSO enforcement off, code dialog in `apps/app`, refused replay, `check:admin-atomicity`, `check:admin-step-up`, 2 events `admin.step_up.{verified,failed}`. Lot 1: staff roles and permissions behind every `/admin/*` route, `session.staff`, staff list, role and revoke routes, `check:admin-staff`, 3 events `admin.staff.{added,role_changed,revoked}`; `PUT /admin/users/:id/role` and `admin.user.role_changed` removed. Open: override write routes and the team screen (lot 6), four-eyes (lot 3), `apps/admin` (lots 4, 5, 6, 7).
 - **Date**: after the review pass, which reads the surface this phase moves.
 - **Why**: admin screens live in `apps/app`, on the customer host and session, behind one gate (`requirePlatformAdmin`) that grants everything or nothing. A cloner with a support hire must hand out the right to ban and to impersonate along with the right to read an account.
 - **Model**: Erebor, the OpenUp back office, kept to what any SaaS needs. Its moderation stack stays out.

@@ -175,6 +175,16 @@ jobs:
         # its own probe users.
         run: pnpm --filter api check:admin-staff
 
+      - name: Check admin writes commit with their events and a ban refuses sign-in
+        # The rollback and the sign-in hook only exist on a real transaction and the
+        # real auth library. Creates and removes its own probe users.
+        run: pnpm --filter api check:admin-atomicity
+
+      - name: Check the admin step-up on the real route stack
+        # The replay upsert and the session cascade live in SQL. Creates and removes
+        # its own probe users.
+        run: pnpm --filter api check:admin-step-up
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
