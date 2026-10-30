@@ -20,6 +20,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 2 | **Tooltips pass** | Delivered | Tooltips and contextual help everywhere they add something: icon-only buttons, truncated values, disabled controls, technical terms | A dense pro tool must explain itself in place; today most icons and truncated values say nothing on hover or focus |
 | 3 | **Review pass** | Open | Full manual review of the shipped surface, owned by @axelhamil | The only thing between "feature-complete" and "clone-ready" |
 | 4 | **C.1 remainder** | Open | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
+| 5 | **Phase K** | Open | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -71,6 +72,26 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
   - **Behavioural signals (S5b)**: impossible travel on sign-in (`session.ipAddress` and `userAgent` are already stored), accounts-per-visitor cap, env-driven country and ASN deny-list. Each emits a `security.*` event.
   - **Captcha hook (S6)**: `ICaptchaService` port (Turnstile or hCaptcha free tier), invoked when `requireRateLimit` enters a near-cap state (above 80 % of the window), env-flagged.
 - **References**: [Security perimeter C.1](docs/HISTORY.md#security-perimeter-rate-limit--csp--csrf--phase-c1--jun-2026).
+
+---
+
+## Back office: **Phase K**
+
+- **Status**: open.
+- **Date**: after the review pass, which reads the surface this phase moves.
+- **Why**: admin screens live in `apps/app`, on the customer host and session, behind one gate (`requirePlatformAdmin`) that grants everything or nothing. A cloner with a support hire must hand out the right to ban and to impersonate along with the right to read an account.
+- **Model**: Erebor, the OpenUp back office, kept to what any SaaS needs. Its moderation stack stays out.
+- **Scope**:
+  - **Separate app**: `apps/admin` on its own host, same API under `/admin/*`, origin guard, strict CSP, `noindex`. The admin screens of `apps/app` move there, no copy stays behind.
+  - **Staff permissions**: a typed permission catalog, roles as code bundles, per-person grant or deny with expiry. The UI is built from the permissions the API returns, never from a role check. The last manager cannot be removed and nobody changes their own access.
+  - **Staff identity**: mandatory MFA through the existing auth, domain-restricted SSO as an env option. Access is rechecked on every request, so a removed role cuts at once.
+  - **Step-up**: sensitive actions require a recent sign-in and answer a typed error that opens a confirmation dialog.
+  - **Four-eyes**: a pending decision approved by a different person, with expiry and an override that requires a note, applied to account deletion, mass ban and role change. Thresholds are configuration.
+  - **Screens**: inbox of what waits for the team, accounts and organizations with a 360 detail and staff notes, audit viewer with chain verify, platform operations (dead outbox events and their requeue, Stripe event replay, job heartbeats), plan override with an end date, team, `Ctrl K` palette, saved views, live updates over SSE.
+  - **Rails**: every staff action emits a typed event carrying `actorUserId` in the same transaction, like any other state change.
+- **Out of scope**: moderation cases and lanes, QA calibration, moderator wellbeing, holds and takedowns, linked-account clusters, content workspace, growth prospects, integrations rollout, AI support assistant, Discord commands: all OpenUp business.
+- **Done when**: no admin route or screen remains in `apps/app`; a test covers each permission against each staff route, refusal included; the accessibility gate and `docs/SURFACE.md` parity cover the new app; a real two-person approval and a real step-up are proved in the browser at 390, 768 and 1440 px.
+- **References**: [`docs/FEATURES.md`](docs/FEATURES.md), `apps/api/src/modules/admin/`, `apps/api/src/shared/middleware/platform-admin.middleware.ts`.
 
 ---
 
