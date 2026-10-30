@@ -35,7 +35,11 @@ export function UserMenu({ user }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton variant="ghost" label={t("userMenu.openMenu")}>
+        <IconButton
+          variant="ghost"
+          label={t("userMenu.openMenu")}
+          accessibleName={`${initialsOf(display)} ${t("userMenu.openMenu")}`}
+        >
           <Avatar className="size-8">
             {image ? <AvatarImage src={image} alt={display} /> : null}
             <AvatarFallback className="text-xs font-medium">{initialsOf(display)}</AvatarFallback>
