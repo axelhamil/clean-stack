@@ -66,6 +66,7 @@ export default {
       incomplete: "Incomplete",
       incompleteExpired: "Incomplete (expired)",
       paused: "Paused",
+      override: "Granted by our team",
     },
   },
   passkeys: {

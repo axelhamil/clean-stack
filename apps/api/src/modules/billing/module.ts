@@ -1,5 +1,6 @@
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
+import type { IPlanOverrideStore } from "../../shared/ports/plan-override.port";
 import type { IStripeEventGateway, IStripeEventStore } from "../../shared/ports/stripe-event.port";
 import type { IBillingPortalGateway } from "./application/ports/billing-portal.port";
 import type { IStripeCatalogSource } from "./application/ports/stripe-catalog.port";
@@ -10,6 +11,7 @@ import { EntitlementsService } from "./application/services/entitlements.service
 import { StripeBillingPortalGateway } from "./infrastructure/adapters/stripe-billing-portal.gateway";
 import { StripeCatalogSource } from "./infrastructure/adapters/stripe-catalog.source";
 import { StripeEventGateway } from "./infrastructure/adapters/stripe-event.gateway";
+import { DrizzlePlanOverrideStore } from "./infrastructure/repositories/drizzle-plan-override.store";
 import { DrizzleStripeEventStore } from "./infrastructure/repositories/drizzle-stripe-event.store";
 import { DrizzleSubscriptionReadStore } from "./infrastructure/repositories/drizzle-subscription-read.store";
 import { stripeClient } from "./infrastructure/stripe-client";
@@ -19,6 +21,7 @@ declare module "inwire" {
     IStripeCatalogSource: IStripeCatalogSource;
     IBillingPortalGateway: IBillingPortalGateway;
     IStripeEventStore: IStripeEventStore;
+    IPlanOverrideStore: IPlanOverrideStore;
     IStripeEventGateway: IStripeEventGateway;
     ISubscriptionReadStore: ISubscriptionReadStore;
     BillingCatalogService: BillingCatalogService;
@@ -33,6 +36,10 @@ export const billingModule = defineModule()((b) =>
     .add(
       "IBillingPortalGateway",
       (c) => new StripeBillingPortalGateway(stripeClient, c.IInstrumentation),
+    )
+    .add(
+      "IPlanOverrideStore",
+      (c): IPlanOverrideStore => new DrizzlePlanOverrideStore(c.IInstrumentation),
     )
     .add(
       "IStripeEventStore",
@@ -58,6 +65,7 @@ export const billingModule = defineModule()((b) =>
     )
     .add(
       "EntitlementsService",
-      (c) => new EntitlementsService(c.ISubscriptionReadStore, c.IInstrumentation),
+      (c) =>
+        new EntitlementsService(c.ISubscriptionReadStore, c.IPlanOverrideStore, c.IInstrumentation),
     ),
 );

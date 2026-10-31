@@ -2,7 +2,6 @@ import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
-  billingSchema,
   count,
   db,
   desc,
@@ -10,7 +9,6 @@ import {
   ilike,
   multiTenantSchema,
   or,
-  sql,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
@@ -138,33 +136,6 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "admin organization member list failed");
-        }
-      },
-    );
-  }
-
-  async findPlanFor(organizationId: string): Promise<Result<Option<string>, AdminStoreError>> {
-    return this.instrumentation.startSpan(
-      { name: "DrizzleAdminOrgStore > findPlanFor" },
-      async () => {
-        try {
-          const { subscription } = billingSchema;
-          const query = db
-            .select({ plan: subscription.plan })
-            .from(subscription)
-            .where(eq(subscription.referenceId, organizationId))
-            .orderBy(sql`${subscription.periodStart} DESC NULLS LAST`)
-            .limit(1);
-
-          const [row] = await this.instrumentation.startSpan(
-            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => query.execute(),
-          );
-
-          return Result.ok(Option.fromNullable(row?.plan));
-        } catch (err) {
-          this.instrumentation.capture(err);
-          return fail(err, "admin organization plan lookup failed");
         }
       },
     );

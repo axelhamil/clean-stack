@@ -124,6 +124,13 @@ export default {
     ADMIN_PASSWORD_RESET_UNAVAILABLE:
       "L'email de réinitialisation n'a pas pu être envoyé. Les sessions de l'utilisateur ont été fermées, réessayez.",
     ADMIN_OPS_PROVIDER_FAILURE: "Les données d'exploitation n'ont pas pu être lues. Réessayez.",
+    ADMIN_ORG_NOT_FOUND: "Cette organisation n'existe plus.",
+    ADMIN_NOTE_PROVIDER_FAILURE: "Les notes n'ont pas pu être lues ou enregistrées. Réessayez.",
+    ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE:
+      "Le forfait forcé n'a pas pu être lu ou enregistré. Réessayez.",
+    ADMIN_PLAN_OVERRIDE_NOT_FOUND: "Cette organisation n'a pas de forfait forcé actif.",
+    ADMIN_PLAN_OVERRIDE_ALREADY_SET_CONFLICT:
+      "Un collègue vient de forcer un forfait sur cette organisation. Rechargez et vérifiez.",
     ADMIN_STRIPE_UNAVAILABLE: "Stripe n'est pas configuré sur cette plateforme.",
     ADMIN_STRIPE_EVENT_NOT_FOUND: "Cette plateforme n'a jamais reçu cet événement Stripe.",
     ADMIN_STRIPE_PROVIDER_FAILURE:
@@ -299,6 +306,10 @@ export default {
     loadStripeEvents: "Échec du chargement des événements Stripe",
     requeueOutbox: "Échec de la relance de ces événements",
     replayStripeEvent: "Échec du rejeu de cet événement",
+    setPlanOverride: "Échec de l'enregistrement de ce forfait forcé",
+    revokePlanOverride: "Échec de la fin de ce forfait forcé",
+    loadStaffNotes: "Échec du chargement des notes",
+    addStaffNote: "Échec de l'ajout de cette note",
     decideApproval: "Échec de l'enregistrement de la décision",
     cancelApproval: "Échec de l'annulation de cette demande",
     loadAuditLog: "Échec du chargement du journal d'audit",

@@ -1,6 +1,12 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
 import { ENTITLEMENTS } from "../../../shared/entitlements";
+import type {
+  ActivePlanOverride,
+  IPlanOverrideStore,
+  PlanOverrideStoreError,
+} from "../../../shared/ports/plan-override.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   BillingError,
@@ -25,12 +31,36 @@ function makeStore(row: SubscriptionRow | null, fail = false): ISubscriptionRead
   };
 }
 
+const ACTIVE: ActivePlanOverride = {
+  id: "ov-1",
+  organizationId: "org1",
+  tier: "business",
+  expiresAt: new Date("2030-01-01"),
+  note: "Pilot",
+  createdAt: new Date("2026-01-01"),
+};
+
+function makeOverrides(row: ActivePlanOverride | null, fail = false): IPlanOverrideStore {
+  const store = mockPort<IPlanOverrideStore>();
+  store.findActive.mockImplementation(async () =>
+    fail
+      ? Result.fail<Option<ActivePlanOverride>, PlanOverrideStoreError>({
+          code: "ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE",
+          message: "db down",
+        })
+      : Result.ok(Option.fromNullable(row)),
+  );
+
+  return store;
+}
+
+function serviceOver(store: ISubscriptionReadStore, overrides = makeOverrides(null)) {
+  return new EntitlementsService(store, overrides, new NoOpInstrumentation());
+}
+
 describe("EntitlementsService", () => {
   it("resolves the org's tier from the active subscription row", async () => {
-    const svc = new EntitlementsService(
-      makeStore({ tier: "pro", status: "active" }),
-      new NoOpInstrumentation(),
-    );
+    const svc = serviceOver(makeStore({ tier: "pro", status: "active" }));
     const view = await svc.getEntitlements("org1");
     expect(view.tier).toBe("pro");
     expect(view.maxMembers).toBe(ENTITLEMENTS.pro.maxMembers);
@@ -39,15 +69,57 @@ describe("EntitlementsService", () => {
   });
 
   it("defaults to free when there is no active subscription", async () => {
-    const svc = new EntitlementsService(makeStore(null), new NoOpInstrumentation());
+    const svc = serviceOver(makeStore(null));
     const view = await svc.getEntitlements("org1");
     expect(view.tier).toBe("free");
     expect(view.status).toBe("free");
   });
 
   it("fails closed to free when the store errors", async () => {
-    const svc = new EntitlementsService(makeStore(null, true), new NoOpInstrumentation());
+    const svc = serviceOver(makeStore(null, true));
     const view = await svc.getEntitlements("org1");
     expect(view.tier).toBe("free");
+  });
+
+  it("gives an active override's tier over the subscription, keeping the subscription status", async () => {
+    const svc = serviceOver(makeStore({ tier: "pro", status: "active" }), makeOverrides(ACTIVE));
+
+    const view = await svc.getEntitlements("org1");
+
+    expect(view.tier).toBe("business");
+    expect(view.maxMembers).toBe(ENTITLEMENTS.business.maxMembers);
+    expect(view.features).toEqual(ENTITLEMENTS.business.features);
+    expect(view.status).toBe("active");
+  });
+
+  it("says the plan is an override when no subscription backs it", async () => {
+    const svc = serviceOver(makeStore(null), makeOverrides(ACTIVE));
+
+    const view = await svc.getEntitlements("org1");
+
+    expect(view.tier).toBe("business");
+    expect(view.status).toBe("override");
+  });
+
+  it("fails closed to free when the override read errors, whatever the subscription says", async () => {
+    const svc = serviceOver(
+      makeStore({ tier: "pro", status: "active" }),
+      makeOverrides(null, true),
+    );
+
+    const view = await svc.getEntitlements("org1");
+
+    expect(view.tier).toBe("free");
+  });
+
+  it("ignores an override whose tier left the catalog", async () => {
+    const svc = serviceOver(
+      makeStore({ tier: "pro", status: "active" }),
+      makeOverrides({ ...ACTIVE, tier: "retired" }),
+    );
+
+    const view = await svc.getEntitlements("org1");
+
+    expect(view.tier).toBe("pro");
   });
 });

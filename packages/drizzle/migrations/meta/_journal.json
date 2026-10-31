@@ -232,6 +232,13 @@
       "when": 1793452159553,
       "tag": "0032_admin_ops",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793452954429,
+      "tag": "0033_admin_accounts",
+      "breakpoints": true
     }
   ]
 }

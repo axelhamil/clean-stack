@@ -1,4 +1,15 @@
-import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { user } from "./auth";
+import { organization } from "./multi-tenant";
 
 export const STRIPE_EVENT_STATUSES = ["processed", "failed"] as const;
 
@@ -40,4 +51,25 @@ export const stripeEvent = pgTable(
     replayedAt: timestamp("replayed_at", { withTimezone: true }),
   },
   (table) => [index("stripe_event_received_at_idx").on(table.receivedAt)],
+);
+
+export const planOverride = pgTable(
+  "plan_override",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    tier: text("tier").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    note: text("note").notNull(),
+  },
+  (table) => [
+    uniqueIndex("plan_override_one_open_uq")
+      .on(table.organizationId)
+      .where(sql`${table.revokedAt} IS NULL`),
+  ],
 );

@@ -77,6 +77,16 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /admin/ops/stripe-events/:id/replay": {
     consumer: "apps/admin/src/features/operations/api/ops.mutations.ts",
   },
+  "GET /admin/orgs/:id/notes": { consumer: "apps/admin/src/shared/api/queries/notes.ts" },
+  "POST /admin/orgs/:id/notes": { consumer: "apps/admin/src/shared/api/mutations/add-note.ts" },
+  "POST /admin/orgs/:id/plan-override": {
+    consumer: "apps/admin/src/features/orgs/api/orgs.mutations.ts",
+  },
+  "DELETE /admin/orgs/:id/plan-override": {
+    consumer: "apps/admin/src/features/orgs/api/orgs.mutations.ts",
+  },
+  "GET /admin/users/:id/notes": { consumer: "apps/admin/src/shared/api/queries/notes.ts" },
+  "POST /admin/users/:id/notes": { consumer: "apps/admin/src/shared/api/mutations/add-note.ts" },
   "GET /admin/staff": { consumer: "apps/admin/src/features/team/api/team.queries.ts" },
   "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
   "GET /admin/users/:id": {

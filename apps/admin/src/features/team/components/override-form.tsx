@@ -12,7 +12,11 @@ import {
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { earliestExpiryDay, latestExpiryDay, overrideExpiryOf } from "../override-expiry";
+import {
+  earliestExpiryDay,
+  latestExpiryDay,
+  overrideExpiryOf,
+} from "../../../shared/override-expiry";
 import { STAFF_PERMISSION_LABEL_KEYS } from "../team-labels";
 
 export interface OverrideFormValues {

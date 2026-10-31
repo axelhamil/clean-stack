@@ -27,7 +27,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
-import { authSchema, db, eq, sql, TransactionService } from "@packages/drizzle";
+import { authSchema, db, eq, sql, staffSchema, TransactionService } from "@packages/drizzle";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
@@ -60,6 +60,11 @@ async function seedUser(): Promise<void> {
     pendingDeletionUntil: new Date(Date.now() - 1000),
     deletedAt: null,
     locale: "en",
+  });
+  await db.insert(staffSchema.staffNote).values({
+    id: `${userId}-note`,
+    userId,
+    body: "Probe note about the account.",
   });
 }
 
@@ -131,6 +136,12 @@ async function main(): Promise<void> {
   check("the user row still exists", row !== undefined);
   check("deleted_at is still NULL, the wipe did not persist", row?.deletedAt === null);
   check("the email was not anonymized, the wipe did not persist", row?.email === probeEmail);
+
+  const notes = await db
+    .select({ id: staffSchema.staffNote.id })
+    .from(staffSchema.staffNote)
+    .where(eq(staffSchema.staffNote.userId, userId));
+  check("the staff notes come back with the rolled back wipe", notes.length === 1, notes);
 
   const readyForWipe = await new DrizzleRgpdRepository(
     logger,

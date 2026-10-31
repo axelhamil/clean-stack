@@ -10,18 +10,22 @@ import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
 import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
 import type { IApprovalStore } from "./application/ports/approval-store.port";
 import type { IOpsStore } from "./application/ports/ops-store.port";
+import type { IStaffNoteStore } from "./application/ports/staff-note-store.port";
 import type { IStepUpStore } from "./application/ports/step-up-store.port";
 import { AdminModerationService } from "./application/services/admin-moderation.service";
 import { AdminQueryService } from "./application/services/admin-query.service";
 import { ApprovalService } from "./application/services/approval.service";
 import { OpsService } from "./application/services/ops.service";
+import { PlanOverrideService } from "./application/services/plan-override.service";
 import { StaffService } from "./application/services/staff.service";
+import { StaffNoteService } from "./application/services/staff-note.service";
 import { StepUpService } from "./application/services/step-up.service";
 import { DrizzleAdminOrgStore } from "./infrastructure/repositories/drizzle-admin-org.store";
 import { DrizzleAdminUserStore } from "./infrastructure/repositories/drizzle-admin-user.store";
 import { DrizzleApprovalStore } from "./infrastructure/repositories/drizzle-approval.store";
 import { DrizzleOpsStore } from "./infrastructure/repositories/drizzle-ops.store";
 import { DrizzleStaffStore } from "./infrastructure/repositories/drizzle-staff.store";
+import { DrizzleStaffNoteStore } from "./infrastructure/repositories/drizzle-staff-note.store";
 import { DrizzleStepUpStore } from "./infrastructure/repositories/drizzle-step-up.store";
 
 declare module "inwire" {
@@ -40,6 +44,9 @@ declare module "inwire" {
     ApprovalService: ApprovalService;
     IOpsStore: IOpsStore;
     OpsService: OpsService;
+    PlanOverrideService: PlanOverrideService;
+    IStaffNoteStore: IStaffNoteStore;
+    StaffNoteService: StaffNoteService;
     CloseApprovalsOfDeletedUser: EventHandler;
     NotifyImpersonatedUser: EventHandler;
   }
@@ -51,7 +58,14 @@ export const adminModule = defineModule()((b) =>
     .add("IAdminOrgStore", (c): IAdminOrgStore => new DrizzleAdminOrgStore(c.IInstrumentation))
     .add(
       "AdminQueryService",
-      (c) => new AdminQueryService(c.IAdminUserStore, c.IInstrumentation, c.IAdminOrgStore),
+      (c) =>
+        new AdminQueryService(
+          c.IAdminUserStore,
+          c.IInstrumentation,
+          c.IAdminOrgStore,
+          c.EntitlementsService,
+          c.IPlanOverrideStore,
+        ),
     )
     .add("IStaffStore", (c): IStaffStore => new DrizzleStaffStore(c.IInstrumentation))
     .add(
@@ -257,6 +271,21 @@ export const adminModule = defineModule()((b) =>
           c.ITransactionService,
           env,
         ),
+    )
+    .add(
+      "PlanOverrideService",
+      (c) =>
+        new PlanOverrideService(
+          c.IPlanOverrideStore,
+          c.IAdminOrgStore,
+          c.IOutboxRepository,
+          c.ITransactionService,
+        ),
+    )
+    .add("IStaffNoteStore", (c): IStaffNoteStore => new DrizzleStaffNoteStore(c.IInstrumentation))
+    .add(
+      "StaffNoteService",
+      (c) => new StaffNoteService(c.IStaffNoteStore, c.IOutboxRepository, c.ITransactionService),
     )
     .add("CloseApprovalsOfDeletedUser", (c) =>
       closeApprovalsOfDeletedUser({ ApprovalService: c.ApprovalService }),

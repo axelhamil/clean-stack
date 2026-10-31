@@ -7,11 +7,13 @@ import { deliverPasswordReset } from "../../shared/auth/password-reset-delivery"
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
+import { addStaffNoteBodySchema } from "./application/dto/add-staff-note.dto";
 import { banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
 import type { AdminUserRow } from "./application/ports/admin-user-store.port";
 import type { AdminUserDetail } from "./application/services/admin-query.service";
 import { gateOr202 } from "./approval-response";
+import { serializeStaffNote } from "./staff-note-response";
 
 async function findUserOr404(userId: string): Promise<AdminUserDetail> {
   const result = await di.AdminQueryService.getUser(userId);
@@ -145,4 +147,26 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
     );
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
-  });
+  })
+  .get("/:id/notes", requireAuth, requireStaffPermission("users.read"), async (c) => {
+    const result = await di.StaffNoteService.list({ type: "user", id: c.req.param("id") });
+    if (result.isFailure) throw new AppErrorException(result.getError());
+
+    return c.json({ items: result.getValue().map(serializeStaffNote) });
+  })
+  .post(
+    "/:id/notes",
+    requireAuth,
+    requireStaffPermission("notes.write"),
+    zV("json", addStaffNoteBodySchema),
+    async (c) => {
+      const result = await di.StaffNoteService.add({
+        actorUserId: c.get("user").id,
+        subject: { type: "user", id: c.req.param("id") },
+        body: c.req.valid("json").body,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+
+      return c.json({ ok: true });
+    },
+  );

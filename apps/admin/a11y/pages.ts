@@ -4,6 +4,7 @@ import {
   STUB_APPROVAL,
   STUB_DEAD_LETTERS,
   STUB_MEMBERS,
+  STUB_NOTES,
   STUB_ORG,
   STUB_STRIPE_EVENTS,
   STUB_SWEEPS,
@@ -37,7 +38,32 @@ export const STAFF_PAGES: readonly AuditedPage[] = [
   {
     name: "organization detail",
     path: "/orgs/org-stub",
-    prepare: stubApi("**/admin/orgs/org-stub", STUB_ORG),
+    prepare: async (page) => {
+      await stubApi("**/admin/orgs/org-stub", STUB_ORG)(page);
+      await stubApi("**/admin/orgs/org-stub/notes", STUB_NOTES)(page);
+    },
+  },
+  {
+    name: "organization detail, no override and no note",
+    path: "/orgs/org-stub",
+    prepare: async (page) => {
+      await stubApi("**/admin/orgs/org-stub", { ...STUB_ORG, plan: "free", planOverride: null })(
+        page,
+      );
+      await stubApi("**/admin/orgs/org-stub/notes", { items: [] })(page);
+    },
+  },
+  {
+    name: "organization detail, notes load error",
+    path: "/orgs/org-stub",
+    prepare: async (page) => {
+      await stubApi("**/admin/orgs/org-stub", STUB_ORG)(page);
+      await stubApi(
+        "**/admin/orgs/org-stub/notes",
+        { error: { code: "X", message: "x" } },
+        500,
+      )(page);
+    },
   },
   { name: "audit log", path: "/audit" },
   { name: "operations", path: "/operations" },

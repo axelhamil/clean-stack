@@ -37,7 +37,7 @@ describe("staff access", () => {
 
 const MATRIX: Record<StaffRole, readonly StaffPermission[]> = {
   manager: STAFF_PERMISSIONS,
-  support: ["users.read", "users.moderate", "users.impersonate", "orgs.read"],
+  support: ["users.read", "users.moderate", "users.impersonate", "orgs.read", "notes.write"],
   auditor: ["users.read", "orgs.read", "audit.read", "ops.read"],
 };
 

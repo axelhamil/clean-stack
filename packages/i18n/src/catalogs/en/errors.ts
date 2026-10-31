@@ -127,6 +127,13 @@ export default {
     ADMIN_PASSWORD_RESET_UNAVAILABLE:
       "The reset email could not be sent. The user's sessions were ended, try again.",
     ADMIN_OPS_PROVIDER_FAILURE: "The operations data could not be read. Try again.",
+    ADMIN_ORG_NOT_FOUND: "This organization no longer exists.",
+    ADMIN_NOTE_PROVIDER_FAILURE: "The notes could not be read or saved. Try again.",
+    ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE:
+      "The plan override could not be read or saved. Try again.",
+    ADMIN_PLAN_OVERRIDE_NOT_FOUND: "This organization has no active plan override.",
+    ADMIN_PLAN_OVERRIDE_ALREADY_SET_CONFLICT:
+      "A colleague just set a plan override on this organization. Reload and check it.",
     ADMIN_STRIPE_UNAVAILABLE: "Stripe is not configured on this platform.",
     ADMIN_STRIPE_EVENT_NOT_FOUND: "This platform never received this Stripe event.",
     ADMIN_STRIPE_PROVIDER_FAILURE:
@@ -307,6 +314,10 @@ export default {
     loadStripeEvents: "Failed to load Stripe events",
     requeueOutbox: "Failed to requeue these events",
     replayStripeEvent: "Failed to replay this event",
+    setPlanOverride: "Failed to save this plan override",
+    revokePlanOverride: "Failed to end this plan override",
+    loadStaffNotes: "Failed to load the notes",
+    addStaffNote: "Failed to add this note",
     decideApproval: "Failed to record this decision",
     cancelApproval: "Failed to cancel this request",
     loadAuditLog: "Failed to load audit log",

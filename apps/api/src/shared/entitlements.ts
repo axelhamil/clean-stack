@@ -1,4 +1,5 @@
-export type Tier = "free" | "pro" | "business";
+export const TIERS = ["free", "pro", "business"] as const;
+export type Tier = (typeof TIERS)[number];
 export type Feature = "audit_log" | "api" | "sso";
 export type QuotaKey = "uploads" | "projects" | "apiCallsPerMonth";
 

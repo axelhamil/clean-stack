@@ -23,5 +23,4 @@ export interface IAdminOrgStore {
   listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgListRow[], AdminStoreError>>;
   findOrgById(id: string): Promise<Result<Option<AdminOrgRow>, AdminStoreError>>;
   listMembersOf(organizationId: string): Promise<Result<AdminOrgMemberRow[], AdminStoreError>>;
-  findPlanFor(organizationId: string): Promise<Result<Option<string>, AdminStoreError>>;
 }

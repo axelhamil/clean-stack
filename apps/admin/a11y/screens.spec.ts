@@ -5,6 +5,7 @@ import {
   STUB_APPROVAL,
   STUB_DEAD_LETTERS,
   STUB_MEMBERS,
+  STUB_NOTES,
   STUB_ORG,
   STUB_OVERRIDE,
   STUB_STRIPE_EVENTS,
@@ -25,6 +26,8 @@ const ALL_PERMISSIONS = [
   "staff.manage",
   "ops.read",
   "ops.manage",
+  "billing.override",
+  "notes.write",
 ];
 
 async function stub(page: Page, path: string, json: unknown, status = 200): Promise<void> {
@@ -49,6 +52,8 @@ async function stubDetailData(page: Page): Promise<void> {
   await stub(page, `**/admin/users/${STUB_USER_ID}`, STUB_USER);
   await stub(page, "**/admin/users?*", { items: [STUB_USER], nextCursor: null });
   await stub(page, "**/admin/orgs/org-stub", STUB_ORG);
+  await stub(page, "**/admin/orgs/org-stub/notes", STUB_NOTES);
+  await stub(page, `**/admin/users/${STUB_USER_ID}/notes`, STUB_NOTES);
   await stub(page, "**/admin/orgs?*", { items: [STUB_ORG], nextCursor: null });
   await stub(page, "**/admin/approvals/approval-stub", STUB_APPROVAL);
   await stub(page, "**/admin/approvals?*", { items: [STUB_APPROVAL], nextCursor: null });
@@ -108,6 +113,69 @@ test.describe("back office screens", () => {
     await expect(dialog.getByText("Decide approvals")).toBeVisible();
 
     await expectHoldsFocus(page, dialog, opener);
+  });
+
+  test("the plan override dialog holds and gives back focus", async ({ page }) => {
+    await page.goto("/orgs/org-stub");
+
+    const opener = page.getByRole("button", { name: "Replace the override" });
+    await opener.click();
+
+    await expectHoldsFocus(page, page.getByRole("dialog"), opener);
+  });
+
+  test("the end of override dialog holds and gives back focus", async ({ page }) => {
+    await page.goto("/orgs/org-stub");
+
+    const opener = page.getByRole("button", { name: "End the override" });
+    await opener.click();
+
+    await expectHoldsFocus(page, page.getByRole("alertdialog"), opener);
+  });
+
+  test("a plan override refuses a missing end date and a missing reason", async ({ page }) => {
+    await page.goto("/orgs/org-stub");
+    await page.getByRole("button", { name: "Replace the override" }).click();
+    await page.getByRole("button", { name: "Save the override" }).click();
+
+    await expect(page.getByText("Choose an end date")).toBeVisible();
+    await expect(page.getByText("Say why this organization")).toBeVisible();
+  });
+
+  test("the organization shows the effective plan and when the override ends", async ({ page }) => {
+    await page.goto("/orgs/org-stub");
+
+    await expect(page.getByText("Plan override")).toBeVisible();
+    await expect(page.getByText("Business").first()).toBeVisible();
+    const end = await page.evaluate(() =>
+      new Date("2030-01-01T00:00:00.000Z").getFullYear().toString().slice(-2),
+    );
+    await expect(page.getByText("Ends", { exact: true })).toBeVisible();
+    await expect(page.getByText(new RegExp(`\\b(20)?${end}\\b`)).first()).toBeVisible();
+  });
+
+  test("staff who can only read see notes and overrides and are offered no action", async ({
+    page,
+  }) => {
+    await stubMe(page, ["users.read", "orgs.read"]);
+
+    for (const path of ["/orgs/org-stub", USER_PATH]) {
+      await page.goto(path);
+
+      await expect(page.getByText("Called back.")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Add the note" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Replace the override" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "End the override" })).toHaveCount(0);
+    }
+  });
+
+  test("an empty note cannot be added and a written one can", async ({ page }) => {
+    await page.goto(USER_PATH);
+
+    const add = page.getByRole("button", { name: "Add the note" });
+    await expect(add).toBeDisabled();
+    await page.getByLabel("Add a note, only staff can read it").fill("Asked for a refund.");
+    await expect(add).toBeEnabled();
   });
 
   test("the replay dialog holds and gives back focus", async ({ page }) => {

@@ -35,7 +35,14 @@ export const STUB_ORG = {
   name: LONG_NAME,
   slug: "northwind-industries-holdings-international-subsidiaries-europe",
   ssoEnforced: true,
-  plan: null,
+  plan: "business",
+  planOverride: {
+    id: "override-plan-stub",
+    tier: "business",
+    note: LONG_NAME.repeat(4),
+    expiresAt: "2030-01-01T00:00:00.000Z",
+    createdAt: CREATED_AT,
+  },
   memberCount: 1284,
   createdAt: CREATED_AT,
   members: [{ userId: STUB_USER_ID, email: LONG_EMAIL, role: "owner" }],
@@ -136,5 +143,17 @@ export const STUB_STRIPE_EVENTS = {
       lastError: "The handler answered 400.",
       replayedAt: CREATED_AT,
     },
+  ],
+};
+
+export const STUB_NOTES = {
+  items: [
+    {
+      id: "note-stub",
+      authorName: LONG_NAME,
+      body: `${LONG_EMAIL} ${LONG_NAME.repeat(3)}`,
+      createdAt: CREATED_AT,
+    },
+    { id: "note-orphan", authorName: null, body: "Called back.", createdAt: CREATED_AT },
   ],
 };

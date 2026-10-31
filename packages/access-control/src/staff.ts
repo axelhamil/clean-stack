@@ -10,6 +10,7 @@ export const STAFF_PERMISSIONS = [
   "users.impersonate",
   "orgs.read",
   "orgs.sso",
+  "notes.write",
   "audit.read",
   "ops.read",
   "ops.manage",
@@ -29,7 +30,7 @@ export interface StaffPermissionOverride {
 
 const ROLE_PERMISSIONS: Record<StaffRole, readonly StaffPermission[]> = {
   manager: STAFF_PERMISSIONS,
-  support: ["users.read", "users.moderate", "users.impersonate", "orgs.read"],
+  support: ["users.read", "users.moderate", "users.impersonate", "orgs.read", "notes.write"],
   auditor: ["users.read", "orgs.read", "audit.read", "ops.read"],
 };
 

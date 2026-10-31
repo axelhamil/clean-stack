@@ -195,6 +195,11 @@ jobs:
         # live in SQL; a replay needs the real signed handler. Creates and removes its own rows.
         run: pnpm --filter api check:admin-ops
 
+      - name: Check plan overrides and staff notes on the real route stack
+        # Expiry, revocation, the one-open index and the wipes live in SQL; the gates read the
+        # override through the real entitlements. Creates and removes its own rows.
+        run: pnpm --filter api check:admin-accounts
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
