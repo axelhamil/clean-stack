@@ -3,6 +3,8 @@ import { isApprovalAction } from "@packages/access-control";
 import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import {
   and,
+  asc,
+  count,
   desc,
   eq,
   gt,
@@ -34,6 +36,7 @@ import {
   type ApprovalStoreError,
   type ApprovalWrite,
   type IApprovalStore,
+  type OpenApprovals,
 } from "../../application/ports/approval-store.port";
 
 type Executor = ReturnType<typeof resolveExecutor>;
@@ -166,6 +169,20 @@ export class DrizzleApprovalStore implements IApprovalStore {
       );
 
       return recordsOf(rows);
+    });
+  }
+
+  listOpen(limit: number): Promise<Result<OpenApprovals, ApprovalStoreError>> {
+    return this.traced("listOpen", "open approvals read failed", async (exec) => {
+      const rows = await exec
+        .select()
+        .from(table)
+        .where(pendingAndLive)
+        .orderBy(asc(table.createdAt), asc(table.id))
+        .limit(limit);
+      const [total] = await exec.select({ value: count() }).from(table).where(pendingAndLive);
+
+      return { items: recordsOf(rows), total: total?.value ?? 0 };
     });
   }
 

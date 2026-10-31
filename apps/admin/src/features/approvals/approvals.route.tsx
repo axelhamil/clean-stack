@@ -23,8 +23,8 @@ import { useTranslation } from "react-i18next";
 import { requireSection } from "../../shared/auth/require-section";
 import { QueryList } from "../../shared/components/query-list";
 import { StaffPage } from "../../shared/components/staff-page";
+import { approvalActionLabelKey } from "../../shared/labels/approval-action";
 import { approvalsInfiniteQueryOptions } from "./api/approvals.queries";
-import { approvalActionLabelKey } from "./approval-labels";
 import { APPROVAL_STATUSES, approvalsSearchSchema } from "./approvals-search";
 
 const ALL = "all";

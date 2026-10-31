@@ -82,7 +82,10 @@ export function NotesSection({ subject }: NotesSectionProps) {
               <ListRowContent>
                 <p className="wrap-anywhere whitespace-pre-wrap">{note.body}</p>
                 <TypographyMuted className="wrap-anywhere">
-                  {`${note.authorName ?? t("backOffice.notes.formerStaff")} · ${formatDateTime(note.createdAt)}`}
+                  {t("backOffice.notes.signature", {
+                    author: note.authorName ?? t("backOffice.notes.formerStaff"),
+                    date: formatDateTime(note.createdAt),
+                  })}
                 </TypographyMuted>
               </ListRowContent>
             </ListRow>

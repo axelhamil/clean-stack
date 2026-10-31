@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { usersInfiniteQueryOptions } from "../../shared/api/queries/users";
 import { requireSection } from "../../shared/auth/require-section";
 import { QueryList } from "../../shared/components/query-list";
+import { SavedViewsBar } from "../../shared/components/saved-views-bar";
 import { StaffPage } from "../../shared/components/staff-page";
 import { useDebouncedFilter } from "../../shared/hooks/use-debounced-filter";
 import { userQueryOf, usersSearchSchema } from "./users-filters";
@@ -92,6 +93,8 @@ function UsersPage() {
           </SelectContent>
         </Select>
       </div>
+
+      <SavedViewsBar screen="users" filters={search} />
 
       <QueryList
         query={query}

@@ -26,6 +26,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { requireSection } from "../../shared/auth/require-section";
 import { QueryList } from "../../shared/components/query-list";
+import { SavedViewsBar } from "../../shared/components/saved-views-bar";
 import { StaffPage } from "../../shared/components/staff-page";
 import { useDebouncedFilter } from "../../shared/hooks/use-debounced-filter";
 import { auditInfiniteQueryOptions, chainVerifyQueryOptions } from "./api/audit.queries";
@@ -133,6 +134,8 @@ function AuditPage() {
           onChange={(event) => setOrg(event.target.value)}
         />
       </div>
+
+      <SavedViewsBar screen="audit" filters={search} />
 
       <QueryList
         query={query}

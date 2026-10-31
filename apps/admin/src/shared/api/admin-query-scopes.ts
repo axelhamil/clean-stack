@@ -4,4 +4,5 @@ export const ADMIN_QUERY_SCOPES = [
   ["admin", "staff"],
   ["admin", "ops"],
   ["admin", "notes"],
+  ["admin", "inbox"],
 ] as const;

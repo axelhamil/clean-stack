@@ -81,6 +81,8 @@ export const VISIBILITY = {
   "admin.plan_override.set": "internal",
   "admin.plan_override.revoked": "internal",
   "admin.note.added": "internal",
+  "admin.view.saved": "internal",
+  "admin.view.deleted": "internal",
   "admin.step_up.verified": "internal",
   "admin.step_up.failed": "internal",
   "admin.approval.requested": "internal",

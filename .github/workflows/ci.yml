@@ -200,6 +200,11 @@ jobs:
         # override through the real entitlements. Creates and removes its own rows.
         run: pnpm --filter api check:admin-accounts
 
+      - name: Check saved views and the inbox on the real route stack
+        # Ownership lives in the WHERE, the inbox counts in SQL, and the two crons write their
+        # heartbeat through the real routes. Creates and removes its own rows.
+        run: pnpm --filter api check:admin-workspace
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

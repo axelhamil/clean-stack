@@ -82,6 +82,28 @@ export class DrizzleOpsStore implements IOpsStore {
     );
   }
 
+  async countDeadOutbox(): Promise<Result<number, OpsStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleOpsStore > countDeadOutbox" },
+      async () => {
+        try {
+          const query = exec.select({ value: count() }).from(oe).where(deadRow);
+          const [total] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(total?.value ?? 0);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("count dead outbox events"));
+        }
+      },
+    );
+  }
+
   async countDeadQueues(): Promise<Result<DeadQueueCounts, OpsStoreError>> {
     const exec = resolveExecutor();
 

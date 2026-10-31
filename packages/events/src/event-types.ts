@@ -79,6 +79,8 @@ export const EventTypes = {
   ADMIN_PLAN_OVERRIDE_SET: "admin.plan_override.set",
   ADMIN_PLAN_OVERRIDE_REVOKED: "admin.plan_override.revoked",
   ADMIN_NOTE_ADDED: "admin.note.added",
+  ADMIN_VIEW_SAVED: "admin.view.saved",
+  ADMIN_VIEW_DELETED: "admin.view.deleted",
   ADMIN_STEP_UP_VERIFIED: "admin.step_up.verified",
   ADMIN_STEP_UP_FAILED: "admin.step_up.failed",
   ADMIN_APPROVAL_REQUESTED: "admin.approval.requested",

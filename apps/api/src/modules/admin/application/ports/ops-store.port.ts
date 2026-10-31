@@ -20,6 +20,7 @@ export type DeadQueueCounts = { emails: number; webhooks: number };
 
 export interface IOpsStore {
   listDeadOutbox(limit: number): Promise<Result<DeadOutboxPage, OpsStoreError>>;
+  countDeadOutbox(): Promise<Result<number, OpsStoreError>>;
   countDeadQueues(): Promise<Result<DeadQueueCounts, OpsStoreError>>;
   requeueDead(ids: string[], leaseSeconds: number): Promise<Result<string[], OpsStoreError>>;
 }

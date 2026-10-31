@@ -4,6 +4,7 @@ import { STORAGE_STATE } from "./playwright.config";
 import {
   STUB_APPROVAL,
   STUB_DEAD_LETTERS,
+  STUB_INBOX,
   STUB_MEMBERS,
   STUB_NOTES,
   STUB_ORG,
@@ -12,6 +13,7 @@ import {
   STUB_SWEEPS,
   STUB_USER,
   STUB_USER_ID,
+  STUB_VIEWS,
 } from "./stubs";
 
 const USER_PATH = `/users/${STUB_USER_ID}`;
@@ -62,6 +64,8 @@ async function stubDetailData(page: Page): Promise<void> {
   await stub(page, "**/admin/ops/sweeps", STUB_SWEEPS);
   await stub(page, "**/admin/ops/stripe-events", STUB_STRIPE_EVENTS);
   await stub(page, "**/admin/staff/member-stub/overrides", { items: [STUB_OVERRIDE] });
+  await stub(page, "**/admin/inbox", STUB_INBOX);
+  await stub(page, "**/admin/views", STUB_VIEWS);
 }
 
 async function expectHoldsFocus(page: Page, dialog: Locator, opener: Locator): Promise<void> {
@@ -323,6 +327,111 @@ test.describe("back office screens", () => {
     await expect(page.getByRole("button", { name: "Add a person" })).toHaveCount(0);
   });
 
+  test("each inbox row opens the screen that acts on it", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("link", { name: "1 email could not be sent" })).toHaveAttribute(
+      "href",
+      "/operations",
+    );
+    await expect(page.getByText("You asked on")).toBeVisible();
+    await expect(page.getByRole("link", { name: "See all 25 waiting approvals" })).toBeVisible();
+    await expect(page.getByText("webhook")).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Permanent suspension" }).first().click();
+
+    await expect(page).toHaveURL(/\/approvals\/approval-stub$/);
+  });
+
+  test("the inbox shows only what the answer opens", async ({ page }) => {
+    await stub(page, "**/admin/inbox", { ...STUB_INBOX, approvals: null });
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Approvals waiting" })).toHaveCount(0);
+  });
+
+  test("the inbox refreshes on a staff notification", async ({ page }) => {
+    await page.route("**/notifications/stream", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        headers: corsHeaders(route.request().headers().origin),
+        body: 'event: notification\ndata: {"id":"n1"}\n\n',
+      }),
+    );
+    let reads = 0;
+    await page.route("**/admin/inbox", (route) => {
+      reads += 1;
+
+      return route.fulfill({
+        json: STUB_INBOX,
+        headers: corsHeaders(route.request().headers().origin),
+      });
+    });
+    await page.goto("/");
+
+    await expect.poll(() => reads).toBeGreaterThan(1);
+  });
+
+  test("a saved view applies, saves and deletes from the list", async ({ page }) => {
+    const calls: { method: string; body: string | null }[] = [];
+    await page.route("**/admin/views", (route) => {
+      const request = route.request();
+      if (request.method() !== "POST") return route.fallback();
+
+      calls.push({ method: "POST", body: request.postData() });
+
+      return route.fulfill({
+        json: { id: "view-new" },
+        headers: corsHeaders(request.headers().origin),
+      });
+    });
+    await page.route("**/admin/views/view-suspended", (route) => {
+      calls.push({ method: route.request().method(), body: null });
+
+      return route.fulfill({
+        json: { ok: true },
+        headers: corsHeaders(route.request().headers().origin),
+      });
+    });
+    await page.goto("/users");
+
+    await page.getByRole("button", { name: "Suspended", exact: true }).click();
+    await expect(page).toHaveURL(/\/users\?status=suspended$/);
+    await expect(page.getByRole("button", { name: "Suspended", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(page.getByRole("button", { name: "Save this view" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Delete the view Suspended" }).click();
+    await expect.poll(() => calls).toEqual([{ method: "DELETE", body: null }]);
+
+    await page.goto("/users?org=acme");
+    const opener = page.getByRole("button", { name: "Save this view" });
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: "Save this view" });
+    await dialog.getByRole("textbox", { name: "Name" }).fill("Acme people");
+    await page.keyboard.press("Enter");
+    await expect(dialog).toBeHidden();
+
+    expect(JSON.parse(calls.at(-1)?.body ?? "{}")).toEqual({
+      screen: "users",
+      name: "Acme people",
+      filters: { org: "acme" },
+    });
+  });
+
+  test("the save dialog holds and gives back focus", async ({ page }) => {
+    await page.goto("/orgs?q=acme");
+
+    const opener = page.getByRole("button", { name: "Save this view" });
+    await opener.click();
+
+    await expectHoldsFocus(page, page.getByRole("dialog", { name: "Save this view" }), opener);
+  });
+
   for (const path of [
     "/users",
     USER_PATH,
@@ -333,6 +442,7 @@ test.describe("back office screens", () => {
     "/team",
     "/audit",
     "/operations",
+    "/",
   ]) {
     test(`long values leave ${path} inside a 390 px screen`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });

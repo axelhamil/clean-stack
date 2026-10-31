@@ -10,13 +10,16 @@ import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
 import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
 import type { IApprovalStore } from "./application/ports/approval-store.port";
 import type { IOpsStore } from "./application/ports/ops-store.port";
+import type { ISavedViewStore } from "./application/ports/saved-view-store.port";
 import type { IStaffNoteStore } from "./application/ports/staff-note-store.port";
 import type { IStepUpStore } from "./application/ports/step-up-store.port";
 import { AdminModerationService } from "./application/services/admin-moderation.service";
 import { AdminQueryService } from "./application/services/admin-query.service";
 import { ApprovalService } from "./application/services/approval.service";
+import { InboxService } from "./application/services/inbox.service";
 import { OpsService } from "./application/services/ops.service";
 import { PlanOverrideService } from "./application/services/plan-override.service";
+import { SavedViewService } from "./application/services/saved-view.service";
 import { StaffService } from "./application/services/staff.service";
 import { StaffNoteService } from "./application/services/staff-note.service";
 import { StepUpService } from "./application/services/step-up.service";
@@ -24,6 +27,7 @@ import { DrizzleAdminOrgStore } from "./infrastructure/repositories/drizzle-admi
 import { DrizzleAdminUserStore } from "./infrastructure/repositories/drizzle-admin-user.store";
 import { DrizzleApprovalStore } from "./infrastructure/repositories/drizzle-approval.store";
 import { DrizzleOpsStore } from "./infrastructure/repositories/drizzle-ops.store";
+import { DrizzleSavedViewStore } from "./infrastructure/repositories/drizzle-saved-view.store";
 import { DrizzleStaffStore } from "./infrastructure/repositories/drizzle-staff.store";
 import { DrizzleStaffNoteStore } from "./infrastructure/repositories/drizzle-staff-note.store";
 import { DrizzleStepUpStore } from "./infrastructure/repositories/drizzle-step-up.store";
@@ -47,6 +51,9 @@ declare module "inwire" {
     PlanOverrideService: PlanOverrideService;
     IStaffNoteStore: IStaffNoteStore;
     StaffNoteService: StaffNoteService;
+    ISavedViewStore: ISavedViewStore;
+    SavedViewService: SavedViewService;
+    InboxService: InboxService;
     CloseApprovalsOfDeletedUser: EventHandler;
     NotifyImpersonatedUser: EventHandler;
   }
@@ -287,6 +294,12 @@ export const adminModule = defineModule()((b) =>
       "StaffNoteService",
       (c) => new StaffNoteService(c.IStaffNoteStore, c.IOutboxRepository, c.ITransactionService),
     )
+    .add("ISavedViewStore", (c): ISavedViewStore => new DrizzleSavedViewStore(c.IInstrumentation))
+    .add(
+      "SavedViewService",
+      (c) => new SavedViewService(c.ISavedViewStore, c.IOutboxRepository, c.ITransactionService),
+    )
+    .add("InboxService", (c) => new InboxService(c.IApprovalStore, c.IOpsStore, c.ISweepRunStore))
     .add("CloseApprovalsOfDeletedUser", (c) =>
       closeApprovalsOfDeletedUser({ ApprovalService: c.ApprovalService }),
     )

@@ -30,11 +30,13 @@ const { adminOpsRoutes } = await import("../ops.routes");
 const { adminOrgRoutes } = await import("../admin-orgs.routes");
 const { adminUserRoutes } = await import("../routes");
 const { adminStaffRoutes } = await import("../staff.routes");
+const { adminWorkspaceRoutes } = await import("../workspace.routes");
 const { auditLogRoutes } = await import("../../audit-log/routes");
 const { listBackRoutes } = await import("../../../shared/surface/back-routes");
 
 const app = new Hono()
   .route("/admin", adminStaffRoutes)
+  .route("/admin", adminWorkspaceRoutes)
   .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
@@ -48,6 +50,10 @@ app.onError((err, c) =>
 const REQUIRED: Record<string, string> = {
   "GET /admin/me": "staff",
   "POST /admin/step-up": "staff",
+  "GET /admin/inbox": "staff",
+  "GET /admin/views": "staff",
+  "POST /admin/views": "staff",
+  "DELETE /admin/views/:id": "staff",
   "GET /admin/staff": "staff.manage",
   "PUT /admin/staff/:id/role": "staff.manage",
   "DELETE /admin/staff/:id": "staff.manage",

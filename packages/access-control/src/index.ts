@@ -57,6 +57,16 @@ export {
   staffAccessSchema,
   staffReachable,
 } from "./staff";
+export {
+  auditViewFiltersSchema,
+  orgsViewFiltersSchema,
+  STAFF_VIEW_SCREEN_PERMISSION,
+  type StaffView,
+  type StaffViewScreen,
+  screensOpenTo,
+  staffViewSchema,
+  usersViewFiltersSchema,
+} from "./staff-views";
 
 export const ORG_ROLES = ["owner", "admin", "member"] as const;
 export const STATEMENTS = statement;

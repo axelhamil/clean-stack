@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { meQueryOptions } from "../shared/api/queries/me";
 import { refusalRedirect } from "../shared/auth/refusal-redirect";
 import { StepUpGate } from "../shared/auth/step-up-gate";
+import { AdminPalette } from "../shared/components/admin-palette";
 import { AdminShell } from "../shared/components/admin-shell";
 import { useStaffLiveUpdates } from "../shared/hooks/use-staff-live-updates";
 
@@ -29,6 +30,7 @@ function StaffLayout() {
     <AdminShell>
       <Outlet />
       <StepUpGate />
+      <AdminPalette />
     </AdminShell>
   );
 }

@@ -3,11 +3,13 @@ import type { Page } from "@playwright/test";
 import {
   STUB_APPROVAL,
   STUB_DEAD_LETTERS,
+  STUB_INBOX,
   STUB_MEMBERS,
   STUB_NOTES,
   STUB_ORG,
   STUB_STRIPE_EVENTS,
   STUB_SWEEPS,
+  STUB_VIEWS,
 } from "./stubs";
 
 function stubApi(path: string, json: unknown, status = 200) {
@@ -22,6 +24,25 @@ export const PUBLIC_PAGES: readonly AuditedPage[] = [{ name: "denied", path: "/d
 
 export const STAFF_PAGES: readonly AuditedPage[] = [
   { name: "home", path: "/" },
+  { name: "home, full inbox", path: "/", prepare: stubApi("**/admin/inbox", STUB_INBOX) },
+  {
+    name: "home, quiet inbox",
+    path: "/",
+    prepare: stubApi("**/admin/inbox", {
+      approvals: { total: 0, items: [] },
+      operations: { deadEvents: 0, deadEmails: 0, deadWebhooks: 0, failedSweeps: [] },
+    }),
+  },
+  {
+    name: "home, load error",
+    path: "/",
+    prepare: stubApi("**/admin/inbox", { error: { code: "X", message: "x" } }, 500),
+  },
+  {
+    name: "accounts, saved views",
+    path: "/users",
+    prepare: stubApi("**/admin/views", STUB_VIEWS),
+  },
   { name: "accounts", path: "/users" },
   {
     name: "accounts, no match",

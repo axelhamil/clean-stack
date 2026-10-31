@@ -146,6 +146,71 @@ export const STUB_STRIPE_EVENTS = {
   ],
 };
 
+export const STUB_VIEWS = {
+  items: [
+    {
+      id: "view-long",
+      screen: "users",
+      name: LONG_NAME.slice(0, 60),
+      filters: { q: "montgomery" },
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: "view-suspended",
+      screen: "users",
+      name: "Suspended",
+      filters: { status: "suspended" },
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: "view-org",
+      screen: "orgs",
+      name: "Northwind",
+      filters: { q: "north" },
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: "view-audit",
+      screen: "audit",
+      name: "Billing",
+      filters: { action: "billing." },
+      updatedAt: CREATED_AT,
+    },
+  ],
+};
+
+export const STUB_INBOX = {
+  approvals: {
+    total: 25,
+    items: [
+      {
+        id: "approval-stub",
+        action: "user.ban_permanent",
+        requestedBy: "someone-else",
+        createdAt: CREATED_AT,
+      },
+      {
+        id: "approval-mine",
+        action: "staff.revoke",
+        requestedBy: "staff-id",
+        createdAt: CREATED_AT,
+      },
+    ],
+  },
+  operations: {
+    deadEvents: 2,
+    deadEmails: 1,
+    deadWebhooks: 0,
+    failedSweeps: [
+      {
+        label: "sweep-audit-log-with-a-very-long-label-that-should-wrap-on-a-phone-screen",
+        outcome: "batch-error",
+        finishedAt: CREATED_AT,
+      },
+    ],
+  },
+};
+
 export const STUB_NOTES = {
   items: [
     {

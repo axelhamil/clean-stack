@@ -32,6 +32,7 @@ export interface PlanOverrideFormProps {
 
 export function PlanOverrideForm({ isPending, onSubmit }: PlanOverrideFormProps) {
   const { t } = useTranslation("admin");
+  const tierId = useId();
   const endId = useId();
   const endErrorId = useId();
   const noteId = useId();
@@ -55,28 +56,31 @@ export function PlanOverrideForm({ isPending, onSubmit }: PlanOverrideFormProps)
 
   return (
     <div className="flex flex-col gap-3">
-      <Select
-        value={tier}
-        onValueChange={(next) => {
-          const found = PLAN_TIERS.find((candidate) => candidate === next);
-          if (found) setTier(found);
-        }}
-      >
-        <SelectTrigger aria-label={t("orgs.planOverride.tierLabel")} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {PLAN_TIERS.map((candidate) => {
-            const labelKey = planLabelKey(candidate);
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={tierId}>{t("orgs.planOverride.tierLabel")}</Label>
+        <Select
+          value={tier}
+          onValueChange={(next) => {
+            const found = PLAN_TIERS.find((candidate) => candidate === next);
+            if (found) setTier(found);
+          }}
+        >
+          <SelectTrigger id={tierId} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PLAN_TIERS.map((candidate) => {
+              const labelKey = planLabelKey(candidate);
 
-            return (
-              <SelectItem key={candidate} value={candidate}>
-                {labelKey ? t(labelKey) : candidate}
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+              return (
+                <SelectItem key={candidate} value={candidate}>
+                  {labelKey ? t(labelKey) : candidate}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor={endId}>{t("orgs.planOverride.endLabel")}</Label>

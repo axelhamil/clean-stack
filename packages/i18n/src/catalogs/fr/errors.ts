@@ -124,6 +124,9 @@ export default {
     ADMIN_PASSWORD_RESET_UNAVAILABLE:
       "L'email de réinitialisation n'a pas pu être envoyé. Les sessions de l'utilisateur ont été fermées, réessayez.",
     ADMIN_OPS_PROVIDER_FAILURE: "Les données d'exploitation n'ont pas pu être lues. Réessayez.",
+    ADMIN_VIEW_NOT_FOUND: "Cette vue enregistrée n'existe plus.",
+    ADMIN_VIEW_PROVIDER_FAILURE:
+      "Les vues enregistrées n'ont pas pu être lues ou modifiées. Réessayez.",
     ADMIN_ORG_NOT_FOUND: "Cette organisation n'existe plus.",
     ADMIN_NOTE_PROVIDER_FAILURE: "Les notes n'ont pas pu être lues ou enregistrées. Réessayez.",
     ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE:
@@ -309,6 +312,10 @@ export default {
     setPlanOverride: "Échec de l'enregistrement de ce forfait forcé",
     revokePlanOverride: "Échec de la fin de ce forfait forcé",
     loadStaffNotes: "Échec du chargement des notes",
+    loadInbox: "Échec du chargement de votre boîte de réception",
+    loadSavedViews: "Échec du chargement de vos vues enregistrées",
+    saveView: "Échec de l'enregistrement de cette vue",
+    deleteView: "Échec de la suppression de cette vue",
     addStaffNote: "Échec de l'ajout de cette note",
     decideApproval: "Échec de l'enregistrement de la décision",
     cancelApproval: "Échec de l'annulation de cette demande",

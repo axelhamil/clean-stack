@@ -89,6 +89,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A staff member set a plan on an organization until an end date.",
   [EventTypes.ADMIN_PLAN_OVERRIDE_REVOKED]: "A staff member ended a plan override.",
   [EventTypes.ADMIN_NOTE_ADDED]: "A staff member added a note on an account or an organization.",
+  [EventTypes.ADMIN_VIEW_SAVED]: "A staff member saved a private view of a list.",
+  [EventTypes.ADMIN_VIEW_DELETED]: "A staff member deleted a private view of a list.",
   [EventTypes.ADMIN_APPROVAL_CANCELLED]: "A staff member withdrew their approval request.",
   [EventTypes.ADMIN_APPROVAL_EXPIRED]: "An approval request expired before anyone decided.",
   [EventTypes.ADMIN_APPROVAL_EXECUTED]: "An approved action was carried out.",

@@ -7,7 +7,15 @@ import { Route } from "../_staff";
 const $get = vi.hoisted(() => vi.fn());
 
 vi.mock("../../shared/api/api-client", () => ({
-  api: { admin: { me: { $get }, "step-up": { $post: vi.fn() } } },
+  api: {
+    admin: {
+      me: { $get },
+      "step-up": { $post: vi.fn() },
+      users: { $get: vi.fn() },
+      orgs: { $get: vi.fn() },
+      views: { $get: vi.fn() },
+    },
+  },
 }));
 vi.stubGlobal("window", { location: { origin: "http://admin.test" } });
 

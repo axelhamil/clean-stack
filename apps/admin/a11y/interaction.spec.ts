@@ -156,6 +156,132 @@ test.describe("signed in", () => {
     await expect(opener).toBeFocused();
   });
 
+  test("Ctrl K opens the palette, which holds focus and gives it back", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveCount(1);
+    const opener = navOf(page).getByRole("link", { name: "Home" });
+    await opener.focus();
+
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: "Back office search" });
+    await expect(palette.getByRole("combobox")).toBeFocused();
+
+    for (let press = 0; press < 6; press += 1) {
+      await page.keyboard.press("Tab");
+      expect(await palette.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+    }
+    expect(await blockingViolations(page, '[role="dialog"]')).toEqual([]);
+
+    await page.keyboard.press("Escape");
+    await expect(palette).toBeHidden();
+    await expect(opener).toBeFocused();
+  });
+
+  test("the palette lists the sections the permissions open and runs one with the keyboard", async ({
+    page,
+  }) => {
+    await fulfillMe(page, 200, { ...ME, permissions: ["audit.read"] });
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveCount(1);
+
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: "Back office search" });
+
+    await expect(palette.getByRole("option")).toHaveText(["Home", "Audit log"]);
+
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+
+    await expect(palette).toBeHidden();
+    await expect(page).toHaveURL(/\/audit$/);
+  });
+
+  test("the palette searches once per typing burst and opens the result", async ({ page }) => {
+    const searches: string[] = [];
+    await page.route("**/admin/users?*", (route) => {
+      searches.push(new URL(route.request().url()).searchParams.get("search") ?? "");
+
+      return route.fulfill({
+        json: {
+          items: [{ id: "found-user", email: "jo@example.com", name: "Jo" }],
+          nextCursor: null,
+        },
+        headers: corsHeaders(route.request().headers().origin),
+      });
+    });
+    await page.route("**/admin/orgs?*", (route) =>
+      route.fulfill({
+        json: { items: [], nextCursor: null },
+        headers: corsHeaders(route.request().headers().origin),
+      }),
+    );
+    await fulfillMe(page, 200, { ...ME, permissions: ["users.read", "orgs.read"] });
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveCount(1);
+
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: "Back office search" });
+    await palette.getByRole("combobox").pressSequentially("jo@ex", { delay: 20 });
+
+    const result = palette.getByRole("option", { name: "Jo, jo@example.com" });
+    await expect(result).toBeVisible();
+    expect(searches).toEqual(["jo@ex"]);
+
+    await result.click();
+    await expect(page).toHaveURL(/\/users\/found-user$/);
+  });
+
+  test("the palette says when nothing matches, and asks no search of a closed section", async ({
+    page,
+  }) => {
+    let searched = false;
+    await page.route("**/admin/users?*", (route) => {
+      searched = true;
+
+      return route.fallback();
+    });
+    await fulfillMe(page, 200, { ...ME, permissions: ["audit.read"] });
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveCount(1);
+
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: "Back office search" });
+    await palette.getByRole("combobox").fill("zzzzzz");
+
+    await expect(palette.getByText("No results found.")).toBeVisible();
+    expect(searched).toBe(false);
+  });
+
+  test("the palette opens a saved view with its filters", async ({ page }) => {
+    await page.route("**/admin/views", (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              id: "view-audit",
+              screen: "audit",
+              name: "Billing",
+              filters: { action: "billing." },
+              updatedAt: "2026-03-09T10:00:00.000Z",
+            },
+          ],
+        },
+        headers: corsHeaders(route.request().headers().origin),
+      }),
+    );
+    await fulfillMe(page, 200, { ...ME, permissions: ["audit.read"] });
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveCount(1);
+
+    await page.keyboard.press("Control+k");
+    await page
+      .getByRole("dialog", { name: "Back office search" })
+      .getByRole("option", { name: "Billing" })
+      .click();
+
+    await expect(page).toHaveURL(/\/audit\?action=billing\.$/);
+  });
+
   test("a step-up refusal opens the code prompt, which holds and releases focus", async ({
     page,
   }) => {

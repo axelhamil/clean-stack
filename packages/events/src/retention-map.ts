@@ -80,6 +80,8 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.ADMIN_PLAN_OVERRIDE_SET]: "compliance",
   [EventTypes.ADMIN_PLAN_OVERRIDE_REVOKED]: "compliance",
   [EventTypes.ADMIN_NOTE_ADDED]: "compliance",
+  [EventTypes.ADMIN_VIEW_SAVED]: "compliance",
+  [EventTypes.ADMIN_VIEW_DELETED]: "compliance",
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: "compliance",
   [EventTypes.ADMIN_STEP_UP_FAILED]: "compliance",
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: "compliance",

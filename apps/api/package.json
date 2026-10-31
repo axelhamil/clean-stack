@@ -34,6 +34,7 @@
     "check:admin-approval": "bun scripts/check-admin-approval.ts",
     "check:admin-ops": "bun scripts/check-admin-ops.ts",
     "check:admin-accounts": "bun scripts/check-admin-accounts.ts",
+    "check:admin-workspace": "bun scripts/check-admin-workspace.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --isolate --parallel --pass-with-no-tests",

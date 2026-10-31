@@ -546,6 +546,18 @@ export const AdminNoteAddedPayload = ActorRef.extend({
 });
 export type AdminNoteAddedPayload = z.infer<typeof AdminNoteAddedPayload>;
 
+export const AdminViewSavedPayload = ActorRef.extend({
+  viewId: z.string(),
+  screen: z.string(),
+});
+export type AdminViewSavedPayload = z.infer<typeof AdminViewSavedPayload>;
+
+export const AdminViewDeletedPayload = ActorRef.extend({
+  viewId: z.string(),
+  screen: z.string(),
+});
+export type AdminViewDeletedPayload = z.infer<typeof AdminViewDeletedPayload>;
+
 export const AdminStepUpVerifiedPayload = UserRef.extend({
   validUntil: z.string(),
   ip: z.string().nullable(),
@@ -830,6 +842,8 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_PLAN_OVERRIDE_SET]: AdminPlanOverrideSetPayload,
   [EventTypes.ADMIN_PLAN_OVERRIDE_REVOKED]: AdminPlanOverrideRevokedPayload,
   [EventTypes.ADMIN_NOTE_ADDED]: AdminNoteAddedPayload,
+  [EventTypes.ADMIN_VIEW_SAVED]: AdminViewSavedPayload,
+  [EventTypes.ADMIN_VIEW_DELETED]: AdminViewDeletedPayload,
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
   [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: AdminApprovalRequestedPayload,

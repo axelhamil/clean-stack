@@ -59,10 +59,16 @@ export interface ApprovalCreation {
   created: boolean;
 }
 
+export interface OpenApprovals {
+  items: ApprovalRecord[];
+  total: number;
+}
+
 export interface IApprovalStore {
   create(input: ApprovalWrite): Promise<Result<ApprovalCreation, ApprovalStoreError>>;
   find(id: string): Promise<Result<Option<ApprovalRecord>, ApprovalStoreError>>;
   list(input: ListApprovalsInput): Promise<Result<ApprovalRecord[], ApprovalStoreError>>;
+  listOpen(limit: number): Promise<Result<OpenApprovals, ApprovalStoreError>>;
   claim(input: ApprovalClaim): Promise<Result<Option<ApprovalRecord>, ApprovalStoreError>>;
   cancel(
     id: string,

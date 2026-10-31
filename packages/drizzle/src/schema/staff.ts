@@ -122,3 +122,22 @@ export const staffNote = pgTable(
     ),
   ],
 );
+
+export const savedView = pgTable(
+  "saved_view",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    screen: text("screen").notNull(),
+    name: text("name").notNull(),
+    filters: jsonb("filters").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("saved_view_owner_screen_name_uq").on(table.ownerId, table.screen, table.name),
+    check("saved_view_screen_check", sql`${table.screen} IN ('users', 'orgs', 'audit')`),
+  ],
+);

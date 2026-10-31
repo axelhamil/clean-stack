@@ -13,6 +13,7 @@ import { adminInternalRoutes } from "./modules/admin/internal.routes";
 import { adminOpsRoutes } from "./modules/admin/ops.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { adminStaffRoutes } from "./modules/admin/staff.routes";
+import { adminWorkspaceRoutes } from "./modules/admin/workspace.routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
@@ -249,6 +250,7 @@ const routes = app
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
   .route("/admin", adminStaffRoutes)
+  .route("/admin", adminWorkspaceRoutes)
   .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)

@@ -1,3 +1,4 @@
+import { orgsViewFiltersSchema } from "@packages/access-control";
 import { Input } from "@packages/ui/components/ui/input";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { PageHeader } from "@packages/ui/components/ui/page-header";
@@ -17,12 +18,13 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { requireSection } from "../../shared/auth/require-section";
 import { QueryList } from "../../shared/components/query-list";
+import { SavedViewsBar } from "../../shared/components/saved-views-bar";
 import { StaffPage } from "../../shared/components/staff-page";
 import { useDebouncedFilter } from "../../shared/hooks/use-debounced-filter";
 import { orgsInfiniteQueryOptions } from "./api/orgs.queries";
 import { SsoEnforcementSwitch } from "./components/sso-enforcement-switch";
 
-const orgsSearchSchema = z.object({ q: z.string().optional().catch(undefined) });
+const orgsSearchSchema = z.object({ q: orgsViewFiltersSchema.shape.q.catch(undefined) });
 
 export const Route = createFileRoute("/_staff/orgs")({
   validateSearch: orgsSearchSchema,
@@ -51,6 +53,8 @@ function OrgsPage() {
         value={q}
         onChange={(event) => setQ(event.target.value)}
       />
+
+      <SavedViewsBar screen="orgs" filters={search} />
 
       <QueryList
         query={query}

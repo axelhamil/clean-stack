@@ -87,6 +87,10 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   },
   "GET /admin/users/:id/notes": { consumer: "apps/admin/src/shared/api/queries/notes.ts" },
   "POST /admin/users/:id/notes": { consumer: "apps/admin/src/shared/api/mutations/add-note.ts" },
+  "GET /admin/inbox": { consumer: "apps/admin/src/features/home/api/inbox.queries.ts" },
+  "GET /admin/views": { consumer: "apps/admin/src/shared/api/queries/saved-views.ts" },
+  "POST /admin/views": { consumer: "apps/admin/src/shared/api/mutations/saved-views.ts" },
+  "DELETE /admin/views/:id": { consumer: "apps/admin/src/shared/api/mutations/saved-views.ts" },
   "GET /admin/staff": { consumer: "apps/admin/src/features/team/api/team.queries.ts" },
   "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
   "GET /admin/users/:id": {

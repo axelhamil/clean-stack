@@ -494,11 +494,13 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 - `ADMIN_OPS_OUTBOX_REQUEUED` (`admin.ops.outbox_requeued`): `POST /admin/ops/outbox/requeue` sent dead events back to delivery. One event per staff action, not per row, and none when no row moved. Payload `{ actorUserId: string, requeued: number, eventIds: string[] }`.
 - `ADMIN_OPS_STRIPE_EVENT_REPLAYED` (`admin.ops.stripe_event_replayed`): `POST /admin/ops/stripe-events/:id/replay` delivered a received Stripe event again. Payload `{ actorUserId: string, stripeEventId: string, stripeEventType: string }`. Rolled back with a refused delivery.
 
-### Via `PlanOverrideService` and `StaffNoteService` (Phase K)
+### Via `PlanOverrideService`, `StaffNoteService` and `SavedViewService` (Phase K)
 
 - `ADMIN_PLAN_OVERRIDE_SET` (`admin.plan_override.set`): `POST /admin/orgs/:id/plan-override` set a plan until an end date. Payload `{ actorUserId: string, overrideId: string, organizationId: string, tier: string, expiresAt: string, replacedOverrideId: string | null }`. The reason stays on the row.
 - `ADMIN_PLAN_OVERRIDE_REVOKED` (`admin.plan_override.revoked`): `DELETE /admin/orgs/:id/plan-override` ended it early. Payload `{ actorUserId: string, overrideId: string, organizationId: string, tier: string }`. Reaching the end date announces nothing: expiry is a read filter, not a write.
 - `ADMIN_NOTE_ADDED` (`admin.note.added`): a staff note was added on an account or an organization. Payload `{ actorUserId: string, noteId: string, subjectType: "user" | "org", subjectId: string }`, never the body, since the audit trail outlives an erasure. Internal and emitted without an organization scope, so no customer reads it.
+- `ADMIN_VIEW_SAVED` (`admin.view.saved`): `POST /admin/views` saved a private view, new or replacing one of the same name. Payload `{ actorUserId: string, viewId: string, screen: string }`, never the name or the filters, which can hold a searched email.
+- `ADMIN_VIEW_DELETED` (`admin.view.deleted`): `DELETE /admin/views/:id` removed the staff member's own view. Payload as above. A view of someone else answers 404 and announces nothing.
 
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 

@@ -3,24 +3,28 @@ import type { ISweepRunStore, SweepOutcome } from "../ports/sweep-run.port";
 import type { SweepResponse } from "./sweep-runner";
 import type { SweepSpans } from "./sweep-span";
 
-export interface SweepHeartbeat {
+export type SweepBeat = { outcome: SweepOutcome; count: number };
+
+export interface SweepHeartbeat<T> {
   label: string;
   store: ISweepRunStore;
   spans: SweepSpans;
+  beatOf: (response: T) => SweepBeat | undefined;
 }
 
-function outcomeOf(response: SweepResponse): SweepOutcome | undefined {
+export function beatOfSweep(response: SweepResponse): SweepBeat | undefined {
   if (response.dryRun) return undefined;
 
   const { kind } = classifySweepResult(response);
+  if (kind === "skipped") return undefined;
 
-  return kind === "skipped" ? undefined : kind;
+  return { outcome: kind, count: response.deleted };
 }
 
-export async function withSweepHeartbeat(
-  { label, store, spans }: SweepHeartbeat,
-  run: () => Promise<SweepResponse>,
-): Promise<SweepResponse> {
+export async function withSweepHeartbeat<T>(
+  { label, store, spans, beatOf }: SweepHeartbeat<T>,
+  run: () => Promise<T>,
+): Promise<T> {
   const startedAt = new Date();
 
   const beat = async (outcome: SweepOutcome, count: number): Promise<void> => {
@@ -40,7 +44,7 @@ export async function withSweepHeartbeat(
     }
   };
 
-  let response: SweepResponse;
+  let response: T;
   try {
     response = await run();
   } catch (err) {
@@ -48,8 +52,8 @@ export async function withSweepHeartbeat(
     throw err;
   }
 
-  const outcome = outcomeOf(response);
-  if (outcome) await beat(outcome, response.deleted);
+  const summary = beatOf(response);
+  if (summary) await beat(summary.outcome, summary.count);
 
   return response;
 }

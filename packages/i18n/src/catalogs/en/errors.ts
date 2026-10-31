@@ -127,6 +127,8 @@ export default {
     ADMIN_PASSWORD_RESET_UNAVAILABLE:
       "The reset email could not be sent. The user's sessions were ended, try again.",
     ADMIN_OPS_PROVIDER_FAILURE: "The operations data could not be read. Try again.",
+    ADMIN_VIEW_NOT_FOUND: "This saved view no longer exists.",
+    ADMIN_VIEW_PROVIDER_FAILURE: "The saved views could not be read or changed. Try again.",
     ADMIN_ORG_NOT_FOUND: "This organization no longer exists.",
     ADMIN_NOTE_PROVIDER_FAILURE: "The notes could not be read or saved. Try again.",
     ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE:
@@ -317,6 +319,10 @@ export default {
     setPlanOverride: "Failed to save this plan override",
     revokePlanOverride: "Failed to end this plan override",
     loadStaffNotes: "Failed to load the notes",
+    loadInbox: "Failed to load your inbox",
+    loadSavedViews: "Failed to load your saved views",
+    saveView: "Failed to save this view",
+    deleteView: "Failed to delete this view",
     addStaffNote: "Failed to add this note",
     decideApproval: "Failed to record this decision",
     cancelApproval: "Failed to cancel this request",
