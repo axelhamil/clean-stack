@@ -1,5 +1,7 @@
-export const TIERS = ["free", "pro", "business"] as const;
-export type Tier = (typeof TIERS)[number];
+import type { Tier } from "@packages/access-control";
+
+export type { Tier };
+
 export type Feature = "audit_log" | "api" | "sso";
 export type QuotaKey = "uploads" | "projects" | "apiCallsPerMonth";
 
@@ -46,6 +48,7 @@ export function rankOf(tier: Tier): number {
 export interface EntitlementsView extends Entitlement {
   tier: Tier;
   status: string;
+  hasSubscription: boolean;
 }
 
 export function hasFeature(view: EntitlementsView, flag: Feature): boolean {

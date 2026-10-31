@@ -1,5 +1,5 @@
-import { classifySweepResult } from "../../cron/sweep-result";
 import type { ISweepRunStore, SweepOutcome } from "../ports/sweep-run.port";
+import { classifySweepResult } from "./sweep-result";
 import type { SweepResponse } from "./sweep-runner";
 import type { SweepSpans } from "./sweep-span";
 
@@ -10,6 +10,7 @@ export interface SweepHeartbeat<T> {
   store: ISweepRunStore;
   spans: SweepSpans;
   beatOf: (response: T) => SweepBeat | undefined;
+  dryRun?: boolean;
 }
 
 export function beatOfSweep(response: SweepResponse): SweepBeat | undefined {
@@ -22,7 +23,7 @@ export function beatOfSweep(response: SweepResponse): SweepBeat | undefined {
 }
 
 export async function withSweepHeartbeat<T>(
-  { label, store, spans, beatOf }: SweepHeartbeat<T>,
+  { label, store, spans, beatOf, dryRun }: SweepHeartbeat<T>,
   run: () => Promise<T>,
 ): Promise<T> {
   const startedAt = new Date();
@@ -48,7 +49,7 @@ export async function withSweepHeartbeat<T>(
   try {
     response = await run();
   } catch (err) {
-    await beat("failed", 0);
+    if (!dryRun) await beat("failed", 0);
     throw err;
   }
 

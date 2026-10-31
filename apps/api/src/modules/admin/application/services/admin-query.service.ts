@@ -1,11 +1,13 @@
 import { Option, Result } from "@packages/ddd-kit";
 import { encodeTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
-import type { IEntitlementsReader } from "../../../../shared/ports/entitlements-reader.port";
+import type {
+  EntitlementsReadError,
+  IEntitlementsReader,
+} from "../../../../shared/ports/entitlements-reader.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   ActivePlanOverride,
-  IPlanOverrideStore,
-  PlanOverrideStoreError,
+  IPlanOverrideReader,
 } from "../../../../shared/ports/plan-override.port";
 import type { ListOrgsInput } from "../dto/list-orgs.dto";
 import type { ListUsersInput } from "../dto/list-users.dto";
@@ -24,7 +26,7 @@ import type {
   IAdminUserStore,
 } from "../ports/admin-user-store.port";
 
-export type AdminQueryError = AdminStoreError | PlanOverrideStoreError;
+export type AdminQueryError = AdminStoreError | EntitlementsReadError;
 
 export type AdminOrgDetail = AdminOrgRow & {
   members: AdminOrgMemberRow[];
@@ -61,7 +63,7 @@ export class AdminQueryService {
     private readonly instrumentation: IInstrumentation,
     private readonly orgStore: IAdminOrgStore,
     private readonly entitlements: IEntitlementsReader,
-    private readonly planOverrides: IPlanOverrideStore,
+    private readonly planOverrides: IPlanOverrideReader,
   ) {}
 
   async listUsers(
@@ -96,17 +98,18 @@ export class AdminQueryService {
 
       const [members, view, planOverride] = await Promise.all([
         this.orgStore.listMembersOf(id),
-        this.entitlements.getEntitlements(id),
+        this.entitlements.readEntitlements(id),
         this.planOverrides.findActive(id),
       ]);
       if (members.isFailure) return Result.fail(members.getError());
+      if (view.isFailure) return Result.fail(view.getError());
       if (planOverride.isFailure) return Result.fail(planOverride.getError());
 
       return Result.ok(
         Option.some({
           ...maybeOrg.unwrap(),
           members: members.getValue(),
-          plan: view.tier,
+          plan: view.getValue().tier,
           planOverride: planOverride.getValue(),
         }),
       );

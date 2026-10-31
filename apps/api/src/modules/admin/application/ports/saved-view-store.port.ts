@@ -3,7 +3,7 @@ import type { AppError, Option, Result } from "@packages/ddd-kit";
 
 export type SavedViewStoreError = AppError<"ADMIN_VIEW_PROVIDER_FAILURE">;
 
-export type SavedViewRow = StaffView & { id: string; updatedAt: Date };
+export type SavedViewRow = StaffView & { id: string };
 
 export interface DeletedSavedView {
   id: string;

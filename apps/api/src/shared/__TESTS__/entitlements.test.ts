@@ -30,13 +30,23 @@ describe("entitlements", () => {
   });
 
   it("hasFeature reads the view's feature set", () => {
-    const proView = { tier: "pro" as const, status: "active", ...ENTITLEMENTS.pro };
+    const proView = {
+      tier: "pro" as const,
+      status: "active",
+      hasSubscription: true,
+      ...ENTITLEMENTS.pro,
+    };
     expect(hasFeature(proView, "audit_log")).toBe(true);
     expect(hasFeature(proView, "sso")).toBe(false);
   });
 
   it("meetsPlan compares rank inclusively", () => {
-    const proView = { tier: "pro" as const, status: "active", ...ENTITLEMENTS.pro };
+    const proView = {
+      tier: "pro" as const,
+      status: "active",
+      hasSubscription: true,
+      ...ENTITLEMENTS.pro,
+    };
     expect(meetsPlan(proView, "pro")).toBe(true);
     expect(meetsPlan(proView, "free")).toBe(true);
     expect(meetsPlan(proView, "business")).toBe(false);
@@ -50,12 +60,23 @@ describe("entitlements", () => {
   });
 });
 
-const freeView: EntitlementsView = { ...ENTITLEMENTS.free, tier: "free", status: "free" };
-const proView: EntitlementsView = { ...ENTITLEMENTS.pro, tier: "pro", status: "active" };
+const freeView: EntitlementsView = {
+  ...ENTITLEMENTS.free,
+  tier: "free",
+  status: "free",
+  hasSubscription: false,
+};
+const proView: EntitlementsView = {
+  ...ENTITLEMENTS.pro,
+  tier: "pro",
+  status: "active",
+  hasSubscription: true,
+};
 const businessView: EntitlementsView = {
   ...ENTITLEMENTS.business,
   tier: "business",
   status: "active",
+  hasSubscription: true,
 };
 
 describe("quota catalog", () => {

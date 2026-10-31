@@ -5,15 +5,18 @@ import type { IStripeEventGateway, IStripeEventStore } from "../../shared/ports/
 import type { IBillingPortalGateway } from "./application/ports/billing-portal.port";
 import type { IStripeCatalogSource } from "./application/ports/stripe-catalog.port";
 import type { ISubscriptionReadStore } from "./application/ports/subscription-read.port";
+import type { ISubscriptionSyncStore } from "./application/ports/subscription-sync.port";
 import { BillingCatalogService } from "./application/services/billing-catalog.service";
 import { BillingPortalService } from "./application/services/billing-portal.service";
 import { EntitlementsService } from "./application/services/entitlements.service";
 import { StripeBillingPortalGateway } from "./infrastructure/adapters/stripe-billing-portal.gateway";
 import { StripeCatalogSource } from "./infrastructure/adapters/stripe-catalog.source";
 import { StripeEventGateway } from "./infrastructure/adapters/stripe-event.gateway";
+import { StripeSyncVerifier } from "./infrastructure/adapters/stripe-sync-verifier";
 import { DrizzlePlanOverrideStore } from "./infrastructure/repositories/drizzle-plan-override.store";
 import { DrizzleStripeEventStore } from "./infrastructure/repositories/drizzle-stripe-event.store";
 import { DrizzleSubscriptionReadStore } from "./infrastructure/repositories/drizzle-subscription-read.store";
+import { DrizzleSubscriptionSyncStore } from "./infrastructure/repositories/drizzle-subscription-sync.store";
 import { stripeClient } from "./infrastructure/stripe-client";
 
 declare module "inwire" {
@@ -24,6 +27,8 @@ declare module "inwire" {
     IPlanOverrideStore: IPlanOverrideStore;
     IStripeEventGateway: IStripeEventGateway;
     ISubscriptionReadStore: ISubscriptionReadStore;
+    ISubscriptionSyncStore: ISubscriptionSyncStore;
+    StripeSyncVerifier: StripeSyncVerifier;
     BillingCatalogService: BillingCatalogService;
     BillingPortalService: BillingPortalService;
     EntitlementsService: EntitlementsService;
@@ -55,6 +60,14 @@ export const billingModule = defineModule()((b) =>
         ),
     )
     .add("ISubscriptionReadStore", (c) => new DrizzleSubscriptionReadStore(c.IInstrumentation))
+    .add(
+      "ISubscriptionSyncStore",
+      (c): ISubscriptionSyncStore => new DrizzleSubscriptionSyncStore(c.IInstrumentation),
+    )
+    .add(
+      "StripeSyncVerifier",
+      (c) => new StripeSyncVerifier(c.ISubscriptionSyncStore, c.IStripeEventGateway),
+    )
     .add(
       "BillingCatalogService",
       (c) => new BillingCatalogService(c.IStripeCatalogSource, c.IInstrumentation),

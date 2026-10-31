@@ -17,17 +17,18 @@ function HomePage() {
   const { t } = useTranslation("admin");
   const query = useQuery(inboxQueryOptions);
   const approvals = query.data?.approvals;
-  const operations = query.data?.operations;
-  const hasApprovals = (approvals?.total ?? 0) > 0;
-  const hasOperations =
-    operations != null &&
-    operations.deadEvents +
-      operations.deadEmails +
-      operations.deadWebhooks +
-      operations.failedSweeps.length >
-      0;
-  const isQuiet = query.data != null && !hasApprovals && !hasOperations;
-  const isClosed = query.data != null && approvals == null && operations == null;
+  const queues = query.data?.queues;
+  const sweeps = query.data?.sweeps;
+  const showsApprovals = approvals?.status === "failed" || (approvals?.total ?? 0) > 0;
+  const hasDeadQueues =
+    queues?.status === "ok" && queues.deadEvents + queues.deadEmails + queues.deadWebhooks > 0;
+  const showsOperations =
+    queues?.status === "failed" ||
+    sweeps?.status === "failed" ||
+    hasDeadQueues ||
+    (sweeps?.status === "ok" && sweeps.items.length > 0);
+  const isQuiet = query.data != null && !showsApprovals && !showsOperations;
+  const isClosed = query.data != null && approvals == null && queues == null && sweeps == null;
 
   return (
     <StaffPage>
@@ -44,8 +45,12 @@ function HomePage() {
         <LoadErrorRetry message={t("backOffice.inbox.loadFailed")} onRetry={query.refetch} />
       )}
 
-      {approvals && hasApprovals && <InboxApprovals {...approvals} />}
-      {operations && hasOperations && <InboxOperations {...operations} />}
+      {approvals && showsApprovals && (
+        <InboxApprovals approvals={approvals} onRetry={query.refetch} />
+      )}
+      {queues !== undefined && sweeps !== undefined && showsOperations && (
+        <InboxOperations queues={queues} sweeps={sweeps} onRetry={query.refetch} />
+      )}
     </StaffPage>
   );
 }

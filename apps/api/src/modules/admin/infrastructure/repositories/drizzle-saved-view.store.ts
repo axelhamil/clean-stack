@@ -1,4 +1,4 @@
-import { type StaffView, type StaffViewScreen, staffViewSchema } from "@packages/access-control";
+import { type StaffView, type StaffViewScreen, storedStaffView } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { and, asc, dbNow, eq, inArray, resolveExecutor, staffSchema } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
@@ -19,10 +19,10 @@ export class DrizzleSavedViewStore implements ISavedViewStore {
 
   private viewsOf(rows: (typeof savedView.$inferSelect)[]): SavedViewRow[] {
     return rows.flatMap((row) => {
-      const parsed = staffViewSchema.safeParse(row);
-      if (parsed.success) return [{ ...parsed.data, id: row.id, updatedAt: row.updatedAt }];
+      const view = storedStaffView(row);
+      if (view) return [{ ...view, id: row.id }];
 
-      this.instrumentation.capture(parsed.error);
+      this.instrumentation.capture(new Error(`saved view ${row.id} has no screen or name left`));
 
       return [];
     });

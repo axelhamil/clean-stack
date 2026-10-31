@@ -18,11 +18,11 @@ export const adminOpsRoutes = new Hono<{ Variables: AuthVariables }>()
       outbox: {
         total: outbox.total,
         items: outbox.items.map((row) => ({
-          ...row,
-          occurredAt: row.occurredAt.toISOString(),
+          id: row.id,
+          eventType: row.eventType,
+          attempts: row.attempts,
           deadAt: row.deadAt.toISOString(),
           lastError: row.lastError.toNull(),
-          nextAttemptAt: row.nextAttemptAt.map((date) => date.toISOString()).toNull(),
         })),
       },
       queues,
@@ -50,14 +50,16 @@ export const adminOpsRoutes = new Hono<{ Variables: AuthVariables }>()
 
     return c.json({
       items: result.getValue().map((run) => ({
-        ...run,
-        startedAt: run.startedAt.toISOString(),
+        label: run.label,
+        outcome: run.outcome,
+        count: run.count,
+        late: run.late,
         finishedAt: run.finishedAt.toISOString(),
       })),
     });
   })
   .get("/stripe-events", requireAuth, requireStaffPermission("ops.read"), async (c) => {
-    const result = await di.OpsService.listStripeEvents();
+    const result = await di.StripeReplayService.list();
     if (result.isFailure) throw new AppErrorException(result.getError());
 
     const { configured, items } = result.getValue();
@@ -80,7 +82,7 @@ export const adminOpsRoutes = new Hono<{ Variables: AuthVariables }>()
     requireStaffPermission("ops.manage"),
     requireStepUp,
     async (c) => {
-      const result = await di.OpsService.replay({
+      const result = await di.StripeReplayService.replay({
         actorUserId: c.get("user").id,
         stripeEventId: c.req.param("id"),
         handler: (request) => auth.handler(request),

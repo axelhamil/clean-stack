@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { IDomainEvent } from "@packages/ddd-kit";
 import { uuidv7 } from "@packages/ddd-kit";
 import type { EventType } from "@packages/events";
@@ -9,7 +10,14 @@ const SOURCE = "app/api";
 export type EmitOptions = {
   organizationId?: string | null;
   traceparent?: string;
+  eventId?: string;
 };
+
+export function derivedEventId(sourceId: string, eventType: string): string {
+  const hash = createHash("sha256").update(`${sourceId}:${eventType}`).digest("hex");
+
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-8${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
 
 /**
  * Emits a domain event directly to the outbox, bypassing the aggregate/UoW path.
@@ -27,7 +35,7 @@ export async function emitEvent<TPayload>(
   payload: TPayload,
   opts: EmitOptions = {},
 ): Promise<string> {
-  const id = uuidv7();
+  const id = opts.eventId ?? uuidv7();
   const event: IDomainEvent<TPayload> = {
     eventId: id,
     eventType,

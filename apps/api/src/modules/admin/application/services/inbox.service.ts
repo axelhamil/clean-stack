@@ -1,5 +1,6 @@
 import type { StaffPermission } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
+import { isSweepLate } from "../../../../shared/internal-routes/sweep-cadence";
 import type {
   ISweepRunStore,
   SweepRun,
@@ -11,25 +12,24 @@ import type {
   OpenApprovals,
 } from "../ports/approval-store.port";
 import type { IOpsStore, OpsStoreError } from "../ports/ops-store.port";
+import type { SweepRunState } from "./ops.service";
 
 export const INBOX_APPROVALS_PAGE = 20;
 
-export interface InboxOperations {
+export interface InboxQueues {
   deadEvents: number;
   deadEmails: number;
   deadWebhooks: number;
-  failedSweeps: SweepRun[];
 }
 
 export interface Inbox {
-  approvals: Option<OpenApprovals>;
-  operations: Option<InboxOperations>;
+  approvals: Option<Result<OpenApprovals, ApprovalStoreError>>;
+  queues: Option<Result<InboxQueues, OpsStoreError>>;
+  sweeps: Option<Result<SweepRunState[], SweepRunStoreError>>;
 }
 
-export type InboxError = ApprovalStoreError | OpsStoreError | SweepRunStoreError;
-
-function hasFailed(run: SweepRun): boolean {
-  return run.outcome === "failed" || run.outcome === "batch-error";
+function needsAttention(run: SweepRunState): boolean {
+  return run.late || run.outcome === "failed" || run.outcome === "batch-error";
 }
 
 export class InboxService {
@@ -39,48 +39,50 @@ export class InboxService {
     private readonly sweepRuns: ISweepRunStore,
   ) {}
 
-  async forStaff(permissions: readonly StaffPermission[]): Promise<Result<Inbox, InboxError>> {
-    const approvals = await this.openApprovals(permissions);
-    if (approvals.isFailure) return Result.fail(approvals.getError());
+  async forStaff(permissions: readonly StaffPermission[]): Promise<Inbox> {
+    const readsOps = permissions.includes("ops.read");
+    const [approvals, queues, sweeps] = await Promise.all([
+      permissions.includes("approvals.decide")
+        ? this.approvals.listOpen(INBOX_APPROVALS_PAGE).then(Option.some)
+        : Option.none<Result<OpenApprovals, ApprovalStoreError>>(),
+      readsOps
+        ? this.deadQueues().then(Option.some)
+        : Option.none<Result<InboxQueues, OpsStoreError>>(),
+      readsOps
+        ? this.attentionSweeps().then(Option.some)
+        : Option.none<Result<SweepRunState[], SweepRunStoreError>>(),
+    ]);
 
-    const operations = await this.operations(permissions);
-    if (operations.isFailure) return Result.fail(operations.getError());
-
-    return Result.ok({ approvals: approvals.getValue(), operations: operations.getValue() });
+    return { approvals, queues, sweeps };
   }
 
-  private async openApprovals(
-    permissions: readonly StaffPermission[],
-  ): Promise<Result<Option<OpenApprovals>, ApprovalStoreError>> {
-    if (!permissions.includes("approvals.decide")) return Result.ok(Option.none());
-
-    const open = await this.approvals.listOpen(INBOX_APPROVALS_PAGE);
-    if (open.isFailure) return Result.fail(open.getError());
-
-    return Result.ok(Option.some(open.getValue()));
-  }
-
-  private async operations(
-    permissions: readonly StaffPermission[],
-  ): Promise<Result<Option<InboxOperations>, OpsStoreError | SweepRunStoreError>> {
-    if (!permissions.includes("ops.read")) return Result.ok(Option.none());
-
-    const deadEvents = await this.ops.countDeadOutbox();
+  private async deadQueues(): Promise<Result<InboxQueues, OpsStoreError>> {
+    const [deadEvents, queues] = await Promise.all([
+      this.ops.countDeadOutbox(),
+      this.ops.countDeadQueues(),
+    ]);
     if (deadEvents.isFailure) return Result.fail(deadEvents.getError());
-
-    const queues = await this.ops.countDeadQueues();
     if (queues.isFailure) return Result.fail(queues.getError());
 
+    const { emails, webhooks } = queues.getValue();
+
+    return Result.ok({
+      deadEvents: deadEvents.getValue(),
+      deadEmails: emails,
+      deadWebhooks: webhooks,
+    });
+  }
+
+  private async attentionSweeps(): Promise<Result<SweepRunState[], SweepRunStoreError>> {
     const runs = await this.sweepRuns.list();
     if (runs.isFailure) return Result.fail(runs.getError());
 
-    return Result.ok(
-      Option.some({
-        deadEvents: deadEvents.getValue(),
-        deadEmails: queues.getValue().emails,
-        deadWebhooks: queues.getValue().webhooks,
-        failedSweeps: runs.getValue().filter(hasFailed),
-      }),
-    );
+    const now = new Date();
+    const states = runs.getValue().map((run: SweepRun) => ({
+      ...run,
+      late: isSweepLate(run, now),
+    }));
+
+    return Result.ok(states.filter(needsAttention));
   }
 }

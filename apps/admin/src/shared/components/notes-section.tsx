@@ -1,7 +1,6 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { Label } from "@packages/ui/components/ui/label";
 import { ListRow, ListRowContent } from "@packages/ui/components/ui/list-row";
-import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import { Textarea } from "@packages/ui/components/ui/textarea";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
@@ -14,7 +13,7 @@ import { toast } from "sonner";
 import { addNoteMutationOptions } from "../api/mutations/add-note";
 import { type NoteSubject, notesQueryOptions } from "../api/queries/notes";
 import { useStaff } from "../auth/use-staff";
-import { LoadErrorRetry } from "./load-error-retry";
+import { ItemsQueryList } from "./query-list";
 
 export interface NotesSectionProps {
   subject: NoteSubject;
@@ -63,35 +62,33 @@ export function NotesSection({ subject }: NotesSectionProps) {
         </div>
       )}
 
-      {query.isPending && (
-        <SkeletonTable label={t("backOffice.notes.loading")} columns={1} rows={2} />
-      )}
-
-      {query.isError && (
-        <LoadErrorRetry message={t("backOffice.notes.loadFailed")} onRetry={query.refetch} />
-      )}
-
-      {query.data?.items.length === 0 && (
-        <TypographyMuted>{t("backOffice.notes.empty")}</TypographyMuted>
-      )}
-
-      {query.data && query.data.items.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {query.data.items.map((note) => (
-            <ListRow key={note.id}>
-              <ListRowContent>
-                <p className="wrap-anywhere whitespace-pre-wrap">{note.body}</p>
-                <TypographyMuted className="wrap-anywhere">
-                  {t("backOffice.notes.signature", {
-                    author: note.authorName ?? t("backOffice.notes.formerStaff"),
-                    date: formatDateTime(note.createdAt),
-                  })}
-                </TypographyMuted>
-              </ListRowContent>
-            </ListRow>
-          ))}
-        </ul>
-      )}
+      <ItemsQueryList
+        query={query}
+        items={query.data?.items ?? []}
+        loadingLabel={t("backOffice.notes.loading")}
+        errorMessage={t("backOffice.notes.loadFailed")}
+        emptyMessage={t("backOffice.notes.empty")}
+        columns={1}
+        rows={2}
+      >
+        {(notes) => (
+          <ul className="flex flex-col gap-2">
+            {notes.map((note) => (
+              <ListRow key={note.id}>
+                <ListRowContent>
+                  <p className="wrap-anywhere whitespace-pre-wrap">{note.body}</p>
+                  <TypographyMuted className="wrap-anywhere">
+                    {t("backOffice.notes.signature", {
+                      author: note.authorName ?? t("backOffice.notes.formerStaff"),
+                      date: formatDateTime(note.createdAt),
+                    })}
+                  </TypographyMuted>
+                </ListRowContent>
+              </ListRow>
+            ))}
+          </ul>
+        )}
+      </ItemsQueryList>
     </section>
   );
 }

@@ -79,6 +79,20 @@ describe("sweep heartbeat", () => {
     expect(written()).toMatchObject([{ outcome: "failed", count: 0 }]);
   });
 
+  it("records nothing for a dry run that threw, it never was a real run", async () => {
+    const { written, store, spans } = setup();
+
+    const run = withSweepHeartbeat(
+      { label: "sweep-x", store, spans, beatOf: beatOfSweep, dryRun: true },
+      async () => {
+        throw new Error("boom");
+      },
+    );
+
+    await expect(run).rejects.toThrow("boom");
+    expect(written()).toEqual([]);
+  });
+
   it("never fails the sweep when the heartbeat cannot be written", async () => {
     const { store, spans } = setup();
     store.record.mockImplementation(async () => {

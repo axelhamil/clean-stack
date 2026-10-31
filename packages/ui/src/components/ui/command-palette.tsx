@@ -92,6 +92,11 @@ function searchValueOf(entry: CommandPaletteEntry): string {
   return entry.searchValue ? `${entry.label} ${entry.searchValue}` : entry.label;
 }
 
+export interface CommandPaletteStatusRow {
+  id: string;
+  label: string;
+}
+
 export interface CommandPaletteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -104,6 +109,7 @@ export interface CommandPaletteDialogProps {
   onEntryFailed: (error: unknown) => void;
   search?: string;
   onSearchChange?: (search: string) => void;
+  statusRows?: CommandPaletteStatusRow[];
 }
 
 export function CommandPaletteDialog({
@@ -118,6 +124,7 @@ export function CommandPaletteDialog({
   onEntryFailed,
   search,
   onSearchChange,
+  statusRows = [],
 }: CommandPaletteDialogProps) {
   const opener = useRef<Element | null>(null);
   const wasOpen = useRef(false);
@@ -172,6 +179,13 @@ export function CommandPaletteDialog({
           </Fragment>
         ))}
       </CommandList>
+      <div role="status" className="flex flex-col gap-1 empty:hidden">
+        {statusRows.map((row) => (
+          <CommandHint key={row.id} className="px-3 py-1">
+            {row.label}
+          </CommandHint>
+        ))}
+      </div>
     </CommandDialog>
   );
 }

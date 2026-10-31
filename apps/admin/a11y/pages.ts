@@ -29,8 +29,18 @@ export const STAFF_PAGES: readonly AuditedPage[] = [
     name: "home, quiet inbox",
     path: "/",
     prepare: stubApi("**/admin/inbox", {
-      approvals: { total: 0, items: [] },
-      operations: { deadEvents: 0, deadEmails: 0, deadWebhooks: 0, failedSweeps: [] },
+      approvals: { status: "ok", total: 0, items: [] },
+      queues: { status: "ok", deadEvents: 0, deadEmails: 0, deadWebhooks: 0 },
+      sweeps: { status: "ok", items: [] },
+    }),
+  },
+  {
+    name: "home, one failed source",
+    path: "/",
+    prepare: stubApi("**/admin/inbox", {
+      ...STUB_INBOX,
+      approvals: { status: "failed" },
+      sweeps: { status: "failed" },
     }),
   },
   {

@@ -5,71 +5,76 @@ import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typogr
 import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { LoadErrorRetry } from "../../../shared/components/load-error-retry";
+import { sweepStateView } from "../../../shared/labels/sweep-outcome";
+import type { Inbox } from "../api/inbox.queries";
 
 export interface InboxOperationsProps {
-  deadEvents: number;
-  deadEmails: number;
-  deadWebhooks: number;
-  failedSweeps: { label: string; outcome: string; finishedAt: string }[];
+  queues: Inbox["queues"];
+  sweeps: Inbox["sweeps"];
+  onRetry: () => unknown;
 }
 
-export function InboxOperations({
-  deadEvents,
-  deadEmails,
-  deadWebhooks,
-  failedSweeps,
-}: InboxOperationsProps) {
+export function InboxOperations({ queues, sweeps, onRetry }: InboxOperationsProps) {
   const { t } = useTranslation("admin");
   const formatDateTime = useFormatDateTime();
-  const queues = [
+  const counts = queues?.status === "ok" ? queues : null;
+  const deadQueues = [
     {
       key: "events",
-      count: deadEvents,
-      label: t("backOffice.inbox.deadEvents", { count: deadEvents }),
+      count: counts?.deadEvents ?? 0,
+      label: t("backOffice.inbox.deadEvents", { count: counts?.deadEvents ?? 0 }),
     },
     {
       key: "emails",
-      count: deadEmails,
-      label: t("backOffice.inbox.deadEmails", { count: deadEmails }),
+      count: counts?.deadEmails ?? 0,
+      label: t("backOffice.inbox.deadEmails", { count: counts?.deadEmails ?? 0 }),
     },
     {
       key: "webhooks",
-      count: deadWebhooks,
-      label: t("backOffice.inbox.deadWebhooks", { count: deadWebhooks }),
+      count: counts?.deadWebhooks ?? 0,
+      label: t("backOffice.inbox.deadWebhooks", { count: counts?.deadWebhooks ?? 0 }),
     },
   ].filter((queue) => queue.count > 0);
+  const runs = sweeps?.status === "ok" ? sweeps.items : [];
 
   return (
     <section className="flex min-w-0 flex-col gap-4">
       <TypographyH2>{t("backOffice.inbox.operationsTitle")}</TypographyH2>
-      <ul className="flex flex-col gap-2">
-        {queues.map((queue) => (
-          <ListRow key={queue.key}>
-            <NavLink asChild variant="plain">
-              <Link to="/operations">{queue.label}</Link>
-            </NavLink>
-          </ListRow>
-        ))}
-        {failedSweeps.map((run) => (
-          <ListRow key={run.label}>
-            <ListRowContent className="min-w-0 wrap-anywhere">
+      {queues?.status === "failed" && (
+        <LoadErrorRetry message={t("backOffice.inbox.queuesFailed")} onRetry={onRetry} />
+      )}
+      {sweeps?.status === "failed" && (
+        <LoadErrorRetry message={t("backOffice.inbox.sweepsFailed")} onRetry={onRetry} />
+      )}
+      {deadQueues.length + runs.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {deadQueues.map((queue) => (
+            <ListRow key={queue.key}>
               <NavLink asChild variant="plain">
-                <Link to="/operations">{run.label}</Link>
+                <Link to="/operations">{queue.label}</Link>
               </NavLink>
-              <TypographyMuted>
-                {t("backOffice.inbox.lastRun", { date: formatDateTime(run.finishedAt) })}
-              </TypographyMuted>
-            </ListRowContent>
-            <Badge variant="destructive">
-              {t(
-                run.outcome === "failed"
-                  ? "operations.jobs.outcomes.failed"
-                  : "operations.jobs.outcomes.batchError",
-              )}
-            </Badge>
-          </ListRow>
-        ))}
-      </ul>
+            </ListRow>
+          ))}
+          {runs.map((run) => {
+            const state = sweepStateView(run);
+
+            return (
+              <ListRow key={run.label}>
+                <ListRowContent className="min-w-0 wrap-anywhere">
+                  <NavLink asChild variant="plain">
+                    <Link to="/operations">{run.label}</Link>
+                  </NavLink>
+                  <TypographyMuted>
+                    {t("backOffice.inbox.lastRun", { date: formatDateTime(run.finishedAt) })}
+                  </TypographyMuted>
+                </ListRowContent>
+                <Badge variant={state.variant}>{t(state.labelKey)}</Badge>
+              </ListRow>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

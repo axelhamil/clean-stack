@@ -1,6 +1,7 @@
 import {
   CommandPaletteDialog,
   type CommandPaletteGroup,
+  type CommandPaletteStatusRow,
   useTogglePaletteShortcut,
 } from "@packages/ui/components/ui/command-palette";
 import { toastError } from "@packages/web-kit/api/errors/toast";
@@ -118,6 +119,27 @@ export function AdminPalette() {
     },
   ].filter((group) => group.items.length > 0);
 
+  const isDebouncing = draft.trim() !== search && draft.trim().length >= SEARCH_MIN_LENGTH;
+  const statusOf = (
+    id: "accounts" | "organizations",
+    source: { isFetching: boolean; isError: boolean },
+    isOpenToStaff: boolean,
+  ): CommandPaletteStatusRow[] => {
+    if (!isOpenToStaff) return [];
+    if (isDebouncing || source.isFetching) {
+      return [{ id, label: t(`backOffice.palette.status.${id}Searching`) }];
+    }
+    if (isSearching && source.isError) {
+      return [{ id, label: t(`backOffice.palette.status.${id}Failed`) }];
+    }
+
+    return [];
+  };
+  const statusRows = [
+    ...statusOf("accounts", users, can("users.read")),
+    ...statusOf("organizations", orgs, can("orgs.read")),
+  ];
+
   const isPending = draft.trim() !== search || users.isFetching || orgs.isFetching;
   const emptyKey = isPending
     ? "backOffice.palette.searching"
@@ -138,6 +160,7 @@ export function AdminPalette() {
       onEntryFailed={(err) => toastError(err, t("backOffice.palette.actionFailed"))}
       search={draft}
       onSearchChange={setDraft}
+      statusRows={statusRows}
     />
   );
 }

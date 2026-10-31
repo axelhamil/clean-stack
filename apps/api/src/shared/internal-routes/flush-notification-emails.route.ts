@@ -340,7 +340,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
     const { batchSize = DEFAULT_BATCH_SIZE, dryRun = false } = c.req.valid("json");
     const spans = sweepSpans(di.IInstrumentation);
     const response = await withSweepHeartbeat(
-      { label: LEASE_LABEL, store: di.ISweepRunStore, spans, beatOf: beatOfFlush },
+      { label: LEASE_LABEL, store: di.ISweepRunStore, spans, beatOf: beatOfFlush, dryRun },
       () => flushDueNotifications({ batchSize, dryRun, logger: c.var.logger, spans }),
     );
 

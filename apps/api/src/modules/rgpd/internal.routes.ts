@@ -30,6 +30,7 @@ export const rgpdInternalRoutes = new Hono()
         store: di.ISweepRunStore,
         spans: sweepSpans(di.IInstrumentation),
         beatOf: beatOfDeletions,
+        dryRun: body.dryRun,
       },
       async () => {
         const result = await di.RgpdService.processPendingDeletions({

@@ -23,6 +23,7 @@ import { SavedViewService } from "./application/services/saved-view.service";
 import { StaffService } from "./application/services/staff.service";
 import { StaffNoteService } from "./application/services/staff-note.service";
 import { StepUpService } from "./application/services/step-up.service";
+import { StripeReplayService } from "./application/services/stripe-replay.service";
 import { DrizzleAdminOrgStore } from "./infrastructure/repositories/drizzle-admin-org.store";
 import { DrizzleAdminUserStore } from "./infrastructure/repositories/drizzle-admin-user.store";
 import { DrizzleApprovalStore } from "./infrastructure/repositories/drizzle-approval.store";
@@ -48,6 +49,7 @@ declare module "inwire" {
     ApprovalService: ApprovalService;
     IOpsStore: IOpsStore;
     OpsService: OpsService;
+    StripeReplayService: StripeReplayService;
     PlanOverrideService: PlanOverrideService;
     IStaffNoteStore: IStaffNoteStore;
     StaffNoteService: StaffNoteService;
@@ -272,11 +274,19 @@ export const adminModule = defineModule()((b) =>
         new OpsService(
           c.IOpsStore,
           c.ISweepRunStore,
+          c.IOutboxRepository,
+          c.ITransactionService,
+          env,
+        ),
+    )
+    .add(
+      "StripeReplayService",
+      (c) =>
+        new StripeReplayService(
           c.IStripeEventStore,
           c.IStripeEventGateway,
           c.IOutboxRepository,
           c.ITransactionService,
-          env,
         ),
     )
     .add(

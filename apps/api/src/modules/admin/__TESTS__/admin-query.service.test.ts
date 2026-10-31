@@ -5,7 +5,7 @@ import { entitlementsForTier } from "../../../shared/entitlements";
 import type { IEntitlementsReader } from "../../../shared/ports/entitlements-reader.port";
 import type {
   ActivePlanOverride,
-  IPlanOverrideStore,
+  IPlanOverrideReader,
 } from "../../../shared/ports/plan-override.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { AdminOrgListRow, IAdminOrgStore } from "../application/ports/admin-org-store.port";
@@ -71,29 +71,33 @@ function orgStore(overrides: Partial<IAdminOrgStore> = {}): IAdminOrgStore {
   };
 }
 
-const ENTITLEMENTS_READER: IEntitlementsReader = {
-  getEntitlements: mock(async () => ({
-    tier: "pro" as const,
-    status: "active",
-    ...entitlementsForTier("pro"),
-  })),
+const PRO_VIEW = {
+  tier: "pro" as const,
+  status: "active",
+  hasSubscription: true,
+  ...entitlementsForTier("pro"),
 };
 
-function overrideStore(active: Option<ActivePlanOverride> = Option.none()): IPlanOverrideStore {
-  const store = mockPort<IPlanOverrideStore>();
+function entitlementsReader(
+  read: IEntitlementsReader["readEntitlements"] = async () => Result.ok(PRO_VIEW),
+): IEntitlementsReader {
+  return { getEntitlements: mock(async () => PRO_VIEW), readEntitlements: mock(read) };
+}
+
+function overrideStore(active: Option<ActivePlanOverride> = Option.none()): IPlanOverrideReader {
+  const store = mockPort<IPlanOverrideReader>();
   store.findActive.mockImplementation(async () => Result.ok(active));
 
   return store;
 }
 
-function service(users = userStore(), orgs = orgStore(), overrides = overrideStore()) {
-  return new AdminQueryService(
-    users,
-    new NoOpInstrumentation(),
-    orgs,
-    ENTITLEMENTS_READER,
-    overrides,
-  );
+function service(
+  users = userStore(),
+  orgs = orgStore(),
+  overrides = overrideStore(),
+  entitlements = entitlementsReader(),
+) {
+  return new AdminQueryService(users, new NoOpInstrumentation(), orgs, entitlements, overrides);
 }
 
 describe("AdminQueryService", () => {
@@ -197,6 +201,19 @@ describe("AdminQueryService", () => {
       const result = await service(userStore(), orgs).getOrg("nope");
 
       expect(result.getValue().isNone()).toBe(true);
+    });
+
+    it("surfaces a failed plan read instead of showing the org as free", async () => {
+      const result = await service(
+        userStore(),
+        orgStore(),
+        overrideStore(),
+        entitlementsReader(async () =>
+          Result.fail({ code: "BILLING_PROVIDER_FAILURE", message: "db down" }),
+        ),
+      ).getOrg("o-1");
+
+      expect(result.getError().code).toBe("BILLING_PROVIDER_FAILURE");
     });
 
     it("shows the plan the gates apply and the override behind it", async () => {

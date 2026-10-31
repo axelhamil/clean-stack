@@ -110,7 +110,7 @@ const envSchema = z
     WEBHOOK_LEASE_SECONDS: z.coerce.number().int().positive().default(330),
     WEBHOOK_DEAD_RETRY_HOURS: z.coerce.number().positive().default(6),
     CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
-    STRIPE_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+    STRIPE_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     NOTIFICATION_DIGEST_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(8),
     GIT_SHA: z.string().optional(),

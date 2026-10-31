@@ -5,17 +5,30 @@ import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useStaff } from "../../../shared/auth/use-staff";
+import { LoadErrorRetry } from "../../../shared/components/load-error-retry";
 import { approvalActionLabelKey } from "../../../shared/labels/approval-action";
+import type { Inbox } from "../api/inbox.queries";
 
 export interface InboxApprovalsProps {
-  total: number;
-  items: { id: string; action: string; requestedBy: string; createdAt: string }[];
+  approvals: NonNullable<Inbox["approvals"]>;
+  onRetry: () => unknown;
 }
 
-export function InboxApprovals({ total, items }: InboxApprovalsProps) {
+export function InboxApprovals({ approvals, onRetry }: InboxApprovalsProps) {
   const { t } = useTranslation("admin");
   const formatDateTime = useFormatDateTime();
   const { me } = useStaff();
+
+  if (approvals.status === "failed") {
+    return (
+      <section className="flex min-w-0 flex-col gap-4">
+        <TypographyH2>{t("backOffice.inbox.approvals.title")}</TypographyH2>
+        <LoadErrorRetry message={t("backOffice.inbox.approvals.loadFailed")} onRetry={onRetry} />
+      </section>
+    );
+  }
+
+  const { total, items } = approvals;
 
   return (
     <section className="flex min-w-0 flex-col gap-4">

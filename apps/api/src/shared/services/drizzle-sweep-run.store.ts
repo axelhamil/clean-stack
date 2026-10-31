@@ -5,7 +5,7 @@ import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { ISweepRunStore, SweepRun, SweepRunStoreError } from "../ports/sweep-run.port";
 
 const { sweepRun } = sweepSchema;
-const failure = dbOperationFailure("ADMIN_OPS_PROVIDER_FAILURE");
+const failure = dbOperationFailure("SWEEP_RUN_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
 export class DrizzleSweepRunStore implements ISweepRunStore {

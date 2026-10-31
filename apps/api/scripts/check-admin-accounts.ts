@@ -26,7 +26,7 @@ import { deleteOrgIfEmpty } from "../src/auth-queries";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
 import { requireFeature, requirePlan } from "../src/shared/middleware/billing.middleware";
-import { adminProbes, appCall, codeAt, codeOf, currentCounter, freshIp } from "./admin-probes";
+import { adminProbes, appCall, codeOf, freshIp } from "./admin-probes";
 import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
@@ -113,24 +113,14 @@ async function openRows(orgId: string) {
   return rows.filter((row) => row.revokedAt === null);
 }
 
-async function confirmedCookie(
-  name: string,
-): Promise<{ cookie: string; id: string; unconfirmedRefusal: string | undefined }> {
-  const probe = await probes.manager(name);
-  const cookie = await probes.sessionCookie(probe);
-  await probes.enrolTwoFactor(probe);
-
-  const refused = await appCall(cookie, "POST", `/admin/orgs/${PREFIX}/plan-override`, {
-    tier: "pro",
-    expiresAt: inFuture(),
-    note: "x",
-  });
-
-  const code = await codeAt(probe, currentCounter());
-  const confirmed = await appCall(cookie, "POST", "/admin/step-up", { code });
-  if (confirmed.status !== 200) throw new Error(`step-up refused: ${confirmed.status}`);
-
-  return { cookie, id: probe.id, unconfirmedRefusal: codeOf(refused) };
+function confirmedCookie(name: string) {
+  return probes.confirmedManager(name, (cookie) =>
+    appCall(cookie, "POST", `/admin/orgs/${PREFIX}/plan-override`, {
+      tier: "pro",
+      expiresAt: inFuture(),
+      note: "x",
+    }),
+  );
 }
 
 async function proveExpiryAndRevocation(cookie: string): Promise<void> {

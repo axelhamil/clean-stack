@@ -92,6 +92,10 @@ An empty window sends nothing: the flush selects due rows and returns
 `{ flushed: 0, notifications: 0 }` without touching the email queue when there
 are none, the digest is never an empty email.
 
+### Late jobs
+
+The back office derives a `late` state from the last heartbeat rather than storing one (`shared/internal-routes/sweep-cadence.ts`): a daily sweep is late past 26 hours, the notification flush past 15 minutes. A job that never ran has no heartbeat and stays invisible, it shows up only once it reported at least once.
+
 ### Single-flight
 
 Each sweep label holds a lease in `sweep_lock` for the duration of its run, the

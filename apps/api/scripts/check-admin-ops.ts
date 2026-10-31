@@ -24,13 +24,13 @@ import { Hono } from "hono";
 import type Stripe from "stripe";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
-import { OpsService } from "../src/modules/admin/application/services/ops.service";
+import { StripeReplayService } from "../src/modules/admin/application/services/stripe-replay.service";
 import { StripeEventGateway } from "../src/modules/billing/infrastructure/adapters/stripe-event.gateway";
 import { stripeClient } from "../src/modules/billing/infrastructure/stripe-client";
 import { env } from "../src/shared/env";
 import { sweepStripeEventsRoutes } from "../src/shared/internal-routes/sweep-stripe-events.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
-import { adminProbes, appCall, codeAt, codeOf, currentCounter } from "./admin-probes";
+import { adminProbes, appCall } from "./admin-probes";
 import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
@@ -98,20 +98,14 @@ async function outboxRow(id: string) {
 }
 
 async function confirmedManager(name: string): Promise<string> {
-  const probe = await probes.manager(name);
-  const cookie = await probes.sessionCookie(probe);
-  await probes.enrolTwoFactor(probe);
-
-  const unconfirmed = await appCall(cookie, "POST", "/admin/ops/outbox/requeue", { ids: ["x"] });
+  const { cookie, unconfirmedRefusal } = await probes.confirmedManager(name, (unconfirmed) =>
+    appCall(unconfirmed, "POST", "/admin/ops/outbox/requeue", { ids: ["x"] }),
+  );
   check(
     "a requeue without a step-up is refused",
-    codeOf(unconfirmed) === "ADMIN_REAUTH_REQUIRED",
-    unconfirmed.body,
+    unconfirmedRefusal === "ADMIN_REAUTH_REQUIRED",
+    unconfirmedRefusal,
   );
-
-  const code = await codeAt(probe, currentCounter());
-  const confirmed = await appCall(cookie, "POST", "/admin/step-up", { code });
-  if (confirmed.status !== 200) throw new Error(`step-up refused: ${confirmed.status}`);
 
   return cookie;
 }
@@ -205,10 +199,10 @@ async function proveSweepHeartbeat(): Promise<void> {
     {
       id: old,
       type: "invoice.paid",
-      status: "processed",
+      status: "received",
       receivedAt: new Date(Date.now() - (env.STRIPE_EVENT_RETENTION_DAYS + 1) * DAY_MS),
     },
-    { id: recent, type: "invoice.paid", status: "processed" },
+    { id: recent, type: "invoice.paid", status: "received" },
   ]);
   await db.delete(sweepRun).where(eq(sweepRun.label, SWEEP_LABEL));
 
@@ -237,23 +231,28 @@ async function proveSweepHeartbeat(): Promise<void> {
   check("one row per label", second.status === 200 && rows.length === 1, rows.length);
 }
 
+function failedInvoice(id: string, status: string): Stripe.Invoice {
+  const invoice = {
+    id: `in_${id}`,
+    object: "invoice",
+    status,
+    parent: {
+      subscription_details: {
+        metadata: { referenceId: REFERENCE },
+        subscription: SUBSCRIPTION,
+      },
+    },
+  };
+
+  return JSON.parse(JSON.stringify(invoice));
+}
+
 function invoiceFailed(id: string): Stripe.Event {
   const event = {
     id,
     object: "event",
     type: "invoice.payment_failed",
-    data: {
-      object: {
-        id: `in_${id}`,
-        object: "invoice",
-        parent: {
-          subscription_details: {
-            metadata: { referenceId: REFERENCE },
-            subscription: SUBSCRIPTION,
-          },
-        },
-      },
-    },
+    data: { object: failedInvoice(id, "open") },
   };
 
   return JSON.parse(JSON.stringify(event));
@@ -270,36 +269,38 @@ async function paymentFailedCount(): Promise<number> {
   return rows.length;
 }
 
-async function replayCount(id: string): Promise<number> {
+async function replayOutcomes(id: string): Promise<unknown[]> {
   const rows = await db
-    .select({ id: oe.id })
+    .select({ payload: oe.payload })
     .from(oe)
     .where(
       sql`${oe.eventType} = ${EventTypes.ADMIN_OPS_STRIPE_EVENT_REPLAYED} AND ${oe.aggregateId} = ${id}`,
     );
 
-  return rows.length;
+  return rows.map(({ payload }) =>
+    typeof payload === "object" && payload !== null && "outcome" in payload
+      ? payload.outcome
+      : undefined,
+  );
 }
 
-function opsOver(id: string): OpsService {
+function replayOver(id: string, invoiceStatus = "open"): StripeReplayService {
   const gateway = new StripeEventGateway(
     {
       events: { retrieve: async () => invoiceFailed(id) },
       subscriptions: { retrieve: () => Promise.reject(new Error("not a subscription event")) },
+      invoices: { retrieve: async () => failedInvoice(id, invoiceStatus) },
       webhooks: stripeClient.webhooks,
     },
     { secretKey: "sk_test_check_admin_ops", webhookSecret: env.STRIPE_WEBHOOK_SECRET },
     new NoOpInstrumentation(),
   );
 
-  return new OpsService(
-    di.IOpsStore,
-    di.ISweepRunStore,
+  return new StripeReplayService(
     di.IStripeEventStore,
     gateway,
     di.IOutboxRepository,
     di.ITransactionService,
-    env,
   );
 }
 
@@ -321,47 +322,80 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
   );
   const [received] = await db.select().from(stripeEvent).where(eq(stripeEvent.id, id));
   check("a signed webhook is accepted", first.status === 200, first.status);
-  check("the plugin records the received event", received?.status === "processed", received);
+  check("the plugin records the received event", received?.status === "received", received);
   check("the first delivery emits its event", (await paymentFailedCount()) === 1);
 
-  const refused = await opsOver(id).replay({
+  const refused = await replayOver(id).replay({
     actorUserId,
     stripeEventId: id,
     handler: async () => new Response(null, { status: 400 }),
   });
   const [afterRefusal] = await db.select().from(stripeEvent).where(eq(stripeEvent.id, id));
   check("a refused replay fails", refused.isFailure);
-  check("a refused replay announces nothing", (await replayCount(id)) === 0);
+  check("a refused replay is announced as failed", (await replayOutcomes(id)).join() === "failed");
   check(
-    "a refused replay rolls replayed_at back and stores why",
+    "a refused replay leaves replayed_at empty, stores why and frees the claim",
     afterRefusal?.replayedAt === null &&
       afterRefusal.status === "failed" &&
-      afterRefusal.lastError !== null,
+      afterRefusal.lastError !== null &&
+      afterRefusal.replayClaimedAt === null,
     afterRefusal,
   );
 
-  const replayed = await opsOver(id).replay({
-    actorUserId,
-    stripeEventId: id,
-    handler: (request) => auth.handler(request),
-  });
+  const [replayed, doubleClick] = await Promise.all([
+    replayOver(id).replay({
+      actorUserId,
+      stripeEventId: id,
+      handler: (request) => auth.handler(request),
+    }),
+    replayOver(id).replay({
+      actorUserId,
+      stripeEventId: id,
+      handler: (request) => auth.handler(request),
+    }),
+  ]);
+  const passed = [replayed, doubleClick].filter((result) => result.isSuccess);
+  const conflicts = [replayed, doubleClick].filter(
+    (result) => result.isFailure && result.getError().code === "ADMIN_STRIPE_REPLAY_CONFLICT",
+  );
+  check(
+    "two replays at once make one replay and one typed conflict",
+    passed.length === 1 && conflicts.length === 1,
+  );
+
   const [after] = await db.select().from(stripeEvent).where(eq(stripeEvent.id, id));
-  check("the replay passes the real signed handler", replayed.isSuccess, replayed);
   check(
     "the replay marks the row and clears the failure",
-    after?.replayedAt !== null && after?.status === "processed" && after?.lastError === null,
+    after?.replayedAt !== null && after?.status === "received" && after?.lastError === null,
     after,
   );
-  check("the replay is announced once", (await replayCount(id)) === 1);
-  check("the replay runs the same processing", (await paymentFailedCount()) === 2);
+  check(
+    "the replay is announced once",
+    (await replayOutcomes(id)).sort().join() === "failed,succeeded",
+  );
+  check("a replay announces nothing twice", (await paymentFailedCount()) === 1);
 
-  const unknown = await opsOver(id).replay({
+  const paidId = `${STRIPE_PREFIX}_paid`;
+  await db.insert(stripeEvent).values({
+    id: paidId,
+    type: "invoice.payment_failed",
+    status: "failed",
+  });
+  const paid = await replayOver(paidId, "paid").replay({
+    actorUserId,
+    stripeEventId: paidId,
+    handler: (request) => auth.handler(request),
+  });
+  check("an invoice paid since then replays fine", paid.isSuccess, paid);
+  check("an invoice paid since then announces no failure", (await paymentFailedCount()) === 1);
+
+  const unknown = await replayOver(id).replay({
     actorUserId,
     stripeEventId: `${STRIPE_PREFIX}_unknown`,
     handler: (request) => auth.handler(request),
   });
   check(
-    "an event never received is refused",
+    "an event not on record is refused",
     unknown.isFailure && unknown.getError().code === "ADMIN_STRIPE_EVENT_NOT_FOUND",
   );
 }

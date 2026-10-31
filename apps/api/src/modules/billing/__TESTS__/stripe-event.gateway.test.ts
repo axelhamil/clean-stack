@@ -16,6 +16,7 @@ function gatewayOver(event: unknown, current: unknown) {
   const client: StripeEventsClient = {
     events: { retrieve: async () => event as Stripe.Event },
     subscriptions: { retrieve: async () => current as Stripe.Subscription },
+    invoices: { retrieve: async () => current as Stripe.Invoice },
     webhooks: { generateTestHeaderStringAsync: async () => "t=1,v1=signature" },
   };
   const gateway = new StripeEventGateway(client, SECRETS, new NoOpInstrumentation());
@@ -35,12 +36,35 @@ describe("StripeEventGateway", () => {
     expect(JSON.parse(copy.getValue().payload).data.object.status).toBe("canceled");
   });
 
+  it("replays a failed payment with the invoice as it stands now", async () => {
+    const { gateway } = gatewayOver(eventOf("invoice.payment_failed", { id: "in_1" }), {
+      id: "in_1",
+      status: "paid",
+    });
+
+    const copy = await gateway.retrieve("evt_1");
+
+    expect(JSON.parse(copy.getValue().payload).data.object.status).toBe("paid");
+  });
+
   it("keeps any other event as Stripe stored it", async () => {
-    const { gateway } = gatewayOver(eventOf("invoice.payment_failed", { id: "in_1" }), null);
+    const { gateway } = gatewayOver(eventOf("invoice.paid", { id: "in_1" }), null);
 
     const copy = await gateway.retrieve("evt_1");
 
     expect(JSON.parse(copy.getValue().payload).data.object.id).toBe("in_1");
+  });
+
+  it("types an event Stripe no longer holds so the screen can say what to do", async () => {
+    const client = gatewayClient();
+    client.events.retrieve = async () => {
+      throw Object.assign(new Error("No such event"), { statusCode: 404 });
+    };
+    const gateway = new StripeEventGateway(client, SECRETS, new NoOpInstrumentation());
+
+    const result = await gateway.retrieve("evt_1");
+
+    expect(result.getError().code).toBe("STRIPE_EVENT_EXPIRED_NOT_FOUND");
   });
 
   it("reports a delivery the handler refused", async () => {
@@ -51,7 +75,7 @@ describe("StripeEventGateway", () => {
       async () => new Response(null, { status: 400 }),
     );
 
-    expect(result.getError().code).toBe("ADMIN_STRIPE_PROVIDER_FAILURE");
+    expect(result.getError().code).toBe("STRIPE_PROVIDER_FAILURE");
   });
 
   it("is not configured without both Stripe secrets", () => {
@@ -69,6 +93,7 @@ function gatewayClient(): StripeEventsClient {
   return {
     events: { retrieve: async () => eventOf("x", {}) as Stripe.Event },
     subscriptions: { retrieve: async () => ({}) as Stripe.Subscription },
+    invoices: { retrieve: async () => ({}) as Stripe.Invoice },
     webhooks: { generateTestHeaderStringAsync: async () => "" },
   };
 }

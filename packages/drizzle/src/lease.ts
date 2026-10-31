@@ -13,6 +13,8 @@ export interface LeaseKey {
 
 export const dbNow: SQL = sql`now()`;
 
+export const dbClockNow: SQL = sql`clock_timestamp()`;
+
 const DEAD_SHARE_OF_CLAIM = 4;
 
 export function deadShareOf(limit: number): number {
@@ -29,6 +31,10 @@ export function isDeadDue(nextAttemptAt: AnyPgColumn): SQL {
 
 export function secondsFromNow(seconds: number): SQL {
   return sql`now() + make_interval(secs => ${seconds})`;
+}
+
+export function secondsFromClock(seconds: number): SQL {
+  return sql`clock_timestamp() + make_interval(secs => ${seconds})`;
 }
 
 export function leasedBy(columns: LeaseColumns, lease: LeaseKey): SQL {

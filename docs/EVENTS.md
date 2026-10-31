@@ -253,7 +253,7 @@ Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC)
 | `outbox_event` | `OUTBOX_RETENTION_DAYS` | **7d** | `dispatched_at IS NOT NULL AND dispatched_at < cutoff` | NServiceBus / industry consensus 2025: debug window |
 | `audit_log` (operational) | `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS` | **90d** | `retention = 'operational' AND occurred_at < cutoff` | SOC2 minimum-safe (operational logs); RGPD minimisation |
 | `audit_log` (compliance) | `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS` | **365d** | `retention = 'compliance' AND occurred_at < cutoff` | SOC2 Type II ≥ 12 months; PCI-DSS 10.7; NIS2 baseline |
-| `stripe_event` | `STRIPE_EVENT_RETENTION_DAYS` | **90d** | `received_at < cutoff` (ids and statuses only, no payload) | Replay window of the operations screen |
+| `stripe_event` | `STRIPE_EVENT_RETENTION_DAYS` | **30d** | `received_at < cutoff` (ids and statuses only, no payload) | Replay window of the operations screen |
 | `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` (replayable and terminal `dead_letter` alike) | Stripe / GitHub / Hookdeck convergence |
 
 Notes:

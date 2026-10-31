@@ -1,3 +1,4 @@
+import { PAID_TIERS, type PaidTier } from "@packages/access-control";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import { Label } from "@packages/ui/components/ui/label";
@@ -17,10 +18,10 @@ import {
   latestExpiryDay,
   overrideExpiryOf,
 } from "../../../shared/override-expiry";
-import { PLAN_TIERS, type PlanTier, planLabelKey } from "../plan-labels";
+import { planLabelKey } from "../plan-labels";
 
 export interface PlanOverrideFormValues {
-  tier: PlanTier;
+  tier: PaidTier;
   expiresAt: string;
   note: string;
 }
@@ -37,7 +38,7 @@ export function PlanOverrideForm({ isPending, onSubmit }: PlanOverrideFormProps)
   const endErrorId = useId();
   const noteId = useId();
   const noteErrorId = useId();
-  const [tier, setTier] = useState<PlanTier>("pro");
+  const [tier, setTier] = useState<PaidTier>("pro");
   const [end, setEnd] = useState("");
   const [note, setNote] = useState("");
   const [isEndRefused, setIsEndRefused] = useState(false);
@@ -61,7 +62,7 @@ export function PlanOverrideForm({ isPending, onSubmit }: PlanOverrideFormProps)
         <Select
           value={tier}
           onValueChange={(next) => {
-            const found = PLAN_TIERS.find((candidate) => candidate === next);
+            const found = PAID_TIERS.find((candidate) => candidate === next);
             if (found) setTier(found);
           }}
         >
@@ -69,7 +70,7 @@ export function PlanOverrideForm({ isPending, onSubmit }: PlanOverrideFormProps)
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PLAN_TIERS.map((candidate) => {
+            {PAID_TIERS.map((candidate) => {
               const labelKey = planLabelKey(candidate);
 
               return (

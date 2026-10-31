@@ -4,6 +4,7 @@ import { buildEntitlementsView } from "../use-entitlements";
 const proData = {
   tier: "pro" as const,
   status: "active",
+  hasSubscription: true,
   rank: 1,
   features: ["audit_log", "api"] as const,
   maxMembers: 20,
@@ -26,6 +27,7 @@ describe("buildEntitlementsView", () => {
     const v = buildEntitlementsView({
       tier: "business",
       status: "active",
+      hasSubscription: true,
       rank: 2,
       features: ["audit_log", "api", "sso"],
       maxMembers: null,
@@ -47,6 +49,7 @@ describe("buildEntitlementsView: quotas", () => {
     const view = buildEntitlementsView({
       tier: "free",
       status: "free",
+      hasSubscription: false,
       rank: 0,
       features: [],
       maxMembers: 3,
@@ -65,6 +68,7 @@ describe("buildEntitlementsView: quotas", () => {
     const view = buildEntitlementsView({
       tier: "business",
       status: "active",
+      hasSubscription: true,
       rank: 2,
       features: [],
       maxMembers: null,

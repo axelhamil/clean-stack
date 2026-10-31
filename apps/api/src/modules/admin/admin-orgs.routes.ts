@@ -56,11 +56,9 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
       createdAt: o.createdAt.toISOString(),
       planOverride: o.planOverride
         .map((active) => ({
-          id: active.id,
           tier: active.tier,
           note: active.note,
           expiresAt: active.expiresAt.toISOString(),
-          createdAt: active.createdAt.toISOString(),
         }))
         .toNull(),
     });

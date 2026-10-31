@@ -11,7 +11,7 @@ export type SweepRun = {
   count: number;
 };
 
-export type SweepRunStoreError = AppError<"ADMIN_OPS_PROVIDER_FAILURE">;
+export type SweepRunStoreError = AppError<"SWEEP_RUN_PROVIDER_FAILURE">;
 
 export interface ISweepRunStore {
   record(run: SweepRun): Promise<Result<void, SweepRunStoreError>>;

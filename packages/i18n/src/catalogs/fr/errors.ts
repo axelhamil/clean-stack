@@ -129,15 +129,23 @@ export default {
       "Les vues enregistrées n'ont pas pu être lues ou modifiées. Réessayez.",
     ADMIN_ORG_NOT_FOUND: "Cette organisation n'existe plus.",
     ADMIN_NOTE_PROVIDER_FAILURE: "Les notes n'ont pas pu être lues ou enregistrées. Réessayez.",
-    ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE:
-      "Le forfait forcé n'a pas pu être lu ou enregistré. Réessayez.",
+    PLAN_OVERRIDE_PROVIDER_FAILURE: "Le forfait forcé n'a pas pu être lu ou enregistré. Réessayez.",
     ADMIN_PLAN_OVERRIDE_NOT_FOUND: "Cette organisation n'a pas de forfait forcé actif.",
     ADMIN_PLAN_OVERRIDE_ALREADY_SET_CONFLICT:
       "Un collègue vient de forcer un forfait sur cette organisation. Rechargez et vérifiez.",
     ADMIN_STRIPE_UNAVAILABLE: "Stripe n'est pas configuré sur cette plateforme.",
-    ADMIN_STRIPE_EVENT_NOT_FOUND: "Cette plateforme n'a jamais reçu cet événement Stripe.",
-    ADMIN_STRIPE_PROVIDER_FAILURE:
+    ADMIN_STRIPE_EVENT_NOT_FOUND:
+      "Cet événement Stripe n'est pas enregistré : il n'est jamais arrivé ou sa ligne a été purgée après la durée de conservation.",
+    ADMIN_STRIPE_REPLAY_CONFLICT:
+      "Cet événement a déjà été rejoué ou un collègue est en train de le rejouer. Rechargez la liste.",
+    ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE:
       "Le rejeu a échoué. La raison figure sur la ligne de l'événement, réessayez une fois corrigée.",
+    STRIPE_EVENT_PROVIDER_FAILURE:
+      "Les événements Stripe n'ont pas pu être lus ou enregistrés. Réessayez.",
+    STRIPE_EVENT_EXPIRED_NOT_FOUND:
+      "Stripe ne détient plus cet événement, il les conserve 30 jours. Renvoyez-le depuis le tableau de bord Stripe si besoin.",
+    STRIPE_PROVIDER_FAILURE: "Stripe n'a pas répondu. Réessayez dans un instant.",
+    SWEEP_RUN_PROVIDER_FAILURE: "Les tâches planifiées n'ont pas pu être lues. Réessayez.",
     ADMIN_STEP_UP_CODE_INVALID:
       "Ce code n'est pas valide. Vérifiez votre application d'authentification.",
     ADMIN_STEP_UP_REPLAY_INVALID: "Ce code a déjà servi. Attendez le suivant.",

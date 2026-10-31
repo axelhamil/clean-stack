@@ -1,18 +1,11 @@
 import { Option, Result } from "@packages/ddd-kit";
 import {
-  and,
   count,
-  dbNow,
   desc,
   emailSchema,
   eq,
-  gt,
-  inArray,
-  isNotNull,
-  isNull,
   outboxSchema,
   resolveExecutor,
-  secondsFromNow,
   webhooksSchema,
 } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
@@ -29,7 +22,7 @@ const { emailMessage } = emailSchema;
 const { webhookDelivery } = webhooksSchema;
 const failure = dbOperationFailure("ADMIN_OPS_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
-const deadRow = and(isNull(oe.dispatchedAt), isNotNull(oe.deadAt));
+const { deadRow } = outboxSchema;
 
 export class DrizzleOpsStore implements IOpsStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
@@ -45,13 +38,9 @@ export class DrizzleOpsStore implements IOpsStore {
             .select({
               id: oe.id,
               eventType: oe.eventType,
-              aggregateType: oe.aggregateType,
-              aggregateId: oe.aggregateId,
-              occurredAt: oe.occurredAt,
               deadAt: oe.deadAt,
               attempts: oe.attempts,
               lastError: oe.lastError,
-              nextAttemptAt: oe.nextAttemptAt,
             })
             .from(oe)
             .where(deadRow)
@@ -67,7 +56,6 @@ export class DrizzleOpsStore implements IOpsStore {
                       ...row,
                       deadAt: row.deadAt,
                       lastError: Option.fromNullable(row.lastError),
-                      nextAttemptAt: Option.fromNullable(row.nextAttemptAt),
                     },
                   ]
                 : [],
@@ -127,30 +115,5 @@ export class DrizzleOpsStore implements IOpsStore {
         }
       },
     );
-  }
-
-  async requeueDead(ids: string[], leaseSeconds: number): Promise<Result<string[], OpsStoreError>> {
-    const exec = resolveExecutor();
-
-    return this.instrumentation.startSpan({ name: "DrizzleOpsStore > requeueDead" }, async () => {
-      try {
-        const query = exec
-          .update(oe)
-          .set({ nextAttemptAt: dbNow })
-          .where(
-            and(inArray(oe.id, ids), deadRow, gt(oe.nextAttemptAt, secondsFromNow(leaseSeconds))),
-          )
-          .returning({ id: oe.id });
-        const rows = await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
-
-        return Result.ok(rows.map((row) => row.id));
-      } catch (err) {
-        this.instrumentation.capture(err);
-        return Result.fail(failure("requeue dead outbox events"));
-      }
-    });
   }
 }

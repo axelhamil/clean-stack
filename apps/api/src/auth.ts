@@ -61,6 +61,7 @@ import {
   authorizeSubscriptionAction,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
+import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stripe-payment-failure";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { redirectQuery } from "./shared/auth/email-redirect";
 import { markPasswordResetDelivered } from "./shared/auth/password-reset-delivery";
@@ -80,7 +81,7 @@ import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env, FRONT_ORIGINS } from "./shared/env";
-import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
+import { derivedEventId, emitEvent, emitEventBestEffort } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
 import {
@@ -213,9 +214,11 @@ async function emit<TPayload>(
   aggregateId: string,
   payload: TPayload,
   organizationId?: string | null,
+  eventId?: string,
 ): Promise<void> {
   await emitEvent(di.IOutboxRepository, eventType, aggregateType, aggregateId, payload, {
     organizationId,
+    eventId,
   });
 }
 
@@ -406,26 +409,17 @@ async function emitScimUserEvents(
  * the platform does with a webhook on top of the plugin's own subscription sync.
  */
 async function handleStripeEvent(event: Stripe.Event): Promise<void> {
-  if (event.type !== "invoice.payment_failed") return;
+  const failure = paymentFailureOf(event);
+  if (failure.isNone()) return;
 
-  const invoice = event.data.object;
-  const subDetails = invoice.parent?.subscription_details;
-  const referenceId = subDetails?.metadata?.referenceId;
-  if (!referenceId) return;
-
-  const subscriptionId =
-    typeof subDetails?.subscription === "string" ? subDetails.subscription : "";
+  const { organizationId, subscriptionId, invoiceId } = failure.unwrap();
   await emit(
     EventTypes.BILLING_PAYMENT_FAILED,
     "subscription",
-    subscriptionId || invoice.id,
-    {
-      organizationId: referenceId,
-      subscriptionId,
-      invoiceId: invoice.id,
-      actorUserId: null,
-    },
-    referenceId,
+    subscriptionId || invoiceId,
+    { organizationId, subscriptionId, invoiceId, actorUserId: null },
+    organizationId,
+    derivedEventId(event.id, EventTypes.BILLING_PAYMENT_FAILED),
   );
 }
 
@@ -448,6 +442,7 @@ async function emitSubscriptionEvent(
     periodEnd?: Date | null;
   },
   tier: string,
+  stripeEventId: string,
 ): Promise<void> {
   const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
   await emit(
@@ -463,6 +458,7 @@ async function emitSubscriptionEvent(
       currentPeriodEnd: subscription.periodEnd ?? null,
     },
     subscription.referenceId,
+    derivedEventId(stripeEventId, eventType),
   );
 }
 
@@ -815,18 +811,20 @@ const authOptions = {
 
           return authorizeSubscriptionAction(action, orgRole);
         },
-        onSubscriptionComplete: async ({ subscription, plan }) => {
+        onSubscriptionComplete: async ({ event, subscription, plan }) => {
           await emitSubscriptionEvent(
             EventTypes.BILLING_SUBSCRIPTION_CREATED,
             subscription,
             plan.name,
+            event.id,
           );
         },
-        onSubscriptionUpdate: async ({ subscription }) => {
+        onSubscriptionUpdate: async ({ event, subscription }) => {
           await emitSubscriptionEvent(
             subscriptionEventType(subscription.status),
             subscription,
             subscription.plan,
+            event.id,
           );
         },
       },
@@ -838,7 +836,7 @@ const authOptions = {
           throw err;
         }
 
-        await recordStripeDelivery(event, Option.none());
+        await recordStripeDelivery(event, await di.StripeSyncVerifier.check(event));
       },
     }),
     bearer(),

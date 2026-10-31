@@ -37,11 +37,9 @@ export const STUB_ORG = {
   ssoEnforced: true,
   plan: "business",
   planOverride: {
-    id: "override-plan-stub",
     tier: "business",
     note: LONG_NAME.repeat(4),
     expiresAt: "2030-01-01T00:00:00.000Z",
-    createdAt: CREATED_AT,
   },
   memberCount: 1284,
   createdAt: CREATED_AT,
@@ -98,13 +96,9 @@ export const STUB_DEAD_LETTERS = {
       {
         id: "dead-event-stub",
         eventType: "billing.subscription.updated",
-        aggregateType: "subscription",
-        aggregateId: "sub_stub",
-        occurredAt: CREATED_AT,
         deadAt: CREATED_AT,
         attempts: 25,
         lastError: `audit-log: ${LONG_EMAIL} ${LONG_NAME}`,
-        nextAttemptAt: "2030-01-01T00:00:00.000Z",
       },
     ],
   },
@@ -115,18 +109,16 @@ export const STUB_SWEEPS = {
   items: [
     {
       label: "sweep-email-messages",
-      startedAt: CREATED_AT,
       finishedAt: CREATED_AT,
       outcome: "ok",
-      durationMs: 12,
+      late: true,
       count: 40,
     },
     {
       label: "sweep-audit-log",
-      startedAt: CREATED_AT,
       finishedAt: CREATED_AT,
       outcome: "batch-error",
-      durationMs: 12,
+      late: false,
       count: 0,
     },
   ],
@@ -153,34 +145,31 @@ export const STUB_VIEWS = {
       screen: "users",
       name: LONG_NAME.slice(0, 60),
       filters: { q: "montgomery" },
-      updatedAt: CREATED_AT,
     },
     {
       id: "view-suspended",
       screen: "users",
       name: "Suspended",
       filters: { status: "suspended" },
-      updatedAt: CREATED_AT,
     },
     {
       id: "view-org",
       screen: "orgs",
       name: "Northwind",
       filters: { q: "north" },
-      updatedAt: CREATED_AT,
     },
     {
       id: "view-audit",
       screen: "audit",
       name: "Billing",
       filters: { action: "billing." },
-      updatedAt: CREATED_AT,
     },
   ],
 };
 
 export const STUB_INBOX = {
   approvals: {
+    status: "ok",
     total: 25,
     items: [
       {
@@ -197,14 +186,14 @@ export const STUB_INBOX = {
       },
     ],
   },
-  operations: {
-    deadEvents: 2,
-    deadEmails: 1,
-    deadWebhooks: 0,
-    failedSweeps: [
+  queues: { status: "ok", deadEvents: 2, deadEmails: 1, deadWebhooks: 0 },
+  sweeps: {
+    status: "ok",
+    items: [
       {
         label: "sweep-audit-log-with-a-very-long-label-that-should-wrap-on-a-phone-screen",
         outcome: "batch-error",
+        late: false,
         finishedAt: CREATED_AT,
       },
     ],

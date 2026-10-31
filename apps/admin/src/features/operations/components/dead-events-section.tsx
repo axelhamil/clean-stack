@@ -1,5 +1,4 @@
 import { Button } from "@packages/ui/components/ui/button";
-import { SkeletonTable } from "@packages/ui/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -16,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useStaff } from "../../../shared/auth/use-staff";
-import { LoadErrorRetry } from "../../../shared/components/load-error-retry";
+import { ItemsQueryList } from "../../../shared/components/query-list";
 import { OPS_QUERY_KEY, requeueOutboxMutationOptions } from "../api/ops.mutations";
 import { deadLettersQueryOptions } from "../api/ops.queries";
 
@@ -50,69 +49,68 @@ export function DeadEventsSection() {
             disabled={requeue.isPending}
             onClick={() => requeue.mutate(items.map((item) => item.id))}
           >
-            {t("operations.dead.requeueAll")}
+            {t("operations.dead.requeueShown", { count: items.length })}
           </Button>
         )}
       </div>
 
-      {query.isPending && <SkeletonTable label={t("operations.dead.loading")} columns={4} />}
-
-      {query.isError && (
-        <LoadErrorRetry message={t("operations.dead.loadFailed")} onRetry={query.refetch} />
-      )}
-
-      {query.data && items.length === 0 && (
-        <TypographyMuted>{t("operations.dead.empty")}</TypographyMuted>
-      )}
-
-      {query.data && items.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("operations.dead.table.event")}</TableHead>
-              <TableHead className="hidden md:table-cell">
-                {t("operations.dead.table.deadAt")}
-              </TableHead>
-              <TableHead className="hidden md:table-cell">
-                {t("operations.dead.table.attempts")}
-              </TableHead>
-              {can("ops.manage") && (
-                <TableHead>
-                  <span className="sr-only">{t("operations.dead.requeue")}</span>
+      <ItemsQueryList
+        query={query}
+        items={items}
+        loadingLabel={t("operations.dead.loading")}
+        errorMessage={t("operations.dead.loadFailed")}
+        emptyMessage={t("operations.dead.empty")}
+        columns={4}
+      >
+        {(listed) => (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("operations.dead.table.event")}</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  {t("operations.dead.table.deadAt")}
                 </TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="whitespace-normal wrap-anywhere">
-                  {item.eventType}
-                  <TypographyMuted>{item.lastError ?? item.id}</TypographyMuted>
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {formatDateTime(item.deadAt)}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">{item.attempts}</TableCell>
+                <TableHead className="hidden md:table-cell">
+                  {t("operations.dead.table.attempts")}
+                </TableHead>
                 {can("ops.manage") && (
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={requeue.isPending}
-                      onClick={() => requeue.mutate([item.id])}
-                    >
-                      {t("operations.dead.requeue")}
-                    </Button>
-                  </TableCell>
+                  <TableHead>
+                    <span className="sr-only">{t("operations.dead.requeue")}</span>
+                  </TableHead>
                 )}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+            </TableHeader>
+            <TableBody>
+              {listed.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="whitespace-normal wrap-anywhere">
+                    {item.eventType}
+                    <TypographyMuted>{item.lastError ?? item.id}</TypographyMuted>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {formatDateTime(item.deadAt)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">{item.attempts}</TableCell>
+                  {can("ops.manage") && (
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={requeue.isPending}
+                        onClick={() => requeue.mutate([item.id])}
+                      >
+                        {t("operations.dead.requeue")}
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </ItemsQueryList>
 
-      {query.data && query.data.outbox.total > items.length && (
+      {query.data && items.length > 0 && (
         <TypographyMuted>
           {t("operations.dead.partial", { shown: items.length, total: query.data.outbox.total })}
         </TypographyMuted>

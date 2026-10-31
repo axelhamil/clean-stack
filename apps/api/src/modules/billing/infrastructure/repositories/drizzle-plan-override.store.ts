@@ -10,7 +10,7 @@ import type {
 } from "../../../../shared/ports/plan-override.port";
 
 const { planOverride } = billingSchema;
-const failure = dbOperationFailure("ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE");
+const failure = dbOperationFailure("PLAN_OVERRIDE_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
 function activeOf(organizationId: string) {

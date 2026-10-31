@@ -223,12 +223,9 @@ async function seedDeadEmail(): Promise<void> {
 }
 
 type InboxBody = {
-  approvals: { total: number; items: { id: string }[] } | null;
-  operations: {
-    deadEvents: number;
-    deadEmails: number;
-    failedSweeps: { label: string }[];
-  } | null;
+  approvals: { status: string; total: number; items: { id: string }[] } | null;
+  queues: { status: string; deadEvents: number; deadEmails: number } | null;
+  sweeps: { status: string; items: { label: string; late: boolean }[] } | null;
 };
 
 async function inboxOf(cookie: string): Promise<InboxBody> {
@@ -275,18 +272,18 @@ async function proveInbox(manager: string, requesterId: string) {
   const after = await inboxOf(manager);
   check(
     "the inbox counts a dead event",
-    after.operations?.deadEvents === (before.operations?.deadEvents ?? 0) + 1,
-    after.operations,
+    after.queues?.deadEvents === (before.queues?.deadEvents ?? 0) + 1,
+    after.queues,
   );
   check(
     "the inbox counts a dead email",
-    after.operations?.deadEmails === (before.operations?.deadEmails ?? 0) + 1,
-    after.operations,
+    after.queues?.deadEmails === (before.queues?.deadEmails ?? 0) + 1,
+    after.queues,
   );
   check(
     "the inbox lists a failed job",
-    after.operations?.failedSweeps.some((run) => run.label === `${PREFIX}-sweep`) === true,
-    after.operations,
+    after.sweeps?.items.some((run) => run.label === `${PREFIX}-sweep`) === true,
+    after.sweeps,
   );
   check(
     "the inbox counts a live approval, never a lapsed one",
@@ -299,14 +296,14 @@ async function proveInbox(manager: string, requesterId: string) {
   const auditor = await inboxOf((await staffCookie("reader", "auditor")).cookie);
   check(
     "an auditor reads operations and no approvals",
-    auditor.approvals === null && auditor.operations !== null,
+    auditor.approvals === null && auditor.queues !== null && auditor.sweeps !== null,
     auditor,
   );
 
   const support = await inboxOf((await staffCookie("helper", "support")).cookie);
   check(
     "a support member's inbox opens neither section",
-    support.approvals === null && support.operations === null,
+    support.approvals === null && support.queues === null && support.sweeps === null,
     support,
   );
 

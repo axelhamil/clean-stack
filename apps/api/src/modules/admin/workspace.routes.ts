@@ -6,34 +6,52 @@ import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.mi
 import { requireStaff } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
 
+const SECTION_FAILED = { status: "failed" as const };
+
 export const adminWorkspaceRoutes = new Hono<{ Variables: AuthVariables }>()
   .get("/inbox", requireAuth, requireStaff, async (c) => {
-    const result = await di.InboxService.forStaff(c.get("staff").permissions);
-    if (result.isFailure) throw new AppErrorException(result.getError());
-
-    const { approvals, operations } = result.getValue();
+    const { approvals, queues, sweeps } = await di.InboxService.forStaff(
+      c.get("staff").permissions,
+    );
 
     return c.json({
       approvals: approvals
-        .map(({ total, items }) => ({
-          total,
-          items: items.map((item) => ({
-            id: item.id,
-            action: item.action,
-            requestedBy: item.requestedBy,
-            createdAt: item.createdAt.toISOString(),
-          })),
-        }))
+        .map((read) => {
+          if (read.isFailure) return SECTION_FAILED;
+
+          const { total, items } = read.getValue();
+
+          return {
+            status: "ok" as const,
+            total,
+            items: items.map((item) => ({
+              id: item.id,
+              action: item.action,
+              requestedBy: item.requestedBy,
+              createdAt: item.createdAt.toISOString(),
+            })),
+          };
+        })
         .toNull(),
-      operations: operations
-        .map(({ failedSweeps, ...counts }) => ({
-          ...counts,
-          failedSweeps: failedSweeps.map((run) => ({
-            label: run.label,
-            outcome: run.outcome,
-            finishedAt: run.finishedAt.toISOString(),
-          })),
-        }))
+      queues: queues
+        .map((read) =>
+          read.isFailure ? SECTION_FAILED : { status: "ok" as const, ...read.getValue() },
+        )
+        .toNull(),
+      sweeps: sweeps
+        .map((read) => {
+          if (read.isFailure) return SECTION_FAILED;
+
+          return {
+            status: "ok" as const,
+            items: read.getValue().map((run) => ({
+              label: run.label,
+              outcome: run.outcome,
+              late: run.late,
+              finishedAt: run.finishedAt.toISOString(),
+            })),
+          };
+        })
         .toNull(),
     });
   })
@@ -45,10 +63,7 @@ export const adminWorkspaceRoutes = new Hono<{ Variables: AuthVariables }>()
     if (result.isFailure) throw new AppErrorException(result.getError());
 
     return c.json({
-      items: result.getValue().map((view) => ({
-        ...view,
-        updatedAt: view.updatedAt.toISOString(),
-      })),
+      items: result.getValue(),
     });
   })
   .post("/views", requireAuth, requireStaff, zV("json", staffViewSchema), async (c) => {

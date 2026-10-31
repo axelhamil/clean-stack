@@ -5,13 +5,9 @@ export type OpsStoreError = AppError<"ADMIN_OPS_PROVIDER_FAILURE">;
 export type DeadOutboxEvent = {
   id: string;
   eventType: string;
-  aggregateType: string;
-  aggregateId: string;
-  occurredAt: Date;
   deadAt: Date;
   attempts: number;
   lastError: Option<string>;
-  nextAttemptAt: Option<Date>;
 };
 
 export type DeadOutboxPage = { items: DeadOutboxEvent[]; total: number };
@@ -22,5 +18,4 @@ export interface IOpsStore {
   listDeadOutbox(limit: number): Promise<Result<DeadOutboxPage, OpsStoreError>>;
   countDeadOutbox(): Promise<Result<number, OpsStoreError>>;
   countDeadQueues(): Promise<Result<DeadQueueCounts, OpsStoreError>>;
-  requeueDead(ids: string[], leaseSeconds: number): Promise<Result<string[], OpsStoreError>>;
 }

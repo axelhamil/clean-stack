@@ -262,7 +262,6 @@ test.describe("signed in", () => {
               screen: "audit",
               name: "Billing",
               filters: { action: "billing." },
-              updatedAt: "2026-03-09T10:00:00.000Z",
             },
           ],
         },

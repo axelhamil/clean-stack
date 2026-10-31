@@ -162,6 +162,12 @@ export default {
       searching: "Searching…",
       searchFailed: "The search failed. Type again to retry.",
       actionFailed: "This action failed",
+      status: {
+        accountsSearching: "Searching accounts…",
+        accountsFailed: "The account search failed. Type again to retry.",
+        organizationsSearching: "Searching organizations…",
+        organizationsFailed: "The organization search failed. Type again to retry.",
+      },
       groups: {
         navigate: "Go to",
         views: "Your saved views",
@@ -187,12 +193,15 @@ export default {
       quiet: "Nothing needs you right now.",
       approvals: {
         title: "Approvals waiting",
+        loadFailed: "The waiting approvals could not be read.",
         asked: "Asked on {{date}}",
         askedByYou: "You asked on {{date}}, a colleague must decide",
         seeAll_one: "See the {{count}} waiting approval",
         seeAll_other: "See all {{count}} waiting approvals",
       },
       operationsTitle: "Operations",
+      queuesFailed: "The delivery queues could not be read.",
+      sweepsFailed: "The scheduled jobs could not be read.",
       deadEvents_one: "{{count}} event could not be delivered",
       deadEvents_other: "{{count}} events could not be delivered",
       deadEmails_one: "{{count}} email could not be sent",
@@ -268,7 +277,8 @@ export default {
       loadFailed: "Failed to load dead events.",
       empty: "No dead events. Every event was delivered or is still retrying.",
       requeue: "Requeue",
-      requeueAll: "Requeue all listed",
+      requeueShown_one: "Requeue this one",
+      requeueShown_other: "Requeue these {{count}}",
       requeued: "Sent back to delivery.",
       nothingMoved: "Nothing moved: these events are already retrying or were delivered.",
       partial: "Showing the latest {{shown}} of {{total}}.",
@@ -287,6 +297,7 @@ export default {
         truncated: "More left",
         batchError: "Batch error",
         failed: "Failed",
+        late: "Late",
       },
     },
     stripe: {
@@ -299,14 +310,14 @@ export default {
       replayed: "Event replayed.",
       replayTitle: "Replay this event?",
       replayDescription:
-        "It runs the same processing as the original delivery, with the current state of the subscription. Events and notifications it emits go out again.",
+        "It runs the same processing as the original delivery, with the current state of the subscription. Events already announced are not announced again, and an invoice paid since then announces nothing.",
       table: {
         event: "Event",
         status: "Status",
         receivedAt: "Received",
         replayedAt: "Replayed",
       },
-      statuses: { processed: "Processed", failed: "Failed" },
+      statuses: { received: "Received", failed: "Failed" },
     },
   },
   team: {

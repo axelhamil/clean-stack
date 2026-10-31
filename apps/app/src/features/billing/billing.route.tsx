@@ -75,7 +75,7 @@ function BillingPage() {
       <PageHeader
         title={t("billing.pageTitle")}
         actions={
-          isPaid && (
+          ent.hasSubscription && (
             <GuardHint guard={guard} otherwiseDisabled={portal.isPending}>
               <Button
                 onClick={() => portal.mutate()}

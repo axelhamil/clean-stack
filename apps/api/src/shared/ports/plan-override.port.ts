@@ -1,6 +1,6 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
 
-export type PlanOverrideStoreError = AppError<"ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE">;
+export type PlanOverrideStoreError = AppError<"PLAN_OVERRIDE_PROVIDER_FAILURE">;
 
 export interface ActivePlanOverride {
   id: string;
@@ -30,3 +30,5 @@ export interface IPlanOverrideStore {
     organizationId: string,
   ): Promise<Result<Option<{ id: string; tier: string }>, PlanOverrideStoreError>>;
 }
+
+export type IPlanOverrideReader = Pick<IPlanOverrideStore, "findActive">;

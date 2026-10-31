@@ -62,3 +62,38 @@ export function QueryList<T>({
     </>
   );
 }
+
+export interface ItemsQueryListProps<T> {
+  query: { isPending: boolean; isError: boolean; refetch: () => unknown };
+  items: T[];
+  loadingLabel: string;
+  errorMessage: string;
+  emptyMessage: string;
+  columns: number;
+  rows?: number;
+  children: (items: T[]) => ReactNode;
+}
+
+export function ItemsQueryList<T>({
+  query,
+  items,
+  loadingLabel,
+  errorMessage,
+  emptyMessage,
+  columns,
+  rows,
+  children,
+}: ItemsQueryListProps<T>) {
+  if (query.isPending) return <SkeletonTable label={loadingLabel} columns={columns} rows={rows} />;
+
+  const retry = query.isError && <LoadErrorRetry message={errorMessage} onRetry={query.refetch} />;
+
+  if (items.length === 0) return retry || <TypographyMuted>{emptyMessage}</TypographyMuted>;
+
+  return (
+    <>
+      {children(items)}
+      {retry}
+    </>
+  );
+}

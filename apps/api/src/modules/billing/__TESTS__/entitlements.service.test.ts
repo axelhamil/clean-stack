@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import { ENTITLEMENTS } from "../../../shared/entitlements";
@@ -45,7 +45,7 @@ function makeOverrides(row: ActivePlanOverride | null, fail = false): IPlanOverr
   store.findActive.mockImplementation(async () =>
     fail
       ? Result.fail<Option<ActivePlanOverride>, PlanOverrideStoreError>({
-          code: "ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE",
+          code: "PLAN_OVERRIDE_PROVIDER_FAILURE",
           message: "db down",
         })
       : Result.ok(Option.fromNullable(row)),
@@ -101,15 +101,41 @@ describe("EntitlementsService", () => {
     expect(view.status).toBe("override");
   });
 
-  it("fails closed to free when the override read errors, whatever the subscription says", async () => {
-    const svc = serviceOver(
+  it("keeps the paid subscription when the override read errors, and reports the failure", async () => {
+    const instrumentation = new NoOpInstrumentation();
+    const capture = spyOn(instrumentation, "capture");
+    const svc = new EntitlementsService(
       makeStore({ tier: "pro", status: "active" }),
       makeOverrides(null, true),
+      instrumentation,
     );
 
     const view = await svc.getEntitlements("org1");
 
-    expect(view.tier).toBe("free");
+    expect(view.tier).toBe("pro");
+    expect(capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a read failure of either source to the caller that must not show a guess", async () => {
+    const overrideDown = serviceOver(
+      makeStore({ tier: "pro", status: "active" }),
+      makeOverrides(null, true),
+    );
+    const subscriptionDown = serviceOver(makeStore(null, true));
+
+    const first = await overrideDown.readEntitlements("org1");
+    const second = await subscriptionDown.readEntitlements("org1");
+
+    expect(first.getError().code).toBe("PLAN_OVERRIDE_PROVIDER_FAILURE");
+    expect(second.getError().code).toBe("BILLING_PROVIDER_FAILURE");
+  });
+
+  it("says whether a subscription backs the plan, an override alone has no billing portal", async () => {
+    const backed = serviceOver(makeStore({ tier: "pro", status: "active" }), makeOverrides(ACTIVE));
+    const overrideOnly = serviceOver(makeStore(null), makeOverrides(ACTIVE));
+
+    expect((await backed.getEntitlements("org1")).hasSubscription).toBe(true);
+    expect((await overrideOnly.getEntitlements("org1")).hasSubscription).toBe(false);
   });
 
   it("ignores an override whose tier left the catalog", async () => {

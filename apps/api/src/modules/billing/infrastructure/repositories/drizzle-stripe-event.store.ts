@@ -1,5 +1,17 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { billingSchema, dbNow, desc, eq, resolveExecutor } from "@packages/drizzle";
+import {
+  and,
+  billingSchema,
+  dbClockNow,
+  dbNow,
+  desc,
+  eq,
+  isNull,
+  lt,
+  or,
+  resolveExecutor,
+  secondsFromClock,
+} from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
@@ -10,10 +22,10 @@ import type {
 } from "../../../../shared/ports/stripe-event.port";
 
 const { stripeEvent } = billingSchema;
-const failure = dbOperationFailure("ADMIN_OPS_PROVIDER_FAILURE");
+const failure = dbOperationFailure("STRIPE_EVENT_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
-function toRow(row: typeof stripeEvent.$inferSelect): StripeEventRow {
+function toRow({ replayClaimedAt: _, ...row }: typeof stripeEvent.$inferSelect): StripeEventRow {
   return {
     ...row,
     lastError: Option.fromNullable(row.lastError),
@@ -34,7 +46,7 @@ export class DrizzleStripeEventStore implements IStripeEventStore {
       async () => {
         try {
           const outcome = {
-            status: delivery.lastError.isSome() ? ("failed" as const) : ("processed" as const),
+            status: delivery.lastError.isSome() ? ("failed" as const) : ("received" as const),
             lastError: delivery.lastError.toNull(),
           };
           const query = exec
@@ -95,6 +107,68 @@ export class DrizzleStripeEventStore implements IStripeEventStore {
         return Result.fail(failure("list stripe events"));
       }
     });
+  }
+
+  async claimReplay(
+    id: string,
+    leaseSeconds: number,
+  ): Promise<Result<boolean, StripeEventStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStripeEventStore > claimReplay" },
+      async () => {
+        try {
+          const query = exec
+            .update(stripeEvent)
+            .set({ replayClaimedAt: dbClockNow })
+            .where(
+              and(
+                eq(stripeEvent.id, id),
+                or(
+                  isNull(stripeEvent.replayClaimedAt),
+                  lt(stripeEvent.replayClaimedAt, secondsFromClock(-leaseSeconds)),
+                ),
+              ),
+            )
+            .returning({ id: stripeEvent.id });
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(rows.length > 0);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("claim stripe event replay"));
+        }
+      },
+    );
+  }
+
+  async releaseReplay(id: string): Promise<Result<void, StripeEventStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStripeEventStore > releaseReplay" },
+      async () => {
+        try {
+          const query = exec
+            .update(stripeEvent)
+            .set({ replayClaimedAt: null })
+            .where(eq(stripeEvent.id, id));
+          await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok();
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("release stripe event replay"));
+        }
+      },
+    );
   }
 
   async markReplayed(id: string): Promise<Result<void, StripeEventStoreError>> {

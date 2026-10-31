@@ -6,10 +6,10 @@ import {
   dbNow,
   deadShareOf,
   eq,
+  gt,
   inArray,
   isDeadDue,
   isDue,
-  isNotNull,
   isNull,
   leasedBy,
   or,
@@ -17,6 +17,7 @@ import {
   type PgUpdateSetSource,
   releasedSet,
   resolveExecutor,
+  secondsFromClock,
   secondsFromNow,
   sql,
 } from "@packages/drizzle";
@@ -74,7 +75,7 @@ function nonNegative(ms: Option<number>): Option<number> {
 const merged = (deliveries: OutboxDeliveries) =>
   sql`${oe.deliveries} || ${JSON.stringify(deliveries)}::jsonb`;
 const liveRow = and(isNull(oe.dispatchedAt), isNull(oe.deadAt));
-const deadRow = and(isNull(oe.dispatchedAt), isNotNull(oe.deadAt));
+const { deadRow } = outboxSchema;
 const leased = (lease: OutboxLease) => and(leasedBy(oe, lease), isNull(oe.dispatchedAt));
 
 function claimQuery(
@@ -278,6 +279,38 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
 
   async release(lease: OutboxLease): Promise<Result<boolean, string>> {
     return this.settle("release", lease, releasedSet(oe));
+  }
+
+  async requeueDead(ids: string[], leaseSeconds: number): Promise<Result<string[], string>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleOutboxRepository > requeueDead" },
+      async () => {
+        try {
+          const query = exec
+            .update(oe)
+            .set({ nextAttemptAt: dbNow })
+            .where(
+              and(
+                inArray(oe.id, ids),
+                deadRow,
+                gt(oe.nextAttemptAt, secondsFromClock(leaseSeconds)),
+              ),
+            )
+            .returning({ id: oe.id });
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(rows.map((row) => row.id));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(unavailable(err));
+        }
+      },
+    );
   }
 
   private async settle(

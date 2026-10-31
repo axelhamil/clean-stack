@@ -246,6 +246,13 @@
       "when": 1793453721410,
       "tag": "0034_admin_saved_views",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793455967412,
+      "tag": "0035_rapid_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

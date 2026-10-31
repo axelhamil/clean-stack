@@ -11,7 +11,7 @@ import {
 import { user } from "./auth";
 import { organization } from "./multi-tenant";
 
-export const STRIPE_EVENT_STATUSES = ["processed", "failed"] as const;
+export const STRIPE_EVENT_STATUSES = ["received", "failed"] as const;
 
 export const subscription = pgTable(
   "subscription",
@@ -37,6 +37,7 @@ export const subscription = pgTable(
   (table) => [
     index("subscription_reference_id_idx").on(table.referenceId),
     index("subscription_stripe_customer_id_idx").on(table.stripeCustomerId),
+    index("subscription_stripe_subscription_id_idx").on(table.stripeSubscriptionId),
   ],
 );
 
@@ -49,6 +50,7 @@ export const stripeEvent = pgTable(
     status: text("status", { enum: STRIPE_EVENT_STATUSES }).notNull(),
     lastError: text("last_error"),
     replayedAt: timestamp("replayed_at", { withTimezone: true }),
+    replayClaimedAt: timestamp("replay_claimed_at", { withTimezone: true }),
   },
   (table) => [index("stripe_event_received_at_idx").on(table.receivedAt)],
 );

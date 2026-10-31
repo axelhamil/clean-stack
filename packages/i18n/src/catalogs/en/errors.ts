@@ -131,15 +131,22 @@ export default {
     ADMIN_VIEW_PROVIDER_FAILURE: "The saved views could not be read or changed. Try again.",
     ADMIN_ORG_NOT_FOUND: "This organization no longer exists.",
     ADMIN_NOTE_PROVIDER_FAILURE: "The notes could not be read or saved. Try again.",
-    ADMIN_PLAN_OVERRIDE_PROVIDER_FAILURE:
-      "The plan override could not be read or saved. Try again.",
+    PLAN_OVERRIDE_PROVIDER_FAILURE: "The plan override could not be read or saved. Try again.",
     ADMIN_PLAN_OVERRIDE_NOT_FOUND: "This organization has no active plan override.",
     ADMIN_PLAN_OVERRIDE_ALREADY_SET_CONFLICT:
       "A colleague just set a plan override on this organization. Reload and check it.",
     ADMIN_STRIPE_UNAVAILABLE: "Stripe is not configured on this platform.",
-    ADMIN_STRIPE_EVENT_NOT_FOUND: "This platform never received this Stripe event.",
-    ADMIN_STRIPE_PROVIDER_FAILURE:
+    ADMIN_STRIPE_EVENT_NOT_FOUND:
+      "This Stripe event is not on record: it never arrived or its row was purged after the retention window.",
+    ADMIN_STRIPE_REPLAY_CONFLICT:
+      "This event was already replayed or a colleague is replaying it. Reload the list.",
+    ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE:
       "The replay failed. The reason is on the event's row, try again once it is fixed.",
+    STRIPE_EVENT_PROVIDER_FAILURE: "The Stripe events could not be read or saved. Try again.",
+    STRIPE_EVENT_EXPIRED_NOT_FOUND:
+      "Stripe no longer holds this event, it keeps them 30 days. Resend it from the Stripe dashboard if needed.",
+    STRIPE_PROVIDER_FAILURE: "Stripe did not answer. Try again in a moment.",
+    SWEEP_RUN_PROVIDER_FAILURE: "The scheduled jobs could not be read. Try again.",
     ADMIN_STEP_UP_CODE_INVALID: "This code is not valid. Check your authenticator app.",
     ADMIN_STEP_UP_REPLAY_INVALID: "This code was already used. Wait for the next one.",
     ADMIN_STEP_UP_SESSION_NOT_FOUND: "This session has ended. Sign in again.",

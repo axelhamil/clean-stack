@@ -67,7 +67,13 @@ export function runSweepRequest(opts: {
   const spans = sweepSpans(di.IInstrumentation);
 
   return withSweepHeartbeat(
-    { label: opts.label, store: di.ISweepRunStore, spans, beatOf: beatOfSweep },
+    {
+      label: opts.label,
+      store: di.ISweepRunStore,
+      spans,
+      beatOf: beatOfSweep,
+      dryRun: opts.body.dryRun,
+    },
     () =>
       runRetentionSweep({
         body: opts.body,

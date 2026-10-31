@@ -520,6 +520,7 @@ export type AdminOpsOutboxRequeuedPayload = z.infer<typeof AdminOpsOutboxRequeue
 export const AdminOpsStripeEventReplayedPayload = ActorRef.extend({
   stripeEventId: z.string(),
   stripeEventType: z.string(),
+  outcome: z.enum(["succeeded", "failed"]),
 });
 export type AdminOpsStripeEventReplayedPayload = z.infer<typeof AdminOpsStripeEventReplayedPayload>;
 

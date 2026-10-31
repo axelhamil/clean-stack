@@ -159,6 +159,13 @@ export default {
       searching: "Recherche en cours…",
       searchFailed: "La recherche a échoué. Modifiez le texte pour réessayer.",
       actionFailed: "Cette action a échoué",
+      status: {
+        accountsSearching: "Recherche des comptes…",
+        accountsFailed: "La recherche de comptes a échoué. Modifiez le texte pour réessayer.",
+        organizationsSearching: "Recherche des organisations…",
+        organizationsFailed:
+          "La recherche d'organisations a échoué. Modifiez le texte pour réessayer.",
+      },
       groups: {
         navigate: "Aller à",
         views: "Vos vues enregistrées",
@@ -184,12 +191,15 @@ export default {
       quiet: "Rien ne vous attend pour l'instant.",
       approvals: {
         title: "Validations en attente",
+        loadFailed: "Les validations en attente n'ont pas pu être lues.",
         asked: "Demandée le {{date}}",
         askedByYou: "Vous l'avez demandée le {{date}}, un collègue doit décider",
         seeAll_one: "Voir la validation en attente",
         seeAll_other: "Voir les {{count}} validations en attente",
       },
       operationsTitle: "Opérations",
+      queuesFailed: "Les files de livraison n'ont pas pu être lues.",
+      sweepsFailed: "Les tâches planifiées n'ont pas pu être lues.",
       deadEvents_one: "{{count}} événement n'a pas pu être livré",
       deadEvents_other: "{{count}} événements n'ont pas pu être livrés",
       deadEmails_one: "{{count}} e-mail n'a pas pu être envoyé",
@@ -267,7 +277,8 @@ export default {
       loadFailed: "Échec du chargement des événements morts.",
       empty: "Aucun événement mort. Tout a été livré ou est encore en cours de reprise.",
       requeue: "Relancer",
-      requeueAll: "Relancer toute la liste",
+      requeueShown_one: "Relancer celui-ci",
+      requeueShown_other: "Relancer ces {{count}}",
       requeued: "Renvoyé en livraison.",
       nothingMoved: "Rien n'a bougé : ces événements sont déjà en reprise ou ont été livrés.",
       partial: "Affichage des {{shown}} plus récents sur {{total}}.",
@@ -291,6 +302,7 @@ export default {
         truncated: "Reste à faire",
         batchError: "Erreur de lot",
         failed: "Échec",
+        late: "En retard",
       },
     },
     stripe: {
@@ -304,14 +316,14 @@ export default {
       replayed: "Événement rejoué.",
       replayTitle: "Rejouer cet événement ?",
       replayDescription:
-        "Il suit le même traitement que la livraison d'origine, avec l'état actuel de l'abonnement. Les événements et notifications qu'il émet repartent.",
+        "Il suit le même traitement que la livraison d'origine, avec l'état actuel de l'abonnement. Les événements déjà annoncés ne le sont pas de nouveau, et une facture payée depuis n'annonce rien.",
       table: {
         event: "Événement",
         status: "Statut",
         receivedAt: "Reçu",
         replayedAt: "Rejoué",
       },
-      statuses: { processed: "Traité", failed: "Échec" },
+      statuses: { received: "Reçu", failed: "Échec" },
     },
   },
   team: {
