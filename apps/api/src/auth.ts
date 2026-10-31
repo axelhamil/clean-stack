@@ -10,9 +10,11 @@ import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
+import { Option } from "@packages/ddd-kit";
 import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
+import { scrubText } from "@packages/sentry-scrub";
 import {
   type BetterAuthOptions,
   type BetterAuthPlugin,
@@ -397,6 +399,39 @@ async function emitScimUserEvents(
     { organizationId, actorUserId, userId },
     organizationId,
   );
+}
+
+/**
+ * Stripe is the caller, so a failed invoice names no user. Bookkeeping aside, this is all
+ * the platform does with a webhook on top of the plugin's own subscription sync.
+ */
+async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+  if (event.type !== "invoice.payment_failed") return;
+
+  const invoice = event.data.object;
+  const subDetails = invoice.parent?.subscription_details;
+  const referenceId = subDetails?.metadata?.referenceId;
+  if (!referenceId) return;
+
+  const subscriptionId =
+    typeof subDetails?.subscription === "string" ? subDetails.subscription : "";
+  await emit(
+    EventTypes.BILLING_PAYMENT_FAILED,
+    "subscription",
+    subscriptionId || invoice.id,
+    {
+      organizationId: referenceId,
+      subscriptionId,
+      invoiceId: invoice.id,
+      actorUserId: null,
+    },
+    referenceId,
+  );
+}
+
+/** Delivery bookkeeping: a store failure is captured there and must not make Stripe retry. */
+async function recordStripeDelivery(event: Stripe.Event, lastError: Option<string>): Promise<void> {
+  await di.IStripeEventStore.recordDelivery({ id: event.id, type: event.type, lastError });
 }
 
 /**
@@ -796,25 +831,14 @@ const authOptions = {
         },
       },
       onEvent: async (event) => {
-        if (event.type !== "invoice.payment_failed") return;
-        const invoice = event.data.object as Stripe.Invoice;
-        const subDetails = invoice.parent?.subscription_details;
-        const referenceId = subDetails?.metadata?.referenceId;
-        if (!referenceId) return;
-        const subscriptionId =
-          typeof subDetails?.subscription === "string" ? subDetails.subscription : "";
-        await emit(
-          EventTypes.BILLING_PAYMENT_FAILED,
-          "subscription",
-          subscriptionId || invoice.id,
-          {
-            organizationId: referenceId,
-            subscriptionId,
-            invoiceId: invoice.id,
-            actorUserId: null,
-          },
-          referenceId,
-        );
+        try {
+          await handleStripeEvent(event);
+        } catch (err) {
+          await recordStripeDelivery(event, Option.some(scrubText(String(err))));
+          throw err;
+        }
+
+        await recordStripeDelivery(event, Option.none());
       },
     }),
     bearer(),

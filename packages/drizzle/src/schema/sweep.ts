@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * One row per sweep label, holding a time-boxed lease.
@@ -20,4 +20,15 @@ export const sweepLock = pgTable("sweep_lock", {
   owner: text("owner").notNull(),
   lockedAt: timestamp("locked_at", { withTimezone: true }).defaultNow().notNull(),
   lockedUntil: timestamp("locked_until", { withTimezone: true }).notNull(),
+});
+
+export const SWEEP_RUN_OUTCOMES = ["ok", "truncated", "batch-error", "failed"] as const;
+
+export const sweepRun = pgTable("sweep_run", {
+  label: text("label").primaryKey(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }).notNull(),
+  outcome: text("outcome", { enum: SWEEP_RUN_OUTCOMES }).notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  count: integer("count").notNull(),
 });

@@ -126,6 +126,11 @@ export default {
     ADMIN_STEP_UP_MFA_FORBIDDEN: "Turn on two-factor authentication to confirm this action.",
     ADMIN_PASSWORD_RESET_UNAVAILABLE:
       "The reset email could not be sent. The user's sessions were ended, try again.",
+    ADMIN_OPS_PROVIDER_FAILURE: "The operations data could not be read. Try again.",
+    ADMIN_STRIPE_UNAVAILABLE: "Stripe is not configured on this platform.",
+    ADMIN_STRIPE_EVENT_NOT_FOUND: "This platform never received this Stripe event.",
+    ADMIN_STRIPE_PROVIDER_FAILURE:
+      "The replay failed. The reason is on the event's row, try again once it is fixed.",
     ADMIN_STEP_UP_CODE_INVALID: "This code is not valid. Check your authenticator app.",
     ADMIN_STEP_UP_REPLAY_INVALID: "This code was already used. Wait for the next one.",
     ADMIN_STEP_UP_SESSION_NOT_FOUND: "This session has ended. Sign in again.",
@@ -297,6 +302,11 @@ export default {
     removeStaffOverride: "Failed to remove this permission change",
     loadApprovals: "Failed to load approvals",
     loadApproval: "Failed to load this request",
+    loadDeadLetters: "Failed to load dead events",
+    loadSweeps: "Failed to load scheduled jobs",
+    loadStripeEvents: "Failed to load Stripe events",
+    requeueOutbox: "Failed to requeue these events",
+    replayStripeEvent: "Failed to replay this event",
     decideApproval: "Failed to record this decision",
     cancelApproval: "Failed to cancel this request",
     loadAuditLog: "Failed to load audit log",

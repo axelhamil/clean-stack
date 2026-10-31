@@ -15,6 +15,7 @@ import { Route as featuresHomeHomeDotrouteRouteImport } from './features/home/ho
 import { Route as featuresSectionsSectionDotrouteRouteImport } from './features/sections/section.route'
 import { Route as featuresApprovalsApprovalsDotrouteRouteImport } from './features/approvals/approvals.route'
 import { Route as featuresAuditAuditDotrouteRouteImport } from './features/audit/audit.route'
+import { Route as featuresOperationsOperationsDotrouteRouteImport } from './features/operations/operations.route'
 import { Route as featuresOrgsOrgsDotrouteRouteImport } from './features/orgs/orgs.route'
 import { Route as featuresTeamTeamDotrouteRouteImport } from './features/team/team.route'
 import { Route as featuresUsersUsersDotrouteRouteImport } from './features/users/users.route'
@@ -54,6 +55,12 @@ const featuresAuditAuditDotrouteRoute =
   featuresAuditAuditDotrouteRouteImport.update({
     id: '/audit',
     path: '/audit',
+    getParentRoute: () => routerStaffRoute,
+  } as any)
+const featuresOperationsOperationsDotrouteRoute =
+  featuresOperationsOperationsDotrouteRouteImport.update({
+    id: '/operations',
+    path: '/operations',
     getParentRoute: () => routerStaffRoute,
   } as any)
 const featuresOrgsOrgsDotrouteRoute =
@@ -99,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/$section': typeof featuresSectionsSectionDotrouteRoute
   '/approvals': typeof featuresApprovalsApprovalsDotrouteRoute
   '/audit': typeof featuresAuditAuditDotrouteRoute
+  '/operations': typeof featuresOperationsOperationsDotrouteRoute
   '/orgs': typeof featuresOrgsOrgsDotrouteRoute
   '/team': typeof featuresTeamTeamDotrouteRoute
   '/users': typeof featuresUsersUsersDotrouteRoute
@@ -112,6 +120,7 @@ export interface FileRoutesByTo {
   '/$section': typeof featuresSectionsSectionDotrouteRoute
   '/approvals': typeof featuresApprovalsApprovalsDotrouteRoute
   '/audit': typeof featuresAuditAuditDotrouteRoute
+  '/operations': typeof featuresOperationsOperationsDotrouteRoute
   '/orgs': typeof featuresOrgsOrgsDotrouteRoute
   '/team': typeof featuresTeamTeamDotrouteRoute
   '/users': typeof featuresUsersUsersDotrouteRoute
@@ -127,6 +136,7 @@ export interface FileRoutesById {
   '/_staff/$section': typeof featuresSectionsSectionDotrouteRoute
   '/_staff/approvals': typeof featuresApprovalsApprovalsDotrouteRoute
   '/_staff/audit': typeof featuresAuditAuditDotrouteRoute
+  '/_staff/operations': typeof featuresOperationsOperationsDotrouteRoute
   '/_staff/orgs': typeof featuresOrgsOrgsDotrouteRoute
   '/_staff/team': typeof featuresTeamTeamDotrouteRoute
   '/_staff/users': typeof featuresUsersUsersDotrouteRoute
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/$section'
     | '/approvals'
     | '/audit'
+    | '/operations'
     | '/orgs'
     | '/team'
     | '/users'
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/$section'
     | '/approvals'
     | '/audit'
+    | '/operations'
     | '/orgs'
     | '/team'
     | '/users'
@@ -169,6 +181,7 @@ export interface FileRouteTypes {
     | '/_staff/$section'
     | '/_staff/approvals'
     | '/_staff/audit'
+    | '/_staff/operations'
     | '/_staff/orgs'
     | '/_staff/team'
     | '/_staff/users'
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof featuresAuditAuditDotrouteRouteImport
       parentRoute: typeof routerStaffRoute
     }
+    '/_staff/operations': {
+      id: '/_staff/operations'
+      path: '/operations'
+      fullPath: '/operations'
+      preLoaderRoute: typeof featuresOperationsOperationsDotrouteRouteImport
+      parentRoute: typeof routerStaffRoute
+    }
     '/_staff/orgs': {
       id: '/_staff/orgs'
       path: '/orgs'
@@ -276,6 +296,7 @@ interface routerStaffRouteChildren {
   featuresSectionsSectionDotrouteRoute: typeof featuresSectionsSectionDotrouteRoute
   featuresApprovalsApprovalsDotrouteRoute: typeof featuresApprovalsApprovalsDotrouteRoute
   featuresAuditAuditDotrouteRoute: typeof featuresAuditAuditDotrouteRoute
+  featuresOperationsOperationsDotrouteRoute: typeof featuresOperationsOperationsDotrouteRoute
   featuresOrgsOrgsDotrouteRoute: typeof featuresOrgsOrgsDotrouteRoute
   featuresTeamTeamDotrouteRoute: typeof featuresTeamTeamDotrouteRoute
   featuresUsersUsersDotrouteRoute: typeof featuresUsersUsersDotrouteRoute
@@ -290,6 +311,8 @@ const routerStaffRouteChildren: routerStaffRouteChildren = {
   featuresApprovalsApprovalsDotrouteRoute:
     featuresApprovalsApprovalsDotrouteRoute,
   featuresAuditAuditDotrouteRoute: featuresAuditAuditDotrouteRoute,
+  featuresOperationsOperationsDotrouteRoute:
+    featuresOperationsOperationsDotrouteRoute,
   featuresOrgsOrgsDotrouteRoute: featuresOrgsOrgsDotrouteRoute,
   featuresTeamTeamDotrouteRoute: featuresTeamTeamDotrouteRoute,
   featuresUsersUsersDotrouteRoute: featuresUsersUsersDotrouteRoute,

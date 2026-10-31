@@ -1,4 +1,6 @@
 import { defineModule } from "inwire";
+import { env } from "../../shared/env";
+import type { IStripeEventGateway, IStripeEventStore } from "../../shared/ports/stripe-event.port";
 import type { IBillingPortalGateway } from "./application/ports/billing-portal.port";
 import type { IStripeCatalogSource } from "./application/ports/stripe-catalog.port";
 import type { ISubscriptionReadStore } from "./application/ports/subscription-read.port";
@@ -7,6 +9,8 @@ import { BillingPortalService } from "./application/services/billing-portal.serv
 import { EntitlementsService } from "./application/services/entitlements.service";
 import { StripeBillingPortalGateway } from "./infrastructure/adapters/stripe-billing-portal.gateway";
 import { StripeCatalogSource } from "./infrastructure/adapters/stripe-catalog.source";
+import { StripeEventGateway } from "./infrastructure/adapters/stripe-event.gateway";
+import { DrizzleStripeEventStore } from "./infrastructure/repositories/drizzle-stripe-event.store";
 import { DrizzleSubscriptionReadStore } from "./infrastructure/repositories/drizzle-subscription-read.store";
 import { stripeClient } from "./infrastructure/stripe-client";
 
@@ -14,6 +18,8 @@ declare module "inwire" {
   interface AppDeps {
     IStripeCatalogSource: IStripeCatalogSource;
     IBillingPortalGateway: IBillingPortalGateway;
+    IStripeEventStore: IStripeEventStore;
+    IStripeEventGateway: IStripeEventGateway;
     ISubscriptionReadStore: ISubscriptionReadStore;
     BillingCatalogService: BillingCatalogService;
     BillingPortalService: BillingPortalService;
@@ -27,6 +33,19 @@ export const billingModule = defineModule()((b) =>
     .add(
       "IBillingPortalGateway",
       (c) => new StripeBillingPortalGateway(stripeClient, c.IInstrumentation),
+    )
+    .add(
+      "IStripeEventStore",
+      (c): IStripeEventStore => new DrizzleStripeEventStore(c.IInstrumentation),
+    )
+    .add(
+      "IStripeEventGateway",
+      (c): IStripeEventGateway =>
+        new StripeEventGateway(
+          stripeClient,
+          { secretKey: env.STRIPE_SECRET_KEY, webhookSecret: env.STRIPE_WEBHOOK_SECRET },
+          c.IInstrumentation,
+        ),
     )
     .add("ISubscriptionReadStore", (c) => new DrizzleSubscriptionReadStore(c.IInstrumentation))
     .add(

@@ -1,6 +1,13 @@
 import { type AuditedPage, corsHeaders } from "@packages/test/a11y";
 import type { Page } from "@playwright/test";
-import { STUB_APPROVAL, STUB_MEMBERS, STUB_ORG } from "./stubs";
+import {
+  STUB_APPROVAL,
+  STUB_DEAD_LETTERS,
+  STUB_MEMBERS,
+  STUB_ORG,
+  STUB_STRIPE_EVENTS,
+  STUB_SWEEPS,
+} from "./stubs";
 
 function stubApi(path: string, json: unknown, status = 200) {
   return async (page: Page): Promise<void> => {
@@ -33,7 +40,26 @@ export const STAFF_PAGES: readonly AuditedPage[] = [
     prepare: stubApi("**/admin/orgs/org-stub", STUB_ORG),
   },
   { name: "audit log", path: "/audit" },
-  { name: "operations section", path: "/operations" },
+  { name: "operations", path: "/operations" },
+  {
+    name: "operations, full",
+    path: "/operations",
+    prepare: async (page) => {
+      await stubApi("**/admin/ops/dead-letters", STUB_DEAD_LETTERS)(page);
+      await stubApi("**/admin/ops/sweeps", STUB_SWEEPS)(page);
+      await stubApi("**/admin/ops/stripe-events", STUB_STRIPE_EVENTS)(page);
+    },
+  },
+  {
+    name: "operations, load error",
+    path: "/operations",
+    prepare: async (page) => {
+      const refused = { error: { code: "X", message: "x" } };
+      await stubApi("**/admin/ops/dead-letters", refused, 500)(page);
+      await stubApi("**/admin/ops/sweeps", refused, 500)(page);
+      await stubApi("**/admin/ops/stripe-events", refused, 500)(page);
+    },
+  },
   { name: "approvals", path: "/approvals" },
   {
     name: "approval detail",

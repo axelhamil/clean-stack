@@ -39,6 +39,7 @@ const sweeps = [
   "/internal/sweep-consents",
   "/internal/sweep-notifications",
   "/internal/sweep-admin-approvals",
+  "/internal/sweep-stripe-events",
 ] as const;
 
 const heartbeat = new HttpHeartbeat(process.env.SWEEP_HEARTBEAT_URL, (message) =>

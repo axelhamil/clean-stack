@@ -64,6 +64,19 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "DELETE /admin/staff/:id/overrides/:overrideId": {
     consumer: "apps/admin/src/features/team/api/team.mutations.ts",
   },
+  "GET /admin/ops/dead-letters": {
+    consumer: "apps/admin/src/features/operations/api/ops.queries.ts",
+  },
+  "GET /admin/ops/stripe-events": {
+    consumer: "apps/admin/src/features/operations/api/ops.queries.ts",
+  },
+  "GET /admin/ops/sweeps": { consumer: "apps/admin/src/features/operations/api/ops.queries.ts" },
+  "POST /admin/ops/outbox/requeue": {
+    consumer: "apps/admin/src/features/operations/api/ops.mutations.ts",
+  },
+  "POST /admin/ops/stripe-events/:id/replay": {
+    consumer: "apps/admin/src/features/operations/api/ops.mutations.ts",
+  },
   "GET /admin/staff": { consumer: "apps/admin/src/features/team/api/team.queries.ts" },
   "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
   "GET /admin/users/:id": {
@@ -141,6 +154,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /internal/sweep-consents": { uiLess: "internal-cron" },
   "POST /internal/sweep-email-messages": { uiLess: "internal-cron" },
   "POST /internal/sweep-notifications": { uiLess: "internal-cron" },
+  "POST /internal/sweep-stripe-events": { uiLess: "internal-cron" },
   "POST /internal/sweep-outbox": { uiLess: "internal-cron" },
   "POST /internal/sweep-webhook-delivery": { uiLess: "internal-cron" },
   "POST /me/delete": { consumer: "apps/app/src/shared/api/mutations/request-account-deletion.ts" },

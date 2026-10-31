@@ -9,15 +9,18 @@ import { notifyImpersonatedUser } from "./application/event-handlers/notify-impe
 import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
 import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
 import type { IApprovalStore } from "./application/ports/approval-store.port";
+import type { IOpsStore } from "./application/ports/ops-store.port";
 import type { IStepUpStore } from "./application/ports/step-up-store.port";
 import { AdminModerationService } from "./application/services/admin-moderation.service";
 import { AdminQueryService } from "./application/services/admin-query.service";
 import { ApprovalService } from "./application/services/approval.service";
+import { OpsService } from "./application/services/ops.service";
 import { StaffService } from "./application/services/staff.service";
 import { StepUpService } from "./application/services/step-up.service";
 import { DrizzleAdminOrgStore } from "./infrastructure/repositories/drizzle-admin-org.store";
 import { DrizzleAdminUserStore } from "./infrastructure/repositories/drizzle-admin-user.store";
 import { DrizzleApprovalStore } from "./infrastructure/repositories/drizzle-approval.store";
+import { DrizzleOpsStore } from "./infrastructure/repositories/drizzle-ops.store";
 import { DrizzleStaffStore } from "./infrastructure/repositories/drizzle-staff.store";
 import { DrizzleStepUpStore } from "./infrastructure/repositories/drizzle-step-up.store";
 
@@ -35,6 +38,8 @@ declare module "inwire" {
     IApprovalStore: IApprovalStore;
     ApprovalHandlers: ApprovalHandlers;
     ApprovalService: ApprovalService;
+    IOpsStore: IOpsStore;
+    OpsService: OpsService;
     CloseApprovalsOfDeletedUser: EventHandler;
     NotifyImpersonatedUser: EventHandler;
   }
@@ -236,6 +241,20 @@ export const adminModule = defineModule()((b) =>
           c.ITransactionService,
           c.IInstrumentation,
           c.ApprovalHandlers,
+          env,
+        ),
+    )
+    .add("IOpsStore", (c): IOpsStore => new DrizzleOpsStore(c.IInstrumentation))
+    .add(
+      "OpsService",
+      (c) =>
+        new OpsService(
+          c.IOpsStore,
+          c.ISweepRunStore,
+          c.IStripeEventStore,
+          c.IStripeEventGateway,
+          c.IOutboxRepository,
+          c.ITransactionService,
           env,
         ),
     )

@@ -190,6 +190,11 @@ jobs:
         # second unit needs a real transaction. Creates and removes its own probe users.
         run: pnpm --filter api check:admin-approval
 
+      - name: Check operations requeue, sweep heartbeats and Stripe replay on the real route stack
+        # The dead-row guard against stealing a lease and the claim that picks a requeued row
+        # live in SQL; a replay needs the real signed handler. Creates and removes its own rows.
+        run: pnpm --filter api check:admin-ops
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

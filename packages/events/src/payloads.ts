@@ -511,6 +511,18 @@ export const AdminStaffOverrideRevokedPayload = ActorRef.extend(UserRef.shape).e
 });
 export type AdminStaffOverrideRevokedPayload = z.infer<typeof AdminStaffOverrideRevokedPayload>;
 
+export const AdminOpsOutboxRequeuedPayload = ActorRef.extend({
+  requeued: z.number().int().positive(),
+  eventIds: z.array(z.string()),
+});
+export type AdminOpsOutboxRequeuedPayload = z.infer<typeof AdminOpsOutboxRequeuedPayload>;
+
+export const AdminOpsStripeEventReplayedPayload = ActorRef.extend({
+  stripeEventId: z.string(),
+  stripeEventType: z.string(),
+});
+export type AdminOpsStripeEventReplayedPayload = z.infer<typeof AdminOpsStripeEventReplayedPayload>;
+
 export const AdminStepUpVerifiedPayload = UserRef.extend({
   validUntil: z.string(),
   ip: z.string().nullable(),
@@ -790,6 +802,8 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
   [EventTypes.ADMIN_STAFF_OVERRIDE_SET]: AdminStaffOverrideSetPayload,
   [EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED]: AdminStaffOverrideRevokedPayload,
+  [EventTypes.ADMIN_OPS_OUTBOX_REQUEUED]: AdminOpsOutboxRequeuedPayload,
+  [EventTypes.ADMIN_OPS_STRIPE_EVENT_REPLAYED]: AdminOpsStripeEventReplayedPayload,
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
   [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: AdminApprovalRequestedPayload,

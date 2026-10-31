@@ -76,6 +76,8 @@ export const VISIBILITY = {
   "admin.staff.revoked": "internal",
   "admin.staff.override_set": "internal",
   "admin.staff.override_revoked": "internal",
+  "admin.ops.outbox_requeued": "internal",
+  "admin.ops.stripe_event_replayed": "internal",
   "admin.step_up.verified": "internal",
   "admin.step_up.failed": "internal",
   "admin.approval.requested": "internal",

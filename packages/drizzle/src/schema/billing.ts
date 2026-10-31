@@ -1,5 +1,7 @@
 import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+export const STRIPE_EVENT_STATUSES = ["processed", "failed"] as const;
+
 export const subscription = pgTable(
   "subscription",
   {
@@ -25,4 +27,17 @@ export const subscription = pgTable(
     index("subscription_reference_id_idx").on(table.referenceId),
     index("subscription_stripe_customer_id_idx").on(table.stripeCustomerId),
   ],
+);
+
+export const stripeEvent = pgTable(
+  "stripe_event",
+  {
+    id: text("id").primaryKey(),
+    type: text("type").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    status: text("status", { enum: STRIPE_EVENT_STATUSES }).notNull(),
+    lastError: text("last_error"),
+    replayedAt: timestamp("replayed_at", { withTimezone: true }),
+  },
+  (table) => [index("stripe_event_received_at_idx").on(table.receivedAt)],
 );

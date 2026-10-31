@@ -123,6 +123,11 @@ export default {
       "Activez l'authentification à deux facteurs pour confirmer cette action.",
     ADMIN_PASSWORD_RESET_UNAVAILABLE:
       "L'email de réinitialisation n'a pas pu être envoyé. Les sessions de l'utilisateur ont été fermées, réessayez.",
+    ADMIN_OPS_PROVIDER_FAILURE: "Les données d'exploitation n'ont pas pu être lues. Réessayez.",
+    ADMIN_STRIPE_UNAVAILABLE: "Stripe n'est pas configuré sur cette plateforme.",
+    ADMIN_STRIPE_EVENT_NOT_FOUND: "Cette plateforme n'a jamais reçu cet événement Stripe.",
+    ADMIN_STRIPE_PROVIDER_FAILURE:
+      "Le rejeu a échoué. La raison figure sur la ligne de l'événement, réessayez une fois corrigée.",
     ADMIN_STEP_UP_CODE_INVALID:
       "Ce code n'est pas valide. Vérifiez votre application d'authentification.",
     ADMIN_STEP_UP_REPLAY_INVALID: "Ce code a déjà servi. Attendez le suivant.",
@@ -289,6 +294,11 @@ export default {
     removeStaffOverride: "Échec du retrait du changement de permission",
     loadApprovals: "Échec du chargement des approbations",
     loadApproval: "Échec du chargement de cette demande",
+    loadDeadLetters: "Échec du chargement des événements morts",
+    loadSweeps: "Échec du chargement des tâches planifiées",
+    loadStripeEvents: "Échec du chargement des événements Stripe",
+    requeueOutbox: "Échec de la relance de ces événements",
+    replayStripeEvent: "Échec du rejeu de cet événement",
     decideApproval: "Échec de l'enregistrement de la décision",
     cancelApproval: "Échec de l'annulation de cette demande",
     loadAuditLog: "Échec du chargement du journal d'audit",

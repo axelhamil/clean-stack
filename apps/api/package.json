@@ -32,6 +32,7 @@
     "check:admin-atomicity": "bun scripts/check-admin-atomicity.ts",
     "check:admin-step-up": "bun scripts/check-admin-step-up.ts",
     "check:admin-approval": "bun scripts/check-admin-approval.ts",
+    "check:admin-ops": "bun scripts/check-admin-ops.ts",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --isolate --parallel --pass-with-no-tests",

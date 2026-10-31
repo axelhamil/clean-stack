@@ -3,9 +3,12 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { STORAGE_STATE } from "./playwright.config";
 import {
   STUB_APPROVAL,
+  STUB_DEAD_LETTERS,
   STUB_MEMBERS,
   STUB_ORG,
   STUB_OVERRIDE,
+  STUB_STRIPE_EVENTS,
+  STUB_SWEEPS,
   STUB_USER,
   STUB_USER_ID,
 } from "./stubs";
@@ -20,6 +23,8 @@ const ALL_PERMISSIONS = [
   "audit.read",
   "approvals.decide",
   "staff.manage",
+  "ops.read",
+  "ops.manage",
 ];
 
 async function stub(page: Page, path: string, json: unknown, status = 200): Promise<void> {
@@ -48,6 +53,9 @@ async function stubDetailData(page: Page): Promise<void> {
   await stub(page, "**/admin/approvals/approval-stub", STUB_APPROVAL);
   await stub(page, "**/admin/approvals?*", { items: [STUB_APPROVAL], nextCursor: null });
   await stub(page, "**/admin/staff", { items: STUB_MEMBERS });
+  await stub(page, "**/admin/ops/dead-letters", STUB_DEAD_LETTERS);
+  await stub(page, "**/admin/ops/sweeps", STUB_SWEEPS);
+  await stub(page, "**/admin/ops/stripe-events", STUB_STRIPE_EVENTS);
   await stub(page, "**/admin/staff/member-stub/overrides", { items: [STUB_OVERRIDE] });
 }
 
@@ -100,6 +108,32 @@ test.describe("back office screens", () => {
     await expect(dialog.getByText("Decide approvals")).toBeVisible();
 
     await expectHoldsFocus(page, dialog, opener);
+  });
+
+  test("the replay dialog holds and gives back focus", async ({ page }) => {
+    await page.goto("/operations");
+
+    const opener = page.getByRole("button", { name: "Replay" });
+    await opener.click();
+
+    await expectHoldsFocus(page, page.getByRole("alertdialog"), opener);
+  });
+
+  test("staff who can read operations are offered no action", async ({ page }) => {
+    await stubMe(page, ["ops.read"]);
+    await page.goto("/operations");
+
+    await expect(page.getByText("billing.subscription.updated")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Requeue", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Replay" })).toHaveCount(0);
+  });
+
+  test("an unconfigured Stripe says so and offers no replay", async ({ page }) => {
+    await stub(page, "**/admin/ops/stripe-events", { ...STUB_STRIPE_EVENTS, configured: false });
+    await page.goto("/operations");
+
+    await expect(page.getByText("Stripe is not configured on this platform")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Replay" })).toHaveCount(0);
   });
 
   test("the add person dialog holds and gives back focus", async ({ page }) => {
@@ -230,6 +264,7 @@ test.describe("back office screens", () => {
     "/approvals/approval-stub",
     "/team",
     "/audit",
+    "/operations",
   ]) {
     test(`long values leave ${path} inside a 390 px screen`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });

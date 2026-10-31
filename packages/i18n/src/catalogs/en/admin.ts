@@ -150,7 +150,6 @@ export default {
       title: "Home",
       empty: "Nothing to show here yet. The menu lists what your access opens.",
     },
-    sectionNotBuilt: "This screen is not built yet.",
     sections: {
       users: "Accounts",
       orgs: "Organizations",
@@ -179,6 +178,55 @@ export default {
     codeLabel: "Authenticator code",
     submit: "Confirm",
     confirmedToast: "Confirmed. You can repeat your action.",
+  },
+  operations: {
+    pageTitle: "Operations",
+    dead: {
+      title: "Dead events",
+      loading: "Loading dead events…",
+      loadFailed: "Failed to load dead events.",
+      empty: "No dead events. Every event was delivered or is still retrying.",
+      requeue: "Requeue",
+      requeueAll: "Requeue all listed",
+      requeued: "Sent back to delivery.",
+      nothingMoved: "Nothing moved: these events are already retrying or were delivered.",
+      partial: "Showing the latest {{shown}} of {{total}}.",
+      otherQueues:
+        "{{emails}} dead emails and {{webhooks}} dead-letter webhooks retry on their own schedule.",
+      table: { event: "Event", deadAt: "Dead since", attempts: "Attempts" },
+    },
+    jobs: {
+      title: "Scheduled jobs",
+      loading: "Loading scheduled jobs…",
+      loadFailed: "Failed to load scheduled jobs.",
+      empty: "No job has reported yet.",
+      table: { job: "Job", outcome: "Last run", finishedAt: "Finished", count: "Rows" },
+      outcomes: {
+        ok: "Done",
+        truncated: "More left",
+        batchError: "Batch error",
+        failed: "Failed",
+      },
+    },
+    stripe: {
+      title: "Stripe events",
+      loading: "Loading Stripe events…",
+      loadFailed: "Failed to load Stripe events.",
+      empty: "No Stripe event received yet.",
+      notConfigured: "Stripe is not configured on this platform, so events cannot be replayed.",
+      replay: "Replay",
+      replayed: "Event replayed.",
+      replayTitle: "Replay this event?",
+      replayDescription:
+        "It runs the same processing as the original delivery, with the current state of the subscription. Events and notifications it emits go out again.",
+      table: {
+        event: "Event",
+        status: "Status",
+        receivedAt: "Received",
+        replayedAt: "Replayed",
+      },
+      statuses: { processed: "Processed", failed: "Failed" },
+    },
   },
   team: {
     pageTitle: "Team",

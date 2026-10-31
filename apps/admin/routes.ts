@@ -12,6 +12,7 @@ export const routes = rootRoute("router/__root.tsx", [
     route("/audit", "features/audit/audit.route.tsx"),
     route("/approvals", "features/approvals/approvals.route.tsx"),
     route("/approvals/$id", "features/approvals/approval-detail.route.tsx"),
+    route("/operations", "features/operations/operations.route.tsx"),
     route("/team", "features/team/team.route.tsx"),
     route("/$section", "features/sections/section.route.tsx"),
   ]),

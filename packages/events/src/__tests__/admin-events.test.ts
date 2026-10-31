@@ -9,8 +9,8 @@ import {
 import { retentionFor } from "../retention-map";
 
 describe("admin events", () => {
-  it("declares the nineteen admin event types", () => {
-    expect(Object.values(EventTypes).filter((t) => t.startsWith("admin."))).toHaveLength(19);
+  it("declares the twenty-one admin event types", () => {
+    expect(Object.values(EventTypes).filter((t) => t.startsWith("admin."))).toHaveLength(21);
   });
 
   it("retains every admin event under the compliance policy", () => {

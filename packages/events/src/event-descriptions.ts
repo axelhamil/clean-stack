@@ -82,6 +82,9 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.ADMIN_STEP_UP_FAILED]: "A staff member's confirmation code was refused.",
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: "A staff member asked a colleague to approve an action.",
   [EventTypes.ADMIN_APPROVAL_DECIDED]: "A staff member approved or rejected a requested action.",
+  [EventTypes.ADMIN_OPS_OUTBOX_REQUEUED]:
+    "A staff member sent dead outbox events back to delivery.",
+  [EventTypes.ADMIN_OPS_STRIPE_EVENT_REPLAYED]: "A staff member replayed a received Stripe event.",
   [EventTypes.ADMIN_APPROVAL_CANCELLED]: "A staff member withdrew their approval request.",
   [EventTypes.ADMIN_APPROVAL_EXPIRED]: "An approval request expired before anyone decided.",
   [EventTypes.ADMIN_APPROVAL_EXECUTED]: "An approved action was carried out.",

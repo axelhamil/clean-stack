@@ -253,6 +253,7 @@ Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC)
 | `outbox_event` | `OUTBOX_RETENTION_DAYS` | **7d** | `dispatched_at IS NOT NULL AND dispatched_at < cutoff` | NServiceBus / industry consensus 2025: debug window |
 | `audit_log` (operational) | `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS` | **90d** | `retention = 'operational' AND occurred_at < cutoff` | SOC2 minimum-safe (operational logs); RGPD minimisation |
 | `audit_log` (compliance) | `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS` | **365d** | `retention = 'compliance' AND occurred_at < cutoff` | SOC2 Type II ≥ 12 months; PCI-DSS 10.7; NIS2 baseline |
+| `stripe_event` | `STRIPE_EVENT_RETENTION_DAYS` | **90d** | `received_at < cutoff` (ids and statuses only, no payload) | Replay window of the operations screen |
 | `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` (replayable and terminal `dead_letter` alike) | Stripe / GitHub / Hookdeck convergence |
 
 Notes:
@@ -487,6 +488,11 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 - `ADMIN_STAFF_REVOKED` (`admin.staff.revoked`): payload `{ actorUserId: string, userId: string, role: string }`. Also emitted by an account wipe, inside its transaction, with the member as actor since the deletion is their own request.
 - `ADMIN_STAFF_OVERRIDE_SET` (`admin.staff.override_set`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny", expiresAt: string | null }`. It replaces a live override of the same permission.
 - `ADMIN_STAFF_OVERRIDE_REVOKED` (`admin.staff.override_revoked`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny" }`.
+
+### Via `OpsService` (Phase K)
+
+- `ADMIN_OPS_OUTBOX_REQUEUED` (`admin.ops.outbox_requeued`): `POST /admin/ops/outbox/requeue` sent dead events back to delivery. One event per staff action, not per row, and none when no row moved. Payload `{ actorUserId: string, requeued: number, eventIds: string[] }`.
+- `ADMIN_OPS_STRIPE_EVENT_REPLAYED` (`admin.ops.stripe_event_replayed`): `POST /admin/ops/stripe-events/:id/replay` delivered a received Stripe event again. Payload `{ actorUserId: string, stripeEventId: string, stripeEventType: string }`. Rolled back with a refused delivery.
 
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 

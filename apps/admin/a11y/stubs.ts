@@ -83,3 +83,58 @@ export const STUB_OVERRIDE = {
   expiresAt: "2030-01-01T00:00:00.000Z",
   createdAt: CREATED_AT,
 };
+
+export const STUB_DEAD_LETTERS = {
+  outbox: {
+    total: 2,
+    items: [
+      {
+        id: "dead-event-stub",
+        eventType: "billing.subscription.updated",
+        aggregateType: "subscription",
+        aggregateId: "sub_stub",
+        occurredAt: CREATED_AT,
+        deadAt: CREATED_AT,
+        attempts: 25,
+        lastError: `audit-log: ${LONG_EMAIL} ${LONG_NAME}`,
+        nextAttemptAt: "2030-01-01T00:00:00.000Z",
+      },
+    ],
+  },
+  queues: { emails: 3, webhooks: 1 },
+};
+
+export const STUB_SWEEPS = {
+  items: [
+    {
+      label: "sweep-email-messages",
+      startedAt: CREATED_AT,
+      finishedAt: CREATED_AT,
+      outcome: "ok",
+      durationMs: 12,
+      count: 40,
+    },
+    {
+      label: "sweep-audit-log",
+      startedAt: CREATED_AT,
+      finishedAt: CREATED_AT,
+      outcome: "batch-error",
+      durationMs: 12,
+      count: 0,
+    },
+  ],
+};
+
+export const STUB_STRIPE_EVENTS = {
+  configured: true,
+  items: [
+    {
+      id: "evt_stub",
+      type: "customer.subscription.updated",
+      status: "failed",
+      receivedAt: CREATED_AT,
+      lastError: "The handler answered 400.",
+      replayedAt: CREATED_AT,
+    },
+  ],
+};

@@ -147,7 +147,6 @@ export default {
       title: "Accueil",
       empty: "Rien à afficher ici pour l'instant. Le menu liste ce que vos accès ouvrent.",
     },
-    sectionNotBuilt: "Cet écran n'est pas encore construit.",
     sections: {
       users: "Comptes",
       orgs: "Organisations",
@@ -178,6 +177,61 @@ export default {
     codeLabel: "Code d'authentification",
     submit: "Confirmer",
     confirmedToast: "Confirmé. Vous pouvez refaire votre action.",
+  },
+  operations: {
+    pageTitle: "Opérations",
+    dead: {
+      title: "Événements morts",
+      loading: "Chargement des événements morts…",
+      loadFailed: "Échec du chargement des événements morts.",
+      empty: "Aucun événement mort. Tout a été livré ou est encore en cours de reprise.",
+      requeue: "Relancer",
+      requeueAll: "Relancer toute la liste",
+      requeued: "Renvoyé en livraison.",
+      nothingMoved: "Rien n'a bougé : ces événements sont déjà en reprise ou ont été livrés.",
+      partial: "Affichage des {{shown}} plus récents sur {{total}}.",
+      otherQueues:
+        "{{emails}} emails morts et {{webhooks}} webhooks en lettre morte reprennent selon leur propre calendrier.",
+      table: { event: "Événement", deadAt: "Mort depuis", attempts: "Tentatives" },
+    },
+    jobs: {
+      title: "Tâches planifiées",
+      loading: "Chargement des tâches planifiées…",
+      loadFailed: "Échec du chargement des tâches planifiées.",
+      empty: "Aucune tâche n'a encore rendu compte.",
+      table: {
+        job: "Tâche",
+        outcome: "Dernière exécution",
+        finishedAt: "Terminée",
+        count: "Lignes",
+      },
+      outcomes: {
+        ok: "Terminée",
+        truncated: "Reste à faire",
+        batchError: "Erreur de lot",
+        failed: "Échec",
+      },
+    },
+    stripe: {
+      title: "Événements Stripe",
+      loading: "Chargement des événements Stripe…",
+      loadFailed: "Échec du chargement des événements Stripe.",
+      empty: "Aucun événement Stripe reçu pour l'instant.",
+      notConfigured:
+        "Stripe n'est pas configuré sur cette plateforme, les événements ne peuvent donc pas être rejoués.",
+      replay: "Rejouer",
+      replayed: "Événement rejoué.",
+      replayTitle: "Rejouer cet événement ?",
+      replayDescription:
+        "Il suit le même traitement que la livraison d'origine, avec l'état actuel de l'abonnement. Les événements et notifications qu'il émet repartent.",
+      table: {
+        event: "Événement",
+        status: "Statut",
+        receivedAt: "Reçu",
+        replayedAt: "Rejoué",
+      },
+      statuses: { processed: "Traité", failed: "Échec" },
+    },
   },
   team: {
     pageTitle: "Équipe",

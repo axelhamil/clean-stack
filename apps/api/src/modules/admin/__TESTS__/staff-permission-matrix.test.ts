@@ -26,6 +26,7 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
 
 const { adminApprovalRoutes } = await import("../approvals.routes");
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
+const { adminOpsRoutes } = await import("../ops.routes");
 const { adminOrgRoutes } = await import("../admin-orgs.routes");
 const { adminUserRoutes } = await import("../routes");
 const { adminStaffRoutes } = await import("../staff.routes");
@@ -37,6 +38,7 @@ const app = new Hono()
   .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
+  .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", auditLogRoutes);
 app.onError((err, c) =>
@@ -66,6 +68,11 @@ const REQUIRED: Record<string, string> = {
   "GET /admin/orgs": "orgs.read",
   "GET /admin/orgs/:id": "orgs.read",
   "POST /admin/orgs/:id/sso-enforcement": "orgs.sso",
+  "GET /admin/ops/dead-letters": "ops.read",
+  "POST /admin/ops/outbox/requeue": "ops.manage",
+  "GET /admin/ops/sweeps": "ops.read",
+  "GET /admin/ops/stripe-events": "ops.read",
+  "POST /admin/ops/stripe-events/:id/replay": "ops.manage",
   "GET /admin/audit-log": "audit.read",
   "GET /admin/audit-log/verify": "audit.read",
 };
