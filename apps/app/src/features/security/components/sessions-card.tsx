@@ -10,6 +10,7 @@ import {
 import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useQuery } from "@tanstack/react-query";
 import { LogOutIcon, MonitorIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -20,7 +21,6 @@ import {
   type ImpersonationGuard,
   useImpersonationGuard,
 } from "../../../shared/auth/use-impersonation-guard";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { useRevokeOtherSessions } from "../hooks/use-revoke-other-sessions";
 import { useRevokeSession } from "../hooks/use-revoke-session";
 

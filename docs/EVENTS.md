@@ -403,7 +403,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **98 events** (35 public + 63 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **100 events** (35 public + 65 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
@@ -485,6 +485,8 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 - `ADMIN_STAFF_ADDED` (`admin.staff.added`): a user joined the staff, or came back after a revocation. Payload: `{ actorUserId: string | null, userId: string, role: string, source: "env" | "console" }`. `actorUserId` is `null` for the bootstrap insert of an id listed in `PLATFORM_ADMIN_IDS`, which only the real insert announces.
 - `ADMIN_STAFF_ROLE_CHANGED` (`admin.staff.role_changed`): payload `{ actorUserId: string, userId: string, from: string, to: string }`.
 - `ADMIN_STAFF_REVOKED` (`admin.staff.revoked`): payload `{ actorUserId: string, userId: string, role: string }`. Also emitted by an account wipe, inside its transaction, with the member as actor since the deletion is their own request.
+- `ADMIN_STAFF_OVERRIDE_SET` (`admin.staff.override_set`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny", expiresAt: string | null }`. It replaces a live override of the same permission.
+- `ADMIN_STAFF_OVERRIDE_REVOKED` (`admin.staff.override_revoked`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny" }`.
 
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 
@@ -584,7 +586,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 
 | Path | Role |
 |---|---|
-| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (98 events: 35 public + 63 internal) |
+| `packages/events/src/{event-types,payloads,retention-map}.ts` | Central catalog (100 events: 35 public + 65 internal) |
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |

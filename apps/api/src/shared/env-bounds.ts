@@ -115,7 +115,21 @@ export function validateApprovalEnv(
   value: { ADMIN_APPROVAL_ENABLED: boolean; ADMIN_APPROVAL_ACTIONS: readonly string[] },
   ctx: z.RefinementCtx,
 ): void {
-  if (!value.ADMIN_APPROVAL_ENABLED || value.ADMIN_APPROVAL_ACTIONS.length > 0) return;
+  if (!value.ADMIN_APPROVAL_ENABLED) return;
+
+  const gatesRoleOnly =
+    value.ADMIN_APPROVAL_ACTIONS.includes("staff.role_change") &&
+    !value.ADMIN_APPROVAL_ACTIONS.includes("staff.permission_override");
+  if (gatesRoleOnly) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["ADMIN_APPROVAL_ACTIONS"],
+      message:
+        "ADMIN_APPROVAL_ACTIONS lists staff.role_change without staff.permission_override: a single person could grant through an override what the role change gates. Add staff.permission_override.",
+    });
+  }
+
+  if (value.ADMIN_APPROVAL_ACTIONS.length > 0) return;
 
   ctx.addIssue({
     code: "custom",

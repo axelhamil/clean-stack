@@ -195,9 +195,9 @@ describe("DrizzleAuditRepository", () => {
         hash: null,
       };
       const rows = [
-        { ...row, id: "r1", occurredAt: new Date("2024-01-03") },
-        { ...row, id: "r2", occurredAt: new Date("2024-01-02") },
-        { ...row, id: "r3", occurredAt: new Date("2024-01-01") }, // this is the extra one
+        { row: { ...row, id: "r1" }, cursorAt: "2024-01-03 00:00:00.000001" },
+        { row: { ...row, id: "r2" }, cursorAt: "2024-01-02 00:00:00.000001" },
+        { row: { ...row, id: "r3" }, cursorAt: "2024-01-01 00:00:00.000001" }, // this is the extra one
       ];
       selectExecute.mockResolvedValueOnce(rows);
       const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
@@ -206,7 +206,7 @@ describe("DrizzleAuditRepository", () => {
       const page = result.getValue();
       expect(page.items).toHaveLength(2);
       expect(page.nextCursor.isSome()).toBe(true);
-      expect(page.nextCursor.unwrap()).toBe(new Date("2024-01-02").toISOString());
+      expect(page.nextCursor.unwrap()).toBe("2024-01-02 00:00:00.000001~r2");
     });
 
     it("calls instrumentation.capture and returns Result.fail on DB error", async () => {

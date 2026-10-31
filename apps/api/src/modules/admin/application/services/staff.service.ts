@@ -1,4 +1,4 @@
-import type { StaffPermission, StaffRole } from "@packages/access-control";
+import { permissionsOfRole, type StaffPermission, type StaffRole } from "@packages/access-control";
 import { type AppError, type IUnitOfWork, type Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
@@ -6,6 +6,7 @@ import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type {
   IStaffStore,
   StaffListRow,
+  StaffOverrideRow,
   StaffRecord,
   StaffStoreError,
 } from "../../../../shared/ports/staff-store.port";
@@ -18,6 +19,8 @@ import {
 } from "../../../../shared/staff-access";
 import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
 
+const MANAGE_STAFF_PERMISSION: StaffPermission = "staff.manage";
+
 export type StaffChangeError =
   | StaffStoreError
   | AdminStoreError
@@ -25,6 +28,9 @@ export type StaffChangeError =
   | AppError<"ADMIN_STAFF_LISTED_FORBIDDEN">
   | AppError<"ADMIN_STAFF_LAST_MANAGER_FORBIDDEN">
   | AppError<"ADMIN_STAFF_NOT_FOUND">
+  | AppError<"ADMIN_STAFF_OVERRIDE_NOT_FOUND">
+  | AppError<"ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT">
+  | AppError<"ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN">
   | AppError<"ADMIN_STAFF_ROLE_CHANGED_CONFLICT">
   | AppError<"ADMIN_USER_NOT_FOUND">;
 
@@ -42,6 +48,20 @@ interface StaffChange {
   targetUserId: string;
 }
 
+interface StaffGrantingChange extends StaffChange {
+  actorPermissions: readonly StaffPermission[];
+}
+
+interface StaffOverrideChange extends StaffGrantingChange {
+  permission: StaffPermission;
+  effect: "grant" | "deny";
+  expiresAt: Option<Date>;
+}
+
+interface StaffOverrideRemoval extends StaffGrantingChange {
+  overrideId: string;
+}
+
 export class StaffService {
   constructor(
     private readonly store: IStaffStore,
@@ -56,6 +76,14 @@ export class StaffService {
     if (rows.isFailure) return rows;
 
     return Result.ok(rows.getValue().filter((row) => grantsStaffAccess(row, this.env)));
+  }
+
+  async listOverrides(targetUserId: string): Promise<Result<StaffOverrideRow[], StaffChangeError>> {
+    const row = await this.grantingRow(targetUserId);
+    if (row.isFailure) return Result.fail(row.getError());
+    if (row.getValue().isNone()) return Result.fail(notStaff());
+
+    return this.store.listLiveOverrides(targetUserId);
   }
 
   async moderate<E>(
@@ -106,9 +134,9 @@ export class StaffService {
   }
 
   async refuseRoleChange(
-    input: StaffChange & { role: StaffRole },
+    input: StaffGrantingChange & { role: StaffRole },
   ): Promise<Result<Option<StaffRole>, StaffChangeError>> {
-    const refused = this.refusedChange(input);
+    const refused = this.refusedRoleGrant(input);
     if (refused.isFailure) return Result.fail(refused.getError());
 
     return this.uow.run(async (): Promise<Result<Option<StaffRole>, StaffChangeError>> => {
@@ -145,9 +173,9 @@ export class StaffService {
   }
 
   async assignRole(
-    input: StaffChange & { role: StaffRole; expectedRole?: StaffRole | null },
+    input: StaffGrantingChange & { role: StaffRole; expectedRole?: StaffRole | null },
   ): Promise<Result<void, StaffChangeError>> {
-    const refused = this.refusedChange(input);
+    const refused = this.refusedRoleGrant(input);
     if (refused.isFailure) return refused;
 
     return this.uow.run(async (): Promise<Result<void, StaffChangeError>> => {
@@ -233,6 +261,160 @@ export class StaffService {
     });
   }
 
+  refuseOverride(input: StaffOverrideChange): Promise<Result<void, StaffChangeError>> {
+    return this.uow.run(async (): Promise<Result<void, StaffChangeError>> => {
+      const refused = await this.overrideRefusal(input);
+
+      return refused.isFailure ? Result.fail(refused.getError()) : Result.ok();
+    });
+  }
+
+  async refuseOverrideRemoval(
+    input: StaffOverrideRemoval,
+  ): Promise<Result<StaffOverrideRow, StaffChangeError>> {
+    const refused = this.refusedChange(input);
+    if (refused.isFailure) return Result.fail(refused.getError());
+
+    const live = await this.listOverrides(input.targetUserId);
+    if (live.isFailure) return Result.fail(live.getError());
+
+    const row = live.getValue().find((candidate) => candidate.id === input.overrideId);
+    if (!row) return Result.fail(overrideNotFound());
+
+    const lifted = this.refusedRemoval(input, row);
+    if (lifted.isFailure) return Result.fail(lifted.getError());
+
+    return Result.ok(row);
+  }
+
+  async setOverride(input: StaffOverrideChange): Promise<Result<void, StaffChangeError>> {
+    return this.uow.run(async (): Promise<Result<void, StaffChangeError>> => {
+      const refused = await this.overrideRefusal(input);
+      if (refused.isFailure) return Result.fail(refused.getError());
+
+      const written = await this.store.replaceOverride({
+        userId: input.targetUserId,
+        permission: input.permission,
+        effect: input.effect,
+        expiresAt: input.expiresAt,
+        createdBy: input.actorUserId,
+      });
+      if (written.isFailure) return Result.fail(written.getError());
+
+      const ended = await this.endImpersonationsIfLost(input.targetUserId);
+      if (ended.isFailure) return ended;
+
+      await emitEvent(
+        this.outbox,
+        EventTypes.ADMIN_STAFF_OVERRIDE_SET,
+        "user",
+        input.targetUserId,
+        {
+          actorUserId: input.actorUserId,
+          userId: input.targetUserId,
+          overrideId: written.getValue(),
+          permission: input.permission,
+          effect: input.effect,
+          expiresAt: input.expiresAt.map((date) => date.toISOString()).toNull(),
+        },
+      );
+
+      return Result.ok();
+    });
+  }
+
+  async removeOverride(input: StaffOverrideRemoval): Promise<Result<void, StaffChangeError>> {
+    const refused = this.refusedChange(input);
+    if (refused.isFailure) return refused;
+
+    return this.uow.run(async (): Promise<Result<void, StaffChangeError>> => {
+      const managers = await this.store.lockActiveManagers();
+      if (managers.isFailure) return Result.fail(managers.getError());
+
+      const removed = await this.store.revokeOverride(input.targetUserId, input.overrideId);
+      if (removed.isFailure) return Result.fail(removed.getError());
+
+      const record = removed.getValue();
+      if (record.isNone()) return Result.fail(overrideNotFound());
+
+      const lifted = this.refusedRemoval(input, record.unwrap());
+      if (lifted.isFailure) return lifted;
+
+      const ended = await this.endImpersonationsIfLost(input.targetUserId);
+      if (ended.isFailure) return ended;
+
+      const { permission, effect } = record.unwrap();
+      await emitEvent(
+        this.outbox,
+        EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED,
+        "user",
+        input.targetUserId,
+        {
+          actorUserId: input.actorUserId,
+          userId: input.targetUserId,
+          overrideId: input.overrideId,
+          permission,
+          effect,
+        },
+      );
+
+      return Result.ok();
+    });
+  }
+
+  private async overrideRefusal(
+    input: StaffOverrideChange,
+  ): Promise<Result<void, StaffChangeError>> {
+    const refused = this.refusedChange(input);
+    if (refused.isFailure) return refused;
+
+    if (input.effect === "grant" && !input.actorPermissions.includes(input.permission)) {
+      return Result.fail(grantNotHeld());
+    }
+
+    const isOver = input.expiresAt.map((at) => at.getTime() <= Date.now()).unwrapOr(false);
+    if (isOver) {
+      return Result.fail({
+        code: "ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT",
+        message: "The end date of this change has passed. Ask again with a later date.",
+      });
+    }
+
+    const managers = await this.store.lockActiveManagers();
+    if (managers.isFailure) return Result.fail(managers.getError());
+
+    const found = await this.grantingRow(input.targetUserId);
+    if (found.isFailure) return Result.fail(found.getError());
+    if (found.getValue().isNone()) return Result.fail(notStaff());
+
+    const row = found.getValue().unwrap();
+    const losesManagement =
+      input.effect === "deny" &&
+      input.permission === MANAGE_STAFF_PERMISSION &&
+      row.role === "manager" &&
+      permissionsOfRecord(row, new Date()).includes(MANAGE_STAFF_PERMISSION);
+    if (losesManagement && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
+      return Result.fail(lastManager());
+    }
+
+    return Result.ok();
+  }
+
+  private async endImpersonationsIfLost(userId: string): Promise<Result<void, StaffChangeError>> {
+    const row = await this.grantingRow(userId);
+    if (row.isFailure) return Result.fail(row.getError());
+
+    const stillImpersonates = row
+      .getValue()
+      .map((record) => permissionsOfRecord(record, new Date()).includes(IMPERSONATE_PERMISSION))
+      .unwrapOr(false);
+    if (stillImpersonates) return Result.ok();
+
+    const ended = await this.store.endImpersonationsBy(userId);
+
+    return ended.isFailure ? Result.fail(ended.getError()) : Result.ok();
+  }
+
   private async banRefusal(input: StaffModeration): Promise<Result<void, StaffBanError>> {
     const managers = await this.store.lockActiveManagers();
     if (managers.isFailure) return Result.fail(managers.getError());
@@ -264,7 +446,7 @@ export class StaffService {
     if (found.isFailure) return Result.fail(found.getError());
 
     if (found.getValue().isNone()) {
-      return Result.fail({ code: "ADMIN_STAFF_NOT_FOUND", message: "Not a staff member." });
+      return Result.fail(notStaff());
     }
 
     const { role } = found.getValue().unwrap();
@@ -300,6 +482,44 @@ export class StaffService {
     });
 
     return Result.ok();
+  }
+
+  refusedRoleGrant(
+    input: StaffGrantingChange & { role: StaffRole },
+  ): Result<void, StaffChangeError> {
+    const refused = this.refusedChange(input);
+    if (refused.isFailure) return refused;
+
+    const beyond = permissionsOfRole(input.role).some(
+      (permission) => !input.actorPermissions.includes(permission),
+    );
+
+    return beyond ? Result.fail(grantNotHeld()) : Result.ok();
+  }
+
+  refusedOverrideGrant(input: {
+    actorPermissions: readonly StaffPermission[];
+    permission: StaffPermission;
+    effect: "grant" | "deny";
+    liftsOverride: boolean;
+  }): Result<void, StaffChangeError> {
+    const gives = input.liftsOverride ? input.effect === "deny" : input.effect === "grant";
+
+    return gives && !input.actorPermissions.includes(input.permission)
+      ? Result.fail(grantNotHeld())
+      : Result.ok();
+  }
+
+  private refusedRemoval(
+    input: StaffOverrideRemoval,
+    row: { permission: StaffPermission; effect: "grant" | "deny" },
+  ): Result<void, StaffChangeError> {
+    return this.refusedOverrideGrant({
+      actorPermissions: input.actorPermissions,
+      permission: row.permission,
+      effect: row.effect,
+      liftsOverride: true,
+    });
   }
 
   private refusedChange(input: StaffChange): Result<void, StaffChangeError> {
@@ -352,6 +572,24 @@ export class StaffService {
 
     return Result.ok();
   }
+}
+
+function notStaff(): AppError<"ADMIN_STAFF_NOT_FOUND"> {
+  return { code: "ADMIN_STAFF_NOT_FOUND", message: "Not a staff member." };
+}
+
+function grantNotHeld(): AppError<"ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN"> {
+  return {
+    code: "ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN",
+    message: "Nobody gives a permission they do not hold themselves.",
+  };
+}
+
+function overrideNotFound(): AppError<"ADMIN_STAFF_OVERRIDE_NOT_FOUND"> {
+  return {
+    code: "ADMIN_STAFF_OVERRIDE_NOT_FOUND",
+    message: "This permission change no longer exists.",
+  };
 }
 
 function lastManager(): AppError<"ADMIN_STAFF_LAST_MANAGER_FORBIDDEN"> {

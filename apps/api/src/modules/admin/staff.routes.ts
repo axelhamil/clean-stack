@@ -1,4 +1,4 @@
-import { AppErrorException } from "@packages/ddd-kit";
+import { AppErrorException, Option } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { env } from "../../shared/env";
@@ -11,6 +11,7 @@ import {
 } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
 import { setStaffRoleBodySchema } from "./application/dto/set-staff-role.dto";
+import { setStaffOverrideBodySchema } from "./application/dto/staff-override.dto";
 import { stepUpBodySchema } from "./application/dto/step-up.dto";
 import { gateOr202 } from "./approval-response";
 
@@ -81,6 +82,7 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
 
       const result = await di.StaffService.assignRole({
         actorUserId,
+        actorPermissions: c.get("staff").permissions,
         targetUserId,
         role: body.role,
       });
@@ -110,6 +112,87 @@ export const adminStaffRoutes = new Hono<{ Variables: AuthVariables }>()
       if (pending) return pending;
 
       const result = await di.StaffService.revoke({ actorUserId, targetUserId });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+
+      return c.json({ ok: true });
+    },
+  )
+  .get("/staff/:id/overrides", requireAuth, requireStaffPermission("staff.manage"), async (c) => {
+    const result = await di.StaffService.listOverrides(c.req.param("id"));
+    if (result.isFailure) throw new AppErrorException(result.getError());
+
+    return c.json({
+      items: result.getValue().map((row) => ({
+        id: row.id,
+        permission: row.permission,
+        effect: row.effect,
+        expiresAt: row.expiresAt.map((date) => date.toISOString()).toNull(),
+        createdAt: row.createdAt.toISOString(),
+      })),
+    });
+  })
+  .post(
+    "/staff/:id/overrides",
+    requireAuth,
+    requireStaffPermission("staff.manage"),
+    requireStepUp,
+    zV("json", setStaffOverrideBodySchema),
+    async (c) => {
+      const actorUserId = c.get("user").id;
+      const targetUserId = c.req.param("id");
+      const body = c.req.valid("json");
+      const pending = gateOr202(
+        c,
+        await di.ApprovalService.gate({
+          action: "staff.permission_override",
+          subjectId: targetUserId,
+          params: { op: "set", ...body },
+          requestedBy: actorUserId,
+          requesterPermissions: c.get("staff").permissions,
+        }),
+      );
+      if (pending) return pending;
+
+      const result = await di.StaffService.setOverride({
+        actorUserId,
+        actorPermissions: c.get("staff").permissions,
+        targetUserId,
+        permission: body.permission,
+        effect: body.effect,
+        expiresAt: Option.fromNullable(body.expiresAt).map((iso) => new Date(iso)),
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+
+      return c.json({ ok: true });
+    },
+  )
+  .delete(
+    "/staff/:id/overrides/:overrideId",
+    requireAuth,
+    requireStaffPermission("staff.manage"),
+    requireStepUp,
+    async (c) => {
+      const actorUserId = c.get("user").id;
+      const targetUserId = c.req.param("id");
+      const overrideId = c.req.param("overrideId");
+      const pending = gateOr202(
+        c,
+        await di.ApprovalService.gate({
+          action: "staff.permission_override",
+          subjectId: targetUserId,
+          params: { op: "revoke", overrideId },
+          requestedBy: actorUserId,
+          requesterPermissions: c.get("staff").permissions,
+        }),
+      );
+      if (pending) return pending;
+
+      const result = await di.StaffService.removeOverride({
+        actorUserId,
+        actorPermissions: c.get("staff").permissions,
+        targetUserId,
+        overrideId,
+      });
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       return c.json({ ok: true });

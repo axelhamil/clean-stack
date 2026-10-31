@@ -1,10 +1,17 @@
+import {
+  consume,
+  handleStreamChunk,
+} from "@packages/web-kit/notifications/use-notification-stream";
 import type { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { consume, handleStreamChunk } from "../use-notification-stream";
+import { refreshOnNotification } from "../use-notification-stream";
 
 const fakeClient = () => {
   const invalidate = vi.fn();
-  return { invalidate, client: { invalidateQueries: invalidate } as unknown as QueryClient };
+  return {
+    invalidate,
+    client: refreshOnNotification({ invalidateQueries: invalidate } as unknown as QueryClient),
+  };
 };
 
 /**

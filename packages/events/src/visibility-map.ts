@@ -74,6 +74,8 @@ export const VISIBILITY = {
   "admin.staff.added": "internal",
   "admin.staff.role_changed": "internal",
   "admin.staff.revoked": "internal",
+  "admin.staff.override_set": "internal",
+  "admin.staff.override_revoked": "internal",
   "admin.step_up.verified": "internal",
   "admin.step_up.failed": "internal",
   "admin.approval.requested": "internal",

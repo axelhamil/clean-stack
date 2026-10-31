@@ -1,3 +1,6 @@
+import { BanForm } from "@packages/staff-ui/ban-form";
+import { ImpersonateForm } from "@packages/staff-ui/impersonate-form";
+import { SessionsSection } from "@packages/staff-ui/sessions-section";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
@@ -20,6 +23,7 @@ import { Separator } from "@packages/ui/components/ui/separator";
 import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
@@ -30,7 +34,6 @@ import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { broadcastAuthChange } from "../../shared/auth/auth-broadcast";
 import { ensureStaffPermission } from "../../shared/auth/ensure-staff";
 import { StaffCan } from "../../shared/auth/staff-can";
-import { useFormatDate } from "../../shared/i18n/use-format-date";
 import { USER_STATUS_LABEL_KEYS } from "./admin-user-labels";
 import {
   banUserMutationOptions,
@@ -40,9 +43,6 @@ import {
   unbanUserMutationOptions,
 } from "./api/admin-users.mutations";
 import { adminUserQueryOptions } from "./api/admin-users.queries";
-import { SessionsSection } from "./components/sessions-section";
-import { BanForm } from "./forms/ban-form";
-import { ImpersonateForm } from "./forms/impersonate-form";
 
 export const Route = createFileRoute("/_protected/_shell/_admin/admin/users/$id")({
   beforeLoad: ensureStaffPermission("users.read"),

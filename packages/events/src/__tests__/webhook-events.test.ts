@@ -11,7 +11,7 @@ import { RETENTION_MAP } from "../retention-map";
 
 describe("webhook events", () => {
   it("catalog size matches the declared count", () => {
-    expect(ALL_EVENT_TYPES).toHaveLength(98);
+    expect(ALL_EVENT_TYPES).toHaveLength(100);
   });
 
   it("declares the delivery lifecycle event constants", () => {

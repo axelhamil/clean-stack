@@ -133,6 +133,12 @@ export default {
       "Le demandeur n'a plus ce pouvoir, la demande est donc close.",
     ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
       "Les accès de cette personne ont changé depuis la demande. Refaites-la.",
+    ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT:
+      "Une autre demande sur cette personne est déjà en attente. Décidez-la ou annulez-la, puis recommencez.",
+    ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN:
+      "Vous ne pouvez pas donner une permission que vous n'avez pas. Demandez à un collègue qui la détient.",
+    ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT:
+      "La date de fin de ce changement est passée. Recommencez avec une date ultérieure.",
     ADMIN_APPROVAL_NOT_FOUND: "Cette demande d'approbation n'existe plus.",
     ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN:
       "Vous ne pouvez pas demander cette action sur votre propre compte.",
@@ -157,6 +163,7 @@ export default {
     ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
       "C'est le dernier responsable. Ajoutez-en un autre avant de modifier cet accès.",
     ADMIN_STAFF_NOT_FOUND: "Cette personne ne fait pas partie de l'équipe.",
+    ADMIN_STAFF_OVERRIDE_NOT_FOUND: "Ce changement de permission n'existe plus.",
     ADMIN_USER_STAFF_TARGET_FORBIDDEN:
       "Seule une personne qui gère l'équipe peut agir sur un de ses membres.",
     IMPERSONATION_ACTION_FORBIDDEN:
@@ -274,6 +281,16 @@ export default {
     loadAdminOrgs: "Échec du chargement des organisations",
     loadAdminOrg: "Échec du chargement de l'organisation",
     updateAdminOrgSsoEnforcement: "Échec de la mise à jour de l'imposition du SSO",
+    loadStaff: "Échec du chargement de l'équipe",
+    setStaffRole: "Échec du changement de rôle",
+    revokeStaff: "Échec du retrait de l'équipe",
+    loadStaffOverrides: "Échec du chargement des changements de permissions",
+    setStaffOverride: "Échec de l'enregistrement du changement de permission",
+    removeStaffOverride: "Échec du retrait du changement de permission",
+    loadApprovals: "Échec du chargement des approbations",
+    loadApproval: "Échec du chargement de cette demande",
+    decideApproval: "Échec de l'enregistrement de la décision",
+    cancelApproval: "Échec de l'annulation de cette demande",
     loadAuditLog: "Échec du chargement du journal d'audit",
     verifyAuditChain: "Échec de la vérification de la chaîne",
     updateAvatar: "Échec de la mise à jour de l'avatar",

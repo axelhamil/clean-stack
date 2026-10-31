@@ -1,5 +1,6 @@
 import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
+import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangleIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -8,7 +9,6 @@ import { GuardHint } from "../auth/guard-hint";
 import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useCancelDeletion } from "../auth/use-cancel-deletion";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
-import { useFormatDateTime } from "../i18n/use-format-date";
 
 export function DeletionPendingBanner() {
   const { t } = useTranslation("settings");

@@ -37,6 +37,7 @@ export const APPROVAL_ACTIONS = [
   "user.ban_permanent",
   "staff.role_change",
   "staff.revoke",
+  "staff.permission_override",
 ] as const;
 
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
@@ -45,6 +46,7 @@ export const APPROVAL_ACTION_PERMISSION: Record<ApprovalAction, StaffPermission>
   "user.ban_permanent": "users.moderate",
   "staff.role_change": "staff.manage",
   "staff.revoke": "staff.manage",
+  "staff.permission_override": "staff.manage",
 };
 
 export function isApprovalAction(value: string): value is ApprovalAction {

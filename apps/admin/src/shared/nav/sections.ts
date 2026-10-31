@@ -21,3 +21,7 @@ export function sectionOpenTo(
 ): Section | undefined {
   return sectionsOpenTo(permissions).find((section) => section.id === id);
 }
+
+export function isSectionPath(pathname: string, id: Section["id"]): boolean {
+  return pathname === `/${id}` || pathname.startsWith(`/${id}/`);
+}

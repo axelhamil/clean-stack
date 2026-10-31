@@ -1,9 +1,9 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { USER_STATUS_LABEL_KEYS } from "../admin-user-labels";
 import type { AdminUserListItem } from "../api/admin-users.queries";
 

@@ -1,14 +1,18 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Hint } from "@packages/ui/components/ui/hint";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { chainVerifyQueryOptions } from "../api/audit-log.queries";
 
-export function ChainBadge() {
+export interface ChainBadgeProps {
+  verification: { verified: boolean; brokenAtSequence?: number | null } | undefined;
+  failed?: boolean;
+}
+
+export function ChainBadge({ verification: data, failed = false }: ChainBadgeProps) {
   const { t } = useTranslation("admin");
-  const { data, isLoading } = useQuery(chainVerifyQueryOptions);
 
-  if (isLoading || !data) {
+  if (failed) return <Badge variant="destructive">{t("auditLog.chain.failed")}</Badge>;
+
+  if (!data) {
     return <Badge variant="secondary">{t("auditLog.chain.checking")}</Badge>;
   }
 

@@ -135,6 +135,12 @@ export default {
       "The requester no longer holds this power, so the request is closed.",
     ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
       "This person's access changed since the request was made. Ask again.",
+    ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT:
+      "A different request on this person is already waiting. Decide or cancel it, then ask again.",
+    ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN:
+      "You cannot give a permission you do not hold yourself. Ask a colleague who holds it.",
+    ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT:
+      "The end date of this change has passed. Ask again with a later date.",
     ADMIN_APPROVAL_NOT_FOUND: "This approval request no longer exists.",
     ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN: "You cannot request this action on your own account.",
     ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN: "A different person must decide this request.",
@@ -153,6 +159,7 @@ export default {
     ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
       "This is the last manager. Add another manager before changing this access.",
     ADMIN_STAFF_NOT_FOUND: "This person is not on the staff.",
+    ADMIN_STAFF_OVERRIDE_NOT_FOUND: "This permission change no longer exists.",
     ADMIN_USER_STAFF_TARGET_FORBIDDEN:
       "Only someone who manages the staff can act on a staff member.",
     IMPERSONATION_ACTION_FORBIDDEN:
@@ -282,6 +289,16 @@ export default {
     // enforcement on an arbitrary organization, a different action from a
     // different source that happens to share the same English wording.
     updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
+    loadStaff: "Failed to load the team",
+    setStaffRole: "Failed to change this role",
+    revokeStaff: "Failed to remove this person from the team",
+    loadStaffOverrides: "Failed to load permission changes",
+    setStaffOverride: "Failed to save this permission change",
+    removeStaffOverride: "Failed to remove this permission change",
+    loadApprovals: "Failed to load approvals",
+    loadApproval: "Failed to load this request",
+    decideApproval: "Failed to record this decision",
+    cancelApproval: "Failed to cancel this request",
     loadAuditLog: "Failed to load audit log",
     verifyAuditChain: "Failed to verify chain",
     updateAvatar: "Failed to update avatar",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { banFormSchema, impersonateFormSchema } from "../admin-users.schema";
+import { banFormSchema, impersonateFormSchema } from "../staff-forms.schema";
 
 describe("impersonateFormSchema", () => {
   it("rejects an empty reason", () => {

@@ -1,4 +1,4 @@
-import { type EventHandler, Result } from "@packages/ddd-kit";
+import { type EventHandler, Option, Result } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
@@ -97,7 +97,7 @@ export const adminModule = defineModule()((b) =>
 
             return refused.isFailure ? Result.fail(refused.getError()) : Result.ok(params);
           },
-          authorize: (subjectId, actor) =>
+          authorize: async ({ subjectId }, actor) =>
             c.StaffService.refuseTarget({
               actorPermissions: actor.permissions,
               targetUserId: subjectId,
@@ -118,6 +118,7 @@ export const adminModule = defineModule()((b) =>
           prepare: async ({ subjectId, params }, actor) => {
             const from = await c.StaffService.refuseRoleChange({
               actorUserId: actor.userId,
+              actorPermissions: actor.permissions,
               targetUserId: subjectId,
               role: params.role,
             });
@@ -126,10 +127,17 @@ export const adminModule = defineModule()((b) =>
               ? Result.fail(from.getError())
               : Result.ok({ role: params.role, fromRole: from.getValue().toNull() });
           },
-          authorize: async () => Result.ok(),
+          authorize: async ({ subjectId, params }, actor) =>
+            c.StaffService.refusedRoleGrant({
+              actorUserId: actor.userId,
+              actorPermissions: actor.permissions,
+              targetUserId: subjectId,
+              role: params.role,
+            }),
           run: ({ subjectId, params }, actor) =>
             c.StaffService.assignRole({
               actorUserId: actor.userId,
+              actorPermissions: actor.permissions,
               targetUserId: subjectId,
               role: params.role,
               expectedRole: params.fromRole,
@@ -147,6 +155,73 @@ export const adminModule = defineModule()((b) =>
           authorize: async () => Result.ok(),
           run: ({ subjectId }, actor) =>
             c.StaffService.revoke({ actorUserId: actor.userId, targetUserId: subjectId }),
+        },
+        "staff.permission_override": {
+          prepare: async ({ subjectId, params }, actor) => {
+            const change = {
+              actorUserId: actor.userId,
+              actorPermissions: actor.permissions,
+              targetUserId: subjectId,
+            };
+
+            if (params.op === "set") {
+              const expiresAt = params.expiresAt ?? null;
+              const refused = await c.StaffService.refuseOverride({
+                ...change,
+                permission: params.permission,
+                effect: params.effect,
+                expiresAt: Option.fromNullable(expiresAt).map((iso) => new Date(iso)),
+              });
+
+              return refused.isFailure
+                ? Result.fail(refused.getError())
+                : Result.ok({
+                    op: "set" as const,
+                    permission: params.permission,
+                    effect: params.effect,
+                    expiresAt,
+                  });
+            }
+
+            const live = await c.StaffService.refuseOverrideRemoval({
+              ...change,
+              overrideId: params.overrideId,
+            });
+            if (live.isFailure) return Result.fail(live.getError());
+
+            const row = live.getValue();
+
+            return Result.ok({
+              op: "revoke" as const,
+              overrideId: params.overrideId,
+              permission: row.permission,
+              effect: row.effect,
+              expiresAt: row.expiresAt.map((at) => at.toISOString()).toNull(),
+            });
+          },
+          authorize: async ({ params }, actor) =>
+            c.StaffService.refusedOverrideGrant({
+              actorPermissions: actor.permissions,
+              permission: params.permission,
+              effect: params.effect,
+              liftsOverride: params.op === "revoke",
+            }),
+          run: ({ subjectId, params }, actor) => {
+            const change = {
+              actorUserId: actor.userId,
+              actorPermissions: actor.permissions,
+              targetUserId: subjectId,
+            };
+
+            return params.op === "set"
+              ? c.StaffService.setOverride({
+                  ...change,
+                  permission: params.permission,
+                  effect: params.effect,
+                  expiresAt: Option.fromNullable(params.expiresAt).map((iso) => new Date(iso)),
+                })
+              : c.StaffService.removeOverride({ ...change, overrideId: params.overrideId });
+          },
         },
       }),
     )

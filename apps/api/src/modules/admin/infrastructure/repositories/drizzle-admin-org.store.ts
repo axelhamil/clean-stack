@@ -8,15 +8,16 @@ import {
   desc,
   eq,
   ilike,
-  lt,
   multiTenantSchema,
   or,
   sql,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
+import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListOrgsInput } from "../../application/dto/list-orgs.dto";
 import type {
+  AdminOrgListRow,
   AdminOrgMemberRow,
   AdminOrgRow,
   IAdminOrgStore,
@@ -43,7 +44,7 @@ function orgColumns() {
 export class DrizzleAdminOrgStore implements IAdminOrgStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgRow[], AdminStoreError>> {
+  async listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgListRow[], AdminStoreError>> {
     return this.instrumentation.startSpan({ name: "DrizzleAdminOrgStore > listOrgs" }, async () => {
       try {
         const { organization, member } = multiTenantSchema;
@@ -56,15 +57,17 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
             ),
           );
         }
-        if (input.cursor) conditions.push(lt(organization.createdAt, new Date(input.cursor)));
+        if (input.cursor) {
+          conditions.push(afterTimeIdCursor(organization.createdAt, organization.id, input.cursor));
+        }
 
         const query = db
-          .select(orgColumns())
+          .select({ ...orgColumns(), cursorAt: exactInstant(organization.createdAt) })
           .from(organization)
           .leftJoin(member, eq(member.organizationId, organization.id))
           .where(conditions.length ? and(...conditions) : undefined)
           .groupBy(organization.id)
-          .orderBy(desc(organization.createdAt))
+          .orderBy(desc(organization.createdAt), desc(organization.id))
           .limit(input.limit);
 
         const rows = await this.instrumentation.startSpan(

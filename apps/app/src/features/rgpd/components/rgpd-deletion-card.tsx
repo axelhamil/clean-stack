@@ -13,6 +13,7 @@ import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
+import { useFormatDate, useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon, TrashIcon } from "lucide-react";
@@ -24,7 +25,6 @@ import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useCancelDeletion } from "../../../shared/auth/use-cancel-deletion";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
-import { useFormatDate, useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { RequestDeletionPasswordForm } from "../forms/request-deletion-password-form";
 import { RequestDeletionTotpForm } from "../forms/request-deletion-totp-form";
 

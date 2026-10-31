@@ -72,6 +72,8 @@ export const EventTypes = {
   ADMIN_STAFF_ADDED: "admin.staff.added",
   ADMIN_STAFF_ROLE_CHANGED: "admin.staff.role_changed",
   ADMIN_STAFF_REVOKED: "admin.staff.revoked",
+  ADMIN_STAFF_OVERRIDE_SET: "admin.staff.override_set",
+  ADMIN_STAFF_OVERRIDE_REVOKED: "admin.staff.override_revoked",
   ADMIN_STEP_UP_VERIFIED: "admin.step_up.verified",
   ADMIN_STEP_UP_FAILED: "admin.step_up.failed",
   ADMIN_APPROVAL_REQUESTED: "admin.approval.requested",

@@ -1,8 +1,8 @@
 import { Button } from "@packages/ui/components/ui/button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { TypographyInline } from "@packages/ui/components/ui/typography";
+import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useTranslation } from "react-i18next";
-import { useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { EMPTY_VALUE } from "../../../shared/utils";
 import type { AuditRow } from "../api/audit-log.queries";
 import { AUDIT_ACTOR_TYPE_LABEL_KEYS } from "../audit-actor-type-labels";

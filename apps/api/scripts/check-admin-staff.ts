@@ -11,7 +11,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Result } from "@packages/ddd-kit";
+import { permissionsOfRole } from "@packages/access-control";
+import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -33,6 +34,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-admin-staff");
 
+const MANAGER_PERMISSIONS = permissionsOfRole("manager");
 const RACERS = 20;
 const ROUNDS = 10;
 const prefix = `check-admin-staff-${crypto.randomUUID()}`;
@@ -344,6 +346,138 @@ async function proveModerationTarget(): Promise<void> {
   );
 }
 
+async function proveOverrides(): Promise<void> {
+  const service = staffService();
+  await resetManagers([managerA, managerB]);
+
+  const denyManage = (targetUserId: string, actorUserId: string) =>
+    service.setOverride({
+      actorUserId,
+      actorPermissions: MANAGER_PERMISSIONS,
+      targetUserId,
+      permission: "staff.manage",
+      effect: "deny",
+      expiresAt: Option.none(),
+    });
+
+  const racing = await Promise.all([
+    denyManage(managerA, managerB),
+    denyManage(managerB, managerA),
+  ]);
+  check(
+    "two managers denying each other staff management leave one holder",
+    racing.filter((result) => result.isSuccess).length === 1,
+  );
+
+  const [held] = await db
+    .select({ userId: staffSchema.staffPermissionOverride.userId })
+    .from(staffSchema.staffPermissionOverride)
+    .where(inArray(staffSchema.staffPermissionOverride.userId, [managerA, managerB]));
+  const denied = held?.userId ?? managerA;
+  const holder = denied === managerA ? managerB : managerA;
+  const lastHolderRevoked = await service.revoke({ actorUserId: plainUser, targetUserId: holder });
+  check(
+    "a manager denied staff management does not count as the last manager's backup",
+    lastHolderRevoked.isFailure &&
+      lastHolderRevoked.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
+  );
+
+  const live = await di.IStaffStore.listLiveOverrides(denied);
+  const [override] = live.isSuccess ? live.getValue() : [];
+  const removed = await service.removeOverride({
+    actorUserId: holder,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: denied,
+    overrideId: override?.id ?? "",
+  });
+  check("removing the denial gives the backup back", removed.isSuccess);
+  const afterRemoval = await di.IStaffStore.listLiveOverrides(denied);
+  check(
+    "a removed override is no longer live",
+    afterRemoval.isSuccess && afterRemoval.getValue().length === 0,
+  );
+
+  const foreign = await service.removeOverride({
+    actorUserId: denied,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: holder,
+    overrideId: override?.id ?? "",
+  });
+  check(
+    "an override id of another person answers not found",
+    foreign.isFailure && foreign.getError().code === "ADMIN_STAFF_OVERRIDE_NOT_FOUND",
+  );
+
+  await openImpersonation(holder);
+  const denyImpersonation = await service.setOverride({
+    actorUserId: denied,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: holder,
+    permission: "users.impersonate",
+    effect: "deny",
+    expiresAt: Option.some(new Date(Date.now() + 60_000)),
+  });
+  check("a denial with an expiry is written", denyImpersonation.isSuccess);
+  check(
+    "a denial of impersonation ends the sessions they impersonate through",
+    (await impersonationSessionsOf(holder)) === 0,
+  );
+
+  const [event] = await db
+    .select({ payload: outboxSchema.outboxEvent.payload })
+    .from(outboxSchema.outboxEvent)
+    .where(
+      and(
+        eq(outboxSchema.outboxEvent.aggregateId, holder),
+        eq(outboxSchema.outboxEvent.eventType, EventTypes.ADMIN_STAFF_OVERRIDE_SET),
+      ),
+    );
+  check("the write announces its event in the same transaction", event !== undefined);
+}
+
+async function proveStaleDenyOfListedManager(): Promise<void> {
+  await resetManagers([managerA, managerB]);
+  await db.insert(staffSchema.staffPermissionOverride).values({
+    id: crypto.randomUUID(),
+    userId: managerA,
+    permission: "staff.manage",
+    effect: "deny",
+  });
+
+  const service = staffService([managerA]);
+  const removal = await service.revoke({ actorUserId: plainUser, targetUserId: managerB });
+  check(
+    "a stale denial on a listed manager does not make the other one unremovable",
+    removal.isSuccess,
+  );
+
+  await resetManagers([managerB]);
+  const redenied = await staffService().setOverride({
+    actorUserId: plainUser,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: managerB,
+    permission: "users.moderate",
+    effect: "deny",
+    expiresAt: Option.none(),
+  });
+  check("a denial of another permission leaves the last manager free", redenied.isSuccess);
+  const lockedOut = await staffService().setOverride({
+    actorUserId: plainUser,
+    actorPermissions: MANAGER_PERMISSIONS,
+    targetUserId: managerB,
+    permission: "staff.manage",
+    effect: "deny",
+    expiresAt: Option.none(),
+  });
+  check(
+    "the last manager still cannot lose staff management",
+    lockedOut.isFailure && lockedOut.getError().code === "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
+  );
+  await db
+    .delete(staffSchema.staffPermissionOverride)
+    .where(inArray(staffSchema.staffPermissionOverride.userId, [managerA, managerB]));
+}
+
 async function proveWipeRevokes(): Promise<void> {
   await resetManagers([leaver, managerA]);
   await db.insert(staffSchema.staffPermissionOverride).values({
@@ -497,6 +631,7 @@ async function proveReviveAndRegrant(): Promise<void> {
     .values({ userId: formerListed, role: "manager", source: "env" });
   const regranted = await staffService().assignRole({
     actorUserId: managerA,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: formerListed,
     role: "manager",
   });
@@ -566,6 +701,7 @@ async function proveImpersonationsEnd(): Promise<void> {
 
   await service.assignRole({
     actorUserId: managerB,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: supportActor,
     role: "manager",
   });
@@ -580,6 +716,7 @@ async function proveImpersonationsEnd(): Promise<void> {
 
   await service.assignRole({
     actorUserId: managerB,
+    actorPermissions: MANAGER_PERMISSIONS,
     targetUserId: supportActor,
     role: "auditor",
   });
@@ -707,6 +844,8 @@ async function main(): Promise<void> {
     await proveLastManagerHolds();
     await proveBanGuardHolds();
     await proveModerationTarget();
+    await proveOverrides();
+    await proveStaleDenyOfListedManager();
     await proveWipeRevokes();
     await proveDeletionRefused();
   });

@@ -215,6 +215,14 @@ describe("validateApprovalEnv", () => {
     })
     .superRefine(validateApprovalEnv);
 
+  it("refuses a gated role change whose bypass through an override stays open", () => {
+    const parsed = (actions: string[]) =>
+      schema.safeParse({ ADMIN_APPROVAL_ENABLED: true, ADMIN_APPROVAL_ACTIONS: actions }).success;
+
+    expect(parsed(["staff.role_change"])).toBe(false);
+    expect(parsed(["staff.role_change", "staff.permission_override"])).toBe(true);
+  });
+
   it("refuses four-eyes switched on with nothing to gate", () => {
     const parsed = schema.safeParse({ ADMIN_APPROVAL_ENABLED: true, ADMIN_APPROVAL_ACTIONS: [] });
 

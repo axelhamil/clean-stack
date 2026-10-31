@@ -32,11 +32,19 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
     consumer: "apps/app/src/features/webhooks/api/webhooks.mutations.ts",
   },
   "DELETE /uploads": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
-  "DELETE /admin/staff/:id": { uiLess: "dormant-by-design" },
-  "GET /admin/approvals": { uiLess: "dormant-by-design" },
-  "GET /admin/approvals/:id": { uiLess: "dormant-by-design" },
-  "POST /admin/approvals/:id/decide": { uiLess: "dormant-by-design" },
-  "POST /admin/approvals/:id/cancel": { uiLess: "dormant-by-design" },
+  "DELETE /admin/staff/:id": { consumer: "apps/admin/src/features/team/api/team.mutations.ts" },
+  "GET /admin/approvals": {
+    consumer: "apps/admin/src/features/approvals/api/approvals.queries.ts",
+  },
+  "GET /admin/approvals/:id": {
+    consumer: "apps/admin/src/features/approvals/api/approvals.queries.ts",
+  },
+  "POST /admin/approvals/:id/decide": {
+    consumer: "apps/admin/src/features/approvals/api/approvals.mutations.ts",
+  },
+  "POST /admin/approvals/:id/cancel": {
+    consumer: "apps/admin/src/shared/api/mutations/cancel-approval.ts",
+  },
   "GET /admin/audit-log": {
     consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
   },
@@ -47,7 +55,16 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /admin/step-up": { consumer: "apps/app/src/shared/api/mutations/verify-step-up.ts" },
   "GET /admin/orgs": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
   "GET /admin/orgs/:id": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
-  "GET /admin/staff": { uiLess: "dormant-by-design" },
+  "GET /admin/staff/:id/overrides": {
+    consumer: "apps/admin/src/features/team/api/team.queries.ts",
+  },
+  "POST /admin/staff/:id/overrides": {
+    consumer: "apps/admin/src/features/team/api/team.mutations.ts",
+  },
+  "DELETE /admin/staff/:id/overrides/:overrideId": {
+    consumer: "apps/admin/src/features/team/api/team.mutations.ts",
+  },
+  "GET /admin/staff": { consumer: "apps/admin/src/features/team/api/team.queries.ts" },
   "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
   "GET /admin/users/:id": {
     consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts",
@@ -157,7 +174,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /uploads/confirm": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
   "POST /uploads/download": { uiLess: "dormant-by-design" },
   "POST /uploads/presign": { consumer: "apps/app/src/shared/api/mutations/create-upload.ts" },
-  "PUT /admin/staff/:id/role": { uiLess: "dormant-by-design" },
+  "PUT /admin/staff/:id/role": { consumer: "apps/admin/src/features/team/api/team.mutations.ts" },
   "PUT /me/locale": { consumer: "apps/app/src/shared/api/mutations/set-locale.ts" },
   "PUT /notifications/org-preferences": {
     consumer: "apps/app/src/shared/api/mutations/notifications.ts",

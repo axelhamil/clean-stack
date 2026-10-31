@@ -95,7 +95,7 @@ export const adminApproval = pgTable(
     ),
     check(
       "admin_approval_action_check",
-      sql`${table.action} IN ('user.ban_permanent', 'staff.role_change', 'staff.revoke')`,
+      sql`${table.action} IN ('user.ban_permanent', 'staff.role_change', 'staff.revoke', 'staff.permission_override')`,
     ),
   ],
 );

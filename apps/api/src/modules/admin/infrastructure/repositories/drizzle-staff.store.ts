@@ -1,13 +1,20 @@
-import { isStaffPermission, isStaffRole, type StaffRole } from "@packages/access-control";
+import {
+  isStaffPermission,
+  isStaffRole,
+  type StaffPermission,
+  type StaffRole,
+} from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   asc,
   authSchema,
   eq,
+  gt,
   inArray,
   isNotNull,
   isNull,
+  or,
   resolveExecutor,
   staffSchema,
 } from "@packages/drizzle";
@@ -18,6 +25,7 @@ import type {
   StaffListRow,
   StaffManagerRecord,
   StaffOverrideRecord,
+  StaffOverrideRow,
   StaffRecord,
   StaffSource,
   StaffStoreError,
@@ -29,6 +37,7 @@ const fail = createDbFailure("ADMIN_STAFF_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const MIRROR_STAFF = "admin";
 const MIRROR_PLAIN = "user";
+const MANAGE_STAFF: StaffPermission = "staff.manage";
 
 export function sourceOf(value: string): Option<StaffSource> {
   if (value === "env" || value === "console" || value === "migration") return Option.some(value);
@@ -197,6 +206,23 @@ export class DrizzleStaffStore implements IStaffStore {
 
           if (locked.length === 0) return Result.ok([]);
 
+          const now = new Date();
+          const { staffPermissionOverride: override } = staffSchema;
+          const lockedIds = locked.map((row) => row.userId);
+          const deniedRows = await exec
+            .select({ userId: override.userId })
+            .from(override)
+            .where(
+              and(
+                inArray(override.userId, lockedIds),
+                eq(override.permission, MANAGE_STAFF),
+                eq(override.effect, "deny"),
+                isNull(override.revokedAt),
+                or(isNull(override.expiresAt), gt(override.expiresAt, now)),
+              ),
+            );
+          const denied = new Set(deniedRows.map((row) => row.userId));
+
           const owners = await exec
             .select({
               id: user.id,
@@ -206,14 +232,8 @@ export class DrizzleStaffStore implements IStaffStore {
               pendingDeletionUntil: user.pendingDeletionUntil,
             })
             .from(user)
-            .where(
-              inArray(
-                user.id,
-                locked.map((row) => row.userId),
-              ),
-            );
+            .where(inArray(user.id, lockedIds));
 
-          const now = new Date();
           const counted = new Set(
             owners.filter((owner) => stillCountsAsManager(owner, now)).map((owner) => owner.id),
           );
@@ -223,7 +243,7 @@ export class DrizzleStaffStore implements IStaffStore {
               const parsed = sourceOf(source);
               if (!counted.has(userId) || parsed.isNone()) return [];
 
-              return [{ userId, source: parsed.unwrap() }];
+              return [{ userId, source: parsed.unwrap(), manageDenied: denied.has(userId) }];
             }),
           );
         } catch (err) {
@@ -357,6 +377,135 @@ export class DrizzleStaffStore implements IStaffStore {
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "impersonation end failed");
+        }
+      },
+    );
+  }
+
+  async listLiveOverrides(userId: string): Promise<Result<StaffOverrideRow[], StaffStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > listLiveOverrides" },
+      async () => {
+        try {
+          const { staffPermissionOverride: override } = staffSchema;
+          const query = exec
+            .select({
+              id: override.id,
+              permission: override.permission,
+              effect: override.effect,
+              expiresAt: override.expiresAt,
+              createdAt: override.createdAt,
+            })
+            .from(override)
+            .where(
+              and(
+                eq(override.userId, userId),
+                isNull(override.revokedAt),
+                or(isNull(override.expiresAt), gt(override.expiresAt, new Date())),
+              ),
+            )
+            .orderBy(asc(override.createdAt));
+
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(
+            rows.flatMap((row) => {
+              const parsed = overrideOf(row);
+
+              return parsed.isSome()
+                ? [{ ...parsed.unwrap(), id: row.id, createdAt: row.createdAt }]
+                : [];
+            }),
+          );
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "staff override list failed");
+        }
+      },
+    );
+  }
+
+  async replaceOverride(input: {
+    userId: string;
+    permission: StaffPermission;
+    effect: "grant" | "deny";
+    expiresAt: Option<Date>;
+    createdBy: string;
+  }): Promise<Result<string, StaffStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > replaceOverride" },
+      async () => {
+        try {
+          const { staffPermissionOverride: override } = staffSchema;
+          const id = crypto.randomUUID();
+
+          await exec
+            .update(override)
+            .set({ revokedAt: new Date() })
+            .where(
+              and(
+                eq(override.userId, input.userId),
+                eq(override.permission, input.permission),
+                isNull(override.revokedAt),
+              ),
+            );
+
+          await exec.insert(override).values({
+            id,
+            userId: input.userId,
+            permission: input.permission,
+            effect: input.effect,
+            expiresAt: input.expiresAt.toNull(),
+            createdBy: input.createdBy,
+          });
+
+          return Result.ok(id);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "staff override write failed");
+        }
+      },
+    );
+  }
+
+  async revokeOverride(
+    userId: string,
+    overrideId: string,
+  ): Promise<Result<Option<StaffOverrideRecord>, StaffStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > revokeOverride" },
+      async () => {
+        try {
+          const { staffPermissionOverride: override } = staffSchema;
+          const [row] = await exec
+            .update(override)
+            .set({ revokedAt: new Date() })
+            .where(
+              and(
+                eq(override.id, overrideId),
+                eq(override.userId, userId),
+                isNull(override.revokedAt),
+              ),
+            )
+            .returning({
+              permission: override.permission,
+              effect: override.effect,
+              expiresAt: override.expiresAt,
+            });
+
+          return Result.ok(row ? overrideOf(row) : Option.none());
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "staff override revocation failed");
         }
       },
     );

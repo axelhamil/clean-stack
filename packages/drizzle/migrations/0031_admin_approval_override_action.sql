@@ -1,0 +1,2 @@
+ALTER TABLE "admin_approval" DROP CONSTRAINT "admin_approval_action_check";--> statement-breakpoint
+ALTER TABLE "admin_approval" ADD CONSTRAINT "admin_approval_action_check" CHECK ("admin_approval"."action" IN ('user.ban_permanent', 'staff.role_change', 'staff.revoke', 'staff.permission_override'));

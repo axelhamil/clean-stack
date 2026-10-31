@@ -11,10 +11,10 @@ import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
 import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
 import { TypographyInline } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
 import { ENDPOINT_STATUS_KEYS } from "../webhook-labels";
 

@@ -1,6 +1,16 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { formatDate, formatDateTime } from "../utils";
+
+export function formatDate(value: Date | string, locale: string): string {
+  return new Intl.DateTimeFormat(locale).format(new Date(value));
+}
+
+export function formatDateTime(value: Date | string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
 
 /**
  * Formats a date in the active UI language.

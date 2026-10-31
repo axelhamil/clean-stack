@@ -7,10 +7,10 @@ import {
   ListRowMeta,
 } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useTranslation } from "react-i18next";
 import { GuardHint } from "../auth/guard-hint";
 import type { ImpersonationGuard } from "../auth/use-impersonation-guard";
-import { useFormatDate } from "../i18n/use-format-date";
 import type { NotificationGroup } from "./group-notifications";
 import { categoryKeyFor, labelOf } from "./notification-labels";
 

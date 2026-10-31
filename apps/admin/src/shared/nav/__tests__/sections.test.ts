@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sectionOpenTo, sectionsOpenTo } from "../sections";
+import { isSectionPath, sectionOpenTo, sectionsOpenTo } from "../sections";
 
 const ids = (permissions: Parameters<typeof sectionsOpenTo>[0]) =>
   sectionsOpenTo(permissions).map((section) => section.id);
@@ -28,5 +28,13 @@ describe("sectionOpenTo", () => {
   it("answers the same for a forbidden section and one that does not exist", () => {
     expect(sectionOpenTo("team", ["audit.read"])).toBeUndefined();
     expect(sectionOpenTo("nope", ["audit.read"])).toBeUndefined();
+  });
+});
+
+describe("isSectionPath", () => {
+  it("keeps a section highlighted on its detail pages, and not on a section with the same start", () => {
+    expect(isSectionPath("/users/abc", "users")).toBe(true);
+    expect(isSectionPath("/users", "users")).toBe(true);
+    expect(isSectionPath("/users-archive", "users")).toBe(false);
   });
 });

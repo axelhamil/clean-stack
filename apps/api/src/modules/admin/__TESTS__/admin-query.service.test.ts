@@ -1,18 +1,18 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
-import type { AdminOrgRow, IAdminOrgStore } from "../application/ports/admin-org-store.port";
+import type { AdminOrgListRow, IAdminOrgStore } from "../application/ports/admin-org-store.port";
 import type {
   AdminSessionRow,
   AdminStoreError,
-  AdminUserRow,
+  AdminUserListRow,
   EndedSession,
   IAdminUserStore,
   UnbanOutcome,
 } from "../application/ports/admin-user-store.port";
 import { AdminQueryService } from "../application/services/admin-query.service";
 
-const USER: AdminUserRow = {
+const USER: AdminUserListRow = {
   id: "u-1",
   email: "a@example.com",
   name: "A",
@@ -21,14 +21,16 @@ const USER: AdminUserRow = {
   banExpires: Option.none(),
   twoFactorEnabled: true,
   createdAt: new Date("2026-01-01"),
+  cursorAt: "2026-01-01 00:00:00.123456",
 };
 
-const ORG: AdminOrgRow = {
+const ORG: AdminOrgListRow = {
   id: "o-1",
   name: "Acme",
   slug: "acme",
   memberCount: 3,
   createdAt: new Date("2026-01-01"),
+  cursorAt: "2026-01-01 00:00:00.123456",
   ssoEnforced: false,
 };
 
@@ -81,10 +83,10 @@ describe("AdminQueryService", () => {
       expect(page.nextCursor.isNone()).toBe(true);
     });
 
-    it("returns the last createdAt as cursor when the page is exactly full", async () => {
+    it("returns the exact instant and id of the last row as cursor when the page is exactly full", async () => {
       const page = (await service().listUsers({ limit: 1 })).getValue();
 
-      expect(page.nextCursor.unwrap()).toBe(new Date("2026-01-01").toISOString());
+      expect(page.nextCursor.unwrap()).toBe("2026-01-01 00:00:00.123456~u-1");
     });
 
     it("passes the organizationId filter through to the store", async () => {
@@ -98,7 +100,7 @@ describe("AdminQueryService", () => {
     });
 
     it("propagates a store failure", async () => {
-      const users = userStore({ listUsers: mock(async () => failed<AdminUserRow[]>()) });
+      const users = userStore({ listUsers: mock(async () => failed<AdminUserListRow[]>()) });
 
       const result = await service(users).listUsers({ limit: 50 });
 
@@ -108,7 +110,9 @@ describe("AdminQueryService", () => {
 
   describe("getUser", () => {
     it("returns none when the user does not exist", async () => {
-      const users = userStore({ findUserById: mock(async () => ok(Option.none<AdminUserRow>())) });
+      const users = userStore({
+        findUserById: mock(async () => ok(Option.none<AdminUserListRow>())),
+      });
 
       const result = await service(users).getUser("missing");
 
@@ -123,6 +127,7 @@ describe("AdminQueryService", () => {
             {
               id: "s-1",
               createdAt: new Date("2026-02-01"),
+              cursorAt: "2026-02-01 00:00:00",
               expiresAt: new Date("2026-02-02"),
               ipAddress: Option.some("1.2.3.4"),
               userAgent: Option.none<string>(),
@@ -160,7 +165,7 @@ describe("AdminQueryService", () => {
 
   describe("getOrg", () => {
     it("returns none for an unknown org", async () => {
-      const orgs = orgStore({ findOrgById: mock(async () => ok(Option.none<AdminOrgRow>())) });
+      const orgs = orgStore({ findOrgById: mock(async () => ok(Option.none<AdminOrgListRow>())) });
 
       const result = await service(userStore(), orgs).getOrg("nope");
 
