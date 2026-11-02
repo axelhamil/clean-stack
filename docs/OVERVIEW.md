@@ -92,17 +92,17 @@ Most boilerplates hand you an app and leave "make it deployable" as an exercise.
 
 - **Health probes**: `/livez`, `/readyz`, and `/startupz` in the IETF health-check format that Datadog, Grafana, and Kubernetes parse natively. Readiness aggregates self-registering per-module checks into a three-state result (healthy / degraded-but-serving / down), so one flaky non-critical dependency doesn't pull the whole pod out of rotation. Probes run outside all middleware and logging, so a 5-second probe interval doesn't drown your logs.
 - **Graceful shutdown**: on `SIGTERM`, readiness flips to 503 immediately, in-flight requests get a grace window to drain, then the event dispatcher and webhook worker stop cleanly. No more intermittent 502s on every deploy.
-- **Scheduled jobs, scheduler-agnostic**: the recurring work (processing due account deletions, sweeping expired audit / outbox / webhook rows by retention policy) lives behind internal endpoints you point *any* scheduler at: Railway Cron, GitHub Actions, a Kubernetes CronJob. A reference Railway cron config and a ready-to-run sweep entrypoint are included.
+- **Scheduled jobs, scheduler-agnostic**: the recurring work (processing due account deletions, sweeping expired audit / outbox / webhook rows by retention policy) lives behind internal endpoints you point *any* scheduler at: a Coolify scheduled task, GitHub Actions, a Kubernetes CronJob. The reference Coolify `sweep` task and a ready-to-run sweep entrypoint are included.
 - **A back office home that says what waits**: staff land on the approvals to decide, the deliveries that died and the jobs that failed, each row leading to the screen that deals with it, and only what their permissions open. A keyboard palette reaches any screen, account or organization, and each person keeps private saved filters on accounts, organizations and the audit log.
 - **An operations screen for your staff**: the back office lists dead events, the last run of every scheduled job and the Stripe events received. Staff with the right permission send dead events back to delivery or replay a Stripe event, after confirming with a code, and the action lands in the audit trail.
 - **Account tools for your staff**: from an organization's page, staff with the right permission grant a plan until an end date, after confirming with a code. Every plan limit follows it and goes back by itself when it ends. Staff also keep private notes on accounts and organizations, erased with the account they describe and never part of a data export.
 - **Internal endpoints are signed, not just hidden**: `/internal/*` requires an HMAC-SHA256 signature (the signing key never travels on the wire) with an optional private-network layer on top for PaaS internal meshes.
 - **Observability, off until you want it**: Sentry on both API and app, resolving to a no-op until you set a DSN. When on: errors captured with request/user/org/path tags, structured logs promoted to breadcrumbs, GDPR scrubbing on by default (whitelist-based, EU data-residency option), and a span around every I/O call. One request ID threads an audit row to its logs and its error report. Swappable for GlitchTip or Highlight by changing a DSN.
-- **Disaster recovery, decided for you**: point-in-time recovery from your managed Postgres provider is the primary defense (setup pointers per provider included); on top of it, copy-paste recipes for a weekly portable `pg_dump` export to your own bucket and a monthly automated restore-test that fails loudly if a backup ever won't restore.
+- **Disaster recovery, decided for you**: on your own server, the database copies every change to an encrypted bucket within a minute and takes a full backup each week, so you can bring it back to any minute of the last four weeks. A rehearsal restores it once a month and warns you if it ever fails. On a managed database, the provider's point-in-time recovery does the same job, with setup pointers included.
 
 ## Deploy it the way it's meant to go
 
-- **Config-as-code**: the reference deployment (Railway, three services: api, app, cron) is entirely in version-controlled `.toml`, nothing dashboard-only, with selective rebuilds so touching the frontend doesn't rebuild the API.
+- **Config-as-code on your own VPS**: the reference deployment (Coolify, three apps: api, app, admin, plus the sweep task) is declared in version-controlled TypeScript and reconciled through the Coolify API. Images are built once CI is green and deployed by digest, never by tag, with health gates after every deploy and a one-click rollback. Only secrets, domains and the Postgres resource are set by hand.
 - **Provider-portable**: the Dockerfiles are standard; moving to Fly.io, Render, or Cloud Run is a config file and an env migration, and the cron entrypoint is platform-agnostic.
 - **Graceful degradation**: optional services fail soft: no email key logs to stdout, no storage key surfaces as a non-critical readiness warning. The app boots; you wire providers when you're ready.
 
@@ -210,5 +210,5 @@ The full plan, with constraints and extension points, lives in [`../ROADMAP.md`]
 | Storage | [`STORAGE.md`](./STORAGE.md) |
 | Observability | [`OBSERVABILITY.md`](./OBSERVABILITY.md) |
 | Disaster recovery | [`DISASTER-RECOVERY.md`](./DISASTER-RECOVERY.md) |
-| Deploy (Railway) | [`DEPLOY-RAILWAY.md`](./DEPLOY-RAILWAY.md) |
+| Deploy (Coolify) | [`DEPLOY-COOLIFY.md`](./DEPLOY-COOLIFY.md) |
 | Design decisions trail | [`HISTORY.md`](./HISTORY.md) |

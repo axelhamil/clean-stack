@@ -1,0 +1,85 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to roll back"
+        required: true
+        type: choice
+        options: [staging, production]
+      release:
+        description: "Full commit sha the images were built from"
+        required: true
+      api_digest:
+        description: "sha256:<64 hex> of a previous clean-stack-api image, empty to leave the api as is"
+        required: false
+      app_digest:
+        description: "sha256:<64 hex> of a previous clean-stack-app image, empty to leave the app as is"
+        required: false
+      admin_digest:
+        description: "sha256:<64 hex> of a previous clean-stack-admin image, empty to leave the admin as is"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  rollback:
+    name: Deploy previous images
+    if: inputs.environment == 'staging' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      RELEASE: ${{ inputs.release }}
+      API_DIGEST: ${{ inputs.api_digest }}
+      APP_DIGEST: ${{ inputs.app_digest }}
+      ADMIN_DIGEST: ${{ inputs.admin_digest }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Join the tailnet
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy through the Coolify API
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+          COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          images=()
+          if [ -n "$API_DIGEST" ]; then images+=(--api "ghcr.io/$owner/clean-stack-api@$API_DIGEST"); fi
+          if [ -n "$APP_DIGEST" ]; then images+=(--app "ghcr.io/$owner/clean-stack-app@$APP_DIGEST"); fi
+          if [ -n "$ADMIN_DIGEST" ]; then images+=(--admin "ghcr.io/$owner/clean-stack-admin@$ADMIN_DIGEST"); fi
+          bun infra/coolify/deploy.ts --environment "$DEPLOY_ENVIRONMENT" --owner "$owner" --release "$RELEASE" "${images[@]}"
+
+      - name: Check the api is ready and both fronts are up
+        env:
+          API_BASE: ${{ vars.VITE_API_URL }}
+          APP_BASE: ${{ vars.VITE_APP_URL }}
+          ADMIN_BASE: ${{ vars.VITE_ADMIN_URL }}
+        run: >-
+          bun infra/coolify/gates.ts
+          --api "$API_BASE"
+          --app "$APP_BASE"
+          --admin "$ADMIN_BASE"

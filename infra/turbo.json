@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "coolify/**",
+        "docker/**",
+        "pgbackrest/**",
+        "vps/**",
+        "test-support.ts",
+        "package.json",
+        "tsconfig.json",
+        "$TURBO_ROOT$/.github/workflows/**",
+        "$TURBO_ROOT$/docker-compose.yaml"
+      ]
+    },
+    "type-check": {
+      "inputs": [
+        "coolify/**",
+        "pgbackrest/**",
+        "vps/**",
+        "test-support.ts",
+        "package.json",
+        "tsconfig.json"
+      ]
+    }
+  }
+}

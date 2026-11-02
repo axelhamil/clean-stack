@@ -201,13 +201,28 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 
 ---
 
-## Disaster recovery ✅ (doc-only)
+## Disaster recovery ✅
 
-PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway). No backup code ships: providers cover sub-minute RPO.
+pgBackRest PITR to R2 on the Coolify reference deploy; on a managed Postgres, the provider's PITR.
 
-- **`docs/DISASTER-RECOVERY.md`**: RPO/RTO targets, 3-2-1 rule applied, PITR setup per provider, restore runbook.
-- **Weekly `pg_dump` export**: GitHub Actions / Railway Cron / K8s CronJob recipes. Streams `pg_dump | gzip | aws s3 cp -`, read-only Postgres role.
-- **Monthly restore-test**: GitHub Actions recipe: spawn Postgres, restore, `psql count(*)` smoke check.
+- **`infra/docker/postgres-pgbackrest.Dockerfile`**: Postgres 18 pinned by digest with pgBackRest 2.60.0, built by `deploy.yml` (`clean-stack-postgres`), never deployed by it.
+- **`infra/pgbackrest/`**: `pgbackrest.conf` (stanza `clean-stack`, S3 repository, `aes-256-cbc`, 4 full and 7 differential, async archive with a 5 GiB queue), `postgresql.conf` (`archive_mode = on`, `archive_timeout = 60`), secrets from the environment only; `drill.sh` + `docker-compose.drill.yaml`: local backup then PITR restore on a throwaway SeaweedFS behind TLS, row count checked.
+- **`.github/workflows/pgbackrest-drill.yml`**: monthly restore of the latest state and a point 24 h back with a read-only key, archiving off, `select 1` and `drizzle.__drizzle_migrations` checked, gated by `PGBACKREST_DRILL_ENABLED`.
+- **`infra/vps/pgbackrest-run.sh`** + timers from `bootstrap.sh --pgbackrest`: full Sunday, differential Monday to Saturday at 00:00 UTC, `check` at 05:00 UTC, on every listed container once `pg_isready` answers, one run at a time under `flock`, heartbeat pings.
+- **`docs/DISASTER-RECOVERY.md`**: RPO/RTO, 3-2-1, keys, schedule, restore to the side, PITR and in place, drills, managed alternative, optional weekly `pg_dump`.
+
+---
+
+## Reference deploy (Coolify) ✅
+
+VPS with Coolify v4, its API on the tailnet only, Cloudflare in front. Runbook: [`./DEPLOY-COOLIFY.md`](./DEPLOY-COOLIFY.md).
+
+- **`infra/coolify/services.ts`**: desired `api`, `app`, `admin` apps per environment (port, health check, stop grace 45 s on `api`, literal env, `sweep` task `17 3 * * *`), images `ghcr.io/<owner>/clean-stack-<app>`.
+- **`infra/coolify/apply.ts`**: dry run by default, `--apply` writes, never deletes, reports missing secrets by key presence and never prints a value, treats a value hidden by a token without `read:sensitive` as unknown, rewrites every literal on `--apply`.
+- **`infra/coolify/deploy.ts`** + **`gates.ts`**: deploy `api`, `app`, `admin` by sha256 digest in that order, wait for an idle `sweep`, write `GIT_SHA`, restore the previous image and `GIT_SHA` of a failed app, stop at the first skip or failure inside a 45 min budget, report where each app was left; then `/readyz` and both `/health` must answer 200.
+- **`.github/workflows/deploy.yml`**: after a green CI on a push to `dev` (staging) or `main` (production), gated by `COOLIFY_DEPLOY == 'on'`; **`rollback.yml`** redeploys previous digests without building.
+- **`infra/coolify/*.test.ts`**: client, plan, deploy order, failures and restores, gates, the workflow guards parsed from the YAML, and the drift between the api env schema and the declared api env.
+- **`infra/vps/`**: `bootstrap.sh` for a Debian 13 host (unattended upgrades, Docker, Tailscale SSH, firewall unit), `host.nft` (inbound only loopback, established, `tailscale0`, the Coolify bridge and Cloudflare on 80 and 443, the same in forward against published ports), guarded by `host.test.ts` (rules, `nft -c` in a user namespace, timers through `systemd-analyze`).
 
 ---
 
@@ -230,7 +245,7 @@ See [`./EVENTS.md`](./EVENTS.md) for the DX guide (add an event, build a handler
 
 Deploy-safe perimeter: rate-limit, strict CSP, and stateless CSRF, wired before any business feature.
 
-**Rate-limit** (`apps/api/src/shared/middleware/rate-limit.middleware.ts`): `global` policy + 8 per-auth-route burst policies. IETF `RateLimit` / `Retry-After` headers. **Fail-closed on auth**: store outage → 503; global fail-open. `TRUSTED_PROXIES=private` (Railway/Fly) or CIDR. Store: memory (dev) → Postgres (multi-replica).
+**Rate-limit** (`apps/api/src/shared/middleware/rate-limit.middleware.ts`): `global` policy + 8 per-auth-route burst policies. IETF `RateLimit` / `Retry-After` headers. **Fail-closed on auth**: store outage → 503; global fail-open. `TRUSTED_PROXIES=private` (Coolify, Fly) or CIDR. Store: memory (dev) → Postgres (multi-replica).
 
 **CSP** (Caddy + Vite, not a Hono middleware): per-request nonce via Caddy `{http.request.uuid}` forwarded to Vite via `html.cspNonce`. `'strict-dynamic'`: no `'unsafe-inline'`, no host allowlist. `POST /csp-report` (IP-rate-limited, `Cross-Origin-Resource-Policy: cross-origin`).
 

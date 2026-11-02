@@ -8,7 +8,7 @@ The dispatcher is an **in-process Bun worker** holding a persistent `pg.Client` 
 
 | Platform shape | Status | Notes |
 |---|---|---|
-| Railway, Fly.io, Render, Coolify, dedicated VM, K8s | ✅ Just works | Process stays alive; LISTEN persists across requests. |
+| Coolify, Fly.io, Render, dedicated VM, K8s | ✅ Just works | Process stays alive; LISTEN persists across requests. |
 | Cloud Run, App Runner, Azure Container Apps | 🟡 Set `min_instances ≥ 1` | Default scale-to-zero kills the worker. With one always-warm replica, behaves like the row above. |
 | Vercel Functions, Netlify Functions, AWS Lambda | ❌ Re-wire required | Functions terminate after the response. The outbox table will fill up; no one drains it. |
 | Cloudflare Workers, edge runtimes | ❌ Not viable | No Node.js process model + no `pg` client. Even with rewiring, no in-process worker lives long enough. |
@@ -21,7 +21,7 @@ If you must ship on serverless functions, the rail still works: you swap the dis
 
 1. **Cron-triggered drain** (lowest effort). Expose a protected `POST /internal/drain-outbox` (gated by the same HMAC layer as `/internal/rgpd-sweep`) that runs one `OutboxRelay.drainOnce()` (claim a batch by lease, run its handlers, settle each event). Trigger every 1-5 min via Vercel Cron / GitHub Actions / Inngest scheduled function. **Trade-off**: latency floor = cron interval (1 min on Vercel free, 30 s on Inngest).
 2. **External queue** (lowest latency). Replace `outbox.enqueue()` with a push to SQS / Inngest / QStash inside the same TX (XA-style two-phase, or accept the well-known race window). The queue invokes a serverless function per message.
-3. **Hybrid** (most pragmatic). Keep the api serverless, deploy a tiny worker container alongside (Railway/Fly, ~5 €/mo) running the existing `OutboxDispatcher` + `WebhookDeliveryWorker`. Pointing it at the same `DATABASE_URL` is enough; no other code changes.
+3. **Hybrid** (most pragmatic). Keep the api serverless, deploy a tiny worker container alongside (a Coolify app on a small VPS, Fly, ~5 €/mo) running the existing `OutboxDispatcher` + `WebhookDeliveryWorker`. Pointing it at the same `DATABASE_URL` is enough; no other code changes.
 
 The audit/webhook subscribers, the catalogue, the `uow.run` flush: all unchanged in any path. Only `OutboxDispatcher` swaps.
 
@@ -279,19 +279,19 @@ Each endpoint runs a batched `DELETE ... WHERE id IN (SELECT id ... ORDER BY <ts
 
 ### Cron chain entrypoint
 
-The chained sweep runner lives at `apps/api/src/cron/sweep.ts`: single source of truth, bundled by `bun build` into `dist/cron/sweep.js`. Reads `API_URL` and `INTERNAL_SIGNING_KEY` from env, hits the three endpoints in FK order, exits non-zero on first failure.
+The chained sweep runner lives at `apps/api/src/cron/sweep.ts`: single source of truth, run from source by `bun apps/api/src/cron/sweep.ts` (the api image ships the source tree). Reads `API_URL` and `INTERNAL_SIGNING_KEY` from env, hits the three endpoints in FK order, exits non-zero on first failure.
 
 Runtime invocation (the same binary works in any orchestrator):
 
 ```bash
 API_URL=https://api.example.com \
 INTERNAL_SIGNING_KEY=<hex32+> \
-  bun dist/cron/sweep.js
+  bun apps/api/src/cron/sweep.ts
 ```
 
-**Railway Cron** (reference deploy: see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)) configures this via `infra/railway/cron.toml`: `startCommand = "bun dist/cron/sweep.js"`, `cronSchedule = "17 3 * * *"`, `restartPolicyType = "NEVER"`. The cron service reuses the api Docker image: no extra Dockerfile.
+**Coolify** (reference deploy: see [`DEPLOY-COOLIFY.md`](DEPLOY-COOLIFY.md)) runs this as the `sweep` scheduled task of the `api` app, declared in `infra/coolify/services.ts`: command `bun apps/api/src/cron/sweep.ts`, schedule `17 3 * * *`, `API_URL=http://localhost:3000`. The task runs inside the api container: no extra image.
 
-For other orchestrators (Fly Machines `--schedule`, Render Cron Job, Cloud Scheduler → Cloud Run job, K8s CronJob), point the entrypoint at the same `bun dist/cron/sweep.js` command and pass the two env vars. The signature primitives (`signedInternalFetch` with object input: see `apps/api/src/shared/internal-routes/internal-fetch.ts`) are platform-agnostic.
+For other orchestrators (Fly Machines `--schedule`, Render Cron Job, Cloud Scheduler → Cloud Run job, K8s CronJob), point the entrypoint at the same `bun apps/api/src/cron/sweep.ts` command and pass the two env vars. The signature primitives (`signedInternalFetch` with object input: see `apps/api/src/shared/internal-routes/internal-fetch.ts`) are platform-agnostic.
 
 ## Setup checklist post-clone
 

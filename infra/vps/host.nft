@@ -1,0 +1,46 @@
+#!/usr/sbin/nft -f
+
+table inet clean_stack_host
+delete table inet clean_stack_host
+
+table inet clean_stack_host {
+	set public_interfaces {
+		type ifname
+	}
+
+	set container_to_host {
+		type ifname . inet_service
+	}
+
+	set cloudflare_v4 {
+		type ipv4_addr
+		flags interval
+	}
+
+	set cloudflare_v6 {
+		type ipv6_addr
+		flags interval
+	}
+
+	chain input {
+		type filter hook input priority filter - 1; policy drop;
+		iif "lo" accept
+		ct state established,related accept
+		iifname "tailscale0" accept
+		iifname . tcp dport @container_to_host accept
+		iifname @public_interfaces tcp dport { 80, 443 } ip saddr @cloudflare_v4 accept
+		iifname @public_interfaces tcp dport { 80, 443 } ip6 saddr @cloudflare_v6 accept
+		iifname @public_interfaces icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-advert } ip6 hoplimit 255 accept
+		counter drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter - 1; policy accept;
+		iifname @public_interfaces ct state new meta l4proto tcp ct original proto-dst { 80, 443 } ip saddr @cloudflare_v4 accept
+		iifname @public_interfaces ct state new meta l4proto tcp ct original proto-dst { 80, 443 } ip6 saddr @cloudflare_v6 accept
+		iifname @public_interfaces ct state new,invalid,untracked counter drop
+	}
+}
+
+include "/etc/clean-stack/host.local.nft"
+include "/etc/clean-stack/cloudflare.nft"

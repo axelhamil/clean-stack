@@ -76,7 +76,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Authorization** | Capability-based SSOT (`@packages/access-control`). **Same predicate** at server middleware, route `beforeLoad` gate, and `<Can requires={...}>` UI: drift impossible by construction. |
 | **Legal / compliance** | Day-one EU-legal across the GDPR surface: **Art. 7** privacy/terms versioning (re-acceptance gate when a version bumps, `user.policy.accepted` evidence), **Art. 16** rectification (profile + email-change + password), **Art. 17** erasure (`POST /me/delete`: 2FA-required, 7-day soft-delete grace, sole-owner preflight, cancel-on-sign-in, cron wipe + ref anonymization), **Art. 20** portability (`POST /me/export`: signed 7-day R2 URL, 1/24h throttle). Passwords follow **NIST SP 800-63B** (min 15, HIBP k-anonymity breach check, contextual ban-list, no forced complexity). Without this, fines up to 4% of revenue. |
 | **Direct uploads** | Three-step presign → `PUT` direct to provider → server `HeadObject` confirm. Server is blind during transfer; owner-scoped keys (`<userId>/<scope>/<uuid>-<filename>`); R2 / S3 / B2 / Wasabi / Tigris: provider swap = one env var. |
-| **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Railway/Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
+| **Internal endpoints** | `/internal/*` (cron, queues) HMAC-SHA256-signed (`X-Internal-Signature`); signing key never on the wire. Stack `private-network` on Coolify or Fly via `INTERNAL_AUTH_LAYERS` for defense-in-depth. |
 | **Event-driven + audit** | Transactional outbox + LISTEN/NOTIFY dispatcher → **100 typed events** auto-emitted on every state change (35 public + 65 internal), append-only `audit_log` (SOC2 §CC7.2 / RGPD Art. 30), outbound webhooks (HMAC-signed, AEAD-encrypted secrets, decorrelated-jitter retry → dead-letter), operator UI at `/settings/webhooks`, public event catalog at `/developers/events`. Each audit row carries the request's `X-Request-Id` via an `AsyncLocalStorage` context: one key joins an audit entry to its logs and Sentry event. |
 | **DDD scope** | Reserved for what your customers pay for. Not for billing, auth, gating, or quotas (config + middleware suffices). Lesson learned the hard way: ~70% less code than full-DDD on the SaaS plumbing. |
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
@@ -150,14 +150,14 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 **Infra, ops & DX**
 - Hono RPC end-to-end types (`hcWithType`) · `pino` logging with single error envelope · CQRS error contract
 - Health probes (`/livez` `/readyz` `/startupz`) + graceful shutdown · Sentry error tracking (RGPD-scrubbed, NoOp without DSN)
-- Disaster-recovery runbook (PITR-first) · Railway reference deploy (config-as-code)
+- Postgres PITR with pgBackRest to R2 and restore drills · Coolify reference deploy on a VPS (config-as-code, deploy by digest, hardened host)
 - `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
 - Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
 - WCAG 2.1 AA gate on every PR: `@axe-core/playwright` over 11 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
 
 ### Roadmap
 
-The SaaS plumbing is shipped: auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 85-event rail, Railway deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
+The SaaS plumbing is shipped: auth, multi-tenant, RGPD, consent, billing, quota gating, security perimeter, admin + impersonation, API tokens, audit log, webhooks, in-app notifications, durable email, enterprise SSO + SCIM, typed i18n (`en`/`fr`), the 85-event rail, Coolify deploy. What's left is deliberately short; the rest was cut rather than carried as a wishlist. Full detail in [`ROADMAP.md`](ROADMAP.md).
 
 - **Dependency refresh Oct 2026** (Node 26 LTS, Bun 1.4.4, pnpm 12), in progress.
 - **Phase I, OpenUp resync**: kit, architecture guardrails, telemetry hygiene, ambient unit of work and a leased outbox, in five lots.
@@ -284,7 +284,7 @@ Three `.env` files, on purpose. **Do not collapse them into one at the root**: i
 
 `pnpm bootstrap` (or `bash scripts/bootstrap.sh`) copies each `.env.example` → `.env` if missing. Idempotent, never overwrites.
 
-Only four variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `APP_URL`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), `WEBHOOK_MASTER_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) section 4), `API_TOKEN_PEPPER` or `SCIM_CREDENTIAL_HASH_SECRET` is missing: a silent fallback there is worse than a refused boot. `API_TOKEN_PEPPER` (min 32 chars, `openssl rand -hex 32`) is the server secret that makes a database dump insufficient to forge tokens; `API_TOKEN_PREFIX` should be unique per clone (e.g. `myapp_`). Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Railway/Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
+Only four variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `APP_URL`. Everything else is optional with sensible behavior when missing (storage off, email warns, etc.). **In production the api additionally fails hard** if `CORS_ORIGIN`, `INTERNAL_SIGNING_KEY`, `INTERNAL_AUTH_LAYERS` (incl. `signature`), `WEBHOOK_MASTER_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) section 4), `API_TOKEN_PEPPER` or `SCIM_CREDENTIAL_HASH_SECRET` is missing: a silent fallback there is worse than a refused boot. `API_TOKEN_PEPPER` (min 32 chars, `openssl rand -hex 32`) is the server secret that makes a database dump insufficient to forge tokens; `API_TOKEN_PREFIX` should be unique per clone (e.g. `myapp_`). Behind a proxy/PaaS, set `TRUSTED_PROXIES=private` (Coolify, Fly) or every request shares the LB IP as rate-limit key (collective lockout). See [`apps/api/.env.example`](apps/api/.env.example) for the full template.
 
 ---
 
@@ -292,17 +292,17 @@ Only four variables are **required to boot** in dev: `DATABASE_URL`, `BETTER_AUT
 
 The api ships an **always-on event-driven rail** (transactional outbox + Postgres `LISTEN/NOTIFY` dispatcher + webhook delivery worker, all in-process). Two deployment shapes follow from this:
 
-✅ **Compatible**: Railway, Fly.io, Render, Coolify, dedicated VM, Kubernetes/EKS/GKE/AKS. Anywhere the api process stays alive between requests.
+✅ **Compatible**: Coolify, Fly.io, Render, dedicated VM, Kubernetes/EKS/GKE/AKS. Anywhere the api process stays alive between requests.
 
 🟡 **Compatible with `min_instances ≥ 1`**: Google Cloud Run, AWS App Runner, Azure Container Apps. They scale-to-zero by default; with zero replicas the dispatcher dies and `outbox_event` rows pile up unhandled. **Pin minimum 1 instance** (Cloud Run: `--min-instances=1`) and you're fine.
 
 ❌ **Incompatible without re-wiring**: Vercel Functions, Netlify Functions, AWS Lambda, Cloudflare Workers, edge runtimes generally. Functions terminate after the response, killing `LISTEN`. To go serverless, swap the in-process dispatcher for a cron-triggered drain endpoint or an external queue (Inngest, QStash, SQS), see [`docs/EVENTS.md`](docs/EVENTS.md#deployment-requirements) for the workaround. Edge runtimes also can't run the Postgres LISTEN client at all: keep the api on a regular runtime; if you need edge for specific endpoints, split them into a separate service.
 
-**Reference deploy (Railway)**: a prod-validated config-as-code runbook for the 3 services (api + app + cron) + Postgres + R2: env baseline, per-service `infra/railway/*.toml`, the boot-trap gotchas hit in practice (`NODE_ENV` override, app start-command, cross-site cookies), cookie strategy by domain topology, and a provider-swap section (Fly / Render / Cloud Run: Dockerfiles are portable). See [`docs/DEPLOY-RAILWAY.md`](docs/DEPLOY-RAILWAY.md).
+**Reference deploy (Coolify)**: a VPS run by Coolify v4 with 3 apps (api + app + admin) + a Postgres resource + R2. The desired state is TypeScript (`infra/coolify/services.ts`), reconciled by `infra/coolify/apply.ts` (dry run by default, never deletes, never touches a secret value); `.github/workflows/deploy.yml` builds the images after a green CI and deploys them by sha256 digest with health gates, `rollback.yml` redeploys previous digests. The runbook covers the host, Tailscale, Cloudflare, tokens, the boot-trap gotchas (`NODE_ENV` override, empty start command, stop grace above the shutdown deadline) and cookie topology. Dockerfiles stay portable. See [`docs/DEPLOY-COOLIFY.md`](docs/DEPLOY-COOLIFY.md).
 
-**Health probes**: three endpoints (`/livez`, `/readyz`, `/startupz`) following K8s 2026 convention + IETF `draft-inadarei` format, with tri-state aggregation (pass/warn/fail) and `SIGTERM`-driven graceful shutdown. Per-PaaS recipes (Railway, Fly, Render, K8s, Cloud Run) in [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md).
+**Health probes**: three endpoints (`/livez`, `/readyz`, `/startupz`) following K8s 2026 convention + IETF `draft-inadarei` format, with tri-state aggregation (pass/warn/fail) and `SIGTERM`-driven graceful shutdown. Per-platform recipes (Coolify, Fly, Render, K8s, Cloud Run) in [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md).
 
-**Disaster recovery**: PITR-first (delegated to your managed Postgres provider), with copy-paste recipes for a weekly portable `pg_dump` export and a monthly automated restore-test. RPO/RTO targets, restore runbook, lifecycle + versioning snippets in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
+**Disaster recovery**: on the reference deploy, a Postgres 18 image with pgBackRest archives WAL continuously to an encrypted R2 repository (full weekly, differential daily, about 1 min RPO), with a local restore drill and a monthly drill in CI; on a managed Postgres, the provider's PITR. RPO/RTO targets, restore runbook and an optional weekly `pg_dump` export in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
 
 **Observability**: error tracking via Sentry on api + app, RGPD-clean payload scrubbing by default, pino integration for log breadcrumbs, global TanStack Query/mutation error capture + user-id tagging on the front, NoOp without `SENTRY_DSN`. OpenTelemetry tracing and Prometheus `/metrics` are deferred to Phase D.1 (managed alongside dashboards). Port usage, removability runbook, provider swap recipe (GlitchTip / Highlight) in [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
@@ -338,9 +338,9 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md): DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md): visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md): endpoints, registry, graceful shutdown, per-PaaS recipes |
-| **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md): PITR-first, restore runbook, weekly export + monthly restore-test recipes |
+| **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md): pgBackRest PITR to R2, restore runbook, local and monthly drills, managed-Postgres alternative |
 | **Observability** | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md): Sentry api+app, RGPD scrubbing, removability runbook, provider swap recipe |
-| **Deploy (Railway)** | [`docs/DEPLOY-RAILWAY.md`](docs/DEPLOY-RAILWAY.md): config-as-code runbook, boot-trap gotchas, cookie topology, provider swap |
+| **Deploy (Coolify)** | [`docs/DEPLOY-COOLIFY.md`](docs/DEPLOY-COOLIFY.md): VPS and Coolify runbook, apply, deploy by digest, rollback, boot-trap gotchas, cookie topology |
 | **History** | [`docs/HISTORY.md`](docs/HISTORY.md): design decisions trail |
 
 ---

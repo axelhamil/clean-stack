@@ -247,12 +247,7 @@ describe("validateHostsEnv", () => {
     })
     .superRefine(validateHostsEnv);
   it.each([
-    [
-      "up.railway.app",
-      "https://app.up.railway.app",
-      "https://api.up.railway.app",
-      "https://admin.up.railway.app",
-    ],
+    ["fly.dev", "https://app.fly.dev", "https://api.fly.dev", "https://admin.fly.dev"],
     [
       "co.uk",
       "https://app.example.co.uk",

@@ -511,7 +511,7 @@ describe("requireRateLimit middleware", () => {
       expect(body.ip).toBe("203.0.113.1");
     });
 
-    it("`private` keyword trusts an IPv6 ULA proxy (Railway), returns XFF client", async () => {
+    it("`private` keyword trusts an IPv6 ULA proxy, returns XFF client", async () => {
       mockedAddress = "fd12:3456:789a::1";
       const { env: e } = await import("../env");
       (e as Record<string, unknown>).TRUSTED_PROXIES = ["private"];

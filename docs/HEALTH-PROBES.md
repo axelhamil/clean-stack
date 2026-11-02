@@ -117,7 +117,7 @@ On `SIGTERM` / `SIGINT`:
 
 The boot refuses a configuration whose worst case exceeds `SHUTDOWN_DEADLINE_MS` (`env-bounds.ts`): `SHUTDOWN_GRACE_PERIOD_MS + 1000 + 2 x SHUTDOWN_STEP_TIMEOUT_MS + SHUTDOWN_WORKERS_TIMEOUT_MS + 2500` (telemetry flush) `+ 1000` (deadline flush), `36000` with the defaults, since a slow but healthy shutdown would then be cut and exit `1`.
 
-**Platform stop timeout**: the delay between `SIGTERM` and `SIGKILL` on the platform must exceed `SHUTDOWN_DEADLINE_MS`, or the platform kills the process mid-drain and the deadline never fires (Railway: `RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, see [DEPLOY-RAILWAY.md](DEPLOY-RAILWAY.md); Kubernetes: `terminationGracePeriodSeconds`; Fly: `kill_timeout`).
+**Platform stop timeout**: the delay between `SIGTERM` and `SIGKILL` on the platform must exceed `SHUTDOWN_DEADLINE_MS`, or the platform kills the process mid-drain and the deadline never fires (Coolify: the app's stop grace period, 45 s on `api` in `infra/coolify/services.ts`, see [DEPLOY-COOLIFY.md](DEPLOY-COOLIFY.md); Kubernetes: `terminationGracePeriodSeconds`; Fly: `kill_timeout`).
 
 **Without this flip**, the pod accepts new requests while terminating → intermittent 502s during every deploy. Visible to end-users.
 
@@ -136,14 +136,9 @@ The steps are declared in `apps/api/src/index.ts` and run by `runShutdown` / `in
 
 ## Deploy target recipes
 
-### Railway (`railway.toml`)
+### Coolify (`infra/coolify/services.ts`)
 
-```toml
-[deploy]
-healthcheckPath = "/readyz"
-healthcheckTimeout = 10
-restartPolicyType = "ON_FAILURE"
-```
+The container health check probes `/livez` (`wget -qO- http://127.0.0.1:3000/livez`), so a slow dependency never restarts a healthy process; the deploy gate (`infra/coolify/gates.ts`) asks `/readyz` for a 200 after each deploy. Stop grace 45 s, above `SHUTDOWN_DEADLINE_MS`.
 
 ### Fly.io (`fly.toml`)
 

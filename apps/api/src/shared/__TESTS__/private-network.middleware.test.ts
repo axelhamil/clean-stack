@@ -23,7 +23,7 @@ describe("requirePrivateNetwork", () => {
     expect(await statusFor("::1")).toBe(200);
   });
 
-  it("should accept IPv6 ULA (Railway/Fly internal mesh)", async () => {
+  it("should accept IPv6 ULA (private container mesh)", async () => {
     expect(await statusFor("fd00::beef")).toBe(200);
   });
 

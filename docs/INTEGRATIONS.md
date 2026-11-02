@@ -91,8 +91,8 @@ endpoints; you wire your own scheduler.
 |---|---|---|
 | `POST /internal/rgpd-sweep` | Daily, e.g. `0 3 * * *` UTC | Wipes accounts whose 7-day grace window has elapsed. Idempotent, safe to over-schedule. |
 | `POST /internal/flush-notification-emails` | Every minute | Groups notification emails that have come due into per-user/category digests and enqueues them. This cadence is what `immediate` means for email; true real-time is the SSE stream's job. `hourly` / `daily` rows come due on wall-clock anchors stamped at fan-out, see `docs/CRON.md` § Digest windows. |
-| `POST /internal/sweep-admin-impersonations` | Daily, on the sweep cron (`17 3 * * *`, `infra/railway/cron.toml`) | Ends impersonation sessions past their expiry and announces each one. Between two runs, an expired session the auth library meets again is deleted and announced by the session hook. |
-| `POST /internal/sweep-admin-approvals` | Daily, on the sweep cron (`17 3 * * *`, `infra/railway/cron.toml`) | Expires pending four-eyes requests past their deadline. Between two runs an overdue row executes nothing: the decision refuses it and a new request on the same pair closes it. |
+| `POST /internal/sweep-admin-impersonations` | Daily, on the sweep cron (`17 3 * * *`, the `sweep` task in `infra/coolify/services.ts`) | Ends impersonation sessions past their expiry and announces each one. Between two runs, an expired session the auth library meets again is deleted and announced by the session hook. |
+| `POST /internal/sweep-admin-approvals` | Daily, on the sweep cron (`17 3 * * *`, the `sweep` task in `infra/coolify/services.ts`) | Expires pending four-eyes requests past their deadline. Between two runs an overdue row executes nothing: the decision refuses it and a new request on the same pair closes it. |
 | `POST /internal/sweep-stripe-events` | Daily | Purges `stripe_event` rows past `STRIPE_EVENT_RETENTION_DAYS` (default 30d, what Stripe keeps retrievable). |
 | `POST /internal/sweep-notifications` | Daily | Purges **read** notifications past `NOTIFICATION_RETENTION_DAYS`. Unread rows are never purged, whatever their age. |
 | `POST /internal/sweep-email-messages` | Daily | Purges `sent` rows past `EMAIL_MESSAGE_RETENTION_DAYS` (default 7d, from `sent_at`) and `failed` rows past `EMAIL_MESSAGE_FAILED_RETENTION_DAYS` (default 90d, from `created_at`). |
@@ -103,15 +103,16 @@ Only the first row is strictly required to be compliant; the rest keep tables fr
 All `/internal/*` endpoints are protected by HMAC-signed requests
 (`X-Internal-Signature: t=<unix>,v1=<hex>` over a canonical message, see
 [`CRON.md`](./CRON.md)). The signing key never travels on the wire. On
-infra with a private mesh (Railway, Fly), stack `private-network` on top
+infra where the scheduler calls on loopback or a private mesh (the Coolify `sweep` task, Fly), stack `private-network` on top
 via `INTERNAL_AUTH_LAYERS=signature,private-network`.
 
 ### Choose one scheduler
 
-Implementation snippets for each option (GitHub Actions, Vercel Cron, Railway,
+Implementation snippets for each option (GitHub Actions, Vercel Cron, a Coolify scheduled task,
 K8s CronJob, Inngest, BullMQ) are in [`CRON.md`](./CRON.md). Pick by infra:
 
-- **Serverless / managed PaaS** → Vercel Cron or Railway Cron (zero infra).
+- **Coolify (reference deploy)** → a scheduled task on the `api` app, declared in `infra/coolify/services.ts`.
+- **Serverless / managed PaaS** → Vercel Cron (zero infra).
 - **GitHub-only ops** → GitHub Actions cron (free, no extra service).
 - **Kubernetes** → CronJob (native, observable via `kubectl`).
 - **Already running a queue** → Inngest or BullMQ (reuse infra, retries built-in).
@@ -239,7 +240,7 @@ fast on missing/invalid values.
 - `INTERNAL_SIGNING_KEY` (min 32, `openssl rand -hex 32`): HMAC key for
   `/internal/*` request signing. Never sent on the wire.
 - `INTERNAL_AUTH_LAYERS`: `signature` (default) or `signature,private-network`
-  on Railway/Fly for defense-in-depth.
+  when the scheduler calls on loopback or a private mesh (Coolify, Fly) for defense-in-depth.
 - `RESEND_API_KEY`. Template IDs live in `TEMPLATE_IDS` in code (see §1), not env.
 - `S3_*` env vars (see §3).
 
@@ -277,8 +278,9 @@ root is the up-to-date template.
   `drizzle-kit push --force` because it executes under Turbo's non-TTY pipe;
   drizzle-kit's interactive data-loss prompt would otherwise hang. Safe in dev
   (push is dev-only); prod uses `db:migrate` which doesn't prompt.
-- **Backups**: configured at the managed-Postgres level. Test restore
-  procedure before going live, a backup you can't restore is not a backup.
+- **Backups**: pgBackRest PITR to R2 on the Coolify reference deploy, the
+  provider's PITR on a managed Postgres ([DISASTER-RECOVERY.md](DISASTER-RECOVERY.md)).
+  Run a restore drill before going live, a backup you can't restore is not a backup.
 - **Pool sizing**: defaults match Bun's connection pooling; tune
   `DATABASE_URL` query params (`?max=10`) only after measuring contention.
 
@@ -381,7 +383,7 @@ publicly accessible HTTPS endpoint and a GitHub review of the integration:
 - [ ] Stripe webhook endpoint registered for the 4 required event types;
       `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` set (or omit both for free-only)
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`
-      set per infra (`signature` everywhere, add `private-network` on Railway/Fly)
+      set per infra (`signature` everywhere, add `private-network` on Coolify or Fly)
 - [ ] `BETTER_AUTH_SECRET` generated (≥32 chars)
 - [ ] `API_TOKEN_PEPPER` generated (`openssl rand -hex 32`); `API_TOKEN_PREFIX` set to your app's unique prefix (not `clean_`)
 - [ ] All env vars set per §5
