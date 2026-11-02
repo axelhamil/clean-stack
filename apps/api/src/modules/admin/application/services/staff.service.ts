@@ -12,6 +12,7 @@ import type {
   StaffStoreError,
 } from "../../../../shared/ports/staff-store.port";
 import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
+import { announceSessionsEnded } from "../../../../shared/services/session-end";
 import {
   grantsStaffAccess,
   IMPERSONATE_PERMISSION,
@@ -66,10 +67,30 @@ interface StaffOverrideRemoval extends StaffGrantingChange {
 
 interface MetSession {
   id: string;
-  impersonatedBy?: string | null;
+  userId: string;
+  expiresAt: Date;
 }
 
 const STOPPING_PATHS = ["/admin/stop-impersonating", "/sign-out"];
+const STAFF_PATH_PREFIX = "/admin/";
+const PROVISIONING_PATH_PREFIX = "/scim/";
+
+function signOutActor(
+  session: MetSession,
+  impersonation: EndedImpersonation | undefined,
+  endpointPath: string | undefined,
+  now: Date,
+): string | null {
+  const owner = session.userId;
+  if (session.expiresAt <= now) return null;
+  if (endpointPath?.startsWith(PROVISIONING_PATH_PREFIX)) return null;
+  if (!impersonation) return owner;
+  if (STOPPING_PATHS.includes(endpointPath ?? "")) return impersonation.impersonatedBy;
+
+  const byCustomer = endpointPath !== undefined && !endpointPath.startsWith(STAFF_PATH_PREFIX);
+
+  return byCustomer ? owner : impersonation.impersonatedBy;
+}
 
 export class StaffService {
   constructor(
@@ -93,6 +114,7 @@ export class StaffService {
       if (ended.isFailure) return Result.fail(ended.getError());
 
       await announceImpersonationsEnded(this.outbox, ended.getValue(), "expired", new Date());
+      await announceSessionsEnded(this.outbox, ended.getValue(), null);
 
       return Result.ok(ended.getValue().length);
     });
@@ -102,23 +124,26 @@ export class StaffService {
     return this.store.countExpiredImpersonations();
   }
 
-  async endImpersonationSession(
+  async endSession(
     session: MetSession,
     endpointPath?: string,
   ): Promise<Result<void, StaffStoreError>> {
-    if (!session.impersonatedBy) return Result.ok();
-
-    const reason = STOPPING_PATHS.includes(endpointPath ?? "") ? "stopped" : "revoked";
+    const stopping = STOPPING_PATHS.includes(endpointPath ?? "");
 
     return this.uow.run(async (): Promise<Result<void, StaffStoreError>> => {
-      const ended = await this.store.endImpersonationSession(session.id);
+      const ended = await this.store.endSession(session.id);
       if (ended.isFailure) return Result.fail(ended.getError());
 
-      const claimed = ended
-        .getValue()
-        .map((row) => [row])
-        .unwrapOr([]);
-      await announceImpersonationsEnded(this.outbox, claimed, reason, new Date());
+      const { sessions, impersonations } = ended.getValue();
+      const now = new Date();
+      const actorUserId = signOutActor(session, impersonations[0], endpointPath, now);
+      await announceImpersonationsEnded(
+        this.outbox,
+        impersonations,
+        stopping ? "stopped" : "revoked",
+        now,
+      );
+      await announceSessionsEnded(this.outbox, sessions, actorUserId);
 
       return Result.ok();
     });
@@ -267,7 +292,7 @@ export class StaffService {
         const ended = await this.store.endImpersonationsBy(input.targetUserId);
         if (ended.isFailure) return Result.fail(ended.getError());
 
-        await this.announceRevoked(ended.getValue());
+        await this.announceRevoked(ended.getValue(), input.actorUserId);
       }
 
       await emitEvent(
@@ -299,7 +324,7 @@ export class StaffService {
       const revoked = await this.store.revoke(input.targetUserId);
       if (revoked.isFailure) return Result.fail(revoked.getError());
 
-      await this.announceRevoked(revoked.getValue());
+      await this.announceRevoked(revoked.getValue(), input.actorUserId);
 
       await emitEvent(this.outbox, EventTypes.ADMIN_STAFF_REVOKED, "user", input.targetUserId, {
         actorUserId: input.actorUserId,
@@ -351,7 +376,7 @@ export class StaffService {
       });
       if (written.isFailure) return Result.fail(written.getError());
 
-      const ended = await this.endImpersonationsIfLost(input.targetUserId);
+      const ended = await this.endImpersonationsIfLost(input);
       if (ended.isFailure) return ended;
 
       await emitEvent(
@@ -390,7 +415,7 @@ export class StaffService {
       const lifted = this.refusedRemoval(input, record.unwrap());
       if (lifted.isFailure) return lifted;
 
-      const ended = await this.endImpersonationsIfLost(input.targetUserId);
+      const ended = await this.endImpersonationsIfLost(input);
       if (ended.isFailure) return ended;
 
       const { permission, effect } = record.unwrap();
@@ -450,8 +475,10 @@ export class StaffService {
     return Result.ok();
   }
 
-  private async endImpersonationsIfLost(userId: string): Promise<Result<void, StaffChangeError>> {
-    const row = await this.grantingRow(userId);
+  private async endImpersonationsIfLost(
+    input: StaffChange,
+  ): Promise<Result<void, StaffChangeError>> {
+    const row = await this.grantingRow(input.targetUserId);
     if (row.isFailure) return Result.fail(row.getError());
 
     const stillImpersonates = row
@@ -460,16 +487,17 @@ export class StaffService {
       .unwrapOr(false);
     if (stillImpersonates) return Result.ok();
 
-    const ended = await this.store.endImpersonationsBy(userId);
+    const ended = await this.store.endImpersonationsBy(input.targetUserId);
     if (ended.isFailure) return Result.fail(ended.getError());
 
-    await this.announceRevoked(ended.getValue());
+    await this.announceRevoked(ended.getValue(), input.actorUserId);
 
     return Result.ok();
   }
 
-  private announceRevoked(ended: EndedImpersonation[]): Promise<void> {
-    return announceImpersonationsEnded(this.outbox, ended, "revoked", new Date());
+  private async announceRevoked(ended: EndedImpersonation[], actorUserId: string): Promise<void> {
+    await announceImpersonationsEnded(this.outbox, ended, "revoked", new Date());
+    await announceSessionsEnded(this.outbox, ended, actorUserId);
   }
 
   private async banRefusal(input: StaffModeration): Promise<Result<void, StaffBanError>> {

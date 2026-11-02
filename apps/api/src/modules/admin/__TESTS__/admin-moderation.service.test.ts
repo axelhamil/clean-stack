@@ -5,19 +5,16 @@ import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
-import type {
-  EndedSessions,
-  IAdminUserStore,
-  UnbanOutcome,
-} from "../application/ports/admin-user-store.port";
+import type { EndedSessions } from "../../../shared/ports/staff-store.port";
+import type { IAdminUserStore, UnbanOutcome } from "../application/ports/admin-user-store.port";
 import { AdminModerationService } from "../application/services/admin-moderation.service";
 
 const SUBJECT = { actorUserId: "admin", userId: "target" };
 const STARTED = new Date(Date.now() - 60_000);
 const ENDED: EndedSessions = {
   sessions: [
-    { id: "s1", userId: "target" },
-    { id: "s2", userId: "someone-impersonated" },
+    { sessionId: "s1", userId: "target" },
+    { sessionId: "s2", userId: "someone-impersonated" },
   ],
   impersonations: [
     {

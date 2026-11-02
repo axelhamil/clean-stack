@@ -1619,15 +1619,8 @@ const authOptions = {
       },
       delete: {
         before: async (session, context) => {
-          const ended = await di.StaffService.endImpersonationSession(session, context?.path);
+          const ended = await di.StaffService.endSession(session, context?.path);
           if (ended.isFailure) throw new AppErrorException(ended.getError());
-        },
-        after: async (session) => {
-          await emit(EventTypes.USER_SIGNED_OUT, "session", session.id, {
-            userId: session.userId,
-            sessionId: session.id,
-            actorUserId: session.userId,
-          });
         },
       },
     },

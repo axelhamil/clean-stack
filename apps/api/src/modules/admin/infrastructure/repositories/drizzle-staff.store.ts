@@ -19,7 +19,11 @@ import {
   resolveExecutor,
   staffSchema,
 } from "@packages/drizzle";
-import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
+import {
+  ENDED_SESSION_COLUMNS,
+  endedImpersonationsOf,
+  endedSessionsOf,
+} from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { countEligibleWithTimeout } from "../../../../shared/internal-routes/sweep-count";
 import {
@@ -31,6 +35,7 @@ import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   EndedImpersonation,
+  EndedSessions,
   IStaffStore,
   StaffListRow,
   StaffManagerRecord,
@@ -444,27 +449,22 @@ export class DrizzleStaffStore implements IStaffStore {
     );
   }
 
-  async endImpersonationSession(
-    sessionId: string,
-  ): Promise<Result<Option<EndedImpersonation>, StaffStoreError>> {
+  async endSession(sessionId: string): Promise<Result<EndedSessions, StaffStoreError>> {
     const exec = resolveExecutor();
 
-    return this.instrumentation.startSpan(
-      { name: "DrizzleStaffStore > endImpersonationSession" },
-      async () => {
-        try {
-          const rows = await exec
-            .delete(session)
-            .where(and(eq(session.id, sessionId), isNotNull(session.impersonatedBy)))
-            .returning(ENDED_SESSION_COLUMNS);
+    return this.instrumentation.startSpan({ name: "DrizzleStaffStore > endSession" }, async () => {
+      try {
+        const rows = await exec
+          .delete(session)
+          .where(eq(session.id, sessionId))
+          .returning(ENDED_SESSION_COLUMNS);
 
-          return Result.ok(Option.fromNullable(endedImpersonationsOf(rows)[0]));
-        } catch (err) {
-          this.instrumentation.capture(err);
-          return fail(err, "impersonation end failed");
-        }
-      },
-    );
+        return Result.ok(endedSessionsOf(rows));
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "session end failed");
+      }
+    });
   }
 
   async countExpiredImpersonations(): Promise<Result<number, StaffStoreError>> {

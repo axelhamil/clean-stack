@@ -7,13 +7,13 @@ import type {
   ActivePlanOverride,
   IPlanOverrideReader,
 } from "../../../shared/ports/plan-override.port";
+import type { EndedSessions } from "../../../shared/ports/staff-store.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { AdminOrgListRow, IAdminOrgStore } from "../application/ports/admin-org-store.port";
 import type {
   AdminSessionRow,
   AdminStoreError,
   AdminUserListRow,
-  EndedSessions,
   IAdminUserStore,
   UnbanOutcome,
 } from "../application/ports/admin-user-store.port";

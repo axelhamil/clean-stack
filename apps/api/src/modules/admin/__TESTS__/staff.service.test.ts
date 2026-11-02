@@ -867,14 +867,34 @@ describe("StaffService", () => {
       });
     });
 
-    function claimed(given: { impersonation: EndedImpersonation }) {
+    function claimed(given: { impersonation?: EndedImpersonation }) {
       const fixture = setup({});
-      fixture.store.endImpersonationSession.mockImplementation(async () =>
-        Result.ok(Option.some(given.impersonation)),
+      const row = given.impersonation ?? { sessionId: "ordinary", userId: CUSTOMER };
+      fixture.store.endSession.mockImplementation(async () =>
+        Result.ok({
+          sessions: [{ sessionId: row.sessionId, userId: row.userId }],
+          impersonations: given.impersonation ? [given.impersonation] : [],
+        }),
       );
 
       return fixture;
     }
+
+    const met = (row: EndedImpersonation) => ({
+      id: row.sessionId,
+      userId: row.userId,
+      expiresAt: row.expiresAt,
+    });
+    const ordinary = {
+      id: "ordinary",
+      userId: CUSTOMER,
+      expiresAt: new Date(Date.now() + HOUR_MS),
+    };
+
+    const signOuts = (outbox: Parameters<typeof enqueuedEvents>[0]) =>
+      enqueuedEvents(outbox)
+        .filter((event) => event.eventType === EventTypes.USER_SIGNED_OUT)
+        .map((event) => event.payload);
 
     it.each([
       ["/admin/stop-impersonating", "stopped"],
@@ -885,9 +905,9 @@ describe("StaffService", () => {
       const live = impersonation(60_000);
       const { store, outbox, service } = claimed({ impersonation: live });
 
-      await service.endImpersonationSession({ id: live.sessionId, impersonatedBy: TARGET }, path);
+      await service.endSession(met(live), path);
 
-      expect(store.endImpersonationSession).toHaveBeenCalledWith("s1");
+      expect(store.endSession).toHaveBeenCalledWith("s1");
       expect(stopped(outbox).map((event) => event.payload)).toEqual([
         {
           actorUserId: TARGET,
@@ -898,33 +918,139 @@ describe("StaffService", () => {
       ]);
     });
 
-    it("announces an expired impersonation the library meets again as expired", async () => {
+    it.each([
+      ["/admin/stop-impersonating", TARGET],
+      ["/sign-out", TARGET],
+      ["/revoke-sessions", CUSTOMER],
+      ["/delete-user", CUSTOMER],
+      ["/admin/revoke-user-sessions", TARGET],
+      ["/scim/v2/Users/x", null],
+      [undefined, TARGET],
+    ])("signs a live impersonation the library ends on %s out by %s", async (path, actor) => {
+      const live = impersonation(60_000);
+      const { outbox, service } = claimed({ impersonation: live });
+
+      await service.endSession(met(live), path);
+
+      expect(signOuts(outbox)).toEqual([expect.objectContaining({ actorUserId: actor })]);
+    });
+
+    it("announces an expired impersonation the library meets again as expired, signed out by no one", async () => {
       const ended = impersonation(2 * HOUR_MS);
       const { outbox, service } = claimed({ impersonation: ended });
 
-      await service.endImpersonationSession({ id: ended.sessionId, impersonatedBy: TARGET });
+      await service.endSession(met(ended), "/sign-out");
 
       expect(stopped(outbox).map((event) => event.payload)).toEqual([
         { actorUserId: TARGET, userId: CUSTOMER, durationMs: HOUR_MS, endReason: "expired" },
       ]);
+      expect(signOuts(outbox)).toEqual([expect.objectContaining({ actorUserId: null })]);
+    });
+
+    it("signs an ordinary session out by its owner, with no impersonation end", async () => {
+      const { outbox, service } = claimed({});
+
+      await service.endSession(ordinary, "/sign-out");
+
+      expect(enqueuedEvents(outbox)).toEqual([
+        {
+          eventType: EventTypes.USER_SIGNED_OUT,
+          aggregateId: "ordinary",
+          payload: { userId: CUSTOMER, sessionId: "ordinary", actorUserId: CUSTOMER },
+        },
+      ]);
+    });
+
+    it.each([
+      [
+        "an expired ordinary session the library cleans up",
+        new Date(Date.now() - 1),
+        "/get-session",
+      ],
+      [
+        "an ordinary session an identity provider deprovisions",
+        ordinary.expiresAt,
+        "/scim/v2/Users/x",
+      ],
+    ])("signs %s out by no one", async (_case, expiresAt, path) => {
+      const { outbox, service } = claimed({});
+
+      await service.endSession({ ...ordinary, expiresAt }, path);
+
+      expect(signOuts(outbox)).toEqual([expect.objectContaining({ actorUserId: null })]);
     });
 
     it("announces nothing for a session another path already ended", async () => {
       const { store, outbox, service } = setup({});
-      store.endImpersonationSession.mockImplementation(async () => Result.ok(Option.none()));
+      store.endSession.mockImplementation(async () =>
+        Result.ok({ sessions: [], impersonations: [] }),
+      );
 
-      await service.endImpersonationSession({ id: "s1", impersonatedBy: TARGET }, "/sign-out");
+      await service.endSession(met(impersonation(60_000)), "/sign-out");
 
-      expect(stopped(outbox)).toEqual([]);
+      expect(enqueuedEvents(outbox)).toEqual([]);
+    });
+  });
+
+  describe("the sessions the back office ends", () => {
+    function impersonation(sessionId: string): EndedImpersonation {
+      const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+      return {
+        sessionId,
+        userId: "customer",
+        impersonatedBy: TARGET,
+        createdAt,
+        expiresAt: new Date(createdAt.getTime() + 60 * 60 * 1000),
+      };
+    }
+
+    const signedOut = (outbox: Parameters<typeof enqueuedEvents>[0]) =>
+      enqueuedEvents(outbox).filter((event) => event.eventType === EventTypes.USER_SIGNED_OUT);
+
+    const announced = (actorUserId: string | null) =>
+      ["s1", "s2"].map((sessionId) => ({
+        eventType: EventTypes.USER_SIGNED_OUT,
+        aggregateId: sessionId,
+        payload: { userId: "customer", sessionId, actorUserId },
+      }));
+
+    it("announces each expired session the sweep deletes as signed out by no one", async () => {
+      const { store, outbox, service } = setup({});
+      store.endExpiredImpersonations.mockImplementation(async () =>
+        Result.ok([impersonation("s1"), impersonation("s2")]),
+      );
+
+      await service.expireImpersonations(100);
+
+      expect(signedOut(outbox)).toEqual(announced(null));
     });
 
-    it("leaves an ordinary session alone", async () => {
-      const { store, outbox, service } = setup({});
+    it("announces each session ended by taking the permission away as signed out by the actor", async () => {
+      const { outbox, service } = setup({
+        target: member("auditor"),
+        ended: [impersonation("s1"), impersonation("s2")],
+      });
 
-      await service.endImpersonationSession({ id: "ordinary", impersonatedBy: null }, "/sign-out");
+      await service.setOverride({
+        ...change,
+        permission: "users.impersonate",
+        effect: "deny",
+        expiresAt: Option.none(),
+      });
 
-      expect(store.endImpersonationSession).not.toHaveBeenCalled();
-      expect(stopped(outbox)).toEqual([]);
+      expect(signedOut(outbox)).toEqual(announced(ACTOR));
+    });
+
+    it("announces each session of a revoked staff member as signed out by the actor", async () => {
+      const { outbox, service } = setup({
+        target: member("support"),
+        ended: [impersonation("s1"), impersonation("s2")],
+      });
+
+      await service.revoke(change);
+
+      expect(signedOut(outbox)).toEqual(announced(ACTOR));
     });
   });
 });

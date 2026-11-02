@@ -1,5 +1,5 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
-import type { EndedImpersonation } from "../../../../shared/ports/staff-store.port";
+import type { EndedSessions } from "../../../../shared/ports/staff-store.port";
 import type { ListUsersInput } from "../dto/list-users.dto";
 
 export type AdminStoreError = AppError<"ADMIN_QUERY_PROVIDER_FAILURE">;
@@ -33,16 +33,6 @@ export interface AdminMembershipRow {
 }
 
 export type UnbanOutcome = "unbanned" | "not_banned" | "not_found";
-
-export interface EndedSession {
-  id: string;
-  userId: string;
-}
-
-export interface EndedSessions {
-  sessions: EndedSession[];
-  impersonations: EndedImpersonation[];
-}
 
 export interface BanWrite {
   userId: string;
