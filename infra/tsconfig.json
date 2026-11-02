@@ -1,0 +1,11 @@
+{
+  "extends": "@packages/typescript-config/base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun"]
+  },
+  "include": ["coolify/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": ["coolify/**", "package.json", "tsconfig.json", "$TURBO_ROOT$/.github/workflows/**"]
+    },
+    "type-check": {
+      "inputs": ["coolify/**", "package.json", "tsconfig.json"]
+    }
+  }
+}

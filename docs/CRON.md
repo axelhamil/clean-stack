@@ -23,10 +23,10 @@ Two layers, configured at deploy time via `INTERNAL_AUTH_LAYERS`:
   `X-Internal-Signature: t=<unix>,v1=<hex>`. Replay window: 30s. The signing
   key never travels on the wire.
 - **`private-network`** (optional, additive): accepts the request only if
-  the source IP is in the IPv6 ULA range (Railway/Fly internal mesh) or
+  the source IP is in the IPv6 ULA range (a private container mesh) or
   loopback. Not a substitute for `signature`; stack on top.
 
-Set in env (defense-in-depth on Railway):
+Set in env (defense-in-depth when the scheduler calls from the same host, as the Coolify `sweep` task does):
 
 ```bash
 INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)
@@ -176,9 +176,9 @@ the grace period exists to avoid.
 **The boot-time ordering check only covers the API process.** `INTERNAL_FETCH_TIMEOUT_MS`
 is validated in `apps/api/src/shared/env.ts` but read nowhere in the API, its only
 consumer is `apps/api/src/cron/sweep.ts`, a standalone script that runs as its own
-service (Railway/Fly/K8s CronJob) with its own environment and parses `process.env`
+process (a Coolify scheduled task, a K8s CronJob) with its own environment and parses `process.env`
 directly, unchecked against the other two bounds. Raising `SERVER_IDLE_TIMEOUT_SECONDS`
-on the API without also raising `INTERNAL_FETCH_TIMEOUT_MS` on the cron service leaves
+on the API without also raising `INTERNAL_FETCH_TIMEOUT_MS` where the cron runs leaves
 the cron aborting a legitimate long sweep and reporting it `UNREACHABLE`: always raise
 both together.
 
@@ -265,7 +265,7 @@ caller imports; same canonical-message function the API uses to verify.
 import { signedInternalFetch } from "@apps/api/src/shared/internal-routes/internal-fetch";
 
 const res = await signedInternalFetch({
-  baseUrl: process.env.INTERNAL_API_URL!,   // https://api.railway.internal:3000
+  baseUrl: process.env.INTERNAL_API_URL!,   // http://localhost:3000 from a task in the api container
   method: "POST",
   path: "/internal/rgpd-sweep",
   body: { dryRun: false },
@@ -280,24 +280,20 @@ broken cron.
 
 ## Wiring options
 
-### Railway Cron (recommended for Railway deployments)
+### Coolify scheduled task (reference deploy)
 
-Run the cron as a service in the **same project** as the API. It reaches the
-API via the private network at `https://${API_SERVICE}.railway.internal:3000`
-and signs each request. With `INTERNAL_AUTH_LAYERS=signature,private-network`
-you get both barriers active.
+A scheduled task on the `api` app runs inside the api container, so it reaches
+the API on loopback (`http://localhost:3000`) and signs each request. With
+`INTERNAL_AUTH_LAYERS=signature,private-network` both barriers are active:
+the `private-network` layer refuses anything that comes through Traefik.
+Declare the task in `infra/coolify/services.ts` (the shipped `sweep` task is the
+model) and `infra/coolify/apply.ts` creates it:
 
-```jsonc
-// railway.json (cron service, own repo / own service)
-{
-  "deploy": {
-    "startCommand": "bun rgpd-sweep.ts",
-    "cronSchedule": "0 3 * * *"
-  }
-}
+```ts
+{ name: "rgpd-sweep", command: "bun rgpd-sweep.ts", schedule: "0 3 * * *", timeoutSeconds: 1_800, enabled: true }
 ```
 
-`rgpd-sweep.ts` is a one-shot wrapper you write in your scheduler service that imports `signedInternalFetch` and calls `/internal/rgpd-sweep`. Not part of the API bundle.
+`rgpd-sweep.ts` is a one-shot wrapper you write that imports `signedInternalFetch` and calls `/internal/rgpd-sweep`. Not part of the API bundle.
 
 ### GitHub Actions cron
 
@@ -380,7 +376,7 @@ Same `internalLayers` (HMAC + optional private network) gate, same `signedIntern
 
 Three endpoints purge the derived tables of the event pipeline. Defaults: outbox 7d (delivered rows only, by `dispatched_at`: a dead row that never delivered is never purged, the relay replays it every `OUTBOX_DEAD_RETRY_HOURS` without any cron), audit_log operational 90d / compliance 365d, webhook_delivery 30d (`success` + `dead_letter` only, `pending`/`failed` never purged; a replayable `dead_letter` is purged too once past retention, which bounds its cadence replay to `WEBHOOK_DELIVERY_RETENTION_DAYS`). All take `{ batchSize?: 1 to 50000, dryRun?: boolean }`.
 
-Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix and env knobs. Reference cron entrypoint chaining the three in order: `apps/api/src/cron/sweep.ts` (bundled to `dist/cron/sweep.js`). Wire it via the wiring options above, Railway Cron is the reference deploy (see [`DEPLOY-RAILWAY.md`](DEPLOY-RAILWAY.md)).
+Schedule: daily at 03:17 UTC (off-peak). Order matters because `webhook_delivery.outbox_event_id` is `ON DELETE RESTRICT`: 1) `sweep-webhook-delivery`, 2) `sweep-audit-log`, 3) `sweep-outbox`. See `docs/EVENTS.md` § Retention for the matrix and env knobs. Reference cron entrypoint chaining the three in order: `apps/api/src/cron/sweep.ts`, run from source by `bun apps/api/src/cron/sweep.ts`. Wire it via the wiring options above; the reference deploy runs it as the Coolify `sweep` task of the `api` app (see [`DEPLOY-COOLIFY.md`](DEPLOY-COOLIFY.md)).
 
 **Heartbeat**: `sweep.ts` pings `SWEEP_HEARTBEAT_URL` around its run (healthchecks.io / Cronitor style): `<url>/start` before the first sweep, then `<url>` when every sweep succeeded or `<url>/fail` when one failed, including the early exit on an unreachable API. A run that never starts or never finishes is what the monitor alerts on, which logs alone cannot show. Unset means no ping. The ping (`cron/http-heartbeat.ts`) has a 10 s timeout, never throws, and reports only the error name or the status, never the URL (it carries the check's secret).
 
@@ -398,4 +394,4 @@ The email queue itself is not driven by this cron: `EmailDeliveryWorker` claims 
 
 ## Not an internal endpoint, Postgres backups
 
-The weekly `pg_dump` portable export and monthly restore-test are scheduled crons too, but **not** API endpoints. They run outside the API process (your scheduler invokes `pg_dump` directly against the DB, streams to S3). See [`./DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md): copy-paste recipes for GitHub Actions, Railway Cron, and K8s CronJob, plus the restore runbook. PITR delegated to the managed Postgres provider (Neon/Supabase/RDS/Railway).
+The weekly `pg_dump` portable export and monthly restore-test are scheduled crons too, but **not** API endpoints. They run outside the API process (your scheduler invokes `pg_dump` directly against the DB, streams to S3). See [`./DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md): copy-paste recipes for GitHub Actions, a Coolify scheduled task, and K8s CronJob, plus the restore runbook. PITR comes from the Postgres host: a managed provider (Neon/Supabase/RDS), or continuous archiving on the Coolify VPS (a later lot).
