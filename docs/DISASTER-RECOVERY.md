@@ -27,7 +27,7 @@ Provider PITR + provider snapshot count as one logical copy (same blast radius i
 
 Short pointers only, every provider's UI changes faster than docs. Search "PITR" in your dashboard.
 
-- **Railway**: Pro plan ships daily backups by default. PITR is an add-on; enable it on the Postgres service settings. Restore via the dashboard or the Railway CLI.
+- **Coolify (reference deploy)**: a Postgres database resource on the VPS has no PITR of its own. Enable the resource's scheduled backup to an S3-compatible bucket (R2) for a daily dump until continuous archiving ships (a later lot). Restore from the resource's backup list in the dashboard. See [DEPLOY-COOLIFY.md](DEPLOY-COOLIFY.md).
 - **Neon**: branch-based PITR is built-in (sub-second granularity on Scale+). Restore = create a new branch from a point in time, swap the connection string. CLI: `neon branches restore`.
 - **Supabase**: daily automated backups (Pro). PITR is an add-on (Pro+) with up to 7 d granularity. Restore via the dashboard.
 - **AWS RDS**: automated backups on by default (7 d retention, up to 35 d). PITR sub-minute granularity. Restore via `aws rds restore-db-instance-to-point-in-time`.
@@ -148,19 +148,9 @@ jobs:
 
 Set `secrets.DATABASE_URL` to a **read-only** Postgres role (`GRANT CONNECT, USAGE, SELECT` on the relevant schemas): `pg_dump` doesn't need superuser, and a leaked CI secret should not be able to write.
 
-### Railway Cron (same project as the API)
+### Coolify scheduled backup (reference deploy)
 
-```jsonc
-// railway.json (cron service, separate from the API service)
-{
-  "deploy": {
-    "startCommand": "bash -c 'pg_dump $DATABASE_URL | gzip | aws s3 cp - s3://$S3_BUCKET/backups/postgres/$(date -u +%Y-%m-%dT%H%M%SZ).sql.gz --endpoint-url $S3_ENDPOINT'",
-    "cronSchedule": "0 3 * * 0"
-  }
-}
-```
-
-The cron service needs the `postgresql-client` package (Nixpacks: add `postgresql_17` to `nixpacks.toml`) and AWS CLI. Same env vars as above.
+The Postgres database resource carries its own backup schedule: set the frequency to `0 3 * * 0` and an S3 destination (the R2 bucket, prefix `backups/postgres/`) in the resource's Backups tab. Coolify runs `pg_dump` in the database container, so no extra image or tool is needed. The R2 credentials live in Coolify's S3 storage settings, not in the api environment.
 
 ### Kubernetes CronJob
 

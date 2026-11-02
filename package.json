@@ -10,7 +10,7 @@
     "check": "biome check .",
     "fix": "biome check --write .",
     "ci:check": "biome ci .",
-    "check:duplication": "jscpd ./packages ./apps/api/src ./apps/app/src ./apps/admin/src",
+    "check:duplication": "jscpd ./packages ./apps/api/src ./apps/app/src ./apps/admin/src ./infra",
     "check:unused": "knip",
     "check:boundaries": "depcruise apps packages --config .dependency-cruiser.cjs",
     "db:push": "turbo db:push",

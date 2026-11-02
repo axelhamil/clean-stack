@@ -10,7 +10,7 @@ Event catalog today: 92 events, 35 public, 57 internal (counted from `packages/e
 
 ## What's left
 
-The plumbing a SaaS boilerplate owes its cloner is shipped: auth and MFA, multi-tenant with a capability SSOT, RGPD Art. 17 and 20, cookie consent, policy versioning, billing and quota gating, security perimeter, admin and impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC and SAML) with SCIM provisioning, a typed i18n rail (`en` and `fr`), the event rail and a Railway reference deploy.
+The plumbing a SaaS boilerplate owes its cloner is shipped: auth and MFA, multi-tenant with a capability SSOT, RGPD Art. 17 and 20, cookie consent, policy versioning, billing and quota gating, security perimeter, admin and impersonation, API tokens, audit log, outbound webhooks, in-app notifications, durable email delivery, enterprise SSO (OIDC and SAML) with SCIM provisioning, a typed i18n rail (`en` and `fr`), the event rail and a reference deploy on a VPS through Coolify, which replaced the Railway one in Phase L.
 
 What remains is short on purpose. **Everything not listed here was cut**: a boilerplate that carries a wishlist of twelve unbuilt phases reads as unfinished when it is not.
 
@@ -21,6 +21,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 3 | **Review pass** | Delivered | End-to-end review of the server surface, the customer screens and the clone path, defects fixed | The only thing between "feature-complete" and "clone-ready" |
 | 4 | **C.1 remainder** | Delivered | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Delivered | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
+| 6 | **Phase L** | In progress | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; then Postgres backups with PITR | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -95,6 +96,19 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ---
 
+## Reference deploy on a VPS: **Phase L**
+
+- **Status**: lot 1 delivered (Coolify rail). Lot 2 open: Postgres with continuous archiving and PITR to R2, host bootstrap and firewall, a monthly restore drill.
+- **Date**: after Phase K.
+- **Why**: Railway outages took the reference deploy down with them, and a managed PaaS hides the knobs a cloner needs (stop grace, registry, network). A VPS run by Coolify costs less, keeps the Dockerfiles portable and is the model a sister project already runs.
+- **Model**: the OpenUp Coolify rail, kept to what any SaaS needs. Its vault, worker, ClickHouse and cutover flag stay out.
+- **Scope, lot 1**: `infra/coolify/` (`@infra/deploy`): desired `api`, `app`, `admin` apps and the `sweep` task in `services.ts`, `apply.ts` (dry run by default, never deletes, a secret is set when its key exists, a hidden value is unknown and `--apply` rewrites every literal, no `read:sensitive` token), `deploy.ts` (by sha256 digest, `api` then `app` then `admin` in a 45 min budget, waits for an idle `sweep`, writes `GIT_SHA`, restores the previous image on failure, stops at the first skip or failure), `gates.ts` (`/readyz` and both `/health`). `.github/workflows/deploy.yml` after a green CI on a push (`dev` to staging, `main` to production, off until `COOLIFY_DEPLOY` is `on`), `rollback.yml` without a build. CI now also runs on pushes to `dev` and `main`. `infra/railway/` and its runbook removed, `docs/DEPLOY-COOLIFY.md` added. The Railway project itself is untouched.
+- **Out of scope**: Workers for the SPAs (their CSP is templated by Caddy at runtime), a migrator in CI (no database path from CI), a secrets vault.
+- **Done when**: lot 1, the repo checks green and `infra/coolify` tested without network; lot 2, a restore drill proves a point in time.
+- **References**: [`docs/DEPLOY-COOLIFY.md`](docs/DEPLOY-COOLIFY.md), `infra/coolify/`, `.github/workflows/deploy.yml`.
+
+---
+
 ## Shipped phases
 
 Status is shipped for every row. "Detail" links the as-built record.
@@ -109,7 +123,7 @@ Status is shipped for every row. "Detail" links the as-built record.
 | **Vertical-slice layout** | May 2026 | One feature, one folder per side | `features/<x>/` on the front, `modules/<x>/` on the back | [`CLAUDE.md`](CLAUDE.md) |
 | **Clone-ability bootstrap** | May 2026 | Clone to running in minutes | `pnpm bootstrap`, SeaweedFS `storage` profile, `db:push --force`, source-only internal packages | [`scripts/bootstrap.sh`](scripts/bootstrap.sh) |
 | **Event-driven foundation** | May 2026 | Every state change observable | Outbox, LISTEN/NOTIFY dispatcher, audit-log API, webhooks API, HMAC and AEAD delivery worker with decorrelated jitter, retention sweeps | [HISTORY](docs/HISTORY.md#event-driven-foundation-outbox--dispatcher--audit-log--webhooks--may-2026), [EVENTS](docs/EVENTS.md), [EVENT_PIPELINE](docs/EVENT_PIPELINE.md) |
-| **Phase 0: Foundation closeout** | May 2026 | Be operable before being featureful | Health probes, backups and DR, Sentry, removability dry-run, retention sweeps, Railway reference deploy | [HISTORY](docs/HISTORY.md#observability-sentry-with-iinstrumentation-port--phase-04--may-2026) |
+| **Phase 0: Foundation closeout** | May 2026 | Be operable before being featureful | Health probes, backups and DR, Sentry, removability dry-run, retention sweeps, reference deploy (Railway then, replaced by Coolify in Phase L) | [HISTORY](docs/HISTORY.md#observability-sentry-with-iinstrumentation-port--phase-04--may-2026) |
 | **App shell and command palette** | Jun 2026 | One navigation model | Top nav, settings tabs, view-transition theme, command palette | [HISTORY](docs/HISTORY.md#app-shell-top-nav--k-command-palette-) |
 | **A.1: Profile and NIST password** | Jun 2026 | Rectification (Art. 16) and a modern password policy | `ProfileCard`, `ChangePasswordCard`, HIBP k-anonymity, 15 characters minimum, ban list, 2 compliance events | [HISTORY](docs/HISTORY.md#right-to-rectification-art-16--nist-800-63b-4--phase-a1--jun-2026) |
 | **A.2: Privacy and Terms versioning** | Jun 2026 | Prove which version a user accepted | `@packages/policies`, `policy_acceptance`, `/legal/accept` gate, `requireCurrentPolicies`, 1 event | [HISTORY](docs/HISTORY.md#privacy--terms-versioning--phase-a2--jun-2026) |

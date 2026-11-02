@@ -6,7 +6,7 @@ import { HTTPException } from "hono/http-exception";
  * Trust the source IP (TCP-level), never the Host header (proxy-spoofable).
  *
  * Allowed prefixes:
- *   - fc00::/7 IPv6 ULA (Railway, Fly internal, generic on-prem private mesh)
+ *   - fc00::/7 IPv6 ULA (container or on-prem private mesh)
  *   - 127.0.0.1 / ::1 loopback (dev + same-host call)
  *
  * Anything else → 401. Public traffic that lands here means a misconfigured

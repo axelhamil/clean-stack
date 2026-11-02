@@ -10,7 +10,7 @@ describe("requireSeedableDatabase", () => {
     "postgres://u:p@db.example.com:5432/db",
     "postgres://localhost:p@db.example.com:5432/db",
     "postgres://u:p@localhost.example.com:5432/db",
-    "postgres://u:p@postgres.railway.internal:5432/db",
+    "postgres://u:p@postgres.internal.example.net:5432/db",
     "",
     undefined,
   ])("refuses %s", (url) => {

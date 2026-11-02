@@ -23,7 +23,7 @@ export interface SignedFetchInput {
  *
  * Builds the canonical message, computes the HMAC-SHA256 signature, and
  * attaches it as `X-Internal-Signature`. Import this in external schedulers
- * (GH Actions, Railway cron sidecar), it is the only supported way to call
+ * (GH Actions, a Coolify scheduled task), it is the only supported way to call
  * internal routes from outside the process.
  */
 export async function signedInternalFetch(input: SignedFetchInput): Promise<Response> {

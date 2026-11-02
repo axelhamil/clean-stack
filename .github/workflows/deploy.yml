@@ -1,0 +1,149 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build and push the images
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && vars.COOLIFY_DEPLOY == 'on'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'staging' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      owner: ${{ steps.owner.outputs.name }}
+      api: ${{ steps.api.outputs.digest }}
+      app: ${{ steps.app.outputs.digest }}
+      admin: ${{ steps.admin.outputs.digest }}
+    env:
+      DEPLOY_ENVIRONMENT: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - id: owner
+        name: Lower-case the image owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: api
+        name: Build the api image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/api/prod.Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.name }}/clean-stack-api:sha-${{ github.event.workflow_run.head_sha }}
+          labels: org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+
+      - id: app
+        name: Build the app image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/app/prod.Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.name }}/clean-stack-app:sha-${{ github.event.workflow_run.head_sha }}
+          labels: org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_ADMIN_URL=${{ vars.VITE_ADMIN_URL }}
+            VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}
+            VITE_SENTRY_ENVIRONMENT=${{ env.DEPLOY_ENVIRONMENT }}
+            VITE_GIT_SHA=${{ github.event.workflow_run.head_sha }}
+
+      - id: admin
+        name: Build the admin image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/admin/prod.Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.name }}/clean-stack-admin:sha-${{ github.event.workflow_run.head_sha }}
+          labels: org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_APP_URL=${{ vars.VITE_APP_URL }}
+            VITE_SENTRY_DSN=${{ vars.VITE_ADMIN_SENTRY_DSN }}
+            VITE_SENTRY_ENVIRONMENT=${{ env.DEPLOY_ENVIRONMENT }}
+            VITE_GIT_SHA=${{ github.event.workflow_run.head_sha }}
+
+  deploy:
+    name: Deploy and check
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'staging' }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      DEPLOY_ENVIRONMENT: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'staging' }}
+      IMAGE_OWNER: ${{ needs.build.outputs.owner }}
+      API_IMAGE: ghcr.io/${{ needs.build.outputs.owner }}/clean-stack-api@${{ needs.build.outputs.api }}
+      APP_IMAGE: ghcr.io/${{ needs.build.outputs.owner }}/clean-stack-app@${{ needs.build.outputs.app }}
+      ADMIN_IMAGE: ghcr.io/${{ needs.build.outputs.owner }}/clean-stack-admin@${{ needs.build.outputs.admin }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Join the tailnet
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy through the Coolify API
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+          COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
+        run: >-
+          bun infra/coolify/deploy.ts
+          --environment "$DEPLOY_ENVIRONMENT"
+          --owner "$IMAGE_OWNER"
+          --release "$RELEASE_SHA"
+          --api "$API_IMAGE"
+          --app "$APP_IMAGE"
+          --admin "$ADMIN_IMAGE"
+
+      - name: Check the api is ready and both fronts are up
+        env:
+          API_BASE: ${{ vars.VITE_API_URL }}
+          APP_BASE: ${{ vars.VITE_APP_URL }}
+          ADMIN_BASE: ${{ vars.VITE_ADMIN_URL }}
+        run: >-
+          bun infra/coolify/gates.ts
+          --api "$API_BASE"
+          --app "$APP_BASE"
+          --admin "$ADMIN_BASE"

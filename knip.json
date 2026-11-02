@@ -67,6 +67,10 @@
     },
     "packages/test": {
       "project": ["src/**/*.ts"]
+    },
+    "infra": {
+      "entry": ["coolify/apply.ts", "coolify/*.test.ts"],
+      "project": ["coolify/**/*.ts"]
     }
   },
   "ignoreBinaries": ["src/index.ts"],

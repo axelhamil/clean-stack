@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "infra"
 allowBuilds:
   '@swc/core': true
   esbuild: true
