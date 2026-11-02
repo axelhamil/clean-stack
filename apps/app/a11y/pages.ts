@@ -51,4 +51,5 @@ export const AUTHENTICATED_PAGES: readonly AuditedPage[] = [
   { name: "billing settings", path: "/settings/billing" },
   { name: "new organization", path: "/org/new" },
   { name: "policy acceptance", path: "/legal/accept", prepare: servePoliciesAsStale },
+  { name: "not found (signed in)", path: "/no-such-page" },
 ];
