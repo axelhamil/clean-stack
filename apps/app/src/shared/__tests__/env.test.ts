@@ -43,4 +43,10 @@ describe("env", () => {
 
     await expect(loadEnv()).rejects.toThrow();
   });
+
+  it("refuses a back office URL that is not a bare origin", async () => {
+    vi.stubEnv("VITE_ADMIN_URL", "https://admin.example.com/back");
+
+    await expect(loadEnv()).rejects.toThrow();
+  });
 });

@@ -1,6 +1,6 @@
 # features/
 
-User-facing sub-domains (vertical slice). One folder per sub-domain, never per area. Areas (`/settings/*`, `/admin/*`) live as **pathless layout nodes declared in `apps/app/routes.ts`**, backed by a `router/*.tsx` layout component, not as folders here.
+User-facing sub-domains (vertical slice). One folder per sub-domain, never per area. Areas (`/settings/*`) live as **pathless layout nodes declared in `apps/app/routes.ts`**, backed by a `router/*.tsx` layout component, not as folders here.
 
 Two flavors of feature:
 
