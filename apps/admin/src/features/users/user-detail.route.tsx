@@ -1,6 +1,3 @@
-import { BanForm } from "@packages/staff-ui/ban-form";
-import { ImpersonateForm } from "@packages/staff-ui/impersonate-form";
-import { SessionsSection } from "@packages/staff-ui/sessions-section";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
@@ -46,6 +43,9 @@ import {
   unbanUserMutationOptions,
 } from "./api/users.mutations";
 import { userQueryOptions } from "./api/users.queries";
+import { BanForm } from "./components/ban-form";
+import { ImpersonateForm } from "./components/impersonate-form";
+import { SessionsSection } from "./components/sessions-section";
 
 export const Route = createFileRoute("/_staff/users/$id")({
   beforeLoad: requireSection("users"),

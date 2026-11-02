@@ -1,5 +1,4 @@
 import { STAFF_PERMISSIONS, STAFF_ROLES } from "@packages/access-control";
-import { banDurationLabelKey } from "@packages/staff-ui/staff-forms.schema";
 import {
   DescriptionDetails,
   DescriptionItem,
@@ -8,6 +7,7 @@ import {
 import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
+import { banDurationLabelKey } from "../../../shared/staff-forms.schema";
 import { STAFF_PERMISSION_LABEL_KEYS, STAFF_ROLE_LABEL_KEYS } from "../../team/team-labels";
 
 const banParamsSchema = z.object({

@@ -1,5 +1,3 @@
-import { type AuditMetadataRow, AuditMetadataSheet } from "@packages/staff-ui/audit-metadata-sheet";
-import { ChainBadge } from "@packages/staff-ui/chain-badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { Input } from "@packages/ui/components/ui/input";
 import { PageHeader } from "@packages/ui/components/ui/page-header";
@@ -31,6 +29,8 @@ import { StaffPage } from "../../shared/components/staff-page";
 import { useDebouncedFilter } from "../../shared/hooks/use-debounced-filter";
 import { auditInfiniteQueryOptions, chainVerifyQueryOptions } from "./api/audit.queries";
 import { AUDIT_ACTION_PREFIXES, auditQueryOf, auditSearchSchema } from "./audit-filters";
+import { type AuditMetadataRow, AuditMetadataSheet } from "./components/audit-metadata-sheet";
+import { ChainBadge } from "./components/chain-badge";
 
 const ALL = "all";
 const ACTION_PREFIXES = ["user.", "org.", "billing.", "security.", "webhook.", "admin."] as const;
