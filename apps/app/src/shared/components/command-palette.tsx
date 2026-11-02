@@ -1,4 +1,3 @@
-import type { StaffPermission } from "@packages/access-control";
 import {
   CommandPaletteDialog,
   type CommandPaletteEntry,
@@ -22,7 +21,6 @@ import {
   Monitor,
   Moon,
   Plus,
-  ScrollText,
   ShieldCheck,
   Sun,
   User,
@@ -36,7 +34,6 @@ import { orgsListQueryOptions } from "../api/queries/orgs-list";
 import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
-import { useStaffAccess } from "../auth/use-staff-access";
 import { LEGAL_ROUTES } from "../legal-routes";
 
 interface NavigationRoute extends NavigationRequirement {
@@ -127,58 +124,6 @@ function useOrganizationGroup(t: TFunction<"common">): CommandPaletteGroup | nul
   };
 }
 
-interface OperatorRoute {
-  id: string;
-  to: string;
-  labelKey:
-    | "commandPalette.admin.auditLog"
-    | "commandPalette.admin.accounts"
-    | "commandPalette.admin.organizations";
-  icon: LucideIcon;
-  permission: StaffPermission;
-}
-
-const OPERATOR_ROUTES: readonly OperatorRoute[] = [
-  {
-    id: "operator:audit-log",
-    to: "/admin/audit-log",
-    labelKey: "commandPalette.admin.auditLog",
-    icon: ScrollText,
-    permission: "audit.read",
-  },
-  {
-    id: "operator:users",
-    to: "/admin/users",
-    labelKey: "commandPalette.admin.accounts",
-    icon: Users,
-    permission: "users.read",
-  },
-  {
-    id: "operator:orgs",
-    to: "/admin/orgs",
-    labelKey: "commandPalette.admin.organizations",
-    icon: Building2,
-    permission: "orgs.read",
-  },
-];
-
-function useOperatorGroup(t: TFunction<"common">): CommandPaletteGroup | null {
-  const navigate = useNavigate();
-  const { can } = useStaffAccess();
-  const reachable = OPERATOR_ROUTES.filter((route) => can(route.permission));
-  if (reachable.length === 0) return null;
-
-  return {
-    heading: t("commandPalette.groups.admin"),
-    items: reachable.map((route) => ({
-      id: route.id,
-      label: t(route.labelKey),
-      icon: route.icon,
-      run: () => navigate({ to: route.to }),
-    })),
-  };
-}
-
 function useLegalGroup(t: TFunction<"common">): CommandPaletteGroup {
   const navigate = useNavigate();
   return {
@@ -241,11 +186,10 @@ function useActionsGroup(t: TFunction<"common">): CommandPaletteGroup {
 function useCommandGroups(t: TFunction<"common">): CommandPaletteGroup[] {
   const navigation = useNavigationGroup(t);
   const organization = useOrganizationGroup(t);
-  const operator = useOperatorGroup(t);
   const legal = useLegalGroup(t);
   const actions = useActionsGroup(t);
 
-  return [navigation, organization, operator, legal, actions].filter(
+  return [navigation, organization, legal, actions].filter(
     (group): group is CommandPaletteGroup => group !== null,
   );
 }

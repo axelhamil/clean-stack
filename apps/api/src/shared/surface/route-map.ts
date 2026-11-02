@@ -18,7 +18,7 @@ export type SurfaceEntry = { consumer: string } | { uiLess: UiLessReason };
 export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "ALL /api/auth/*": { uiLess: "library-owned" },
   "DELETE /admin/users/:id/sessions": {
-    consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
+    consumer: "apps/admin/src/features/users/api/users.mutations.ts",
   },
   "DELETE /consents": { consumer: "apps/app/src/shared/api/mutations/withdraw-consent.ts" },
   "DELETE /me/delete": { consumer: "apps/app/src/shared/api/mutations/cancel-account-deletion.ts" },
@@ -46,15 +46,15 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
     consumer: "apps/admin/src/shared/api/mutations/cancel-approval.ts",
   },
   "GET /admin/audit-log": {
-    consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
+    consumer: "apps/admin/src/features/audit/api/audit.queries.ts",
   },
   "GET /admin/audit-log/verify": {
-    consumer: "apps/app/src/features/admin-audit-log/api/audit-log.queries.ts",
+    consumer: "apps/admin/src/features/audit/api/audit.queries.ts",
   },
   "GET /admin/me": { consumer: "apps/admin/src/shared/api/queries/me.ts" },
-  "POST /admin/step-up": { consumer: "apps/app/src/shared/api/mutations/verify-step-up.ts" },
-  "GET /admin/orgs": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
-  "GET /admin/orgs/:id": { consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.queries.ts" },
+  "POST /admin/step-up": { consumer: "apps/admin/src/shared/api/mutations/verify-step-up.ts" },
+  "GET /admin/orgs": { consumer: "apps/admin/src/features/orgs/api/orgs.queries.ts" },
+  "GET /admin/orgs/:id": { consumer: "apps/admin/src/features/orgs/api/orgs.queries.ts" },
   "GET /admin/staff/:id/overrides": {
     consumer: "apps/admin/src/features/team/api/team.queries.ts",
   },
@@ -92,9 +92,9 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /admin/views": { consumer: "apps/admin/src/shared/api/mutations/saved-views.ts" },
   "DELETE /admin/views/:id": { consumer: "apps/admin/src/shared/api/mutations/saved-views.ts" },
   "GET /admin/staff": { consumer: "apps/admin/src/features/team/api/team.queries.ts" },
-  "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
+  "GET /admin/users": { consumer: "apps/admin/src/shared/api/queries/users.ts" },
   "GET /admin/users/:id": {
-    consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts",
+    consumer: "apps/admin/src/features/users/api/users.queries.ts",
   },
   "GET /api/v1/me": { uiLess: "public-api" },
   "GET /api/v1/organizations": { uiLess: "public-api" },
@@ -140,22 +140,22 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
     consumer: "apps/app/src/features/webhooks/api/webhooks.mutations.ts",
   },
   "POST /admin/impersonation/:id/start": {
-    consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
+    consumer: "apps/admin/src/features/users/api/users.mutations.ts",
   },
   "POST /admin/impersonation/stop": {
     consumer: "apps/app/src/shared/api/mutations/stop-impersonation.ts",
   },
   "POST /admin/orgs/:id/sso-enforcement": {
-    consumer: "apps/app/src/features/admin-orgs/api/admin-orgs.mutations.ts",
+    consumer: "apps/admin/src/features/orgs/api/orgs.mutations.ts",
   },
   "POST /admin/users/:id/ban": {
-    consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
+    consumer: "apps/admin/src/features/users/api/users.mutations.ts",
   },
   "POST /admin/users/:id/reset-password": {
-    consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
+    consumer: "apps/admin/src/features/users/api/users.mutations.ts",
   },
   "POST /admin/users/:id/unban": {
-    consumer: "apps/app/src/features/admin-users/api/admin-users.mutations.ts",
+    consumer: "apps/admin/src/features/users/api/users.mutations.ts",
   },
   "POST /api/token-scanning/github": { uiLess: "provider-callback" },
   "POST /billing/portal": { consumer: "apps/app/src/shared/api/mutations/open-billing-portal.ts" },

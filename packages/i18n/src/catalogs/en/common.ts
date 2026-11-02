@@ -21,7 +21,6 @@ export default {
   nav: {
     dashboard: "Dashboard",
     settings: "Settings",
-    admin: "Admin",
   },
   shell: {
     brandLabel: "App",
@@ -38,7 +37,6 @@ export default {
     groups: {
       navigate: "Navigate",
       switchOrganization: "Switch organization",
-      admin: "Admin",
       legal: "Legal & privacy",
       actions: "Actions",
     },
@@ -51,11 +49,6 @@ export default {
       eventCatalog: "Developers: Event catalog",
     },
     organizationActive: "active",
-    admin: {
-      auditLog: "Admin: Audit log",
-      accounts: "Admin: Accounts",
-      organizations: "Admin: Organizations",
-    },
     theme: {
       light: "Theme: Light",
       dark: "Theme: Dark",

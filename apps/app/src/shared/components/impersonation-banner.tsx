@@ -11,6 +11,7 @@ import { stopImpersonationMutationOptions } from "../api/mutations/stop-imperson
 import { sessionQueryOptions } from "../api/queries/session";
 import { broadcastAuthChange } from "../auth/auth-broadcast";
 import { isImpersonating } from "../auth/is-impersonating";
+import { env } from "../env";
 import { displayName } from "../utils";
 
 export function ImpersonationBanner() {
@@ -23,9 +24,16 @@ export function ImpersonationBanner() {
   const mutation = useMutation({
     ...stopImpersonationMutationOptions,
     onSuccess: async () => {
+      const impersonatedUserId = session?.user.id;
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
       broadcastAuthChange({ identityChanged: true });
-      void navigate({ to: "/admin/users" });
+
+      if (env.VITE_ADMIN_URL && impersonatedUserId) {
+        window.location.assign(new URL(`/users/${impersonatedUserId}`, env.VITE_ADMIN_URL).href);
+        return;
+      }
+
+      void navigate({ to: "/dashboard" });
     },
     onError: (err) => toastError(err, errorFallback("stopImpersonation")),
   });

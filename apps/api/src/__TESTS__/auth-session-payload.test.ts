@@ -6,7 +6,6 @@ describe("buildSessionPayload", () => {
     const payload = buildSessionPayload(
       { id: "u-1", role: "user", twoFactorEnabled: false },
       { id: "s-1", impersonatedBy: "admin-1", activeOrganizationId: null },
-      null,
     );
     expect(payload.session.impersonatedBy).toBe("admin-1");
   });
@@ -15,7 +14,6 @@ describe("buildSessionPayload", () => {
     const payload = buildSessionPayload(
       { id: "u-1", role: "user", twoFactorEnabled: false },
       { id: "s-1", impersonatedBy: null, activeOrganizationId: null },
-      null,
     );
     expect(payload.session.impersonatedBy).toBeNull();
   });
@@ -24,25 +22,7 @@ describe("buildSessionPayload", () => {
     const payload = buildSessionPayload(
       { id: "u-1", role: "user", twoFactorEnabled: false },
       { id: "s-1", impersonatedBy: undefined, activeOrganizationId: null },
-      null,
     );
     expect(payload.session.impersonatedBy).toBeNull();
-  });
-
-  it("exposes the staff access it is given, and never recomputes it from the role", () => {
-    const staff = { role: "auditor" as const, permissions: ["audit.read" as const], mfaOk: true };
-    const refused = buildSessionPayload(
-      { id: "u-1", role: "admin" },
-      { id: "s-1", impersonatedBy: null, activeOrganizationId: null },
-      null,
-    );
-    const granted = buildSessionPayload(
-      { id: "u-1", role: "user" },
-      { id: "s-1", impersonatedBy: null, activeOrganizationId: null },
-      staff,
-    );
-
-    expect(refused.staff).toBeNull();
-    expect(granted.staff).toEqual(staff);
   });
 });
