@@ -253,6 +253,13 @@
       "when": 1793455967412,
       "tag": "0035_rapid_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793619118907,
+      "tag": "0036_user_stripe_customer_index",
+      "breakpoints": true
     }
   ]
 }

@@ -320,6 +320,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               emailVerified: false,
               twoFactorEnabled: false,
               pendingDeletionUntil: null,
+              stripeCustomerId: null,
               deletedAt: new Date(),
             })
             .where(and(eq(schema.user.id, userId), isNull(schema.user.deletedAt)))
