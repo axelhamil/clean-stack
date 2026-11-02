@@ -14,10 +14,11 @@ import {
   or,
   resolveExecutor,
 } from "@packages/drizzle";
-import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
+import { ENDED_SESSION_COLUMNS, endedSessionsOf } from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { EndedSessions } from "../../../../shared/ports/staff-store.port";
 import type { ListUsersInput } from "../../application/dto/list-users.dto";
 import type {
   AdminMembershipRow,
@@ -26,7 +27,6 @@ import type {
   AdminUserListRow,
   AdminUserRow,
   BanWrite,
-  EndedSessions,
   IAdminUserStore,
   UnbanOutcome,
 } from "../../application/ports/admin-user-store.port";
@@ -100,13 +100,6 @@ function sessionsHeldOrImpersonatedBy(userId: string) {
   const { session } = authSchema;
 
   return or(eq(session.userId, userId), eq(session.impersonatedBy, userId));
-}
-
-function endedSessionsOf(rows: Parameters<typeof endedImpersonationsOf>[0]): EndedSessions {
-  return {
-    sessions: rows.map((row) => ({ id: row.sessionId, userId: row.userId })),
-    impersonations: endedImpersonationsOf(rows),
-  };
 }
 
 export class DrizzleAdminUserStore implements IAdminUserStore {

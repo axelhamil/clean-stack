@@ -2,12 +2,10 @@ import { type AppError, type IUnitOfWork, Option, Result } from "@packages/ddd-k
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import type { EndedSessions } from "../../../../shared/ports/staff-store.port";
 import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
-import type {
-  AdminStoreError,
-  EndedSessions,
-  IAdminUserStore,
-} from "../ports/admin-user-store.port";
+import { announceSessionsEnded } from "../../../../shared/services/session-end";
+import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
 
 export type AdminModerationError =
   | AdminStoreError
@@ -145,14 +143,7 @@ export class AdminModerationService {
   }
 
   private async announceEnded(ended: EndedSessions, actorUserId: string): Promise<void> {
-    for (const session of ended.sessions) {
-      await emitEvent(this.outbox, EventTypes.USER_SIGNED_OUT, "session", session.id, {
-        userId: session.userId,
-        sessionId: session.id,
-        actorUserId,
-      });
-    }
-
+    await announceSessionsEnded(this.outbox, ended.sessions, actorUserId);
     await announceImpersonationsEnded(this.outbox, ended.impersonations, "revoked", new Date());
   }
 }
