@@ -7,7 +7,6 @@ export default {
     loading: "Chargement…",
     loadFailed: "Échec du chargement des comptes.",
     empty: "Aucun compte ne correspond à ces filtres.",
-    loadMore: "Charger plus",
     allStatusesPlaceholder: "Tous les statuts",
     suspendAccountTitle: "Suspendre le compte",
     // Genuine cognate: "permanent" is spelled identically in French.
@@ -19,7 +18,6 @@ export default {
     table: {
       account: "Compte",
       email: "E-mail",
-      name: "Nom",
       status: "Statut",
       created: "Date de création",
     },
@@ -53,7 +51,6 @@ export default {
       banSuccessToast: "Compte suspendu.",
       banPendingToast: "Demande envoyée. Un collègue doit approuver cette suspension.",
       unbanSuccessToast: "Compte réactivé.",
-      impersonateSuccessToast: "Emprunt d'identité démarré.",
       revokeSessionsSuccessToast: "Sessions révoquées.",
       resetPasswordSuccessToast: "E-mail de réinitialisation du mot de passe envoyé.",
     },
@@ -99,15 +96,12 @@ export default {
     loading: "Chargement…",
     loadFailed: "Échec du chargement des organisations.",
     empty: "Aucune organisation ne correspond à cette recherche.",
-    loadMore: "Charger plus",
     ssoEnforcementUpdatedToast: "Imposition du SSO mise à jour.",
     ssoEnforcedAriaLabel: "SSO imposé pour {{name}}",
     ssoEnforcementOffHint:
       "Désactiver l'imposition du SSO permet aux membres de cette organisation de se reconnecter avec un mot de passe.",
     table: {
       name: "Nom",
-      // Genuine cognate, see the English catalog's comment.
-      slug: "Slug",
       members: "Membres",
       created: "Date de création",
       ssoEnforced: "SSO imposé",
@@ -116,6 +110,7 @@ export default {
       loading: "Chargement…",
       loadFailed: "Échec du chargement de l'organisation.",
       detailsTitle: "Détails",
+      // Genuine cognate, see the English catalog's comment.
       slugLabel: "Slug",
       planLabel: "Forfait",
       createdLabel: "Date de création",
@@ -478,16 +473,13 @@ export default {
     empty: "Aucun événement ne correspond à ces filtres.",
     occurredFromLabel: "Date de début",
     occurredToLabel: "Date de fin",
-    loadMore: "Charger plus",
     detailsAction: "Détails",
     table: {
-      occurredAt: "Survenu le",
       actorType: "Type d'acteur",
       // Same word in French too, matching the existing "Actions" / "Webhooks"
       // cognate exemptions already in the parity gate.
       action: "Action",
       target: "Cible",
-      organization: "Organisation",
     },
     actorType: {
       user: "Utilisateur",

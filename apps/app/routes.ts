@@ -16,14 +16,6 @@ export const routes = rootRoute("router/__root.tsx", [
       route("/dashboard", "features/dashboard/dashboard.route.tsx"),
       route("/org/new", "features/organization/new.route.tsx"),
 
-      layout("_admin", "router/_admin.tsx", [
-        route("/admin/audit-log", "features/admin-audit-log/admin-audit-log.route.tsx"),
-        route("/admin/orgs", "features/admin-orgs/admin-orgs.route.tsx"),
-        route("/admin/orgs/$orgId", "features/admin-orgs/admin-org-detail.route.tsx"),
-        route("/admin/users", "features/admin-users/admin-users.route.tsx"),
-        route("/admin/users/$id", "features/admin-users/admin-user-detail.route.tsx"),
-      ]),
-
       route("/settings", "router/settings.tsx", [
         index("router/settings-index.route.tsx"),
         route("/account", "features/account/account.route.tsx"),

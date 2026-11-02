@@ -1,9 +1,7 @@
-import type { StaffAccess } from "@packages/access-control";
-
 export function buildSessionPayload<
   U extends { id: string; locale?: string | null },
   S extends { id: string; impersonatedBy?: string | null; activeOrganizationId?: string | null },
->(user: U, session: S, staff: StaffAccess | null, activeOrganizationRole?: string | null) {
+>(user: U, session: S, activeOrganizationRole?: string | null) {
   const enrichedUser = { ...user, locale: user.locale ?? null } as U & {
     locale: string | null;
   };
@@ -15,5 +13,5 @@ export function buildSessionPayload<
     impersonatedBy: string | null;
     activeOrganizationRole?: string | null;
   };
-  return { user: enrichedUser, session: enrichedSession, staff };
+  return { user: enrichedUser, session: enrichedSession };
 }

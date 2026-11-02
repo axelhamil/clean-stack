@@ -12,7 +12,7 @@ apps/app/
   src/
     main.tsx                    createRoot + <AppProviders />
     router.tsx                  createRouter({ routeTree, context: { queryClient }, preload/pending defaults }) + `watchPolicyRefusals` wiring. routeTree.gen.ts is generated but versioned
-    router/                     One file per layout/gate (`__root`, `_guest`, `_protected`, `_shell`, `_admin`, `_org-scope`, `settings`) + non-route leaves (`index.route.tsx`, `settings-index.route.tsx`, `should-redirect-to-legal-accept.ts`)
+    router/                     One file per layout/gate (`__root`, `_guest`, `_protected`, `_shell`, `_org-scope`, `settings`) + non-route leaves (`index.route.tsx`, `settings-index.route.tsx`, `should-redirect-to-legal-accept.ts`)
     shared/                     Cross-cutting (no business): api client + errors, auth, i18n, notifications, observability, legal, hooks (see "Shared")
     features/<feature>/         Sub-domain: a vertical slice (see "Features")
 ```
@@ -116,7 +116,7 @@ Primitives, tokens and their authoring rules live in `packages/ui/CLAUDE.md`. As
 
 ## Accessibility gate
 
-**Exactly one `<main>` and one `<h1>` per rendered page.** `__root.tsx` and the pathless gates never wrap in landmarks: they are passthroughs (`component: Outlet`) or, when every child shares one page width, a plain container around the `Outlet` (`_admin`, like the `settings` layout). Each `<feature>.route.tsx` owns its `<header>`/`<main>`/`<footer>`. This is a CI gate (`.github/workflows/ci.yml`): a new page needs one entry in `a11y/pages.ts` (axe in light and dark, exactly one `<main>` and one `<h1>`); a new interactive primitive puts its keyboard contract in the interaction spec (`a11y/interaction.spec.ts`).
+**Exactly one `<main>` and one `<h1>` per rendered page.** `__root.tsx` and the pathless gates never wrap in landmarks: they are passthroughs (`component: Outlet`) or, when every child shares one page width, a plain container around the `Outlet` (the `settings` layout). Each `<feature>.route.tsx` owns its `<header>`/`<main>`/`<footer>`. This is a CI gate (`.github/workflows/ci.yml`): a new page needs one entry in `a11y/pages.ts` (axe in light and dark, exactly one `<main>` and one `<h1>`); a new interactive primitive puts its keyboard contract in the interaction spec (`a11y/interaction.spec.ts`).
 
 ## i18n
 
@@ -132,7 +132,7 @@ Primitives, tokens and their authoring rules live in `packages/ui/CLAUDE.md`. As
 ## Shared (`src/shared/`)
 
 - `api/`: the app's `api` and `queryClient` instances (built by the `@packages/web-kit` factories), `queries/`, `mutations/`, `errors/policy-refusal` (`api-error`, `messages`, `toast` are in `@packages/web-kit/api/errors/`). `policy-refusal.ts` invalidates the router on `POLICY_ACCEPTANCE_REQUIRED` so `_shell`'s existing redirect fires; never add a second redirect mechanism.
-- `auth/`: auth-client, `auth-broadcast`, `Can` + `useAuthorization`, the gates (`ensure-org-permission`, `ensure-staff`, `feature-gate`, `plan-gate`, `quota-gate`), `use-entitlements`, `use-active-org-id`, `use-set-active-org`, `use-refresh-session`, `use-sign-out`, `use-impersonation-guard`, role labels, `*.schema.ts`, dev-only `authorization-devtool`.
+- `auth/`: auth-client, `auth-broadcast`, `Can` + `useAuthorization`, the gates (`ensure-org-permission`, `feature-gate`, `plan-gate`, `quota-gate`), `use-entitlements`, `use-active-org-id`, `use-set-active-org`, `use-refresh-session`, `use-sign-out`, `use-impersonation-guard`, role labels, `*.schema.ts`, dev-only `authorization-devtool`.
 - `components/`: cross-feature UI (app-shell, org-switcher, command-palette, cookie-banner, legal-footer, consent-gate, ...). `hooks/use-consent`.
 - `legal/`, `legal-routes.ts`, `sub-processors.config.ts`, `sub-processor-labels.ts`: the legal surface shared by the shell and the legal pages. `LEGAL_ROUTES` is the one list read by `legal-footer.tsx` and `command-palette.tsx`: never duplicate it.
 - `notifications/`: bell, inbox item, preference matrix, grouping, labels, `notification-broadcast`, and the SSE stream hook with a stall guard (no ping for 2x the 25 s interval + 5 s → reconnect).

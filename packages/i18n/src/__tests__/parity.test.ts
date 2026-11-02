@@ -123,10 +123,7 @@ describe("catalog parity", () => {
     // "Normal" is spelled identically in French too (a genuine cognate).
     "admin.users.sessions.typeNormal",
     // "Slug" has no established French translation in SaaS products: a
-    // genuine cognate, not an untranslated placeholder. Two separate keys
-    // (list table header, detail page label) so a translator can still word
-    // them differently later.
-    "admin.orgs.table.slug",
+    // genuine cognate, not an untranslated placeholder.
     "admin.orgs.plan.pro",
     "admin.orgs.plan.business",
     "admin.orgs.detail.slugLabel",

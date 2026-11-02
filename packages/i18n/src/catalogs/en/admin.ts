@@ -7,7 +7,6 @@ export default {
     loading: "Loading…",
     loadFailed: "Failed to load accounts.",
     empty: "No accounts match these filters.",
-    loadMore: "Load more",
     allStatusesPlaceholder: "All statuses",
     // Shared by the ban dialog's title and the ban form's own submit button:
     // both name the exact same action in the exact same flow.
@@ -23,7 +22,6 @@ export default {
     table: {
       account: "Account",
       email: "Email",
-      name: "Name",
       status: "Status",
       created: "Created",
     },
@@ -54,7 +52,6 @@ export default {
       banSuccessToast: "Account suspended.",
       banPendingToast: "Request sent. A colleague must approve this suspension.",
       unbanSuccessToast: "Account reactivated.",
-      impersonateSuccessToast: "Impersonation started.",
       revokeSessionsSuccessToast: "Sessions revoked.",
       resetPasswordSuccessToast: "Password reset email sent.",
     },
@@ -98,16 +95,12 @@ export default {
     loading: "Loading…",
     loadFailed: "Failed to load organizations.",
     empty: "No organizations match this search.",
-    loadMore: "Load more",
     ssoEnforcementUpdatedToast: "SSO enforcement updated.",
     ssoEnforcedAriaLabel: "SSO enforced for {{name}}",
     ssoEnforcementOffHint:
       "Turning SSO enforcement off lets members of that organization sign in with a password again.",
     table: {
       name: "Name",
-      // "Slug" has no established French translation in SaaS products, kept
-      // identical in both locales and listed in ALLOWED_IDENTICAL.
-      slug: "Slug",
       members: "Members",
       created: "Created",
       ssoEnforced: "SSO enforced",
@@ -116,8 +109,8 @@ export default {
       loading: "Loading…",
       loadFailed: "Failed to load organization.",
       detailsTitle: "Details",
-      // Same cognate as `table.slug` above, own key: this section has its
-      // own copy so a translator can word it differently later if needed.
+      // "Slug" has no established French translation in SaaS products, kept
+      // identical in both locales and listed in ALLOWED_IDENTICAL.
       slugLabel: "Slug",
       // "Plan" is spelled identically in French (a genuine cognate).
       planLabel: "Plan",
@@ -471,14 +464,11 @@ export default {
     empty: "No events match these filters.",
     occurredFromLabel: "From date",
     occurredToLabel: "To date",
-    loadMore: "Load more",
     detailsAction: "Details",
     table: {
-      occurredAt: "Occurred at",
       actorType: "Actor type",
       action: "Action",
       target: "Target",
-      organization: "Organization",
     },
     actorType: {
       user: "User",

@@ -479,9 +479,6 @@ importers:
       '@packages/sentry-scrub':
         specifier: workspace:*
         version: link:../../packages/sentry-scrub
-      '@packages/staff-ui':
-        specifier: workspace:*
-        version: link:../../packages/staff-ui
       '@packages/ui':
         specifier: workspace:*
         version: link:../../packages/ui
