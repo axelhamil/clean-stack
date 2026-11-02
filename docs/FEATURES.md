@@ -256,7 +256,7 @@ Per-organization subscriptions, zero billing backoffice. Stripe Checkout for upg
 
 **Three gate axes** (transferable pattern for any premium feature):
 - **Role**: `billing:["read","manage"]` in `@packages/access-control`.
-- **Seats**: `ENTITLEMENTS[tier].maxMembers` enforced in `beforeAddMember` / `beforeAcceptInvitation` / `beforeCreateInvitation`. Unlimited = `null` (`BILLING_SEAT_LIMIT_REACHED`).
+- **Seats**: `ENTITLEMENTS[tier].maxMembers` enforced in `beforeAddMember` / `beforeAcceptInvitation` / `beforeCreateInvitation` (`organization-seats.ts`, `402 ORGANIZATION_SEAT_PAYMENT_REQUIRED`). Unlimited = `null`.
 - **Tier/feature**: `requireFeature` / `requirePlan` (back, `402`); `useEntitlements()` / `<FeatureGate>` / `<PlanGate>` (front). Free tier: unlimited orgs, 3 members.
 
 **Module** `apps/api/src/modules/billing/`: `BillingCatalogService` (free-only when `STRIPE_SECRET_KEY` unset), `EntitlementsService`, `BillingPortalService` (resolves the org's Stripe customer, `BILLING_NOT_FOUND` without a subscription `active`, `trialing`, `past_due` or `unpaid`, the same read as `hasSubscription`, so a past due customer can change their card while tier resolution stays on `active` and `trialing`) behind `IBillingPortalGateway` (`StripeBillingPortalGateway`), `DrizzleSubscriptionReadStore`, `StripeCatalogSource`. Routes: `GET /billing/plans`, `GET /billing/subscription`, `POST /billing/checkout`, `POST /billing/portal`. **Frontend** `apps/app/src/features/billing/`: `/pricing` · `/settings/billing` · `useEntitlements()` · `<FeatureGate>` · `<PlanGate>`.

@@ -8,7 +8,6 @@ import {
   type Feature,
   hasFeature,
   hasQuotaRemaining,
-  hasSeatAvailable,
   meetsPlan,
   type QuotaKey,
   type Tier,
@@ -30,12 +29,6 @@ export function assertFeature(view: EntitlementsView, flag: Feature): void {
 
 export function assertPlan(view: EntitlementsView, minTier: Tier): void {
   if (!meetsPlan(view, minTier)) paymentRequired(`Plan below required tier: ${minTier}`);
-}
-
-export function assertSeat(activeMembers: number, maxMembers: number | null): void {
-  if (!hasSeatAvailable(activeMembers, maxMembers)) {
-    paymentRequired(`Seat limit reached (${maxMembers ?? "∞"}).`);
-  }
 }
 
 export function assertQuota(used: number, limit: number | null): void {
