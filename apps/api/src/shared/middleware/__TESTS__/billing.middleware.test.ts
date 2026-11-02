@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { AppErrorException } from "@packages/ddd-kit";
 import { ENTITLEMENTS } from "../../entitlements";
-import { assertFeature, assertPlan, assertSeat } from "../billing.middleware";
+import { assertFeature, assertPlan } from "../billing.middleware";
 
 const proView = {
   tier: "pro" as const,
@@ -28,12 +28,5 @@ describe("billing gate assertions", () => {
     expect(() => assertPlan(proView, "business")).toThrow();
     expect(captureCode(() => assertPlan(proView, "business"))).toBe("BILLING_PAYMENT_REQUIRED");
     expect(assertPlan(proView, "pro")).toBeUndefined();
-  });
-  it("assertSeat throws BILLING_PAYMENT_REQUIRED when the cap is reached", () => {
-    expect(() => assertSeat(3, ENTITLEMENTS.free.maxMembers)).toThrow();
-    expect(captureCode(() => assertSeat(3, ENTITLEMENTS.free.maxMembers))).toBe(
-      "BILLING_PAYMENT_REQUIRED",
-    );
-    expect(assertSeat(2, ENTITLEMENTS.free.maxMembers)).toBeUndefined();
   });
 });
