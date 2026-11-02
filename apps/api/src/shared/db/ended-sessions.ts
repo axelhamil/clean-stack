@@ -1,5 +1,5 @@
 import { authSchema } from "@packages/drizzle";
-import type { EndedImpersonation } from "../ports/staff-store.port";
+import type { EndedImpersonation, EndedSessions } from "../ports/staff-store.port";
 
 const { session } = authSchema;
 
@@ -23,4 +23,11 @@ export function endedImpersonationsOf(rows: EndedSessionRow[]): EndedImpersonati
   return rows.flatMap(({ impersonatedBy, ...row }) =>
     impersonatedBy === null ? [] : [{ ...row, impersonatedBy }],
   );
+}
+
+export function endedSessionsOf(rows: EndedSessionRow[]): EndedSessions {
+  return {
+    sessions: rows.map(({ sessionId, userId }) => ({ sessionId, userId })),
+    impersonations: endedImpersonationsOf(rows),
+  };
 }

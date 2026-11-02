@@ -355,7 +355,12 @@ async function proveSeatCap(cookie: string, ownerId: string): Promise<void> {
     );
 
   const refused = await invite();
-  check("at the free cap an invitation is refused", refused.status >= 400, refused.status);
+  const refusal = await refused.json().catch(() => null);
+  check(
+    "at the free cap an invitation is refused with a 402 and the seat code",
+    refused.status === 402 && refusal?.code === "ORGANIZATION_SEAT_PAYMENT_REQUIRED",
+    { status: refused.status, body: refusal },
+  );
 
   await db.insert(planOverride).values({
     id: uuidv7(),
@@ -417,7 +422,10 @@ async function proveWipes(cookie: string, ownerId: string): Promise<void> {
   const erased = await probes.user("erased");
   await db
     .update(authSchema.user)
-    .set({ pendingDeletionUntil: new Date(Date.now() - 1000) })
+    .set({
+      pendingDeletionUntil: new Date(Date.now() - 1000),
+      stripeCustomerId: `cus_${PREFIX}`,
+    })
     .where(eq(authSchema.user.id, erased.id));
   const personal = await seedOrg("personal", [erased.id], "owner");
   await db
@@ -442,6 +450,15 @@ async function proveWipes(cookie: string, ownerId: string): Promise<void> {
     (await notesOf("org", personal)).length === 0,
   );
   check("the override goes with the org", (await openRows(personal)).length === 0);
+  const [erasedRow] = await db
+    .select({ stripeCustomerId: authSchema.user.stripeCustomerId })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, erased.id));
+  check(
+    "the erasure releases the stripe customer for a later sign-up",
+    erasedRow?.stripeCustomerId === null,
+    erasedRow,
+  );
 
   const afterErasure = await appCall(cookie, "POST", `/admin/users/${erased.id}/notes`, {
     body: "x",

@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 /**
  * Proves against a real Postgres what a mocked unit of work cannot: a moderation write and its
  * audit event commit or roll back together, the sessions of a banned user and the sessions they
@@ -258,6 +259,22 @@ async function proveImpersonationEndsAnnouncedOnce(): Promise<void> {
     JSON.stringify(await stoppedReasons(swept.id)) === '["expired"]',
     await stoppedReasons(swept.id),
   );
+  const sweptSignOuts = await probes.eventPayloads(EventTypes.USER_SIGNED_OUT, swept.id);
+  const [sweptSignOut] = sweptSignOuts;
+  check(
+    "each expired impersonation is announced signed out once, by no one",
+    sweptSignOuts.length === 1 &&
+      typeof sweptSignOut === "object" &&
+      sweptSignOut !== null &&
+      "actorUserId" in sweptSignOut &&
+      sweptSignOut.actorUserId === null,
+    sweptSignOuts,
+  );
+  check(
+    "a sweep racing the library on one expired session announces its sign-out once",
+    (await probes.eventCount(EventTypes.USER_SIGNED_OUT, raced.id)) === 1,
+    await probes.eventPayloads(EventTypes.USER_SIGNED_OUT, raced.id),
+  );
   check(
     "a live impersonation and an ordinary expired session are left to their paths",
     (await sessionCount(live.id)) === 1 &&
@@ -299,6 +316,11 @@ async function proveImpersonationEndsAnnouncedOnce(): Promise<void> {
       JSON.stringify(await stoppedReasons(signedOut.id)) === '["stopped"]',
     await stoppedReasons(signedOut.id),
   );
+  check(
+    "a sign-out while impersonating announces the sign-out once",
+    (await probes.eventCount(EventTypes.USER_SIGNED_OUT, signedOut.id)) === 1,
+    await probes.eventPayloads(EventTypes.USER_SIGNED_OUT, signedOut.id),
+  );
 }
 
 async function proveRevocationEndsImpersonations(): Promise<void> {
@@ -329,6 +351,32 @@ async function proveRevocationEndsImpersonations(): Promise<void> {
       "actorUserId" in announced &&
       announced.actorUserId === actor.id,
     announced,
+  );
+}
+
+async function proveRevocationRacingSignOutAnnouncesOnce(): Promise<void> {
+  const actor = await probes.user("race-sign-out-actor");
+  const target = await probes.user("race-sign-out-target");
+  const cookie = await probes.sessionCookie(target);
+
+  let signingOut: Promise<unknown> = Promise.resolve();
+  const revoked = await di.ITransactionService.run(async () => {
+    const ended = await di.AdminModerationService.revokeSessions({
+      actorUserId: actor.id,
+      userId: target.id,
+    });
+    signingOut = appCall(cookie, "POST", "/api/auth/sign-out", {});
+    await sleep(500);
+
+    return ended;
+  });
+  await signingOut;
+
+  check("a revocation racing a sign-out succeeds", revoked.isSuccess);
+  check(
+    "a revocation racing a sign-out of an ordinary session announces the sign-out once",
+    (await probes.eventCount(EventTypes.USER_SIGNED_OUT, target.id)) === 1,
+    await probes.eventPayloads(EventTypes.USER_SIGNED_OUT, target.id),
   );
 }
 
@@ -440,6 +488,7 @@ async function main(): Promise<void> {
   await proveExpiredBanLetsIn();
   await proveRevocationEndsImpersonations();
   await proveImpersonationEndsAnnouncedOnce();
+  await proveRevocationRacingSignOutAnnouncesOnce();
   await proveUnbanOfNonBannedIsNoOp();
   await proveBanRaceRefusedOnRequest();
   await proveExpiryIsAnnounced();

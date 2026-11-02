@@ -66,6 +66,7 @@ import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stri
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { redirectQuery } from "./shared/auth/email-redirect";
 import { IMPERSONATION_TTL_SECONDS } from "./shared/auth/impersonation-ttl";
+import { organizationSeatGate } from "./shared/auth/organization-seats";
 import { markPasswordResetDelivered } from "./shared/auth/password-reset-delivery";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
@@ -85,7 +86,6 @@ import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env, FRONT_ORIGINS } from "./shared/env";
 import { derivedEventId, emitEvent, emitEventBestEffort } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
-import { assertSeat } from "./shared/middleware/billing.middleware";
 import {
   IMPERSONATE_PATH,
   isBlockedDuringImpersonation,
@@ -272,10 +272,7 @@ async function hasSsoEntitlement(organizationId: string): Promise<boolean> {
 
 /**
  * The seat cap itself: one question, one answer, for every surface that creates a
- * member. Callers differ only in how they refuse, the organization hooks throw
- * `AppErrorException` through `assertSeat`, the SCIM projection has to throw a
- * BetterAuth `APIError` with a SCIM-shaped body, and that difference must never
- * be allowed to become two different definitions of "is there a seat".
+ * member.
  * Centralised so the check is never duplicated across hooks (CLAUDE.md
  * reusability rule, §6 two-path trap).
  *
@@ -296,14 +293,7 @@ async function seatCapFor(
   };
 }
 
-/**
- * The seat gate for every member-creation path that refuses with the app's own
- * error type (direct add, invitation acceptance, invitation creation).
- */
-async function assertSeatAvailableFor(orgId: string): Promise<void> {
-  const { activeMembers, maxMembers } = await seatCapFor(orgId);
-  assertSeat(activeMembers, maxMembers);
-}
+const assertSeatAvailableFor = organizationSeatGate(seatCapFor);
 
 /**
  * How long a value captured in `hooks.before`, or a row written by the request in
@@ -911,8 +901,6 @@ const authOptions = {
         },
         // Authoritative gate for the invite→accept path. `beforeAddMember` does
         // NOT fire on invitation acceptance (§6 two-path trap documented above).
-        // Throwing here blocks the accept endpoint with a 402 before the member
-        // row is written, closing the over-provisioning race on this path.
         beforeAcceptInvitation: async ({ organization: org }) => {
           await assertSeatAvailableFor(org.id);
         },
@@ -1631,15 +1619,8 @@ const authOptions = {
       },
       delete: {
         before: async (session, context) => {
-          const ended = await di.StaffService.endImpersonationSession(session, context?.path);
+          const ended = await di.StaffService.endSession(session, context?.path);
           if (ended.isFailure) throw new AppErrorException(ended.getError());
-        },
-        after: async (session) => {
-          await emit(EventTypes.USER_SIGNED_OUT, "session", session.id, {
-            userId: session.userId,
-            sessionId: session.id,
-            actorUserId: session.userId,
-          });
         },
       },
     },

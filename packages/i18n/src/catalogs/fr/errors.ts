@@ -11,6 +11,8 @@ export default {
     TWO_FACTOR_REQUIRED: "Confirmez avec votre mot de passe ou votre code d'authentification.",
     TWO_FACTOR_INVALID: "Code d'authentification invalide.",
     SSO_PLAN_REQUIRED: "Votre forfait n'inclut pas le SSO.",
+    ORGANIZATION_SEAT_PAYMENT_REQUIRED:
+      "Cette organisation n'a plus de place libre. Un propriétaire ou un administrateur doit passer à un forfait supérieur ou retirer un membre.",
     SSO_ORGANIZATION_REQUIRED: "Aucune organisation active.",
     SCIM_CONNECTION_NOT_FOUND: "Cette organisation n'a aucune connexion d'annuaire à déconnecter.",
     SCIM_CONNECTION_PROVIDER_FAILURE:

@@ -1,29 +1,45 @@
-import { relations } from "drizzle-orm";
-import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  image: text("image"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  twoFactorEnabled: boolean("two_factor_enabled").default(false),
-  pendingDeletionUntil: timestamp("pending_deletion_until"),
-  deletedAt: timestamp("deleted_at"),
-  lastExportRequestedAt: timestamp("last_export_requested_at"),
-  pendingEmail: text("pending_email"),
-  locale: text("locale"),
-  stripeCustomerId: text("stripe_customer_id"),
-  role: text("role"),
-  banned: boolean("banned").default(false),
-  banReason: text("ban_reason"),
-  banExpires: timestamp("ban_expires"),
-});
+export const user = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    image: text("image"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    twoFactorEnabled: boolean("two_factor_enabled").default(false),
+    pendingDeletionUntil: timestamp("pending_deletion_until"),
+    deletedAt: timestamp("deleted_at"),
+    lastExportRequestedAt: timestamp("last_export_requested_at"),
+    pendingEmail: text("pending_email"),
+    locale: text("locale"),
+    stripeCustomerId: text("stripe_customer_id"),
+    role: text("role"),
+    banned: boolean("banned").default(false),
+    banReason: text("ban_reason"),
+    banExpires: timestamp("ban_expires"),
+  },
+  (table) => [
+    uniqueIndex("user_stripe_customer_id_uidx")
+      .on(table.stripeCustomerId)
+      .where(sql`${table.stripeCustomerId} IS NOT NULL`),
+  ],
+);
 
 export const session = pgTable(
   "session",
