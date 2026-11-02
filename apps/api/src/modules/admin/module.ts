@@ -76,7 +76,10 @@ export const adminModule = defineModule()((b) =>
           c.IPlanOverrideStore,
         ),
     )
-    .add("IStaffStore", (c): IStaffStore => new DrizzleStaffStore(c.IInstrumentation))
+    .add(
+      "IStaffStore",
+      (c): IStaffStore => new DrizzleStaffStore(c.IInstrumentation, c.ITransactionService),
+    )
     .add(
       "StaffAccessService",
       (c) => new StaffAccessService(c.IStaffStore, c.IOutboxRepository, c.ITransactionService, env),

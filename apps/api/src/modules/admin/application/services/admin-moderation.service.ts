@@ -2,9 +2,10 @@ import { type AppError, type IUnitOfWork, Option, Result } from "@packages/ddd-k
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
 import type {
   AdminStoreError,
-  EndedSession,
+  EndedSessions,
   IAdminUserStore,
 } from "../ports/admin-user-store.port";
 
@@ -23,10 +24,6 @@ interface ImpersonationStart extends ModerationSubject {
   ticketRef?: string;
   ip: string | null;
   expiresAt: string;
-}
-
-interface ImpersonationStop extends ModerationSubject {
-  durationMs: number;
 }
 
 const userNotFound: AppError<"ADMIN_USER_NOT_FOUND"> = {
@@ -101,7 +98,7 @@ export class AdminModerationService {
       await emitEvent(this.outbox, EventTypes.ADMIN_USER_SESSIONS_REVOKED, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,
-        count: ended.getValue().length,
+        count: ended.getValue().sessions.length,
       });
 
       return Result.ok();
@@ -147,28 +144,15 @@ export class AdminModerationService {
     });
   }
 
-  stopImpersonation<T, E>(
-    input: ImpersonationStop,
-    stop: () => Promise<Result<T, E>>,
-  ): Promise<Result<T, E>> {
-    return this.uow.run(async () => {
-      await emitEvent(this.outbox, EventTypes.ADMIN_IMPERSONATION_STOPPED, "user", input.userId, {
-        actorUserId: input.actorUserId,
-        userId: input.userId,
-        durationMs: input.durationMs,
-      });
-
-      return stop();
-    });
-  }
-
-  private async announceEnded(sessions: EndedSession[], actorUserId: string): Promise<void> {
-    for (const session of sessions) {
+  private async announceEnded(ended: EndedSessions, actorUserId: string): Promise<void> {
+    for (const session of ended.sessions) {
       await emitEvent(this.outbox, EventTypes.USER_SIGNED_OUT, "session", session.id, {
         userId: session.userId,
         sessionId: session.id,
         actorUserId,
       });
     }
+
+    await announceImpersonationsEnded(this.outbox, ended.impersonations, "revoked", new Date());
   }
 }

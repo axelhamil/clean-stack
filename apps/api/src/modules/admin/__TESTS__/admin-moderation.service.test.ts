@@ -6,19 +6,32 @@ import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
-  EndedSession,
+  EndedSessions,
   IAdminUserStore,
   UnbanOutcome,
 } from "../application/ports/admin-user-store.port";
 import { AdminModerationService } from "../application/services/admin-moderation.service";
 
 const SUBJECT = { actorUserId: "admin", userId: "target" };
-const ENDED: EndedSession[] = [
-  { id: "s1", userId: "target" },
-  { id: "s2", userId: "someone-impersonated" },
-];
+const STARTED = new Date(Date.now() - 60_000);
+const ENDED: EndedSessions = {
+  sessions: [
+    { id: "s1", userId: "target" },
+    { id: "s2", userId: "someone-impersonated" },
+  ],
+  impersonations: [
+    {
+      sessionId: "s2",
+      userId: "someone-impersonated",
+      impersonatedBy: "target",
+      createdAt: STARTED,
+      expiresAt: new Date(STARTED.getTime() + 3_600_000),
+    },
+  ],
+};
+const ONE_ENDED: EndedSessions = { sessions: ENDED.sessions.slice(0, 1), impersonations: [] };
 
-function setup(given: { banned?: Option<EndedSession[]>; unbanned?: UnbanOutcome } = {}) {
+function setup(given: { banned?: Option<EndedSessions>; unbanned?: UnbanOutcome } = {}) {
   const store = mockPort<IAdminUserStore>();
   const writeTransactions: unknown[] = [];
   store.ban.mockImplementation(async () => {
@@ -27,9 +40,7 @@ function setup(given: { banned?: Option<EndedSession[]>; unbanned?: UnbanOutcome
     return Result.ok(given.banned ?? Option.some(ENDED));
   });
   store.unban.mockImplementation(async () => Result.ok(given.unbanned ?? "unbanned"));
-  store.deleteSessions.mockImplementation(async () =>
-    Result.ok([ENDED[0] ?? { id: "", userId: "" }]),
-  );
+  store.deleteSessions.mockImplementation(async () => Result.ok(ONE_ENDED));
 
   const outbox = mockPort<IOutboxRepository>();
   const emitTransactions: unknown[] = [];
@@ -56,10 +67,34 @@ describe("AdminModerationService.ban", () => {
     expect(types(outbox)).toEqual([
       EventTypes.USER_SIGNED_OUT,
       EventTypes.USER_SIGNED_OUT,
+      EventTypes.ADMIN_IMPERSONATION_STOPPED,
       EventTypes.ADMIN_USER_BANNED,
     ]);
     expect(writeTransactions[0]).toBeDefined();
     expect(new Set([...writeTransactions, ...emitTransactions]).size).toBe(1);
+  });
+
+  it("announces the impersonation the banned staff member ran as revoked, by its impersonator", async () => {
+    const { service, outbox } = setup();
+
+    await service.ban({ ...SUBJECT, reason: "spam" });
+
+    expect(
+      enqueuedEvents(outbox).filter(
+        (event) => event.eventType === EventTypes.ADMIN_IMPERSONATION_STOPPED,
+      ),
+    ).toEqual([
+      {
+        eventType: EventTypes.ADMIN_IMPERSONATION_STOPPED,
+        aggregateId: "someone-impersonated",
+        payload: {
+          actorUserId: "target",
+          userId: "someone-impersonated",
+          durationMs: expect.any(Number),
+          endReason: "revoked",
+        },
+      },
+    ]);
   });
 
   it("gives a temporary ban its expiry and a permanent one none", async () => {

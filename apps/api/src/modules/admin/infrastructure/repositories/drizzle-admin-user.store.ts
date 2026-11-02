@@ -14,6 +14,7 @@ import {
   or,
   resolveExecutor,
 } from "@packages/drizzle";
+import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -25,7 +26,7 @@ import type {
   AdminUserListRow,
   AdminUserRow,
   BanWrite,
-  EndedSession,
+  EndedSessions,
   IAdminUserStore,
   UnbanOutcome,
 } from "../../application/ports/admin-user-store.port";
@@ -99,6 +100,13 @@ function sessionsHeldOrImpersonatedBy(userId: string) {
   const { session } = authSchema;
 
   return or(eq(session.userId, userId), eq(session.impersonatedBy, userId));
+}
+
+function endedSessionsOf(rows: Parameters<typeof endedImpersonationsOf>[0]): EndedSessions {
+  return {
+    sessions: rows.map((row) => ({ id: row.sessionId, userId: row.userId })),
+    impersonations: endedImpersonationsOf(rows),
+  };
 }
 
 export class DrizzleAdminUserStore implements IAdminUserStore {
@@ -239,7 +247,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
     );
   }
 
-  async ban(input: BanWrite): Promise<Result<Option<EndedSession[]>, AdminStoreError>> {
+  async ban(input: BanWrite): Promise<Result<Option<EndedSessions>, AdminStoreError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > ban" }, async () => {
@@ -260,9 +268,9 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
         const ended = await exec
           .delete(session)
           .where(sessionsHeldOrImpersonatedBy(input.userId))
-          .returning({ id: session.id, userId: session.userId });
+          .returning(ENDED_SESSION_COLUMNS);
 
-        return Result.ok(Option.some(ended));
+        return Result.ok(Option.some(endedSessionsOf(ended)));
       } catch (err) {
         this.instrumentation.capture(err);
         return fail(err, "admin ban failed");
@@ -297,7 +305,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
     });
   }
 
-  async deleteSessions(userId: string): Promise<Result<EndedSession[], AdminStoreError>> {
+  async deleteSessions(userId: string): Promise<Result<EndedSessions, AdminStoreError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
@@ -308,13 +316,13 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
           const query = exec
             .delete(session)
             .where(sessionsHeldOrImpersonatedBy(userId))
-            .returning({ id: session.id, userId: session.userId });
+            .returning(ENDED_SESSION_COLUMNS);
           const ended = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
 
-          return Result.ok(ended);
+          return Result.ok(endedSessionsOf(ended));
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "admin session deletion failed");

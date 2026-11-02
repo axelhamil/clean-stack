@@ -10,6 +10,7 @@ import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
 import type { ITotpVerifier } from "../../../../shared/ports/totp-verifier.port";
+import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
 import {
   grantsStaffAccess,
   isLastManager,
@@ -289,6 +290,13 @@ export class RgpdService {
             if (wipe.isFailure) return wipe;
             if (wipe.getValue().alreadyWiped) return wipe;
 
+            await announceImpersonationsEnded(
+              this.outbox,
+              wipe.getValue().endedImpersonations,
+              "revoked",
+              new Date(),
+            );
+
             const revoked = await this.revokeStaffAccess(input.userId);
             if (revoked.isFailure)
               return Result.fail<ExecuteWipeOutput, RgpdError>(revoked.getError());
@@ -392,6 +400,8 @@ export class RgpdService {
 
     const revoked = await this.staff.revoke(userId);
     if (revoked.isFailure) return Result.fail(revoked.getError());
+
+    await announceImpersonationsEnded(this.outbox, revoked.getValue(), "revoked", new Date());
 
     await emitEvent(this.outbox, EventTypes.ADMIN_STAFF_REVOKED, "user", userId, {
       actorUserId: userId,

@@ -42,6 +42,7 @@ const sweeps = [
   "/internal/sweep-consents",
   "/internal/sweep-notifications",
   "/internal/sweep-admin-approvals",
+  "/internal/sweep-admin-impersonations",
   "/internal/sweep-stripe-events",
 ] as const;
 

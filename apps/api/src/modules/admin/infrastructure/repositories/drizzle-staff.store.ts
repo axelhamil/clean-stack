@@ -4,7 +4,7 @@ import {
   type StaffPermission,
   type StaffRole,
 } from "@packages/access-control";
-import { Option, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   asc,
@@ -14,13 +14,23 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lte,
   or,
   resolveExecutor,
   staffSchema,
 } from "@packages/drizzle";
+import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
+import { countEligibleWithTimeout } from "../../../../shared/internal-routes/sweep-count";
+import {
+  lockedBatch,
+  requireFilter,
+  withSweepGuards,
+} from "../../../../shared/internal-routes/sweep-purge";
+import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
+  EndedImpersonation,
   IStaffStore,
   StaffListRow,
   StaffManagerRecord,
@@ -65,8 +75,24 @@ function banIsLive(banned: boolean | null, banExpires: Date | null, now: Date): 
   return banExpires === null || banExpires > now;
 }
 
-async function deleteImpersonationSessions(exec: Executor, userId: string): Promise<void> {
-  await exec.delete(authSchema.session).where(eq(authSchema.session.impersonatedBy, userId));
+const { session } = authSchema;
+function expiredImpersonations(now: Date) {
+  return requireFilter(
+    and(isNotNull(session.impersonatedBy), lte(session.expiresAt, now)),
+    "sweep-admin-impersonations",
+  );
+}
+
+async function deleteImpersonationSessions(
+  exec: Executor,
+  userId: string,
+): Promise<EndedImpersonation[]> {
+  const rows = await exec
+    .delete(session)
+    .where(eq(session.impersonatedBy, userId))
+    .returning(ENDED_SESSION_COLUMNS);
+
+  return endedImpersonationsOf(rows);
 }
 
 function stillCountsAsManager(
@@ -84,7 +110,10 @@ function stillCountsAsManager(
 }
 
 export class DrizzleStaffStore implements IStaffStore {
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  constructor(
+    private readonly instrumentation: IInstrumentation,
+    private readonly uow: IUnitOfWork,
+  ) {}
 
   async findActive(userId: string): Promise<Result<Option<StaffRecord>, StaffStoreError>> {
     const exec = resolveExecutor();
@@ -326,7 +355,7 @@ export class DrizzleStaffStore implements IStaffStore {
     });
   }
 
-  async revoke(userId: string): Promise<Result<void, StaffStoreError>> {
+  async revoke(userId: string): Promise<Result<EndedImpersonation[], StaffStoreError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan({ name: "DrizzleStaffStore > revoke" }, async () => {
@@ -354,9 +383,7 @@ export class DrizzleStaffStore implements IStaffStore {
           .set({ role: MIRROR_PLAIN })
           .where(eq(authSchema.user.id, userId));
 
-        await deleteImpersonationSessions(exec, userId);
-
-        return Result.ok();
+        return Result.ok(await deleteImpersonationSessions(exec, userId));
       } catch (err) {
         this.instrumentation.capture(err);
         return fail(err, "staff revocation failed");
@@ -364,19 +391,98 @@ export class DrizzleStaffStore implements IStaffStore {
     });
   }
 
-  async endImpersonationsBy(userId: string): Promise<Result<void, StaffStoreError>> {
+  async endImpersonationsBy(
+    userId: string,
+  ): Promise<Result<EndedImpersonation[], StaffStoreError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
       { name: "DrizzleStaffStore > endImpersonationsBy" },
       async () => {
         try {
-          await deleteImpersonationSessions(exec, userId);
-
-          return Result.ok();
+          return Result.ok(await deleteImpersonationSessions(exec, userId));
         } catch (err) {
           this.instrumentation.capture(err);
           return fail(err, "impersonation end failed");
+        }
+      },
+    );
+  }
+
+  async endExpiredImpersonations(
+    limit: number,
+  ): Promise<Result<EndedImpersonation[], StaffStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > endExpiredImpersonations" },
+      async () => {
+        try {
+          const rows = await withSweepGuards(this.uow, (exec) => {
+            const batch = lockedBatch(exec, {
+              table: session,
+              idColumn: session.id,
+              where: expiredImpersonations(new Date()),
+              orderBy: session.expiresAt,
+              batchSize: limit,
+            });
+            const query = exec
+              .delete(session)
+              .where(inArray(session.id, batch))
+              .returning(ENDED_SESSION_COLUMNS);
+
+            return this.instrumentation.startSpan(
+              { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+              () => query.execute(),
+            );
+          });
+
+          return Result.ok(endedImpersonationsOf(rows));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "impersonation expiry failed");
+        }
+      },
+    );
+  }
+
+  async endImpersonationSession(
+    sessionId: string,
+  ): Promise<Result<Option<EndedImpersonation>, StaffStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > endImpersonationSession" },
+      async () => {
+        try {
+          const rows = await exec
+            .delete(session)
+            .where(and(eq(session.id, sessionId), isNotNull(session.impersonatedBy)))
+            .returning(ENDED_SESSION_COLUMNS);
+
+          return Result.ok(Option.fromNullable(endedImpersonationsOf(rows)[0]));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "impersonation end failed");
+        }
+      },
+    );
+  }
+
+  async countExpiredImpersonations(): Promise<Result<number, StaffStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleStaffStore > countExpiredImpersonations" },
+      async () => {
+        try {
+          return Result.ok(
+            await countEligibleWithTimeout(
+              session,
+              expiredImpersonations(new Date()),
+              sweepSpans(this.instrumentation),
+              this.uow,
+            ),
+          );
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "impersonation expiry count failed");
         }
       },
     );

@@ -85,6 +85,7 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
         deletedOrgIds: ["org_personal", "org_solo"],
         anonymizedEmail: "deleted-uuid@anonymized.local",
         alreadyWiped: false,
+        endedImpersonations: [],
       }),
     ),
     verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(true)),
@@ -156,7 +157,7 @@ function makeStaff(row: Option<StaffRecord>, managers: StaffManagerRecord[]) {
   const staff = mockPort<IStaffStore>();
   staff.findActive.mockImplementation(async () => Result.ok(row));
   staff.lockActiveManagers.mockImplementation(async () => Result.ok(managers));
-  staff.revoke.mockImplementation(async () => Result.ok());
+  staff.revoke.mockImplementation(async () => Result.ok([]));
 
   return staff;
 }
@@ -471,6 +472,87 @@ describe("RgpdService", () => {
       ]);
     });
 
+    it("announces each impersonation of a wiped customer as revoked", async () => {
+      const createdAt = new Date(Date.now() - 60_000);
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+        executeWipe: mock(async () =>
+          Result.ok<ExecuteWipeOutput, RgpdError>({
+            deletedOrgIds: [],
+            anonymizedEmail: "deleted-uuid@anonymized.local",
+            alreadyWiped: false,
+            endedImpersonations: [
+              {
+                sessionId: "s1",
+                userId: "u1",
+                impersonatedBy: "staff-1",
+                createdAt,
+                expiresAt: new Date(createdAt.getTime() + 3_600_000),
+              },
+            ],
+          }),
+        ),
+      });
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockImplementation(async () => {});
+      const service = buildService({ repo, email, outbox });
+
+      await service.executeAccountWipe({ userId: "u1" });
+
+      expect(
+        enqueuedEvents(outbox)
+          .filter((e) => e.eventType === EventTypes.ADMIN_IMPERSONATION_STOPPED)
+          .map((e) => e.payload),
+      ).toEqual([
+        expect.objectContaining({ actorUserId: "staff-1", userId: "u1", endReason: "revoked" }),
+      ]);
+    });
+
+    it("announces the impersonations a wiped staff member still ran as revoked", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+      });
+      const staff = makeStaff(
+        Option.some<StaffRecord>({
+          userId: "u1",
+          role: "support",
+          source: "console",
+          banned: false,
+          overrides: [],
+        }),
+        [],
+      );
+      const createdAt = new Date(Date.now() - 60_000);
+      staff.revoke.mockImplementation(async () =>
+        Result.ok([
+          {
+            sessionId: "s1",
+            userId: "customer",
+            impersonatedBy: "u1",
+            createdAt,
+            expiresAt: new Date(createdAt.getTime() + 3_600_000),
+          },
+        ]),
+      );
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockImplementation(async () => {});
+      const service = buildService({ repo, email, staff, outbox });
+
+      await service.executeAccountWipe({ userId: "u1" });
+
+      expect(
+        enqueuedEvents(outbox)
+          .filter((e) => e.eventType === EventTypes.ADMIN_IMPERSONATION_STOPPED)
+          .map((e) => e.payload),
+      ).toEqual([
+        expect.objectContaining({ actorUserId: "u1", userId: "customer", endReason: "revoked" }),
+      ]);
+    });
+
     it("writes nothing on the staff side for a user who is not staff", async () => {
       const repo = makeRepo({
         getUserDeletionState: mock(async () =>
@@ -655,6 +737,7 @@ describe("RgpdService", () => {
             deletedOrgIds: [],
             anonymizedEmail: "",
             alreadyWiped: true,
+            endedImpersonations: [],
           }),
         ),
       });

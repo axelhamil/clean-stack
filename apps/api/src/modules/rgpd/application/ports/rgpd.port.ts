@@ -1,5 +1,6 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
+import type { EndedImpersonation } from "../../../../shared/ports/staff-store.port";
 
 export type RgpdError = AppError<
   | "ACCOUNT_DELETION_BLOCKED"
@@ -68,6 +69,7 @@ export interface ExecuteWipeOutput {
   deletedOrgIds: string[];
   anonymizedEmail: string;
   alreadyWiped: boolean;
+  endedImpersonations: EndedImpersonation[];
 }
 
 export interface PendingDeletionRow {

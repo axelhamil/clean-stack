@@ -1,7 +1,7 @@
 /**
  * Proves against a real Postgres what a mocked unit of work cannot: a moderation write and its
  * audit event commit or roll back together, the sessions of a banned user and the sessions they
- * were impersonating end with the ban, and the sign-in hook of the auth library honours a ban
+ * were impersonating end with the ban, every end of an impersonation is announced once, and the sign-in hook of the auth library honours a ban
  * written directly. Creates and removes its own probe users.
  */
 
@@ -11,6 +11,7 @@ import { EventTypes } from "@packages/events";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { AdminModerationService } from "../src/modules/admin/application/services/admin-moderation.service";
+import { StaffService } from "../src/modules/admin/application/services/staff.service";
 import type { IOutboxRepository } from "../src/shared/ports/outbox.port";
 import { adminProbes, appCall, codeOf } from "./admin-probes";
 import { checkRecorder } from "./check-harness";
@@ -185,12 +186,119 @@ async function proveExpiredBanLetsIn(): Promise<void> {
   check("an expired ban lets the user in", (await signInStatus(target.email)) === 200);
 }
 
-async function impersonationSessionOf(actor: string, subject: string): Promise<void> {
+async function impersonationSessionOf(
+  actor: string | null,
+  subject: string,
+  expiresAt?: Date,
+): Promise<string> {
   const created = await auth.$context.then((ctx) => ctx.internalAdapter.createSession(subject));
   await db
     .update(authSchema.session)
-    .set({ impersonatedBy: actor })
+    .set({ impersonatedBy: actor, ...(expiresAt ? { expiresAt } : {}) })
     .where(eq(authSchema.session.id, created.id));
+
+  return created.token;
+}
+
+async function stoppedReasons(subject: string): Promise<string[]> {
+  const payloads = await probes.eventPayloads(EventTypes.ADMIN_IMPERSONATION_STOPPED, subject);
+
+  return payloads.map((payload) =>
+    typeof payload === "object" && payload !== null && "endReason" in payload
+      ? String(payload.endReason)
+      : "",
+  );
+}
+
+async function proveImpersonationEndsAnnouncedOnce(): Promise<void> {
+  const staff = await probes.user("end-staff");
+  const swept = await probes.user("end-swept");
+  const raced = await probes.user("end-raced");
+  const live = await probes.user("end-live");
+  const ordinary = await probes.user("end-ordinary");
+  const past = new Date(Date.now() - 60_000);
+  await impersonationSessionOf(staff.id, swept.id, past);
+  const racedToken = await impersonationSessionOf(staff.id, raced.id, past);
+  const liveToken = await impersonationSessionOf(staff.id, live.id);
+  await impersonationSessionOf(null, ordinary.id, past);
+
+  const failingSweep = new StaffService(
+    di.IStaffStore,
+    di.IAdminUserStore,
+    failingOutbox,
+    di.ITransactionService,
+    { PLATFORM_ADMIN_IDS: [] },
+  );
+  check(
+    "a failing emit surfaces from the impersonation sweep",
+    await refusedByEmit(() => failingSweep.expireImpersonations(100)),
+  );
+  check("a failing emit keeps the expired session", (await sessionCount(swept.id)) === 1);
+
+  const ctx = await auth.$context;
+  const [sweep] = await Promise.all([
+    di.StaffService.expireImpersonations(100),
+    ctx.internalAdapter.deleteSession(racedToken),
+  ]);
+  check("the impersonation sweep succeeds", sweep.isSuccess);
+  check(
+    "the expired impersonations end",
+    (await sessionCount(swept.id)) === 0 && (await sessionCount(raced.id)) === 0,
+  );
+  check(
+    "a sweep racing the library on one expired session announces it once",
+    JSON.stringify(await stoppedReasons(raced.id)) === '["expired"]',
+    await stoppedReasons(raced.id),
+  );
+
+  const again = await di.StaffService.expireImpersonations(100);
+  check("a second sweep succeeds", again.isSuccess);
+  check(
+    "each expired impersonation is announced once, as expired",
+    JSON.stringify(await stoppedReasons(swept.id)) === '["expired"]',
+    await stoppedReasons(swept.id),
+  );
+  check(
+    "a live impersonation and an ordinary expired session are left to their paths",
+    (await sessionCount(live.id)) === 1 &&
+      (await sessionCount(ordinary.id)) === 1 &&
+      (await stoppedReasons(ordinary.id)).length === 0,
+  );
+
+  const met = await probes.user("end-met");
+  const metToken = await impersonationSessionOf(staff.id, met.id, past);
+  await ctx.internalAdapter.deleteSession(metToken);
+  await ctx.internalAdapter.deleteSession(metToken);
+  check(
+    "the library deleting an expired impersonation announces it once, as expired",
+    (await sessionCount(met.id)) === 0 &&
+      JSON.stringify(await stoppedReasons(met.id)) === '["expired"]',
+    await stoppedReasons(met.id),
+  );
+
+  await ctx.internalAdapter.deleteSession(liveToken);
+  await ctx.internalAdapter.deleteSession(liveToken);
+  check(
+    "the library deleting a live impersonation outside a stop announces it revoked, once",
+    (await sessionCount(live.id)) === 0 &&
+      JSON.stringify(await stoppedReasons(live.id)) === '["revoked"]',
+    await stoppedReasons(live.id),
+  );
+
+  const signedOut = await probes.user("end-signed-out");
+  const cookie = await probes.sessionCookie(signedOut);
+  await db
+    .update(authSchema.session)
+    .set({ impersonatedBy: staff.id })
+    .where(eq(authSchema.session.userId, signedOut.id));
+  const signOut = await appCall(cookie, "POST", "/api/auth/sign-out", {});
+  check("a sign-out while impersonating succeeds", signOut.status === 200, signOut.status);
+  check(
+    "a sign-out while impersonating announces it stopped, once",
+    (await sessionCount(signedOut.id)) === 0 &&
+      JSON.stringify(await stoppedReasons(signedOut.id)) === '["stopped"]',
+    await stoppedReasons(signedOut.id),
+  );
 }
 
 async function proveRevocationEndsImpersonations(): Promise<void> {
@@ -209,6 +317,11 @@ async function proveRevocationEndsImpersonations(): Promise<void> {
     (await sessionCount(subject.id)) === 0,
   );
   const [announced] = await probes.eventPayloads(EventTypes.USER_SIGNED_OUT, subject.id);
+  check(
+    "the ended impersonation is announced revoked",
+    JSON.stringify(await stoppedReasons(subject.id)) === '["revoked"]',
+    await stoppedReasons(subject.id),
+  );
   check(
     "the ended session names the admin as actor",
     typeof announced === "object" &&
@@ -326,6 +439,7 @@ async function main(): Promise<void> {
   await proveBanRefusesSignIn();
   await proveExpiredBanLetsIn();
   await proveRevocationEndsImpersonations();
+  await proveImpersonationEndsAnnouncedOnce();
   await proveUnbanOfNonBannedIsNoOp();
   await proveBanRaceRefusedOnRequest();
   await proveExpiryIsAnnounced();
