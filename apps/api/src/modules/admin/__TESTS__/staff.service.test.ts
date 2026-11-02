@@ -7,6 +7,7 @@ import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
+  EndedImpersonation,
   IStaffStore,
   StaffManagerRecord,
   StaffRecord,
@@ -37,6 +38,7 @@ function setup(given: {
   managers?: StaffManagerRecord[];
   user?: Option<AdminUserRow>;
   listed?: string[];
+  ended?: EndedImpersonation[];
 }) {
   const store = mockPort<IStaffStore>();
   store.findActive.mockImplementation(async () => Result.ok(given.target ?? Option.none()));
@@ -44,8 +46,8 @@ function setup(given: {
     Result.ok(given.managers ?? [{ userId: ACTOR, source: "console" }]),
   );
   store.assign.mockImplementation(async () => Result.ok());
-  store.revoke.mockImplementation(async () => Result.ok());
-  store.endImpersonationsBy.mockImplementation(async () => Result.ok());
+  store.revoke.mockImplementation(async () => Result.ok(given.ended ?? []));
+  store.endImpersonationsBy.mockImplementation(async () => Result.ok(given.ended ?? []));
   store.replaceOverride.mockImplementation(async () => Result.ok("override-1"));
   store.revokeOverride.mockImplementation(async () =>
     Result.ok(
@@ -767,6 +769,162 @@ describe("StaffService", () => {
 
       expect(result.getError().code).toBe("ADMIN_STAFF_ROLE_CHANGED_CONFLICT");
       expect(store.assign).not.toHaveBeenCalled();
+    });
+  });
+  describe("the ends of an impersonation", () => {
+    const HOUR_MS = 60 * 60 * 1000;
+    const CUSTOMER = "customer";
+
+    function impersonation(startedMsAgo: number, sessionId = "s1"): EndedImpersonation {
+      const createdAt = new Date(Date.now() - startedMsAgo);
+
+      return {
+        sessionId,
+        userId: CUSTOMER,
+        impersonatedBy: TARGET,
+        createdAt,
+        expiresAt: new Date(createdAt.getTime() + HOUR_MS),
+      };
+    }
+
+    const stopped = (outbox: Parameters<typeof enqueuedEvents>[0]) =>
+      enqueuedEvents(outbox).filter(
+        (event) => event.eventType === EventTypes.ADMIN_IMPERSONATION_STOPPED,
+      );
+
+    it("announces each expired session once, with its full length, and nothing on a second sweep", async () => {
+      const { store, outbox, service } = setup({});
+      const expired = [impersonation(2 * HOUR_MS, "s1"), impersonation(3 * HOUR_MS, "s2")];
+      store.endExpiredImpersonations.mockImplementationOnce(async () => Result.ok(expired));
+      store.endExpiredImpersonations.mockImplementationOnce(async () => Result.ok([]));
+
+      const first = await service.expireImpersonations(100);
+      const second = await service.expireImpersonations(100);
+
+      expect(first.getValue()).toBe(2);
+      expect(second.getValue()).toBe(0);
+      expect(stopped(outbox)).toEqual(
+        ["s1", "s2"].map(() => ({
+          eventType: EventTypes.ADMIN_IMPERSONATION_STOPPED,
+          aggregateId: CUSTOMER,
+          payload: {
+            actorUserId: TARGET,
+            userId: CUSTOMER,
+            durationMs: HOUR_MS,
+            endReason: "expired",
+          },
+        })),
+      );
+    });
+
+    it("announces each session revoked when a write takes the permission away", async () => {
+      const ended = [impersonation(60_000, "s1"), impersonation(60_000, "s2")];
+      const { outbox, service } = setup({ target: member("auditor"), ended });
+
+      await service.setOverride({
+        actorUserId: ACTOR,
+        targetUserId: TARGET,
+        actorPermissions: ALL_PERMISSIONS,
+        permission: "users.impersonate",
+        effect: "deny",
+        expiresAt: Option.none(),
+      });
+
+      const payloads = stopped(outbox).map((event) => event.payload);
+      expect(payloads).toHaveLength(2);
+      expect(payloads[0]).toMatchObject({
+        actorUserId: TARGET,
+        userId: CUSTOMER,
+        endReason: "revoked",
+        durationMs: expect.any(Number),
+      });
+    });
+
+    it("announces the sessions of a revoked staff member revoked", async () => {
+      const { outbox, service } = setup({
+        target: member("support"),
+        ended: [impersonation(60_000)],
+      });
+
+      await service.revoke(change);
+
+      expect(stopped(outbox).map((event) => event.payload)).toEqual([
+        expect.objectContaining({ actorUserId: TARGET, endReason: "revoked" }),
+      ]);
+    });
+
+    it("announces a session already past its expiry when revoked as expired", async () => {
+      const { outbox, service } = setup({
+        target: member("support"),
+        ended: [impersonation(2 * HOUR_MS)],
+      });
+
+      await service.revoke(change);
+
+      expect(stopped(outbox)[0]?.payload).toMatchObject({
+        endReason: "expired",
+        durationMs: HOUR_MS,
+      });
+    });
+
+    function claimed(given: { impersonation: EndedImpersonation }) {
+      const fixture = setup({});
+      fixture.store.endImpersonationSession.mockImplementation(async () =>
+        Result.ok(Option.some(given.impersonation)),
+      );
+
+      return fixture;
+    }
+
+    it.each([
+      ["/admin/stop-impersonating", "stopped"],
+      ["/sign-out", "stopped"],
+      ["/revoke-sessions", "revoked"],
+      ["/delete-user", "revoked"],
+    ])("announces a live impersonation the library ends on %s as %s", async (path, reason) => {
+      const live = impersonation(60_000);
+      const { store, outbox, service } = claimed({ impersonation: live });
+
+      await service.endImpersonationSession({ id: live.sessionId, impersonatedBy: TARGET }, path);
+
+      expect(store.endImpersonationSession).toHaveBeenCalledWith("s1");
+      expect(stopped(outbox).map((event) => event.payload)).toEqual([
+        {
+          actorUserId: TARGET,
+          userId: CUSTOMER,
+          durationMs: expect.any(Number),
+          endReason: reason,
+        },
+      ]);
+    });
+
+    it("announces an expired impersonation the library meets again as expired", async () => {
+      const ended = impersonation(2 * HOUR_MS);
+      const { outbox, service } = claimed({ impersonation: ended });
+
+      await service.endImpersonationSession({ id: ended.sessionId, impersonatedBy: TARGET });
+
+      expect(stopped(outbox).map((event) => event.payload)).toEqual([
+        { actorUserId: TARGET, userId: CUSTOMER, durationMs: HOUR_MS, endReason: "expired" },
+      ]);
+    });
+
+    it("announces nothing for a session another path already ended", async () => {
+      const { store, outbox, service } = setup({});
+      store.endImpersonationSession.mockImplementation(async () => Result.ok(Option.none()));
+
+      await service.endImpersonationSession({ id: "s1", impersonatedBy: TARGET }, "/sign-out");
+
+      expect(stopped(outbox)).toEqual([]);
+    });
+
+    it("leaves an ordinary session alone", async () => {
+      const { store, outbox, service } = setup({});
+
+      await service.endImpersonationSession({ id: "ordinary", impersonatedBy: null }, "/sign-out");
+
+      expect(store.endImpersonationSession).not.toHaveBeenCalled();
+      expect(stopped(outbox)).toEqual([]);
     });
   });
 });

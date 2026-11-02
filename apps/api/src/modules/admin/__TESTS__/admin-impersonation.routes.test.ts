@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
@@ -10,7 +11,7 @@ mock.module("hono/bun", () => ({
 }));
 
 const { AdminModerationService } = await import("../application/services/admin-moderation.service");
-const { unitOfWork, outcome } = mockUnitOfWork();
+const { unitOfWork } = mockUnitOfWork();
 
 mock.module("../../../container", () => ({
   di: {
@@ -156,7 +157,7 @@ describe("POST /admin/impersonation/stop", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 403 and rolls the stop event back when BetterAuth refuses stop", async () => {
+  it("returns 403 and announces nothing when BetterAuth refuses stop", async () => {
     emitted.length = 0;
     currentSession = {
       impersonatedBy: "admin-1",
@@ -170,24 +171,28 @@ describe("POST /admin/impersonation/stop", () => {
       method: "POST",
     });
     expect(res.status).toBe(403);
-    expect(outcome()).toBe("rolled_back");
+    expect(emitted).toEqual([]);
   });
 
-  it("relays the restore cookie and emits the stop event", async () => {
+  it("stops outside any transaction and leaves the announcement to the session hook", async () => {
     emitted.length = 0;
     currentSession = {
       impersonatedBy: "admin-1",
       userId: "target-2",
       createdAt: new Date(Date.now() - 5_000),
     };
+    let transactionAtStop: unknown = "unset";
+    mockStopImpersonating.mockImplementationOnce(async () => {
+      transactionAtStop = UnitOfWorkContext.transaction();
+
+      return stopResponse;
+    });
     const res = await app.request("/stop", {
       method: "POST",
     });
     expect(res.status).toBe(200);
     expect(res.headers.getSetCookie()).toContain("session=admin-restored; Path=/; HttpOnly");
-    const event = emitted.find((e) => e.type === EventTypes.ADMIN_IMPERSONATION_STOPPED);
-    expect(event?.payload.actorUserId).toBe("admin-1");
-    expect(event?.payload.userId).toBe("target-2");
-    expect(event?.payload.durationMs).toBeGreaterThan(0);
+    expect(transactionAtStop).toBeUndefined();
+    expect(emitted).toEqual([]);
   });
 });

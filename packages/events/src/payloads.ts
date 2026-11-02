@@ -456,6 +456,7 @@ export type AdminImpersonationStartedPayload = z.infer<typeof AdminImpersonation
 
 export const AdminImpersonationStoppedPayload = ActorRef.extend(UserRef.shape).extend({
   durationMs: z.number().int().nonnegative(),
+  endReason: z.enum(["stopped", "expired", "revoked"]),
 });
 export type AdminImpersonationStoppedPayload = z.infer<typeof AdminImpersonationStoppedPayload>;
 

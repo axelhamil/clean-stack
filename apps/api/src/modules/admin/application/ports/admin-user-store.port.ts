@@ -1,4 +1,5 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
+import type { EndedImpersonation } from "../../../../shared/ports/staff-store.port";
 import type { ListUsersInput } from "../dto/list-users.dto";
 
 export type AdminStoreError = AppError<"ADMIN_QUERY_PROVIDER_FAILURE">;
@@ -38,6 +39,11 @@ export interface EndedSession {
   userId: string;
 }
 
+export interface EndedSessions {
+  sessions: EndedSession[];
+  impersonations: EndedImpersonation[];
+}
+
 export interface BanWrite {
   userId: string;
   reason: string;
@@ -49,7 +55,7 @@ export interface IAdminUserStore {
   findUserById(id: string): Promise<Result<Option<AdminUserRow>, AdminStoreError>>;
   listSessionsFor(userId: string): Promise<Result<AdminSessionRow[], AdminStoreError>>;
   listMembershipsFor(userId: string): Promise<Result<AdminMembershipRow[], AdminStoreError>>;
-  ban(input: BanWrite): Promise<Result<Option<EndedSession[]>, AdminStoreError>>;
+  ban(input: BanWrite): Promise<Result<Option<EndedSessions>, AdminStoreError>>;
   unban(userId: string): Promise<Result<UnbanOutcome, AdminStoreError>>;
-  deleteSessions(userId: string): Promise<Result<EndedSession[], AdminStoreError>>;
+  deleteSessions(userId: string): Promise<Result<EndedSessions, AdminStoreError>>;
 }

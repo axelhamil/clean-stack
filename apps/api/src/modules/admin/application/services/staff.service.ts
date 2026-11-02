@@ -4,12 +4,14 @@ import { EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type {
+  EndedImpersonation,
   IStaffStore,
   StaffListRow,
   StaffOverrideRow,
   StaffRecord,
   StaffStoreError,
 } from "../../../../shared/ports/staff-store.port";
+import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
 import {
   grantsStaffAccess,
   IMPERSONATE_PERMISSION,
@@ -62,6 +64,13 @@ interface StaffOverrideRemoval extends StaffGrantingChange {
   overrideId: string;
 }
 
+interface MetSession {
+  id: string;
+  impersonatedBy?: string | null;
+}
+
+const STOPPING_PATHS = ["/admin/stop-impersonating", "/sign-out"];
+
 export class StaffService {
   constructor(
     private readonly store: IStaffStore,
@@ -76,6 +85,43 @@ export class StaffService {
     if (rows.isFailure) return rows;
 
     return Result.ok(rows.getValue().filter((row) => grantsStaffAccess(row, this.env)));
+  }
+
+  async expireImpersonations(limit: number): Promise<Result<number, StaffStoreError>> {
+    return this.uow.run(async (): Promise<Result<number, StaffStoreError>> => {
+      const ended = await this.store.endExpiredImpersonations(limit);
+      if (ended.isFailure) return Result.fail(ended.getError());
+
+      await announceImpersonationsEnded(this.outbox, ended.getValue(), "expired", new Date());
+
+      return Result.ok(ended.getValue().length);
+    });
+  }
+
+  countExpiredImpersonations(): Promise<Result<number, StaffStoreError>> {
+    return this.store.countExpiredImpersonations();
+  }
+
+  async endImpersonationSession(
+    session: MetSession,
+    endpointPath?: string,
+  ): Promise<Result<void, StaffStoreError>> {
+    if (!session.impersonatedBy) return Result.ok();
+
+    const reason = STOPPING_PATHS.includes(endpointPath ?? "") ? "stopped" : "revoked";
+
+    return this.uow.run(async (): Promise<Result<void, StaffStoreError>> => {
+      const ended = await this.store.endImpersonationSession(session.id);
+      if (ended.isFailure) return Result.fail(ended.getError());
+
+      const claimed = ended
+        .getValue()
+        .map((row) => [row])
+        .unwrapOr([]);
+      await announceImpersonationsEnded(this.outbox, claimed, reason, new Date());
+
+      return Result.ok();
+    });
   }
 
   async listOverrides(targetUserId: string): Promise<Result<StaffOverrideRow[], StaffChangeError>> {
@@ -220,6 +266,8 @@ export class StaffService {
       if (!stillImpersonates) {
         const ended = await this.store.endImpersonationsBy(input.targetUserId);
         if (ended.isFailure) return Result.fail(ended.getError());
+
+        await this.announceRevoked(ended.getValue());
       }
 
       await emitEvent(
@@ -250,6 +298,8 @@ export class StaffService {
       const role = revocable.getValue();
       const revoked = await this.store.revoke(input.targetUserId);
       if (revoked.isFailure) return Result.fail(revoked.getError());
+
+      await this.announceRevoked(revoked.getValue());
 
       await emitEvent(this.outbox, EventTypes.ADMIN_STAFF_REVOKED, "user", input.targetUserId, {
         actorUserId: input.actorUserId,
@@ -411,8 +461,15 @@ export class StaffService {
     if (stillImpersonates) return Result.ok();
 
     const ended = await this.store.endImpersonationsBy(userId);
+    if (ended.isFailure) return Result.fail(ended.getError());
 
-    return ended.isFailure ? Result.fail(ended.getError()) : Result.ok();
+    await this.announceRevoked(ended.getValue());
+
+    return Result.ok();
+  }
+
+  private announceRevoked(ended: EndedImpersonation[]): Promise<void> {
+    return announceImpersonationsEnded(this.outbox, ended, "revoked", new Date());
   }
 
   private async banRefusal(input: StaffModeration): Promise<Result<void, StaffBanError>> {

@@ -164,6 +164,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /internal/flush-notification-emails": { uiLess: "internal-cron" },
   "POST /internal/rgpd-sweep": { uiLess: "internal-cron" },
   "POST /internal/sweep-admin-approvals": { uiLess: "internal-cron" },
+  "POST /internal/sweep-admin-impersonations": { uiLess: "internal-cron" },
   "POST /internal/sweep-audit-log": { uiLess: "internal-cron" },
   "POST /internal/sweep-consents": { uiLess: "internal-cron" },
   "POST /internal/sweep-email-messages": { uiLess: "internal-cron" },

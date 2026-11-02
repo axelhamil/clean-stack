@@ -91,6 +91,7 @@ endpoints; you wire your own scheduler.
 |---|---|---|
 | `POST /internal/rgpd-sweep` | Daily, e.g. `0 3 * * *` UTC | Wipes accounts whose 7-day grace window has elapsed. Idempotent, safe to over-schedule. |
 | `POST /internal/flush-notification-emails` | Every minute | Groups notification emails that have come due into per-user/category digests and enqueues them. This cadence is what `immediate` means for email; true real-time is the SSE stream's job. `hourly` / `daily` rows come due on wall-clock anchors stamped at fan-out, see `docs/CRON.md` § Digest windows. |
+| `POST /internal/sweep-admin-impersonations` | Daily, on the sweep cron (`17 3 * * *`, `infra/railway/cron.toml`) | Ends impersonation sessions past their expiry and announces each one. Between two runs, an expired session the auth library meets again is deleted and announced by the session hook. |
 | `POST /internal/sweep-admin-approvals` | Daily, on the sweep cron (`17 3 * * *`, `infra/railway/cron.toml`) | Expires pending four-eyes requests past their deadline. Between two runs an overdue row executes nothing: the decision refuses it and a new request on the same pair closes it. |
 | `POST /internal/sweep-stripe-events` | Daily | Purges `stripe_event` rows past `STRIPE_EVENT_RETENTION_DAYS` (default 30d, what Stripe keeps retrievable). |
 | `POST /internal/sweep-notifications` | Daily | Purges **read** notifications past `NOTIFICATION_RETENTION_DAYS`. Unread rows are never purged, whatever their age. |

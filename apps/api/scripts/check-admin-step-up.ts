@@ -241,6 +241,25 @@ async function proveSensitiveRoutes(): Promise<void> {
     "the start is announced",
     (await probes.eventCount(EventTypes.ADMIN_IMPERSONATION_STARTED, target.id)) === 1,
   );
+
+  const impersonating = started.response.headers
+    .getSetCookie()
+    .map((pair) => pair.split(";")[0] ?? "")
+    .filter((pair) => !pair.endsWith("="));
+  const stopped = await call(impersonating.join("; "), "POST", "/admin/impersonation/stop");
+  check("the real stop succeeds", stopped.status === 200, stopped.body);
+  const reasons = (
+    await probes.eventPayloads(EventTypes.ADMIN_IMPERSONATION_STOPPED, target.id)
+  ).map((payload) =>
+    typeof payload === "object" && payload !== null && "endReason" in payload
+      ? payload.endReason
+      : null,
+  );
+  check(
+    "the real stop is announced once, as stopped",
+    JSON.stringify(reasons) === '["stopped"]',
+    reasons,
+  );
 }
 
 async function proveOverrideRoutesNeedStepUp(): Promise<void> {

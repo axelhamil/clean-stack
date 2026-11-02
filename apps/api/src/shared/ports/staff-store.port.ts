@@ -38,6 +38,14 @@ export interface StaffListRow {
   createdAt: Date;
 }
 
+export interface EndedImpersonation {
+  sessionId: string;
+  userId: string;
+  impersonatedBy: string;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
 export interface IStaffStore {
   findActive(userId: string): Promise<Result<Option<StaffRecord>, StaffStoreError>>;
   listActive(): Promise<Result<StaffListRow[], StaffStoreError>>;
@@ -48,8 +56,13 @@ export interface IStaffStore {
     role: StaffRole;
     createdBy: string;
   }): Promise<Result<void, StaffStoreError>>;
-  revoke(userId: string): Promise<Result<void, StaffStoreError>>;
-  endImpersonationsBy(userId: string): Promise<Result<void, StaffStoreError>>;
+  revoke(userId: string): Promise<Result<EndedImpersonation[], StaffStoreError>>;
+  endImpersonationsBy(userId: string): Promise<Result<EndedImpersonation[], StaffStoreError>>;
+  endExpiredImpersonations(limit: number): Promise<Result<EndedImpersonation[], StaffStoreError>>;
+  endImpersonationSession(
+    sessionId: string,
+  ): Promise<Result<Option<EndedImpersonation>, StaffStoreError>>;
+  countExpiredImpersonations(): Promise<Result<number, StaffStoreError>>;
   listLiveOverrides(userId: string): Promise<Result<StaffOverrideRow[], StaffStoreError>>;
   replaceOverride(input: {
     userId: string;

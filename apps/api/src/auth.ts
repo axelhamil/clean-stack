@@ -10,7 +10,7 @@ import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
-import { Option } from "@packages/ddd-kit";
+import { AppErrorException, Option } from "@packages/ddd-kit";
 import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
@@ -65,6 +65,7 @@ import {
 import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stripe-payment-failure";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { redirectQuery } from "./shared/auth/email-redirect";
+import { IMPERSONATION_TTL_SECONDS } from "./shared/auth/impersonation-ttl";
 import { markPasswordResetDelivered } from "./shared/auth/password-reset-delivery";
 import { RequestSnapshots } from "./shared/auth/request-snapshots";
 import { normalizeSamlConfig } from "./shared/auth/saml-config";
@@ -882,7 +883,12 @@ const authOptions = {
     }),
     passkey({ rpName: "clean-stack" }),
     clearExpiredBanBeforeAdminPlugin,
-    admin({ adminUserIds: env.PLATFORM_ADMIN_IDS, defaultRole: "user", adminRoles: ["admin"] }),
+    admin({
+      adminUserIds: env.PLATFORM_ADMIN_IDS,
+      defaultRole: "user",
+      adminRoles: ["admin"],
+      impersonationSessionDuration: IMPERSONATION_TTL_SECONDS,
+    }),
     organization({
       ac,
       roles,
@@ -1624,6 +1630,10 @@ const authOptions = {
         },
       },
       delete: {
+        before: async (session, context) => {
+          const ended = await di.StaffService.endImpersonationSession(session, context?.path);
+          if (ended.isFailure) throw new AppErrorException(ended.getError());
+        },
         after: async (session) => {
           await emit(EventTypes.USER_SIGNED_OUT, "session", session.id, {
             userId: session.userId,

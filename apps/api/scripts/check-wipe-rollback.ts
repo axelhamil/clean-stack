@@ -101,14 +101,15 @@ async function main(): Promise<void> {
 
   const outbox = new DrizzleOutboxRepository(instrumentation);
   const email = new QueuedEmailService(new DrizzleEmailQueue(instrumentation), instrumentation);
+  const uow = new TransactionService(instrumentation);
   const service = new RgpdService(
     new DrizzleRgpdRepository(logger, instrumentation),
     new NoOpStorageService(),
     email,
-    new TransactionService(instrumentation),
+    uow,
     outbox,
     instrumentation,
-    new DrizzleStaffStore(instrumentation),
+    new DrizzleStaffStore(instrumentation, uow),
     { PLATFORM_ADMIN_IDS: [] },
     new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
   );

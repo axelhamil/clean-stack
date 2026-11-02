@@ -98,7 +98,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
     "A platform administrator started an impersonation session.",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]:
-    "A platform administrator ended an impersonation session.",
+    "An impersonation session ended: stopped by its administrator, expired, or revoked.",
   [EventTypes.ADMIN_USER_BANNED]: "A platform administrator banned a user account.",
   [EventTypes.ADMIN_USER_UNBANNED]: "A platform administrator lifted the ban on a user account.",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]:

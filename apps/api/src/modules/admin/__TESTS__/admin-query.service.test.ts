@@ -13,7 +13,7 @@ import type {
   AdminSessionRow,
   AdminStoreError,
   AdminUserListRow,
-  EndedSession,
+  EndedSessions,
   IAdminUserStore,
   UnbanOutcome,
 } from "../application/ports/admin-user-store.port";
@@ -55,9 +55,9 @@ function userStore(overrides: Partial<IAdminUserStore> = {}): IAdminUserStore {
     findUserById: mock(async () => ok(Option.some(USER))),
     listSessionsFor: mock(async () => ok([])),
     listMembershipsFor: mock(async () => ok([])),
-    ban: mock(async () => ok(Option.none<EndedSession[]>())),
+    ban: mock(async () => ok(Option.none<EndedSessions>())),
     unban: mock(async () => ok<UnbanOutcome>("not_found")),
-    deleteSessions: mock(async () => ok([])),
+    deleteSessions: mock(async () => ok({ sessions: [], impersonations: [] })),
     ...overrides,
   };
 }

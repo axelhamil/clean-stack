@@ -16,6 +16,7 @@ import {
 } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
 import { verifyPassword as verifyHash } from "better-auth/crypto";
+import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
@@ -328,12 +329,20 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             // Another overlapping run already wiped this account between our
             // pending-deletion read and this transaction: nothing left to do,
             // and the caller must not emit USER_DELETED a second time.
-            return Result.ok({ deletedOrgIds: [], anonymizedEmail: "", alreadyWiped: true });
+            return Result.ok({
+              deletedOrgIds: [],
+              anonymizedEmail: "",
+              alreadyWiped: true,
+              endedImpersonations: [],
+            });
           }
 
           await exec.delete(staffSchema.staffNote).where(eq(staffSchema.staffNote.userId, userId));
           await exec.delete(staffSchema.savedView).where(eq(staffSchema.savedView.ownerId, userId));
-          await exec.delete(schema.session).where(eq(schema.session.userId, userId));
+          const endedSessions = await exec
+            .delete(schema.session)
+            .where(eq(schema.session.userId, userId))
+            .returning(ENDED_SESSION_COLUMNS);
           await exec.delete(schema.account).where(eq(schema.account.userId, userId));
           await exec.delete(schema.twoFactor).where(eq(schema.twoFactor.userId, userId));
           await exec.delete(schema.passkey).where(eq(schema.passkey.userId, userId));
@@ -366,6 +375,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             deletedOrgIds: deletedOrgs.map((o) => o.id),
             anonymizedEmail,
             alreadyWiped: false,
+            endedImpersonations: endedImpersonationsOf(endedSessions),
           });
         } catch (err) {
           this.instrumentation.capture(err);
