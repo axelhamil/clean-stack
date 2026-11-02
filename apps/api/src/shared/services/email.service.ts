@@ -13,6 +13,18 @@ import type {
 import type { EmailMessageInsert, IEmailQueue } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 
+/**
+ * Positional per-row key derived from the batch key. Only a fallback: the suffix
+ * shifts when a batch is rebuilt from a partially successful set, which is why a
+ * recipient's own `idempotencyKey` always wins over it.
+ */
+function batchRowKey(options: SendTemplateOptions | undefined, index: number): Option<string> {
+  const batchKey = options?.idempotencyKey;
+  if (!batchKey) return Option.none();
+
+  return Option.some(`${batchKey}#${index}`);
+}
+
 export class QueuedEmailService implements IEmailService {
   constructor(
     private readonly queue: IEmailQueue,
@@ -58,12 +70,10 @@ export class QueuedEmailService implements IEmailService {
             payload: r.variables,
             idempotencyKey: r.idempotencyKey
               ? Option.some(r.idempotencyKey)
-              : options?.idempotencyKey
-                ? Option.some(`${options.idempotencyKey}#${index}`)
-                : Option.none(),
+              : batchRowKey(options, index),
           });
         }
-        return this.enqueue(rows, options?.tx);
+        return this.enqueue(rows);
       },
     );
   }
@@ -93,35 +103,31 @@ export class QueuedEmailService implements IEmailService {
           subject: m.subject,
           locale: DEFAULT_LOCALE,
           payload: m.body,
-          idempotencyKey: options?.idempotencyKey
-            ? Option.some(`${options.idempotencyKey}#${index}`)
-            : Option.none(),
+          idempotencyKey: batchRowKey(options, index),
         }));
-        return this.enqueue(rows, options?.tx);
+        return this.enqueue(rows);
       },
     );
   }
 
-  private async enqueue(
-    rows: EmailMessageInsert[],
-    tx: SendTemplateOptions["tx"],
-  ): Promise<Result<void, EmailError>> {
-    const result = await this.queue.enqueue(rows, tx);
+  private async enqueue(rows: EmailMessageInsert[]): Promise<Result<void, EmailError>> {
+    const result = await this.queue.enqueue(rows);
     if (result.isFailure) {
       return Result.fail({
         code: "EMAIL_PROVIDER_FAILURE",
         message: result.getError().message,
       });
     }
+
     const { written } = result.getValue();
     if (rows.length > 0 && written === 0) {
       // Every row was suppressed (idempotency conflict on all of them). A 0-of-N write is
-      // indistinguishable from success to the caller unless we surface it — and a caller
+      // indistinguishable from success to the caller unless we surface it, and a caller
       // that believes an email was queued when nothing was written (e.g. the RGPD deletion
       // confirmation) must not commit on that false premise.
       return Result.fail({
         code: "EMAIL_PROVIDER_FAILURE",
-        message: `email enqueue fully suppressed — 0 of ${rows.length} row(s) written`,
+        message: `email enqueue fully suppressed: 0 of ${rows.length} row(s) written`,
       });
     }
     return Result.ok();

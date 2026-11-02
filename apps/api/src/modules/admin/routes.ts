@@ -1,49 +1,59 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { auth } from "../../auth";
 import { di } from "../../container";
+import { deliverPasswordReset } from "../../shared/auth/password-reset-delivery";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { requirePlatformAdmin } from "../../shared/middleware/platform-admin.middleware";
-import { AdminActionService } from "../../shared/services/admin-action.service";
+import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
 import { zV } from "../../shared/validator";
+import { addStaffNoteBodySchema } from "./application/dto/add-staff-note.dto";
 import { banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";
-import { setRoleBodySchema } from "./application/dto/set-role.dto";
+import type { AdminUserRow } from "./application/ports/admin-user-store.port";
+import type { AdminUserDetail } from "./application/services/admin-query.service";
+import { gateOr202 } from "./approval-response";
+import { serializeStaffNote } from "./staff-note-response";
 
-const actionSvc = new AdminActionService(
-  di.IOutboxRepository,
-  di.ITransactionService,
-  di.IInstrumentation,
-);
+async function findUserOr404(userId: string): Promise<AdminUserDetail> {
+  const result = await di.AdminQueryService.getUser(userId);
+  if (result.isFailure) throw new AppErrorException(result.getError());
+
+  const found = result.getValue();
+  if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
+
+  return found.unwrap();
+}
+
+function serializeUser(u: AdminUserRow) {
+  return {
+    ...u,
+    banReason: u.banReason.toNull(),
+    banExpires: u.banExpires.map((d) => d.toISOString()).toNull(),
+    createdAt: u.createdAt.toISOString(),
+  };
+}
 
 export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
-  .get("/", requireAuth, requirePlatformAdmin, zV("query", listUsersQuerySchema), async (c) => {
-    const result = await di.AdminQueryService.listUsers(c.req.valid("query"));
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    const page = result.getValue();
+  .get(
+    "/",
+    requireAuth,
+    requireStaffPermission("users.read"),
+    zV("query", listUsersQuerySchema),
+    async (c) => {
+      const result = await di.AdminQueryService.listUsers(c.req.valid("query"));
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      const page = result.getValue();
+      return c.json({
+        items: page.items.map(serializeUser),
+        nextCursor: page.nextCursor.toNull(),
+      });
+    },
+  )
+  .get("/:id", requireAuth, requireStaffPermission("users.read"), async (c) => {
+    const u = await findUserOr404(c.req.param("id"));
     return c.json({
-      items: page.items.map((u) => ({
-        ...u,
-        role: u.role.toNull(),
-        banReason: u.banReason.toNull(),
-        banExpires: u.banExpires.toNull()?.toISOString() ?? null,
-        createdAt: u.createdAt.toISOString(),
-      })),
-      nextCursor: page.nextCursor.toNull(),
-    });
-  })
-  .get("/:id", requireAuth, requirePlatformAdmin, async (c) => {
-    const result = await di.AdminQueryService.getUser(c.req.param("id"));
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    const found = result.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
-    return c.json({
-      ...u,
-      role: u.role.toNull(),
-      banReason: u.banReason.toNull(),
-      banExpires: u.banExpires.toNull()?.toISOString() ?? null,
-      createdAt: u.createdAt.toISOString(),
+      ...serializeUser(u),
       sessions: u.sessions.map((s) => ({
         id: s.id,
         createdAt: s.createdAt.toISOString(),
@@ -52,81 +62,111 @@ export const adminUserRoutes = new Hono<{ Variables: AuthVariables }>()
         userAgent: s.userAgent.toNull(),
         impersonatedBy: s.impersonatedBy.toNull(),
       })),
+      memberships: u.memberships,
     });
   })
-  .post("/:id/ban", requireAuth, requirePlatformAdmin, zV("json", banUserBodySchema), async (c) => {
-    const actor = c.get("user");
-    const body = c.req.valid("json");
-    const result = await actionSvc.ban({
-      actorUserId: actor.id,
-      userId: c.req.param("id"),
-      reason: body.reason,
-      expiresIn: body.expiresIn,
-      headers: c.req.raw.headers,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true });
-  })
-  .post("/:id/unban", requireAuth, requirePlatformAdmin, async (c) => {
-    const actor = c.get("user");
-    const result = await actionSvc.unban({
-      actorUserId: actor.id,
-      userId: c.req.param("id"),
-      headers: c.req.raw.headers,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true });
-  })
-  .put("/:id/role", requireAuth, requirePlatformAdmin, zV("json", setRoleBodySchema), async (c) => {
-    const actor = c.get("user");
-    const body = c.req.valid("json");
-    const userId = c.req.param("id");
-    const userResult = await di.AdminQueryService.getUser(userId);
-    if (userResult.isFailure) throw new AppErrorException(userResult.getError());
-    const found = userResult.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
-    const result = await actionSvc.setRole({
-      actorUserId: actor.id,
-      userId,
-      role: body.role,
-      previousRole: u.role.toNull(),
-      headers: c.req.raw.headers,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true });
-  })
-  .post("/:id/reset-password", requireAuth, requirePlatformAdmin, async (c) => {
-    const actor = c.get("user");
-    const userId = c.req.param("id");
-    const userResult = await di.AdminQueryService.getUser(userId);
-    if (userResult.isFailure) throw new AppErrorException(userResult.getError());
-    const found = userResult.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
-    const result = await actionSvc.resetPassword({
-      actorUserId: actor.id,
-      userId,
-      email: u.email,
-      headers: c.req.raw.headers,
-    });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({ ok: true });
-  })
-  .delete("/:id/sessions", requireAuth, requirePlatformAdmin, async (c) => {
+  .post(
+    "/:id/ban",
+    requireAuth,
+    requireStaffPermission("users.moderate"),
+    zV("json", banUserBodySchema),
+    async (c) => {
+      const actor = c.get("user");
+      const userId = c.req.param("id");
+      const body = c.req.valid("json");
+      const sensitive = await di.StaffService.banIsSensitive({
+        targetUserId: userId,
+        expiresIn: body.expiresIn,
+      });
+      if (sensitive.isFailure) throw new AppErrorException(sensitive.getError());
+
+      if (sensitive.getValue()) {
+        await assertStepUp(actor, c.get("session"));
+
+        const pending = gateOr202(
+          c,
+          await di.ApprovalService.gate({
+            action: "user.ban_permanent",
+            subjectId: userId,
+            params: body,
+            requestedBy: actor.id,
+            requesterPermissions: c.get("staff").permissions,
+          }),
+        );
+        if (pending) return pending;
+      }
+
+      const result = await di.StaffService.moderateBan(
+        { actorPermissions: c.get("staff").permissions, targetUserId: userId },
+        () =>
+          di.AdminModerationService.ban({
+            actorUserId: actor.id,
+            userId,
+            reason: body.reason,
+            expiresIn: body.expiresIn,
+          }),
+      );
+      if (result.isFailure) throw new AppErrorException(result.getError());
+      return c.json({ ok: true });
+    },
+  )
+  .post("/:id/unban", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
     const actor = c.get("user");
     const userId = c.req.param("id");
-    const userResult = await di.AdminQueryService.getUser(userId);
-    if (userResult.isFailure) throw new AppErrorException(userResult.getError());
-    const found = userResult.getValue();
-    if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_USER_NOT_FOUND" });
-    const u = found.unwrap();
-    const result = await actionSvc.revokeSessions({
-      actorUserId: actor.id,
-      userId,
-      count: u.sessions.length,
-      headers: c.req.raw.headers,
-    });
+    const result = await di.StaffService.moderate(
+      { actorPermissions: c.get("staff").permissions, targetUserId: userId },
+      () => di.AdminModerationService.unban({ actorUserId: actor.id, userId }),
+    );
     if (result.isFailure) throw new AppErrorException(result.getError());
     return c.json({ ok: true });
-  });
+  })
+  .post("/:id/reset-password", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
+    const actor = c.get("user");
+    const userId = c.req.param("id");
+    const u = await findUserOr404(userId);
+    const result = await di.StaffService.moderate(
+      { actorPermissions: c.get("staff").permissions, targetUserId: userId },
+      () =>
+        di.AdminModerationService.resetPassword({ actorUserId: actor.id, userId }, () =>
+          deliverPasswordReset(
+            () => auth.api.requestPasswordReset({ body: { email: u.email } }),
+            (error) => di.IInstrumentation.capture(error),
+          ),
+        ),
+    );
+    if (result.isFailure) throw new AppErrorException(result.getError());
+    return c.json({ ok: true });
+  })
+  .delete("/:id/sessions", requireAuth, requireStaffPermission("users.moderate"), async (c) => {
+    const actor = c.get("user");
+    const userId = c.req.param("id");
+    await findUserOr404(userId);
+    const result = await di.StaffService.moderate(
+      { actorPermissions: c.get("staff").permissions, targetUserId: userId },
+      () => di.AdminModerationService.revokeSessions({ actorUserId: actor.id, userId }),
+    );
+    if (result.isFailure) throw new AppErrorException(result.getError());
+    return c.json({ ok: true });
+  })
+  .get("/:id/notes", requireAuth, requireStaffPermission("users.read"), async (c) => {
+    const result = await di.StaffNoteService.list({ type: "user", id: c.req.param("id") });
+    if (result.isFailure) throw new AppErrorException(result.getError());
+
+    return c.json({ items: result.getValue().map(serializeStaffNote) });
+  })
+  .post(
+    "/:id/notes",
+    requireAuth,
+    requireStaffPermission("notes.write"),
+    zV("json", addStaffNoteBodySchema),
+    async (c) => {
+      const result = await di.StaffNoteService.add({
+        actorUserId: c.get("user").id,
+        subject: { type: "user", id: c.req.param("id") },
+        body: c.req.valid("json").body,
+      });
+      if (result.isFailure) throw new AppErrorException(result.getError());
+
+      return c.json({ ok: true });
+    },
+  );

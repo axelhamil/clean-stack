@@ -4,16 +4,24 @@ import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import { DEFAULT_SWEEP_DEADLINE_MS } from "../../../../shared/internal-routes/sweep-runner";
 import { logger } from "../../../../shared/logger";
-import type { EmailError, IEmailService } from "../../../../shared/ports/email.port";
+import type { IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
-import type { ITransaction } from "../../../../shared/transaction";
+import type { ITotpVerifier } from "../../../../shared/ports/totp-verifier.port";
+import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
+import {
+  grantsStaffAccess,
+  isLastManager,
+  type StaffListing,
+} from "../../../../shared/staff-access";
 import type {
   ExecuteWipeOutput,
   IRgpdRepository,
   RgpdError,
   SoleOwnedOrgWithMembers,
+  UserDeletionState,
 } from "../ports/rgpd.port";
 
 const EXPORT_DOWNLOAD_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -76,9 +84,12 @@ export class RgpdService {
     private readonly rgpd: IRgpdRepository,
     private readonly storage: IStorageService,
     private readonly email: IEmailService,
-    private readonly transactions: IUnitOfWork<ITransaction>,
+    private readonly transactions: IUnitOfWork,
     private readonly outbox: IOutboxRepository,
     private readonly instrumentation: IInstrumentation,
+    private readonly staff: IStaffStore,
+    private readonly staffEnv: StaffListing,
+    private readonly totp: ITotpVerifier,
   ) {}
 
   async preflightAccountDeletion(
@@ -102,13 +113,10 @@ export class RgpdService {
     return this.instrumentation.startSpan(
       { name: "RgpdService > requestAccountDeletion", op: "function" },
       async () => {
-        const stateResult = await this.rgpd.getUserDeletionState(input.userId);
+        const stateResult = await this.loadDeletionState(input.userId);
         if (stateResult.isFailure) return Result.fail(stateResult.getError());
-        const stateOpt = stateResult.getValue();
-        if (stateOpt.isNone())
-          return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
 
-        const state = stateOpt.unwrap();
+        const state = stateResult.getValue();
 
         if (state.pendingDeletionUntil.isSome())
           return Result.ok({
@@ -135,9 +143,9 @@ export class RgpdService {
               message: "two-factor TOTP code required",
             });
 
-          const totpResult = await this.rgpd.verifyTotp(input.userId, input.totpCode);
+          const totpResult = await this.totp.consume(input.userId, input.totpCode);
           if (totpResult.isFailure) return Result.fail(totpResult.getError());
-          if (!totpResult.getValue())
+          if (totpResult.getValue() !== "accepted")
             return Result.fail({ code: "TWO_FACTOR_INVALID", message: "invalid TOTP code" });
         } else {
           if (!input.password)
@@ -155,8 +163,11 @@ export class RgpdService {
         const until = new Date(
           Date.now() + (env.RGPD_GRACE_PERIOD_DAYS ?? 7) * 24 * 60 * 60 * 1000,
         );
-        const txResult = await this.transactions.run(async (tx) => {
-          const marked = await this.rgpd.markPendingDeletion(input.userId, until, tx);
+        const txResult = await this.transactions.run(async () => {
+          const refused = await this.refusedLastManager(input.userId);
+          if (refused.isFailure) return refused;
+
+          const marked = await this.rgpd.markPendingDeletion(input.userId, until);
           if (marked.isFailure) return marked;
           await emitEvent(
             this.outbox,
@@ -165,9 +176,8 @@ export class RgpdService {
             input.userId,
             { userId: input.userId, pendingDeletionUntil: until },
             {},
-            tx,
           );
-          return Result.ok<void, RgpdError>(undefined);
+          return Result.ok<RgpdError>();
         });
         if (txResult.isFailure) return Result.fail(txResult.getError());
 
@@ -198,13 +208,10 @@ export class RgpdService {
     return this.instrumentation.startSpan(
       { name: "RgpdService > cancelAccountDeletion", op: "function" },
       async () => {
-        const stateResult = await this.rgpd.getUserDeletionState(input.userId);
+        const stateResult = await this.loadDeletionState(input.userId);
         if (stateResult.isFailure) return Result.fail(stateResult.getError());
-        const stateOpt = stateResult.getValue();
-        if (stateOpt.isNone())
-          return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
 
-        const state = stateOpt.unwrap();
+        const state = stateResult.getValue();
         if (state.deletedAt.isSome())
           return Result.fail({
             code: "ACCOUNT_DELETION_NOT_FOUND",
@@ -218,8 +225,8 @@ export class RgpdService {
           });
         const pendingUntil = state.pendingDeletionUntil.unwrap();
 
-        const txResult = await this.transactions.run(async (tx) => {
-          const cleared = await this.rgpd.clearPendingDeletion(input.userId, tx);
+        const txResult = await this.transactions.run(async () => {
+          const cleared = await this.rgpd.clearPendingDeletion(input.userId);
           if (cleared.isFailure) return cleared;
           await emitEvent(
             this.outbox,
@@ -228,9 +235,8 @@ export class RgpdService {
             input.userId,
             { userId: input.userId },
             {},
-            tx,
           );
-          return Result.ok<void, RgpdError>(undefined);
+          return Result.ok<RgpdError>();
         });
         if (txResult.isFailure) return Result.fail(txResult.getError());
 
@@ -260,13 +266,10 @@ export class RgpdService {
     return this.instrumentation.startSpan(
       { name: "RgpdService > executeAccountWipe", op: "function" },
       async () => {
-        const stateResult = await this.rgpd.getUserDeletionState(input.userId);
+        const stateResult = await this.loadDeletionState(input.userId);
         if (stateResult.isFailure) return Result.fail(stateResult.getError());
-        const stateOpt = stateResult.getValue();
-        if (stateOpt.isNone())
-          return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
 
-        const state = stateOpt.unwrap();
+        const state = stateResult.getValue();
         if (state.deletedAt.isSome())
           return Result.ok({ deletedOrgIds: [], storageKeysDeleted: 0 });
 
@@ -280,13 +283,24 @@ export class RgpdService {
         const originalName = state.name;
         const originalLocale = state.locale;
 
-        let wipeOutput: ExecuteWipeOutput;
-        let notifyFailure: EmailError | null = null;
+        let inner: Result<ExecuteWipeOutput, RgpdError>;
         try {
-          const inner = await this.transactions.run(async (trx) => {
-            const wipe = await this.rgpd.executeWipe(input.userId, trx);
+          inner = await this.transactions.run(async () => {
+            const wipe = await this.rgpd.executeWipe(input.userId);
             if (wipe.isFailure) return wipe;
             if (wipe.getValue().alreadyWiped) return wipe;
+
+            await announceImpersonationsEnded(
+              this.outbox,
+              wipe.getValue().endedImpersonations,
+              "revoked",
+              new Date(),
+            );
+
+            const revoked = await this.revokeStaffAccess(input.userId);
+            if (revoked.isFailure)
+              return Result.fail<ExecuteWipeOutput, RgpdError>(revoked.getError());
+
             await emitEvent(
               this.outbox,
               EventTypes.USER_DELETED,
@@ -294,9 +308,8 @@ export class RgpdService {
               input.userId,
               { userId: input.userId, deletedAt: new Date() },
               {},
-              trx,
             );
-            for (const orgId of wipe.getValue().deletedOrgIds ?? []) {
+            for (const orgId of wipe.getValue().deletedOrgIds) {
               await emitEvent(
                 this.outbox,
                 EventTypes.ORG_DELETED,
@@ -304,7 +317,6 @@ export class RgpdService {
                 orgId,
                 { organizationId: orgId, actorUserId: input.userId },
                 { organizationId: orgId },
-                trx,
               );
             }
             const notified = await this.email.sendTemplate(
@@ -312,41 +324,23 @@ export class RgpdService {
               originalEmail,
               { name: originalName },
               {
-                tx: trx,
                 locale: originalLocale.toUndefined(),
                 idempotencyKey: `delete-completed/${input.userId}`,
               },
             );
             if (notified.isFailure) {
-              notifyFailure = notified.getError();
-              throw new Error("rollback");
+              logger.error(
+                { userId: input.userId, code: notified.getError().code },
+                "account wipe rolled back: deletion confirmation could not be enqueued",
+              );
+              return Result.fail<ExecuteWipeOutput, RgpdError>({
+                code: "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
+                message: "deletion confirmation enqueue failed, wipe rolled back",
+              });
             }
             return wipe;
           });
-          if (inner.isFailure) {
-            logger.error(
-              { userId: input.userId, code: inner.getError().code },
-              "account wipe transaction reported failure",
-            );
-            return Result.fail({
-              code: "ACCOUNT_WIPE_PROVIDER_FAILURE",
-              message: "wipe transaction failed",
-            });
-          }
-          wipeOutput = inner.getValue();
         } catch (e) {
-          const failure = notifyFailure as EmailError | null;
-          const isRollbackSentinel = e instanceof Error && e.message === "rollback";
-          if (isRollbackSentinel && failure) {
-            logger.error(
-              { userId: input.userId, code: failure.code },
-              "account wipe rolled back — deletion confirmation could not be enqueued",
-            );
-            return Result.fail({
-              code: "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
-              message: "deletion confirmation enqueue failed — wipe rolled back",
-            });
-          }
           this.instrumentation.capture(e);
           logger.error({ err: e, userId: input.userId }, "account wipe transaction failed");
           return Result.fail({
@@ -355,30 +349,67 @@ export class RgpdService {
           });
         }
 
-        const list = await this.storage.listObjectKeys(`${input.userId}/`);
-        let keysDeleted = 0;
-        if (list.isSuccess) {
-          const keys = list.getValue();
-          keysDeleted = keys.length;
-          const del = await this.storage.deleteObjects(keys);
-          if (del.isFailure)
-            logger.warn(
-              { userId: input.userId, code: del.getError().code },
-              "storage prefix delete failed after wipe — orphaned blobs need manual cleanup",
-            );
-        } else {
-          logger.warn(
-            { userId: input.userId, code: list.getError().code },
-            "storage prefix listing failed after wipe — orphaned blobs need manual cleanup",
-          );
-        }
+        if (inner.isFailure) {
+          const failure = inner.getError();
+          if (failure.code === "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE") return Result.fail(failure);
 
-        return Result.ok({
-          deletedOrgIds: wipeOutput.deletedOrgIds ?? [],
-          storageKeysDeleted: keysDeleted,
-        });
+          logger.error(
+            { userId: input.userId, code: failure.code },
+            "account wipe transaction reported failure",
+          );
+          return Result.fail({
+            code: "ACCOUNT_WIPE_PROVIDER_FAILURE",
+            message: "wipe transaction failed",
+          });
+        }
+        const wipeOutput = inner.getValue();
+
+        const storageKeysDeleted = await this.purgeUserObjects(input.userId);
+
+        return Result.ok({ deletedOrgIds: wipeOutput.deletedOrgIds, storageKeysDeleted });
       },
     );
+  }
+
+  private async refusedLastManager(userId: string): Promise<Result<void, RgpdError>> {
+    if (this.staffEnv.PLATFORM_ADMIN_IDS.includes(userId)) return Result.ok();
+
+    const found = await this.staff.findActive(userId);
+    if (found.isFailure) return Result.fail(found.getError());
+
+    const isManager = found
+      .getValue()
+      .filter((row) => row.role === "manager" && grantsStaffAccess(row, this.staffEnv))
+      .isSome();
+    if (!isManager) return Result.ok();
+
+    const managers = await this.staff.lockActiveManagers();
+    if (managers.isFailure) return Result.fail(managers.getError());
+    if (!isLastManager(userId, managers.getValue(), this.staffEnv)) return Result.ok();
+
+    return Result.fail({
+      code: "ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN",
+      message: "appoint another staff manager before deleting this account",
+    });
+  }
+
+  private async revokeStaffAccess(userId: string): Promise<Result<void, RgpdError>> {
+    const found = await this.staff.findActive(userId);
+    if (found.isFailure) return Result.fail(found.getError());
+    if (found.getValue().isNone()) return Result.ok();
+
+    const revoked = await this.staff.revoke(userId);
+    if (revoked.isFailure) return Result.fail(revoked.getError());
+
+    await announceImpersonationsEnded(this.outbox, revoked.getValue(), "revoked", new Date());
+
+    await emitEvent(this.outbox, EventTypes.ADMIN_STAFF_REVOKED, "user", userId, {
+      actorUserId: userId,
+      userId,
+      role: found.getValue().unwrap().role,
+    });
+
+    return Result.ok();
   }
 
   async processPendingDeletions(
@@ -387,22 +418,18 @@ export class RgpdService {
     return this.instrumentation.startSpan(
       { name: "RgpdService > processPendingDeletions", op: "function" },
       async () => {
+        const dryRun = input.dryRun === true;
+
         const batchResult = await this.rgpd.findUsersReadyForWipe(input.batchSize ?? 50);
         if (batchResult.isFailure) {
           logger.error(
             { code: batchResult.getError().code },
-            "rgpd sweep aborted — could not load batch",
+            "rgpd sweep aborted: could not load batch",
           );
-          return Result.ok({
-            processed: 0,
-            succeeded: [],
-            failed: [],
-            dryRun: input.dryRun === true,
-            truncated: false,
-          });
+          return Result.ok({ processed: 0, succeeded: [], failed: [], dryRun, truncated: false });
         }
+
         const batch = batchResult.getValue();
-        const dryRun = input.dryRun === true;
 
         if (dryRun)
           return Result.ok({
@@ -423,7 +450,7 @@ export class RgpdService {
         for (const row of batch) {
           // Checked between wipes, never inside one: executeAccountWipe owns a transaction
           // with cascade deletes and storage calls, and cutting it short would leave a
-          // half-erased account — the one outcome an Art. 17 sweep must never produce.
+          // half-erased account, the one outcome an Art. 17 sweep must never produce.
           if (now() >= deadlineAt) {
             truncated = true;
             logger.warn(
@@ -431,7 +458,7 @@ export class RgpdService {
                 processed: succeeded.length + failed.length,
                 remaining: batch.length - succeeded.length - failed.length,
               },
-              "rgpd sweep hit the time budget — remaining accounts deferred to the next tick",
+              "rgpd sweep hit the time budget: remaining accounts deferred to the next tick",
             );
             break;
           }
@@ -448,7 +475,7 @@ export class RgpdService {
             failed.push({ userId: row.userId, errorCode: "WIPE_UNCAUGHT" });
             logger.error(
               { err: e, userId: row.userId, message },
-              "wipe threw uncaught error — Result contract violated",
+              "wipe threw uncaught error: Result contract violated",
             );
           }
         }
@@ -478,13 +505,10 @@ export class RgpdService {
     return this.instrumentation.startSpan(
       { name: "RgpdService > requestDataExport", op: "function" },
       async () => {
-        const stateResult = await this.rgpd.getUserDeletionState(input.userId);
+        const stateResult = await this.loadDeletionState(input.userId);
         if (stateResult.isFailure) return Result.fail(stateResult.getError());
-        const stateOpt = stateResult.getValue();
-        if (stateOpt.isNone())
-          return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
 
-        const state = stateOpt.unwrap();
+        const state = stateResult.getValue();
 
         const exportRateLimitHours = env.RGPD_EXPORT_RATE_LIMIT_HOURS ?? 24;
         const minNextRequestAt = state.lastExportRequestedAt.isSome()
@@ -515,8 +539,8 @@ export class RgpdService {
         });
         if (presigned.isFailure) return Result.fail(presigned.getError());
 
-        const txResult = await this.transactions.run(async (tx) => {
-          const touched = await this.rgpd.touchExportRequestedAt(input.userId, tx);
+        const txResult = await this.transactions.run(async () => {
+          const touched = await this.rgpd.touchExportRequestedAt(input.userId);
           if (touched.isFailure) return touched;
           await emitEvent(
             this.outbox,
@@ -525,7 +549,6 @@ export class RgpdService {
             input.userId,
             { userId: input.userId },
             {},
-            tx,
           );
           await emitEvent(
             this.outbox,
@@ -538,9 +561,8 @@ export class RgpdService {
               expiresAt: new Date(presigned.getValue().expiresAt),
             },
             {},
-            tx,
           );
-          return Result.ok<void, RgpdError>(undefined);
+          return Result.ok<RgpdError>();
         });
         if (txResult.isFailure) return Result.fail(txResult.getError());
 
@@ -566,5 +588,39 @@ export class RgpdService {
         return Result.ok({ ok: true, expiresAt: presigned.getValue().expiresAt });
       },
     );
+  }
+
+  private async loadDeletionState(userId: string): Promise<Result<UserDeletionState, RgpdError>> {
+    const stateResult = await this.rgpd.getUserDeletionState(userId);
+    if (stateResult.isFailure) return Result.fail(stateResult.getError());
+
+    const state = stateResult.getValue();
+    if (state.isNone()) {
+      return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
+    }
+
+    return Result.ok(state.unwrap());
+  }
+
+  private async purgeUserObjects(userId: string): Promise<number> {
+    const list = await this.storage.listObjectKeys(`${userId}/`);
+    if (list.isFailure) {
+      logger.warn(
+        { userId, code: list.getError().code },
+        "storage prefix listing failed after wipe: orphaned blobs need manual cleanup",
+      );
+      return 0;
+    }
+
+    const keys = list.getValue();
+    const deleted = await this.storage.deleteObjects(keys);
+    if (deleted.isFailure) {
+      logger.warn(
+        { userId, code: deleted.getError().code },
+        "storage prefix delete failed after wipe: orphaned blobs need manual cleanup",
+      );
+    }
+
+    return keys.length;
   }
 }

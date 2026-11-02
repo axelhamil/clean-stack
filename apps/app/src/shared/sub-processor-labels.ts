@@ -1,7 +1,7 @@
 import type { SubProcessorId } from "./sub-processors.config";
 
-// The register in `sub-processors.config.ts` stays English — it restates the
-// signed DPA — but `purpose` and `region` are the two fields a user actually
+// The register in `sub-processors.config.ts` stays English (it restates the
+// signed DPA), but `purpose` and `region` are the two fields a user actually
 // reads, on the privacy settings card and on the public register page. Both
 // read the same keys, so the two surfaces can never drift apart. They live in
 // `common.legal` rather than under either page's own namespace precisely

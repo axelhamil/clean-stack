@@ -37,7 +37,7 @@ export type EmailTemplateKey = keyof EmailTemplates;
  * plus the bound `emails` translator.
  *
  * Every template needs exactly this shape, so deriving it keeps the variable
- * contract in one place — adding a variable to `EmailTemplates` immediately
+ * contract in one place: adding a variable to `EmailTemplates` immediately
  * type-checks against its component, instead of drifting behind a hand-written
  * copy of the same members.
  */

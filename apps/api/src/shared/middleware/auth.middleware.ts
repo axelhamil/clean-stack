@@ -1,11 +1,23 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { auth, type SessionData, type SessionUser } from "../../auth";
+import { di } from "../../container";
+
+const IMPERSONATION_STOP_PATH = "/admin/impersonation/stop";
 
 type AuthVariables = {
   user: SessionUser | null;
   session: SessionData | null;
 };
+
+export function isCurrentlyBanned(user: {
+  banned?: boolean | null;
+  banExpires?: Date | null;
+}): boolean {
+  if (user.banned !== true) return false;
+
+  return !user.banExpires || new Date(user.banExpires).getTime() > Date.now();
+}
 
 export const sessionMiddleware = createMiddleware<{
   Variables: AuthVariables;
@@ -21,6 +33,23 @@ export const sessionMiddleware = createMiddleware<{
   }
 
   const result = await auth.api.getSession({ headers: c.req.raw.headers });
+  const impersonator = result?.session?.impersonatedBy;
+  if (
+    impersonator &&
+    c.req.path !== IMPERSONATION_STOP_PATH &&
+    !(await di.StaffAccessService.impersonatorHolds(impersonator))
+  ) {
+    c.set("user", null);
+    c.set("session", null);
+    return next();
+  }
+
+  if (result && isCurrentlyBanned(result.user) && c.req.path !== IMPERSONATION_STOP_PATH) {
+    c.set("user", null);
+    c.set("session", null);
+    return next();
+  }
+
   c.set("user", result?.user ?? null);
   c.set("session", result?.session ?? null);
 

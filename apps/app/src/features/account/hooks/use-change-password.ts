@@ -1,3 +1,4 @@
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -6,6 +7,7 @@ import type { ChangePasswordInput } from "../account.schema";
 
 export function useChangePassword() {
   const { t } = useTranslation("settings");
+
   return useMutation({
     mutationKey: ["account", "change-password"],
     mutationFn: async (input: ChangePasswordInput) => {
@@ -13,7 +15,7 @@ export function useChangePassword() {
         currentPassword: input.currentPassword,
         newPassword: input.newPassword,
       });
-      if (error) throw new Error(error.message ?? t("account.passwordChangeFailed"));
+      if (error) throw toAuthClientError(error, t("account.passwordChangeFailed"));
     },
     onSuccess: () => {
       toast.success(t("account.passwordChangedToast"));

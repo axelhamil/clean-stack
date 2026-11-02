@@ -1,16 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogFooter,
-} from "@packages/ui/components/ui/alert-dialog";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
-import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { buildDeletionOnError } from "../build-deletion-on-error";
+import { DeletionConfirmFooter } from "../components/deletion-confirm-footer";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import {
   type RequestDeletionWithPasswordInput,
@@ -22,11 +17,10 @@ interface RequestDeletionPasswordFormProps {
 }
 
 export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPasswordFormProps) {
-  const { t } = useTranslation("errors");
-  const { t: tSettings } = useTranslation("settings");
-  const { t: tCommon } = useTranslation("common");
+  const { t } = useTranslation("settings");
+  const revealLabels = usePasswordRevealLabels();
+  const { t: tErrors } = useTranslation("errors");
   const mutation = useRequestDeletion({ onClose });
-  const guard = useImpersonationGuard();
   const form = useForm<RequestDeletionWithPasswordInput>({
     resolver: zodResolver(requestDeletionWithPasswordSchema),
     defaultValues: { password: "" },
@@ -41,8 +35,8 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
               onClose,
               "ACCOUNT_PASSWORD_INVALID",
               (msg) => form.setError("password", { message: msg }),
+              tErrors,
               t,
-              tSettings,
             ),
           }),
         )}
@@ -52,23 +46,13 @@ export function RequestDeletionPasswordForm({ onClose }: RequestDeletionPassword
         <FormTextField
           control={form.control}
           name="password"
-          label={tSettings("deletion.passwordLabel")}
+          label={t("deletion.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
-          placeholder={tSettings("deletion.passwordPlaceholder")}
+          placeholder={t("deletion.passwordPlaceholder")}
         />
-        <AlertDialogFooter>
-          <AlertDialogCancel type="button">{tCommon("actions.cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            type="submit"
-            variant="destructive"
-            disabled={mutation.isPending || guard.blocked}
-            {...guard.describeProps(mutation.isPending)}
-          >
-            {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-        <ImpersonationReason guard={guard} />
+        <DeletionConfirmFooter isPending={mutation.isPending} />
       </form>
     </Form>
   );

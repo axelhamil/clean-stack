@@ -4,7 +4,7 @@
  * Store I/O (Postgres round-trips) is the responsibility of the rate-limiter-flexible
  * library; integration coverage requires a real DB and lives outside this unit suite.
  * The drizzleFactory constructor-argument mapping is verified by spying the constructor
- * (mock.module on rate-limiter-flexible) — no real DB queries are issued.
+ * (mock.module on rate-limiter-flexible), so no real DB query is issued.
  *
  * firstBlock strict-equality concurrency note:
  *   Postgres store: RateLimiterDrizzle uses ON CONFLICT … DO UPDATE with an atomic
@@ -17,90 +17,18 @@
  */
 
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-// Import real lib exports before mock.module (mock.module callback is synchronous).
-import {
-  RateLimiterMemory as RealRateLimiterMemory,
-  RateLimiterRes as RealRateLimiterRes,
-} from "rate-limiter-flexible";
-import type { IInstrumentation } from "../ports/instrumentation.port";
+import { rateLimitSchema } from "@packages/drizzle";
+// Import the real lib before mock.module (the mock.module callback is synchronous).
+import * as realRateLimiterFlexible from "rate-limiter-flexible";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { WindowConfig } from "../ports/rate-limiter.port";
 
-// ── Mock @packages/drizzle ──────────────────────────────────────────────────
-// The adapter imports `rateLimitSchema` + the `RateLimitDbClient` type; the container
-// imports `getRateLimitDbClient`. Both are needed here, nowhere else — the replacement
-// stays inside this file's module registry.
-const fakeDb = {};
+// The Postgres factory only hands the client through, so a bare object stands in
+// for it; the schema is the real one.
 const fakeRateLimitClient = {};
-const fakeRateLimitRecord = { key: {}, points: {}, expire: {} };
-
-mock.module("@packages/drizzle", () => ({
-  db: fakeDb,
-  getRateLimitDbClient: () => fakeRateLimitClient,
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  not: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  like: () => ({}),
-  inArray: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: fakeRateLimitRecord },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-}));
 
 // ── Mock rate-limiter-flexible ──────────────────────────────────────────────
-// RateLimiterDrizzle is a spy constructor — no real DB calls.
+// RateLimiterDrizzle is a spy constructor: no real DB calls.
 const drizzleCtorCalls: unknown[] = [];
 
 class FakeRateLimiterDrizzle {
@@ -113,49 +41,15 @@ class FakeRateLimiterDrizzle {
 }
 
 mock.module("rate-limiter-flexible", () => ({
-  RateLimiterMemory: RealRateLimiterMemory,
-  RateLimiterRes: RealRateLimiterRes,
+  ...realRateLimiterFlexible,
   RateLimiterDrizzle: FakeRateLimiterDrizzle,
-  RateLimiterRedis: class {},
-  RateLimiterRedisNonAtomic: class {},
-  RateLimiterMongo: class {},
-  RateLimiterMySQL: class {},
-  RateLimiterPostgres: class {},
-  RateLimiterClusterMaster: class {},
-  RateLimiterClusterMasterPM2: class {},
-  RateLimiterCluster: class {},
-  RLWrapperBlackAndWhite: class {},
-  RLWrapperTimeouts: class {},
-  RateLimiterUnion: class {},
-  RateLimiterQueue: class {},
-  BurstyRateLimiter: class {},
-  RateLimiterCompatibleAbstract: class {},
-  RateLimiterDynamo: class {},
-  RateLimiterPrisma: class {},
-  RateLimiterValkey: class {},
-  RateLimiterValkeyGlide: class {},
-  RateLimiterSQLite: class {},
-  RateLimiterEtcd: class {},
-  RateLimiterDrizzleNonAtomic: class {},
-  RateLimiterEtcdNonAtomic: class {},
-  RateLimiterQueueError: class {},
-  RateLimiterEtcdTransactionFailedError: class {},
 }));
 
 const { RateLimiterFlexibleAdapter, memoryFactory, makeDrizzleFactory, storeFactoryFor } =
   await import("../services/rate-limiter-flexible.adapter");
 
-function makeNoopInstrumentation(): IInstrumentation {
-  return {
-    startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-    capture: () => {},
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  };
-}
-
 function makeAdapter() {
-  return new RateLimiterFlexibleAdapter(makeNoopInstrumentation(), memoryFactory);
+  return new RateLimiterFlexibleAdapter(mockInstrumentation(), memoryFactory);
 }
 
 const WINDOW_1S: WindowConfig = { policyName: "test", windowSec: 1, maxRequests: 3 };
@@ -260,13 +154,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
   describe("instrumentation.capture on internal error", () => {
     it("calls instrumentation.capture and returns isFailure on unexpected error", async () => {
-      const captureSpy = mock(() => {});
-      const instrumentation: IInstrumentation = {
-        startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-        capture: captureSpy,
-        addBreadcrumb: () => {},
-        setSpanAttributes: () => {},
-      };
+      const instrumentation = mockInstrumentation();
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);
 
@@ -280,7 +168,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("RATE_LIMITER_INTERNAL_ERROR");
-      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(instrumentation.capture).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -302,7 +190,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
     it("clamps resetSeconds to 0 when msBeforeNext is -1 (no-expiry postgres row)", async () => {
       // RateLimiterDrizzle returns msBeforeNext=-1 when expire IS NULL.
-      // Without Math.max the formula yields ceil(-1/1000)=0 — already safe,
+      // Without Math.max the formula yields ceil(-1/1000)=0, already safe,
       // but explicit guard prevents future regressions if msBeforeNext goes more negative.
 
       // RateLimiterRes properties are read-only; construct via a stub factory that throws
@@ -320,10 +208,7 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
         },
       });
 
-      const adapter = new RateLimiterFlexibleAdapter(
-        makeNoopInstrumentation(),
-        stubFactory as never,
-      );
+      const adapter = new RateLimiterFlexibleAdapter(mockInstrumentation(), stubFactory as never);
       const w: WindowConfig = { policyName: "p", windowSec: 60, maxRequests: 1 };
       const result = await adapter.consume("key", [w]);
       expect(result.isSuccess).toBe(true);
@@ -374,20 +259,15 @@ describe("RateLimiterFlexibleAdapter (memoryFactory)", () => {
 
   describe("span name", () => {
     it("outer span is hardcoded to RateLimiterFlexibleAdapter > consume", async () => {
-      const startSpanSpy = mock((_opts: unknown, cb: () => unknown) => cb());
-      const instrumentation: IInstrumentation = {
-        startSpan: startSpanSpy as unknown as IInstrumentation["startSpan"],
-        capture: () => {},
-        addBreadcrumb: () => {},
-        setSpanAttributes: () => {},
-      };
+      const instrumentation = mockInstrumentation();
 
       const adapter = new RateLimiterFlexibleAdapter(instrumentation, memoryFactory);
       await adapter.consume("ip-span", [WINDOW_1S]);
 
-      expect(startSpanSpy).toHaveBeenCalledTimes(1);
-      const callArg = startSpanSpy.mock.calls[0]?.[0] as { name: string };
-      expect(callArg.name).toBe("RateLimiterFlexibleAdapter > consume");
+      expect(instrumentation.startSpan).toHaveBeenCalledTimes(1);
+      expect(instrumentation.startSpan.mock.calls[0]?.[0].name).toBe(
+        "RateLimiterFlexibleAdapter > consume",
+      );
     });
   });
 });
@@ -408,7 +288,7 @@ describe("makeDrizzleFactory option-mapping", () => {
     expect(drizzleCtorCalls).toHaveLength(1);
     const opts = drizzleCtorCalls[0] as Record<string, unknown>;
     expect(opts.storeClient).toBe(fakeRateLimitClient);
-    expect(opts.schema).toBe(fakeRateLimitRecord);
+    expect(opts.schema).toBe(rateLimitSchema.rateLimitRecord);
     expect(opts.keyPrefix).toBe("auth-sign-in:900");
     expect(opts.points).toBe(5);
     expect(opts.duration).toBe(900);

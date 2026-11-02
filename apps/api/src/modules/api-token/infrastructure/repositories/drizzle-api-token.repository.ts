@@ -1,37 +1,49 @@
 import { Option, Result } from "@packages/ddd-kit";
-import type { ApiTokenRevokedReason } from "@packages/drizzle";
-import { and, apiTokenSchema, db, eq, isNull, lt, or } from "@packages/drizzle";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
+import { and, apiTokenSchema, eq, isNull, lt, or, resolveExecutor } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   ApiTokenError,
   ApiTokenRecord,
+  ApiTokenRevokedReason,
   IApiTokenRepository,
   TokenOwner,
-} from "../../application/ports/api-token.port";
+} from "../../../../shared/ports/api-token.port";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const t = apiTokenSchema.apiToken;
 
-function storeFailure(err: unknown, op: string): ApiTokenError {
+function toRecord(row: typeof t.$inferSelect): ApiTokenRecord {
   return {
-    code: "API_TOKEN_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
+    id: row.id,
+    userId: row.userId,
+    organizationId: Option.fromNullable(row.organizationId),
+    name: row.name,
+    scopes: row.scopes,
+    tokenHmac: row.tokenHmac,
+    pepperVersion: row.pepperVersion,
+    tokenStart: row.tokenStart,
+    lastUsedAt: Option.fromNullable(row.lastUsedAt),
+    expiresAt: Option.fromNullable(row.expiresAt),
+    revokedAt: Option.fromNullable(row.revokedAt),
+    revokedReason: Option.fromNullable(row.revokedReason),
+    createdAt: row.createdAt,
   };
 }
+
+const storeFailure = dbOperationFailure("API_TOKEN_PROVIDER_FAILURE");
 
 /**
  * The rows an owner may see and revoke. Always AND-joined on `userId`, so a
  * member never reaches another member's token; the organization leg widens to
  * "this organization OR no organization at all" so a token created with the
- * "Personal" scope stays reachable while an organization is active — which it
- * always is, every user owning a personal organization.
+ * "Personal" scope stays reachable while an organization is active (which it
+ * always is, every user owning a personal organization).
  *
  * Exported so the repository's other methods can compose it; the predicate
  * itself is proven against a real Postgres by
  * `scripts/check-api-token-visibility.ts` (`pnpm --filter api
- * check:api-token-visibility`), not by the unit suite — that suite mocks
+ * check:api-token-visibility`), not by the unit suite: that suite mocks
  * `@packages/drizzle`'s `and`/`or`/`eq`/`isNull`, so it evaluates the mock,
  * never the actual WHERE clause.
  */
@@ -47,25 +59,25 @@ export function visibleTokensFilter(owner: TokenOwner) {
 export class DrizzleApiTokenRepository implements IApiTokenRepository {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async insert(row: ApiTokenRecord, tx?: ITransaction): Promise<Result<void, ApiTokenError>> {
-    const invoker = tx ?? db;
+  async insert(row: ApiTokenRecord): Promise<Result<void, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > insert" },
       async () => {
         try {
-          const query = invoker.insert(t).values({
+          const query = exec.insert(t).values({
             id: row.id,
             userId: row.userId,
-            organizationId: row.organizationId,
+            organizationId: row.organizationId.toNull(),
             name: row.name,
             scopes: row.scopes,
             tokenHmac: row.tokenHmac,
             pepperVersion: row.pepperVersion,
             tokenStart: row.tokenStart,
-            lastUsedAt: row.lastUsedAt,
-            expiresAt: row.expiresAt,
-            revokedAt: row.revokedAt,
-            revokedReason: row.revokedReason,
+            lastUsedAt: row.lastUsedAt.toNull(),
+            expiresAt: row.expiresAt.toNull(),
+            revokedAt: row.revokedAt.toNull(),
+            revokedReason: row.revokedReason.toNull(),
             createdAt: row.createdAt,
           });
           await this.instrumentation.startSpan(
@@ -75,27 +87,27 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "insert"));
+          return Result.fail(storeFailure("insert"));
         }
       },
     );
   }
 
   async listByOwner(owner: TokenOwner): Promise<Result<ApiTokenRecord[], ApiTokenError>> {
-    const invoker = db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > listByOwner" },
       async () => {
         try {
-          const query = invoker.select().from(t).where(visibleTokensFilter(owner));
+          const query = exec.select().from(t).where(visibleTokensFilter(owner));
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(rows as ApiTokenRecord[]);
+          return Result.ok(rows.map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "listByOwner"));
+          return Result.fail(storeFailure("listByOwner"));
         }
       },
     );
@@ -105,60 +117,56 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     id: string,
     owner: TokenOwner,
   ): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>> {
-    const invoker = db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > findByIdForOwner" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .select()
             .from(t)
             .where(and(eq(t.id, id), visibleTokensFilter(owner)))
             .limit(1);
-          const rows = await this.instrumentation.startSpan(
+          const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(Option.fromNullable(rows[0] as ApiTokenRecord | undefined));
+          return Result.ok(Option.fromNullable(row).map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findByIdForOwner"));
+          return Result.fail(storeFailure("findByIdForOwner"));
         }
       },
     );
   }
 
   async findByHmac(hmac: string): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>> {
-    const invoker = db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > findByHmac" },
       async () => {
         try {
-          const query = invoker.select().from(t).where(eq(t.tokenHmac, hmac)).limit(1);
-          const rows = await this.instrumentation.startSpan(
+          const query = exec.select().from(t).where(eq(t.tokenHmac, hmac)).limit(1);
+          const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok(Option.fromNullable(rows[0] as ApiTokenRecord | undefined));
+          return Result.ok(Option.fromNullable(row).map(toRecord));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findByHmac"));
+          return Result.fail(storeFailure("findByHmac"));
         }
       },
     );
   }
 
-  async revoke(
-    id: string,
-    reason: ApiTokenRevokedReason,
-    tx?: ITransaction,
-  ): Promise<Result<void, ApiTokenError>> {
-    const invoker = tx ?? db;
+  async revoke(id: string, reason: ApiTokenRevokedReason): Promise<Result<void, ApiTokenError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > revoke" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .update(t)
             .set({ revokedAt: new Date(), revokedReason: reason })
             .where(and(eq(t.id, id), isNull(t.revokedAt)));
@@ -169,7 +177,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "revoke"));
+          return Result.fail(storeFailure("revoke"));
         }
       },
     );
@@ -178,14 +186,13 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
   async revokeAllForMembership(
     userId: string,
     organizationId: string,
-    tx?: ITransaction,
   ): Promise<Result<string[], ApiTokenError>> {
-    const invoker = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > revokeAllForMembership" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .update(t)
             .set({ revokedAt: new Date(), revokedReason: "membership_lost" })
             .where(
@@ -199,19 +206,19 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(rows.map((r) => r.id));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "revokeAllForMembership"));
+          return Result.fail(storeFailure("revokeAllForMembership"));
         }
       },
     );
   }
 
   async touchLastUsed(id: string, bucketFloor: Date): Promise<Result<boolean, ApiTokenError>> {
-    const invoker = db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > touchLastUsed" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .update(t)
             .set({ lastUsedAt: new Date() })
             .where(and(eq(t.id, id), or(isNull(t.lastUsedAt), lt(t.lastUsedAt, bucketFloor))))
@@ -223,7 +230,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok(rows.length > 0);
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "touchLastUsed"));
+          return Result.fail(storeFailure("touchLastUsed"));
         }
       },
     );
@@ -234,15 +241,12 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     hmac: string,
     pepperVersion: number,
   ): Promise<Result<void, ApiTokenError>> {
-    const invoker = db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > rehash" },
       async () => {
         try {
-          const query = invoker
-            .update(t)
-            .set({ tokenHmac: hmac, pepperVersion })
-            .where(eq(t.id, id));
+          const query = exec.update(t).set({ tokenHmac: hmac, pepperVersion }).where(eq(t.id, id));
           await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
@@ -250,7 +254,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           return Result.ok();
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "rehash"));
+          return Result.fail(storeFailure("rehash"));
         }
       },
     );

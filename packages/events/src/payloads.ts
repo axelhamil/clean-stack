@@ -21,6 +21,7 @@ export type UserSignedInPayload = z.infer<typeof UserSignedInPayload>;
 
 export const UserSignedOutPayload = UserRef.extend({
   sessionId: z.string(),
+  actorUserId: z.string().nullable(),
 });
 export type UserSignedOutPayload = z.infer<typeof UserSignedOutPayload>;
 
@@ -100,7 +101,7 @@ export const UserProfileUpdatedPayload = UserRef.extend({
 export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
 
 export const UserEmailChangeRequestedPayload = UserRef.extend({
-  newEmail: z.email(),
+  newEmail: Email,
 });
 export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
 
@@ -250,6 +251,14 @@ export const WebhookDeliveryExhaustedPayload = OrgRef.extend({
 });
 export type WebhookDeliveryExhaustedPayload = z.infer<typeof WebhookDeliveryExhaustedPayload>;
 
+export const WebhookDeliveryReplayedPayload = OrgRef.extend({
+  endpointId: z.string(),
+  deliveryId: z.string(),
+  replayedDeliveryId: z.string(),
+  actorUserId: z.string(),
+});
+export type WebhookDeliveryReplayedPayload = z.infer<typeof WebhookDeliveryReplayedPayload>;
+
 export const EmailDeliveryExhaustedPayload = z.object({
   messageId: z.string(),
   template: z.string().nullable(),
@@ -260,6 +269,19 @@ export const EmailDeliveryExhaustedPayload = z.object({
 });
 export type EmailDeliveryExhaustedPayload = z.infer<typeof EmailDeliveryExhaustedPayload>;
 
+export const OUTBOX_LAST_ERROR_MAX_LENGTH = 1_000;
+
+export const OutboxEventDeadPayload = z.object({
+  eventId: z.string(),
+  eventType: z.string(),
+  aggregateId: z.string(),
+  attempts: z.number().int().positive(),
+  lastError: z.string().max(OUTBOX_LAST_ERROR_MAX_LENGTH),
+  failedHandlers: z.array(z.string()),
+  actorUserId: z.null(),
+});
+export type OutboxEventDeadPayload = z.infer<typeof OutboxEventDeadPayload>;
+
 export const UserPolicyAcceptedPayload = UserRef.extend({
   policyType: z.string(),
   policyVersion: z.string(),
@@ -268,7 +290,7 @@ export const UserPolicyAcceptedPayload = UserRef.extend({
 export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
 
 // userId is optional: guest consents have no userId, only subjectId (anonymous cookie-based id).
-// extractActor will fall back to system/anonymous for guests — accepted per §7 (no identified user).
+// extractActor falls back to system/anonymous for guests, accepted per §7 (no identified user).
 export const UserCookieConsentGrantedPayload = z.object({
   userId: z.string().optional(),
   subjectId: z.string(),
@@ -287,6 +309,12 @@ export const UserCookieConsentWithdrawnPayload = z.object({
 });
 export type UserCookieConsentWithdrawnPayload = z.infer<typeof UserCookieConsentWithdrawnPayload>;
 
+export const UserCookieConsentLinkedPayload = UserRef.extend({
+  subjectId: z.string(),
+  consentRecordIds: z.array(z.string()).min(1),
+});
+export type UserCookieConsentLinkedPayload = z.infer<typeof UserCookieConsentLinkedPayload>;
+
 export const SecurityRateLimitExceededPayload = z.object({
   actorUserId: z.string().nullable(),
   ip: z.string().max(45),
@@ -297,7 +325,7 @@ export const SecurityRateLimitExceededPayload = z.object({
 export type SecurityRateLimitExceededPayload = z.infer<typeof SecurityRateLimitExceededPayload>;
 
 export const SecurityCspViolationPayload = z.object({
-  // Always null: CSP reports are browser-sent before any authenticated session — no known actor.
+  // Always null: CSP reports are browser-sent before any authenticated session, so no actor is known.
   actorUserId: z.string().nullable(),
   ip: z.string().max(45),
   documentUri: z.string().max(2048),
@@ -337,6 +365,29 @@ export const SecuritySignupRejectedPayload = z.object({
   reason: z.enum(["disposable_email"]),
 });
 export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
+
+export const SecurityImpossibleTravelDetectedPayload = z.object({
+  userId: z.string(),
+  sessionId: z.string(),
+  previousSessionId: z.string(),
+  previousCountry: z.string().max(2),
+  country: z.string().max(2),
+  ip: z.string().max(45).nullable(),
+  elapsedSeconds: z.number().int().nonnegative(),
+});
+export type SecurityImpossibleTravelDetectedPayload = z.infer<
+  typeof SecurityImpossibleTravelDetectedPayload
+>;
+
+export const SecurityGeoDeniedPayload = z.object({
+  actorUserId: z.string().nullable(),
+  ip: z.string().max(45).nullable(),
+  path: z.string().max(512),
+  country: z.string().max(2).nullable(),
+  asn: z.string().max(10).nullable(),
+  reason: z.enum(["country", "asn"]),
+});
+export type SecurityGeoDeniedPayload = z.infer<typeof SecurityGeoDeniedPayload>;
 
 export const SecurityOperatorAuditAccessedPayload = z.object({
   actorUserId: z.string(),
@@ -395,7 +446,7 @@ export type BillingQuotaExceededPayload = z.infer<typeof BillingQuotaExceededPay
 
 const ActorRef = z.object({ actorUserId: z.string() });
 
-export const AdminImpersonationStartedPayload = ActorRef.merge(UserRef).extend({
+export const AdminImpersonationStartedPayload = ActorRef.extend(UserRef.shape).extend({
   reason: z.string().min(1),
   ticketRef: z.string().optional(),
   ip: z.string().nullable(),
@@ -403,33 +454,156 @@ export const AdminImpersonationStartedPayload = ActorRef.merge(UserRef).extend({
 });
 export type AdminImpersonationStartedPayload = z.infer<typeof AdminImpersonationStartedPayload>;
 
-export const AdminImpersonationStoppedPayload = ActorRef.merge(UserRef).extend({
+export const AdminImpersonationStoppedPayload = ActorRef.extend(UserRef.shape).extend({
   durationMs: z.number().int().nonnegative(),
+  endReason: z.enum(["stopped", "expired", "revoked"]),
 });
 export type AdminImpersonationStoppedPayload = z.infer<typeof AdminImpersonationStoppedPayload>;
 
-export const AdminUserBannedPayload = ActorRef.merge(UserRef).extend({
+export const AdminUserBannedPayload = ActorRef.extend(UserRef.shape).extend({
   reason: z.string().min(1),
   expiresAt: z.string().nullable(),
 });
 export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 
-export const AdminUserUnbannedPayload = ActorRef.merge(UserRef);
+export const AdminUserUnbannedPayload = UserRef.extend({
+  actorUserId: z.string().nullable(),
+});
 export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
-export const AdminUserRoleChangedPayload = ActorRef.merge(UserRef).extend({
-  from: z.string().nullable(),
-  to: z.string(),
-});
-export type AdminUserRoleChangedPayload = z.infer<typeof AdminUserRoleChangedPayload>;
-
-export const AdminUserPasswordResetPayload = ActorRef.merge(UserRef);
+export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);
 export type AdminUserPasswordResetPayload = z.infer<typeof AdminUserPasswordResetPayload>;
 
-export const AdminUserSessionsRevokedPayload = ActorRef.merge(UserRef).extend({
+export const AdminUserSessionsRevokedPayload = ActorRef.extend(UserRef.shape).extend({
   count: z.number().int().nonnegative(),
 });
 export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
+
+export const AdminStaffAddedPayload = UserRef.extend({
+  actorUserId: z.string().nullable(),
+  role: z.string(),
+  source: z.enum(["env", "console"]),
+});
+export type AdminStaffAddedPayload = z.infer<typeof AdminStaffAddedPayload>;
+
+export const AdminStaffRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
+  from: z.string(),
+  to: z.string(),
+});
+export type AdminStaffRoleChangedPayload = z.infer<typeof AdminStaffRoleChangedPayload>;
+
+export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
+  role: z.string(),
+});
+export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
+
+export const AdminStaffOverrideSetPayload = ActorRef.extend(UserRef.shape).extend({
+  overrideId: z.string(),
+  permission: z.string(),
+  effect: z.enum(["grant", "deny"]),
+  expiresAt: z.string().nullable(),
+});
+export type AdminStaffOverrideSetPayload = z.infer<typeof AdminStaffOverrideSetPayload>;
+
+export const AdminStaffOverrideRevokedPayload = ActorRef.extend(UserRef.shape).extend({
+  overrideId: z.string(),
+  permission: z.string(),
+  effect: z.enum(["grant", "deny"]),
+});
+export type AdminStaffOverrideRevokedPayload = z.infer<typeof AdminStaffOverrideRevokedPayload>;
+
+export const AdminOpsOutboxRequeuedPayload = ActorRef.extend({
+  requeued: z.number().int().positive(),
+  eventIds: z.array(z.string()),
+});
+export type AdminOpsOutboxRequeuedPayload = z.infer<typeof AdminOpsOutboxRequeuedPayload>;
+
+export const AdminOpsStripeEventReplayedPayload = ActorRef.extend({
+  stripeEventId: z.string(),
+  stripeEventType: z.string(),
+  outcome: z.enum(["succeeded", "failed"]),
+});
+export type AdminOpsStripeEventReplayedPayload = z.infer<typeof AdminOpsStripeEventReplayedPayload>;
+
+export const AdminPlanOverrideSetPayload = ActorRef.extend({
+  overrideId: z.string(),
+  organizationId: z.string(),
+  tier: z.string(),
+  expiresAt: z.string(),
+  replacedOverrideId: z.string().nullable(),
+});
+export type AdminPlanOverrideSetPayload = z.infer<typeof AdminPlanOverrideSetPayload>;
+
+export const AdminPlanOverrideRevokedPayload = ActorRef.extend({
+  overrideId: z.string(),
+  organizationId: z.string(),
+  tier: z.string(),
+});
+export type AdminPlanOverrideRevokedPayload = z.infer<typeof AdminPlanOverrideRevokedPayload>;
+
+export const AdminNoteAddedPayload = ActorRef.extend({
+  noteId: z.string(),
+  subjectType: z.enum(["user", "org"]),
+  subjectId: z.string(),
+});
+export type AdminNoteAddedPayload = z.infer<typeof AdminNoteAddedPayload>;
+
+export const AdminViewSavedPayload = ActorRef.extend({
+  viewId: z.string(),
+  screen: z.string(),
+});
+export type AdminViewSavedPayload = z.infer<typeof AdminViewSavedPayload>;
+
+export const AdminViewDeletedPayload = ActorRef.extend({
+  viewId: z.string(),
+  screen: z.string(),
+});
+export type AdminViewDeletedPayload = z.infer<typeof AdminViewDeletedPayload>;
+
+export const AdminStepUpVerifiedPayload = UserRef.extend({
+  validUntil: z.string(),
+  ip: z.string().nullable(),
+});
+export type AdminStepUpVerifiedPayload = z.infer<typeof AdminStepUpVerifiedPayload>;
+
+export const AdminStepUpFailedPayload = UserRef.extend({
+  reason: z.enum(["invalid_code", "replayed_code"]),
+  ip: z.string().nullable(),
+});
+export type AdminStepUpFailedPayload = z.infer<typeof AdminStepUpFailedPayload>;
+
+const ApprovalRef = UserRef.extend({
+  approvalId: z.string(),
+  action: z.string(),
+  requesterUserId: z.string(),
+});
+
+export const AdminApprovalRequestedPayload = ActorRef.extend(ApprovalRef.shape);
+export type AdminApprovalRequestedPayload = z.infer<typeof AdminApprovalRequestedPayload>;
+
+export const AdminApprovalDecidedPayload = ActorRef.extend(ApprovalRef.shape).extend({
+  outcome: z.enum(["approved", "rejected"]),
+  note: z.string().min(1),
+});
+export type AdminApprovalDecidedPayload = z.infer<typeof AdminApprovalDecidedPayload>;
+
+export const AdminApprovalCancelledPayload = ApprovalRef.extend({
+  actorUserId: z.string().nullable(),
+});
+export type AdminApprovalCancelledPayload = z.infer<typeof AdminApprovalCancelledPayload>;
+
+export const AdminApprovalExpiredPayload = ApprovalRef.extend({
+  actorUserId: z.string().nullable(),
+});
+export type AdminApprovalExpiredPayload = z.infer<typeof AdminApprovalExpiredPayload>;
+
+export const AdminApprovalExecutedPayload = ActorRef.extend(ApprovalRef.shape);
+export type AdminApprovalExecutedPayload = z.infer<typeof AdminApprovalExecutedPayload>;
+
+export const AdminApprovalFailedPayload = ActorRef.extend(ApprovalRef.shape).extend({
+  reason: z.string().min(1),
+});
+export type AdminApprovalFailedPayload = z.infer<typeof AdminApprovalFailedPayload>;
 
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
@@ -438,16 +612,18 @@ export const ApiTokenCreatedPayload = z.object({
   tokenId: z.string(),
   name: z.string(),
   scopes: z.array(z.string()),
-  expiresAt: z.date().nullable(),
+  expiresAt: z.coerce.date().nullable(),
 });
 export type ApiTokenCreatedPayload = z.infer<typeof ApiTokenCreatedPayload>;
+
+export const API_TOKEN_REVOKED_REASONS = ["user", "membership_lost", "leaked"] as const;
 
 export const ApiTokenRevokedPayload = z.object({
   userId: z.string(),
   actorUserId: z.string().nullable(),
   organizationId: z.string().nullable(),
   tokenId: z.string(),
-  reason: z.enum(["user", "membership_lost", "leaked"]),
+  reason: z.enum(API_TOKEN_REVOKED_REASONS),
 });
 export type ApiTokenRevokedPayload = z.infer<typeof ApiTokenRevokedPayload>;
 
@@ -484,7 +660,7 @@ export type NotificationOrgPreferenceUpdatedPayload = z.infer<
 
 // Subject and actor are the same person: both routes carry `denyImpersonated`
 // and the update is scoped to rows the caller owns, so no admin or system can
-// reach it on someone else's behalf. `userId` alone therefore satisfies §7 —
+// reach it on someone else's behalf. `userId` alone therefore satisfies §7:
 // there is no second party to name, and `actorUserId` would only restate it.
 //
 // `notificationIds` carries what actually changed for an explicit selection
@@ -548,6 +724,9 @@ export const SsoLoginFailurePayload = z.object({
 });
 export type SsoLoginFailurePayload = z.infer<typeof SsoLoginFailurePayload>;
 
+// `providerId` names the SCIM connection (`ba_scim_connection_…`). It used to be the
+// SSO provider id when a SCIM connection hung off one; the key is kept so the
+// payload shape does not change under consumers.
 const ScimConnectionRef = z.object({
   actorUserId: z.string(),
   organizationId: z.string(),
@@ -560,6 +739,11 @@ export type ScimConnectionCreatedPayload = z.infer<typeof ScimConnectionCreatedP
 export const ScimConnectionDeletedPayload = ScimConnectionRef;
 export type ScimConnectionDeletedPayload = z.infer<typeof ScimConnectionDeletedPayload>;
 
+export const ScimConnectionTokenRotatedPayload = ScimConnectionRef;
+export type ScimConnectionTokenRotatedPayload = z.infer<typeof ScimConnectionTokenRotatedPayload>;
+
+// `scimProviderId` names the SCIM connection the change came through, see
+// `ScimConnectionRef`.
 const ScimUserRef = z.object({
   userId: z.string(),
   actorUserId: z.string().nullable(),
@@ -624,16 +808,21 @@ export const PayloadByEventType = {
   [EventTypes.WEBHOOK_ENDPOINT_SECRET_ROTATED]: WebhookEndpointSecretRotatedPayload,
   [EventTypes.WEBHOOK_ENDPOINT_DISABLED]: WebhookEndpointDisabledPayload,
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]: WebhookDeliveryExhaustedPayload,
+  [EventTypes.WEBHOOK_DELIVERY_REPLAYED]: WebhookDeliveryReplayedPayload,
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]: EmailDeliveryExhaustedPayload,
+  [EventTypes.OUTBOX_EVENT_DEAD]: OutboxEventDeadPayload,
   [EventTypes.USER_POLICY_ACCEPTED]: UserPolicyAcceptedPayload,
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: UserCookieConsentGrantedPayload,
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: UserCookieConsentWithdrawnPayload,
+  [EventTypes.USER_COOKIE_CONSENT_LINKED]: UserCookieConsentLinkedPayload,
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: SecurityRateLimitExceededPayload,
   [EventTypes.SECURITY_CSP_VIOLATION]: SecurityCspViolationPayload,
   [EventTypes.SECURITY_CSRF_REJECTED]: SecurityCsrfRejectedPayload,
   [EventTypes.SECURITY_PASSWORD_BREACHED]: SecurityPasswordBreachedPayload,
   [EventTypes.SECURITY_SIGNUP_REJECTED]: SecuritySignupRejectedPayload,
   [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: SecurityOperatorAuditAccessedPayload,
+  [EventTypes.SECURITY_IMPOSSIBLE_TRAVEL_DETECTED]: SecurityImpossibleTravelDetectedPayload,
+  [EventTypes.SECURITY_GEO_DENIED]: SecurityGeoDeniedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CREATED]: BillingSubscriptionCreatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: BillingSubscriptionUpdatedPayload,
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: BillingSubscriptionCancelledPayload,
@@ -643,9 +832,28 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]: AdminImpersonationStoppedPayload,
   [EventTypes.ADMIN_USER_BANNED]: AdminUserBannedPayload,
   [EventTypes.ADMIN_USER_UNBANNED]: AdminUserUnbannedPayload,
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: AdminUserRoleChangedPayload,
   [EventTypes.ADMIN_USER_PASSWORD_RESET]: AdminUserPasswordResetPayload,
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]: AdminUserSessionsRevokedPayload,
+  [EventTypes.ADMIN_STAFF_ADDED]: AdminStaffAddedPayload,
+  [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: AdminStaffRoleChangedPayload,
+  [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
+  [EventTypes.ADMIN_STAFF_OVERRIDE_SET]: AdminStaffOverrideSetPayload,
+  [EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED]: AdminStaffOverrideRevokedPayload,
+  [EventTypes.ADMIN_OPS_OUTBOX_REQUEUED]: AdminOpsOutboxRequeuedPayload,
+  [EventTypes.ADMIN_OPS_STRIPE_EVENT_REPLAYED]: AdminOpsStripeEventReplayedPayload,
+  [EventTypes.ADMIN_PLAN_OVERRIDE_SET]: AdminPlanOverrideSetPayload,
+  [EventTypes.ADMIN_PLAN_OVERRIDE_REVOKED]: AdminPlanOverrideRevokedPayload,
+  [EventTypes.ADMIN_NOTE_ADDED]: AdminNoteAddedPayload,
+  [EventTypes.ADMIN_VIEW_SAVED]: AdminViewSavedPayload,
+  [EventTypes.ADMIN_VIEW_DELETED]: AdminViewDeletedPayload,
+  [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
+  [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
+  [EventTypes.ADMIN_APPROVAL_REQUESTED]: AdminApprovalRequestedPayload,
+  [EventTypes.ADMIN_APPROVAL_DECIDED]: AdminApprovalDecidedPayload,
+  [EventTypes.ADMIN_APPROVAL_CANCELLED]: AdminApprovalCancelledPayload,
+  [EventTypes.ADMIN_APPROVAL_EXPIRED]: AdminApprovalExpiredPayload,
+  [EventTypes.ADMIN_APPROVAL_EXECUTED]: AdminApprovalExecutedPayload,
+  [EventTypes.ADMIN_APPROVAL_FAILED]: AdminApprovalFailedPayload,
   [EventTypes.API_TOKEN_CREATED]: ApiTokenCreatedPayload,
   [EventTypes.API_TOKEN_REVOKED]: ApiTokenRevokedPayload,
   [EventTypes.API_TOKEN_USED]: ApiTokenUsedPayload,
@@ -661,6 +869,7 @@ export const PayloadByEventType = {
   [EventTypes.SSO_LOGIN_FAILURE]: SsoLoginFailurePayload,
   [EventTypes.SCIM_CONNECTION_CREATED]: ScimConnectionCreatedPayload,
   [EventTypes.SCIM_CONNECTION_DELETED]: ScimConnectionDeletedPayload,
+  [EventTypes.SCIM_CONNECTION_TOKEN_ROTATED]: ScimConnectionTokenRotatedPayload,
   [EventTypes.SCIM_USER_CREATED]: ScimUserCreatedPayload,
   [EventTypes.SCIM_USER_UPDATED]: ScimUserUpdatedPayload,
   [EventTypes.SCIM_USER_DEACTIVATED]: ScimUserDeactivatedPayload,

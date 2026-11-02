@@ -1,12 +1,49 @@
+import { APPROVAL_ACTIONS } from "@packages/access-control";
 import { z } from "zod";
+import {
+  frontOrigins,
+  validateApprovalEnv,
+  validateEnvBounds,
+  validateHostsEnv,
+  validateSecuritySignalsEnv,
+} from "./env-bounds";
 
 declare const process: { env: Record<string, string | undefined> };
+
+const commaList = (value: string): string[] =>
+  value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 
 const envSchema = z
   .object({
     DATABASE_URL: z.url(),
+    MIGRATIONS_FOLDER: z.string().default("./migrations"),
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_SECRETS: z
+      .string()
+      .transform((v) =>
+        commaList(v).map((entry) => {
+          const separator = entry.indexOf(":");
+          return {
+            version: separator < 0 ? entry : entry.slice(0, separator).trim(),
+            value: separator < 0 ? "" : entry.slice(separator + 1).trim(),
+          };
+        }),
+      )
+      .pipe(
+        z
+          .array(
+            z.object({
+              version: z.string().regex(/^\d+$/).transform(Number),
+              value: z.string().min(32),
+            }),
+          )
+          .min(1),
+      )
+      .optional(),
 
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: z.coerce.number().optional(),
@@ -18,24 +55,16 @@ const envSchema = z
       .optional()
       .transform((v) => v?.split(",").map((s) => s.trim())),
     APP_URL: z.url(),
+    ADMIN_URL: z.url().optional(),
+    AUTH_COOKIE_DOMAIN: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM: z.string().optional(),
     INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
     INTERNAL_AUTH_LAYERS: z
       .string()
-      .optional()
-      .transform((v) =>
-        v
-          ?.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      )
-      .pipe(
-        z
-          .array(z.enum(["signature", "private-network"]))
-          .min(1)
-          .optional(),
-      ),
+      .transform(commaList)
+      .pipe(z.array(z.enum(["signature", "private-network"])).min(1))
+      .optional(),
     RGPD_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).optional(),
     RGPD_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().optional(),
     RGPD_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().optional(),
@@ -50,8 +79,8 @@ const envSchema = z
       .transform((v) => v === "true"),
     S3_PUBLIC_URL: z.url().optional(),
     STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().optional(),
-    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().optional(),
-    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().optional(),
+    STORAGE_PRESIGN_TTL_MIN_SECONDS: z.coerce.number().int().positive().default(60),
+    STORAGE_PRESIGN_TTL_MAX_SECONDS: z.coerce.number().int().positive().default(3600),
     WEBHOOK_MASTER_KEY: z
       .string()
       .regex(/^[0-9a-f]{64}$/i, "WEBHOOK_MASTER_KEY must be 64 hex chars (32 bytes)")
@@ -61,8 +90,16 @@ const envSchema = z
       .optional()
       .transform((v) => v === "true"),
     OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+    OUTBOX_LEASE_SECONDS: z.coerce.number().int().positive().default(120),
+    OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().positive().default(10),
+    OUTBOX_DEAD_RETRY_HOURS: z.coerce.number().positive().default(6),
+    OUTBOX_CONCURRENCY: z.coerce.number().int().positive().default(4),
+    OUTBOX_HANDLER_BUDGET_SECONDS: z.coerce.number().int().positive().default(30),
     EMAIL_MESSAGE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
     EMAIL_MESSAGE_FAILED_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+    EMAIL_LEASE_SECONDS: z.coerce.number().int().positive().default(120),
+    EMAIL_DEAD_RETRY_HOURS: z.coerce.number().positive().default(6),
+    EMAIL_DEAD_REPLAY_WINDOW_HOURS: z.coerce.number().int().positive().default(24),
     AUDIT_LOG_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
     AUDIT_LOG_COMPLIANCE_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
     WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
@@ -70,12 +107,18 @@ const envSchema = z
     WEBHOOK_AUTO_DISABLE_AFTER_DAYS: z.coerce.number().int().positive().default(5),
     WEBHOOK_AUTO_DISABLE_MIN_FAILURES: z.coerce.number().int().positive().default(2),
     WEBHOOK_RESPONSE_CAPTURE_BYTES: z.coerce.number().int().positive().default(4096),
+    WEBHOOK_LEASE_SECONDS: z.coerce.number().int().positive().default(330),
+    WEBHOOK_DEAD_RETRY_HOURS: z.coerce.number().positive().default(6),
     CONSENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+    STRIPE_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     NOTIFICATION_DIGEST_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(8),
     GIT_SHA: z.string().optional(),
     BUILD_TIME: z.string().optional(),
     SHUTDOWN_GRACE_PERIOD_MS: z.coerce.number().int().min(0).default(15_000),
+    SHUTDOWN_STEP_TIMEOUT_MS: z.coerce.number().int().min(100).default(2_000),
+    SHUTDOWN_WORKERS_TIMEOUT_MS: z.coerce.number().int().min(100).default(12_000),
+    SHUTDOWN_DEADLINE_MS: z.coerce.number().int().min(1000).default(36_000),
     SENTRY_DSN: z.url().optional(),
     SENTRY_ENVIRONMENT: z.string().optional(),
     SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
@@ -86,31 +129,43 @@ const envSchema = z
       .string()
       .optional()
       .transform((v) => v !== "false"),
-    PLATFORM_ADMIN_IDS: z
-      .string()
-      .optional()
-      .transform(
-        (v) =>
-          v
-            ?.split(",")
-            .map((s) => s.trim())
-            .filter(Boolean) ?? [],
-      ),
+    PLATFORM_ADMIN_IDS: z.string().transform(commaList).default([]),
     PLATFORM_ADMIN_REQUIRE_MFA: z
       .string()
       .optional()
       .transform((v) => v !== "false"),
+    ADMIN_STEP_UP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+    ADMIN_APPROVAL_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((v) => v === "true"),
+    ADMIN_APPROVAL_ACTIONS: z
+      .string()
+      .transform(commaList)
+      .pipe(z.array(z.enum(APPROVAL_ACTIONS)))
+      .default([...APPROVAL_ACTIONS]),
+    ADMIN_APPROVAL_TTL_HOURS: z.coerce.number().int().positive().default(72),
     DISPOSABLE_EMAIL_DNS_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
     RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
-    TRUSTED_PROXIES: z
+    TRUSTED_PROXIES: z.string().transform(commaList).optional(),
+    GEO_COUNTRY_HEADER: z.string().trim().optional(),
+    GEO_ASN_HEADER: z.string().trim().optional(),
+    IMPOSSIBLE_TRAVEL_WINDOW_MINUTES: z.coerce.number().int().positive().optional(),
+    SECURITY_DENY_COUNTRIES: z
       .string()
-      .optional()
-      .transform((v) =>
-        v
-          ?.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      ),
+      .transform((v) => commaList(v).map((country) => country.toUpperCase()))
+      .default([]),
+    SECURITY_DENY_ASNS: z
+      .string()
+      .transform((v) => commaList(v).map((asn) => asn.replace(/^AS/i, "")))
+      .default([]),
+    ACCOUNTS_PER_VISITOR_MAX: z.coerce.number().int().positive().optional(),
+    ACCOUNTS_PER_VISITOR_WINDOW_SEC: z.coerce.number().int().positive().default(86_400),
+    CAPTCHA_SECRET_KEY: z.string().optional(),
+    CAPTCHA_VERIFY_URL: z
+      .url()
+      .default("https://challenges.cloudflare.com/turnstile/v0/siteverify"),
+    CAPTCHA_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     API_TOKEN_PEPPER: z.string().min(32).optional(),
@@ -122,44 +177,14 @@ const envSchema = z
     API_TOKEN_MAX_EXPIRY_DAYS: z.coerce.number().int().positive().default(365),
     API_TOKEN_LAST_USED_BUCKET_MIN: z.coerce.number().int().positive().default(15),
     API_TOKEN_PEPPER_VERSION: z.coerce.number().int().positive().default(1),
+    SCIM_CREDENTIAL_HASH_SECRET: z.string().min(32).optional(),
   })
-  .superRefine(validateEnvBounds);
-
-/**
- * The three sweep-timeout bounds only work nested: the sweep must be able to finish
- * and answer before the socket closes, and the socket must close before the client
- * gives up. A `.env` that inverts them silently reproduces the bug this configuration
- * exists to prevent, so it fails the boot instead.
- *
- * Exported (rather than inlined in the `superRefine` call) so tests can exercise the
- * comparisons directly against plain literals — `env.ts` parses `process.env` at
- * import time and throws on missing required vars, so importing `env` from a test
- * would require a full `.env`.
- */
-export function validateEnvBounds(
-  value: {
-    SERVER_IDLE_TIMEOUT_SECONDS: number;
-    SWEEP_DEADLINE_MS: number;
-    INTERNAL_FETCH_TIMEOUT_MS: number;
-  },
-  ctx: z.RefinementCtx,
-): void {
-  const idleMs = value.SERVER_IDLE_TIMEOUT_SECONDS * 1000;
-  if (value.SWEEP_DEADLINE_MS >= idleMs) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["SWEEP_DEADLINE_MS"],
-      message: `SWEEP_DEADLINE_MS (${value.SWEEP_DEADLINE_MS}) must be below SERVER_IDLE_TIMEOUT_SECONDS (${value.SERVER_IDLE_TIMEOUT_SECONDS}s = ${idleMs}ms), or the socket closes before the sweep can answer.`,
-    });
-  }
-  if (value.INTERNAL_FETCH_TIMEOUT_MS <= idleMs) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["INTERNAL_FETCH_TIMEOUT_MS"],
-      message: `INTERNAL_FETCH_TIMEOUT_MS (${value.INTERNAL_FETCH_TIMEOUT_MS}) must exceed SERVER_IDLE_TIMEOUT_SECONDS (${value.SERVER_IDLE_TIMEOUT_SECONDS}s = ${idleMs}ms), or the client gives up before the server answers.`,
-    });
-  }
-}
+  .superRefine((value, ctx) => {
+    validateEnvBounds(value, ctx);
+    validateApprovalEnv(value, ctx);
+    validateHostsEnv(value, ctx);
+    validateSecuritySignalsEnv(value, ctx);
+  });
 
 const rawEnv = Object.fromEntries(
   Object.entries(process.env).map(([k, v]) => [k, v === "" ? undefined : v]),
@@ -167,8 +192,10 @@ const rawEnv = Object.fromEntries(
 
 export const env = envSchema.parse(rawEnv);
 
+export const FRONT_ORIGINS = frontOrigins(env);
+
 // Bootstrap ships these as long-enough placeholders so local dev and CI checks
-// (check:sweep-lock, check:fanout) work out of the box — but "long enough" also
+// (check:sweep-lock, check:fanout) work out of the box, but "long enough" also
 // satisfies `.min(32)`, so a deploy that copies `.env.example` verbatim and forgets
 // to replace them would otherwise boot with a published secret. Reject the literal
 // placeholder text, not just its length.
@@ -190,7 +217,7 @@ if (env.NODE_ENV === "production") {
   }
   if (!env.CORS_ORIGIN || env.CORS_ORIGIN.length === 0) {
     throw new Error(
-      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost — rejecting the real front and collapsing the CORS + CSRF allowlist.",
+      "CORS_ORIGIN is required in production (comma-separated allowed origins). Without it the API falls back to localhost, rejecting the real front and collapsing the CORS + CSRF allowlist.",
     );
   }
   if (!env.INTERNAL_AUTH_LAYERS?.includes("signature")) {
@@ -215,7 +242,12 @@ if (env.NODE_ENV === "production") {
   }
   if (!env.API_TOKEN_PEPPER) {
     throw new Error(
-      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret — a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
+      "API_TOKEN_PEPPER is required in production (min 32 chars). Without it every API token hash is unsalted by a server secret: a DB dump becomes a set of usable tokens. Generate: openssl rand -hex 32",
+    );
+  }
+  if (!env.SCIM_CREDENTIAL_HASH_SECRET) {
+    throw new Error(
+      "SCIM_CREDENTIAL_HASH_SECRET is required in production (min 32 chars). It keys the digest of every SCIM bearer token: without a real one, a DB dump becomes a set of usable directory credentials. Generate: openssl rand -hex 32",
     );
   }
 }

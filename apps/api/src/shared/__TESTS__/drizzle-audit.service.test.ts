@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
-// Expose full export surface to avoid cross-file export-not-found errors under parallel bun test.
 const insertExecute = mock(async () => {});
 const selectExecute = mock(async () => [] as unknown[]);
 
@@ -26,86 +26,10 @@ const fakeDb = {
   select: () => makeQueryChain(selectExecute),
 };
 
-const fakeTx = {
-  insert: () => makeQueryChain(insertExecute),
-  select: () => makeQueryChain(selectExecute),
-};
-
 mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
   db: fakeDb,
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  not: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  like: () => ({}),
-  inArray: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: {
-    auditLog: {
-      actorId: {},
-      actorType: {},
-      organizationId: {},
-      action: {},
-      targetType: {},
-      targetId: {},
-      occurredAt: {},
-      retention: {},
-      id: {},
-    },
-  },
-  webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
+  resolveExecutor: () => fakeDb,
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
@@ -204,12 +128,6 @@ describe("DrizzleAuditRepository", () => {
       expect(val.action).toBe(baseEntry.action);
     });
 
-    it("uses provided tx instead of module-level db", async () => {
-      const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
-      const result = await repo.record(baseEntry, fakeTx as never);
-      expect(result.isSuccess).toBe(true);
-    });
-
     it("calls instrumentation.capture and returns Result.fail on DB error", async () => {
       const instr = new NoOpInstrumentation();
       const captureSpy = spyOn(instr, "capture");
@@ -277,9 +195,9 @@ describe("DrizzleAuditRepository", () => {
         hash: null,
       };
       const rows = [
-        { ...row, id: "r1", occurredAt: new Date("2024-01-03") },
-        { ...row, id: "r2", occurredAt: new Date("2024-01-02") },
-        { ...row, id: "r3", occurredAt: new Date("2024-01-01") }, // this is the extra one
+        { row: { ...row, id: "r1" }, cursorAt: "2024-01-03 00:00:00.000001" },
+        { row: { ...row, id: "r2" }, cursorAt: "2024-01-02 00:00:00.000001" },
+        { row: { ...row, id: "r3" }, cursorAt: "2024-01-01 00:00:00.000001" }, // this is the extra one
       ];
       selectExecute.mockResolvedValueOnce(rows);
       const repo = new DrizzleAuditRepository(new NoOpInstrumentation());
@@ -288,7 +206,7 @@ describe("DrizzleAuditRepository", () => {
       const page = result.getValue();
       expect(page.items).toHaveLength(2);
       expect(page.nextCursor.isSome()).toBe(true);
-      expect(page.nextCursor.unwrap()).toBe(new Date("2024-01-02").toISOString());
+      expect(page.nextCursor.unwrap()).toBe("2024-01-02 00:00:00.000001~r2");
     });
 
     it("calls instrumentation.capture and returns Result.fail on DB error", async () => {

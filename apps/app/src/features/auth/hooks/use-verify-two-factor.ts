@@ -1,18 +1,16 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { TwoFactorInput } from "../../../shared/auth/auth.schema";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
 import { resolveAuthError } from "../auth-error";
+import { useCompleteSignIn } from "./use-complete-sign-in";
 
 export function useVerifyTwoFactor(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const completeSignIn = useCompleteSignIn();
+
   return useMutation({
     mutationKey: ["session", "verify-two-factor"],
     mutationFn: async (input: TwoFactorInput) => {
@@ -26,13 +24,7 @@ export function useVerifyTwoFactor(redirectTo?: string) {
     },
     onSuccess: async () => {
       toast.success(t("twoFactor.verifiedToast"));
-      await queryClient.refetchQueries({
-        queryKey: sessionQueryOptions.queryKey,
-      });
-
-      broadcastAuthChange();
-
-      void navigate({ to: redirectTo ?? "/" });
+      await completeSignIn(redirectTo);
     },
     onError: (err) => toast.error(err.message),
   });

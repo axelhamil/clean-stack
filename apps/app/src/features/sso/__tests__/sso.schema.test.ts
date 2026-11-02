@@ -40,12 +40,20 @@ describe("samlProviderSchema", () => {
   });
 });
 
-// A per-issue `message:` wins over the global Zod map (shared/CLAUDE.md:40), so a
+// A per-issue `message:` wins over the global Zod map (apps/app/CLAUDE.md, i18n), so a
 // schema that carries one is permanently English. Asserting on `code`/`params`
 // rather than on rendered text is what makes this a rule check and not a copy test.
 function issuesFor(schema: z.ZodType, input: unknown) {
   const result = schema.safeParse(input);
   return result.success ? [] : result.error.issues;
+}
+
+// Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed on
+// `code`, so the conditional gives real access to `params`. A cast would assert
+// the shape instead of proving it, and would still compile if the `code` check
+// ever stopped holding.
+function paramsOf(issue: z.core.$ZodIssue | undefined) {
+  return issue?.code === "custom" ? issue.params : undefined;
 }
 
 describe("sso schemas route their copy through the catalog", () => {
@@ -58,11 +66,7 @@ describe("sso schemas route their copy through the catalog", () => {
     });
     const domainIssue = issues.find((i) => i.path[0] === "domain");
     expect(domainIssue?.code).toBe("custom");
-    // Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed
-    // on `code`, so the conditional gives real access to `params`. A cast would
-    // assert the shape instead of proving it, and would still compile if the
-    // check above ever stopped holding.
-    expect(domainIssue?.code === "custom" ? domainIssue.params : undefined).toEqual({
+    expect(paramsOf(domainIssue)).toEqual({
       i18nKey: "validation.bareDomain",
     });
   });
@@ -76,11 +80,7 @@ describe("sso schemas route their copy through the catalog", () => {
     });
     const issuerIssue = issues.find((i) => i.path[0] === "issuer");
     expect(issuerIssue?.code).toBe("custom");
-    // Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed
-    // on `code`, so the conditional gives real access to `params`. A cast would
-    // assert the shape instead of proving it, and would still compile if the
-    // check above ever stopped holding.
-    expect(issuerIssue?.code === "custom" ? issuerIssue.params : undefined).toEqual({
+    expect(paramsOf(issuerIssue)).toEqual({
       i18nKey: "validation.httpsUrl",
     });
   });
@@ -89,16 +89,12 @@ describe("sso schemas route their copy through the catalog", () => {
     const issues = issuesFor(samlProviderSchema, {
       domain: "acme.com",
       entryPoint: "http://idp.acme.com/sso/saml",
-      issuer: "acme-saml",
+      idpEntityId: "https://idp.acme.com/metadata",
       cert: "PEM",
     });
     const entryIssue = issues.find((i) => i.path[0] === "entryPoint");
     expect(entryIssue?.code).toBe("custom");
-    // Narrowed on the discriminant rather than cast: `$ZodIssue` is a union keyed
-    // on `code`, so the conditional gives real access to `params`. A cast would
-    // assert the shape instead of proving it, and would still compile if the
-    // check above ever stopped holding.
-    expect(entryIssue?.code === "custom" ? entryIssue.params : undefined).toEqual({
+    expect(paramsOf(entryIssue)).toEqual({
       i18nKey: "validation.httpsUrl",
     });
   });
@@ -107,7 +103,7 @@ describe("sso schemas route their copy through the catalog", () => {
     const issues = issuesFor(samlProviderSchema, {
       domain: "acme.com",
       entryPoint: "https://idp.acme.com/sso/saml",
-      issuer: "acme-saml",
+      idpEntityId: "https://idp.acme.com/metadata",
       cert: "",
     });
     const certIssue = issues.find((i) => i.path[0] === "cert");

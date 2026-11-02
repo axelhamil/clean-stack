@@ -9,50 +9,50 @@ import {
 } from "../notification-map";
 
 describe("NOTIFICATION_MAP", () => {
-  test("les events d'audit purs ne sont pas notifiables", () => {
+  test("keeps pure audit events out of notifications", () => {
     expect(isNotifiable("api_token.used")).toBe(false);
     expect(isNotifiable("security.csp.violation")).toBe(false);
     expect(isNotifiable("webhook.delivery.exhausted")).toBe(false);
   });
 
-  test("toute cle du map est un event connu", () => {
+  test("only keys the map by known event types", () => {
     for (const key of Object.keys(NOTIFICATION_MAP)) {
       expect(ALL_EVENT_TYPES).toContain(key);
     }
   });
 
-  test("les events security sont forced", () => {
+  test("forces security events", () => {
     const config = notificationConfigOf("user.password_changed");
     expect(config?.forced).toBe(true);
     expect(config?.category).toBe("security");
   });
 
-  test("billing.payment.failed cible billing:read et non manage", () => {
+  test("targets billing:read, not manage, for billing.payment.failed", () => {
     const config = notificationConfigOf("billing.payment.failed");
     expect(config?.audience).toEqual({ can: { billing: ["read"] } });
   });
 
-  test("aucun event forced ne cible org:all", () => {
+  test("never sends a forced event to the whole org", () => {
     for (const [type, config] of Object.entries(NOTIFICATION_MAP)) {
       if (!config.forced) continue;
-      expect(config.audience, `${type} forced vers toute l'org`).not.toBe("org:all");
+      expect(config.audience, `${type} is forced to the whole org`).not.toBe("org:all");
     }
   });
 
-  test("forcedLevelOf distingue une categorie entierement forcee d'une categorie mixte", () => {
+  test("tells a fully forced category from a mixed one", () => {
     expect(forcedLevelOf("security")).toBe("all");
     expect(forcedLevelOf("billing")).toBe("some");
     expect(forcedLevelOf("org")).toBe("none");
     expect(forcedLevelOf("activity")).toBe("none");
   });
 
-  test("chaque event notifiable declare explicitement ce qui part au navigateur", () => {
+  test("declares explicitly what each notifiable event sends to the browser", () => {
     for (const [type, config] of Object.entries(NOTIFICATION_MAP)) {
-      expect(Array.isArray(config.payloadFields), `${type} sans liste blanche`).toBe(true);
+      expect(Array.isArray(config.payloadFields), `${type} has no allowlist`).toBe(true);
     }
   });
 
-  test("publicNotificationPayload ne laisse passer que les champs declares", () => {
+  test("lets only declared fields through publicNotificationPayload", () => {
     const visible = publicNotificationPayload("org.member.invited", {
       organizationId: "org-1",
       invitationId: "token-secret",
@@ -64,20 +64,20 @@ describe("NOTIFICATION_MAP", () => {
     expect(visible).toEqual({ email: "a@b.com", role: "member" });
   });
 
-  test("publicNotificationPayload ne rend rien pour un event inconnu ou un payload absent", () => {
-    expect(publicNotificationPayload("event.inexistant", { secret: 1 })).toEqual({});
+  test("returns nothing for an unknown event or a missing payload", () => {
+    expect(publicNotificationPayload("event.unknown", { secret: 1 })).toEqual({});
     expect(publicNotificationPayload("org.member.invited", null)).toEqual({});
-    expect(publicNotificationPayload("org.member.invited", "chaine")).toEqual({});
+    expect(publicNotificationPayload("org.member.invited", "text")).toEqual({});
   });
 
-  test("un champ declare mais absent du payload n'apparait pas comme undefined", () => {
+  test("omits a declared field missing from the payload instead of returning undefined", () => {
     expect(publicNotificationPayload("user.passkey.added", { userId: "u1" })).toEqual({});
   });
 
-  test("un event forced n'est jamais batche par dedupWindow", () => {
+  test("never batches a forced event through dedupWindow", () => {
     for (const [type, config] of Object.entries(NOTIFICATION_MAP)) {
       if (!config.forced) continue;
-      expect(config.dedupWindow, `${type} forced avec une fenetre de dedup`).toBeUndefined();
+      expect(config.dedupWindow, `${type} is forced with a dedup window`).toBeUndefined();
     }
   });
 });

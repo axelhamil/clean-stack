@@ -6,6 +6,7 @@ export {
   count,
   desc,
   eq,
+  getTableColumns,
   gt,
   gte,
   ilike,
@@ -21,10 +22,26 @@ export {
   sql,
 } from "drizzle-orm";
 export { migrate } from "drizzle-orm/node-postgres/migrator";
-export type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
+export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 export { alias } from "drizzle-orm/pg-core";
-export { type DbClient, db, type Transaction } from "./config";
-export { getRateLimitDbClient, type RateLimitDbClient } from "./rate-limit-client";
+export { closeDb, type DbClient, db, type Transaction } from "./config";
+export {
+  claimedSet,
+  dbClockNow,
+  dbNow,
+  deadShareOf,
+  isDeadDue,
+  isDue,
+  leasedBy,
+  releasedSet,
+  secondsFromClock,
+  secondsFromNow,
+} from "./lease";
+export {
+  closeRateLimitDb,
+  getRateLimitDbClient,
+  type RateLimitDbClient,
+} from "./rate-limit-client";
 export { trackEventsOnSuccess } from "./repositories/track-events";
 export type { AuditActorType, AuditRetention } from "./schema/audit-log";
 
@@ -47,7 +64,14 @@ export * as policiesSchema from "./schema/policies";
 export * as quotaUsageSchema from "./schema/quota-usage";
 export * as rateLimitSchema from "./schema/rate-limit";
 export * as ssoSchema from "./schema/sso";
+export * as staffSchema from "./schema/staff";
 export * as sweepSchema from "./schema/sweep";
 export type { WebhookDeliveryStatus } from "./schema/webhooks";
 export * as webhooksSchema from "./schema/webhooks";
-export { type FlushHandler, TransactionService } from "./services/transaction-manager.service";
+export {
+  ambientTransaction,
+  type FlushHandler,
+  resolveExecutor,
+  savepoint,
+  TransactionService,
+} from "./services/transaction-manager.service";

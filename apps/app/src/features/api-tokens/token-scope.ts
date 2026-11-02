@@ -1,7 +1,7 @@
 /**
- * The list mixes two scopes — the active organization's tokens and the
- * caller's org-less ones — so every row has to say which one it is, otherwise
- * the fix trades an invisible token for an ambiguous one.
+ * The list mixes two scopes (the active organization's tokens and the
+ * caller's org-less ones), so every row has to say which one it is, otherwise
+ * an invisible token becomes an ambiguous one.
  *
  * Kept free of React so it can be asserted directly under the node-environment
  * test runner: the decision is data, only the badge around it is markup.
@@ -15,6 +15,7 @@ export function tokenScopeDisplay(
   activeOrg: { id: string; name: string } | null | undefined,
 ): TokenScopeDisplay {
   if (organizationId === null) return { kind: "personal" };
+
   // A row from an organization other than the active one should never reach the
   // list; if one ever did, label it generically rather than with the wrong name.
   return {

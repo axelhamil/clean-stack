@@ -10,22 +10,23 @@ import {
   SelectValue,
 } from "@packages/ui/components/ui/select";
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { removeMemberMutationOptions } from "../../../shared/api/mutations/remove-member";
 import { updateMemberRoleMutationOptions } from "../../../shared/api/mutations/update-member-role";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { orgMembersQueryOptions } from "../../../shared/api/queries/org-members";
 import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
-import { ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
+import { isOrgRole, ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
+import { ASSIGNABLE_ROLES } from "../assignable-roles";
 
 export interface MemberRowProps {
   member: {
     id: string;
-    role: "owner" | "admin" | "member";
+    role: string;
     user: { id: string; email: string; name: string | null };
   };
   organizationId: string;
@@ -65,8 +66,8 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
   });
 
   return (
-    <ListRow>
-      <ListRowContent>
+    <ListRow variant="plain" className="flex-wrap">
+      <ListRowContent className="min-w-0 break-words">
         <TypographyP>{member.user.name ?? member.user.email}</TypographyP>
         <TypographyMuted>{member.user.email}</TypographyMuted>
       </ListRowContent>
@@ -74,30 +75,30 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
         {canManage ? (
           <Select
             value={member.role}
-            onValueChange={(v) =>
-              updateRole.mutate({
-                memberId: member.id,
-                role: v as "owner" | "admin" | "member",
-                organizationId,
-              })
-            }
+            onValueChange={(role) => {
+              if (isOrgRole(role)) updateRole.mutate({ memberId: member.id, role, organizationId });
+            }}
           >
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="member">{t(ROLE_LABEL_KEYS.member)}</SelectItem>
-              <SelectItem value="admin">{t(ROLE_LABEL_KEYS.admin)}</SelectItem>
-              <SelectItem value="owner">{t(ROLE_LABEL_KEYS.owner)}</SelectItem>
+              {ASSIGNABLE_ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {t(ROLE_LABEL_KEYS[role])}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         ) : (
-          <Badge variant="secondary">{t(ROLE_LABEL_KEYS[member.role])}</Badge>
+          <Badge variant="secondary">
+            {isOrgRole(member.role) ? t(ROLE_LABEL_KEYS[member.role]) : member.role}
+          </Badge>
         )}
         {canManage && (
           <DestructiveActionDialog
             trigger={
-              <Button variant="destructive" size="sm" disabled={remove.isPending}>
+              <Button variant="ghost" size="sm" disabled={remove.isPending}>
                 {t("organization.removeAction")}
               </Button>
             }
@@ -112,6 +113,7 @@ export function MemberRow({ member, organizationId, isCurrentUser }: MemberRowPr
               />
             }
             actionLabel={t("organization.removeMemberDialogTitle")}
+            cancelLabel={t("common:actions.cancel")}
             isPending={remove.isPending}
             onConfirm={() => remove.mutate({ memberIdOrEmail: member.id, organizationId })}
           />

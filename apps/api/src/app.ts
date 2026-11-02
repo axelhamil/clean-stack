@@ -1,3 +1,4 @@
+import { Option } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
@@ -7,7 +8,12 @@ import { findUserById } from "./auth-queries";
 import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
+import { adminApprovalRoutes } from "./modules/admin/approvals.routes";
+import { adminInternalRoutes } from "./modules/admin/internal.routes";
+import { adminOpsRoutes } from "./modules/admin/ops.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
+import { adminStaffRoutes } from "./modules/admin/staff.routes";
+import { adminWorkspaceRoutes } from "./modules/admin/workspace.routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
@@ -24,7 +30,7 @@ import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
-import { env } from "./shared/env";
+import { env, FRONT_ORIGINS } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-notification-emails.route";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
@@ -32,6 +38,7 @@ import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.rou
 import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
 import { sweepNotificationsRoutes } from "./shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
+import { sweepStripeEventsRoutes } from "./shared/internal-routes/sweep-stripe-events.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { type AuthVariables, sessionMiddleware } from "./shared/middleware/auth.middleware";
 import { requireCsrf } from "./shared/middleware/csrf.middleware";
@@ -40,6 +47,7 @@ import { httpLogger } from "./shared/middleware/logger.middleware";
 import { resolveClientIp } from "./shared/middleware/rate-limit.ip";
 import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
 import {
+  ADMIN_STEP_UP_USER_POLICY,
   AUTH_FORGOT_PASSWORD_POLICY,
   AUTH_MAGIC_LINK_POLICY,
   AUTH_PASSKEY_POLICY,
@@ -53,8 +61,12 @@ import {
   CSP_REPORT_POLICY,
   GITHUB_SCANNING_POLICY,
   GLOBAL_POLICY,
+  type PolicyConfig,
   SCIM_POLICY,
+  visitorCapRoutes,
 } from "./shared/middleware/rate-limit.policies";
+import { resolveVisitorGeo } from "./shared/middleware/visitor-geo";
+import type { VisitorGeo } from "./shared/ports/ip-geo.port";
 import { runWithRequestContext } from "./shared/request-context";
 
 type AppEnv = {
@@ -65,19 +77,78 @@ type AppEnv = {
 
 const app = new Hono<AppEnv>();
 
+const allowedOrigins = FRONT_ORIGINS;
+const apiTokenPepper = env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use";
+
+/** A rate limit whose first block also lands on the security event rail. */
+const securityRateLimit = (policy: PolicyConfig) =>
+  requireRateLimit(
+    {
+      limiter: di.IRateLimiter,
+      outbox: di.IOutboxRepository,
+      captcha: { service: di.ICaptchaService, usage: di.IRateLimiter },
+    },
+    policy,
+  );
+
+// Cookie-authenticated mutation surfaces: every one gets the Origin check.
+const CSRF_GUARDED_PATHS = [
+  "/me",
+  "/me/*",
+  "/uploads",
+  "/uploads/*",
+  "/settings/*",
+  "/admin/*",
+  "/consents",
+  "/consents/*",
+  "/billing/portal",
+  "/notifications",
+  "/notifications/*",
+] as const;
+
+// BetterAuth's credential and token-consuming endpoints, each on its own tight,
+// fail-closed policy. The two-factor policy is shared on purpose: the three verify
+// paths and backup-code regeneration draw from one budget per IP.
+const AUTH_RATE_LIMITS: ReadonlyArray<readonly [path: string, policy: PolicyConfig]> = [
+  ["/sign-in/email", AUTH_SIGN_IN_POLICY],
+  ["/request-password-reset", AUTH_FORGOT_PASSWORD_POLICY],
+  ["/sign-in/magic-link", AUTH_MAGIC_LINK_POLICY],
+  ["/sign-up/email", AUTH_SIGN_UP_POLICY],
+  ["/two-factor/verify-totp", AUTH_TWO_FACTOR_POLICY],
+  ["/two-factor/verify-otp", AUTH_TWO_FACTOR_POLICY],
+  ["/two-factor/verify-backup-code", AUTH_TWO_FACTOR_POLICY],
+  ["/two-factor/generate-backup-codes", AUTH_TWO_FACTOR_POLICY],
+  ["/send-verification-email", AUTH_SEND_VERIFICATION_POLICY],
+  ["/verify-email", AUTH_VERIFY_EMAIL_POLICY],
+  ["/reset-password", AUTH_RESET_PASSWORD_POLICY],
+  ["/passkey/verify-authentication", AUTH_PASSKEY_POLICY],
+  ["/scim/*", SCIM_POLICY],
+  ...visitorCapRoutes(env.ACCOUNTS_PER_VISITOR_MAX, env.ACCOUNTS_PER_VISITOR_WINDOW_SEC),
+];
+
 app.route("/", healthRoutes);
 
 // Mounted before the global middlewares: the endpoint is public, cross-origin (browser-posted),
-// and must not inherit the same-origin CORP that secureHeaders sets — that would block the report POST.
+// and must not inherit the same-origin CORP that secureHeaders sets, that would block the report POST.
 app.use("/csp-report", cspReportCors);
-app.use(
-  "/csp-report",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, CSP_REPORT_POLICY),
+app.use("/csp-report", securityRateLimit(CSP_REPORT_POLICY));
+app.route(
+  "/",
+  makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL, adminUrl: env.ADMIN_URL }),
 );
-app.route("/", makeCspReportApp({ outbox: di.IOutboxRepository, appUrl: env.APP_URL }));
 
 app.use("*", requestId());
-app.use("*", (c, next) => runWithRequestContext({ requestId: c.get("requestId") }, next));
+app.use("*", (c, next) => {
+  let clientIp: string | undefined;
+  let visitorGeo: VisitorGeo | undefined;
+  const context = {
+    requestId: c.get("requestId"),
+    clientIp: () => (clientIp ??= resolveClientIp(c)),
+    visitorGeo: () => (visitorGeo ??= resolveVisitorGeo(c, di.IIpGeoService)),
+  };
+
+  return runWithRequestContext(context, next);
+});
 app.use("*", httpLogger);
 app.use(
   "*",
@@ -92,7 +163,7 @@ app.use(
 app.use(
   "*",
   cors({
-    origin: env.CORS_ORIGIN ?? ["http://localhost:5173"],
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -101,114 +172,39 @@ app.use("*", sessionMiddleware);
 
 const globalRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, GLOBAL_POLICY);
 app.use("*", (c, next) => (c.req.path.startsWith("/api/v1/") ? next() : globalRateLimit(c, next)));
-const csrf = requireCsrf({
-  outbox: di.IOutboxRepository,
-  allowedOrigins: env.CORS_ORIGIN ?? ["http://localhost:5173"],
-});
-app.use("/me", csrf);
-app.use("/me/*", csrf);
-app.use("/uploads", csrf);
-app.use("/uploads/*", csrf);
-app.use("/settings/*", csrf);
-app.use("/admin/*", csrf);
-app.use("/consents", csrf);
-app.use("/consents/*", csrf);
-app.use("/billing/portal", csrf);
+
+const csrf = requireCsrf({ outbox: di.IOutboxRepository, allowedOrigins });
+for (const path of CSRF_GUARDED_PATHS) app.use(path, csrf);
+
 const consentRateLimit = requireRateLimit({ limiter: di.IRateLimiter }, CONSENT_POST_POLICY);
 app.use("/consents", (c, next) =>
   c.req.method === "POST" || c.req.method === "DELETE" ? consentRateLimit(c, next) : next(),
 );
-app.use(
-  "/api/auth/sign-in/email",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_IN_POLICY),
-);
-app.use(
-  "/api/auth/request-password-reset",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_FORGOT_PASSWORD_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/sign-in/magic-link",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_MAGIC_LINK_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/sign-up/email",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_SIGN_UP_POLICY),
-);
-app.use(
-  "/api/auth/two-factor/verify-totp",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/two-factor/verify-otp",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/two-factor/verify-backup-code",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/two-factor/generate-backup-codes",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_TWO_FACTOR_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/send-verification-email",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_SEND_VERIFICATION_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/verify-email",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_VERIFY_EMAIL_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/reset-password",
-  requireRateLimit(
-    { limiter: di.IRateLimiter, outbox: di.IOutboxRepository },
-    AUTH_RESET_PASSWORD_POLICY,
-  ),
-);
-app.use(
-  "/api/auth/passkey/verify-authentication",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, AUTH_PASSKEY_POLICY),
-);
-app.use(
-  "/api/auth/scim/*",
-  requireRateLimit({ limiter: di.IRateLimiter, outbox: di.IOutboxRepository }, SCIM_POLICY),
+
+for (const [path, policy] of AUTH_RATE_LIMITS) {
+  app.use(`/api/auth${path}`, securityRateLimit(policy));
+}
+
+app.use("/admin/step-up", securityRateLimit(AUTH_TWO_FACTOR_POLICY));
+app.use("/admin/step-up", securityRateLimit(ADMIN_STEP_UP_USER_POLICY));
+
+app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/admin/*", (c) =>
+  c.json({ error: { code: "NOT_FOUND", message: "Not found." } }, 404),
 );
 
-// SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId — BetterAuth's
+// SCIM (RFC 7644) requires PUT/PATCH/DELETE on /scim/v2/Users/:userId, BetterAuth's
 // own router 404s any method/path it hasn't registered, so widening the verb list here
 // exposes no surface beyond what the mounted plugins already declare.
 app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/internal", healthInternalRoutes);
 app.route("/internal", rgpdInternalRoutes);
+app.route("/internal", adminInternalRoutes);
 app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
+app.route("/internal", sweepStripeEventsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
 app.route("/internal", sweepNotificationsRoutes);
 app.route("/internal", flushNotificationEmailsRoutes);
@@ -219,11 +215,10 @@ app.route(
     repo: di.IApiTokenRepository,
     outbox: di.IOutboxRepository,
     prefix: env.API_TOKEN_PREFIX,
-    pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+    pepper: apiTokenPepper,
     pepperVersion: env.API_TOKEN_PEPPER_VERSION,
     pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
     bucketMin: env.API_TOKEN_LAST_USED_BUCKET_MIN,
-    platformAdminIds: env.PLATFORM_ADMIN_IDS,
     limiter: di.IRateLimiter,
     resolveIp: resolveClientIp,
   }),
@@ -242,9 +237,9 @@ app.route(
     outboxRepository: di.IOutboxRepository,
     emailService: di.IEmailService,
     instrumentation: di.IInstrumentation,
-    findUserById,
+    findUserById: async (id) => Option.fromNullable(await findUserById(id)),
     prefix: env.API_TOKEN_PREFIX,
-    pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+    pepper: apiTokenPepper,
     pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
   }),
 );
@@ -254,8 +249,12 @@ const routes = app
   .route("/me", profileRoutes)
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
+  .route("/admin", adminStaffRoutes)
+  .route("/admin", adminWorkspaceRoutes)
+  .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
+  .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/tokens", apiTokenRoutes)

@@ -2,7 +2,7 @@ import { CopyIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "../../libs/utils";
-import { Button } from "./button";
+import { IconButton } from "./icon-button";
 import { Panel } from "./panel";
 
 interface CopyableValueProps extends Omit<React.ComponentProps<"div">, "onCopy"> {
@@ -12,9 +12,10 @@ interface CopyableValueProps extends Omit<React.ComponentProps<"div">, "onCopy">
 }
 
 function CopyableValue({ value, copyLabel, onCopied, className, ...props }: CopyableValueProps) {
+  // `onCopied` waits for the write: a denied clipboard permission must not
+  // confirm a copy that never happened.
   const copy = () => {
-    void navigator.clipboard.writeText(value);
-    onCopied?.();
+    void navigator.clipboard.writeText(value).then(() => onCopied?.());
   };
 
   return (
@@ -24,9 +25,9 @@ function CopyableValue({ value, copyLabel, onCopied, className, ...props }: Copy
       {...props}
     >
       <span className="flex-1">{value}</span>
-      <Button size="icon" variant="ghost" onClick={copy} aria-label={copyLabel}>
+      <IconButton variant="ghost" onClick={copy} label={copyLabel}>
         <CopyIcon className="size-4" />
-      </Button>
+      </IconButton>
     </Panel>
   );
 }

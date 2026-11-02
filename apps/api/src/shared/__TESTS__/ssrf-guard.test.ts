@@ -91,4 +91,12 @@ describe("assertPublicUrl", () => {
     });
     expect(r.isFailure).toBe(true);
   });
+
+  it("fails as a lookup timeout when the resolver does not answer in time", async () => {
+    const hanging = () => new Promise<Array<{ address: string }>>(() => {});
+
+    const r = await assertPublicUrl("https://example.com/hook", hanging, false, 10);
+
+    expect(r.isFailure && r.getError().code).toBe("WEBHOOK_HOST_LOOKUP_TIMEOUT");
+  });
 });

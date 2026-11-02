@@ -1,19 +1,5 @@
+import { createApiClient } from "@packages/web-kit/api/api-client";
 import { type ApiClient, hcWithType } from "api/client";
 import { env } from "../env";
 
-const baseUrl = env.VITE_API_URL.endsWith("/") ? env.VITE_API_URL : `${env.VITE_API_URL}/`;
-
-type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-const customFetch: FetchFn = async (input, init) => {
-  const headers = new Headers(init?.headers);
-  if (!headers.has("X-Request-Id")) {
-    headers.set("X-Request-Id", crypto.randomUUID());
-  }
-  return fetch(input, { ...init, headers });
-};
-
-export const api: ApiClient = hcWithType(baseUrl, {
-  init: { credentials: "include" },
-  fetch: customFetch,
-});
+export const api: ApiClient = createApiClient(env.VITE_API_URL, hcWithType);

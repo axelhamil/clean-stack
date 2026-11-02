@@ -24,3 +24,16 @@ describe("domainEventToOutboxRow", () => {
     expect(row.metadata.requestId).toBeUndefined();
   });
 });
+
+describe("domainEventToOutboxRow identity", () => {
+  it("the outbox row reuses the event eventId so a replayed enqueue targets the same row", () => {
+    const identified: IDomainEvent = { ...event, eventId: "0190a3c2-7b4d-7e8f-9a0b-1c2d3e4f5a6b" };
+
+    const replayed = domainEventToOutboxRow(identified, {
+      source: "app/api",
+      aggregateType: "user",
+    });
+
+    expect(replayed.id).toBe(identified.eventId);
+  });
+});

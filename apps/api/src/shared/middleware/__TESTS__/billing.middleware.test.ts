@@ -1,9 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { AppErrorException } from "@packages/ddd-kit";
-import { ENTITLEMENTS } from "../../../modules/billing/config";
+import { ENTITLEMENTS } from "../../entitlements";
 import { assertFeature, assertPlan, assertSeat } from "../billing.middleware";
 
-const proView = { tier: "pro" as const, status: "active", ...ENTITLEMENTS.pro };
+const proView = {
+  tier: "pro" as const,
+  status: "active",
+  hasSubscription: true,
+  ...ENTITLEMENTS.pro,
+};
 
 function captureCode(fn: () => void): string | undefined {
   try {

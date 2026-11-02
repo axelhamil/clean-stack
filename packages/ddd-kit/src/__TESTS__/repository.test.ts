@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it } from "vitest";
 import {
   type BaseRepository,
   createPaginatedResult,
@@ -465,14 +465,14 @@ class MockScopedNoteRepository implements ScopedRepository<Note, ScopeOf<"user">
     return Result.ok(entity);
   }
 
-  async delete(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<UUID<string>>> {
+  async delete(id: Note["_id"], scope: ScopeOf<"user">): Promise<Result<Note["_id"]>> {
     const i = this.notes.findIndex((n) => n._id.equals(id) && this.isOwner(n, scope));
     if (i === -1) return Result.fail("Note not found");
     this.notes.splice(i, 1);
     return Result.ok(id);
   }
 
-  async findById(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<Option<Note>>> {
+  async findById(id: Note["_id"], scope: ScopeOf<"user">): Promise<Result<Option<Note>>> {
     const n = this.notes.find((x) => x._id.equals(id) && this.isOwner(x, scope));
     return Result.ok(Option.fromNullable(n));
   }
@@ -515,7 +515,7 @@ class MockScopedNoteRepository implements ScopedRepository<Note, ScopeOf<"user">
     return Result.ok(Option.fromNullable(n));
   }
 
-  async exists(id: UUID<string>, scope: ScopeOf<"user">): Promise<Result<boolean>> {
+  async exists(id: Note["_id"], scope: ScopeOf<"user">): Promise<Result<boolean>> {
     return Result.ok(this.notes.some((n) => n._id.equals(id) && this.isOwner(n, scope)));
   }
 
@@ -607,5 +607,32 @@ describe("ScopedRepository", () => {
       expect((await repo.exists(note._id, aliceScope)).getValue()).toBe(true);
       expect((await repo.exists(note._id, bobScope)).getValue()).toBe(false);
     });
+  });
+});
+
+type RepoError = { code: "DB_DOWN" };
+
+describe("repository error type", () => {
+  it("a repository declared with a typed error returns Result with that error", () => {
+    type Repo = BaseRepository<User, RepoError>;
+    type Scoped = ScopedRepository<User, ScopeOf<"org">, RepoError>;
+
+    expectTypeOf<ReturnType<Repo["findById"]>>().toEqualTypeOf<
+      Promise<Result<Option<User>, RepoError>>
+    >();
+    expectTypeOf<ReturnType<Repo["count"]>>().toEqualTypeOf<Promise<Result<number, RepoError>>>();
+    expectTypeOf<ReturnType<Scoped["create"]>>().toEqualTypeOf<Promise<Result<User, RepoError>>>();
+    expectTypeOf<ReturnType<Scoped["findAll"]>>().toEqualTypeOf<
+      Promise<Result<PaginatedResult<User>, RepoError>>
+    >();
+  });
+
+  it("the default error stays string so existing implementers compile", () => {
+    expectTypeOf<ReturnType<BaseRepository<User>["exists"]>>().toEqualTypeOf<
+      Promise<Result<boolean, string>>
+    >();
+    expectTypeOf<ReturnType<ScopedRepository<User, ScopeOf<"user">>["delete"]>>().toEqualTypeOf<
+      Promise<Result<User["_id"], string>>
+    >();
   });
 });

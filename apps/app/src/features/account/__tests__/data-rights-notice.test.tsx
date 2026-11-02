@@ -4,7 +4,7 @@ import { I18nextProvider } from "react-i18next";
 import { describe, expect, it, vi } from "vitest";
 import { DataRightsNotice } from "../components/data-rights-notice";
 
-// `Link` needs a live router context (`useRouter()`) to resolve `to` — the only
+// `Link` needs a live router context (`useRouter()`) to resolve `to`: the only
 // thing this test mocks. `DataRightsNotice` itself, imported from the real
 // production file, is never touched: this is what caught the crash.
 vi.mock("@tanstack/react-router", () => ({
@@ -33,11 +33,11 @@ vi.mock("@tanstack/react-router", () => ({
  * the tag straight to the innermost element (`Link` with a `navLinkVariants`
  * className) so `Trans`'s cloned children land on the actual anchor.
  *
- * This renders the real, unmodified `DataRightsNotice` export — not a
- * hand-copied reproduction of its JSX — so a regression in the production
+ * This renders the real, unmodified `DataRightsNotice` export (not a
+ * hand-copied reproduction of its JSX), so a regression in the production
  * file fails this test.
  */
-describe("account settings — data rights notice", () => {
+describe("account settings: data rights notice", () => {
   it("renders without throwing", async () => {
     const i18n = await createI18n({ locale: "en", resources: enCatalog });
 

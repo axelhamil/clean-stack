@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const EMAIL_MESSAGE_STATUSES = ["pending", "sent", "failed"] as const;
+export const EMAIL_MESSAGE_STATUSES = ["pending", "sent", "failed", "dead"] as const;
 export const EMAIL_MESSAGE_KINDS = ["template", "raw"] as const;
 
 export const emailMessage = pgTable(
@@ -29,8 +29,11 @@ export const emailMessage = pgTable(
       .on(table.nextAttemptAt, table.createdAt)
       .where(sql`${table.status} = 'pending'`),
     index("email_message_sweep_idx").on(table.sentAt).where(sql`${table.status} = 'sent'`),
+    index("email_message_dead_retry_idx")
+      .on(table.nextAttemptAt)
+      .where(sql`${table.status} = 'dead'`),
     index("email_message_failed_sweep_idx")
       .on(table.createdAt)
-      .where(sql`${table.status} = 'failed'`),
+      .where(sql`${table.status} in ('failed', 'dead')`),
   ],
 );

@@ -1,14 +1,6 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,9 +8,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { DisableTwoFactorForm } from "../forms/disable-two-factor-form";
@@ -30,34 +24,27 @@ interface TwoFactorCardProps {
 
 export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const guard = useImpersonationGuard();
   const action = enabled ? t("twoFactor.disableAction") : t("twoFactor.enableAction");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("twoFactor.title")}</CardTitle>
-        <CardDescription>{t("twoFactor.description")}</CardDescription>
-        <CardAction>
-          <Badge variant={enabled ? "default" : "secondary"}>
-            {enabled ? t("twoFactor.enabled") : t("twoFactor.off")}
-          </Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
+    <SettingsSection title={t("twoFactor.title")} description={t("twoFactor.description")}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge variant={enabled ? "default" : "secondary"}>
+          {enabled ? t("twoFactor.enabled") : t("twoFactor.off")}
+        </Badge>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant={enabled ? "destructive" : "outline"}
-              disabled={guard.blocked}
-              {...guard.describeProps()}
-            >
-              {enabled ? <ShieldOffIcon /> : <ShieldCheckIcon />}
-              {action}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+          <GuardHint guard={guard}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={guard.blocked} {...guard.describeProps()}>
+                {enabled ? <ShieldOffIcon /> : <ShieldCheckIcon />}
+                {action}
+              </Button>
+            </DialogTrigger>
+          </GuardHint>
+          <DialogContent closeLabel={tCommon("actions.close")}>
             <DialogHeader>
               <DialogTitle>{action}</DialogTitle>
               <DialogDescription>
@@ -73,8 +60,8 @@ export function TwoFactorCard({ enabled }: TwoFactorCardProps) {
             )}
           </DialogContent>
         </Dialog>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+      </div>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }

@@ -7,17 +7,38 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./bun": "./src/bun/port-mock.ts",
+    "./bun/unit-of-work": "./src/bun/unit-of-work-mock.ts",
+    "./source-scan": "./src/source-scan.ts",
+    "./a11y": "./src/a11y.ts",
+    "./redirect-vectors": "./src/redirect-vectors.ts",
     "./base-vitest.config": "./base-vitest.config.js"
   },
   "scripts": {
+    "test": "vitest run",
     "format": "biome format . --write",
     "lint": "biome lint .",
     "check": "biome check .",
     "fix": "biome check --write ."
   },
+  "peerDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@packages/ddd-kit": "workspace:*",
+    "@playwright/test": "^1.64.1"
+  },
+  "peerDependenciesMeta": {
+    "@axe-core/playwright": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@packages/typescript-config": "workspace:*",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }

@@ -23,7 +23,7 @@ const unconfigured = <T>(): Promise<Result<T, StorageError>> =>
 export class NoOpStorageService implements IStorageService {
   constructor() {
     logger.warn(
-      "S3 not configured — uploads disabled, storage operations will fail with STORAGE_PROVIDER_FAILURE",
+      "S3 not configured: uploads disabled, storage operations will fail with STORAGE_PROVIDER_FAILURE",
     );
   }
 

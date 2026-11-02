@@ -12,7 +12,7 @@ import { DeleteCompleted } from "./components/delete-completed";
 import { DeleteRequested } from "./components/delete-requested";
 import { ImpersonationStarted } from "./components/impersonation-started";
 import { MagicLink } from "./components/magic-link";
-import { NotificationDigest } from "./components/notification-digest";
+import { NotificationDigest, notificationDigestSubject } from "./components/notification-digest";
 import { OrgInvitation } from "./components/org-invitation";
 import { ResetPassword } from "./components/reset-password";
 import { VerifyEmail } from "./components/verify-email";
@@ -48,14 +48,7 @@ const TEMPLATES: { [K in EmailTemplateKey]: TemplateEntry<K> } = {
     subject: (t) => t("subjects.impersonationStarted"),
   },
   api_token_leaked: { component: ApiTokenLeaked, subject: (t) => t("subjects.apiTokenLeaked") },
-  notification_digest: {
-    component: NotificationDigest,
-    subject: (t, v) =>
-      t("subjects.notificationDigest", {
-        count: Number(v.itemCount),
-        category: v.category,
-      }),
-  },
+  notification_digest: { component: NotificationDigest, subject: notificationDigestSubject },
 };
 
 export const EMAIL_TEMPLATE_KEYS = Object.keys(TEMPLATES) as EmailTemplateKey[];

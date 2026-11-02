@@ -3,11 +3,11 @@ import type * as React from "react";
 
 import { cn } from "../../libs/utils";
 
-const typographyH1Variants = cva("scroll-m-20 font-extrabold tracking-tight", {
+const typographyH1Variants = cva("scroll-m-20 font-semibold tracking-tight", {
   variants: {
     variant: {
-      hero: "text-center text-4xl text-balance",
-      page: "text-left text-3xl",
+      hero: "text-center text-3xl text-balance",
+      page: "text-left text-2xl",
     },
   },
   defaultVariants: { variant: "hero" },
@@ -27,14 +27,29 @@ function TypographyH1({ className, variant, ...props }: TypographyH1Props) {
   );
 }
 
-function TypographyH2({ className, ...props }: React.ComponentProps<"h2">) {
+const typographyH2Variants = cva("scroll-m-20 font-semibold tracking-tight first:mt-0", {
+  variants: {
+    variant: {
+      default: "text-xl",
+      section: "text-base",
+    },
+    tone: {
+      default: "",
+      destructive: "text-destructive",
+    },
+  },
+  defaultVariants: { variant: "default", tone: "default" },
+});
+
+interface TypographyH2Props
+  extends React.ComponentProps<"h2">,
+    VariantProps<typeof typographyH2Variants> {}
+
+function TypographyH2({ className, variant, tone, ...props }: TypographyH2Props) {
   return (
     <h2
       data-slot="typography-h2"
-      className={cn(
-        "scroll-m-20 border-b pb-2 font-semibold text-3xl tracking-tight first:mt-0",
-        className,
-      )}
+      className={cn(typographyH2Variants({ variant, tone }), className)}
       {...props}
     />
   );
@@ -44,7 +59,7 @@ function TypographyH3({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
       data-slot="typography-h3"
-      className={cn("scroll-m-20 font-semibold text-2xl tracking-tight", className)}
+      className={cn("scroll-m-20 font-semibold text-lg tracking-tight", className)}
       {...props}
     />
   );
@@ -54,27 +69,21 @@ function TypographyH4({ className, ...props }: React.ComponentProps<"h4">) {
   return (
     <h4
       data-slot="typography-h4"
-      className={cn("scroll-m-20 font-semibold text-xl tracking-tight", className)}
+      className={cn("scroll-m-20 font-semibold text-base tracking-tight", className)}
       {...props}
     />
   );
 }
 
 function TypographyP({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="typography-p"
-      className={cn("leading-7 [&:not(:first-child)]:mt-6", className)}
-      {...props}
-    />
-  );
+  return <p data-slot="typography-p" className={cn("leading-7", className)} {...props} />;
 }
 
 function TypographyLead({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="typography-lead"
-      className={cn("text-muted-foreground text-xl", className)}
+      className={cn("text-muted-foreground text-lg", className)}
       {...props}
     />
   );
@@ -110,6 +119,46 @@ function TypographyMuted({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
+const typographyInlineVariants = cva("", {
+  variants: {
+    tone: {
+      default: "",
+      muted: "text-muted-foreground",
+      destructive: "text-destructive",
+    },
+    font: {
+      sans: "",
+      mono: "font-mono",
+    },
+    size: {
+      inherit: "",
+      sm: "text-sm",
+      xs: "text-xs",
+    },
+  },
+  defaultVariants: { tone: "default", font: "sans", size: "inherit" },
+});
+
+interface TypographyInlineProps
+  extends React.ComponentProps<"span">,
+    VariantProps<typeof typographyInlineVariants> {}
+
+/**
+ * Phrasing text where a block paragraph is not allowed or not wanted: inside a
+ * `summary`, a table cell, a title or next to other inline content. Size
+ * inherits from the parent unless set; `mono` is for identifiers (event
+ * types, token prefixes, URLs), without the inline code chip.
+ */
+function TypographyInline({ className, tone, font, size, ...props }: TypographyInlineProps) {
+  return (
+    <span
+      data-slot="typography-inline"
+      className={cn(typographyInlineVariants({ tone, font, size }), className)}
+      {...props}
+    />
+  );
+}
+
 function TypographyBlockquote({ className, ...props }: React.ComponentProps<"blockquote">) {
   return (
     <blockquote
@@ -125,7 +174,7 @@ function TypographyInlineCode({ className, ...props }: React.ComponentProps<"cod
     <code
       data-slot="typography-inline-code"
       className={cn(
-        "relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono font-semibold text-sm",
+        "relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono font-medium text-sm",
         className,
       )}
       {...props}
@@ -137,7 +186,7 @@ function TypographyList({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
       data-slot="typography-list"
-      className={cn("my-6 ml-6 list-disc [&>li]:mt-2", className)}
+      className={cn("ml-6 list-disc [&>li]:mt-2", className)}
       {...props}
     />
   );
@@ -149,6 +198,7 @@ export {
   TypographyH2,
   TypographyH3,
   TypographyH4,
+  TypographyInline,
   TypographyInlineCode,
   TypographyLarge,
   TypographyLead,

@@ -24,7 +24,6 @@ export default {
     saving: "Enregistrement…",
     nameLabel: "Nom",
     saveChanges: "Enregistrer les modifications",
-    uploadAvatarLabel: "Téléverser une nouvelle image d'avatar",
     changeAvatar: "Changer d'avatar",
     uploading: "Téléversement…",
     avatarUpdatedToast: "Avatar mis à jour",
@@ -48,6 +47,11 @@ export default {
     membersUsage: "{{count}} / {{max}} membres",
     membersUsageAriaLabel: "Utilisation des membres",
     manageBilling: "Gérer la facturation",
+    checkoutReturnToast: "Paiement reçu",
+    activationPending:
+      "Votre offre est en cours d'activation. Actualisez dans un instant pour la voir.",
+    refreshPlan: "Actualiser l'offre",
+    loadFailed: "Votre offre et l'utilisation des membres n'ont pas pu être chargées.",
     tier: {
       free: "Gratuit",
       pro: "Pro",
@@ -61,11 +65,13 @@ export default {
       canceled: "Annulé",
       unpaid: "Impayé",
       incomplete: "Incomplet",
-      incompleteExpired: "Incomplet — expiré",
+      incompleteExpired: "Incomplet (expiré)",
       paused: "En pause",
+      override: "Accordé par notre équipe",
     },
   },
   passkeys: {
+    loadFailed: "Impossible de charger vos clés d'accès. Rechargez la page pour réessayer.",
     title: "Clés d'accès",
     description:
       "Connectez-vous avec la biométrie ou une clé matérielle. Les clés d'accès résistent au hameçonnage et remplacent les mots de passe.",
@@ -80,6 +86,9 @@ export default {
     deviceBound: "Liée à l'appareil",
     synced: "Synchronisée",
     backedUp: "Sauvegardée",
+    deviceBoundHint: "Enregistrée sur cet appareil uniquement : perdue si l'appareil est perdu.",
+    syncedHint: "Synchronisée entre vos appareils par votre gestionnaire de clés d'accès.",
+    backedUpHint: "Votre gestionnaire de clés d'accès conserve une sauvegarde de cette clé.",
     added: "Ajoutée le {{date}}",
     remove: "Supprimer la clé d'accès",
     addedToast: "Clé d'accès ajoutée",
@@ -138,6 +147,7 @@ export default {
     copy: "Copier",
     download: "Télécharger",
     copiedToast: "Codes de secours copiés",
+    copyFailed: "Impossible de copier les codes de secours. Téléchargez-les à la place.",
   },
   deletion: {
     scheduledTitle: "Suppression du compte programmée",
@@ -189,6 +199,8 @@ export default {
     },
   },
   notifications: {
+    loadFailed:
+      "Impossible de charger les préférences de notification. Rechargez la page pour réessayer.",
     title: "Notifications",
     preferencesTitle: "Préférences de notification",
     preferencesDescription:
@@ -205,6 +217,8 @@ export default {
     inAppAriaLabel: "Notifications dans l'application pour la catégorie {{category}}",
     emailAriaLabel: "Notifications par e-mail pour la catégorie {{category}}",
     emailFrequencyAriaLabel: "Fréquence des e-mails pour la catégorie {{category}}",
+    emailFrequencyDisabledHint:
+      "Activez les e-mails pour cette catégorie pour choisir une fréquence.",
     enforceAriaLabel: "Imposer la catégorie {{category}} à tous les membres",
     frequency: {
       immediate: "Immédiatement",
@@ -213,6 +227,10 @@ export default {
     },
   },
   organization: {
+    membersLoading: "Chargement…",
+    membersLoadFailed: "Impossible de charger les membres. Rechargez la page pour réessayer.",
+    invitationsLoadFailed:
+      "Impossible de charger les invitations en attente. Rechargez la page pour réessayer.",
     noActiveOrg: "Aucune organisation active.",
     title: "Paramètres de l'organisation",
     detailsTitle: "Détails",
@@ -257,6 +275,7 @@ export default {
     selectMemberPlaceholder: "Sélectionnez un membre…",
     currentRoleSuffix: "(rôle actuel : {{role}})",
     transferAndLeaveAction: "Transférer et quitter",
+    transferSelectMemberHint: "Sélectionnez d'abord le membre qui reprend l'organisation.",
     leftOrgToast: "Organisation quittée",
     leaveFailed: "Impossible de quitter l'organisation",
     transferAndLeaveFailed: "Impossible de transférer la propriété et de quitter l'organisation",
@@ -275,6 +294,7 @@ export default {
       "Supprimez votre compte dans les <accountLink>paramètres du compte</accountLink> pour supprimer cette organisation.",
     deleteOrgAlertDescription:
       "Supprimer <orgName></orgName> supprimera définitivement tous les membres, invitations et données. Cette action est irréversible.",
+    deleteOrgConfirmLabel: "Saisissez <value>{{name}}</value> pour confirmer",
     deleteOrgDialogDescription:
       "Cette action est irréversible. Tous les membres, invitations et données rattachés à cette organisation seront supprimés définitivement.",
     saveDefaultsFailed: "Impossible d'enregistrer les valeurs par défaut de l'organisation",
@@ -289,6 +309,7 @@ export default {
       description: "Votre statut d'acceptation des versions actuelles de nos politiques.",
       loading: "Chargement…",
       neverAccepted: "Aucune version acceptée",
+      acceptedVersion: "v{{version}} acceptée",
       upToDate: "À jour",
       updateRequired: "Mise à jour requise",
       loadError: "Impossible de charger le statut des politiques.",
@@ -312,6 +333,7 @@ export default {
     requestFailed: "Impossible de demander l'export des données. Veuillez réessayer.",
   },
   sessions: {
+    loadFailed: "Impossible de charger vos sessions. Rechargez la page pour réessayer.",
     title: "Sessions actives",
     description: "Appareils actuellement connectés à votre compte.",
     signOutOthers: "Déconnecter les autres sessions",
@@ -357,7 +379,7 @@ export default {
     },
     endpointRow: {
       autoDisabledTooltip:
-        "Désactivé après des échecs de livraison répétés — réactivez pour réinitialiser",
+        "Désactivé après des échecs de livraison répétés (réactivez pour réinitialiser)",
       openActions: "Ouvrir les actions",
       viewDeliveries: "Voir les livraisons",
       edit: "Modifier",
@@ -367,9 +389,9 @@ export default {
     },
     deliveries: {
       title: "Livraisons",
-      allStatusesPlaceholder: "Tous les statuts",
       allStatusFilter: "Tous",
       loading: "Chargement des livraisons…",
+      empty: "Aucune livraison pour l'instant.",
       eventTypeHeader: "Type d'événement",
       statusHeader: "Statut",
       attemptsHeader: "Tentatives",
@@ -389,11 +411,14 @@ export default {
       attemptNumber: "Tentative n° {{number}}",
       noResponse: "aucune réponse",
       payload: "Charge utile",
+      duration: "{{ms}} ms",
     },
     verifySnippetHeading: "Vérifier les signatures (Node.js)",
     eventTypePicker: {
       allEvents: "Tous les événements (*)",
       groupWildcard: "{{group}}.* (tous les événements du groupe {{group}})",
+      allEventsNote: "Tous les événements sont inclus. Décochez cette case pour les choisir.",
+      groupNote: "Tous les événements de ce groupe sont inclus.",
     },
     form: {
       urlLabel: "URL du point de terminaison",
@@ -444,6 +469,7 @@ export default {
   },
   sso: {
     pageTitle: "Authentification unique",
+    loading: "Chargement…",
     upsell: {
       description:
         "Permettez aux membres de se connecter via votre fournisseur d'identité (OIDC ou SAML), provisionnez les comptes via SCIM et imposez le SSO sur un domaine vérifié.",
@@ -467,7 +493,7 @@ export default {
     domainCard: {
       title: "Vérification du domaine",
       description:
-        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif — les membres de ce domaine ne peuvent pas se connecter via ce fournisseur — jusqu'à ce que l'enregistrement soit résolu.",
+        "Prouvez que vous contrôlez le domaine en publiant un enregistrement TXT. Le fournisseur reste inactif (les membres de ce domaine ne peuvent pas se connecter via ce fournisseur) jusqu'à ce que l'enregistrement soit résolu.",
       verifiedToast: "Domaine vérifié",
       verifiedBadge: "Vérifié",
       unverifiedBadge: "Non vérifié",
@@ -476,18 +502,19 @@ export default {
       checkNowAction: "Vérifier maintenant",
       alreadyVerified: "Ce domaine est déjà vérifié.",
       verifyFailed:
-        "Échec de la vérification — l'enregistrement DNS est introuvable. La propagation des changements DNS peut prendre du temps.",
+        "Échec de la vérification : l'enregistrement DNS est introuvable. La propagation des changements DNS peut prendre du temps.",
     },
     enforcementCard: {
+      loadFailed: "Le paramètre d'application n'a pas pu être chargé.",
       title: "Imposer le SSO",
       description:
-        "Une fois cette option activée, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès — le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
+        "Une fois cette option activée, les membres de votre domaine vérifié ne peuvent plus se connecter avec un mot de passe, un lien magique ou une clé d'accès : le SSO via votre fournisseur d'identité devient l'unique moyen de connexion.",
       updatedToast: "Imposition du SSO mise à jour",
       switchAriaLabel: "Imposer le SSO pour votre domaine",
       enforcedLabel: "Imposé",
       notEnforcedLabel: "Non imposé",
       verifyDomainFirst:
-        "Vérifiez votre domaine avant d'imposer le SSO — sinon, plus personne sur ce domaine ne pourra se connecter.",
+        "Vérifiez votre domaine avant d'imposer le SSO, sinon plus personne sur ce domaine ne pourra se connecter.",
     },
     scimCard: {
       title: "Provisionnement SCIM",
@@ -495,10 +522,18 @@ export default {
         "Laissez votre fournisseur d'identité créer, mettre à jour et désactiver les membres automatiquement.",
       onlyOwnerCanGenerate: "Seul le propriétaire de l'organisation peut générer un jeton SCIM.",
       baseUrlLabel: "URL de base SCIM",
+      notConnected: "Aucun annuaire n'est encore connecté.",
+      connectedUntil: "Annuaire connecté. Son jeton expire le {{date}}.",
       generateAction: "Générer le jeton",
+      rotateAction: "Remplacer le jeton",
       secretDialogTitle: "Jeton SCIM",
       secretDialogDescription:
-        "Copiez ce jeton maintenant — il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité.",
+        "Copiez ce jeton maintenant : il ne sera plus jamais affiché et ne peut pas être récupéré ensuite. Collez-le dans le connecteur SCIM de votre fournisseur d'identité. Il est valable un an, et tout jeton précédent cesse de fonctionner.",
+      disconnectAction: "Déconnecter l'annuaire",
+      disconnectDialogTitle: "Déconnecter l'annuaire ?",
+      disconnectDialogDescription:
+        "Son jeton cesse de fonctionner, et les membres provisionnés par votre fournisseur d'identité perdent l'accès à cette organisation. Les propriétaires gardent le leur.",
+      disconnectedToast: "Annuaire déconnecté",
     },
     forms: {
       oidc: {
@@ -513,8 +548,8 @@ export default {
       saml: {
         domainLabel: "Domaine",
         domainPlaceholder: "acme.com",
-        issuerLabel: "Émetteur / ID d'entité",
-        issuerPlaceholder: "acme-saml",
+        idpEntityIdLabel: "ID d'entité du fournisseur d'identité",
+        idpEntityIdPlaceholder: "https://idp.acme.com/metadata",
         entryPointLabel: "Point d'entrée",
         entryPointPlaceholder: "https://idp.acme.com/sso/saml",
         certLabel: "Certificat de signature",

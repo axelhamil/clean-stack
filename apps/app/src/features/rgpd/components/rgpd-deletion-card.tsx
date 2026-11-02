@@ -8,29 +8,25 @@ import {
   AlertDialogTrigger,
 } from "@packages/ui/components/ui/alert-dialog";
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
 import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
-import { TypographyLarge, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { useFormatDate, useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../../../shared/api/errors/toast";
 import { preflightDeletionQueryOptions } from "../../../shared/api/queries/account-deletion";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
+import { useCancelDeletion } from "../../../shared/auth/use-cancel-deletion";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { useSetActiveOrg } from "../../../shared/auth/use-set-active-org";
-import { useFormatDate, useFormatDateTime } from "../../../shared/i18n/use-format-date";
 import { RequestDeletionPasswordForm } from "../forms/request-deletion-password-form";
 import { RequestDeletionTotpForm } from "../forms/request-deletion-totp-form";
-import { useCancelDeletion } from "../hooks/use-cancel-deletion";
 
 interface RgpdDeletionCardProps {
   pendingDeletionUntil: Date | string | null | undefined;
@@ -44,6 +40,7 @@ export function RgpdDeletionCard({
   if (pendingDeletionUntil) {
     return <PendingState until={new Date(pendingDeletionUntil)} />;
   }
+
   return <ActiveState twoFactorEnabled={twoFactorEnabled} />;
 }
 
@@ -57,21 +54,20 @@ function PendingState({ until }: PendingStateProps) {
   const formatDateTime = useFormatDateTime();
   const cancel = useCancelDeletion();
   const guard = useImpersonationGuard();
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle variant="destructive">{t("deletion.scheduledTitle")}</CardTitle>
-        <CardDescription>
-          {t("deletion.scheduledDescription", { date: formatDateTime(until) })}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <Alert variant="destructive">
-          <AlertTriangleIcon />
-          <AlertDescription>
-            {t("deletion.anonymizedWarning", { date: formatDate(until) })}
-          </AlertDescription>
-        </Alert>
+    <SettingsSection
+      tone="destructive"
+      title={t("deletion.scheduledTitle")}
+      description={t("deletion.scheduledDescription", { date: formatDateTime(until) })}
+    >
+      <Alert variant="destructive">
+        <AlertTriangleIcon />
+        <AlertDescription>
+          {t("deletion.anonymizedWarning", { date: formatDate(until) })}
+        </AlertDescription>
+      </Alert>
+      <GuardHint guard={guard} otherwiseDisabled={cancel.isPending} className="self-start">
         <Button
           type="button"
           variant="outline"
@@ -82,9 +78,9 @@ function PendingState({ until }: PendingStateProps) {
         >
           {cancel.isPending ? t("deletion.cancelling") : t("deletion.cancel")}
         </Button>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+      </GuardHint>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }
 
@@ -94,35 +90,41 @@ interface ActiveStateProps {
 
 function ActiveState({ twoFactorEnabled }: ActiveStateProps) {
   const { t } = useTranslation("settings");
-  const preflight = useQuery(preflightDeletionQueryOptions);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle variant="destructive">{t("deletion.title")}</CardTitle>
-        <CardDescription>{t("deletion.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {preflight.isPending ? (
-          <TypographyMuted>{t("deletion.checking")}</TypographyMuted>
-        ) : preflight.isError ? (
-          <Alert variant="destructive">
-            <AlertTriangleIcon />
-            <AlertDescription>{t("deletion.checkFailed")}</AlertDescription>
-          </Alert>
-        ) : preflight.data.blockingOrgs.length > 0 ? (
-          <BlockingOrgsList orgs={preflight.data.blockingOrgs} />
-        ) : (
-          <>
-            <Alert variant="destructive">
-              <AlertTriangleIcon />
-              <AlertDescription>{t("deletion.warning")}</AlertDescription>
-            </Alert>
-            <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      tone="destructive"
+      title={t("deletion.title")}
+      description={t("deletion.description")}
+    >
+      <DeletionPreflight twoFactorEnabled={twoFactorEnabled} />
+    </SettingsSection>
+  );
+}
+
+interface DeletionPreflightProps {
+  twoFactorEnabled: boolean;
+}
+
+function DeletionPreflight({ twoFactorEnabled }: DeletionPreflightProps) {
+  const { t } = useTranslation("settings");
+  const preflight = useQuery(preflightDeletionQueryOptions);
+
+  if (preflight.isPending) return <TypographyMuted>{t("deletion.checking")}</TypographyMuted>;
+
+  if (preflight.isLoadingError) return <LoadErrorAlert message={t("deletion.checkFailed")} />;
+
+  const { blockingOrgs } = preflight.data;
+  if (blockingOrgs.length > 0) return <BlockingOrgsList orgs={blockingOrgs} />;
+
+  return (
+    <>
+      <Alert variant="destructive">
+        <AlertTriangleIcon />
+        <AlertDescription>{t("deletion.warning")}</AlertDescription>
+      </Alert>
+      <DeleteDialog twoFactorEnabled={twoFactorEnabled} />
+    </>
   );
 }
 
@@ -150,9 +152,9 @@ function BlockingOrgsList({ orgs }: BlockingOrgsListProps) {
       <TypographyMuted>{t("deletion.blockingIntro")}</TypographyMuted>
       <ul className="flex flex-col gap-2">
         {orgs.map((org) => (
-          <ListRow key={org.orgId}>
-            <ListRowContent>
-              <TypographyLarge>{org.orgName}</TypographyLarge>
+          <ListRow variant="plain" key={org.orgId} className="flex-wrap">
+            <ListRowContent className="min-w-0 break-words">
+              <TypographySmall>{org.orgName}</TypographySmall>
               <TypographyMuted>
                 {t("deletion.otherMembers", { count: org.otherMembersCount })}
               </TypographyMuted>
@@ -181,10 +183,11 @@ interface DeleteDialogProps {
 function DeleteDialog({ twoFactorEnabled }: DeleteDialogProps) {
   const { t } = useTranslation("settings");
   const [open, setOpen] = useState(false);
+
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="destructive" className="self-start">
+        <Button type="button" variant="outline" className="self-start">
           <TrashIcon />
           {t("deletion.title")}
         </Button>

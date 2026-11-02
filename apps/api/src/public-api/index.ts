@@ -23,9 +23,9 @@ export function createPublicApiV1(deps: PublicApiV1Deps): Hono<{ Variables: ApiT
   };
 
   return new Hono<{ Variables: ApiTokenVariables }>()
+    .use("*", requireRateLimit({ limiter: deps.limiter }, ipPolicy))
     .use("*", requireApiToken(deps, { scopes: [] }))
     .use("*", requireRateLimit({ limiter: deps.limiter }, API_TOKEN_POLICY))
-    .use("*", requireRateLimit({ limiter: deps.limiter }, ipPolicy))
     .route("/me", mePublicRoutes)
     .route("/organizations", orgsPublicRoutes);
 }

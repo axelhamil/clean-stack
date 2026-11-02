@@ -1,9 +1,15 @@
 import { describe, expect, it, mock } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
+const realEventEmitter = await import("../../event-emitter");
+
 mock.module("../../event-emitter", () => ({
+  ...realEventEmitter,
   emitEvent: mock(
     async (
       _o: unknown,
@@ -18,182 +24,42 @@ mock.module("../../event-emitter", () => ({
   ),
 }));
 
-const authApi = {
-  banUser: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
-  unbanUser: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
-  setRole: mock(async (_args: unknown) => ({ user: { id: "u-2" } })),
-  revokeUserSessions: mock(async (_args: unknown) => ({ success: true })),
-  requestPasswordReset: mock(async (_args: unknown) => ({ status: true })),
-};
-
-mock.module("../../../auth", () => ({ auth: { api: authApi } }));
+const writeTransactions: unknown[] = [];
+const setOrgSsoEnforced = mock(async (_organizationId: string, _enforced: boolean) => {
+  writeTransactions.push(UnitOfWorkContext.transaction());
+});
+const realAuthQueries = await import("../../../auth-queries");
+mock.module("../../../auth-queries", () => ({ ...realAuthQueries, setOrgSsoEnforced }));
 
 const { AdminActionService } = await import("../admin-action.service");
 
-const instrumentation = {
-  startSpan: <T>(_o: unknown, fn: () => T) => fn(),
-  capture: mock(() => {}),
-  addBreadcrumb: mock(() => {}),
-  setSpanAttributes: mock(() => {}),
-};
+const instrumentation = mockInstrumentation();
 
-const fakeTx = {
-  update: () => ({ set: () => ({ where: async () => undefined }) }),
-} as never;
-
-const noopUow = {
-  startTransaction: async (cb: (tx: unknown) => unknown) => cb(fakeTx),
-  run: async (cb: (tx: unknown) => unknown) => cb(fakeTx),
-};
-
-function service() {
-  return new AdminActionService({} as never, noopUow as never, instrumentation as never);
-}
-
-function makeHeaders(token = "tok-1") {
-  return new Headers({ authorization: `Bearer ${token}`, cookie: "session=abc" });
+function service(unitOfWork = mockUnitOfWork().unitOfWork) {
+  return new AdminActionService({} as never, unitOfWork, instrumentation);
 }
 
 describe("AdminActionService", () => {
-  describe("ban", () => {
-    it("passes headers to auth.api.banUser", async () => {
-      authApi.banUser.mockClear();
-      const headers = makeHeaders();
-      await service().ban({ actorUserId: "admin-1", userId: "u-2", reason: "spam", headers });
-      expect(authApi.banUser).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("emits admin.user.banned with the actor distinct from the subject", async () => {
-      emitted.length = 0;
-      const result = await service().ban({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        reason: "spam",
-        headers: makeHeaders(),
-      });
-      expect(result.isSuccess).toBe(true);
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_BANNED);
-      expect(event?.payload.actorUserId).toBe("admin-1");
-      expect(event?.payload.userId).toBe("u-2");
-    });
-
-    it("fails and captures when BetterAuth rejects the ban", async () => {
-      authApi.banUser.mockImplementationOnce(async () => {
-        throw new Error("nope");
-      });
-      const result = await service().ban({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        reason: "spam",
-        headers: makeHeaders(),
-      });
-      expect(result.isFailure).toBe(true);
-      expect(instrumentation.capture).toHaveBeenCalled();
-    });
-  });
-
-  describe("unban", () => {
-    it("passes headers to auth.api.unbanUser", async () => {
-      authApi.unbanUser.mockClear();
-      const headers = makeHeaders();
-      await service().unban({ actorUserId: "admin-1", userId: "u-2", headers });
-      expect(authApi.unbanUser).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("emits admin.user.unbanned with the actor distinct from the subject", async () => {
-      emitted.length = 0;
-      const result = await service().unban({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        headers: makeHeaders(),
-      });
-      expect(result.isSuccess).toBe(true);
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_UNBANNED);
-      expect(event?.payload.actorUserId).toBe("admin-1");
-      expect(event?.payload.userId).toBe("u-2");
-    });
-  });
-
-  describe("setRole", () => {
-    it("passes headers to auth.api.setRole", async () => {
-      authApi.setRole.mockClear();
-      const headers = makeHeaders();
-      await service().setRole({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        role: "admin",
-        previousRole: "user",
-        headers,
-      });
-      expect(authApi.setRole).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("records the previous role in the event payload", async () => {
-      emitted.length = 0;
-      await service().setRole({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        role: "admin",
-        previousRole: "user",
-        headers: makeHeaders(),
-      });
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_ROLE_CHANGED);
-      expect(event?.payload.from).toBe("user");
-      expect(event?.payload.to).toBe("admin");
-    });
-  });
-
-  describe("revokeSessions", () => {
-    it("passes headers to auth.api.revokeUserSessions", async () => {
-      authApi.revokeUserSessions.mockClear();
-      const headers = makeHeaders();
-      await service().revokeSessions({ actorUserId: "admin-1", userId: "u-2", count: 3, headers });
-      expect(authApi.revokeUserSessions).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("emits admin.user.sessions_revoked with the actor distinct from the subject", async () => {
-      emitted.length = 0;
-      const result = await service().revokeSessions({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        count: 3,
-        headers: makeHeaders(),
-      });
-      expect(result.isSuccess).toBe(true);
-      const event = emitted.find((e) => e.type === EventTypes.ADMIN_USER_SESSIONS_REVOKED);
-      expect(event?.payload.actorUserId).toBe("admin-1");
-      expect(event?.payload.userId).toBe("u-2");
-    });
-  });
-
-  describe("resetPassword", () => {
-    it("passes headers to auth.api.revokeUserSessions before the reset email", async () => {
-      authApi.revokeUserSessions.mockClear();
-      const headers = makeHeaders();
-      await service().resetPassword({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        email: "a@example.com",
-        headers,
-      });
-      expect(authApi.revokeUserSessions).toHaveBeenCalledWith(expect.objectContaining({ headers }));
-    });
-
-    it("revokes sessions before sending the reset email", async () => {
-      emitted.length = 0;
-      await service().resetPassword({
-        actorUserId: "admin-1",
-        userId: "u-2",
-        email: "a@example.com",
-        headers: makeHeaders(),
-      });
-      expect(authApi.revokeUserSessions).toHaveBeenCalled();
-      expect(authApi.requestPasswordReset).toHaveBeenCalled();
-      expect(emitted.some((e) => e.type === EventTypes.ADMIN_USER_PASSWORD_RESET)).toBe(true);
-    });
-  });
-
   describe("setSsoEnforcement", () => {
+    it("writes the flag and emits the event in one committed unit of work", async () => {
+      setOrgSsoEnforced.mockClear();
+      writeTransactions.length = 0;
+      emitted.length = 0;
+      const { unitOfWork, outcome } = mockUnitOfWork();
+      const result = await service(unitOfWork).setSsoEnforcement({
+        organizationId: "org-1",
+        enforced: true,
+        actorUserId: "owner-1",
+        viaPlatformAdmin: false,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(outcome()).toBe("committed");
+      expect(setOrgSsoEnforced).toHaveBeenCalledWith("org-1", true);
+      expect(writeTransactions[0]).toBeDefined();
+      expect(emitted.map((e) => e.type)).toEqual([EventTypes.SSO_ENFORCEMENT_CHANGED]);
+    });
+
     it("records the platform admin as actor when lifting sso enforcement", async () => {
       emitted.length = 0;
       const result = await service().setSsoEnforcement({

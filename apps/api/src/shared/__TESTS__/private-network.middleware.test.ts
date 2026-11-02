@@ -3,7 +3,9 @@ import { Hono } from "hono";
 
 let mockedAddress = "::1";
 
+const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({
+  ...realHonoBun,
   getConnInfo: () => ({ remote: { address: mockedAddress } }),
 }));
 
@@ -29,7 +31,7 @@ describe("requirePrivateNetwork", () => {
     expect(await statusFor("8.8.8.8")).toBe(401);
   });
 
-  it("should reject IPv4-mapped IPv6 carrying a public IPv4 (the gotcha — `::ffff:x.x.x.x`)", async () => {
+  it("should reject IPv4-mapped IPv6 carrying a public IPv4 (the gotcha, `::ffff:x.x.x.x`)", async () => {
     expect(await statusFor("::ffff:8.8.8.8")).toBe(401);
   });
 

@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "agentGuidance": false,
   "ui": "tui",
   "globalDependencies": [
     "biome.json",
@@ -14,6 +15,8 @@
     "DATABASE_URL",
     "CORS_ORIGIN",
     "APP_URL",
+    "ADMIN_URL",
+    "AUTH_COOKIE_DOMAIN",
     "BETTER_AUTH_*",
     "RESEND_*",
     "INTERNAL_*",
@@ -25,7 +28,6 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "with": ["type-check"],
       "inputs": [
         "src/**",
         "common/**",
@@ -81,13 +83,26 @@
     "check:a11y": {
       "dependsOn": ["build"],
       "cache": false,
-      "env": ["A11Y_BASE_URL", "SEED_EMAIL", "SEED_PASSWORD"]
+      "env": ["A11Y_BASE_URL", "A11Y_APP_URL", "SEED_EMAIL", "SEED_PASSWORD"]
     },
-    "format": { "outputs": [] },
-    "lint": { "outputs": [] },
-    "db:generate": { "cache": false, "env": ["DATABASE_URL"] },
-    "db:push": { "cache": false, "env": ["DATABASE_URL"] },
-    "db:seed": { "cache": false, "env": ["DATABASE_URL"] },
+    "format": {
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "db:generate": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
+    },
+    "db:push": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
+    },
+    "db:seed": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
+    },
     "db:studio": {
       "cache": false,
       "persistent": true,
@@ -100,6 +115,9 @@
       "outputs": ["drizzle/migrations/**"],
       "env": ["DATABASE_URL"]
     },
-    "ui:add": { "cache": false, "interactive": true }
+    "ui:add": {
+      "cache": false,
+      "interactive": true
+    }
   }
 }

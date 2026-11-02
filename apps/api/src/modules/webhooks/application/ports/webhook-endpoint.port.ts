@@ -1,5 +1,4 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
-import type { ITransaction } from "../../../../shared/transaction";
 
 export type WebhookRepoError = AppError<"WEBHOOK_PERSISTENCE_PROVIDER_FAILURE">;
 
@@ -37,47 +36,30 @@ export type UpdateEndpointArgs = {
 };
 
 export interface IWebhookEndpointRepository {
-  create(
-    args: CreateEndpointArgs,
-    tx?: ITransaction,
-  ): Promise<Result<WebhookEndpointRecord, WebhookRepoError>>;
+  create(args: CreateEndpointArgs): Promise<Result<WebhookEndpointRecord, WebhookRepoError>>;
   update(
     args: UpdateEndpointArgs,
-    tx?: ITransaction,
   ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
-  delete(
-    id: string,
-    organizationId: string,
-    tx?: ITransaction,
-  ): Promise<Result<boolean, WebhookRepoError>>;
+  delete(id: string, organizationId: string): Promise<Result<boolean, WebhookRepoError>>;
   findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>>;
   listByOrg(organizationId: string): Promise<Result<WebhookEndpointRecord[], WebhookRepoError>>;
-  applySecretRotation(
-    args: {
-      id: string;
-      organizationId: string;
-      secretCipher: string;
-      previousSecretCipher: string;
-      previousSecretExpiresAt: Date;
-    },
-    tx: ITransaction,
-  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
+  applySecretRotation(args: {
+    id: string;
+    organizationId: string;
+    secretCipher: string;
+    previousSecretCipher: string;
+    previousSecretExpiresAt: Date;
+  }): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
   bumpFailure(
     id: string,
     organizationId: string,
-    tx: ITransaction,
   ): Promise<
     Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
   >;
-  resetFailure(
-    id: string,
-    organizationId: string,
-    tx: ITransaction,
-  ): Promise<Result<void, WebhookRepoError>>;
+  resetFailure(id: string, organizationId: string): Promise<Result<void, WebhookRepoError>>;
   markDisabled(
     id: string,
     organizationId: string,
     disabledAt: Date,
-    tx: ITransaction,
   ): Promise<Result<void, WebhookRepoError>>;
 }

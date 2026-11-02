@@ -9,7 +9,7 @@ describe("signWebhookPayload", () => {
     expect(result).toMatch(/^t=\d+,v1=[0-9a-f]+$/);
   });
 
-  it("is deterministic — same inputs produce same output", async () => {
+  it("is deterministic: same inputs produce same output", async () => {
     const ts = Math.floor(Date.now() / 1000);
     const a = await signWebhookPayload('{"event":"test"}', ["secret"], ts);
     const b = await signWebhookPayload('{"event":"test"}', ["secret"], ts);

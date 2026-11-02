@@ -1,8 +1,8 @@
-import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
+import { type EventHandler, type IDomainEvent, onEvent, Result } from "@packages/ddd-kit";
 import { AdminImpersonationStartedPayload, EventTypes } from "@packages/events";
+import { handlerIdempotency } from "../../../../shared/handler-idempotency";
 import { localeForUser } from "../../../../shared/locale-for-user";
 import type { IEmailService } from "../../../../shared/ports/email.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IProfileStore } from "../../../../shared/ports/profile.port";
 import type { AdminQueryService } from "../services/admin-query.service";
 
@@ -10,7 +10,6 @@ interface NotifyImpersonatedUserDeps {
   IEmailService: IEmailService;
   AdminQueryService: AdminQueryService;
   IProfileStore: IProfileStore;
-  IInstrumentation: IInstrumentation;
   supportUrl: string;
 }
 
@@ -22,38 +21,34 @@ const FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
+const HANDLER_NAME = "notify-impersonated-user";
+
 export const notifyImpersonatedUser: (deps: NotifyImpersonatedUserDeps) => EventHandler = onEvent(
   EventTypes.ADMIN_IMPERSONATION_STARTED,
+  HANDLER_NAME,
   (c: NotifyImpersonatedUserDeps) => async (event: IDomainEvent) => {
     const parsed = AdminImpersonationStartedPayload.safeParse(event.payload);
-    if (!parsed.success) return;
+    if (!parsed.success) return Result.ok();
 
     const found = await c.AdminQueryService.getUser(parsed.data.userId);
-    if (found.isFailure) return;
+    if (found.isFailure) return Result.fail(found.getError());
+
     const target = found.getValue();
-    if (target.isNone()) return;
+    if (target.isNone()) return Result.ok();
+
     const user = target.unwrap();
-
-    try {
-      const locale = await localeForUser(c.IProfileStore, parsed.data.userId);
-
-      const sent = await c.IEmailService.sendTemplate(
-        "impersonation_started",
-        user.email,
-        {
-          userName: user.name,
-          startedAt: event.dateOccurred.toLocaleString(locale, FORMAT),
-          expiresAt: new Date(parsed.data.expiresAt).toLocaleString(locale, FORMAT),
-          reason: parsed.data.reason,
-          supportUrl: c.supportUrl,
-        },
-        { locale },
-      );
-      if (sent.isFailure) {
-        c.IInstrumentation.capture(sent.getError());
-      }
-    } catch (err) {
-      c.IInstrumentation.capture(err);
-    }
+    const locale = await localeForUser(c.IProfileStore, parsed.data.userId);
+    return c.IEmailService.sendTemplate(
+      "impersonation_started",
+      user.email,
+      {
+        userName: user.name,
+        startedAt: event.dateOccurred.toLocaleString(locale, FORMAT),
+        expiresAt: new Date(parsed.data.expiresAt).toLocaleString(locale, FORMAT),
+        reason: parsed.data.reason,
+        supportUrl: c.supportUrl,
+      },
+      { locale, ...handlerIdempotency(HANDLER_NAME, event) },
+    );
   },
 );

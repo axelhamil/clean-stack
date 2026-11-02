@@ -1,6 +1,6 @@
 # Disaster recovery
 
-> **TL;DR** — **activate PITR on your managed Postgres provider. That's your primary defense.** The weekly `pg_dump` export recipe below is for portable / anti-vendor-lock-in only, not your DR plan. clean-stack ships no backup code on purpose: every modern Postgres host does this better than a custom cron would, and `pgBackRest` lost its maintainer in 2026 — building on top of it would have been a regression.
+> **TL;DR**: **activate PITR on your managed Postgres provider. That's your primary defense.** The weekly `pg_dump` export recipe below is for portable / anti-vendor-lock-in only, not your DR plan. clean-stack ships no backup code on purpose: every modern Postgres host does this better than a custom cron would, and `pgBackRest` lost its maintainer in 2026, building on top of it would have been a regression.
 
 This doc covers: RPO/RTO targets, the 3-2-1 rule applied to a clean-stack deployment, PITR setup per provider, the restore runbook, optional weekly portable export, optional monthly automated restore-test, lifecycle + versioning on the backup bucket, and known caveats.
 
@@ -8,31 +8,31 @@ This doc covers: RPO/RTO targets, the 3-2-1 rule applied to a clean-stack deploy
 
 | Metric | With PITR (recommended) | With weekly `pg_dump` only (fallback) |
 |---|---|---|
-| **RPO** (max acceptable data loss) | 1–5 min (WAL replay) | up to 7 days |
-| **RTO** (max acceptable downtime) | 1 h | 2–4 h (provision Postgres + restore dump + smoke) |
+| **RPO** (max acceptable data loss) | 1 to 5 min (WAL replay) | up to 7 days |
+| **RTO** (max acceptable downtime) | 1 h | 2 to 4 h (provision Postgres + restore dump + smoke) |
 
-If your business can't tolerate a 24h+ data loss on prod, PITR isn't optional. For early-stage SaaS with a tiny user base, a daily provider snapshot + the weekly portable export is enough — just be honest about what you're committing to.
+If your business can't tolerate a 24h+ data loss on prod, PITR isn't optional. For early-stage SaaS with a tiny user base, a daily provider snapshot + the weekly portable export is enough, just be honest about what you're committing to.
 
 ## 3-2-1 rule applied
 
 | Copy | Where | Who manages it |
 |---|---|---|
 | **Live** | Your provider's primary Postgres | Provider (replicated automatically on Neon/Supabase/RDS) |
-| **PITR / daily snapshot** | Same provider, separate storage tier | Provider (continuous WAL or daily snapshots, retention 7–35 d) |
+| **PITR / daily snapshot** | Same provider, separate storage tier | Provider (continuous WAL or daily snapshots, retention 7 to 35 d) |
 | **Weekly portable export** | Your S3-compatible bucket (R2 / SeaweedFS / S3), preferably **different region** | You (the recipe below) |
 
 Provider PITR + provider snapshot count as one logical copy (same blast radius if the provider account is compromised or terminated). The weekly portable export is what survives "the provider deleted my account by mistake" or "I want to leave this vendor".
 
 ## PITR setup per provider
 
-Short pointers only — every provider's UI changes faster than docs. Search "PITR" in your dashboard.
+Short pointers only, every provider's UI changes faster than docs. Search "PITR" in your dashboard.
 
-- **Railway** — Pro plan ships daily backups by default. PITR is an add-on; enable it on the Postgres service settings. Restore via the dashboard or the Railway CLI.
-- **Neon** — branch-based PITR is built-in (sub-second granularity on Scale+). Restore = create a new branch from a point in time, swap the connection string. CLI: `neon branches restore`.
-- **Supabase** — daily automated backups (Pro). PITR is an add-on (Pro+) with up to 7 d granularity. Restore via the dashboard.
-- **AWS RDS** — automated backups on by default (7 d retention, up to 35 d). PITR sub-minute granularity. Restore via `aws rds restore-db-instance-to-point-in-time`.
-- **Fly.io Postgres** — daily volume snapshots (5 d retention). For PITR, attach a continuous backup target (S3 via `fly pg backup`) or migrate to a managed provider.
-- **Self-hosted Postgres** — point to [WAL-G](https://github.com/wal-g/wal-g) (sidecar, S3-compatible, well-suited to Kubernetes and Docker Compose). Notice: [pgBackRest is unmaintained since 2026](https://thebuild.com/blog/2026/04/30/after-pgbackrest/) — don't start new projects on it. Barman (EDB-backed) is the alternative for multi-cluster ops.
+- **Railway**: Pro plan ships daily backups by default. PITR is an add-on; enable it on the Postgres service settings. Restore via the dashboard or the Railway CLI.
+- **Neon**: branch-based PITR is built-in (sub-second granularity on Scale+). Restore = create a new branch from a point in time, swap the connection string. CLI: `neon branches restore`.
+- **Supabase**: daily automated backups (Pro). PITR is an add-on (Pro+) with up to 7 d granularity. Restore via the dashboard.
+- **AWS RDS**: automated backups on by default (7 d retention, up to 35 d). PITR sub-minute granularity. Restore via `aws rds restore-db-instance-to-point-in-time`.
+- **Fly.io Postgres**: daily volume snapshots (5 d retention). For PITR, attach a continuous backup target (S3 via `fly pg backup`) or migrate to a managed provider.
+- **Self-hosted Postgres**: point to [WAL-G](https://github.com/wal-g/wal-g) (sidecar, S3-compatible, well-suited to Kubernetes and Docker Compose). Notice: [pgBackRest is unmaintained since 2026](https://thebuild.com/blog/2026/04/30/after-pgbackrest/): don't start new projects on it. Barman (EDB-backed) is the alternative for multi-cluster ops.
 
 Whichever you pick, **test the restore** before you need it (see § Restore runbook below).
 
@@ -62,7 +62,7 @@ aws s3 cp \
   --endpoint-url "$S3_ENDPOINT"
 ```
 
-For PITR restores, this step doesn't apply — use the provider console / CLI; the runbook resumes at step 4.
+For PITR restores, this step doesn't apply, use the provider console / CLI; the runbook resumes at step 4.
 
 ### 3. Restore
 
@@ -71,11 +71,11 @@ gunzip -c latest.sql.gz \
   | psql -h localhost -p 5436 -U postgres -d postgres
 ```
 
-Expect a flood of `CREATE TABLE` / `COPY` / `ALTER TABLE`. `NOTICE` lines about already-present extensions are fine; `ERROR` lines are not — abort and investigate.
+Expect a flood of `CREATE TABLE` / `COPY` / `ALTER TABLE`. `NOTICE` lines about already-present extensions are fine; `ERROR` lines are not, abort and investigate.
 
 ### 4. Verify
 
-Sanity check: every table has the row counts you'd expect. Inline 15-line smoke script — drop in `apps/api/scripts/db-smoke.ts` if you want to keep it (clean-stack doesn't ship it by default, infra-specific):
+Sanity check: every table has the row counts you'd expect. Inline 15-line smoke script, drop in `apps/api/scripts/db-smoke.ts` if you want to keep it (clean-stack doesn't ship it by default, infra-specific):
 
 ```ts
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -111,9 +111,9 @@ Any row of `{ count: 0 }` on a table you expect data in = corrupted dump or wron
 
 Don't roll forward if you don't know exactly when the bad write happened. Don't restore in place if you haven't first validated on the side instance.
 
-## Optional — weekly portable export
+## Optional, weekly portable export
 
-The recipes below produce one `*.sql.gz` per week in `backups/postgres/<ISO-timestamp>.sql.gz`. They're a fallback against vendor lock-in or provider account loss — not your primary DR. Pick **one** scheduler.
+The recipes below produce one `*.sql.gz` per week in `backups/postgres/<ISO-timestamp>.sql.gz`. They're a fallback against vendor lock-in or provider account loss, not your primary DR. Pick **one** scheduler.
 
 ### GitHub Actions
 
@@ -146,12 +146,12 @@ jobs:
           echo "key=$KEY" >> "$GITHUB_OUTPUT"
 ```
 
-Set `secrets.DATABASE_URL` to a **read-only** Postgres role (`GRANT CONNECT, USAGE, SELECT` on the relevant schemas) — `pg_dump` doesn't need superuser, and a leaked CI secret should not be able to write.
+Set `secrets.DATABASE_URL` to a **read-only** Postgres role (`GRANT CONNECT, USAGE, SELECT` on the relevant schemas): `pg_dump` doesn't need superuser, and a leaked CI secret should not be able to write.
 
 ### Railway Cron (same project as the API)
 
 ```jsonc
-// railway.json (cron service — separate from the API service)
+// railway.json (cron service, separate from the API service)
 {
   "deploy": {
     "startCommand": "bash -c 'pg_dump $DATABASE_URL | gzip | aws s3 cp - s3://$S3_BUCKET/backups/postgres/$(date -u +%Y-%m-%dT%H%M%SZ).sql.gz --endpoint-url $S3_ENDPOINT'",
@@ -189,7 +189,7 @@ spec:
               envFrom: [{ secretRef: { name: postgres-export } }]
 ```
 
-## Optional — monthly automated restore-test
+## Optional, monthly automated restore-test
 
 A backup that's never restored is a backup you don't know works. This recipe restores the latest dump to an ephemeral Postgres and fails loudly if it can't.
 
@@ -238,13 +238,13 @@ jobs:
           done
 ```
 
-If this job fails, page someone. A green job a month is a thin signal — a red job after weeks of green is the only thing standing between you and a real outage.
+If this job fails, page someone. A green job a month is a thin signal, a red job after weeks of green is the only thing standing between you and a real outage.
 
-## Backup bucket — lifecycle + versioning
+## Backup bucket, lifecycle + versioning
 
 S3-compatible buckets (R2, SeaweedFS, AWS S3) all support lifecycle rules and versioning, with subtle differences. Below = AWS-flavoured CLI; adapt the endpoint for R2 or SeaweedFS.
 
-### Lifecycle — expire dailies, keep monthlies
+### Lifecycle, expire dailies, keep monthlies
 
 This rule expires anything older than 30 days under `backups/postgres/` and transitions monthly snapshots (under `backups/postgres-monthly/`) to a cold-storage class after 30 days, keeping them 1 year. Re-target the prefix paths for your layout.
 
@@ -282,18 +282,18 @@ aws s3api put-bucket-versioning \
   --versioning-configuration Status=Enabled
 ```
 
-For production: enable **MFA delete** (AWS S3 only, not R2/SeaweedFS) — requires a TOTP factor on every permanent delete.
+For production: enable **MFA delete** (AWS S3 only, not R2/SeaweedFS): requires a TOTP factor on every permanent delete.
 
 ### Caveats
 
-- **Cloudflare R2** — no GLACIER class. Use **Infrequent Access** (`StorageClass: STANDARD_IA`) instead, or accept that monthly snapshots cost the same as dailies. R2 lifecycle support is more limited than AWS S3; check current capability before relying on transition rules.
-- **SeaweedFS** — lifecycle rules and versioning are partially supported depending on version. Treat the snippets above as production guidance; locally, focus on the dump path itself, not the lifecycle.
+- **Cloudflare R2**: no GLACIER class. Use **Infrequent Access** (`StorageClass: STANDARD_IA`) instead, or accept that monthly snapshots cost the same as dailies. R2 lifecycle support is more limited than AWS S3; check current capability before relying on transition rules.
+- **SeaweedFS**: lifecycle rules and versioning are partially supported depending on version. Treat the snippets above as production guidance; locally, focus on the dump path itself, not the lifecycle.
 
 ## Sources
 
-- [After pgBackRest — Christophe Pettus (April 2026)](https://thebuild.com/blog/2026/04/30/after-pgbackrest/) — why the tool is unmaintained and what to migrate to.
-- [Set up PostgreSQL backups with WAL-G on Kubernetes (Feb 2026)](https://oneuptime.com/blog/post/2026-02-09-postgresql-backups-walg-kubernetes/view) — sidecar pattern for self-hosted.
-- [Best PostgreSQL hosting in 2026: RDS vs Supabase vs Neon vs Self-hosted](https://dev.to/philip_mcclarence_2ef9475/best-postgresql-hosting-in-2026-rds-vs-supabase-vs-neon-vs-self-hosted-5fkp) — provider PITR comparison.
-- [Why you don't need PITR for most Postgres DBs in 2026](https://medium.com/@pawale7663/why-you-dont-need-pitr-and-incremental-backups-for-most-postgresql-databases-in-2026-b2a1f3ec6833) — counterpoint, RPO-honesty perspective.
-- **SOC 2** Trust Services Criteria § A.1 (Availability — backup + recovery).
+- [After pgBackRest, Christophe Pettus (April 2026)](https://thebuild.com/blog/2026/04/30/after-pgbackrest/): why the tool is unmaintained and what to migrate to.
+- [Set up PostgreSQL backups with WAL-G on Kubernetes (Feb 2026)](https://oneuptime.com/blog/post/2026-02-09-postgresql-backups-walg-kubernetes/view): sidecar pattern for self-hosted.
+- [Best PostgreSQL hosting in 2026: RDS vs Supabase vs Neon vs Self-hosted](https://dev.to/philip_mcclarence_2ef9475/best-postgresql-hosting-in-2026-rds-vs-supabase-vs-neon-vs-self-hosted-5fkp): provider PITR comparison.
+- [Why you don't need PITR for most Postgres DBs in 2026](https://medium.com/@pawale7663/why-you-dont-need-pitr-and-incremental-backups-for-most-postgresql-databases-in-2026-b2a1f3ec6833): counterpoint, RPO-honesty perspective.
+- **SOC 2** Trust Services Criteria § A.1 (Availability, backup + recovery).
 - **ISO 27001** Annex A § A.12.3 (Backup).

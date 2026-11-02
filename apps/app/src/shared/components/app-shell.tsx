@@ -1,36 +1,31 @@
 import { BrandLink } from "@packages/ui/components/ui/brand-link";
 import { Button } from "@packages/ui/components/ui/button";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { cn } from "@packages/ui/libs/utils.js";
-import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { sessionQueryOptions } from "../../shared/api/queries/session";
-import { LogoMark } from "../../shared/components/logo-mark";
-import { ThemeToggle } from "../../shared/components/theme-toggle";
-import { NotificationBell } from "../../shared/notifications/notification-bell";
 import { AuthorizationDevTool } from "../auth/authorization-devtool";
-import { canAccessPlatformAdmin } from "../auth/can-access-platform-admin";
+import { NotificationBell } from "../notifications/notification-bell";
 import { CommandPalette } from "./command-palette";
 import { ContextualTabs } from "./contextual-tabs";
+import { DeletionPendingBanner } from "./deletion-pending-banner";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { LegalFooter } from "./legal-footer";
+import { LogoMark } from "./logo-mark";
 import { OrgSwitcher } from "./org-switcher";
+import { ThemeToggle } from "./theme-toggle";
+import { usePrimaryNav } from "./use-primary-nav";
 import { UserMenu } from "./user-menu";
 
 interface AppShellProps {
   user: { name?: string | null; email: string };
   children: React.ReactNode;
 }
-
-const PRIMARY_NAV = [
-  { to: "/dashboard", labelKey: "nav.dashboard" },
-  { to: "/settings", labelKey: "nav.settings" },
-] as const;
 
 function isApplePlatform(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -43,8 +38,7 @@ const SHORTCUT_LABEL = isApplePlatform() ? "⌘ K" : "Ctrl K";
 export function AppShell({ user, children }: AppShellProps) {
   const { t } = useTranslation("common");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { data: session } = useQuery(sessionQueryOptions);
-  const platformAdmin = canAccessPlatformAdmin(session);
+  const primaryNav = usePrimaryNav();
 
   const fireCommandPalette = () => {
     window.dispatchEvent(
@@ -54,8 +48,8 @@ export function AppShell({ user, children }: AppShellProps) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="glass-header sticky top-0 z-30 border-b">
-        <div className={cn(pageContainerVariants(), "flex h-14 items-center gap-4")}>
+      <header className="sticky top-0 z-30 border-b bg-background">
+        <div className={cn(pageContainerVariants(), "flex h-14 items-center gap-2 sm:gap-4")}>
           <BrandLink asChild>
             <Link to="/dashboard">
               <LogoMark />
@@ -67,47 +61,35 @@ export function AppShell({ user, children }: AppShellProps) {
 
           <OrgSwitcher />
 
-          <nav className="ml-2 hidden items-center gap-1 md:flex">
-            {PRIMARY_NAV.map((item) => {
-              const active =
-                item.to === "/dashboard"
-                  ? pathname === item.to
-                  : pathname === item.to || pathname.startsWith(`${item.to}/`);
-
-              return (
-                <NavLink key={item.to} variant="pill" active={active} asChild>
-                  <Link to={item.to}>{t(item.labelKey)}</Link>
-                </NavLink>
-              );
-            })}
-            {platformAdmin && (
-              <NavLink variant="pill" active={pathname.startsWith("/admin")} asChild>
-                <Link to="/admin/users">{t("nav.admin")}</Link>
+          <nav className="hidden shrink-0 items-center gap-1 md:flex">
+            {primaryNav.map((item) => (
+              <NavLink key={item.to} variant="pill" active={item.active} asChild>
+                <Link to={item.to}>{t(item.labelKey)}</Link>
               </NavLink>
-            )}
+            ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <Button
               variant="outline"
               size="sm"
               onClick={fireCommandPalette}
-              className="hidden h-9 gap-2 text-muted-foreground sm:inline-flex"
+              className="hidden h-9 gap-2 text-muted-foreground lg:inline-flex"
             >
               <Search className="size-4" />
               <span>{t("shell.search")}</span>
               <KeyboardShortcut className="ml-2">{SHORTCUT_LABEL}</KeyboardShortcut>
             </Button>
 
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
               onClick={fireCommandPalette}
-              className="sm:hidden"
-              aria-label={t("shell.openCommandPalette")}
+              className="lg:hidden"
+              label={t("shell.openCommandPalette")}
+              shortcut={SHORTCUT_LABEL}
             >
               <Search />
-            </Button>
+            </IconButton>
 
             <NotificationBell />
 
@@ -125,6 +107,7 @@ export function AppShell({ user, children }: AppShellProps) {
       </header>
 
       <ImpersonationBanner />
+      <DeletionPendingBanner />
 
       <div className="flex-1">{children}</div>
 

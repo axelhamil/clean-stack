@@ -1,0 +1,9 @@
+{
+  "extends": "@packages/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "allowImportingTsExtensions": false
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", ".auth"]
+}

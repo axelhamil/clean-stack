@@ -24,7 +24,6 @@ export default {
     saving: "Saving…",
     nameLabel: "Name",
     saveChanges: "Save changes",
-    uploadAvatarLabel: "Upload a new avatar image",
     changeAvatar: "Change avatar",
     uploading: "Uploading…",
     avatarUpdatedToast: "Avatar updated",
@@ -48,6 +47,10 @@ export default {
     membersUsage: "{{count}} / {{max}} members",
     membersUsageAriaLabel: "Members usage",
     manageBilling: "Manage billing",
+    checkoutReturnToast: "Payment received",
+    activationPending: "Your plan is being activated. Refresh in a moment to see it.",
+    refreshPlan: "Refresh plan",
+    loadFailed: "Your plan and member usage could not be loaded.",
     tier: {
       free: "Free",
       pro: "Pro",
@@ -61,11 +64,13 @@ export default {
       canceled: "Canceled",
       unpaid: "Unpaid",
       incomplete: "Incomplete",
-      incompleteExpired: "Incomplete — expired",
+      incompleteExpired: "Incomplete (expired)",
       paused: "Paused",
+      override: "Granted by our team",
     },
   },
   passkeys: {
+    loadFailed: "Could not load your passkeys. Reload the page to retry.",
     title: "Passkeys",
     description:
       "Sign in with biometrics or a hardware key. Passkeys are phishing-resistant and replace passwords.",
@@ -80,6 +85,9 @@ export default {
     deviceBound: "Device-bound",
     synced: "Synced",
     backedUp: "Backed up",
+    deviceBoundHint: "Stored on this device only: lost if the device is lost.",
+    syncedHint: "Synced across your devices by your passkey manager.",
+    backedUpHint: "Your passkey manager keeps a backup of this passkey.",
     added: "Added {{date}}",
     remove: "Remove passkey",
     addedToast: "Passkey added",
@@ -132,6 +140,7 @@ export default {
     copy: "Copy",
     download: "Download",
     copiedToast: "Backup codes copied",
+    copyFailed: "Couldn't copy the backup codes. Download them instead.",
   },
   deletion: {
     scheduledTitle: "Account deletion scheduled",
@@ -180,6 +189,7 @@ export default {
     },
   },
   notifications: {
+    loadFailed: "Could not load notification preferences. Reload the page to retry.",
     title: "Notifications",
     preferencesTitle: "Notification preferences",
     preferencesDescription:
@@ -195,6 +205,7 @@ export default {
     inAppAriaLabel: "In-app notifications for {{category}}",
     emailAriaLabel: "Email notifications for {{category}}",
     emailFrequencyAriaLabel: "Email frequency for {{category}}",
+    emailFrequencyDisabledHint: "Turn on email for this category to choose a frequency.",
     enforceAriaLabel: "Enforce {{category}} for all members",
     frequency: {
       immediate: "Immediately",
@@ -203,6 +214,9 @@ export default {
     },
   },
   organization: {
+    membersLoading: "Loading…",
+    membersLoadFailed: "Could not load members. Reload the page to retry.",
+    invitationsLoadFailed: "Could not load pending invitations. Reload the page to retry.",
     noActiveOrg: "No active organization.",
     title: "Organization settings",
     detailsTitle: "Details",
@@ -247,6 +261,7 @@ export default {
     selectMemberPlaceholder: "Select a member…",
     currentRoleSuffix: "(current role: {{role}})",
     transferAndLeaveAction: "Transfer and leave",
+    transferSelectMemberHint: "Select the member who takes over first.",
     leftOrgToast: "Left organization",
     leaveFailed: "Failed to leave",
     transferAndLeaveFailed: "Failed to transfer and leave",
@@ -264,6 +279,7 @@ export default {
       "Delete your account in <accountLink>Account settings</accountLink> to remove this organization.",
     deleteOrgAlertDescription:
       "Deleting <orgName></orgName> will permanently delete all members, invitations, and data. This action cannot be undone.",
+    deleteOrgConfirmLabel: "Type <value>{{name}}</value> to confirm",
     deleteOrgDialogDescription:
       "This action cannot be undone. All members, invitations, and data attached to this organization will be permanently removed.",
     saveDefaultsFailed: "Could not save the organization defaults",
@@ -278,6 +294,7 @@ export default {
       description: "Your acceptance status for the current versions of our policies.",
       loading: "Loading…",
       neverAccepted: "Never accepted",
+      acceptedVersion: "Accepted v{{version}}",
       upToDate: "Up to date",
       updateRequired: "Update required",
       loadError: "Could not load policy status.",
@@ -299,6 +316,7 @@ export default {
     requestFailed: "Couldn't request data export. Please try again.",
   },
   sessions: {
+    loadFailed: "Could not load your sessions. Reload the page to retry.",
     title: "Active sessions",
     description: "Devices currently signed in to your account.",
     signOutOthers: "Sign out others",
@@ -343,7 +361,7 @@ export default {
       createdHeader: "Created",
     },
     endpointRow: {
-      autoDisabledTooltip: "Disabled after repeated delivery failures — re-enable to reset",
+      autoDisabledTooltip: "Disabled after repeated delivery failures (re-enable to reset)",
       openActions: "Open actions",
       viewDeliveries: "View deliveries",
       edit: "Edit",
@@ -353,9 +371,9 @@ export default {
     },
     deliveries: {
       title: "Deliveries",
-      allStatusesPlaceholder: "All statuses",
       allStatusFilter: "All",
       loading: "Loading deliveries…",
+      empty: "No deliveries yet.",
       eventTypeHeader: "Event type",
       statusHeader: "Status",
       attemptsHeader: "Attempts",
@@ -375,11 +393,14 @@ export default {
       attemptNumber: "Attempt #{{number}}",
       noResponse: "no response",
       payload: "Payload",
+      duration: "{{ms}} ms",
     },
     verifySnippetHeading: "Verify signatures (Node.js)",
     eventTypePicker: {
       allEvents: "All events (*)",
       groupWildcard: "{{group}}.* (all {{group}} events)",
+      allEventsNote: "Every event is included. Clear this box to pick events.",
+      groupNote: "Every event in this group is included.",
     },
     form: {
       urlLabel: "Endpoint URL",
@@ -436,12 +457,13 @@ export default {
   },
   sso: {
     pageTitle: "Single sign-on",
+    loading: "Loading…",
     upsell: {
       description:
         "Let members sign in through your identity provider (OIDC or SAML), provision accounts via SCIM, and enforce SSO across a verified domain.",
       upgradeAction: "Upgrade to the Business plan",
     },
-    // Shared between `domainCard` and `scimCard` — both gate on the same
+    // Shared between `domainCard` and `scimCard`: both gate on the same
     // "no provider registered yet" condition for the same org.
     registerProviderFirst: "Register an identity provider first.",
     providerCard: {
@@ -449,7 +471,7 @@ export default {
       description:
         "Connect the OIDC or SAML application your identity provider issues so members on your domain can sign in through it.",
       registeredToast: "SSO provider registered",
-      // Also read by the registration Tabs triggers — same protocol names,
+      // Also read by the registration Tabs triggers: same protocol names,
       // same source, one key each (see `sso-labels.ts`).
       type: {
         oidc: "OIDC",
@@ -463,7 +485,7 @@ export default {
     domainCard: {
       title: "Domain verification",
       description:
-        "Prove you control the domain by publishing a TXT record. The provider stays inactive — members on that domain cannot sign in through it — until the record resolves.",
+        "Prove you control the domain by publishing a TXT record. The provider stays inactive (members on that domain cannot sign in through it) until the record resolves.",
       verifiedToast: "Domain verified",
       verifiedBadge: "Verified",
       unverifiedBadge: "Unverified",
@@ -472,18 +494,19 @@ export default {
       checkNowAction: "Check now",
       alreadyVerified: "This domain is already verified.",
       verifyFailed:
-        "Verification failed — the DNS record was not found. DNS changes can take a while to propagate.",
+        "Verification failed: the DNS record was not found. DNS changes can take a while to propagate.",
     },
     enforcementCard: {
+      loadFailed: "The enforcement setting could not be loaded.",
       title: "Enforce SSO",
       description:
-        "When enabled, members on your verified domain can no longer sign in with a password, a magic link, or a passkey — SSO through your identity provider becomes the only way in.",
+        "When enabled, members on your verified domain can no longer sign in with a password, a magic link, or a passkey: SSO through your identity provider becomes the only way in.",
       updatedToast: "SSO enforcement updated",
       switchAriaLabel: "Enforce SSO for your domain",
       enforcedLabel: "Enforced",
       notEnforcedLabel: "Not enforced",
       verifyDomainFirst:
-        "Verify your domain before enforcing SSO — otherwise nobody on it will be able to sign in at all.",
+        "Verify your domain before enforcing SSO, otherwise nobody on it will be able to sign in at all.",
     },
     scimCard: {
       title: "SCIM provisioning",
@@ -491,10 +514,18 @@ export default {
         "Let your identity provider create, update, and deactivate members automatically.",
       onlyOwnerCanGenerate: "Only the organization owner can generate a SCIM token.",
       baseUrlLabel: "SCIM base URL",
+      notConnected: "No directory is connected yet.",
+      connectedUntil: "Directory connected. Its token expires on {{date}}.",
       generateAction: "Generate token",
+      rotateAction: "Replace token",
       secretDialogTitle: "SCIM token",
       secretDialogDescription:
-        "Copy this token now — it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector.",
+        "Copy this token now: it is shown only once and cannot be retrieved later. Paste it into your identity provider's SCIM connector. It is valid for one year, and any previous token stops working.",
+      disconnectAction: "Disconnect directory",
+      disconnectDialogTitle: "Disconnect the directory?",
+      disconnectDialogDescription:
+        "Its token stops working, and the members your identity provider provisioned lose access to this organization. Owners keep theirs.",
+      disconnectedToast: "Directory disconnected",
     },
     forms: {
       oidc: {
@@ -509,8 +540,8 @@ export default {
       saml: {
         domainLabel: "Domain",
         domainPlaceholder: "acme.com",
-        issuerLabel: "Issuer / entity ID",
-        issuerPlaceholder: "acme-saml",
+        idpEntityIdLabel: "IdP entity ID",
+        idpEntityIdPlaceholder: "https://idp.acme.com/metadata",
         entryPointLabel: "Entry point",
         entryPointPlaceholder: "https://idp.acme.com/sso/saml",
         certLabel: "Signing certificate",

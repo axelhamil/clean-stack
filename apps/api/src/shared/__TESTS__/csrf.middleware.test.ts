@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { mockPort } from "@packages/test/bun";
 
-// Mocks AVANT imports dynamiques
+// Replaced before the dynamic import below, so the subject sees the stand-ins.
 const mockedAddress = { address: "127.0.0.1" };
+const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({
+  ...realHonoBun,
   getConnInfo: () => ({ remote: mockedAddress }),
 }));
 
 const warnSpy = mock(() => {});
+const realLogger = await import("../logger");
 mock.module("../logger", () => ({
+  ...realLogger,
   logger: {
     warn: warnSpy,
     info: mock(() => {}),
@@ -16,32 +21,17 @@ mock.module("../logger", () => ({
   },
 }));
 
-// Imports dynamiques post-mock
 const { requireCsrf } = await import("../middleware/csrf.middleware");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
 import { Hono } from "hono";
-import type { IInstrumentation } from "../ports/instrumentation.port";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { IOutboxRepository } from "../ports/outbox.port";
-
-function makeNoop(): IInstrumentation {
-  return {
-    startSpan: (_opts: unknown, cb: () => unknown) => cb(),
-    capture: () => {},
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  } as unknown as IInstrumentation;
-}
 
 const ALLOWED_ORIGINS = ["http://localhost:5173", "https://app.example.com"];
 
-function makeOutbox(): IOutboxRepository {
-  return {
-    enqueue: mock(async () => {}),
-    findPendingBatch: async () => [],
-    markDispatched: async () => {},
-    markFailed: async () => {},
-  };
+function makeOutbox() {
+  return mockPort<IOutboxRepository>();
 }
 
 type CsrfEventPayload = {
@@ -64,7 +54,7 @@ type TestVars = { user: { id: string } | null };
 
 function makeApp(opts: { withUser?: boolean; outbox?: IOutboxRepository } = {}) {
   const app = new Hono<{ Variables: TestVars }>();
-  app.onError(createErrorHandler(makeNoop()));
+  app.onError(createErrorHandler(mockInstrumentation()));
   if (opts.withUser) {
     app.use("*", async (c, next) => {
       c.set("user", { id: "u1" });
@@ -194,7 +184,7 @@ describe("csrf middleware", () => {
   it("outbox absent → pas de crash, warn factory-time", async () => {
     warnSpy.mockClear();
     const app = new Hono();
-    app.onError(createErrorHandler(makeNoop()));
+    app.onError(createErrorHandler(mockInstrumentation()));
     app.use("*", requireCsrf({ allowedOrigins: ALLOWED_ORIGINS }));
     app.post("/test", (c) => c.json({ ok: true }));
     expect(warnSpy.mock.calls.length).toBeGreaterThan(0);

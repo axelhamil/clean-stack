@@ -3,18 +3,22 @@ import {
   and,
   asc,
   auditLogSchema,
-  db,
   desc,
   eq,
   gte,
   isNotNull,
   isNull,
   like,
-  lt,
   lte,
-  type Transaction,
+  resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../db-failure";
+import {
+  afterTimeIdCursor,
+  encodeTimeIdCursor,
+  exactInstant,
+  timeIdCursorSchema,
+} from "../pagination/time-id-cursor";
 import type {
   AuditEntry,
   AuditError,
@@ -31,17 +35,36 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 const fail = createDbFailure("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
+const al = auditLogSchema.auditLog;
+
+function toRecord(row: typeof al.$inferSelect): AuditRecord {
+  return {
+    id: row.id,
+    actorId: Option.fromNullable(row.actorId),
+    actorType: row.actorType,
+    organizationId: Option.fromNullable(row.organizationId),
+    action: row.action,
+    targetType: row.targetType,
+    targetId: row.targetId,
+    metadata: row.metadata,
+    requestId: row.requestId ?? undefined,
+    retention: row.retention,
+    occurredAt: row.occurredAt,
+    prevHash: Option.fromNullable(row.prevHash),
+    hash: Option.fromNullable(row.hash),
+  };
+}
 
 export class DrizzleAuditRepository implements IAuditPort {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async record(entry: AuditEntry, tx?: Transaction): Promise<Result<AuditRecord, AuditError>> {
-    const exec = tx ?? db;
+  async record(entry: AuditEntry): Promise<Result<AuditRecord, AuditError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleAuditRepository > record" }, async () => {
       const id = uuidv7();
       const occurredAt = new Date();
       try {
-        const query = exec.insert(auditLogSchema.auditLog).values({
+        const query = exec.insert(al).values({
           id,
           actorId: entry.actorId.toNull(),
           actorType: entry.actorType,
@@ -72,11 +95,10 @@ export class DrizzleAuditRepository implements IAuditPort {
     });
   }
 
-  async list(filters: AuditFilters, tx?: Transaction): Promise<Result<AuditPage, AuditError>> {
-    const exec = tx ?? db;
+  async list(filters: AuditFilters): Promise<Result<AuditPage, AuditError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleAuditRepository > list" }, async () => {
       const limit = Math.min(filters.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-      const al = auditLogSchema.auditLog;
       const conds = [];
       if (filters.actorId) conds.push(eq(al.actorId, filters.actorId));
       if (filters.organizationId !== undefined) {
@@ -91,18 +113,16 @@ export class DrizzleAuditRepository implements IAuditPort {
       if (filters.actionPrefix) conds.push(like(al.action, `${filters.actionPrefix}%`));
       if (filters.occurredFrom) conds.push(gte(al.occurredAt, filters.occurredFrom));
       if (filters.occurredTo) conds.push(lte(al.occurredAt, filters.occurredTo));
-      if (filters.cursor) {
-        const cursorDate = new Date(filters.cursor);
-        if (!Number.isNaN(cursorDate.getTime())) conds.push(lt(al.occurredAt, cursorDate));
-      }
+      const cursor = timeIdCursorSchema.safeParse(filters.cursor);
+      if (cursor.success) conds.push(afterTimeIdCursor(al.occurredAt, al.id, cursor.data));
       const where = conds.length > 0 ? and(...conds) : undefined;
 
       try {
         const query = exec
-          .select()
+          .select({ row: al, cursorAt: exactInstant(al.occurredAt) })
           .from(al)
           .where(where)
-          .orderBy(desc(al.occurredAt))
+          .orderBy(desc(al.occurredAt), desc(al.id))
           .limit(limit + 1);
         const rows = await this.instrumentation.startSpan(
           { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
@@ -110,24 +130,13 @@ export class DrizzleAuditRepository implements IAuditPort {
         );
 
         const hasMore = rows.length > limit;
-        const items = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
-          id: r.id,
-          actorId: Option.fromNullable(r.actorId),
-          actorType: r.actorType,
-          organizationId: Option.fromNullable(r.organizationId),
-          action: r.action,
-          targetType: r.targetType,
-          targetId: r.targetId,
-          metadata: r.metadata,
-          requestId: r.requestId ?? undefined,
-          retention: r.retention,
-          occurredAt: r.occurredAt,
-          prevHash: Option.fromNullable(r.prevHash),
-          hash: Option.fromNullable(r.hash),
-        }));
-        const nextCursor = Option.fromNullable(
-          hasMore ? (items.at(-1)?.occurredAt.toISOString() ?? null) : null,
-        );
+        const page = rows.slice(0, limit);
+        const items = page.map(({ row }) => toRecord(row));
+        const last = page.at(-1);
+        const nextCursor =
+          hasMore && last
+            ? Option.some(encodeTimeIdCursor(last.cursorAt, last.row.id))
+            : Option.none<string>();
         return Result.ok({ items, nextCursor });
       } catch (e) {
         this.instrumentation.capture(e);
@@ -136,13 +145,12 @@ export class DrizzleAuditRepository implements IAuditPort {
     });
   }
 
-  async verifyChain(tx?: Transaction): Promise<Result<ChainVerification, AuditError>> {
-    const exec = tx ?? db;
+  async verifyChain(): Promise<Result<ChainVerification, AuditError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleAuditRepository > verifyChain" },
       async () => {
         try {
-          const al = auditLogSchema.auditLog;
           const query = exec.select().from(al).where(isNotNull(al.hash)).orderBy(asc(al.sequence));
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },

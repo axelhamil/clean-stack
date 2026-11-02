@@ -1,30 +1,35 @@
-import type { AnyPgColumn, AnyPgTable, SQL, Transaction } from "@packages/drizzle";
-import { db, inArray, sql } from "@packages/drizzle";
+import type { IUnitOfWork } from "@packages/ddd-kit";
+import type { AnyPgColumn, AnyPgTable, SQL } from "@packages/drizzle";
+import { inArray, resolveExecutor, sql } from "@packages/drizzle";
 import type { SweepSpans } from "./sweep-span";
 
-export type PurgeBatchOptions = {
+export type SweepBatch = {
   table: AnyPgTable;
-  /** The primary key, selected by the locking subquery and matched by the delete. */
+  /** The primary key, selected by the locking subquery and matched by the write. */
   idColumn: AnyPgColumn;
   where: SQL;
   /** Oldest-first column, so a truncated run resumes where it stopped. */
   orderBy: AnyPgColumn;
   batchSize: number;
+};
+
+export type PurgeBatchOptions = SweepBatch & {
   spans: SweepSpans;
+  uow: IUnitOfWork;
   /**
    * Test-only escape hatch, run right after the three `SET LOCAL` guards and before
    * the delete. No production call site sets it, so it never changes the delete SQL
    * any route emits. Exists so `apps/api/scripts/check-sweep-lock.ts` can assert
    * `current_setting(...)` against a real Postgres transaction instead of mocking
-   * `tx.execute` and asserting on SQL text (banned — see `shared/CLAUDE.md`).
+   * `execute` and asserting on SQL text (banned, see `apps/api/CLAUDE.md`).
    */
-  assertGuards?: (tx: Transaction) => Promise<void>;
+  assertGuards?: () => Promise<void>;
 };
 
 /**
  * Asserts a sweep filter was actually built.
  *
- * `and()` returns `undefined` when every argument is — a predicate that would make
+ * `and()` returns `undefined` when every argument is, a predicate that would make
  * `purgeBatchWithTimeout` delete the oldest N rows of the whole table, retention window
  * ignored. Each call site knows its own arguments are unconditional, but that is a fact
  * about today's code, not a guarantee: this turns seven unchecked `as SQL` assertions
@@ -44,43 +49,64 @@ export function requireFilter(filter: SQL | undefined, label: string): SQL {
  * they are the reason a batch cannot outlive the sweep budget between deadline checks.
  *
  * One span, not four: the transaction is multi-statement, and rule #8's trap (b) is
- * exactly this — N sibling inner spans are noise. The span wraps the delete and
+ * exactly this, N sibling inner spans are noise. The span wraps the delete and
  * carries its SQL; the lock-timeout guards and the FOR UPDATE subquery ride inside it.
  */
 export async function purgeBatchWithTimeout(opts: PurgeBatchOptions): Promise<number> {
   // `and()` returns `undefined` when given no arguments or all-undefined conditions,
-  // and Drizzle's `where(undefined)` is a no-op — a caller that lets its predicate
+  // and Drizzle's `where(undefined)` is a no-op, a caller that lets its predicate
   // collapse to `undefined` would otherwise delete the oldest N rows of the whole
   // table. Fail closed rather than let that type-check.
   if (!opts.where) {
     throw new Error("purgeBatchWithTimeout: refusing an unfiltered delete");
   }
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-    await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+  return withSweepGuards(
+    opts.uow,
+    async (exec) => {
+      const query = exec
+        .delete(opts.table)
+        .where(inArray(opts.idColumn, lockedBatch(exec, opts)))
+        .returning({ id: opts.idColumn });
 
-    if (opts.assertGuards) {
-      await opts.assertGuards(tx);
+      const deleted = await opts.spans.db(
+        () => query.toSQL().sql,
+        () => query.execute(),
+      );
+      return deleted.length;
+    },
+    opts.assertGuards,
+  );
+}
+
+/**
+ * The three `SET LOCAL` guards a batched sweep write runs under, for a sweep that writes
+ * something other than a delete. They stay on the surrounding transaction when this joins one.
+ */
+export function withSweepGuards<T>(
+  uow: IUnitOfWork,
+  work: (exec: ReturnType<typeof resolveExecutor>) => Promise<T>,
+  assertGuards?: () => Promise<void>,
+): Promise<T> {
+  return uow.run(async () => {
+    const exec = resolveExecutor();
+    await exec.execute(sql`SET LOCAL statement_timeout = '5s'`);
+    await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
+    await exec.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+
+    if (assertGuards) {
+      await assertGuards();
     }
 
-    const subq = tx
-      .select({ id: opts.idColumn })
-      .from(opts.table)
-      .where(opts.where)
-      .orderBy(opts.orderBy)
-      .limit(opts.batchSize)
-      .for("update", { skipLocked: true });
-
-    const query = tx
-      .delete(opts.table)
-      .where(inArray(opts.idColumn, subq))
-      .returning({ id: opts.idColumn });
-
-    const deleted = await opts.spans.db(
-      () => query.toSQL().sql,
-      () => query.execute(),
-    );
-    return deleted.length;
+    return work(exec);
   });
+}
+
+export function lockedBatch(exec: ReturnType<typeof resolveExecutor>, batch: SweepBatch) {
+  return exec
+    .select({ id: batch.idColumn })
+    .from(batch.table)
+    .where(batch.where)
+    .orderBy(batch.orderBy)
+    .limit(batch.batchSize)
+    .for("update", { skipLocked: true });
 }

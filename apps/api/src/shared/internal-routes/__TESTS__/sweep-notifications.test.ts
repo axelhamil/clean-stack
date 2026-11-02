@@ -1,27 +1,24 @@
-import { mock } from "bun:test";
-import { drizzleMock } from "./drizzle-mock";
-
-mock.module("@packages/drizzle", drizzleMock);
-
 import { describe, expect, test } from "bun:test";
+import { db, notificationSchema } from "@packages/drizzle";
+import { buildPurgeFilter } from "../sweep-notifications.route";
 
-const { buildPurgeFilter } = await import("../sweep-notifications.route");
-
-function hasColumnName(obj: unknown, target: string, seen = new WeakSet<object>()): boolean {
-  if (!obj || typeof obj !== "object") return false;
-  if (seen.has(obj as object)) return false;
-  seen.add(obj as object);
-  if ((obj as Record<string, unknown>).name === target) return true;
-  return Object.values(obj as object).some((v) =>
-    Array.isArray(v)
-      ? v.some((i) => hasColumnName(i, target, seen))
-      : hasColumnName(v, target, seen),
-  );
-}
+// Rendered through the real query builder (nothing is replaced in this file), so the
+// SQL below is what Postgres would receive, not a marker a stand-in produced.
+const renderWhere = (cutoff: Date) => {
+  const n = notificationSchema.notification;
+  return db.select({ id: n.id }).from(n).where(buildPurgeFilter(cutoff)).toSQL().sql;
+};
 
 describe("sweep-notifications", () => {
-  test("le filtre de purge exige une notification lue", () => {
-    const filter = buildPurgeFilter(new Date("2026-01-01T00:00:00Z"));
-    expect(hasColumnName(filter, "read_at")).toBe(true);
+  test("the purge filter only targets notifications that were read", () => {
+    expect(renderWhere(new Date("2026-01-01T00:00:00Z"))).toContain(
+      '"notification"."read_at" is not null',
+    );
+  });
+
+  test("the purge filter bounds the rows by their creation date", () => {
+    expect(renderWhere(new Date("2026-01-01T00:00:00Z"))).toContain(
+      '"notification"."created_at" <',
+    );
   });
 });

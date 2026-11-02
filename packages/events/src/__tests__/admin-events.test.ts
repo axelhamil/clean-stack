@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { EventTypes, SUBSCRIBABLE_EVENT_TYPES } from "../event-types";
-import { AdminImpersonationStartedPayload, AdminUserBannedPayload } from "../payloads";
+import {
+  AdminApprovalExpiredPayload,
+  AdminImpersonationStartedPayload,
+  AdminStaffAddedPayload,
+  AdminUserBannedPayload,
+} from "../payloads";
 import { retentionFor } from "../retention-map";
 
 describe("admin events", () => {
-  it("declares the seven admin event types", () => {
-    expect(Object.values(EventTypes).filter((t) => t.startsWith("admin."))).toHaveLength(7);
+  it("declares the twenty-six admin event types", () => {
+    expect(Object.values(EventTypes).filter((t) => t.startsWith("admin."))).toHaveLength(26);
   });
 
   it("retains every admin event under the compliance policy", () => {
@@ -16,6 +21,30 @@ describe("admin events", () => {
 
   it("keeps admin events out of the public subscribable set", () => {
     expect(SUBSCRIBABLE_EVENT_TYPES).not.toContain(EventTypes.ADMIN_USER_BANNED);
+  });
+
+  it("states the actor of a bootstrap staff row as an explicit null", () => {
+    const missing = AdminStaffAddedPayload.safeParse({
+      userId: "u",
+      role: "manager",
+      source: "env",
+    });
+    const explicit = AdminStaffAddedPayload.safeParse({
+      actorUserId: null,
+      userId: "u",
+      role: "manager",
+      source: "env",
+    });
+
+    expect(missing.success).toBe(false);
+    expect(explicit.success).toBe(true);
+  });
+
+  it("states the actor of an expired approval as an explicit null", () => {
+    const ref = { approvalId: "a", action: "staff.revoke", requesterUserId: "r", userId: "u" };
+
+    expect(AdminApprovalExpiredPayload.safeParse(ref).success).toBe(false);
+    expect(AdminApprovalExpiredPayload.safeParse({ ...ref, actorUserId: null }).success).toBe(true);
   });
 
   it("requires a non-empty reason on impersonation start", () => {

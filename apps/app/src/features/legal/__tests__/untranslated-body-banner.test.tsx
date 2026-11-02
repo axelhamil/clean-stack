@@ -5,7 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import { describe, expect, it } from "vitest";
 import { UntranslatedBodyBanner } from "../components/untranslated-body-banner";
 
-// Tests the shared component directly — this is the thing every legal page
+// Tests the shared component directly: this is the thing every legal page
 // actually renders, and the thing round 1 was told to promote instead of
 // copying the `<Alert>` four times. A page-level render would only prove the
 // same condition indirectly, through four extra components, and would need
@@ -35,7 +35,7 @@ describe("UntranslatedBodyBanner", () => {
 
   it("is driven by `show` alone, with no redundant locale check of its own", async () => {
     // The component takes the locale *condition* as a prop rather than
-    // computing it — each call site owns why (`isEnglishFallback` for
+    // computing it; each call site owns why (`isEnglishFallback` for
     // `policy-doc-view.tsx`, a plain `locale !== "en"` for the other four
     // pages). Rendering it under English with `show=true` still shows the
     // disclosure: proof there is no second, buried locale gate in here that

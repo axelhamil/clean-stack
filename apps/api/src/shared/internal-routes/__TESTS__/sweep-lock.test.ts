@@ -1,5 +1,6 @@
 import { mock } from "bun:test";
-import { drizzleMock } from "./drizzle-mock";
+
+const realDrizzle = await import("@packages/drizzle");
 
 const leaseQuery = (rows: Array<{ label: string }>) => {
   const q = {
@@ -13,12 +14,15 @@ const leaseQuery = (rows: Array<{ label: string }>) => {
   return q;
 };
 
+const fakeDb = {
+  insert: () => leaseQuery([{ label: "sweep-x" }]),
+  delete: () => leaseQuery([]),
+};
+
 mock.module("@packages/drizzle", () => ({
-  ...drizzleMock(),
-  db: {
-    insert: () => leaseQuery([{ label: "sweep-x" }]),
-    delete: () => leaseQuery([]),
-  },
+  ...realDrizzle,
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
 }));
 
 const { describe, expect, it, spyOn } = await import("bun:test");

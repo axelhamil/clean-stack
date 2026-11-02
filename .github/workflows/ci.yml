@@ -34,18 +34,18 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_stack
-      # The preview server, not the dev server — CORS, CSRF and BetterAuth all read this.
+      # The preview server, not the dev server: CORS, CSRF and BetterAuth all read this.
       CORS_ORIGIN: http://localhost:4173
       APP_URL: http://localhost:4173
       # The guard resolves MX records; leaving it on would make the seed depend on DNS.
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
       # Pinned explicitly so the CI log states which account the checks run
       # against. Both db:seed and check:fanout resolve it through
-      # apps/api/scripts/seed-account.ts, which holds the same default — so
+      # apps/api/scripts/seed-account.ts, which holds the same default, so
       # they stay aligned whether or not this var is set.
       SEED_EMAIL: dev@example.com
       # check:sweep-lock and check:fanout sign requests against the ephemeral CI
-      # Postgres above — this key never authenticates a real deployment, so it can
+      # Postgres above; this key never authenticates a real deployment, so it can
       # live in the workflow. apps/api/.env.example deliberately ships this var
       # empty (fail-closed on every /internal/* route, including rgpd-sweep) rather
       # than a shared placeholder that would ship a working key into every
@@ -64,7 +64,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.4
 
       - name: Resolve pnpm store
         shell: bash
@@ -79,6 +79,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
 
+      - name: Check module boundaries
+        run: pnpm check:boundaries
+
       - name: Bootstrap env files
         run: pnpm bootstrap
 
@@ -88,6 +91,25 @@ jobs:
       - name: Check the sweep lease against a real database
         run: pnpm --filter api check:sweep-lock
 
+      - name: Check the outbox lease claim and settle against a real database
+        # Skip locked, the lease expiry, the stale settle guard and the dead replay
+        # live in the claim CTE and the settle WHERE, which a mocked executor never
+        # evaluates. Seeds and removes its own probe rows.
+        run: pnpm --filter api check:outbox-lease
+
+      - name: Check the email queue lease claim and settle against a real database
+        # Skip locked, the lease expiry on the database clock, the stale settle guard,
+        # the dead replay window and the release live in the claim CTE and the settle
+        # WHERE, which a mocked executor never evaluates. Seeds and removes its own rows.
+        run: pnpm --filter api check:email-lease
+
+      - name: Check the webhook delivery lease claim and settle against a real database
+        # Skip locked, the lease expiry on the database clock, the stale settle guard,
+        # the replayable versus terminal dead_letter split and the release live in the
+        # claim CTE and the settle WHERE, which a mocked executor never evaluates.
+        # Seeds and removes its own tenant, endpoint and rows.
+        run: pnpm --filter api check:webhook-lease
+
       - name: Seed the audited account
         run: pnpm --filter api db:seed
 
@@ -96,12 +118,12 @@ jobs:
         run: pnpm --filter api check:fanout
 
       - name: Check the digest window against a real database
-        # Same reason as check:fanout — the frequency cascade and the due filter
+        # Same reason as check:fanout: the frequency cascade and the due filter
         # live inside SQL, which a mocked tx never evaluates. Needs the seed too.
         run: pnpm --filter api check:digest
 
       - name: Check api-token owner visibility against a real database
-        # Same reason as check:fanout — `visibleTokensFilter` builds a WHERE
+        # Same reason as check:fanout: `visibleTokensFilter` builds a WHERE
         # clause with and/or/eq/isNull, which a mocked tx never evaluates.
         # Needs the seed too.
         run: pnpm --filter api check:api-token-visibility
@@ -111,15 +133,77 @@ jobs:
         # the confirmation enqueue fails. Creates and removes its own probe user.
         run: pnpm --filter api check:wipe-rollback
 
+      - name: Check the unit-of-work rollback on a failed Result against a real database
+        # A mocked unit of work only proves the service throws inside db.transaction;
+        # only Postgres proves the earlier write and its outbox row are discarded.
+        run: pnpm --filter api check:uow-rollback
+
       - name: Check the email-queue enqueue conflict against a real database
-        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape — a
+        # `onConflictDoNothing` is a Postgres behaviour, not a builder shape; a
         # mocked tx asserts the call, never the outcome.
         run: pnpm --filter api check:enqueue
 
       - name: Check the email-queue markSent CASE against a real database
-        # Same reason: the CASE expression and the attempts increment are only
+        # Same reason: the CASE expression and the lease guard are only
         # evaluated by Postgres.
         run: pnpm --filter api check:marksent
+
+      - name: Check BetterAuth hooks write on the plugin's own transaction
+        # A user and its session created in one BetterAuth transaction (first SSO
+        # sign-in) must get their Personal organization on that same connection;
+        # only two real connections show the foreign key failure.
+        run: pnpm --filter api check:auth-transaction
+
+      - name: Check concurrent SCIM provisionings against the seat cap
+        # The seat lock and count run inside the plugin's transaction; a mocked
+        # adapter serialises concurrent transactions by construction.
+        run: pnpm --filter api check:scim-seats
+
+      - name: Check concurrent writes on a SCIM connection are serialised
+        # Issue and rotate span several plugin transactions; only concurrent calls
+        # against the real tables show a duplicate connection or a lost token.
+        run: pnpm --filter api check:scim-connection
+
+      - name: Check account deletion only trusts a confirmed two-factor enrolment
+        # The verified filter lives in the WHERE of verifyTotp, which a mocked tx
+        # never evaluates. Creates and removes its own probe user.
+        run: pnpm --filter api check:totp-enrolment
+
+      - name: Check staff bootstrap and last-manager guard under concurrency
+        # The ON CONFLICT and the manager row lock live in SQL, which a mocked tx
+        # never evaluates. Also runs the migration's data step. Creates and removes
+        # its own probe users.
+        run: pnpm --filter api check:admin-staff
+
+      - name: Check admin writes commit with their events and a ban refuses sign-in
+        # The rollback and the sign-in hook only exist on a real transaction and the
+        # real auth library. Creates and removes its own probe users.
+        run: pnpm --filter api check:admin-atomicity
+
+      - name: Check the admin step-up on the real route stack
+        # The replay upsert and the session cascade live in SQL. Creates and removes
+        # its own probe users.
+        run: pnpm --filter api check:admin-step-up
+
+      - name: Check four-eyes approvals on the real route stack
+        # The claim, the expiry and the self-approval CHECK live in SQL, the rollback then
+        # second unit needs a real transaction. Creates and removes its own probe users.
+        run: pnpm --filter api check:admin-approval
+
+      - name: Check operations requeue, sweep heartbeats and Stripe replay on the real route stack
+        # The dead-row guard against stealing a lease and the claim that picks a requeued row
+        # live in SQL; a replay needs the real signed handler. Creates and removes its own rows.
+        run: pnpm --filter api check:admin-ops
+
+      - name: Check plan overrides and staff notes on the real route stack
+        # Expiry, revocation, the one-open index and the wipes live in SQL; the gates read the
+        # override through the real entitlements. Creates and removes its own rows.
+        run: pnpm --filter api check:admin-accounts
+
+      - name: Check saved views and the inbox on the real route stack
+        # Ownership lives in the WHERE, the inbox counts in SQL, and the two crons write their
+        # heartbeat through the real routes. Creates and removes its own rows.
+        run: pnpm --filter api check:admin-workspace
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -150,11 +234,129 @@ jobs:
         if: failure()
         # A failure before the API is started leaves no log; `cat` would then
         # fail too and bury the real error under a missing-file one.
-        run: cat /tmp/api.log || echo "no api log — the run failed before the API started" 
+        run: cat /tmp/api.log || echo "no api log, the run failed before the API started" 
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: a11y-traces
           path: apps/app/test-results/
+          retention-days: 7
+
+  a11y-admin:
+    name: Back office accessibility gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clean_stack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clean_stack
+      # The preview server, not the dev server: CORS, CSRF and BetterAuth all read this.
+      CORS_ORIGIN: http://localhost:4173
+      ADMIN_URL: http://localhost:4174
+      # Baked into the previews: the setup is the real round trip through the app's sign-in.
+      VITE_ADMIN_URL: http://localhost:4174
+      VITE_APP_URL: http://localhost:4173
+      APP_URL: http://localhost:4173
+      # The guard resolves MX records; leaving it on would make the seed depend on DNS.
+      DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
+      # Pinned explicitly so the CI log states which account the checks run
+      # against. Both db:seed and check:fanout resolve it through
+      # apps/api/scripts/seed-account.ts, which holds the same default, so
+      # they stay aligned whether or not this var is set.
+      SEED_EMAIL: dev@example.com
+      # check:sweep-lock and check:fanout sign requests against the ephemeral CI
+      # Postgres above; this key never authenticates a real deployment, so it can
+      # live in the workflow. apps/api/.env.example deliberately ships this var
+      # empty (fail-closed on every /internal/* route, including rgpd-sweep) rather
+      # than a shared placeholder that would ship a working key into every
+      # bootstrapped .env and every environment, staging included.
+      INTERNAL_SIGNING_KEY: ci-only-signing-key-3f9a1c7e2b6d4f80912345
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Resolve pnpm store
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
+
+      - name: Bootstrap env files
+        run: pnpm bootstrap
+
+      - name: Push schema
+        run: pnpm db:push
+
+      - name: Seed the staff accounts
+        run: pnpm --filter api db:seed
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      - name: Install Chromium
+        run: pnpm --filter admin exec playwright install --with-deps chromium
+
+      - name: Start the API
+        working-directory: apps/api
+        run: |
+          bun src/index.ts > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3000/readyz > /dev/null; then
+              echo "api ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "api never became ready"; cat /tmp/api.log; exit 1
+
+      - name: Build the customer app for its sign-in
+        run: pnpm turbo run build --filter=app
+
+      - name: Audit
+        run: pnpm turbo run check:a11y --filter=admin
+
+      - name: API log
+        if: failure()
+        run: cat /tmp/api.log || echo "no api log, the run failed before the API started"
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: a11y-admin-traces
+          path: apps/admin/test-results/
           retention-days: 7

@@ -2,15 +2,10 @@ import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import type { IInstrumentation } from "../../ports/instrumentation.port";
+import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { createErrorHandler } from "../error.middleware";
 
-const noopInstrumentation: IInstrumentation = {
-  capture: () => {},
-  startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-  addBreadcrumb: () => {},
-  setSpanAttributes: () => {},
-};
+const noopInstrumentation = new NoOpInstrumentation();
 
 let stale = false;
 
@@ -26,7 +21,9 @@ mock.module("../../../container", () => ({
 
 const mockUpdateUserName = mock(async () => {});
 
+const realAuthQueries = await import("../../../auth-queries");
 mock.module("../../../auth-queries", () => ({
+  ...realAuthQueries,
   updateUserName: mockUpdateUserName,
 }));
 

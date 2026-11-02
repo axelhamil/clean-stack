@@ -1,0 +1,21 @@
+import { formatApiError } from "@packages/web-kit/api/errors/messages";
+import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { cancelAccountDeletionMutationOptions } from "../api/mutations/cancel-account-deletion";
+import { useRefreshSession } from "./use-refresh-session";
+
+export function useCancelDeletion() {
+  const { t } = useTranslation("settings");
+  const { t: tErrors } = useTranslation("errors");
+  const refreshSession = useRefreshSession();
+
+  return useMutation({
+    ...cancelAccountDeletionMutationOptions,
+    onSuccess: async () => {
+      await refreshSession();
+      toast.success(t("deletion.cancelledToast"));
+    },
+    onError: (err) => toast.error(formatApiError(err, t("deletion.cancelFailed"), tErrors)),
+  });
+}

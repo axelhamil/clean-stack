@@ -3,19 +3,24 @@ export default {
     ACCOUNT_EXPORT_RATE_LIMITED: "You can request another data export in 24 hours.",
     ACCOUNT_PASSWORD_REQUIRED: "Confirm with your password.",
     ACCOUNT_DELETION_BLOCKED: "Resolve organization ownership before deleting your account.",
+    ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN:
+      "Appoint another staff manager before deleting your account.",
     ACCOUNT_DELETION_NOT_FOUND: "No deletion to cancel.",
     ACCOUNT_PASSWORD_INVALID: "Invalid password.",
     TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
     TWO_FACTOR_INVALID: "Invalid authenticator code.",
     // `assertSsoEntitlementFor` (apps/api/src/auth.ts) puts the code directly in
     // the APIError's `message` rather than a separate `code` field, so the
-    // front reads it back off `error.message` (see provider-card.tsx) — the
+    // front reads it back off `error.message` (see provider-card.tsx); the
     // catalog lookup itself is keyed the same as every other code either way.
     SSO_PLAN_REQUIRED: "Your plan does not include SSO.",
     SSO_ORGANIZATION_REQUIRED: "No active organization.",
+    SCIM_CONNECTION_NOT_FOUND: "This organization has no directory connection to disconnect.",
+    SCIM_CONNECTION_PROVIDER_FAILURE:
+      "The directory connection could not be updated. Try again in a moment.",
     // BetterAuth's own `BASE_ERROR_CODES`. They are keyed here rather than
     // read off `error.message` because the library ships one English string
-    // per code and no translation hook — the code is the only stable,
+    // per code and no translation hook: the code is the only stable,
     // localisable identifier the client receives.
     INVALID_EMAIL_OR_PASSWORD: "Invalid email or password.",
     INVALID_EMAIL: "Enter a valid email address.",
@@ -38,7 +43,7 @@ export default {
     SESSION_EXPIRED: "Your session has expired. Sign in again to continue.",
     SESSION_NOT_FRESH: "Sign in again to confirm this change.",
     CREDENTIAL_ACCOUNT_NOT_FOUND:
-      "This account has no password — use the sign-in method you set up.",
+      "This account has no password. Use the sign-in method you set up.",
     ACCOUNT_NOT_FOUND: "Account not found.",
     SOCIAL_ACCOUNT_ALREADY_LINKED: "That account is already linked to another user.",
     FAILED_TO_CREATE_USER: "We could not create your account. Please try again.",
@@ -59,7 +64,7 @@ export default {
     INVALID_CODE: "That code is not correct. Check your authenticator app and try again.",
     TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "Too many attempts. Request a new code.",
     ACCOUNT_TEMPORARILY_LOCKED:
-      "Too many failed attempts. Your account is temporarily locked — try again later.",
+      "Too many failed attempts. Your account is temporarily locked. Try again later.",
     INVALID_TWO_FACTOR_COOKIE: "This verification step expired. Sign in again.",
     CHALLENGE_NOT_FOUND: "This passkey attempt expired. Try again.",
     YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY: "This passkey cannot be registered here.",
@@ -116,12 +121,79 @@ export default {
     YOU_ARE_NOT_ALLOWED_TO_ACCESS_THIS_ORGANIZATION:
       "You don't have permission to access this organization.",
     YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "You are not a member of this organization.",
+    ADMIN_STAFF_FORBIDDEN: "This area is for platform staff.",
+    ADMIN_REAUTH_REQUIRED: "Confirm this action with a code from your authenticator app.",
+    ADMIN_STEP_UP_MFA_FORBIDDEN: "Turn on two-factor authentication to confirm this action.",
+    ADMIN_PASSWORD_RESET_UNAVAILABLE:
+      "The reset email could not be sent. The user's sessions were ended, try again.",
+    ADMIN_OPS_PROVIDER_FAILURE: "The operations data could not be read. Try again.",
+    ADMIN_VIEW_NOT_FOUND: "This saved view no longer exists.",
+    ADMIN_VIEW_PROVIDER_FAILURE: "The saved views could not be read or changed. Try again.",
+    ADMIN_ORG_NOT_FOUND: "This organization no longer exists.",
+    ADMIN_NOTE_PROVIDER_FAILURE: "The notes could not be read or saved. Try again.",
+    PLAN_OVERRIDE_PROVIDER_FAILURE: "The plan override could not be read or saved. Try again.",
+    ADMIN_PLAN_OVERRIDE_NOT_FOUND: "This organization has no active plan override.",
+    ADMIN_PLAN_OVERRIDE_ALREADY_SET_CONFLICT:
+      "A colleague just set a plan override on this organization. Reload and check it.",
+    ADMIN_STRIPE_UNAVAILABLE: "Stripe is not configured on this platform.",
+    ADMIN_STRIPE_EVENT_NOT_FOUND:
+      "This Stripe event is not on record: it never arrived or its row was purged after the retention window.",
+    ADMIN_STRIPE_REPLAY_BLOCKED:
+      "The platform does not process this type of event, a replay would change nothing.",
+    ADMIN_STRIPE_REPLAY_CONFLICT:
+      "This event was already replayed or a colleague is replaying it. Reload the list.",
+    ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE:
+      "The replay failed. The reason is on the event's row, try again once it is fixed.",
+    STRIPE_EVENT_PROVIDER_FAILURE: "The Stripe events could not be read or saved. Try again.",
+    STRIPE_EVENT_EXPIRED_NOT_FOUND:
+      "Stripe no longer holds this event, it keeps them 30 days. Resend it from the Stripe dashboard if needed.",
+    STRIPE_PROVIDER_FAILURE: "Stripe did not answer. Try again in a moment.",
+    SWEEP_RUN_PROVIDER_FAILURE: "The scheduled jobs could not be read. Try again.",
+    ADMIN_STEP_UP_CODE_INVALID: "This code is not valid. Check your authenticator app.",
+    ADMIN_STEP_UP_REPLAY_INVALID: "This code was already used. Wait for the next one.",
+    ADMIN_STEP_UP_SESSION_NOT_FOUND: "This session has ended. Sign in again.",
+    ADMIN_USER_NOT_FOUND: "This account no longer exists.",
+    ADMIN_APPROVAL_SUBJECT_DECISION_FORBIDDEN: "Nobody decides a request about their own account.",
+    ADMIN_APPROVAL_REQUESTER_LOST_CONFLICT:
+      "The requester no longer holds this power, so the request is closed.",
+    ADMIN_STAFF_ROLE_CHANGED_CONFLICT:
+      "This person's access changed since the request was made. Ask again.",
+    ADMIN_APPROVAL_ALREADY_PENDING_CONFLICT:
+      "A different request on this person is already waiting. Decide or cancel it, then ask again.",
+    ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN:
+      "You cannot give a permission you do not hold yourself. Ask a colleague who holds it.",
+    ADMIN_STAFF_OVERRIDE_EXPIRED_CONFLICT:
+      "The end date of this change has passed. Ask again with a later date.",
+    ADMIN_APPROVAL_NOT_FOUND: "This approval request no longer exists.",
+    ADMIN_APPROVAL_SELF_SUBJECT_FORBIDDEN: "You cannot request this action on your own account.",
+    ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN: "A different person must decide this request.",
+    ADMIN_APPROVAL_PERMISSION_FORBIDDEN: "You no longer hold the permission this request needs.",
+    ADMIN_APPROVAL_DECIDED_CONFLICT: "This request has already been settled.",
+    ADMIN_APPROVAL_EXPIRED_CONFLICT: "This request has expired. Ask again if it is still needed.",
+    ADMIN_APPROVAL_PARAMS_INVALID: "The stored request is no longer valid.",
+    ADMIN_USER_SELF_BAN_FORBIDDEN: "You cannot suspend your own account.",
+    ADMIN_IMPERSONATION_FORBIDDEN: "You cannot view the product as this account.",
+    ADMIN_STOP_IMPERSONATION_FORBIDDEN: "The impersonation could not be stopped.",
+    ADMIN_STAFF_MFA_FORBIDDEN: "Turn on two-factor authentication to use the staff area.",
+    ADMIN_STAFF_PERMISSION_FORBIDDEN: "Your staff role does not allow this action.",
+    ADMIN_STAFF_SELF_CHANGE_FORBIDDEN: "Ask another manager to change your own access.",
+    ADMIN_STAFF_LISTED_FORBIDDEN:
+      "This person's access comes from the server configuration. Change PLATFORM_ADMIN_IDS instead.",
+    ADMIN_STAFF_LAST_MANAGER_FORBIDDEN:
+      "This is the last manager. Add another manager before changing this access.",
+    ADMIN_STAFF_NOT_FOUND: "This person is not on the staff.",
+    ADMIN_STAFF_OVERRIDE_NOT_FOUND: "This permission change no longer exists.",
+    ADMIN_USER_STAFF_TARGET_FORBIDDEN:
+      "Only someone who manages the staff can act on a staff member.",
     IMPERSONATION_ACTION_FORBIDDEN:
       "This action is unavailable while you are impersonating another user.",
     POLICY_ACCEPTANCE_REQUIRED: "Our terms have been updated. Accept the new version to continue.",
+    CAPTCHA_REQUIRED: "Complete the captcha, then try again.",
+    SECURITY_GEO_FORBIDDEN:
+      "Access is not available from your network or region. Turn off any VPN or proxy and try again, or contact support.",
   },
-  // Covers `HTTP_<status>` codes — raised by `HTTPException` sites with no
-  // business code (`error.middleware.ts`) — for statuses the API actually
+  // Covers `HTTP_<status>` codes (raised by `HTTPException` sites with no
+  // business code, see `error.middleware.ts`) for statuses the API actually
   // sends. A status with no entry here falls through to `bySuffix`/the
   // server's own message, so this only ever adds coverage.
   byStatus: {
@@ -173,7 +245,7 @@ export default {
     invalidEventSelection: "Contains an unknown or non-subscribable event.",
   },
   fallback: {
-    // Shown only when a request fails with no JSON error body — `formatApiError`
+    // Shown only when a request fails with no JSON error body: `formatApiError`
     // prefers the catalog's `byCode`/`bySuffix` answer and then the server's own
     // 4xx message. These are the last resort, not the normal path.
     acceptPolicies: "Failed to accept policies",
@@ -186,6 +258,7 @@ export default {
     recordConsent: "Failed to record consent",
     requestAccountDeletion: "Account deletion failed",
     requestDataExport: "Export request failed",
+    verifyStepUp: "Failed to check this code",
     stopImpersonation: "Failed to stop impersonation",
     withdrawConsent: "Failed to withdraw consent",
     loadPlans: "Failed to load plans",
@@ -195,6 +268,7 @@ export default {
     loadNotificationPreferences: "Failed to load notification preferences",
     loadOrgNotificationPreferences: "Failed to load org notification preferences",
     loadPolicies: "Failed to load policies",
+    loadSession: "Failed to check your session",
     loadSubscription: "Failed to load subscription",
     loadPasskeys: "Failed to load passkeys",
     loadSessions: "Failed to load sessions",
@@ -209,7 +283,7 @@ export default {
     sendWebhookTestEvent: "Failed to send test event",
     // The JSX loading state (`webhooks.route.tsx`) and this fallback message
     // (`webhooks.queries.ts`, shown only when the API sends no JSON error
-    // body) render the exact same failure — one key, so they can never drift
+    // body) render the exact same failure: one key, so they can never drift
     // a trailing period apart the way the two literals did before extraction.
     loadWebhookEndpoints: "Failed to load webhook endpoints.",
     loadWebhookDeliveries: "Failed to load deliveries.",
@@ -218,6 +292,8 @@ export default {
     registerSamlProvider: "Failed to register the SAML provider",
     verifySsoDomain: "Domain verification failed",
     generateScimToken: "Failed to generate the SCIM token",
+    loadScimConnection: "Failed to load the directory connection",
+    disconnectScim: "Failed to disconnect the directory",
     invalidServerResponse: "Invalid response from server",
     updateSsoEnforcement: "Failed to update SSO enforcement",
     loadSsoProviders: "Failed to load SSO providers",
@@ -227,16 +303,38 @@ export default {
     revokeUserSessions: "Failed to revoke sessions",
     resetUserPassword: "Failed to send password reset",
     startImpersonation: "Failed to start impersonation",
-    setUserRole: "Failed to change role",
     loadAdminUsers: "Failed to load accounts",
     loadAdminUser: "Failed to load account",
     loadAdminOrgs: "Failed to load organizations",
     loadAdminOrg: "Failed to load organization",
     // Distinct from `updateSsoEnforcement` above (the org owner's own
-    // self-service toggle) — this is the platform admin overriding
+    // self-service toggle): this is the platform admin overriding
     // enforcement on an arbitrary organization, a different action from a
     // different source that happens to share the same English wording.
     updateAdminOrgSsoEnforcement: "Failed to update SSO enforcement",
+    loadStaff: "Failed to load the team",
+    setStaffRole: "Failed to change this role",
+    revokeStaff: "Failed to remove this person from the team",
+    loadStaffOverrides: "Failed to load permission changes",
+    setStaffOverride: "Failed to save this permission change",
+    removeStaffOverride: "Failed to remove this permission change",
+    loadApprovals: "Failed to load approvals",
+    loadApproval: "Failed to load this request",
+    loadDeadLetters: "Failed to load dead events",
+    loadSweeps: "Failed to load scheduled jobs",
+    loadStripeEvents: "Failed to load Stripe events",
+    requeueOutbox: "Failed to requeue these events",
+    replayStripeEvent: "Failed to replay this event",
+    setPlanOverride: "Failed to save this plan override",
+    revokePlanOverride: "Failed to end this plan override",
+    loadStaffNotes: "Failed to load the notes",
+    loadInbox: "Failed to load your inbox",
+    loadSavedViews: "Failed to load your saved views",
+    saveView: "Failed to save this view",
+    deleteView: "Failed to delete this view",
+    addStaffNote: "Failed to add this note",
+    decideApproval: "Failed to record this decision",
+    cancelApproval: "Failed to cancel this request",
     loadAuditLog: "Failed to load audit log",
     verifyAuditChain: "Failed to verify chain",
     updateAvatar: "Failed to update avatar",
@@ -250,7 +348,13 @@ export default {
     regenerateBackupCodes: "Couldn't regenerate your recovery codes. Please try again.",
     revokeSession: "Failed to revoke session",
     // Distinct from `revokeUserSessions` above (an admin revoking someone
-    // else's sessions) — this is a user revoking their own other sessions.
+    // else's sessions): this is a user revoking their own other sessions.
     revokeOtherSessions: "Failed to revoke sessions",
+    setLocale: "Failed to update language",
+    preflightDeletion: "Failed to check whether the account can be deleted",
+    presignUpload: "Failed to prepare the upload",
+    confirmUpload: "Failed to confirm the upload",
+    deleteUpload: "Failed to delete the file",
+    upgradeSubscription: "Failed to start the upgrade",
   },
 } as const;

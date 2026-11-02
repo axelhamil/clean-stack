@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { useDisableTwoFactor } from "../hooks/use-disable-two-factor";
 import { type PasswordPromptInput, passwordPromptSchema } from "../security.schema";
 
@@ -13,6 +14,7 @@ interface DisableTwoFactorFormProps {
 
 export function DisableTwoFactorForm({ onSuccess }: DisableTwoFactorFormProps = {}) {
   const { t } = useTranslation("settings");
+  const revealLabels = usePasswordRevealLabels();
   const mutation = useDisableTwoFactor();
   const form = useForm<PasswordPromptInput>({
     resolver: zodResolver(passwordPromptSchema),
@@ -33,6 +35,7 @@ export function DisableTwoFactorForm({ onSuccess }: DisableTwoFactorFormProps = 
           name="password"
           label={t("twoFactor.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
           placeholder={t("twoFactor.passwordPlaceholder")}
         />

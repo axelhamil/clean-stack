@@ -7,25 +7,20 @@ import {
   ownerAc,
 } from "better-auth/plugins/organization/access";
 
-const statement = {
-  ...defaultStatements,
+const appStatement = {
   organization: ["update", "delete", "leave"],
   billing: ["read", "manage"],
   auditLog: ["read"],
   webhooks: ["read", "write"],
   apiToken: ["create", "read", "revoke"],
+  scim: ["manage"],
 } as const;
+
+const statement = { ...defaultStatements, ...appStatement } as const;
 
 const _ac = createAccessControl(statement);
 
-const _owner = _ac.newRole({
-  ...ownerAc.statements,
-  organization: ["update", "delete", "leave"],
-  billing: ["read", "manage"],
-  auditLog: ["read"],
-  webhooks: ["read", "write"],
-  apiToken: ["create", "read", "revoke"],
-});
+const _owner = _ac.newRole({ ...ownerAc.statements, ...appStatement });
 
 const _admin = _ac.newRole({
   ...adminAc.statements,
@@ -41,21 +36,51 @@ const _member = _ac.newRole({
   organization: ["leave"],
 });
 
-const _orgRoles = ["owner", "admin", "member"] as const;
-type _OrgRole = (typeof _orgRoles)[number];
+export {
+  APPROVAL_ACTION_PERMISSION,
+  APPROVAL_ACTIONS,
+  type ApprovalAction,
+  authorizeStaff,
+  effectivePermissions,
+  isApprovalAction,
+  isStaffPermission,
+  isStaffRole,
+  permissionsOfRole,
+  rolesWithStaffPermission,
+  STAFF_PERMISSIONS,
+  STAFF_REFUSAL,
+  STAFF_ROLES,
+  type StaffAccess,
+  type StaffPermission,
+  type StaffPermissionOverride,
+  type StaffRole,
+  staffAccessSchema,
+  staffReachable,
+} from "./staff";
+export {
+  auditViewFiltersSchema,
+  orgsViewFiltersSchema,
+  STAFF_VIEW_SCREEN_PERMISSION,
+  type StaffView,
+  type StaffViewScreen,
+  screensOpenTo,
+  staffViewSchema,
+  storedStaffView,
+  usersViewFiltersSchema,
+} from "./staff-views";
 
-const _roles = { owner: _owner, admin: _admin, member: _member } as const satisfies Record<
-  _OrgRole,
-  unknown
->;
-
-export const ORG_ROLES = _orgRoles;
+export const ORG_ROLES = ["owner", "admin", "member"] as const;
 export const STATEMENTS = statement;
 
-export type OrgRole = _OrgRole;
+export type OrgRole = (typeof ORG_ROLES)[number];
 export type OrgPermissions = {
   [K in keyof typeof statement]?: readonly (typeof statement)[K][number][];
 };
+
+const _roles = { owner: _owner, admin: _admin, member: _member } as const satisfies Record<
+  OrgRole,
+  unknown
+>;
 
 export function authorizeRole(
   role: OrgRole | undefined,
@@ -63,6 +88,7 @@ export function authorizeRole(
   connector: "OR" | "AND" = "AND",
 ): boolean {
   if (!role) return false;
+
   const policy = _roles[role] as {
     authorize: (p: OrgPermissions, c?: "OR" | "AND") => { success: boolean };
   };
@@ -77,7 +103,7 @@ export const ac = _ac as unknown as AccessControl;
 export const roles = _roles;
 
 /**
- * The single allowed special-case from CLAUDE.md R5 (multi-tenant).
+ * The single allowed special case of the org-scoping rules (apps/api/CLAUDE.md).
  *
  * Personal orgs are auto-created on signup, tied 1:1 to a user account.
  * Encoded by slug pattern (`personal-${uuid}`); the *check* lives here so
@@ -89,3 +115,10 @@ export const PERSONAL_ORG_SLUG_LIKE_PATTERN = `${PERSONAL_ORG_SLUG_PREFIX}%`;
 export function isPersonalOrg(slug: string): boolean {
   return slug.startsWith(PERSONAL_ORG_SLUG_PREFIX);
 }
+export {
+  OVERRIDE_MAX_YEARS,
+  PAID_TIERS,
+  type PaidTier,
+  TIERS,
+  type Tier,
+} from "./tiers";

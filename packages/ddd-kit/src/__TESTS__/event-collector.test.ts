@@ -6,8 +6,12 @@ import {
   type IDomainEvent,
   isEventHandler,
   onEvent,
+  Result,
+  UnitOfWorkContext,
   UUID,
 } from "../index";
+
+const inScope = <T>(work: () => Promise<T>): Promise<T> => UnitOfWorkContext.run(undefined, work);
 
 class TestEvent implements IDomainEvent<{ value: number }> {
   readonly eventType = "test.event";
@@ -39,7 +43,7 @@ describe("EventCollector (ALS)", () => {
   });
 
   it("collects events added inside context and drains them once", async () => {
-    const result = await EventCollector.runWithContext(async () => {
+    const result = await inScope(async () => {
       EventCollector.add(new TestEvent("agg-1", 1));
       EventCollector.add([new TestEvent("agg-1", 2), new TestEvent("agg-1", 3)]);
       const drained = EventCollector.drain();
@@ -52,14 +56,14 @@ describe("EventCollector (ALS)", () => {
   });
 
   it("isolates events between concurrent contexts", async () => {
-    const ctxA = EventCollector.runWithContext(async () => {
+    const ctxA = inScope(async () => {
       EventCollector.add(new TestEvent("agg-A", 1));
       await new Promise((r) => setTimeout(r, 10));
       EventCollector.add(new TestEvent("agg-A", 2));
       return EventCollector.drain();
     });
 
-    const ctxB = EventCollector.runWithContext(async () => {
+    const ctxB = inScope(async () => {
       EventCollector.add(new TestEvent("agg-B", 1));
       return EventCollector.drain();
     });
@@ -72,8 +76,62 @@ describe("EventCollector (ALS)", () => {
     expect(eventsB[0]?.aggregateId).toBe("agg-B");
   });
 
+  it("reports events added outside a context instead of collecting them", () => {
+    const reports: Array<Record<string, unknown> | undefined> = [];
+    EventCollector.setOutOfContextLogger((_message, meta) => reports.push(meta));
+
+    EventCollector.add([]);
+    EventCollector.add(new TestEvent("agg-1", 1));
+    EventCollector.setOutOfContextLogger(null);
+
+    expect(reports).toEqual([{ eventTypes: ["test.event"], aggregateIds: ["agg-1"] }]);
+    expect(EventCollector.drain()).toEqual([]);
+  });
+
+  it("given saved aggregates, when collected, then collectFrom pulls the events of one aggregate and of a list", async () => {
+    const one = CounterAggregate.create();
+    one.increment();
+    const other = CounterAggregate.create();
+    other.increment();
+    other.increment();
+    const untouched = CounterAggregate.create();
+
+    const collected = await inScope(async () => {
+      EventCollector.collectFrom(one);
+      EventCollector.collectFrom([one, other, untouched]);
+
+      return EventCollector.drain();
+    });
+
+    expect(collected.map((event) => event.payload)).toEqual([
+      { value: 1 },
+      { value: 1 },
+      { value: 2 },
+    ]);
+    expect(other.hasEvents()).toBe(false);
+  });
+
+  it("given a promise that outlives its scope, when it adds events after the scope closed, then they are reported as lost", async () => {
+    const reports: Array<Record<string, unknown> | undefined> = [];
+    EventCollector.setOutOfContextLogger((_message, meta) => reports.push(meta));
+
+    const late = await inScope(async () => ({
+      added: new Promise<boolean>((resolve) =>
+        setTimeout(() => {
+          EventCollector.add(new TestEvent("agg-late", 1));
+          resolve(EventCollector.hasContext());
+        }, 10),
+      ),
+    }));
+    const contextSeenLate = await late.added;
+    EventCollector.setOutOfContextLogger(null);
+
+    expect(contextSeenLate).toBe(false);
+    expect(reports).toEqual([{ eventTypes: ["test.event"], aggregateIds: ["agg-late"] }]);
+  });
+
   it("does not leak events outside the context after it closes", async () => {
-    await EventCollector.runWithContext(async () => {
+    await inScope(async () => {
       EventCollector.add(new TestEvent("agg-1", 1));
     });
 
@@ -110,9 +168,13 @@ describe("Aggregate.pullDomainEvents()", () => {
 
 describe("onEvent / EventHandler", () => {
   it("creates a handler tagged with the marker symbol", () => {
-    const handler = onEvent("user.created", (deps: { calls: string[] }) => async (event) => {
-      deps.calls.push(event.eventType);
-    })({ calls: [] });
+    const handler = onEvent(
+      "user.created",
+      "record-call",
+      (deps: { calls: string[] }) => async (event) => {
+        deps.calls.push(event.eventType);
+      },
+    )({ calls: [] });
 
     expect(handler[EVENT_HANDLER_SYMBOL]).toBe(true);
     expect(handler.eventType).toBe("user.created");
@@ -120,7 +182,7 @@ describe("onEvent / EventHandler", () => {
   });
 
   it("isEventHandler discriminates handlers from arbitrary objects", () => {
-    const handler = onEvent("x.y", () => async () => {})({});
+    const handler = onEvent("x.y", "noop", () => async () => {})({});
     expect(isEventHandler(handler)).toBe(true);
     expect(isEventHandler({})).toBe(false);
     expect(isEventHandler(null)).toBe(false);
@@ -129,11 +191,35 @@ describe("onEvent / EventHandler", () => {
 
   it("handle invokes the factory output", async () => {
     const calls: string[] = [];
-    const handler = onEvent("user.created", (deps: { log: string[] }) => async (event) => {
-      deps.log.push(`got ${event.eventType}`);
-    })({ log: calls });
+    const handler = onEvent(
+      "user.created",
+      "log-event",
+      (deps: { log: string[] }) => async (event) => {
+        deps.log.push(`got ${event.eventType}`);
+      },
+    )({ log: calls });
 
     await handler.handle(new TestEvent("agg-1", 1));
     expect(calls).toEqual(["got test.event"]);
+  });
+
+  it("given a handler that returns a failed Result, when handled, then it throws with the error code and message", async () => {
+    const coded = onEvent(
+      "user.created",
+      "coded-failure",
+      () => async () => Result.fail({ code: "EMAIL_PROVIDER_FAILURE", message: "boom" }),
+    )({});
+    const plain = onEvent(
+      "user.created",
+      "plain-failure",
+      () => async () => Result.fail("gone"),
+    )({});
+    const succeeded = onEvent("user.created", "succeeded", () => async () => Result.ok())({});
+
+    await expect(coded.handle(new TestEvent("agg-1", 1))).rejects.toThrow(
+      "EMAIL_PROVIDER_FAILURE: boom",
+    );
+    await expect(plain.handle(new TestEvent("agg-1", 1))).rejects.toThrow("gone");
+    await expect(succeeded.handle(new TestEvent("agg-1", 1))).resolves.toBeUndefined();
   });
 });

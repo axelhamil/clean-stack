@@ -5,9 +5,11 @@ import { RateLimiterDrizzle, RateLimiterMemory, RateLimiterRes } from "rate-limi
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type {
   IRateLimiter,
+  IRateLimitUsage,
   RateLimitDecision,
   RateLimitError,
   WindowConfig,
+  WindowUsage,
 } from "../ports/rate-limiter.port";
 
 export type RateLimiterFactory = (window: WindowConfig) => RateLimiterAbstract;
@@ -51,7 +53,7 @@ export function storeFactoryFor(
 
 const SPAN_NAME = "RateLimiterFlexibleAdapter > consume";
 
-export class RateLimiterFlexibleAdapter implements IRateLimiter {
+export class RateLimiterFlexibleAdapter implements IRateLimiter, IRateLimitUsage {
   private readonly limiters = new Map<string, RateLimiterAbstract>();
 
   constructor(
@@ -93,6 +95,34 @@ export class RateLimiterFlexibleAdapter implements IRateLimiter {
         });
       }
     });
+  }
+
+  async usage(
+    key: string,
+    windows: WindowConfig[],
+  ): Promise<Result<WindowUsage[], RateLimitError>> {
+    return this.instrumentation.startSpan(
+      { name: "RateLimiterFlexibleAdapter > usage" },
+      async () => {
+        try {
+          const usages = await Promise.all(
+            windows.map(async (window) => ({
+              used: (await this.getLimiter(window).get(key))?.consumedPoints ?? 0,
+              limit: window.maxRequests,
+            })),
+          );
+
+          return Result.ok<WindowUsage[], RateLimitError>(usages);
+        } catch (err) {
+          this.instrumentation.capture(err);
+
+          return Result.fail<WindowUsage[], RateLimitError>({
+            code: "RATE_LIMITER_INTERNAL_ERROR",
+            message: err instanceof Error ? err.message : "rate limiter error",
+          });
+        }
+      },
+    );
   }
 
   private async consumeWindow(key: string, window: WindowConfig): Promise<RateLimitDecision> {

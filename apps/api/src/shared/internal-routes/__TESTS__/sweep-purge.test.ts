@@ -1,5 +1,6 @@
 import { mock } from "bun:test";
-import { drizzleMock } from "./drizzle-mock";
+
+const realDrizzle = await import("@packages/drizzle");
 
 const executed: string[] = [];
 
@@ -20,26 +21,24 @@ function fakeQuery(sql: string, rows: Array<{ id: string }>) {
 }
 
 mock.module("@packages/drizzle", () => ({
-  ...drizzleMock(),
-  db: {
-    transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
-      fn({
-        execute: async () => {},
-        select: () => fakeQuery("select id", []),
-        delete: () => fakeQuery('delete from "t"', [{ id: "a" }, { id: "b" }]),
-      }),
-  },
+  ...realDrizzle,
+  resolveExecutor: () => ({
+    execute: async () => {},
+    select: () => fakeQuery("select id", []),
+    delete: () => fakeQuery('delete from "t"', [{ id: "a" }, { id: "b" }]),
+  }),
 }));
 
 const { describe, expect, it, spyOn } = await import("bun:test");
+const { mockUnitOfWork } = await import("@packages/test/bun/unit-of-work");
 const { NoOpInstrumentation } = await import("../../services/noop-instrumentation");
 const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
 const { isNotNull } = await import("@packages/drizzle");
 
-// A real predicate, mirroring what every route actually passes — `where: undefined`
-// would now be refused by the guard `purgeBatchWithTimeout` fails closed on.
-const realWhere = () => isNotNull({} as never) as never;
+// A present predicate, mirroring what every route passes: `where: undefined` would be
+// refused by the guard `purgeBatchWithTimeout` fails closed on.
+const someWhere = () => isNotNull({} as never) as never;
 
 describe("purgeBatchWithTimeout", () => {
   it("returns the number of deleted rows", async () => {
@@ -47,10 +46,11 @@ describe("purgeBatchWithTimeout", () => {
     const deleted = await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
-      where: realWhere(),
+      where: someWhere(),
       orderBy: {} as never,
       batchSize: 100,
       spans,
+      uow: mockUnitOfWork().unitOfWork,
     });
 
     expect(deleted).toBe(2);
@@ -67,6 +67,7 @@ describe("purgeBatchWithTimeout", () => {
         orderBy: {} as never,
         batchSize: 100,
         spans,
+        uow: mockUnitOfWork().unitOfWork,
       }),
     ).rejects.toThrow("refusing an unfiltered delete");
   });
@@ -79,10 +80,11 @@ describe("purgeBatchWithTimeout", () => {
     await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
-      where: realWhere(),
+      where: someWhere(),
       orderBy: {} as never,
       batchSize: 100,
       spans,
+      uow: mockUnitOfWork().unitOfWork,
     });
 
     expect(spy).toHaveBeenCalledTimes(1);
@@ -95,7 +97,7 @@ describe("purgeBatchWithTimeout", () => {
 
 describe("requireFilter", () => {
   it("returns the filter unchanged when given one", () => {
-    const filter = realWhere();
+    const filter = someWhere();
     expect(requireFilter(filter, "some-label")).toBe(filter);
   });
 

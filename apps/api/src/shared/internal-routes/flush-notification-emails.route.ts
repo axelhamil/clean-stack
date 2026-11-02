@@ -1,4 +1,4 @@
-// `/internal/flush-notification-emails` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
+// `/internal/flush-notification-emails`, gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import {
   alias,
@@ -11,6 +11,7 @@ import {
   isNull,
   lte,
   notificationSchema,
+  resolveExecutor,
   sql,
 } from "@packages/drizzle";
 import { NOTIFICATION_MAP } from "@packages/events";
@@ -21,8 +22,10 @@ import { z } from "zod";
 import { di } from "../../container";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
+import { type SweepBeat, withSweepHeartbeat } from "./sweep-heartbeat";
 import { sweepLockFor } from "./sweep-lock";
-import { sweepSpans } from "./sweep-span";
+import { releaseLease } from "./sweep-runner";
+import { type SweepSpans, sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
@@ -83,9 +86,10 @@ export async function digestIdempotencyKey(ids: string[]): Promise<string> {
 }
 
 const DEFAULT_BATCH_SIZE = 500;
+const LEASE_LABEL = "flush-notification-emails";
 
 // Forced notifications (security, payment failures, …) join no preference row
-// at the fan-out either — the flush must honour the exact same exemption, or a
+// at the fan-out either, the flush must honour the exact same exemption, or a
 // user who disabled email for `security` would silently start losing forced
 // digests it was never allowed to defer in the first place.
 const FORCED_EVENT_TYPES = Object.entries(NOTIFICATION_MAP)
@@ -100,7 +104,7 @@ const opMail = alias(p, "op_mail");
  * Same precedence the fan-out resolves at insertion (`notification-fanout-
  * subscriber.ts`): org-locked wins, then the user's own choice, then the
  * org's unlocked default, then `TRUE`. Re-evaluated here, at send time,
- * against the *current* row — a preference flipped after the notification
+ * against the *current* row, a preference flipped after the notification
  * was queued must be able to cancel a digest already scheduled.
  */
 const forcedCheck =
@@ -121,69 +125,95 @@ const emailStillWanted = sql<boolean>`(
   )
 )`;
 
-export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
-  .use("*", ...internalLayers)
-  .post("/flush-notification-emails", zV("json", bodySchema), async (c) => {
-    const { batchSize = DEFAULT_BATCH_SIZE, dryRun = false } = c.req.valid("json");
-    const now = new Date();
-    const logger = c.var.logger;
-    const n = notificationSchema.notification;
-    const u = authSchema.user;
+interface FlushRun {
+  batchSize: number;
+  dryRun: boolean;
+  logger: PinoLogger;
+  spans: SweepSpans;
+}
 
-    if (dryRun) {
-      const rows = await db
-        .select({ eligible: count() })
-        .from(n)
-        .where(and(lte(n.emailPendingAt, now), isNull(n.emailSentAt)));
-      const eligible = rows[0]?.eligible ?? 0;
-      logger.info({ eligible }, "flush-notification-emails dry-run");
-      return c.json({ dryRun: true, eligible, flushed: 0, notifications: 0 });
-    }
+interface FlushResponse {
+  dryRun: boolean;
+  skipped?: boolean;
+  eligible?: number;
+  flushed: number;
+  notifications: number;
+}
 
-    // Single-flight, same lease table the retention sweeps use.
-    //
-    // `FOR UPDATE SKIP LOCKED` below already makes a double *send* impossible —
-    // two runs can never claim the same row. What it does not prevent is two
-    // runs each claiming *half* of one user's due notifications and each mailing
-    // a digest: no duplicate, but two e-mails for a window the user was promised
-    // one of. Now that the window is a promise the selector makes, that split is
-    // the failure mode worth a lease.
-    const lock = sweepLockFor("flush-notification-emails", sweepSpans(di.IInstrumentation));
-    if (!(await lock.acquire())) {
-      logger.info("flush-notification-emails skipped — lease held by a concurrent run");
-      return c.json({ dryRun: false, skipped: true, flushed: 0, notifications: 0 });
-    }
+export function beatOfFlush(response: FlushResponse): SweepBeat | undefined {
+  if (response.dryRun || response.skipped) return undefined;
 
-    try {
-      const { flushed, notifications } = await db.transaction(async (tx) => {
-        await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
-        await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-        await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+  return { outcome: "ok", count: response.flushed };
+}
+
+async function flushDueNotifications({
+  batchSize,
+  dryRun,
+  logger,
+  spans,
+}: FlushRun): Promise<FlushResponse> {
+  const now = new Date();
+  const n = notificationSchema.notification;
+  const u = authSchema.user;
+  const isDue = and(lte(n.emailPendingAt, now), isNull(n.emailSentAt));
+
+  if (dryRun) {
+    const query = db.select({ eligible: count() }).from(n).where(isDue);
+    const rows = await spans.db(
+      () => query.toSQL().sql,
+      () => query.execute(),
+    );
+    const eligible = rows[0]?.eligible ?? 0;
+    logger.info({ eligible }, "flush-notification-emails dry-run");
+    return { dryRun: true, eligible, flushed: 0, notifications: 0 };
+  }
+
+  // Single-flight, same lease table the retention sweeps use.
+  //
+  // `FOR UPDATE SKIP LOCKED` below already makes a double *send* impossible:
+  // two runs can never claim the same row. What it does not prevent is two
+  // runs each claiming *half* of one user's due notifications and each mailing
+  // a digest: no duplicate, but two e-mails for a window the user was promised
+  // one of. Now that the window is a promise the selector makes, that split is
+  // the failure mode worth a lease.
+  const lock = sweepLockFor(LEASE_LABEL, spans);
+  if (!(await lock.acquire())) {
+    logger.info("flush-notification-emails skipped, lease held by a concurrent run");
+    return { dryRun: false, skipped: true, flushed: 0, notifications: 0 };
+  }
+
+  try {
+    const flush = () =>
+      di.ITransactionService.run(async () => {
+        const exec = resolveExecutor();
+        await exec.execute(sql`SET LOCAL statement_timeout = '30s'`);
+        await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
+        await exec.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
 
         // `batchSize` bounds each round-trip to Postgres, not the run: the
         // lease already rules out a *concurrent* run splitting a window, but
         // capping a single run at one page reintroduced the same split
-        // sequentially — a backlog bigger than `batchSize` used to flush as
+        // sequentially, a backlog bigger than `batchSize` used to flush as
         // two digests for one promised window. This pages through every row
         // due *right now*, in the same transaction, and sends one digest per
         // (user, category) for the whole set.
         //
         // Every row leaving a page is resolved before the next page is read
-        // — dropped rows get `emailPendingAt = null`, kept rows get
-        // `emailSentAt = now` right here, not after the whole loop — so
+        // dropped rows get `emailPendingAt = null`, kept rows get
+        // `emailSentAt = now` right here, not after the whole loop, so
         // neither can still match the `WHERE` below on the next iteration.
         // `FOR UPDATE SKIP LOCKED` does not re-skip locks held by this same
         // transaction: a row left unresolved between pages would come back
         // on the next one. Marking it immediately, inside the same
         // transaction as the eventual send, keeps atomicity (a failed send
         // rolls every page's marks back together) without an accumulator
-        // that grows — and a bound query parameter list — with the size of
+        // that grows, and a bound query parameter list, with the size of
         // the backlog.
         const rows: PendingRow[] = [];
         let dropped = 0;
 
         for (;;) {
-          const candidates = await tx
+          const candidates = await exec
             .select({
               id: n.id,
               userId: n.userId,
@@ -214,7 +244,7 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
                 eq(opMail.scopeId, n.organizationId),
               ),
             )
-            .where(and(lte(n.emailPendingAt, now), isNull(n.emailSentAt)))
+            .where(isDue)
             .limit(batchSize)
             .for("update", { of: n, skipLocked: true });
 
@@ -224,17 +254,17 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
           // turned off, or the category left the org) is honoured here, not
           // by rewriting the fan-out's decision. A dropped row is not
           // eligible forever: its `emailPendingAt` is cleared so it stops
-          // matching the due-window filter on the next run — the
+          // matching the due-window filter on the next run, the
           // notification itself, and its in-app read state, are untouched.
           const droppedIds = candidates.filter((r) => !r.emailStillWanted).map((r) => r.id);
           if (droppedIds.length > 0) {
-            await tx.update(n).set({ emailPendingAt: null }).where(inArray(n.id, droppedIds));
+            await exec.update(n).set({ emailPendingAt: null }).where(inArray(n.id, droppedIds));
             dropped += droppedIds.length;
           }
 
           const allowed = candidates.filter((r) => r.emailStillWanted) as PendingRow[];
           if (allowed.length > 0) {
-            await tx
+            await exec
               .update(n)
               .set({ emailSentAt: now })
               .where(
@@ -260,21 +290,21 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
 
         const digests = buildDigests(rows);
 
+        const recipients = await Promise.all(
+          digests.map(async (d) => ({
+            to: d.email,
+            variables: {
+              category: d.category,
+              itemCount: String(d.items.length),
+              itemsSummary: d.items.map((i) => i.eventType).join(", "),
+            },
+            locale: toLocale(d.locale),
+            idempotencyKey: await digestIdempotencyKey(d.notificationIds),
+          })),
+        );
         const enqueued = await di.IEmailService.sendTemplateBatch(
           "notification_digest",
-          await Promise.all(
-            digests.map(async (d) => ({
-              to: d.email,
-              variables: {
-                category: d.category,
-                itemCount: String(d.items.length),
-                itemsSummary: d.items.map((i) => i.eventType).join(", "),
-              },
-              locale: toLocale(d.locale),
-              idempotencyKey: await digestIdempotencyKey(d.notificationIds),
-            })),
-          ),
-          { tx: tx as unknown as import("../transaction").ITransaction },
+          recipients,
         );
 
         if (enqueued.isFailure) {
@@ -291,8 +321,28 @@ export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
         return { flushed: digests.length, notifications: notificationIds.length };
       });
 
-      return c.json({ dryRun: false, skipped: false, flushed, notifications });
-    } finally {
-      await lock.release();
-    }
+    // One outer span over the whole paged transaction: its statements are many and
+    // alike, and per-statement spans would be noise (rule #8, multi-query methods).
+    const { flushed, notifications } = await spans.span(
+      { name: `flush > ${LEASE_LABEL}`, op: "function" },
+      flush,
+    );
+
+    return { dryRun: false, skipped: false, flushed, notifications };
+  } finally {
+    await releaseLease(lock, LEASE_LABEL, logger, spans);
+  }
+}
+
+export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()
+  .use("*", ...internalLayers)
+  .post("/flush-notification-emails", zV("json", bodySchema), async (c) => {
+    const { batchSize = DEFAULT_BATCH_SIZE, dryRun = false } = c.req.valid("json");
+    const spans = sweepSpans(di.IInstrumentation);
+    const response = await withSweepHeartbeat(
+      { label: LEASE_LABEL, store: di.ISweepRunStore, spans, beatOf: beatOfFlush, dryRun },
+      () => flushDueNotifications({ batchSize, dryRun, logger: c.var.logger, spans }),
+    );
+
+    return c.json(response);
   });

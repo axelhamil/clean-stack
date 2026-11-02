@@ -1,7 +1,6 @@
 import { uuidv7 } from "@packages/ddd-kit";
-import { and, db, eq, sql, sweepSchema } from "@packages/drizzle";
+import { and, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
 import { env } from "../env";
-import type { ITransaction } from "../transaction";
 import type { SweepLock } from "./sweep-runner";
 import type { SweepSpans } from "./sweep-span";
 
@@ -16,21 +15,19 @@ import type { SweepSpans } from "./sweep-span";
  * boolean: the deadline is only checked between batches, so a run can outlive its
  * own TTL. If it does, its lease expires, a successor legitimately acquires it,
  * and the overrunning run must not then delete that successor's row just because
- * it still holds the same `label` — `releaseSweepLease` deletes by `label` AND
+ * it still holds the same `label`, `releaseSweepLease` deletes by `label` AND
  * `owner`, so a stale caller's release is a no-op instead of stealing the lease.
  *
- * `exec` defaults to the shared `db` client (same `tx ?? db` swap-point used by
- * every repository) — a caller inside an existing transaction can pass its `tx`
- * instead of opening a second connection.
+ * Reads the ambient executor like every repository: inside a `uow.run` it joins
+ * the open transaction instead of opening a second connection.
  */
 export async function acquireSweepLease(
   label: string,
   ttlMs: number,
   spans: SweepSpans,
-  exec?: ITransaction,
 ): Promise<string | null> {
   const lock = sweepSchema.sweepLock;
-  const client = exec ?? db;
+  const client = resolveExecutor();
   const owner = uuidv7();
   const until = new Date(Date.now() + ttlMs);
   const query = client
@@ -53,10 +50,9 @@ export async function releaseSweepLease(
   label: string,
   owner: string,
   spans: SweepSpans,
-  exec?: ITransaction,
 ): Promise<void> {
   const lock = sweepSchema.sweepLock;
-  const client = exec ?? db;
+  const client = resolveExecutor();
   const query = client.delete(lock).where(and(eq(lock.label, label), eq(lock.owner, owner)));
   await spans.lease(
     () => query.toSQL().sql,
@@ -67,9 +63,9 @@ export async function releaseSweepLease(
 /**
  * Builds the `{ acquire, release }` pair a sweep route passes to `runRetentionSweep`,
  * closing over the label and its ownership token so the runner's `SweepLock` shape
- * stays a plain boolean-returning `acquire`/no-arg `release` — the token never
+ * stays a plain boolean-returning `acquire`/no-arg `release`, the token never
  * leaves this module. TTL is the sweep budget plus a margin (`SWEEP_DEADLINE_MS * 2`),
- * so a crashed run frees the label shortly after it would have finished anyway — every
+ * so a crashed run frees the label shortly after it would have finished anyway, every
  * route shares this one place instead of repeating the literal.
  */
 export function sweepLockFor(label: string, spans: SweepSpans): SweepLock {

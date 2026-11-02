@@ -1,14 +1,4 @@
-import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-import { onMutationError, onQueryError } from "../observability/query-error-handler";
+import { createQueryClient } from "@packages/web-kit/api/query-client";
+import { captureError } from "../observability/sentry";
 
-export const queryClient = new QueryClient({
-  queryCache: new QueryCache({ onError: onQueryError }),
-  mutationCache: new MutationCache({ onError: onMutationError }),
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+export const queryClient = createQueryClient(captureError);

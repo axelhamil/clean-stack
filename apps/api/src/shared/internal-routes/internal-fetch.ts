@@ -1,4 +1,4 @@
-// Client-side counterpart of `requireInternalSignature` — the canonical message
+// Client-side counterpart of `requireInternalSignature`, the canonical message
 // MUST stay byte-identical with the verifier. See docs/CRON.md.
 import { buildSignatureHeader, canonicalize, SIGNATURE_HEADER, sign } from "./internal-signature";
 
@@ -23,7 +23,7 @@ export interface SignedFetchInput {
  *
  * Builds the canonical message, computes the HMAC-SHA256 signature, and
  * attaches it as `X-Internal-Signature`. Import this in external schedulers
- * (GH Actions, Railway cron sidecar) — it is the only supported way to call
+ * (GH Actions, Railway cron sidecar), it is the only supported way to call
  * internal routes from outside the process.
  */
 export async function signedInternalFetch(input: SignedFetchInput): Promise<Response> {

@@ -1,9 +1,13 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
+import { Hint } from "@packages/ui/components/ui/hint";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components/ui/popover";
 import { ScrollArea } from "@packages/ui/components/ui/scroll-area";
 import { Separator } from "@packages/ui/components/ui/separator";
 import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +20,7 @@ import {
   notificationsInfiniteQueryOptions,
   unreadCountQueryOptions,
 } from "../api/queries/notifications";
+import { GuardHint } from "../auth/guard-hint";
 import { ImpersonationReason } from "../auth/impersonation-reason";
 import { useImpersonationGuard } from "../auth/use-impersonation-guard";
 import { groupNotifications } from "./group-notifications";
@@ -70,11 +75,13 @@ export function NotificationBell() {
   const markRead = useMutation({
     ...markReadMutationOptions,
     onSuccess: (_result, variables) => propagate({ ids: variables.ids }),
+    onError: (err) => toastError(err, errorFallback("markNotificationsRead")),
   });
 
   const markAllRead = useMutation({
     ...markAllReadMutationOptions,
     onSuccess: () => propagate({ all: true }),
+    onError: (err) => toastError(err, errorFallback("markAllNotificationsRead")),
   });
 
   const nothingToMarkRead = count === 0 || markAllRead.isPending;
@@ -82,28 +89,35 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label={unreadLabel(t, count)}>
+        <IconButton variant="ghost" className="relative" label={unreadLabel(t, count)}>
           <Bell />
           {count > 0 && (
             <Badge aria-hidden className="-top-1 -right-1 absolute">
               {badgeLabel(count)}
             </Badge>
           )}
-        </Button>
+        </IconButton>
       </PopoverTrigger>
 
       <PopoverContent align="end" className="w-96 max-w-[calc(100vw-2rem)] p-0">
         <div className="flex items-center justify-between gap-2 p-3">
           <TypographySmall>{t("notifications.title")}</TypographySmall>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => markAllRead.mutate()}
-            disabled={nothingToMarkRead || guard.blocked}
-            {...guard.describeProps(nothingToMarkRead)}
-          >
-            {t("notifications.markAllRead")}
-          </Button>
+          <GuardHint guard={guard} otherwiseDisabled={nothingToMarkRead}>
+            <Hint
+              text={count === 0 ? t("notifications.nothingToMarkRead") : undefined}
+              showOnTouch={false}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => markAllRead.mutate()}
+                disabled={nothingToMarkRead || guard.blocked}
+                {...guard.describeProps(nothingToMarkRead)}
+              >
+                {t("notifications.markAllRead")}
+              </Button>
+            </Hint>
+          </GuardHint>
         </div>
         <ImpersonationReason guard={guard} />
 

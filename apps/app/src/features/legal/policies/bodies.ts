@@ -18,8 +18,8 @@ export function policyBodyFor(locale: Locale, type: PolicyType): () => ReactElem
 // `fr.tsx` re-exports `en.tsx`'s components by reference today, so comparing
 // the resolved body against the canonical English one by identity is what
 // makes this check honest, per R3: it fires the fallback banner for every
-// locale that hasn't gotten its own prose yet, and keeps working unchanged —
-// with nobody having to touch this file — the day a clone owner replaces
+// locale that hasn't gotten its own prose yet, and keeps working unchanged
+// (with nobody having to touch this file) the day a clone owner replaces
 // `fr.tsx` with real French components (the identity then differs, so the
 // banner stops firing on its own).
 export function isEnglishFallback(locale: Locale, type: PolicyType): boolean {

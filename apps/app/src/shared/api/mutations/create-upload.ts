@@ -1,3 +1,4 @@
+import { throwApiError } from "@packages/web-kit/api/errors/api-error";
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferRequestType, InferResponseType } from "hono/client";
 import { api } from "../api-client";
@@ -43,7 +44,8 @@ export async function createUpload({
       ...(expiresInSeconds ? { expiresInSeconds } : {}),
     },
   });
-  if (!presignRes.ok) throw new Error(`Presign failed: HTTP ${presignRes.status}`);
+  if (!presignRes.ok) await throwApiError(presignRes, "presignUpload");
+
   const presigned = await presignRes.json();
 
   const putRes = await fetch(presigned.url, {
@@ -63,9 +65,9 @@ export async function createUpload({
       expectedContentType: presigned.expectedContentType,
     },
   });
-  if (!confirmRes.ok) throw new Error(`Confirm failed: HTTP ${confirmRes.status}`);
+  if (!confirmRes.ok) await throwApiError(confirmRes, "confirmUpload");
 
-  return await confirmRes.json();
+  return confirmRes.json();
 }
 
 export const createUploadMutationOptions = mutationOptions({
@@ -75,5 +77,5 @@ export const createUploadMutationOptions = mutationOptions({
 
 export async function deleteUploadByUrl(url: string): Promise<void> {
   const res = await $delete({ json: { url } });
-  if (!res.ok) throw new Error(`Delete failed: HTTP ${res.status}`);
+  if (!res.ok) await throwApiError(res, "deleteUpload");
 }

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
-  isDeadLetter,
+  expectedDelayFromAttempts,
+  failureSchedule,
   JITTER_BASE_MS,
   JITTER_CAP_MS,
-  JITTER_MAX_ATTEMPTS,
   JITTER_MULTIPLIER,
-  nextAttemptAt,
   nextDelayMs,
+  retryAfterSeconds,
 } from "../jitter";
 
 describe("nextDelayMs", () => {
@@ -36,43 +36,47 @@ describe("nextDelayMs", () => {
   });
 });
 
-describe("isDeadLetter", () => {
-  it("returns false for attempt 4 (below JITTER_MAX_ATTEMPTS)", () => {
-    expect(isDeadLetter(4)).toBe(false);
+describe("expectedDelayFromAttempts", () => {
+  it("starts at JITTER_BASE_MS and grows by JITTER_MULTIPLIER per attempt", () => {
+    expect(expectedDelayFromAttempts(0)).toBe(JITTER_BASE_MS);
+    expect(expectedDelayFromAttempts(2)).toBe(JITTER_BASE_MS * JITTER_MULTIPLIER ** 2);
   });
 
-  it("returns true for attempt 5 (= JITTER_MAX_ATTEMPTS)", () => {
-    expect(isDeadLetter(JITTER_MAX_ATTEMPTS)).toBe(true);
-  });
-
-  it("returns true for attempt 6 (> JITTER_MAX_ATTEMPTS)", () => {
-    expect(isDeadLetter(6)).toBe(true);
+  it("treats a negative attempt count as the first attempt", () => {
+    expect(expectedDelayFromAttempts(-3)).toBe(JITTER_BASE_MS);
   });
 });
 
-describe("nextAttemptAt", () => {
-  it("returns date and positive delayMs when currentAttempts=0", () => {
-    const result = nextAttemptAt(0, JITTER_BASE_MS);
-    expect(result.date).toBeInstanceOf(Date);
-    expect(result.delayMs).toBeGreaterThan(0);
+describe("retryAfterSeconds", () => {
+  it("retryAfterSeconds stays within base and cap", () => {
+    for (const attempts of [0, 1, 3, 8, 40]) {
+      for (let i = 0; i < 50; i++) {
+        const seconds = retryAfterSeconds(attempts);
+        expect(seconds).toBeGreaterThanOrEqual(JITTER_BASE_MS / 1000);
+        expect(seconds).toBeLessThanOrEqual(JITTER_CAP_MS / 1000);
+      }
+    }
+  });
+});
+
+describe("failureSchedule", () => {
+  const policy = { wasDead: false, maxAttempts: 5, deadRetrySeconds: 21_600 };
+
+  it("failureSchedule keeps a live row retrying under maxAttempts", () => {
+    const schedule = failureSchedule(4, policy);
+
+    expect(schedule.dead).toBe(false);
+    expect(schedule.retryAfterSeconds).toBeLessThan(policy.deadRetrySeconds);
   });
 
-  it("returns { date: null, delayMs: -1 } when next attempt would be dead-letter (currentAttempts=4)", () => {
-    // currentAttempts + 1 = 5 = JITTER_MAX_ATTEMPTS → dead-letter
-    const result = nextAttemptAt(4, JITTER_BASE_MS);
-    expect(result.date).toBeNull();
-    expect(result.delayMs).toBe(-1);
+  it("failureSchedule marks dead at maxAttempts", () => {
+    expect(failureSchedule(5, policy)).toEqual({ dead: true, retryAfterSeconds: 21_600 });
   });
 
-  it("returns a date in the future between now+1s and now+12h for currentAttempts=2", () => {
-    const before = Date.now();
-    const result = nextAttemptAt(2, JITTER_BASE_MS);
-    const after = Date.now();
-
-    if (result.date === null)
-      throw new Error("expected date to be set for non-dead-letter attempt");
-    const dateMs = result.date.getTime();
-    expect(dateMs).toBeGreaterThanOrEqual(before + JITTER_BASE_MS);
-    expect(dateMs).toBeLessThanOrEqual(after + JITTER_CAP_MS);
+  it("failureSchedule keeps a dead row dead and uses the dead cadence", () => {
+    expect(failureSchedule(1, { ...policy, wasDead: true })).toEqual({
+      dead: true,
+      retryAfterSeconds: 21_600,
+    });
   });
 });

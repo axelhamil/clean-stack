@@ -1,9 +1,9 @@
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
-import { toastError } from "../../../shared/api/errors/toast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { PasswordPromptInput } from "../security.schema";
 
 export function useGenerateBackupCodes() {
@@ -19,12 +19,6 @@ export function useGenerateBackupCodes() {
       if (!data?.backupCodes) throw new Error(t("twoFactor.unexpectedResponse"));
       return data.backupCodes;
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.regenerateBackupCodes", {
-          defaultValue: "Couldn't regenerate your recovery codes. Please try again.",
-        }),
-      ),
+    onError: (err) => toastError(err, errorFallback("regenerateBackupCodes")),
   });
 }

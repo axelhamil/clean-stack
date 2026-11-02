@@ -3,7 +3,7 @@ import type * as React from "react";
 import { cn } from "../../libs/utils";
 
 // White background is fixed (not theme-bound) so QR scanners stay legible
-// even in dark mode — high-contrast modules require a known light surface.
+// even in dark mode: high-contrast modules require a known light surface.
 function QrCodeFrame({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

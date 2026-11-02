@@ -3,6 +3,9 @@ export default {
   actions: {
     save: "Enregistrer",
     cancel: "Annuler",
+    close: "Fermer",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
     retry: "Réessayer",
     reload: "Recharger",
   },
@@ -13,12 +16,17 @@ export default {
   },
   errorBoundary: {
     title: "Une erreur est survenue",
-    body: "Nous avons été alertés et nous examinons le problème. Essayez de recharger la page.",
+    body: "Cette page n'a pas pu se charger. Essayez de la recharger.",
+  },
+  notFound: {
+    title: "Page introuvable",
+    description:
+      "Cette page n'existe pas ou a été déplacée. Vérifiez l'adresse, ou revenez à l'accueil.",
+    backHome: "Revenir à l'accueil",
   },
   nav: {
     dashboard: "Tableau de bord",
     settings: "Paramètres",
-    admin: "Administration",
   },
   shell: {
     brandLabel: "App",
@@ -27,30 +35,26 @@ export default {
     logoAlt: "Logo de l'application",
   },
   commandPalette: {
+    title: "Palette de commandes",
+    description: "Recherchez une page ou une action à exécuter.",
     searchPlaceholder: "Rechercher des pages, actions, organisations...",
     noResults: "Aucun résultat.",
     actionFailed: "L'action a échoué",
     groups: {
       navigate: "Naviguer",
       switchOrganization: "Changer d'organisation",
-      admin: "Administration",
       legal: "Légal & confidentialité",
       actions: "Actions",
     },
     nav: {
-      organization: "Paramètres — Organisation",
-      billing: "Paramètres — Facturation",
-      webhooks: "Paramètres — Webhooks",
-      account: "Paramètres — Compte",
-      privacy: "Paramètres — Confidentialité",
-      eventCatalog: "Développeurs — Catalogue d'événements",
+      organization: "Paramètres : organisation",
+      billing: "Paramètres : facturation",
+      webhooks: "Paramètres : webhooks",
+      account: "Paramètres : compte",
+      privacy: "Paramètres : confidentialité",
+      eventCatalog: "Développeurs : catalogue d'événements",
     },
     organizationActive: "actif",
-    admin: {
-      auditLog: "Administration — Journal d'audit",
-      accounts: "Administration — Comptes",
-      organizations: "Administration — Organisations",
-    },
     theme: {
       light: "Thème : clair",
       dark: "Thème : sombre",
@@ -95,7 +99,8 @@ export default {
     signOutFailed: "Échec de la déconnexion",
   },
   impersonation: {
-    activeSession: "Session d'emprunt d'identité active — agit en tant que <name></name>",
+    activeSession:
+      "Session d'emprunt d'identité active : agit en tant que <name>{{name}}</name>. {{remaining}}. Les modifications sont bloquées pendant cette session.",
     remainingMinutes: "{{minutes}} min restantes",
     expired: "session expirée",
     end: "Arrêter l'emprunt d'identité",
@@ -112,6 +117,7 @@ export default {
     preferencesTitle: "Préférences cookies",
   },
   cookieConsent: {
+    necessaryAlwaysOnHint: "Les cookies strictement nécessaires ne peuvent pas être désactivés.",
     title: "Gérez vos préférences cookies",
     save: "Enregistrer les préférences",
     withdraw: "Retirer tous les consentements",
@@ -143,18 +149,24 @@ export default {
     policies: {
       privacyTitle: "Politique de confidentialité",
       termsTitle: "Conditions d'utilisation",
-      versionLine: "Version {{version}} — en vigueur le {{date}}",
+      versionLine: "Version {{version}} (en vigueur le {{date}})",
       unavailableBanner:
         "Ce document n'est pas encore disponible dans votre langue. Vous consultez la version anglaise ci-dessous.",
     },
     accessibility: {
       title: "Déclaration d'accessibilité",
-      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Dernière relecture : 2026-07-09",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA · Dernière relecture : 2026-07-09",
     },
     cookies: {
       title: "Politique de cookies",
-      subtitle: "Conforme CNIL — Dernière mise à jour : 2026-07-09",
+      subtitle: "Conforme CNIL · Dernière mise à jour : 2026-07-09",
       tableCaption: "Cookies de la catégorie {{category}} utilisés par cette application",
+      table: {
+        name: "Nom",
+        provider: "Fournisseur",
+        purpose: "Finalité",
+        retention: "Conservation",
+      },
     },
     dataRights: {
       title: "Vos droits sur vos données",
@@ -163,7 +175,7 @@ export default {
     },
     subProcessors: {
       title: "Registre des sous-traitants",
-      subtitle: "RGPD Art. 28 — Dernière mise à jour : 2026-07-09",
+      subtitle: "RGPD Art. 28 · Dernière mise à jour : 2026-07-09",
       table: {
         name: "Nom",
         purpose: "Finalité",
@@ -202,6 +214,9 @@ export default {
       readFull: "Lire « {{title}} » en intégralité",
       acceptButton: "Accepter et continuer",
       acceptingButton: "Acceptation…",
+      declineButton: "Refuser et se déconnecter",
+      loadFailed:
+        "Les politiques à accepter n'ont pas pu être chargées. Réessayez, ou déconnectez-vous et revenez plus tard.",
     },
     routes: {
       dataRights: "Droits sur les données (RGPD)",
@@ -213,7 +228,7 @@ export default {
     },
   },
   policyAcceptance: {
-    acceptedToast: "Documents acceptés — bienvenue !",
+    acceptedToast: "Documents acceptés, bienvenue !",
     acceptFailed: "Impossible d'enregistrer votre acceptation. Veuillez réessayer.",
   },
   legalFooter: {
@@ -226,7 +241,7 @@ export default {
   secretReveal: {
     title: "Secret de signature",
     description:
-      "Copiez-le maintenant — il ne s'affiche qu'une seule fois et ne pourra plus être récupéré.",
+      "Copiez-le maintenant : il ne s'affiche qu'une seule fois et ne pourra plus être récupéré.",
     secretLabel: "Secret",
     confirm: "Je l'ai enregistré",
   },
@@ -237,6 +252,7 @@ export default {
   notifications: {
     title: "Notifications",
     markAllRead: "Tout marquer comme lu",
+    nothingToMarkRead: "Aucune notification non lue.",
     empty: "Vous êtes à jour.",
     unreadNone: "Notifications, aucune non lue",
     unreadLabel_one: "Notifications, {{count}} non lue",
@@ -262,7 +278,7 @@ export default {
       "Invitez vos collègues, configurez la facturation et lancez-vous. Tout se trouve dans les Paramètres.",
     activityTitle: "Activité",
     activityDescription: "Événements récents dans votre espace de travail.",
-    activityEmpty: "Rien pour l'instant — votre activité apparaîtra ici.",
+    activityEmpty: "Rien pour l'instant. Votre activité apparaîtra ici.",
     usageTitle: "Utilisation",
     usageDescription: "Quota et limites pour la période en cours.",
     usageEmpty: "Branchez la mesure d'usage dès qu'une ressource facturable existe.",
@@ -270,8 +286,6 @@ export default {
   orgNew: {
     title: "Créer une organisation",
     subtitle: "Démarrez un nouvel espace de travail pour votre équipe.",
-    detailsTitle: "Détails de l'organisation",
-    detailsDescription: "Donnez un nom et un identifiant unique à votre organisation.",
     nameLabel: "Nom",
     namePlaceholder: "Acme",
     createdToast: "Organisation créée",
@@ -279,7 +293,9 @@ export default {
   },
   invitation: {
     signInTitle: "Connectez-vous pour accepter",
-    signInBody: "Connectez-vous pour accepter cette invitation.",
+    signInBody:
+      "Connectez-vous ou créez un compte avec l'adresse e-mail invitée pour accepter cette invitation.",
+    createAccount: "Créer un compte",
     joinTitle: "Rejoindre l'organisation",
     signedInAs:
       "Session en cours avec {{email}}. Si ce n'est pas le bon compte, déconnectez-vous et reconnectez-vous avec l'adresse e-mail invitée.",
@@ -298,6 +314,8 @@ export default {
       success: "Réussi",
       failed: "Échec",
       deadLetter: "Dead letter",
+      failedHint: "La dernière tentative a échoué, une autre est prévue.",
+      deadLetterHint: "Toutes les tentatives ont échoué, cette livraison ne sera plus réessayée.",
     },
   },
   pricing: {
@@ -311,8 +329,13 @@ export default {
       month: "mois",
       year: "an",
     },
+    loading: "Chargement des forfaits…",
+    loadFailed: "Impossible de charger les forfaits. Rechargez la page pour réessayer.",
+    empty: "Aucun forfait n'est disponible pour le moment.",
     currentPlanCta: "Forfait actuel",
     getStarted: "Commencer",
     upgrade: "Mettre à niveau",
+    upgradeNeedsOrgHint: "Sélectionnez une organisation pour mettre à niveau.",
+    upgradeUnavailableHint: "Cette offre n'est pas encore disponible à l'achat.",
   },
 } as const;

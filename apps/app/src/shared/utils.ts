@@ -1,3 +1,9 @@
+/**
+ * What a table cell or a label and value row shows when the value is absent,
+ * so every "no value" in the app reads the same.
+ */
+export const EMPTY_VALUE = "-";
+
 export interface DisplayUser {
   name?: string | null;
   email: string;
@@ -5,17 +11,6 @@ export interface DisplayUser {
 
 export function displayName(user: DisplayUser): string {
   return user.name?.trim() || user.email;
-}
-
-export function formatDate(value: Date | string, locale: string): string {
-  return new Intl.DateTimeFormat(locale).format(new Date(value));
-}
-
-export function formatDateTime(value: Date | string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 export function initialsOf(value: string): string {

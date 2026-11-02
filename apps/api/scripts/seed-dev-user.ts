@@ -2,6 +2,7 @@ import { authSchema, db, eq } from "@packages/drizzle";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { seedEmail } from "./seed-account";
+import { seedDevStaff } from "./seed-staff";
 
 // `.test` is reserved and can never carry an MX record, which the disposable-email
 // guard reads as throwaway; the password must avoid the email local part, the user
@@ -32,13 +33,15 @@ const [seeded] = await db
   .limit(1);
 
 // Verifying the email in SQL skips the /verify-email hook that records the initial
-// policy acceptance — without this, every sign-in lands on the /legal/accept gate.
+// policy acceptance, without this, every sign-in lands on the /legal/accept gate.
 if (seeded) {
   const stale = await di.PolicyAcceptanceService.getStaleTypes(seeded.id);
   if (stale.isSuccess && stale.getValue().length > 0) {
     await di.PolicyAcceptanceService.accept(seeded.id, stale.getValue());
   }
 }
+
+await seedDevStaff(password);
 
 console.log(JSON.stringify({ seeded, password }, null, 2));
 process.exit(0);

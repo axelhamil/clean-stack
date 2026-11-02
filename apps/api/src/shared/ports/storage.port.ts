@@ -55,6 +55,6 @@ export interface IStorageService {
   publicUrlFor(key: string): string;
 
   /** Inverse of `publicUrlFor`. `Option.none()` when the URL was not produced by
-   * this storage — a social-login avatar is a perfectly ordinary `user.image`. */
+   * this storage: a social-login avatar is a perfectly ordinary `user.image`. */
   keyFromPublicUrl(url: string): Option<string>;
 }

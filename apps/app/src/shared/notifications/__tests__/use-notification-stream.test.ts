@@ -1,15 +1,22 @@
+import {
+  consume,
+  handleStreamChunk,
+} from "@packages/web-kit/notifications/use-notification-stream";
 import type { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { consume, handleStreamChunk } from "../use-notification-stream";
+import { refreshOnNotification } from "../use-notification-stream";
 
 const fakeClient = () => {
   const invalidate = vi.fn();
-  return { invalidate, client: { invalidateQueries: invalidate } as unknown as QueryClient };
+  return {
+    invalidate,
+    client: refreshOnNotification({ invalidateQueries: invalidate } as unknown as QueryClient),
+  };
 };
 
 /**
  * A controllable `ReadableStream<Uint8Array>` stand-in: `push` resolves the pending
- * `read()` with a frame, `cancel` (spied) resolves it with `done: true` — the same
+ * `read()` with a frame, `cancel` (spied) resolves it with `done: true`, the same
  * settlement a real stream gives a reader it is told to cancel while a read is in
  * flight, which is what lets a stalled `consume()` return instead of hanging forever.
  */
@@ -47,7 +54,8 @@ describe("handleStreamChunk", () => {
       queryKey: ["notifications", "list"],
       refetchType: "none",
     });
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["billing", "subscription"] });
+    expect(invalidate).toHaveBeenCalledTimes(3);
   });
 
   test("un battement de coeur n'invalide rien", () => {
@@ -64,7 +72,7 @@ describe("handleStreamChunk", () => {
 
     handleStreamChunk("event: notification\ndata: 1\n\nevent: notification\ndata: 1\n\n", client);
 
-    expect(invalidate).toHaveBeenCalledTimes(4);
+    expect(invalidate).toHaveBeenCalledTimes(6);
   });
 
   test("un evenement coupe en deux fragments n'invalide qu'apres son terminateur", () => {
@@ -74,7 +82,7 @@ describe("handleStreamChunk", () => {
     expect(invalidate).not.toHaveBeenCalled();
 
     handleStreamChunk(`${rest}ication\ndata: 1\n\n`, client);
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledTimes(3);
   });
 
   test("le fragment residuel est rendu a l'appelant", () => {
@@ -91,11 +99,11 @@ describe("handleStreamChunk", () => {
 
     handleStreamChunk("event: notification\r\ndata: 1\r\n\r\n", client);
 
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledTimes(3);
   });
 });
 
-describe("consume — garde-temps de silence", () => {
+describe("consume: garde-temps de silence", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -119,7 +127,7 @@ describe("consume — garde-temps de silence", () => {
     await done;
   });
 
-  test("une trame recue — y compris un ping — repousse le delai de silence", async () => {
+  test("une trame recue (y compris un ping) repousse le delai de silence", async () => {
     const { client } = fakeClient();
     const { body, cancel, push } = makeFakeStream();
 

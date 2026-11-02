@@ -28,7 +28,7 @@ describe("deriveOrgSubKey", () => {
     expect(sub.length).toBe(32);
   });
 
-  it("is deterministic — same org returns same key", () => {
+  it("is deterministic: same org returns same key", () => {
     const a = deriveOrgSubKey(masterKey, "org-1");
     const b = deriveOrgSubKey(masterKey, "org-1");
     expect(Buffer.from(a).toString("hex")).toBe(Buffer.from(b).toString("hex"));

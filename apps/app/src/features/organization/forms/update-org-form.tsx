@@ -9,11 +9,11 @@ import {
   FormMessage,
 } from "@packages/ui/components/ui/form";
 import { Input } from "@packages/ui/components/ui/input";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { updateOrgMutationOptions } from "../../../shared/api/mutations/update-org";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
 import { orgsListQueryOptions } from "../../../shared/api/queries/orgs-list";
@@ -65,7 +65,7 @@ export function UpdateOrgForm({ organizationId, defaultValues }: UpdateOrgFormPr
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={update.isPending}>
+        <Button type="submit" variant="outline" className="self-start" disabled={update.isPending}>
           {t("organization.saveChanges")}
         </Button>
       </form>

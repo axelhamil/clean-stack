@@ -7,38 +7,16 @@
     }
 }
 
+import /etc/caddy/static-site.caddy
+
 # CSP reports post to {VITE_API_URL}/csp-report — VITE_API_URL is already required at build and exposed
 # at runtime by Railway, so no extra var. It must be the API's public HTTPS URL in prod (browser-evaluated).
 :{$PORT:80} {
-    root * /srv
-    encode zstd gzip
+    import spa_site
+    import security_headers
 
     header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        Referrer-Policy strict-origin-when-cross-origin
-        Permissions-Policy "camera=(), microphone=(), geolocation=()"
         Content-Security-Policy "default-src 'self'; script-src 'nonce-{http.request.uuid}' 'strict-dynamic' https: 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri {$VITE_API_URL:http://localhost:3000}/csp-report; report-to csp-endpoint"
         Reporting-Endpoints `csp-endpoint="{$VITE_API_URL:http://localhost:3000}/csp-report"`
-        -Server
-    }
-
-    @assets path /assets/*
-    header @assets Cache-Control "public, max-age=31536000, immutable"
-
-    @nonAssets not path /assets/*
-    header @nonAssets Cache-Control "no-cache, no-store, must-revalidate"
-
-    handle /health {
-        respond "OK" 200
-    }
-
-    handle {
-        templates {
-            mime text/html
-        }
-        try_files {path} /index.html
-        file_server
     }
 }

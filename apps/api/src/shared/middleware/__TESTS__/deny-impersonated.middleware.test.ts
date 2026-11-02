@@ -1,16 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import type { IInstrumentation } from "../../ports/instrumentation.port";
+import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { denyImpersonated } from "../deny-impersonated.middleware";
 import { createErrorHandler } from "../error.middleware";
 
-const noopInstrumentation: IInstrumentation = {
-  capture: () => {},
-  startSpan: (_opts, cb) => cb() as ReturnType<typeof cb>,
-  addBreadcrumb: () => {},
-  setSpanAttributes: () => {},
-};
+const noopInstrumentation = new NoOpInstrumentation();
 
 function ctx(session: unknown) {
   const store = new Map<string, unknown>([["session", session]]);

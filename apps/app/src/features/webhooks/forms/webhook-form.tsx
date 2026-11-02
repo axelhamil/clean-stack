@@ -12,6 +12,7 @@ import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { Switch } from "@packages/ui/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { type WebhookFormInput, webhookFormSchema } from "../webhooks.schema";
 import { EventTypePicker } from "./event-type-picker";
@@ -39,7 +40,7 @@ export function WebhookForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
         <FormTextField
           control={form.control}
           name="url"
@@ -71,13 +72,16 @@ export function WebhookForm({
             </FormItem>
           )}
         />
-        <Button
-          type="submit"
-          disabled={isPending || guard.blocked}
-          {...guard.describeProps(isPending)}
-        >
-          {submitLabel}
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={isPending} className="self-end">
+          <Button
+            type="submit"
+            className="self-end"
+            disabled={isPending || guard.blocked}
+            {...guard.describeProps(isPending)}
+          >
+            {submitLabel}
+          </Button>
+        </GuardHint>
       </form>
     </Form>
   );

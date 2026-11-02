@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Hono } from "hono";
-import { NoOpInstrumentation } from "../../middleware/../services/noop-instrumentation";
 import { createErrorHandler } from "../../middleware/error.middleware";
+import { NoOpInstrumentation } from "../../services/noop-instrumentation";
+import { SIGNATURE_HEADER } from "../internal-signature";
 import { sweepAuditLogRoutes } from "../sweep-audit-log.route";
 import { sweepOutboxRoutes } from "../sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "../sweep-webhook-delivery.route";
@@ -31,7 +32,7 @@ const cases: Array<{ name: string; path: string; routes: Hono }> = [
   },
 ];
 
-describe.each(cases)("POST /internal/$name — HMAC gating", ({ path, routes }) => {
+describe.each(cases)("POST /internal/$name, HMAC gating", ({ path, routes }) => {
   it("rejects with 401 when signature header is missing", async () => {
     const res = await makeApp(routes).request(path, {
       method: "POST",
@@ -47,7 +48,9 @@ describe.each(cases)("POST /internal/$name — HMAC gating", ({ path, routes }) 
       headers: {
         "Content-Type": "application/json",
         host: "localhost",
-        "x-internal-sig": "garbage",
+        // The real header name: a misspelled one exercised the missing-header path
+        // twice and never reached the malformed-value branch.
+        [SIGNATURE_HEADER]: "garbage",
       },
       body: JSON.stringify({ dryRun: true }),
     });

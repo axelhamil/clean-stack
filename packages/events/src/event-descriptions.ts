@@ -44,10 +44,13 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.WEBHOOK_ENDPOINT_DISABLED]:
     "A webhook endpoint was auto-disabled after repeated delivery failures.",
   [EventTypes.WEBHOOK_DELIVERY_EXHAUSTED]:
-    "A webhook delivery was abandoned after exhausting all retries.",
+    "A webhook delivery exhausted its retries and is now dead, replayed every few hours unless its endpoint is gone or refused.",
+  [EventTypes.WEBHOOK_DELIVERY_REPLAYED]: "A webhook delivery was queued again on request.",
   [EventTypes.USER_POLICY_ACCEPTED]: "A user accepted a legal policy version.",
   [EventTypes.USER_COOKIE_CONSENT_GRANTED]: "Cookie consent was granted.",
   [EventTypes.USER_COOKIE_CONSENT_WITHDRAWN]: "Cookie consent was withdrawn.",
+  [EventTypes.USER_COOKIE_CONSENT_LINKED]:
+    "Cookie consent given before sign-in was attached to the account.",
   [EventTypes.SECURITY_RATE_LIMIT_EXCEEDED]: "A rate limit was exceeded.",
   [EventTypes.SECURITY_CSP_VIOLATION]: "A Content-Security-Policy violation was reported.",
   [EventTypes.SECURITY_CSRF_REJECTED]: "A request was rejected by CSRF origin checks.",
@@ -55,20 +58,49 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
     "A password was rejected for appearing in a known breach.",
   [EventTypes.SECURITY_SIGNUP_REJECTED]: "A sign-up was rejected (e.g. disposable email).",
   [EventTypes.SECURITY_OPERATOR_AUDIT_ACCESSED]: "A platform operator accessed the audit log.",
+  [EventTypes.SECURITY_IMPOSSIBLE_TRAVEL_DETECTED]:
+    "A sign-in came from another country than a recent session of the same user.",
+  [EventTypes.SECURITY_GEO_DENIED]:
+    "A sign-in or sign-up was refused by the country or network deny-list.",
   [EventTypes.BILLING_SUBSCRIPTION_CREATED]: "A subscription was created.",
   [EventTypes.BILLING_SUBSCRIPTION_UPDATED]: "A subscription was updated.",
   [EventTypes.BILLING_SUBSCRIPTION_CANCELLED]: "A subscription was cancelled.",
   [EventTypes.BILLING_PAYMENT_FAILED]: "A subscription payment failed.",
   [EventTypes.BILLING_QUOTA_EXCEEDED]: "A plan quota was exceeded.",
   [EventTypes.EMAIL_DELIVERY_EXHAUSTED]:
-    "An email was abandoned after exhausting all delivery attempts.",
+    "An email exhausted its delivery attempts or was rejected; a dead email is replayed every few hours while still recent.",
+  [EventTypes.OUTBOX_EVENT_DEAD]:
+    "A domain event exhausted its delivery attempts and is now retried every few hours.",
+  [EventTypes.ADMIN_STAFF_ADDED]: "A user joined the platform staff with a staff role.",
+  [EventTypes.ADMIN_STAFF_ROLE_CHANGED]: "A staff manager changed a staff member's role.",
+  [EventTypes.ADMIN_STAFF_REVOKED]: "A staff manager removed a staff member's access.",
+  [EventTypes.ADMIN_STAFF_OVERRIDE_SET]:
+    "A staff manager granted or denied one permission to a staff member.",
+  [EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED]:
+    "A staff manager removed a per-person permission grant or denial.",
+  [EventTypes.ADMIN_STEP_UP_VERIFIED]: "A staff member confirmed a sensitive action with a code.",
+  [EventTypes.ADMIN_STEP_UP_FAILED]: "A staff member's confirmation code was refused.",
+  [EventTypes.ADMIN_APPROVAL_REQUESTED]: "A staff member asked a colleague to approve an action.",
+  [EventTypes.ADMIN_APPROVAL_DECIDED]: "A staff member approved or rejected a requested action.",
+  [EventTypes.ADMIN_OPS_OUTBOX_REQUEUED]:
+    "A staff member sent dead outbox events back to delivery.",
+  [EventTypes.ADMIN_OPS_STRIPE_EVENT_REPLAYED]: "A staff member replayed a received Stripe event.",
+  [EventTypes.ADMIN_PLAN_OVERRIDE_SET]:
+    "A staff member set a plan on an organization until an end date.",
+  [EventTypes.ADMIN_PLAN_OVERRIDE_REVOKED]: "A staff member ended a plan override.",
+  [EventTypes.ADMIN_NOTE_ADDED]: "A staff member added a note on an account or an organization.",
+  [EventTypes.ADMIN_VIEW_SAVED]: "A staff member saved a private view of a list.",
+  [EventTypes.ADMIN_VIEW_DELETED]: "A staff member deleted a private view of a list.",
+  [EventTypes.ADMIN_APPROVAL_CANCELLED]: "A staff member withdrew their approval request.",
+  [EventTypes.ADMIN_APPROVAL_EXPIRED]: "An approval request expired before anyone decided.",
+  [EventTypes.ADMIN_APPROVAL_EXECUTED]: "An approved action was carried out.",
+  [EventTypes.ADMIN_APPROVAL_FAILED]: "An approved action was refused when it was carried out.",
   [EventTypes.ADMIN_IMPERSONATION_STARTED]:
     "A platform administrator started an impersonation session.",
   [EventTypes.ADMIN_IMPERSONATION_STOPPED]:
-    "A platform administrator ended an impersonation session.",
+    "An impersonation session ended: stopped by its administrator, expired, or revoked.",
   [EventTypes.ADMIN_USER_BANNED]: "A platform administrator banned a user account.",
   [EventTypes.ADMIN_USER_UNBANNED]: "A platform administrator lifted the ban on a user account.",
-  [EventTypes.ADMIN_USER_ROLE_CHANGED]: "A platform administrator changed a user's platform role.",
   [EventTypes.ADMIN_USER_PASSWORD_RESET]:
     "A platform administrator triggered a password reset for a user.",
   [EventTypes.ADMIN_USER_SESSIONS_REVOKED]:
@@ -92,6 +124,8 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.SCIM_CONNECTION_CREATED]:
     "A SCIM provisioning connection was created and its token issued.",
   [EventTypes.SCIM_CONNECTION_DELETED]: "A SCIM provisioning connection was deleted.",
+  [EventTypes.SCIM_CONNECTION_TOKEN_ROTATED]:
+    "A SCIM provisioning connection's token was replaced and the previous one revoked.",
   [EventTypes.SCIM_USER_CREATED]: "A user was provisioned into an organization through SCIM.",
   [EventTypes.SCIM_USER_UPDATED]: "A user's attributes were updated through SCIM.",
   [EventTypes.SCIM_USER_DEACTIVATED]: "A user was deactivated through SCIM.",

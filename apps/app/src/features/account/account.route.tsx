@@ -17,19 +17,20 @@ export const Route = createFileRoute("/_protected/_shell/settings/account")({
 function AccountPage() {
   const { t } = useTranslation("settings");
   const { user } = Route.useRouteContext();
+  const twoFactorEnabled = user.twoFactorEnabled === true;
 
   return (
-    <main className="flex flex-col gap-6">
+    <main className="flex flex-col gap-8">
       <TypographyH1 className="sr-only">{t("account.title")}</TypographyH1>
       <ProfileCard name={user.name ?? ""} email={user.email} pendingEmail={user.pendingEmail} />
       <LanguageCard />
       <ChangePasswordCard />
       <PasskeysCard />
-      <TwoFactorCard enabled={user.twoFactorEnabled === true} />
-      {user.twoFactorEnabled === true && <RecoveryCodesCard />}
+      <TwoFactorCard enabled={twoFactorEnabled} />
+      {twoFactorEnabled && <RecoveryCodesCard />}
       <RgpdDeletionCard
         pendingDeletionUntil={user.pendingDeletionUntil}
-        twoFactorEnabled={user.twoFactorEnabled === true}
+        twoFactorEnabled={twoFactorEnabled}
       />
       <DataRightsNotice />
     </main>

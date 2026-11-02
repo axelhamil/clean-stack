@@ -1,16 +1,11 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import { updatePreferenceMutationOptions } from "../../shared/api/mutations/notifications";
 import { notificationPreferencesQueryOptions } from "../../shared/api/queries/notifications";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
@@ -29,36 +24,37 @@ function NotificationsPage() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
-  const { data, isPending } = useQuery(notificationPreferencesQueryOptions);
+  const { data, isPending, isLoadingError } = useQuery(notificationPreferencesQueryOptions);
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
     ...updatePreferenceMutationOptions,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: notificationPreferencesQueryOptions.queryKey }),
-    onError: () => toast.error(t("notifications.saveFailedToast")),
+    onError: (err) => toastError(err, t("notifications.saveFailedToast")),
   });
 
   const handleChange = ({ category, channel, enabled, frequency }: PreferenceChange) =>
     update.mutate({ category, channel, enabled, frequency });
 
   return (
-    <main className="flex flex-col gap-6">
+    <main className="flex flex-col gap-8">
       <TypographyH1 className="sr-only">{t("notifications.title")}</TypographyH1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("notifications.preferencesTitle")}</CardTitle>
-          <CardDescription>{t("notifications.preferencesDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <SettingsSection
+        title={t("notifications.preferencesTitle")}
+        description={t("notifications.preferencesDescription")}
+      >
+        {isLoadingError ? (
+          <LoadErrorAlert message={t("notifications.loadFailed")} />
+        ) : (
           <PreferenceMatrix
             rows={rows}
             onChange={handleChange}
             disabled={isPending}
             guard={guard}
           />
-        </CardContent>
-      </Card>
+        )}
+      </SettingsSection>
       <ImpersonationReason guard={guard} />
     </main>
   );

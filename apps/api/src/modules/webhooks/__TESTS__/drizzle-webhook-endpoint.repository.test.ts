@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { UnitOfWorkContext } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 
 // ---------------------------------------------------------------------------
 // DB mock state (mutable per test via beforeEach)
@@ -52,108 +54,18 @@ const fakeRow = {
 };
 
 // Only what this file's subject actually touches: test files do not share a module
-// registry, so this replacement is invisible to every other file (see shared/CLAUDE.md).
+// registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
+const fakeDb = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+};
+
 mock.module("@packages/drizzle", () => ({
-  db: {
-    select: () => makeDbQuery(),
-    insert: () => makeDbQuery(),
-    update: () => makeDbQuery(),
-    delete: () => makeDbQuery(),
-  },
-  eq: () => ({}),
-  and: (..._args: unknown[]) => ({}),
-  or: (..._args: unknown[]) => ({}),
-  inArray: () => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  not: () => ({}),
-  like: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  sql: Object.assign((_strings: TemplateStringsArray, ..._values: unknown[]) => ({}), {
-    raw: () => ({}),
-    identifier: () => ({}),
-  }),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  webhooksSchema: {
-    webhookEndpoint: {
-      id: {},
-      organizationId: {},
-      url: {},
-      secretCipher: {},
-      eventTypes: {},
-      enabled: {},
-      createdAt: {},
-      updatedAt: {},
-      previousSecretCipher: {},
-      previousSecretExpiresAt: {},
-      consecutiveFailures: {},
-      firstFailedAt: {},
-      disabledAt: {},
-      $inferSelect: {},
-      $inferInsert: {},
-    },
-    webhookDelivery: {
-      id: {},
-      endpointId: {},
-      outboxEventId: {},
-      eventType: {},
-      payload: {},
-      status: {},
-      attempts: {},
-      nextAttemptAt: {},
-      lastError: {},
-      lastResponseStatus: {},
-      idempotencyKey: {},
-      createdAt: {},
-    },
-  },
-  authSchema: {},
-  multiTenantSchema: { organization: { id: {} } },
-  schema: {},
-  TransactionService: class {},
-  trackEventsOnSuccess: () => {},
-  uuidv7: () => "generated-uuid",
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
+  ...realDrizzle,
+  db: fakeDb,
+  resolveExecutor: () => UnitOfWorkContext.transaction() ?? fakeDb,
 }));
 
 const { DrizzleWebhookEndpointRepository } = await import(
@@ -163,7 +75,7 @@ const { NoOpInstrumentation } = await import("../../../shared/services/noop-inst
 
 type InstrType = InstanceType<typeof NoOpInstrumentation>;
 
-// Fake transaction — exposes the same query methods as db so tx ?? db resolves uniformly.
+// Fake transaction: exposes the same query methods as db so tx ?? db resolves uniformly.
 const tx = {
   select: () => makeDbQuery(),
   insert: () => makeDbQuery(),
@@ -184,7 +96,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
 
   // -------------------------------------------------------------------------
   // Helper: inject DB error via startSpan spy
-  // Follows the drizzle-audit.service.test.ts pattern — throw on the 2nd span call
+  // Follows the drizzle-audit.service.test.ts pattern: throw on the 2nd span call
   // (inner db.query span) to trigger the repo's catch block.
   // -------------------------------------------------------------------------
   function injectDbError(instr: InstrType, boom: Error) {
@@ -477,15 +389,14 @@ describe("DrizzleWebhookEndpointRepository", () => {
         },
       ];
 
-      const r = await repo.applySecretRotation(
-        {
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.applySecretRotation({
           id: "ep-1",
           organizationId: "org-1",
           secretCipher: "new-cipher",
           previousSecretCipher: "old-cipher",
           previousSecretExpiresAt: new Date("2030-01-01"),
-        },
-        tx,
+        }),
       );
 
       expect(r.isSuccess).toBe(true);
@@ -497,15 +408,14 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Option.none when no row matched", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.applySecretRotation(
-        {
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.applySecretRotation({
           id: "ep-99",
           organizationId: "org-1",
           secretCipher: "x",
           previousSecretCipher: "y",
           previousSecretExpiresAt: new Date(),
-        },
-        tx,
+        }),
       );
 
       expect(r.isSuccess).toBe(true);
@@ -517,15 +427,14 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.applySecretRotation(
-        {
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.applySecretRotation({
           id: "ep-1",
           organizationId: "org-1",
           secretCipher: "x",
           previousSecretCipher: "y",
           previousSecretExpiresAt: new Date(),
-        },
-        tx,
+        }),
       );
 
       expect(r.isFailure).toBe(true);
@@ -543,7 +452,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const failedAt = new Date("2024-06-01");
       dbBehavior = async () => [{ consecutiveFailures: 3, firstFailedAt: failedAt }];
 
-      const r = await repo.bumpFailure("ep-1", "org-1", tx);
+      const r = await UnitOfWorkContext.run(tx, () => repo.bumpFailure("ep-1", "org-1"));
 
       expect(r.isSuccess).toBe(true);
       expect(r.getValue().isSome()).toBe(true);
@@ -554,7 +463,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Option.none when no row matched", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.bumpFailure("ep-99", "org-1", tx);
+      const r = await UnitOfWorkContext.run(tx, () => repo.bumpFailure("ep-99", "org-1"));
 
       expect(r.isSuccess).toBe(true);
       expect(r.getValue().isNone()).toBe(true);
@@ -565,7 +474,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.bumpFailure("ep-1", "org-1", tx);
+      const r = await UnitOfWorkContext.run(tx, () => repo.bumpFailure("ep-1", "org-1"));
 
       expect(r.isFailure).toBe(true);
       expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -581,7 +490,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Result.ok(undefined)", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.resetFailure("ep-1", "org-1", tx);
+      const r = await UnitOfWorkContext.run(tx, () => repo.resetFailure("ep-1", "org-1"));
 
       expect(r.isSuccess).toBe(true);
     });
@@ -591,7 +500,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.resetFailure("ep-1", "org-1", tx);
+      const r = await UnitOfWorkContext.run(tx, () => repo.resetFailure("ep-1", "org-1"));
 
       expect(r.isFailure).toBe(true);
       expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -607,7 +516,9 @@ describe("DrizzleWebhookEndpointRepository", () => {
     it("happy path: returns Result.ok(undefined)", async () => {
       dbBehavior = async () => [];
 
-      const r = await repo.markDisabled("ep-1", "org-1", new Date(), tx);
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.markDisabled("ep-1", "org-1", new Date()),
+      );
 
       expect(r.isSuccess).toBe(true);
     });
@@ -617,7 +528,9 @@ describe("DrizzleWebhookEndpointRepository", () => {
       const captureSpy = spyOn(instrumentation, "capture");
       injectDbError(instrumentation, boom);
 
-      const r = await repo.markDisabled("ep-1", "org-1", new Date(), tx);
+      const r = await UnitOfWorkContext.run(tx, () =>
+        repo.markDisabled("ep-1", "org-1", new Date()),
+      );
 
       expect(r.isFailure).toBe(true);
       expect(r.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
@@ -626,7 +539,7 @@ describe("DrizzleWebhookEndpointRepository", () => {
   });
 
   // -------------------------------------------------------------------------
-  // update — enabled:true clears failure state
+  // update: enabled:true clears failure state
   // -------------------------------------------------------------------------
 
   describe("update (re-enable clears failure state)", () => {

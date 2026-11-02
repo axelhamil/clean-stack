@@ -4,6 +4,7 @@ import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { type UpdateProfileInput, updateProfileSchema } from "../account.schema";
 import { UploadAvatar } from "../components/upload-avatar";
@@ -36,14 +37,16 @@ export function UpdateProfileForm({ name, guard }: UpdateProfileFormProps) {
           label={t("account.nameLabel")}
           autoComplete="name"
         />
-        <Button
-          type="submit"
-          className="w-fit"
-          disabled={mutation.isPending || guard.blocked}
-          {...guard.describeProps(mutation.isPending)}
-        >
-          {mutation.isPending ? t("account.saving") : t("account.saveChanges")}
-        </Button>
+        <GuardHint guard={guard} otherwiseDisabled={mutation.isPending}>
+          <Button
+            type="submit"
+            className="w-fit"
+            disabled={mutation.isPending || guard.blocked}
+            {...guard.describeProps(mutation.isPending)}
+          >
+            {mutation.isPending ? t("account.saving") : t("account.saveChanges")}
+          </Button>
+        </GuardHint>
       </form>
     </Form>
   );

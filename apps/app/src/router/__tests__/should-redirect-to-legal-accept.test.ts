@@ -23,12 +23,13 @@ describe("shouldRedirectToLegalAccept", () => {
     expect(shouldRedirectToLegalAccept(null, current)).toBe(false);
   });
 
-  it("returns false when policies is null (service unavailable)", () => {
-    expect(shouldRedirectToLegalAccept(null, null)).toBe(false);
+  it("returns true when policies could not be loaded, so nobody is admitted unchecked", () => {
+    expect(shouldRedirectToLegalAccept(null, null)).toBe(true);
+    expect(shouldRedirectToLegalAccept(notImpersonating, undefined)).toBe(true);
   });
 
-  it("returns false when policies is undefined", () => {
-    expect(shouldRedirectToLegalAccept(null, undefined)).toBe(false);
+  it("returns false when impersonating and policies could not be loaded", () => {
+    expect(shouldRedirectToLegalAccept(impersonating, null)).toBe(false);
   });
 
   it("returns false when impersonating and policies are current", () => {

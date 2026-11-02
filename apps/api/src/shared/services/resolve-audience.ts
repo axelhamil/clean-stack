@@ -1,41 +1,43 @@
-import { type OrgRole, rolesWith } from "@packages/access-control";
+import { type OrgRole, rolesWith, type StaffPermission } from "@packages/access-control";
+import { Option } from "@packages/ddd-kit";
+
 import type { Audience } from "@packages/events";
-import type { OutboxRecord } from "../ports/outbox.port";
+import type { DeliveredEvent } from "../ports/outbox.port";
+import { readActorId, readUserId } from "./event-actor";
 
 export type AudienceTarget =
   | { kind: "user"; userId: string }
-  | { kind: "org"; organizationId: string; roles: OrgRole[] | "all" };
+  | { kind: "org"; organizationId: string; roles: OrgRole[] | "all" }
+  | {
+      kind: "staff";
+      permission: StaffPermission;
+      requesterUserId: Option<string>;
+      actorUserId: Option<string>;
+      subjectUserId: Option<string>;
+    };
 
-function readUserId(payload: unknown, keys: readonly string[]): string | null {
-  if (typeof payload !== "object" || payload === null) return null;
-  const record = payload as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.length > 0) return value;
-  }
-  return null;
-}
+const SELF_KEYS = ["userId", "ownerUserId"] as const;
 
-export function resolveAudience(audience: Audience, event: OutboxRecord): AudienceTarget | null {
-  if (audience === "self") {
-    const userId = readUserId(event.payload, ["userId", "ownerUserId"]);
-    return userId ? { kind: "user", userId } : null;
-  }
+const toUser = (userId: string): AudienceTarget => ({ kind: "user", userId });
 
-  if (audience === "actor") {
-    const userId = readUserId(event.payload, [
-      "actorUserId",
-      "inviterUserId",
-      "ownerUserId",
-      "userId",
-    ]);
-    return userId ? { kind: "user", userId } : null;
+export function resolveAudience(audience: Audience, event: DeliveredEvent): Option<AudienceTarget> {
+  if (audience === "self") return readUserId(event.payload, SELF_KEYS).map(toUser);
+  if (audience === "actor") return readActorId(event.payload).map(toUser);
+  if (typeof audience === "object" && "staff" in audience) {
+    return Option.some({
+      kind: "staff",
+      permission: audience.staff,
+      requesterUserId: readUserId(event.payload, ["requesterUserId"]),
+      actorUserId: readActorId(event.payload),
+      subjectUserId: readUserId(event.payload, ["userId"]),
+    });
   }
 
-  if (event.organizationId.isNone()) return null;
-  const organizationId = event.organizationId.unwrap();
-
-  if (audience === "org:all") return { kind: "org", organizationId, roles: "all" };
-
-  return { kind: "org", organizationId, roles: rolesWith(audience.can) };
+  return Option.fromNullable(event.organizationId).map(
+    (organizationId): AudienceTarget => ({
+      kind: "org",
+      organizationId,
+      roles: audience === "org:all" ? "all" : rolesWith(audience.can),
+    }),
+  );
 }

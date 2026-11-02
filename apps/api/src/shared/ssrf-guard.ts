@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { Result } from "@packages/ddd-kit";
 import { env } from "./env";
+import { WEBHOOK_DNS_TIMEOUT_SECONDS } from "./env-bounds";
 import { PRIVATE_V4, PRIVATE_V6 } from "./private-ranges";
 
 let cachedList: BlockList | undefined;
@@ -37,7 +38,10 @@ export function isPrivateOrReservedAddress(ip: string): boolean {
   return true;
 }
 
-export type SsrfError = { code: "WEBHOOK_URL_FORBIDDEN"; message: string };
+export type SsrfError = {
+  code: "WEBHOOK_URL_FORBIDDEN" | "WEBHOOK_HOST_LOOKUP_TIMEOUT";
+  message: string;
+};
 export type AddressResolver = (hostname: string) => Promise<Array<{ address: string }>>;
 
 const defaultResolver: AddressResolver = (hostname) => lookup(hostname, { all: true });
@@ -46,10 +50,30 @@ function forbidden(message: string): Result<URL, SsrfError> {
   return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message });
 }
 
+const LOOKUP_TIMED_OUT = Symbol("lookup timed out");
+
+async function resolveWithin(
+  resolve: AddressResolver,
+  hostname: string,
+  timeoutMs: number,
+): Promise<Array<{ address: string }> | typeof LOOKUP_TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<typeof LOOKUP_TIMED_OUT>((settle) => {
+    timer = setTimeout(() => settle(LOOKUP_TIMED_OUT), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([resolve(hostname), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function assertPublicUrl(
   rawUrl: string,
   resolve: AddressResolver = defaultResolver,
   httpsOnly: boolean = env.NODE_ENV === "production",
+  lookupTimeoutMs: number = WEBHOOK_DNS_TIMEOUT_SECONDS * 1000,
 ): Promise<Result<URL, SsrfError>> {
   let url: URL;
   try {
@@ -62,11 +86,17 @@ export async function assertPublicUrl(
   if (!schemeOk) return forbidden("scheme not allowed");
   if (url.username || url.password) return forbidden("credentials in url not allowed");
 
-  let addrs: Array<{ address: string }>;
+  let addrs: Array<{ address: string }> | typeof LOOKUP_TIMED_OUT;
   try {
-    addrs = await resolve(url.hostname);
+    addrs = await resolveWithin(resolve, url.hostname, lookupTimeoutMs);
   } catch {
     return forbidden("host not resolvable");
+  }
+  if (addrs === LOOKUP_TIMED_OUT) {
+    return Result.fail({
+      code: "WEBHOOK_HOST_LOOKUP_TIMEOUT",
+      message: `host lookup timed out after ${lookupTimeoutMs}ms`,
+    });
   }
   if (addrs.length === 0 || addrs.some((a) => isPrivateOrReservedAddress(a.address)))
     return forbidden("destination not publicly routable");

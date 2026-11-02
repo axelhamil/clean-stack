@@ -1,57 +1,56 @@
 import { Badge } from "@packages/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { ListRow, ListRowAction } from "@packages/ui/components/ui/list-row";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyMuted, TypographySmall } from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { policiesQueryOptions } from "../../../shared/api/queries/policies";
+import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { policyLabelFor } from "../../../shared/legal/policy-labels";
 
 export function PolicyAcceptanceCard() {
-  const { data, isLoading } = useQuery(policiesQueryOptions);
+  const { data, isLoading, isFetching, refetch } = useQuery(policiesQueryOptions);
   const { t } = useTranslation("settings");
   const { t: tCommon } = useTranslation("common");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("privacy.policyAcceptance.title")}</CardTitle>
-        <CardDescription>{t("privacy.policyAcceptance.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <TypographyMuted>{t("privacy.policyAcceptance.loading")}</TypographyMuted>
-        ) : data ? (
-          <ul className="flex flex-col divide-y">
-            {Object.entries(data).map(([type, status]) => (
-              <li key={type} className="flex items-center justify-between gap-4 py-3">
-                <span className="text-sm font-medium">{policyLabelFor(type, tCommon)}</span>
-                <div className="flex items-center gap-3">
-                  <TypographyMuted className="text-xs">
-                    {status.acceptedVersion
-                      ? `v${status.acceptedVersion}`
-                      : t("privacy.policyAcceptance.neverAccepted")}
-                  </TypographyMuted>
-                  {status.current ? (
-                    <Badge variant="secondary">{t("privacy.policyAcceptance.upToDate")}</Badge>
-                  ) : (
-                    <Badge variant="destructive">
-                      {t("privacy.policyAcceptance.updateRequired")}
-                    </Badge>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <TypographyMuted>{t("privacy.policyAcceptance.loadError")}</TypographyMuted>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title={t("privacy.policyAcceptance.title")}
+      description={t("privacy.policyAcceptance.description")}
+    >
+      {isLoading ? (
+        <TypographyMuted>{t("privacy.policyAcceptance.loading")}</TypographyMuted>
+      ) : data ? (
+        <ul className="flex flex-col gap-2">
+          {Object.entries(data).map(([type, status]) => (
+            <ListRow variant="plain" key={type} className="flex-wrap">
+              <TypographySmall>{policyLabelFor(type, tCommon)}</TypographySmall>
+              <ListRowAction className="flex-wrap">
+                <TypographyMuted>
+                  {status.acceptedVersion
+                    ? t("privacy.policyAcceptance.acceptedVersion", {
+                        version: status.acceptedVersion,
+                      })
+                    : t("privacy.policyAcceptance.neverAccepted")}
+                </TypographyMuted>
+                {status.current ? (
+                  <Badge variant="secondary">{t("privacy.policyAcceptance.upToDate")}</Badge>
+                ) : (
+                  <Badge variant="destructive">
+                    {t("privacy.policyAcceptance.updateRequired")}
+                  </Badge>
+                )}
+              </ListRowAction>
+            </ListRow>
+          ))}
+        </ul>
+      ) : (
+        <QueryLoadError
+          message={t("privacy.policyAcceptance.loadError")}
+          isFetching={isFetching}
+          onRetry={() => void refetch()}
+        />
+      )}
+    </SettingsSection>
   );
 }

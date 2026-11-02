@@ -1,28 +1,6 @@
-import type { ErrorEvent } from "@sentry/bun";
+import { IP_HEADERS, scrubBreadcrumb, scrubEvent, scrubLog } from "@packages/sentry-scrub";
 import * as Sentry from "@sentry/bun";
 import { env } from "../env";
-
-export function scrubEvent(event: ErrorEvent): ErrorEvent {
-  if (event.request) {
-    event.request.cookies = undefined;
-    event.request.data = undefined;
-    event.request.query_string = undefined;
-    if (event.request.headers) {
-      const h = event.request.headers as Record<string, string | undefined>;
-      h.cookie = undefined;
-      h.Cookie = undefined;
-      h.authorization = undefined;
-      h.Authorization = undefined;
-      h["x-csrf-token"] = undefined;
-    }
-  }
-  if (event.user) {
-    event.user.email = undefined;
-    event.user.username = undefined;
-    event.user.ip_address = undefined;
-  }
-  return event;
-}
 
 if (env.SENTRY_DSN) {
   Sentry.init({
@@ -31,7 +9,22 @@ if (env.SENTRY_DSN) {
     release: env.GIT_SHA,
     tracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
     integrations: [Sentry.pinoIntegration()],
-    sendDefaultPii: false,
+    // v11 collects user info, cookies, headers, bodies and query data by default.
+    // Opt out of every category that can carry PII; beforeSend stays as a second net.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: { deny: IP_HEADERS }, response: { deny: IP_HEADERS } },
+      httpBodies: [],
+      urlQueryParams: false,
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+      genAI: { inputs: false, outputs: false },
+      graphQL: { document: false, variables: false },
+    },
     beforeSend: scrubEvent,
+    beforeBreadcrumb: scrubBreadcrumb,
+    beforeSendLog: scrubLog,
   });
 }

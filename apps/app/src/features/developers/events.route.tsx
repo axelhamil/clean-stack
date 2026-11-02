@@ -1,5 +1,6 @@
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -13,12 +14,16 @@ function DevelopersEventsPage() {
   const { t } = useTranslation("common");
 
   return (
-    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-6 py-6")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1 variant="page">{t("developers.eventsTitle")}</TypographyH1>
-        <TypographyMuted>{t("developers.eventsIntro")}</TypographyMuted>
-        <TypographyMuted>{t("developers.eventsEnglishNote")}</TypographyMuted>
-      </header>
+    <main className={cn(pageContainerVariants({ width: "prose" }), "flex flex-col gap-8 py-8")}>
+      <PageHeader
+        title={t("developers.eventsTitle")}
+        description={
+          <>
+            <TypographyMuted>{t("developers.eventsIntro")}</TypographyMuted>
+            <TypographyMuted>{t("developers.eventsEnglishNote")}</TypographyMuted>
+          </>
+        }
+      />
       <EventTypesTable />
     </main>
   );

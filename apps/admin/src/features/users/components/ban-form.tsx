@@ -1,0 +1,114 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@packages/ui/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@packages/ui/components/ui/form";
+import { Hint } from "@packages/ui/components/ui/hint";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@packages/ui/components/ui/select";
+import { Textarea } from "@packages/ui/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import {
+  BAN_DURATIONS,
+  type BanFormInput,
+  banFormSchema,
+} from "../../../shared/staff-forms.schema";
+
+function useDurationOptions() {
+  const { t } = useTranslation("admin");
+  return [
+    ...BAN_DURATIONS.map(({ labelKey, seconds }) => ({
+      label: t(labelKey),
+      value: String(seconds),
+    })),
+    { label: t("users.durationPermanent"), value: "permanent" },
+  ];
+}
+
+interface BanFormProps {
+  isPending: boolean;
+  onSubmit: (values: BanFormInput) => void;
+}
+
+export function BanForm({ isPending, onSubmit }: BanFormProps) {
+  const { t } = useTranslation("admin");
+  const durationOptions = useDurationOptions();
+  const form = useForm<BanFormInput>({
+    resolver: zodResolver(banFormSchema),
+    mode: "onChange",
+    defaultValues: { reason: "", expiresIn: undefined },
+  });
+
+  const reason = form.watch("reason");
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        <FormField
+          control={form.control}
+          name="reason"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("users.banForm.reasonLabel")}</FormLabel>
+              <FormControl>
+                <Textarea placeholder={t("users.banForm.reasonPlaceholder")} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="expiresIn"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("users.banForm.durationLabel")}</FormLabel>
+              <Select
+                value={field.value !== undefined ? String(field.value) : "permanent"}
+                onValueChange={(v) => field.onChange(v === "permanent" ? undefined : Number(v))}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {durationOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Hint
+          text={!reason.trim() ? t("users.banForm.reasonRequired") : undefined}
+          className="self-end"
+        >
+          <Button
+            type="submit"
+            variant="destructive"
+            className="self-end"
+            disabled={!reason.trim() || isPending}
+          >
+            {t("users.suspendAccountTitle")}
+          </Button>
+        </Hint>
+      </form>
+    </Form>
+  );
+}

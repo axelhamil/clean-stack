@@ -5,7 +5,7 @@ import { CATEGORY_LABEL_KEYS } from "../cookie-category-labels";
 
 describe("CATEGORY_LABEL_KEYS", () => {
   // `satisfies Record<ConsentCategory, string>` proves every category has a
-  // key. It cannot prove `analytics` points at the analytics copy — swapping
+  // key. It cannot prove `analytics` points at the analytics copy; swapping
   // two entries type-checks and renders. Only naming each pair catches that.
   it("points each category at its own consent-panel label key", () => {
     expect(CATEGORY_LABEL_KEYS).toStrictEqual({
@@ -21,11 +21,11 @@ describe("CATEGORY_LABEL_KEYS", () => {
   });
 });
 
-describe("cookies.route table caption — legal.cookies.tableCaption", () => {
+describe("cookies.route table caption (legal.cookies.tableCaption)", () => {
   // Round 2 review: the caption used to be a fixed English record, which
   // stayed English even once the heading above it (and the rest of the
   // page's chrome) was French. It's now `t("legal.cookies.tableCaption", {
-  // category: t(CATEGORY_LABEL_KEYS[cat]) })` — one key, the category
+  // category: t(CATEGORY_LABEL_KEYS[cat]) })`: one key, the category
   // interpolated through the same keys the consent panel already uses. This
   // renders all four through the real French catalog to check the sentence
   // still reads once the category name is a French noun, not just that the

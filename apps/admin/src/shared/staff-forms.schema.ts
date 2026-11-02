@@ -1,0 +1,28 @@
+import { z } from "zod";
+
+export const BAN_DURATIONS = [
+  { labelKey: "users.banForm.duration24h", seconds: 86_400 },
+  { labelKey: "users.banForm.duration7d", seconds: 604_800 },
+  { labelKey: "users.banForm.duration30d", seconds: 2_592_000 },
+] as const;
+
+export function banDurationLabelKey(seconds: number) {
+  return BAN_DURATIONS.find((duration) => duration.seconds === seconds)?.labelKey ?? null;
+}
+
+export const banFormSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+  expiresIn: z
+    .number()
+    .int()
+    .positive()
+    .max(90 * 24 * 60 * 60)
+    .optional(),
+});
+export type BanFormInput = z.infer<typeof banFormSchema>;
+
+export const impersonateFormSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+  ticketRef: z.string().trim().max(100).optional(),
+});
+export type ImpersonateFormInput = z.infer<typeof impersonateFormSchema>;

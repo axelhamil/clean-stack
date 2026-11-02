@@ -6,7 +6,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-for dir in apps/api apps/app packages/drizzle; do
+for dir in apps/api apps/app apps/admin packages/drizzle; do
   src="$ROOT/$dir/.env.example"
   dst="$ROOT/$dir/.env"
   if [ ! -f "$src" ]; then

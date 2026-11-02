@@ -1,24 +1,23 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@packages/ui/components/ui/button";
-import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@packages/ui/components/ui/form";
+import { Form } from "@packages/ui/components/ui/form";
+import { FormCheckboxField } from "@packages/ui/components/ui/form-checkbox-field";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { Trans, useTranslation } from "react-i18next";
 import { type SignUpInput, signUpSchema } from "../../../shared/auth/auth.schema";
 import { PolicyLink } from "../../../shared/components/policy-link";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { useSignUp } from "../hooks/use-sign-up";
 
-export function SignUpForm() {
+interface SignUpFormProps {
+  redirectTo?: string;
+}
+
+export function SignUpForm({ redirectTo }: SignUpFormProps) {
   const { t } = useTranslation("auth");
-  const mutation = useSignUp();
+  const revealLabels = usePasswordRevealLabels();
+  const mutation = useSignUp(redirectTo);
 
   const form = useForm<SignUpInput>({
     resolver: zodResolver(signUpSchema),
@@ -54,34 +53,25 @@ export function SignUpForm() {
           name="password"
           label={t("signIn.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="new-password"
           placeholder={t("signIn.passwordPlaceholder")}
           description={t("passwordField.hint")}
         />
 
-        <FormField
+        <FormCheckboxField
           control={form.control}
           name="acceptedPolicies"
-          render={({ field }) => (
-            <FormItem className="flex flex-col gap-1">
-              <div className="flex flex-row items-center gap-2">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-                <FormLabel weight="normal" className="block leading-normal">
-                  <Trans
-                    ns="auth"
-                    i18nKey="signUp.accept"
-                    components={{
-                      privacy: <PolicyLink type="privacy" />,
-                      terms: <PolicyLink type="terms" />,
-                    }}
-                  />
-                </FormLabel>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
+          label={
+            <Trans
+              ns="auth"
+              i18nKey="signUp.accept"
+              components={{
+                privacy: <PolicyLink type="privacy" />,
+                terms: <PolicyLink type="terms" />,
+              }}
+            />
+          }
         />
 
         <Button type="submit" className="w-full" disabled={mutation.isPending}>

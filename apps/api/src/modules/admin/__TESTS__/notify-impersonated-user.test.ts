@@ -1,25 +1,12 @@
-import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { EmailError } from "../../../shared/ports/email.port";
 import { notifyImpersonatedUser } from "../application/event-handlers/notify-impersonated-user";
 
-const capture = mock(() => {});
-const sendTemplate = mock(async () => Result.ok());
+const sendTemplate = mock(async (): Promise<Result<void, EmailError>> => Result.ok());
 
-const instrumentation = {
-  capture,
-  startSpan: mock(() => {}),
-  addBreadcrumb: mock(() => {}),
-  setSpanAttributes: mock(() => {}),
-};
-
-const profileStore = (locale?: string) => ({
-  findLocale: mock(async () => ({
-    isSuccess: true,
-    isFailure: false,
-    getValue: () => ({ toUndefined: () => locale }),
-  })),
-});
+const profileStore = { findLocale: mock(async () => Result.ok(Option.some("fr"))) };
 
 const BASE_EVENT = {
   eventType: EventTypes.ADMIN_IMPERSONATION_STARTED,
@@ -34,24 +21,24 @@ const BASE_EVENT = {
   },
 };
 
+function handlerWith(getUser: () => Promise<unknown>) {
+  return notifyImpersonatedUser({
+    IEmailService: { sendTemplate },
+    AdminQueryService: { getUser: mock(getUser) },
+    IProfileStore: profileStore,
+    supportUrl: "https://example.com/support",
+  } as never);
+}
+
 describe("notifyImpersonatedUser", () => {
-  it("envoie l'e-mail à l'utilisateur impersonné avec la raison et l'échéance", async () => {
-    const handler = notifyImpersonatedUser({
-      IEmailService: { sendTemplate },
-      AdminQueryService: {
-        getUser: mock(async () => ({
-          isSuccess: true,
-          isFailure: false,
-          getValue: () => ({
-            isNone: () => false,
-            unwrap: () => ({ email: "target@example.com", name: "Ada" }),
-          }),
-        })),
-      },
-      IProfileStore: profileStore("fr"),
-      IInstrumentation: instrumentation,
-      supportUrl: "https://example.com/support",
-    } as never);
+  beforeEach(() => {
+    sendTemplate.mockClear();
+  });
+
+  it("emails the impersonated user with the reason and the expiry", async () => {
+    const handler = handlerWith(async () =>
+      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
+    );
 
     await handler.handle(BASE_EVENT);
 
@@ -68,30 +55,10 @@ describe("notifyImpersonatedUser", () => {
       }),
       { locale: "fr" },
     );
-    expect(capture).not.toHaveBeenCalled();
   });
 
-  it("ne tente pas d'envoyer l'e-mail si l'utilisateur est introuvable", async () => {
-    sendTemplate.mockClear();
-
-    const handler = notifyImpersonatedUser({
-      IEmailService: { sendTemplate },
-      AdminQueryService: {
-        getUser: mock(async () => ({
-          isSuccess: true,
-          isFailure: false,
-          getValue: () => ({
-            isNone: () => true,
-            unwrap: () => {
-              throw new Error("none");
-            },
-          }),
-        })),
-      },
-      IProfileStore: profileStore("fr"),
-      IInstrumentation: instrumentation,
-      supportUrl: "https://example.com/support",
-    } as never);
+  it("sends nothing when the user cannot be found", async () => {
+    const handler = handlerWith(async () => Result.ok(Option.none()));
 
     await handler.handle({
       ...BASE_EVENT,
@@ -102,25 +69,40 @@ describe("notifyImpersonatedUser", () => {
     expect(sendTemplate).not.toHaveBeenCalled();
   });
 
-  it("ne tente pas d'envoyer l'e-mail si la lecture du compte échoue", async () => {
-    sendTemplate.mockClear();
+  it("given a failing account lookup, when handled, then it throws so the delivery is retried", async () => {
+    const handler = handlerWith(async () =>
+      Result.fail({ code: "ADMIN_QUERY_PROVIDER_FAILURE", message: "db error" }),
+    );
 
-    const handler = notifyImpersonatedUser({
-      IEmailService: { sendTemplate },
-      AdminQueryService: {
-        getUser: mock(async () => ({
-          isSuccess: false,
-          isFailure: true,
-          getError: () => ({ code: "ADMIN_QUERY_PROVIDER_FAILURE", message: "db error" }),
-        })),
-      },
-      IProfileStore: profileStore("fr"),
-      IInstrumentation: instrumentation,
-      supportUrl: "https://example.com/support",
-    } as never);
-
-    await handler.handle(BASE_EVENT);
+    await expect(handler.handle(BASE_EVENT)).rejects.toThrow("ADMIN_QUERY_PROVIDER_FAILURE");
 
     expect(sendTemplate).not.toHaveBeenCalled();
+  });
+
+  it("given a failing email send, when handled, then it throws so the delivery is retried", async () => {
+    sendTemplate.mockImplementationOnce(async () =>
+      Result.fail({ code: "EMAIL_PROVIDER_FAILURE" as const, message: "boom" }),
+    );
+    const handler = handlerWith(async () =>
+      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
+    );
+
+    await expect(handler.handle(BASE_EVENT)).rejects.toThrow("EMAIL_PROVIDER_FAILURE");
+  });
+
+  it("given a redelivered event, when handled twice, then both sends carry the same idempotency key", async () => {
+    const handler = handlerWith(async () =>
+      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
+    );
+    const event = { ...BASE_EVENT, eventId: "evt-42" };
+
+    await handler.handle(event);
+    await handler.handle(event);
+
+    const keys = sendTemplate.mock.calls.map((call) => (call as unknown[])[3]);
+    expect(keys).toEqual([
+      { locale: "fr", idempotencyKey: "notify-impersonated-user:evt-42" },
+      { locale: "fr", idempotencyKey: "notify-impersonated-user:evt-42" },
+    ]);
   });
 });

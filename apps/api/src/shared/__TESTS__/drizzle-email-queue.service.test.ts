@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
 
 const inserted: unknown[] = [];
-const execCalls: string[] = [];
 
 // Set by a test to make the insert report fewer written rows than requested.
 let insertReturns: ((rows: unknown[]) => unknown[]) | null = null;
@@ -12,112 +12,26 @@ mock.module("../logger", () => ({
   logger: { warn: warnSpy, info: mock(() => {}), error: mock(() => {}), debug: mock(() => {}) },
 }));
 
+const fakeDb = {
+  insert: () => ({
+    values: (rows: unknown[]) => {
+      inserted.push(...rows);
+      const written = insertReturns ? insertReturns(rows) : rows.map(() => ({ id: "id" }));
+      const chain = {
+        onConflictDoNothing: () => chain,
+        returning: () => chain,
+        toSQL: () => ({ sql: "insert into email_message" }),
+        execute: async () => written,
+      };
+      return chain;
+    },
+  }),
+};
+let executor: unknown = fakeDb;
+
 mock.module("@packages/drizzle", () => ({
-  db: {
-    insert: () => ({
-      values: (rows: unknown[]) => {
-        inserted.push(...rows);
-        const written = insertReturns ? insertReturns(rows) : rows.map(() => ({ id: "id" }));
-        const chain = {
-          onConflictDoNothing: () => chain,
-          returning: async () => written,
-          // biome-ignore lint/suspicious/noThenProperty: intentional thenable so the old `await ....values(...)` call shape still works
-          then: (resolve: (v: unknown) => unknown) => resolve(written),
-        };
-        return chain;
-      },
-    }),
-  },
-  emailSchema: { emailMessage: { id: "id", status: "status", attempts: "attempts" } },
-  and: (...a: unknown[]) => a,
-  eq: (...a: unknown[]) => a,
-  inArray: (...a: unknown[]) => a,
-  isNull: (...a: unknown[]) => a,
-  isNotNull: (...a: unknown[]) => a,
-  lte: (...a: unknown[]) => a,
-  or: (...a: unknown[]) => a,
-  lt: (...a: unknown[]) => a,
-  gt: (...a: unknown[]) => a,
-  gte: (...a: unknown[]) => a,
-  not: (...a: unknown[]) => a,
-  asc: (...a: unknown[]) => a,
-  desc: (...a: unknown[]) => a,
-  like: (...a: unknown[]) => a,
-  count: (...a: unknown[]) => a,
-  arrayContains: (...a: unknown[]) => a,
-  sql: Object.assign(
-    (s: TemplateStringsArray) => {
-      execCalls.push(s.join(""));
-      return s.join("");
-    },
-    {
-      raw: () => ({}),
-      identifier: () => ({}),
-      join: (chunks: unknown[]) => chunks,
-    },
-  ),
-  outboxSchema: {
-    outboxEvent: {
-      id: {},
-      eventType: {},
-      dispatchedAt: {},
-      nextAttemptAt: {},
-      occurredAt: {},
-      attempts: {},
-    },
-  },
-  auditLogSchema: {
-    auditLog: {
-      actorId: {},
-      actorType: {},
-      organizationId: {},
-      action: {},
-      targetType: {},
-      targetId: {},
-      occurredAt: {},
-      retention: {},
-      id: {},
-    },
-  },
-  webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
+  ...realDrizzle,
+  resolveExecutor: () => executor,
 }));
 
 const { DrizzleEmailQueue } = await import("../services/drizzle-email-queue.service");
@@ -136,8 +50,8 @@ const rowFixture = (to: string) => ({
 describe("DrizzleEmailQueue.enqueue", () => {
   beforeEach(() => {
     insertReturns = null;
+    executor = fakeDb;
     inserted.length = 0;
-    execCalls.length = 0;
     warnSpy.mockClear();
   });
 
@@ -170,31 +84,31 @@ describe("DrizzleEmailQueue.enqueue", () => {
 
   it("returns a failure Result instead of throwing when the insert rejects", async () => {
     const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
-    const tx = {
+    executor = {
       insert: () => ({
         values: () => ({
           onConflictDoNothing: () => ({
-            returning: async () => {
-              throw new Error("db down");
-            },
+            returning: () => ({
+              toSQL: () => ({ sql: "insert into email_message" }),
+              execute: async () => {
+                throw new Error("db down");
+              },
+            }),
           }),
         }),
       }),
     };
-    const result = await queue.enqueue(
-      [
-        {
-          kind: "raw",
-          template: Option.none(),
-          toAddress: "a@x.test",
-          subject: "s",
-          locale: "en",
-          payload: {},
-          idempotencyKey: Option.none(),
-        },
-      ],
-      tx as never,
-    );
+    const result = await queue.enqueue([
+      {
+        kind: "raw",
+        template: Option.none(),
+        toAddress: "a@x.test",
+        subject: "s",
+        locale: "en",
+        payload: {},
+        idempotencyKey: Option.none(),
+      },
+    ]);
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("EMAIL_QUEUE_WRITE_FAILED");
   });
@@ -221,50 +135,72 @@ describe("DrizzleEmailQueue.enqueue", () => {
   });
 });
 
-describe("DrizzleEmailQueue.markSent", () => {
-  it("issues a single statement for many ids", async () => {
-    const updates: unknown[] = [];
-    const tx = {
-      update: () => ({
-        set: () => ({
-          where: () => ({
-            toSQL: () => ({ sql: "update" }),
-            execute: async () => {
-              updates.push(1);
-            },
-          }),
-        }),
-      }),
-    };
+function chainResolving(rows: () => Promise<unknown[]>): unknown {
+  const chain: unknown = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (property === "then") return undefined;
+        if (property === "toSQL") return () => ({ sql: "update email_message" });
+        if (property === "execute") return rows;
+        return () => chain;
+      },
+    },
+  );
+  return chain;
+}
 
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
-      ["a", "b", "c"],
-      new Date(),
-      { a: "p1", b: "p2" },
-      tx as never,
-    );
+const lease = { id: "m1", attempts: 1 };
 
-    expect(result.isSuccess).toBe(true);
-    expect(updates).toHaveLength(1);
+describe("DrizzleEmailQueue.claim", () => {
+  beforeEach(() => {
+    executor = fakeDb;
   });
 
-  it("is a no-op for an empty id list", async () => {
+  it("claim returns a failure Result when the query rejects", async () => {
+    executor = chainResolving(async () => {
+      throw new Error("db down");
+    });
+
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).claim({
+      limit: 10,
+      leaseSeconds: 120,
+      deadReplayWindowHours: 24,
+    });
+
+    expect(result.isFailure).toBe(true);
+    expect(result.getError().message).toBe("db down");
+  });
+});
+
+describe("DrizzleEmailQueue.markSent", () => {
+  it("markSent is a no-op for an empty lease list", async () => {
     let called = false;
-    const tx = {
+    executor = {
       update: () => {
         called = true;
-        return {} as never;
+        return chainResolving(async () => []);
       },
     };
 
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent(
-      [],
-      new Date(),
-      {},
-      tx as never,
-    );
+    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent([], {});
 
-    expect(result.isSuccess).toBe(true);
+    expect(result.isSuccess && result.getValue()).toEqual([]);
     expect(called).toBe(false);
+  });
+});
+
+describe("DrizzleEmailQueue.markFailed", () => {
+  it("markFailed reports whether it wrote", async () => {
+    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const failure = { lastError: "HTTP 503", status: "pending", retryAfterSeconds: 3 } as const;
+
+    executor = chainResolving(async () => [{ id: "m1" }]);
+    const written = await queue.markFailed(lease, failure);
+    executor = chainResolving(async () => []);
+    const stale = await queue.markFailed(lease, failure);
+
+    expect(written.isSuccess && written.getValue()).toBe(true);
+    expect(stale.isSuccess && stale.getValue()).toBe(false);
   });
 });

@@ -1,12 +1,7 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
-import { TypographyH1, TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -23,42 +18,31 @@ function DashboardPage() {
 
   return (
     <main className={cn(pageContainerVariants(), "flex flex-col gap-8 py-10")}>
-      <header className="flex flex-col gap-1">
-        <TypographyH1 variant="page">{t("dashboard.welcome", { name: firstName })}</TypographyH1>
-        <TypographyMuted>{t("dashboard.subtitle")}</TypographyMuted>
-      </header>
+      <PageHeader
+        title={t("dashboard.welcome", { name: firstName })}
+        description={t("dashboard.subtitle")}
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("dashboard.gettingStartedTitle")}</CardTitle>
-            <CardDescription>{t("dashboard.gettingStartedDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TypographyP>{t("dashboard.gettingStartedBody")}</TypographyP>
-          </CardContent>
-        </Card>
+      <SettingsSection
+        title={t("dashboard.gettingStartedTitle")}
+        description={t("dashboard.gettingStartedDescription")}
+      >
+        <TypographyP>{t("dashboard.gettingStartedBody")}</TypographyP>
+      </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("dashboard.activityTitle")}</CardTitle>
-            <CardDescription>{t("dashboard.activityDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TypographyMuted>{t("dashboard.activityEmpty")}</TypographyMuted>
-          </CardContent>
-        </Card>
+      <SettingsSection
+        title={t("dashboard.activityTitle")}
+        description={t("dashboard.activityDescription")}
+      >
+        <TypographyMuted>{t("dashboard.activityEmpty")}</TypographyMuted>
+      </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("dashboard.usageTitle")}</CardTitle>
-            <CardDescription>{t("dashboard.usageDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TypographyMuted>{t("dashboard.usageEmpty")}</TypographyMuted>
-          </CardContent>
-        </Card>
-      </div>
+      <SettingsSection
+        title={t("dashboard.usageTitle")}
+        description={t("dashboard.usageDescription")}
+      >
+        <TypographyMuted>{t("dashboard.usageEmpty")}</TypographyMuted>
+      </SettingsSection>
     </main>
   );
 }

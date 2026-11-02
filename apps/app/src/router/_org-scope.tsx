@@ -6,5 +6,5 @@ export const Route = createFileRoute("/_protected/_shell/settings/_org-scope")({
     const org = await context.queryClient.ensureQueryData(activeOrgQueryOptions);
     if (!org) throw redirect({ to: "/" });
   },
-  component: () => <Outlet />,
+  component: Outlet,
 });

@@ -1,16 +1,13 @@
 import "@packages/ui/globals.css";
-import { createRoot } from "react-dom/client";
+import { mountApp } from "@packages/web-kit/boot/mount-app";
 import { AppProviders } from "./shared/app-providers";
-import { initI18n } from "./shared/i18n/i18n";
-import { reactErrorHandler } from "./shared/observability/sentry";
+import { reportCaughtError } from "./shared/observability/report-caught-error";
+import { captureError, reactErrorHandler } from "./shared/observability/sentry";
 
-const rootEl = document.getElementById("root");
-if (!rootEl) throw new Error("#root not found");
-
-const i18n = await initI18n();
-
-createRoot(rootEl, {
+await mountApp({
+  captureError,
   onUncaughtError: reactErrorHandler(),
-  onCaughtError: reactErrorHandler(),
+  onCaughtError: reportCaughtError,
   onRecoverableError: reactErrorHandler(),
-}).render(<AppProviders i18n={i18n} />);
+  render: (i18n) => <AppProviders i18n={i18n} />,
+});

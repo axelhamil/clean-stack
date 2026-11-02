@@ -8,6 +8,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePasswordRevealLabels } from "../../../shared/i18n/use-password-reveal-labels";
 import { BackupCodesPanel } from "../components/backup-codes-panel";
 import { type EnableTwoFactorResult, useEnableTwoFactor } from "../hooks/use-enable-two-factor";
 import { useVerifyTwoFactorSetup } from "../hooks/use-verify-two-factor-setup";
@@ -36,6 +37,7 @@ interface PasswordStepProps {
 
 function PasswordStep({ onSetup }: PasswordStepProps) {
   const { t } = useTranslation("settings");
+  const revealLabels = usePasswordRevealLabels();
   const mutation = useEnableTwoFactor();
   const form = useForm<PasswordPromptInput>({
     resolver: zodResolver(passwordPromptSchema),
@@ -55,6 +57,7 @@ function PasswordStep({ onSetup }: PasswordStepProps) {
           name="password"
           label={t("twoFactor.passwordLabel")}
           type="password"
+          {...revealLabels}
           autoComplete="current-password"
           placeholder={t("twoFactor.passwordPlaceholder")}
         />

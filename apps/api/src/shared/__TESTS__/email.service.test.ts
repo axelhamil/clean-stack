@@ -1,27 +1,27 @@
 import { describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import type { EmailMessageInsert } from "../ports/email-queue.port";
+import { mockPort } from "@packages/test/bun";
+import type { EmailMessageInsert, IEmailQueue } from "../ports/email-queue.port";
 import { QueuedEmailService } from "../services/email.service";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
-function fakeQueue() {
+function fakeQueue(enqueue?: IEmailQueue["enqueue"]) {
   const rows: EmailMessageInsert[] = [];
-  return {
-    rows,
-    enqueue: async (batch: EmailMessageInsert[]) => {
-      rows.push(...batch);
-      return Result.ok<{ written: number }, never>({ written: batch.length });
-    },
-    claimPending: async () => Result.ok([]),
-    markSent: async () => Result.ok<void, never>(undefined),
-    markFailed: async () => Result.ok<void, never>(undefined),
-  };
+  const queue = mockPort<IEmailQueue>();
+  queue.enqueue.mockImplementation(
+    enqueue ??
+      (async (batch) => {
+        rows.push(...batch);
+        return Result.ok({ written: batch.length });
+      }),
+  );
+  return { port: queue, rows };
 }
 
 describe("QueuedEmailService", () => {
   it("enqueues one template row instead of calling the provider", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     const result = await service.sendTemplate("verify_email", "a@x.test", {
       name: "Ada",
       verifyUrl: "https://x.test/v",
@@ -35,7 +35,7 @@ describe("QueuedEmailService", () => {
 
   it("enqueues a raw row with the caller's subject and body", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     const result = await service.sendRaw("a@x.test", "Deploy done", {
       html: "<p>ok</p>",
       text: "ok",
@@ -48,7 +48,7 @@ describe("QueuedEmailService", () => {
 
   it("enqueues one row per recipient for a template batch", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     const result = await service.sendTemplateBatch("delete_completed", [
       { to: "a@x.test", variables: { name: "Ada" } },
       { to: "b@x.test", variables: { name: "Bob" } },
@@ -60,7 +60,7 @@ describe("QueuedEmailService", () => {
 
   it("freezes the caller's locale on the row and renders the subject in it", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     const result = await service.sendTemplate(
       "verify_email",
       "a@x.test",
@@ -73,10 +73,10 @@ describe("QueuedEmailService", () => {
   });
 
   it("surfaces a queue write failure as EMAIL_PROVIDER_FAILURE", async () => {
-    const failing = {
-      enqueue: async () => Result.fail({ code: "EMAIL_QUEUE_WRITE_FAILED", message: "db down" }),
-    };
-    const service = new QueuedEmailService(failing as never, new NoOpInstrumentation());
+    const failing = fakeQueue(async () =>
+      Result.fail({ code: "EMAIL_QUEUE_WRITE_FAILED", message: "db down" }),
+    );
+    const service = new QueuedEmailService(failing.port, new NoOpInstrumentation());
     const result = await service.sendTemplate("magic_link", "a@x.test", {
       magicUrl: "https://x.test/m",
     });
@@ -85,22 +85,16 @@ describe("QueuedEmailService", () => {
   });
 
   it("fails with EMAIL_PROVIDER_FAILURE when every row is suppressed (0 of N written)", async () => {
-    const fullySuppressed = {
-      enqueue: async (_batch: EmailMessageInsert[]) =>
-        Result.ok<{ written: number }, never>({ written: 0 }),
-    };
-    const service = new QueuedEmailService(fullySuppressed as never, new NoOpInstrumentation());
+    const fullySuppressed = fakeQueue(async () => Result.ok({ written: 0 }));
+    const service = new QueuedEmailService(fullySuppressed.port, new NoOpInstrumentation());
     const result = await service.sendTemplate("delete_completed", "a@x.test", { name: "Ada" });
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("EMAIL_PROVIDER_FAILURE");
   });
 
   it("stays success on a partial suppression (some rows written, some duplicates)", async () => {
-    const partiallySuppressed = {
-      enqueue: async (_batch: EmailMessageInsert[]) =>
-        Result.ok<{ written: number }, never>({ written: 1 }),
-    };
-    const service = new QueuedEmailService(partiallySuppressed as never, new NoOpInstrumentation());
+    const partiallySuppressed = fakeQueue(async () => Result.ok({ written: 1 }));
+    const service = new QueuedEmailService(partiallySuppressed.port, new NoOpInstrumentation());
     const result = await service.sendTemplateBatch("delete_completed", [
       { to: "a@x.test", variables: { name: "Ada" } },
       { to: "b@x.test", variables: { name: "Bob" } },
@@ -110,7 +104,7 @@ describe("QueuedEmailService", () => {
 
   it("uses a recipient-level key verbatim", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     await service.sendTemplateBatch("delete_completed", [
       { to: "a@example.com", variables: { name: "A" }, idempotencyKey: "wipe/user-1" },
     ]);
@@ -119,7 +113,7 @@ describe("QueuedEmailService", () => {
 
   it("falls back to the batch key namespaced with #", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     await service.sendTemplateBatch(
       "delete_completed",
       [
@@ -135,7 +129,7 @@ describe("QueuedEmailService", () => {
 
   it("prefers the recipient key over the batch key", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     await service.sendTemplateBatch(
       "delete_completed",
       [{ to: "a@example.com", variables: { name: "A" }, idempotencyKey: "explicit" }],
@@ -146,7 +140,7 @@ describe("QueuedEmailService", () => {
 
   it("leaves the key absent when neither form is supplied", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     await service.sendTemplateBatch("delete_completed", [
       { to: "a@example.com", variables: { name: "A" } },
     ]);
@@ -155,7 +149,7 @@ describe("QueuedEmailService", () => {
 
   it("namespaces the raw batch fallback with # like the template batch", async () => {
     const queue = fakeQueue();
-    const service = new QueuedEmailService(queue as never, new NoOpInstrumentation());
+    const service = new QueuedEmailService(queue.port, new NoOpInstrumentation());
     await service.sendRawBatch(
       [
         { to: "a@example.com", subject: "S1", body: { text: "1" } },

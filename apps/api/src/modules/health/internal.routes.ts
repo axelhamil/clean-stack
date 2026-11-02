@@ -1,4 +1,4 @@
-// `/internal/build-info` — gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
+// `/internal/build-info`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import { Hono } from "hono";
 import { internalLayers } from "../../shared/internal-routes/internal-layers";

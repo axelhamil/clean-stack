@@ -8,6 +8,9 @@ import type { IInstrumentation } from "../ports/instrumentation.port";
 
 const isProd = env.NODE_ENV === "production";
 
+export const SERVER_ERROR_MESSAGE =
+  "The service could not complete this request. Retry in a moment, and quote the requestId if it persists.";
+
 type ErrorBody = {
   error: {
     code: string;
@@ -25,8 +28,24 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
     const orgId = c.get("session")?.activeOrganizationId ?? undefined;
     const trackerContext = { requestId, userId, orgId, path: c.req.path, method: c.req.method };
 
+    const reportServerError = (message: string) => {
+      logger.error({ err, requestId, path: c.req.path }, message);
+      instrumentation.capture(err, trackerContext);
+    };
+
     if (err instanceof AppErrorException) {
       const status = httpStatusFromCode(err.code) as ContentfulStatusCode;
+
+      if (status >= 500) {
+        reportServerError(err.message);
+
+        return c.json(
+          {
+            error: { code: err.code, message: SERVER_ERROR_MESSAGE, requestId },
+          } satisfies ErrorBody,
+          status,
+        );
+      }
 
       const body: ErrorBody = {
         error: {
@@ -36,10 +55,6 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
           ...(err.metadata ? { metadata: err.metadata } : {}),
         },
       };
-      if (status >= 500) {
-        logger.error({ err, requestId, path: c.req.path }, err.message);
-        instrumentation.capture(err, trackerContext);
-      }
 
       return c.json(body, status);
     }
@@ -49,14 +64,11 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
       const body: ErrorBody = {
         error: {
           code: `HTTP_${status}`,
-          message: err.message,
+          message: status >= 500 ? SERVER_ERROR_MESSAGE : err.message,
           requestId,
         },
       };
-      if (status >= 500) {
-        logger.error({ err, requestId, path: c.req.path }, err.message);
-        instrumentation.capture(err, trackerContext);
-      }
+      if (status >= 500) reportServerError(err.message);
 
       return c.json(body, status);
     }
@@ -67,7 +79,7 @@ export function createErrorHandler(instrumentation: IInstrumentation): ErrorHand
     const body: ErrorBody = {
       error: {
         code: "INTERNAL_ERROR",
-        message: "Internal Server Error",
+        message: SERVER_ERROR_MESSAGE,
         requestId,
         ...(isProd ? {} : { stack: err.stack }),
       },

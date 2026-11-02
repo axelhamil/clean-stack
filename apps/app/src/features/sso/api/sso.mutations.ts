@@ -1,20 +1,20 @@
+import { throwApiError, toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { mutationOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { api } from "../../../shared/api/api-client";
-import { throwApiError } from "../../../shared/api/errors/api-error";
 import { authClient } from "../../../shared/auth/auth-client";
 import { env } from "../../../shared/env";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { OidcProviderInput, SamlProviderInput } from "../sso.schema";
 
-// Providers aren't given an id by the operator — the server just wants a stable
+// Providers aren't given an id by the operator: the server just wants a stable
 // string. Deriving it from the domain keeps re-registrations of the same domain
 // idempotent instead of piling up rows against `providersLimit`.
 //
 // Two distinct domains can collide here (e.g. "eu-acme.com" and "eu.acme.com" both
 // slugify to "eu-acme-com"). Left unhandled on purpose: `providerId` is globally
 // unique server-side, so a collision surfaces as a clear registration error to the
-// second registrant rather than silently overwriting the first — loud, not silent.
+// second registrant rather than silently overwriting the first (loud, not silent).
 // A collision-resistant scheme isn't worth it: this id format is already carried in
 // SCIM tokens and audit rows.
 function providerIdFromDomain(domain: string): string {
@@ -38,13 +38,7 @@ export const registerOidcProviderMutationOptions = mutationOptions({
       organizationId,
       oidcConfig: { clientId: values.clientId, clientSecret: values.clientSecret },
     });
-    if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.registerOidcProvider", {
-            defaultValue: "Failed to register the OIDC provider",
-          }),
-      );
+    if (error) throw toAuthClientError(error, errorFallback("registerOidcProvider"));
     return data;
   },
 });
@@ -60,27 +54,27 @@ export const registerSamlProviderMutationOptions = mutationOptions({
   }) => {
     const providerId = providerIdFromDomain(values.domain);
     // The server forces SHA-256 + signed assertions on every SAML registration
-    // (D8 hardening in apps/api/src/auth.ts) — the client never sends
+    // (D8 hardening in apps/api/src/auth.ts): the client never sends
     // `signatureAlgorithm`, there is no weaker option to offer.
+    //
+    // A SAML registration names two entities. The top-level `issuer` is this
+    // app's own (service provider) entity ID, which the plugin puts in the SP
+    // metadata it publishes: it is set to that metadata's URL, the address the
+    // operator hands their IdP. The IdP's entity ID is the one the operator types,
+    // and it is what every incoming assertion is checked against. The plugin
+    // derives the assertion consumer URL itself.
     const { data, error } = await authClient.sso.register({
       providerId,
-      issuer: values.issuer,
+      issuer: `${env.VITE_API_URL}/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(providerId)}`,
       domain: values.domain,
       organizationId,
       samlConfig: {
         entryPoint: values.entryPoint,
         cert: values.cert,
-        callbackUrl: `${env.VITE_API_URL}/api/auth/sso/saml2/sp/acs/${providerId}`,
-        spMetadata: {},
+        idpMetadata: { entityID: values.idpEntityId },
       },
     });
-    if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.registerSamlProvider", {
-            defaultValue: "Failed to register the SAML provider",
-          }),
-      );
+    if (error) throw toAuthClientError(error, errorFallback("registerSamlProvider"));
     return data;
   },
 });
@@ -89,38 +83,27 @@ export const verifyDomainMutationOptions = mutationOptions({
   mutationKey: ["settings", "sso", "verify-domain"] as const,
   mutationFn: async (providerId: string) => {
     const { error } = await authClient.sso.verifyDomain({ providerId });
-    if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.verifySsoDomain", { defaultValue: "Domain verification failed" }),
-      );
+    if (error) throw toAuthClientError(error, errorFallback("verifySsoDomain"));
   },
 });
 
-export const generateScimTokenMutationOptions = mutationOptions({
-  mutationKey: ["settings", "sso", "generate-scim-token"] as const,
-  mutationFn: async ({
-    providerId,
-    organizationId,
-  }: {
-    providerId: string;
-    organizationId: string;
-  }) => {
-    const { data, error } = await authClient.scim.generateToken({ providerId, organizationId });
-    if (error)
-      throw new Error(
-        error.message ??
-          getErrorsT()("fallback.generateScimToken", {
-            defaultValue: "Failed to generate the SCIM token",
-          }),
-      );
-    if (!data?.scimToken)
-      throw new Error(
-        getErrorsT()("fallback.invalidServerResponse", {
-          defaultValue: "Invalid response from server",
-        }),
-      );
-    return data.scimToken;
+const $issueScimToken = api.settings.organization["scim-connection"].$post;
+const $disconnectScim = api.settings.organization["scim-connection"].$delete;
+
+export const issueScimTokenMutationOptions = mutationOptions({
+  mutationKey: ["settings", "sso", "scim-connection", "token"] as const,
+  mutationFn: async () => {
+    const res = await $issueScimToken();
+    if (!res.ok) await throwApiError(res, "generateScimToken");
+    return (await res.json()) as InferResponseType<typeof $issueScimToken, 200>;
+  },
+});
+
+export const disconnectScimMutationOptions = mutationOptions({
+  mutationKey: ["settings", "sso", "scim-connection", "disconnect"] as const,
+  mutationFn: async () => {
+    const res = await $disconnectScim();
+    if (!res.ok) await throwApiError(res, "disconnectScim");
   },
 });
 
@@ -130,13 +113,7 @@ export const setSsoEnforcementMutationOptions = mutationOptions({
   mutationKey: ["settings", "sso", "enforcement"] as const,
   mutationFn: async (enforced: boolean) => {
     const res = await $setSsoEnforcement({ json: { enforced } });
-    if (!res.ok)
-      await throwApiError(
-        res,
-        getErrorsT()("fallback.updateSsoEnforcement", {
-          defaultValue: "Failed to update SSO enforcement",
-        }),
-      );
+    if (!res.ok) await throwApiError(res, "updateSsoEnforcement");
     return (await res.json()) as InferResponseType<typeof $setSsoEnforcement, 200>;
   },
 });

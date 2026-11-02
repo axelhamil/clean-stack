@@ -5,13 +5,13 @@ const { HibpPasswordBreachService } = await import("../hibp-password-breach.serv
 const { NoOpInstrumentation } = await import("../noop-instrumentation");
 
 const PASSWORD = "supersecretpassword";
-// SHA-1("supersecretpassword") uppercase — computed at module load to verify URL construction
+// SHA-1("supersecretpassword") uppercase, computed at module load to verify URL construction
 const HASH = new CryptoHasher("sha1").update(PASSWORD).digest("hex").toUpperCase();
 const PREFIX = HASH.slice(0, 5);
 const SUFFIX = HASH.slice(5);
 
 describe("HibpPasswordBreachService", () => {
-  it("retourne isBreached=true quand le suffix est présent dans la réponse", async () => {
+  it("returns isBreached=true when the suffix is in the response", async () => {
     const mockFetch = mock(async (url: string) => {
       expect(url).toBe(`https://api.pwnedpasswords.com/range/${PREFIX}`);
       expect(url).not.toContain(SUFFIX);
@@ -27,7 +27,7 @@ describe("HibpPasswordBreachService", () => {
     expect(result.getValue()).toBe(true);
   });
 
-  it("retourne isBreached=false quand le suffix est absent", async () => {
+  it("returns isBreached=false when the suffix is absent", async () => {
     const mockFetch = mock(async (_url: string) => {
       return new Response("AAABB:3\r\nCCCDD:1", { status: 200 });
     });
@@ -41,7 +41,7 @@ describe("HibpPasswordBreachService", () => {
     expect(result.getValue()).toBe(false);
   });
 
-  it("ne transmet jamais le password complet dans l'URL (seulement le prefix 5 chars)", async () => {
+  it("never sends the full password in the URL (only the 5-char prefix)", async () => {
     let capturedUrl = "";
     const mockFetch = mock(async (url: string) => {
       capturedUrl = url as string;
@@ -60,7 +60,7 @@ describe("HibpPasswordBreachService", () => {
     expect(capturedUrl).toMatch(/\/range\/[A-F0-9]{5}$/);
   });
 
-  it("retourne Result.fail quand fetch lève une erreur réseau", async () => {
+  it("returns Result.fail when fetch throws a network error", async () => {
     const mockFetch = mock(async (_url: string) => {
       throw new Error("network timeout");
     });
@@ -79,7 +79,7 @@ describe("HibpPasswordBreachService", () => {
     expect(captureSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("retourne Result.fail et capture quand la réponse n'est pas ok", async () => {
+  it("returns Result.fail and captures when the response is not ok", async () => {
     const mockFetch = mock(async (_url: string) => {
       return new Response("Too Many Requests", { status: 429 });
     });

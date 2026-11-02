@@ -3,6 +3,9 @@ export default {
   actions: {
     save: "Save",
     cancel: "Cancel",
+    close: "Close",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     retry: "Retry",
     reload: "Reload",
   },
@@ -13,12 +16,17 @@ export default {
   },
   errorBoundary: {
     title: "Something went wrong",
-    body: "We've been notified and are looking into it. Try reloading the page.",
+    body: "This page could not load. Try reloading it.",
+  },
+  notFound: {
+    title: "Page not found",
+    description:
+      "This page does not exist or has moved. Check the address, or go back to the home page.",
+    backHome: "Back to home",
   },
   nav: {
     dashboard: "Dashboard",
     settings: "Settings",
-    admin: "Admin",
   },
   shell: {
     brandLabel: "App",
@@ -27,30 +35,26 @@ export default {
     logoAlt: "App logo",
   },
   commandPalette: {
+    title: "Command palette",
+    description: "Search for a page or an action to run.",
     searchPlaceholder: "Search pages, actions, organizations...",
     noResults: "No results found.",
     actionFailed: "Action failed",
     groups: {
       navigate: "Navigate",
       switchOrganization: "Switch organization",
-      admin: "Admin",
       legal: "Legal & privacy",
       actions: "Actions",
     },
     nav: {
-      organization: "Settings — Organization",
-      billing: "Settings — Billing",
-      webhooks: "Settings — Webhooks",
-      account: "Settings — Account",
-      privacy: "Settings — Privacy",
-      eventCatalog: "Developers — Event catalog",
+      organization: "Settings: Organization",
+      billing: "Settings: Billing",
+      webhooks: "Settings: Webhooks",
+      account: "Settings: Account",
+      privacy: "Settings: Privacy",
+      eventCatalog: "Developers: Event catalog",
     },
     organizationActive: "active",
-    admin: {
-      auditLog: "Admin — Audit log",
-      accounts: "Admin — Accounts",
-      organizations: "Admin — Organizations",
-    },
     theme: {
       light: "Theme: Light",
       dark: "Theme: Dark",
@@ -95,7 +99,8 @@ export default {
     signOutFailed: "Sign-out failed",
   },
   impersonation: {
-    activeSession: "Active impersonation session — acting as <name></name>",
+    activeSession:
+      "Active impersonation session: acting as <name>{{name}}</name>. {{remaining}}. Changes are blocked in this session.",
     remainingMinutes: "{{minutes}} min remaining",
     expired: "session expired",
     end: "End impersonation",
@@ -112,6 +117,7 @@ export default {
     preferencesTitle: "Cookie preferences",
   },
   cookieConsent: {
+    necessaryAlwaysOnHint: "Strictly necessary cookies cannot be turned off.",
     title: "Manage your cookie preferences",
     save: "Save preferences",
     withdraw: "Withdraw all consent",
@@ -140,18 +146,24 @@ export default {
     policies: {
       privacyTitle: "Privacy Policy",
       termsTitle: "Terms of Service",
-      versionLine: "Version {{version}} — effective {{date}}",
+      versionLine: "Version {{version}} (effective {{date}})",
       unavailableBanner:
         "This document is not yet available in your language. You are reading the English version below.",
     },
     accessibility: {
       title: "Accessibility statement",
-      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA — Last reviewed: 2026-07-09",
+      subtitle: "EAA Art. 14 · EN 301 549 v3.2.1 / WCAG 2.1 AA · Last reviewed: 2026-07-09",
     },
     cookies: {
       title: "Cookie policy",
-      subtitle: "CNIL compliant — Last updated: 2026-07-09",
+      subtitle: "CNIL compliant · Last updated: 2026-07-09",
       tableCaption: "Cookies in the {{category}} category used by this application",
+      table: {
+        name: "Name",
+        provider: "Provider",
+        purpose: "Purpose",
+        retention: "Retention",
+      },
     },
     dataRights: {
       title: "Your data rights",
@@ -160,7 +172,7 @@ export default {
     },
     subProcessors: {
       title: "Sub-processor disclosure",
-      subtitle: "RGPD Art. 28 — Last updated: 2026-07-09",
+      subtitle: "RGPD Art. 28 · Last updated: 2026-07-09",
       table: {
         name: "Name",
         purpose: "Purpose",
@@ -198,6 +210,9 @@ export default {
       readFull: "Read the full {{title}}",
       acceptButton: "Accept and continue",
       acceptingButton: "Accepting…",
+      declineButton: "Decline and sign out",
+      loadFailed:
+        "The policies you need to accept could not be loaded. Retry, or sign out and come back later.",
     },
     routes: {
       dataRights: "Data rights (RGPD)",
@@ -209,7 +224,7 @@ export default {
     },
   },
   policyAcceptance: {
-    acceptedToast: "Policies accepted — welcome!",
+    acceptedToast: "Policies accepted, welcome!",
     acceptFailed: "Could not record your acceptance. Please try again.",
   },
   legalFooter: {
@@ -221,7 +236,7 @@ export default {
   },
   secretReveal: {
     title: "Signing secret",
-    description: "Copy this now — it is shown only once and cannot be retrieved later.",
+    description: "Copy this now: it is shown only once and cannot be retrieved later.",
     secretLabel: "Secret",
     confirm: "I saved it",
   },
@@ -232,6 +247,7 @@ export default {
   notifications: {
     title: "Notifications",
     markAllRead: "Mark all as read",
+    nothingToMarkRead: "No unread notifications.",
     empty: "You are all caught up.",
     unreadNone: "Notifications, none unread",
     unreadLabel_one: "Notifications, {{count}} unread",
@@ -257,7 +273,7 @@ export default {
       "Invite teammates, configure billing, and start shipping. Everything lives under Settings.",
     activityTitle: "Activity",
     activityDescription: "Recent events in your workspace.",
-    activityEmpty: "Nothing yet — your activity will surface here.",
+    activityEmpty: "Nothing yet. Your activity will surface here.",
     usageTitle: "Usage",
     usageDescription: "Quota and limits for the current period.",
     usageEmpty: "Hook up metering once a billable resource exists.",
@@ -265,8 +281,6 @@ export default {
   orgNew: {
     title: "Create organization",
     subtitle: "Spin up a new workspace for your team.",
-    detailsTitle: "Organization details",
-    detailsDescription: "Give your organization a name and a unique slug.",
     nameLabel: "Name",
     namePlaceholder: "Acme",
     createdToast: "Organization created",
@@ -274,7 +288,8 @@ export default {
   },
   invitation: {
     signInTitle: "Sign in to accept",
-    signInBody: "You need to be signed in to accept this invitation.",
+    signInBody: "Sign in or create an account with the invited email to accept this invitation.",
+    createAccount: "Create an account",
     joinTitle: "Join the organization",
     signedInAs:
       "Signed in as {{email}}. If this is the wrong account, sign out and sign back in with the invited email.",
@@ -293,6 +308,8 @@ export default {
       success: "Success",
       failed: "Failed",
       deadLetter: "Dead letter",
+      failedHint: "The last attempt failed, another one is scheduled.",
+      deadLetterHint: "Every retry failed, this delivery will not be attempted again.",
     },
   },
   pricing: {
@@ -306,8 +323,13 @@ export default {
       month: "month",
       year: "year",
     },
+    loading: "Loading plans…",
+    loadFailed: "Plans could not be loaded. Reload the page to try again.",
+    empty: "No plans are available yet.",
     currentPlanCta: "Current plan",
     getStarted: "Get started",
     upgrade: "Upgrade",
+    upgradeNeedsOrgHint: "Select an organization to upgrade.",
+    upgradeUnavailableHint: "This plan is not available for purchase yet.",
   },
 } as const;

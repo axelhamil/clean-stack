@@ -88,7 +88,7 @@ describe("backupCodeUsedNotifier", () => {
     expect(sendTemplate).not.toHaveBeenCalled();
   });
 
-  it("swallows email failures (best-effort, never throws)", async () => {
+  it("given a failing email send, when handled, then it throws so the delivery is retried", async () => {
     const sendTemplate = mock(async () =>
       Result.fail<void, { code: string; message: string }>({
         code: "EMAIL_PROVIDER_FAILURE",
@@ -107,6 +107,30 @@ describe("backupCodeUsedNotifier", () => {
         dateOccurred: new Date(),
         payload: { userId: "u1", email: "axel@example.com" },
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("EMAIL_PROVIDER_FAILURE");
+  });
+
+  it("given a redelivered event, when handled twice, then both sends carry the same idempotency key", async () => {
+    const { service, sendTemplate } = makeEmailService();
+    const handler = backupCodeUsedNotifier({
+      IEmailService: service,
+      IProfileStore: makeProfileStore("fr"),
+    });
+    const event = {
+      eventId: "evt-7",
+      eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
+      aggregateId: "u1",
+      dateOccurred: new Date(),
+      payload: { userId: "u1", email: "axel@example.com" },
+    };
+
+    await handler.handle(event);
+    await handler.handle(event);
+
+    const keys = sendTemplate.mock.calls.map((call) => (call as unknown[])[3]);
+    expect(keys).toEqual([
+      { locale: "fr", idempotencyKey: "notify-backup-code-used:evt-7" },
+      { locale: "fr", idempotencyKey: "notify-backup-code-used:evt-7" },
+    ]);
   });
 });

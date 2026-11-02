@@ -12,10 +12,10 @@ export interface UseSetLocaleMutationOptions {
 /**
  * Single entry point for writing the user's locale.
  *
- * Every caller must do the same two things on success — record the choice so
+ * Every caller must do the same two things on success (record the choice so
  * the session reconciliation stops treating a stale cached user row as the
  * truth, and invalidate the session query so the rest of the app stops reading
- * the old value — so they live here rather than being re-derived per call site.
+ * the old value), so they live here rather than being re-derived per call site.
  */
 export function useSetLocaleMutation(options?: UseSetLocaleMutationOptions) {
   const queryClient = useQueryClient();

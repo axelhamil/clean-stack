@@ -1,17 +1,22 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import type { PolicyConfig } from "../middleware/rate-limit.policies";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 let mockedAddress = "1.2.3.4";
 
+const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({
+  ...realHonoBun,
   getConnInfo: () => ({ remote: { address: mockedAddress } }),
 }));
 
 const warnSpy = mock(() => {});
+const realLogger = await import("../logger");
 mock.module("../logger", () => ({
+  ...realLogger,
   logger: { warn: warnSpy, info: () => {}, error: () => {}, debug: () => {} },
 }));
 
@@ -26,17 +31,8 @@ const {
 const { normalizeHop, resolveClientIp } = await import("../middleware/rate-limit.ip");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
-import type { IInstrumentation } from "../ports/instrumentation.port";
+import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { IRateLimiter, RateLimitDecision, RateLimitError } from "../ports/rate-limiter.port";
-
-function makeNoop(): IInstrumentation {
-  return {
-    startSpan: (_o, cb) => cb() as ReturnType<typeof cb>,
-    capture: () => {},
-    addBreadcrumb: () => {},
-    setSpanAttributes: () => {},
-  };
-}
 
 function allowDecision(policyName = "global"): RateLimitDecision {
   return {
@@ -85,7 +81,7 @@ function makeApp(limiter: IRateLimiter) {
   });
   app.use("*", requireRateLimit({ limiter }, GLOBAL_POLICY));
   app.get("/ok", (c) => c.json({ ok: true }));
-  app.onError(createErrorHandler(makeNoop()));
+  app.onError(createErrorHandler(mockInstrumentation()));
   return app;
 }
 
@@ -97,7 +93,7 @@ describe("requireRateLimit middleware", () => {
       expect(res.status).toBe(200);
       // RFC draft-11: quoted policy name; r=<remaining>;t=<reset>
       expect(res.headers.get("RateLimit")).toMatch(/^"global";r=\d+;t=\d+$/);
-      // GLOBAL_POLICY has 2 windows — both must appear in comma-joined RateLimit-Policy
+      // GLOBAL_POLICY has 2 windows, both must appear in comma-joined RateLimit-Policy
       expect(res.headers.get("RateLimit-Policy")).toMatch(
         /^"global";q=300;w=60, "global";q=1800;w=3600$/,
       );
@@ -149,6 +145,31 @@ describe("requireRateLimit middleware", () => {
       expect(res.headers.get("Retry-After")).toBe("1");
     });
 
+    it("given two stacked policies, then both budgets are advertised", async () => {
+      const app = new Hono();
+      const stacked = (name: string, windowSec: number) =>
+        requireRateLimit(
+          { limiter: makeLimiter(allowDecision(name)) },
+          {
+            name,
+            keyFn: () => name,
+            windows: [{ policyName: name, windowSec, maxRequests: 10 }],
+          },
+        );
+      app.use("/ok", stacked("auth-sign-up", 3600));
+      app.use("/ok", stacked("accounts-per-visitor", 86400));
+      app.get("/ok", (c) => c.json({ ok: true }));
+
+      const res = await app.request("/ok");
+
+      expect(res.headers.get("RateLimit-Policy")).toBe(
+        '"auth-sign-up";q=10;w=3600, "accounts-per-visitor";q=10;w=86400',
+      );
+      expect(res.headers.get("RateLimit")).toBe(
+        '"auth-sign-up";r=59;t=60, "accounts-per-visitor";r=59;t=60',
+      );
+    });
+
     it("sets RateLimit headers even when blocked", async () => {
       const app = makeApp(makeLimiter(blockDecision()));
       const res = await app.request("/ok");
@@ -177,7 +198,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("*", requireRateLimit({ limiter: makeFailLimiter() }, AUTH_SIGN_IN_POLICY));
       app.post("/sign-in", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/sign-in", { method: "POST" });
       expect(res.status).toBe(503);
@@ -203,7 +224,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("*", requireRateLimit({ limiter }, GLOBAL_POLICY));
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       await app.request("/ok");
       expect(capturedKey).toBe("global:user-42");
@@ -224,7 +245,7 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
-  describe("policy isolation — sign-in vs magic-link", () => {
+  describe("policy isolation, sign-in vs magic-link", () => {
     it("a magic-link request consumes ONLY the magic-link policy, not sign-in", async () => {
       const consumedPolicies: string[] = [];
       const limiter: IRateLimiter = {
@@ -245,7 +266,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter }, AUTH_MAGIC_LINK_POLICY),
       );
       app.post("/api/auth/sign-in/magic-link", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/sign-in/magic-link", { method: "POST" });
@@ -276,7 +297,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter }, AUTH_MAGIC_LINK_POLICY),
       );
       app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/sign-in/email", { method: "POST" });
@@ -288,7 +309,7 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
-  describe("policy isolation — two-factor vs sign-in", () => {
+  describe("policy isolation, two-factor vs sign-in", () => {
     it("a two-factor/verify-totp request consumes ONLY the two-factor policy, not sign-in", async () => {
       const consumedPolicies: string[] = [];
       const limiter: IRateLimiter = {
@@ -309,7 +330,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter }, AUTH_TWO_FACTOR_POLICY),
       );
       app.post("/api/auth/two-factor/verify-totp", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/two-factor/verify-totp", { method: "POST" });
@@ -321,7 +342,7 @@ describe("requireRateLimit middleware", () => {
     });
   });
 
-  describe("AUTH_VERIFY_EMAIL_POLICY key — token-scoped", () => {
+  describe("AUTH_VERIFY_EMAIL_POLICY key, token-scoped", () => {
     it("two requests with different tokens consume different keys", async () => {
       const consumedKeys: string[] = [];
       const limiter: IRateLimiter = {
@@ -338,7 +359,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("/api/auth/verify-email", requireRateLimit({ limiter }, AUTH_VERIFY_EMAIL_POLICY));
       app.get("/api/auth/verify-email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "1.2.3.4";
       await app.request("/api/auth/verify-email?token=abc");
@@ -365,7 +386,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("/api/auth/verify-email", requireRateLimit({ limiter }, AUTH_VERIFY_EMAIL_POLICY));
       app.get("/api/auth/verify-email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       mockedAddress = "5.6.7.8";
       await app.request("/api/auth/verify-email");
@@ -577,7 +598,7 @@ describe("requireRateLimit middleware", () => {
       });
       app.use("*", requireRateLimit({ limiter }, AUTH_SIGN_IN_POLICY));
       app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       await app.request("/api/auth/sign-in/email", { method: "POST" });
       expect(capturedKey).toBe("auth-sign-in:9.9.9.9");
@@ -585,13 +606,8 @@ describe("requireRateLimit middleware", () => {
   });
 
   describe("security event emission on firstBlock", () => {
-    function makeOutbox(): IOutboxRepository {
-      return {
-        enqueue: mock(async () => {}),
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+    function makeOutbox() {
+      return mockPort<IOutboxRepository>();
     }
 
     function makeAuthApp(
@@ -610,7 +626,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter, outbox }, AUTH_SIGN_IN_POLICY),
       );
       app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
       return app;
     }
 
@@ -683,7 +699,7 @@ describe("requireRateLimit middleware", () => {
         requireRateLimit({ limiter: makeLimiter(blockDecision()), outbox }, GLOBAL_POLICY),
       );
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/ok");
       expect(res.status).toBe(429);
@@ -702,14 +718,8 @@ describe("requireRateLimit middleware", () => {
     it("still returns 429 when emit throws, and logger.warn is called once with the error", async () => {
       mockedAddress = "1.2.3.4";
       warnSpy.mockClear();
-      const outbox: IOutboxRepository = {
-        enqueue: mock(async () => {
-          throw new Error("outbox down");
-        }),
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockRejectedValue(new Error("outbox down"));
       const limiter = makeLimiter(blockDecision("auth-sign-in"));
       const app = makeAuthApp(limiter, outbox);
 
@@ -789,7 +799,7 @@ describe("requireRateLimit middleware", () => {
         ),
       );
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/ok");
       expect(res.status).toBe(200);
@@ -813,7 +823,7 @@ describe("requireRateLimit middleware", () => {
         ),
       );
       app.get("/ok", (c) => c.json({ ok: true }));
-      app.onError(createErrorHandler(makeNoop()));
+      app.onError(createErrorHandler(mockInstrumentation()));
 
       const res = await app.request("/ok");
       expect(res.status).toBe(429);
@@ -841,12 +851,7 @@ describe("requireRateLimit middleware", () => {
 
     it("does NOT warn when outbox is provided", () => {
       warnSpy.mockClear();
-      const outbox: IOutboxRepository = {
-        enqueue: async () => {},
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const outbox = mockPort<IOutboxRepository>();
       requireRateLimit({ limiter: makeLimiter(allowDecision()), outbox }, AUTH_SIGN_IN_POLICY);
       expect(warnSpy).not.toHaveBeenCalled();
     });

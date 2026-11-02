@@ -5,6 +5,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@packages/ui/components/ui/dialog";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import {
   Table,
   TableBody,
@@ -12,19 +14,20 @@ import {
   TableHeader,
   TableRow,
 } from "@packages/ui/components/ui/table";
-import { TypographyH1 } from "@packages/ui/components/ui/typography";
+import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../shared/api/errors/toast";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
+import { GuardHint } from "../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../shared/auth/impersonation-reason";
 import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { useImpersonationGuard } from "../../shared/auth/use-impersonation-guard";
 import { SecretRevealDialog } from "../../shared/components/secret-reveal-dialog";
-import { getErrorsT } from "../../shared/i18n/get-errors-t";
 import { createTokenMutationOptions, deleteTokenMutationOptions } from "./api/api-tokens.mutations";
 import { apiTokensQueryOptions } from "./api/api-tokens.queries";
 import type { TokenFormInput } from "./api-tokens.schema";
@@ -44,6 +47,7 @@ const DEFAULT_VALUES: TokenFormInput = {
 
 function ApiTokensPage() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const qc = useQueryClient();
   const guard = useImpersonationGuard();
   const [creating, setCreating] = useState(false);
@@ -63,11 +67,7 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.createdToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.createApiToken", { defaultValue: "Failed to create API token" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("createApiToken")),
   });
 
   const revoke = useMutation({
@@ -76,33 +76,33 @@ function ApiTokensPage() {
       void qc.invalidateQueries({ queryKey: apiTokensQueryOptions(organizationId).queryKey });
       toast.success(t("apiTokens.revokedToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.revokeApiToken", { defaultValue: "Failed to revoke API token" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("revokeApiToken")),
   });
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <TypographyH1 variant="page">{t("apiTokens.pageTitle")}</TypographyH1>
-        <Button
-          onClick={() => setCreating(true)}
-          disabled={guard.blocked}
-          {...guard.describeProps()}
-        >
-          {t("apiTokens.newTokenAction")}
-        </Button>
-      </div>
+    <main className="flex flex-col gap-8">
+      <PageHeader
+        title={t("apiTokens.pageTitle")}
+        actions={
+          <GuardHint guard={guard}>
+            <Button
+              onClick={() => setCreating(true)}
+              disabled={guard.blocked}
+              {...guard.describeProps()}
+            >
+              {t("apiTokens.newTokenAction")}
+            </Button>
+          </GuardHint>
+        }
+      />
       <ImpersonationReason guard={guard} />
 
       {tokens.isLoading ? (
-        <p>{t("apiTokens.loading")}</p>
-      ) : tokens.isError ? (
-        <p>{t("apiTokens.loadFailed")}</p>
+        <TypographyMuted>{t("apiTokens.loading")}</TypographyMuted>
+      ) : tokens.isLoadingError ? (
+        <LoadErrorAlert message={t("apiTokens.loadFailed")} />
       ) : tokens.data?.items.length === 0 ? (
-        <p className="text-muted-foreground">{t("apiTokens.empty")}</p>
+        <TypographyMuted>{t("apiTokens.empty")}</TypographyMuted>
       ) : (
         <Table>
           <TableHeader>
@@ -133,7 +133,7 @@ function ApiTokensPage() {
       )}
 
       <Dialog open={creating} onOpenChange={(open) => !open && setCreating(false)}>
-        <DialogContent>
+        <DialogContent closeLabel={tCommon("actions.close")}>
           <DialogHeader>
             <DialogTitle>{t("apiTokens.createDialogTitle")}</DialogTitle>
           </DialogHeader>

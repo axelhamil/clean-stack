@@ -1,14 +1,9 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
 import { Can } from "../../../shared/auth/can";
@@ -26,7 +21,9 @@ export function OrgNotificationDefaultsCard() {
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
   const organizationId = useActiveOrgId();
-  const { data, isPending } = useQuery(orgNotificationPreferencesQueryOptions(organizationId));
+  const { data, isPending, isLoadingError } = useQuery(
+    orgNotificationPreferencesQueryOptions(organizationId),
+  );
   const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
 
   const update = useMutation({
@@ -35,19 +32,20 @@ export function OrgNotificationDefaultsCard() {
       queryClient.invalidateQueries({
         queryKey: orgNotificationPreferencesQueryOptions(organizationId).queryKey,
       }),
-    onError: () => toast.error(t("organization.saveDefaultsFailed")),
+    onError: (err) => toastError(err, t("organization.saveDefaultsFailed")),
   });
 
   const handleChange = (change: PreferenceChange) => update.mutate(change);
 
   return (
     <Can requires={{ organization: ["update"] }}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("organization.notificationDefaultsTitle")}</CardTitle>
-          <CardDescription>{t("organization.notificationDefaultsDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <SettingsSection
+        title={t("organization.notificationDefaultsTitle")}
+        description={t("organization.notificationDefaultsDescription")}
+      >
+        {isLoadingError ? (
+          <LoadErrorAlert message={t("notifications.loadFailed")} />
+        ) : (
           <PreferenceMatrix
             rows={rows}
             onChange={handleChange}
@@ -55,8 +53,8 @@ export function OrgNotificationDefaultsCard() {
             disabled={isPending}
             guard={guard}
           />
-        </CardContent>
-      </Card>
+        )}
+      </SettingsSection>
       <ImpersonationReason guard={guard} />
     </Can>
   );

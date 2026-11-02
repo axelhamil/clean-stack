@@ -10,8 +10,8 @@ export abstract class WatchedList<T> {
   private removed: T[];
 
   protected constructor(initialItems?: T[]) {
-    this.currentItems = initialItems ?? [];
-    this.initial = initialItems ?? [];
+    this.currentItems = [...(initialItems ?? [])];
+    this.initial = [...(initialItems ?? [])];
     this.new = [];
     this.removed = [];
   }
@@ -58,8 +58,10 @@ export abstract class WatchedList<T> {
   }
 
   public find(predicate: (item: T) => boolean): Option<T> {
-    const item = this.currentItems.find(predicate);
-    return item ? Some.of(item) : None.of<T>();
+    const index = this.currentItems.findIndex(predicate);
+    if (index === -1) return None.of<T>();
+
+    return Some.of(this.currentItems[index] as T);
   }
 
   public exists(item: T): boolean {

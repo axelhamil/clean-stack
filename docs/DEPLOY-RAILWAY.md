@@ -1,48 +1,52 @@
 # Deploy to Railway (reference)
 
-Runbook for shipping clean-stack on Railway. Config-as-code lives under `infra/railway/*.toml`. The provider switch out (Fly.io, Render, Cloud Run) is documented at the bottom — Dockerfiles are portable.
+Runbook for shipping clean-stack on Railway. Config-as-code lives under `infra/railway/*.toml`. The provider switch out (Fly.io, Render, Cloud Run) is documented at the bottom, Dockerfiles are portable.
 
-> **TL;DR**: 3 services (`api`, `app`, `cron`) + 1 Postgres add-on + 1 Cloudflare R2 bucket (external). Each service points at `infra/railway/<service>.toml`. Shared secrets centralized via Railway **Shared Variables**, referenced as `${{shared.NAME}}`.
+> **TL;DR**: 4 services (`api`, `app`, `admin`, `cron`) + 1 Postgres add-on + 1 Cloudflare R2 bucket (external). Each service points at `infra/railway/<service>.toml`. Shared secrets centralized via Railway **Shared Variables**, referenced as `${{shared.NAME}}`.
 
 ---
 
 ## 0. Hard requirements & gotchas (read this first)
 
-The non-obvious failure modes that crash a fresh deploy. Every one below was hit bringing this reference up — each produces a confusing or **log-less** failure.
+The non-obvious failure modes that crash a fresh deploy. Every one below was hit bringing this reference up, each produces a confusing or **log-less** failure.
 
-**Boot is fail-hard on these (prod) — the API refuses to start without them:**
+**Boot is fail-hard on these (prod): the API refuses to start without them:**
 
 - `NODE_ENV=production` (see the trap below)
-- `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
-- `APP_URL` (public app URL, e.g. `https://app.example.com`) — Zod-required in `env.ts` at any `NODE_ENV`; the API refuses to boot if the value is absent or not a valid URL. Auth email links, the CSP-report origin filter, and the impersonation notification email all derive from it. The `.env.example` provides `http://localhost:5173` as the dev default.
+- `BETTER_AUTH_SECRET` (≥ 32 chars), `INTERNAL_SIGNING_KEY` (≥ 32 chars), `WEBHOOK_MASTER_KEY` (64 hex), `API_TOKEN_PEPPER` (≥ 32 chars), `SCIM_CREDENTIAL_HASH_SECRET` (≥ 32 chars), `CORS_ORIGIN` (the app public origin), `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` (see [INTEGRATIONS.md](INTEGRATIONS.md) section 4), and `INTERNAL_AUTH_LAYERS` must include `signature`. Missing any → boot throws in `apps/api/src/shared/env.ts`.
+- `APP_URL` (public app URL, e.g. `https://app.example.com`): Zod-required in `env.ts` at any `NODE_ENV`; the API refuses to boot if the value is absent or not a valid URL. Auth email links, the CSP-report origin filter, and the impersonation notification email all derive from it. The `.env.example` provides `http://localhost:5173` as the dev default.
 
-**Boot degrades gracefully on these — the API starts, the feature stays inert until configured:**
+**Boot degrades gracefully on these, the API starts, the feature stays inert until configured:**
 
 - `RESEND_*` unset → emails are **logged to stdout, not delivered** (sign-up verification, magic link, password reset, org invitation silently don't send). Warn at boot, no crash.
 - `S3_*` unset → uploads return `STORAGE_PROVIDER_FAILURE`; `/readyz` reports `storage:s3 fail` (non-critical). Warn at boot, no crash.
 - ⇒ You **can** smoke-deploy without R2/Resend, but those flows won't actually work until the vars are set.
 
-**`NODE_ENV` trap.** The Dockerfile sets `ENV NODE_ENV=production`, but a Railway **service variable** `NODE_ENV=development` *overrides it at runtime* (service vars beat Dockerfile `ENV`). In dev mode the logger loads `pino-pretty` — a devDependency absent from the `--prod` install → instant boot crash (`unable to determine transport target for "pino-pretty"`). Fix: set `NODE_ENV=production` explicitly, or don't set `NODE_ENV` at all (let the Dockerfile win). Never `development` in prod.
+**`NODE_ENV` trap.** The Dockerfile sets `ENV NODE_ENV=production`, but a Railway **service variable** `NODE_ENV=development` *overrides it at runtime* (service vars beat Dockerfile `ENV`). In dev mode the logger loads `pino-pretty`: a devDependency absent from the `--prod` install → instant boot crash (`unable to determine transport target for "pino-pretty"`). Fix: set `NODE_ENV=production` explicitly, or don't set `NODE_ENV` at all (let the Dockerfile win). Never `development` in prod.
 
-**`app` service: leave the Start Command EMPTY.** The app runner image is `caddy:2.11-alpine` — no Node, no pnpm. The Dockerfile `CMD` runs `caddy run …`. A Railway **Start Command** override (e.g. a leftover `pnpm --filter app start`) *replaces* the Caddy CMD → the container exits instantly with **zero logs**, the healthcheck never passes, the deploy fails silently and looks like a phantom. Settings → Deploy → **Start Command must be blank** for `app`.
+**`app` service: leave the Start Command EMPTY.** The app runner image is `caddy:2.11-alpine`: no Node, no pnpm. The Dockerfile `CMD` runs `caddy run …`. A Railway **Start Command** override (e.g. a leftover `pnpm --filter app start`) *replaces* the Caddy CMD → the container exits instantly with **zero logs**, the healthcheck never passes, the deploy fails silently and looks like a phantom. Settings → Deploy → **Start Command must be blank** for `app`.
 
-**Cross-site auth cookies.** On Railway-generated domains, `app` and `api` sit on different `*.up.railway.app` hosts = different sites (`up.railway.app` is a public suffix). BetterAuth's session cookie must be `SameSite=None; Secure` to survive a cross-site credentialed `fetch` — already wired (`apps/api/src/auth.ts`: `sameSite: isProd ? "none" : "lax"`). With a **custom domain under one parent** (`api.x.com` + `app.x.com`) the cookie is same-site → `SameSite=Lax` works and is preferable. See §8.
+**Cross-site auth cookies.** On Railway-generated domains, `app` and `api` sit on different `*.up.railway.app` hosts = different sites (`up.railway.app` is a public suffix). BetterAuth's session cookie must be `SameSite=None; Secure` to survive a cross-site credentialed `fetch`: already wired (`apps/api/src/auth.ts`: `sameSite: isProd ? "none" : "lax"`). With a **custom domain under one parent** (`api.x.com` + `app.x.com`) the cookie is same-site → `SameSite=Lax` works and is preferable. See §8.
 
-**Deploys build from the connected branch.** Changing a variable, hitting *Redeploy*, or pushing all rebuild from the GitHub branch wired to the service (`main`). `railway up` is the only path that deploys local working-tree code — handy for validation, but it does **not** populate `RAILWAY_GIT_*` vars, so build-info shows `unknown` until a real branch deploy.
+**Draining time must exceed the shutdown deadline.** On a redeploy Railway sends `SIGTERM`, then `SIGKILL` once the service's draining time (`RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, Settings → Deploy) runs out. Railway does not document the default, staff answers put it at a few seconds, so treat the setting as required. The API needs up to `SHUTDOWN_DEADLINE_MS` (36 s by default) to drain HTTP, stop the workers and flush telemetry, so set the draining time on `api` above it (e.g. `40`). Below it, the process is killed mid-drain: in-flight emails can be sent twice and the last Sentry batch is lost. Detail: [HEALTH-PROBES.md](HEALTH-PROBES.md#graceful-shutdown-readyz-flips-before-workers-stop).
+
+**Stop the old api before a release that ships outbox migration `0024`.** The api container migrates on start (`bun dist/migrate.js && bun dist/index.js`), and an api built before that migration recreates the `outbox_notify` trigger every time it boots. Scale the `api` service to zero (or wait for the old deployment to be fully removed) before the new one starts, so no old pod restarts after the migration; the new dispatcher drops the trigger once at start as a safety net only. See `docs/EVENTS.md`, delivery section.
+
+**Deploys build from the connected branch.** Changing a variable, hitting *Redeploy*, or pushing all rebuild from the GitHub branch wired to the service (`main`). `railway up` is the only path that deploys local working-tree code, handy for validation, but it does **not** populate `RAILWAY_GIT_*` vars, so build-info shows `unknown` until a real branch deploy.
 
 ---
 
 ## 1. Prerequisites
 
 **Required for any deploy:**
-- Railway account (Hobby plan minimum — Pro recommended for PITR + EU region)
+- Railway account (Hobby plan minimum, Pro recommended for PITR + EU region)
 - GitHub repo connected to Railway
 - Domain control (or use Railway-provided `*.up.railway.app` subdomain)
 
-**Optional — the API boots without them, features stay inert until configured (see §0):**
-- Cloudflare account (R2 bucket, EU jurisdiction) — needed for uploads
-- Resend account (verified sending domain SPF+DKIM+DMARC, EU region) — needed for any email flow
-- Sentry account (EU residency: `*.eu.sentry.io` DSN) — needed for error tracking
+**Optional, the API boots without them, features stay inert until configured (see §0):**
+- Cloudflare account (R2 bucket, EU jurisdiction): needed for uploads
+- Resend account (verified sending domain SPF+DKIM+DMARC, EU region): needed for any email flow
+- Sentry account (EU residency: `*.eu.sentry.io` DSN): needed for error tracking
 
 Local tooling: `railway` CLI (`npm i -g @railway/cli` or `brew install railway`).
 
@@ -51,10 +55,10 @@ Local tooling: `railway` CLI (`npm i -g @railway/cli` or `brew install railway`)
 ## 2. Create project + link Postgres
 
 ```bash
-# Option A — link to an existing project
+# Option A, link to an existing project
 railway link <project-id>
 
-# Option B — create from scratch
+# Option B, create from scratch
 railway init
 ```
 
@@ -70,19 +74,19 @@ railway add --database postgres-ssl
 
 Set the region to `europe-west4` (Amsterdam) via the dashboard for RGPD compliance: **Settings → Region**.
 
-The add-on exposes `${{Postgres.DATABASE_URL}}` to other services — never copy the URL by value.
+The add-on exposes `${{Postgres.DATABASE_URL}}` to other services, never copy the URL by value.
 
 ---
 
-## 3. Create the 3 services
+## 3. Create the 4 services
 
-For **each** service (`api`, `app`, `cron`) — either via dashboard (recommended for first deploy) or CLI:
+For **each** service (`api`, `app`, `admin`, `cron`): either via dashboard (recommended for first deploy) or CLI:
 
 ### Dashboard flow
 
 1. **New Service → Deploy from GitHub repo** → select the repo, branch `main`
 2. **Settings → Service**:
-   - **Root Directory**: `/` (repo root — shared monorepo pattern, lets the Dockerfile resolve `packages/`)
+   - **Root Directory**: `/` (repo root, shared monorepo pattern, lets the Dockerfile resolve `packages/`)
    - **Config-as-code Path**: `infra/railway/<service>.toml`
 3. **Variables**: see §4 below
 4. (api + app only) **Networking → Public Networking → Generate Domain** (or attach custom domain later)
@@ -105,6 +109,9 @@ Set these **once at project level**, then reference from each service:
 | `INTERNAL_SIGNING_KEY`  | `openssl rand -hex 32` (min 32 chars) | api + cron      |
 | `WEBHOOK_MASTER_KEY`    | `openssl rand -hex 32` (64 hex chars) | api             |
 | `API_TOKEN_PEPPER`      | `openssl rand -hex 32` (min 32 chars) | api             |
+| `SCIM_CREDENTIAL_HASH_SECRET` | `openssl rand -hex 32` (min 32 chars) | api       |
+| `STRIPE_SECRET_KEY`     | Stripe dashboard, see [INTEGRATIONS.md](INTEGRATIONS.md) section 4 | api |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint signing secret, see [INTEGRATIONS.md](INTEGRATIONS.md) section 4 | api |
 | `RESEND_API_KEY`        | Resend dashboard (live key)           | api             |
 | `RESEND_FROM`           | `onboarding@<your-verified-domain>`   | api             |
 | `S3_ENDPOINT`           | `https://<account>.r2.cloudflarestorage.com` | api      |
@@ -122,13 +129,13 @@ Set these **once at project level**, then reference from each service:
 **`api`** service:
 
 ```env
-NODE_ENV=production                           # NEVER "development" in prod — see §0 NODE_ENV trap
+NODE_ENV=production                           # NEVER "development" in prod, see §0 NODE_ENV trap
 PORT=${{PORT}}                                # Railway injects automatically
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 BETTER_AUTH_URL=https://api.<your-domain>     # or ${{RAILWAY_PUBLIC_DOMAIN}}
 BETTER_AUTH_SECRET=${{shared.BETTER_AUTH_SECRET}}
-APP_URL=https://app.<your-domain>             # REQUIRED — Zod env schema (any env); email links + CSP filter + impersonation email
-CORS_ORIGIN=https://app.<your-domain>     # REQUIRED — api fails hard at boot without it (no localhost fallback)
+APP_URL=https://app.<your-domain>             # REQUIRED, Zod env schema (any env); email links + CSP filter + impersonation email
+CORS_ORIGIN=https://app.<your-domain>     # REQUIRED, api fails hard at boot without it (no localhost fallback)
 TRUSTED_PROXIES=private                       # trusts Railway's edge-proxy private range → real client IP from XFF (else: collective lockout)
 RATE_LIMIT_STORE=postgres                     # durable + shared across replicas; "memory" is per-replica (under-counts when scaled)
 RESEND_API_KEY=${{shared.RESEND_API_KEY}}
@@ -136,9 +143,10 @@ RESEND_FROM=${{shared.RESEND_FROM}}
 INTERNAL_SIGNING_KEY=${{shared.INTERNAL_SIGNING_KEY}}
 INTERNAL_AUTH_LAYERS=signature                # add ",private-network" if Railway private mesh is on
 WEBHOOK_MASTER_KEY=${{shared.WEBHOOK_MASTER_KEY}}
-API_TOKEN_PEPPER=${{shared.API_TOKEN_PEPPER}}    # required — HMAC key for token storage
+API_TOKEN_PEPPER=${{shared.API_TOKEN_PEPPER}}    # required, HMAC key for token storage
 API_TOKEN_PEPPER_PREVIOUS=                       # set during pepper rotation (see below)
 API_TOKEN_PEPPER_VERSION=1                       # increment when rotating
+SCIM_CREDENTIAL_HASH_SECRET=${{shared.SCIM_CREDENTIAL_HASH_SECRET}}   # required, HMAC key for SCIM directory tokens (rotating it invalidates every issued token)
 API_TOKEN_PREFIX=clean_                          # prefix every clone should change
 S3_ENDPOINT=${{shared.S3_ENDPOINT}}
 S3_REGION=${{shared.S3_REGION}}
@@ -157,13 +165,13 @@ BUILD_TIME=${{RAILWAY_GIT_COMMIT_MESSAGE}}    # Railway has no build-timestamp r
 
 ### API token pepper rotation
 
-The pepper is the HMAC key for token storage — a compromised pepper means a DB dump can brute-force tokens offline. Rotate it annually or on suspected exposure:
+The pepper is the HMAC key for token storage, a compromised pepper means a DB dump can brute-force tokens offline. Rotate it annually or on suspected exposure:
 
 1. Generate a new pepper: `openssl rand -hex 32`
 2. Set `API_TOKEN_PEPPER` = new value, `API_TOKEN_PEPPER_PREVIOUS` = old value, `API_TOKEN_PEPPER_VERSION` = `<n+1>`. Redeploy.
 3. Traffic will now accept tokens verified against both peppers (`PREVIOUS` as fallback). New tokens are stored with the new pepper; existing rows migrate lazily on next use (the middleware re-HMACs on successful `PREVIOUS` verify).
 4. When all rows have migrated: `SELECT pepper_version, count(*) FROM api_token WHERE revoked_at IS NULL GROUP BY 1`. Once no rows show the old version, clear `API_TOKEN_PEPPER_PREVIOUS`. Redeploy.
-5. Clients never see the pepper — rotation is zero-downtime and transparent to PAT holders.
+5. Clients never see the pepper, rotation is zero-downtime and transparent to PAT holders.
 
 **`app`** service:
 
@@ -176,6 +184,24 @@ The pepper is the HMAC key for token storage — a compromised pepper means a DB
 | `PORT`                  | (Railway injects)                    | Runtime       |
 
 **Build args** (`VITE_*`) are baked into the bundle at build time. Set them under **Settings → Build → Build Args** (not Variables). Changing them requires a fresh build.
+
+**`admin`** service (same image rules as `app`: leave the Start Command empty):
+
+| Var                     | Value                                | Type          |
+| ----------------------- | ------------------------------------ | ------------- |
+| `VITE_API_URL`          | `https://api.<your-domain>`          | **Build arg and runtime** (Caddy reads it for the CSP) |
+| `VITE_APP_URL`          | `https://app.<your-domain>`          | **Build arg** |
+| `VITE_SENTRY_DSN`       | Sentry admin project DSN (EU)        | Build arg     |
+| `CSP_CONNECT_EXTRA`     | Sentry ingest origin, when a DSN is set | Runtime    |
+| `PORT`                  | (Railway injects)                    | Runtime       |
+
+The `app` service also takes `VITE_ADMIN_URL=https://admin.<your-domain>` as a build arg (the only external target sign-in may return to), and `api` takes `ADMIN_URL` with the same value (joins CORS and CSRF), plus `AUTH_COOKIE_DOMAIN=<your-domain>` when the session must span the subdomains.
+
+**`AUTH_COOKIE_DOMAIN` is off by default, leave it empty unless staff must share the session across subdomains.** Once set, every host under that domain receives the session cookie: never set it if a subdomain serves user content or a third party (status page, docs host, marketing tool), since any of them could read or fixate the session. A public suffix refuses the boot.
+
+**Existing `.env` files** predate `ADMIN_URL` (`apps/api`) and `VITE_ADMIN_URL` (`apps/app`), and `pnpm bootstrap` never overwrites a file: add both by hand, or sign-in will not return to the back office. Same for build args on a service that already exists.
+
+**`admin` needs a custom domain in production.** On `*.up.railway.app` the hosts are different sites under a public suffix, so no cookie domain can span them and a staff session would rest on third-party cookies. A value of `AUTH_COOKIE_DOMAIN` that is not a parent of `APP_URL`, `BETTER_AUTH_URL` and `ADMIN_URL` refuses the boot. If a cookie change still locks staff out, the break-glass path is `PLATFORM_ADMIN_IDS` plus removing `AUTH_COOKIE_DOMAIN`.
 
 **`cron`** service:
 
@@ -191,7 +217,7 @@ SENTRY_ENVIRONMENT=production
 
 ## 5. Storage: Cloudflare R2 (default)
 
-Why R2 over Railway Bucket: **10 GB free + zero egress + $4.50/1M class A**. Railway Bucket charges egress service→bucket (public network) — invisible until the bill arrives.
+Why R2 over Railway Bucket: **10 GB free + zero egress + $4.50/1M class A**. Railway Bucket charges egress service→bucket (public network): invisible until the bill arrives.
 
 Setup:
 
@@ -225,9 +251,9 @@ If you choose Railway Bucket: `railway add --bucket <name>`, region `europe-west
 
 1. Resend dashboard → **Domains → Add Domain** → verify SPF + DKIM + DMARC
 2. **Settings → Region → EU** (irrelevant for routing, matters for log residency)
-3. **API Keys → Create** with `sending_access` scope only — store as `RESEND_API_KEY` shared var
+3. **API Keys → Create** with `sending_access` scope only, store as `RESEND_API_KEY` shared var
 4. `RESEND_FROM=onboarding@<your-verified-domain>` (or any address on the verified domain)
-5. The 8 template IDs are hardcoded **empty** in `apps/api/src/shared/services/email.service.ts` (`TEMPLATE_IDS`) — fill each from the Resend dashboard when cloning. Empty IDs (or a missing `RESEND_API_KEY`) no longer crash the boot: the service logs a warning and those emails are **logged, not delivered**. Set `RESEND_API_KEY`, `RESEND_FROM`, and all 8 IDs before relying on any email flow (verification, magic link, password reset, org invitation, RGPD export/deletion notices).
+5. The 8 template IDs are hardcoded **empty** in `apps/api/src/shared/services/email-delivery-worker.service.ts` (`TEMPLATE_IDS`): fill each from the Resend dashboard when cloning. Empty IDs (or a missing `RESEND_API_KEY`) no longer crash the boot: the service logs a warning and those emails are **logged, not delivered**. Set `RESEND_API_KEY`, `RESEND_FROM`, and all 8 IDs before relying on any email flow (verification, magic link, password reset, org invitation, RGPD export/deletion notices).
 
 ---
 
@@ -246,8 +272,9 @@ If you choose Railway Bucket: `railway add --bucket <name>`, region `europe-west
 1. **Service → Networking → Custom Domain**:
    - `api`: `api.<your-domain>` → CNAME points to Railway-provided target
    - `app`: `app.<your-domain>` → CNAME points to Railway-provided target
+   - `admin`: `admin.<your-domain>` → CNAME points to Railway-provided target
 2. TLS via Let's Encrypt auto (Railway-managed). Wait ~60s for cert issuance.
-3. Update `BETTER_AUTH_URL`, `APP_URL`, `CORS_ORIGIN`, `VITE_API_URL` (build arg) accordingly — **redeploy app** (build arg change requires rebuild).
+3. Update `BETTER_AUTH_URL`, `APP_URL`, `ADMIN_URL`, `CORS_ORIGIN`, `VITE_API_URL`, `VITE_APP_URL`, `VITE_ADMIN_URL` (build args) accordingly, **redeploy app and admin** (build arg change requires rebuild).
 
 If you skip custom domains: use the `${{RAILWAY_PUBLIC_DOMAIN}}` reference var (auto-resolves to the `*.up.railway.app` URL).
 
@@ -261,7 +288,7 @@ The browser holds the BetterAuth session cookie; it's only sent on requests to `
 | **Custom, shared parent** (`app.x.com` + `api.x.com`) | Same-site | `SameSite=Lax` is enough and is preferable (less CSRF surface) | Set `BETTER_AUTH_URL`/`APP_URL`/`CORS_ORIGIN`/`VITE_API_URL` to the custom hosts. |
 | **Same host, path-split** (`x.com` + `x.com/api` via proxy) | Same-origin | `SameSite=Lax`, no CORS at all | Requires a reverse proxy in front; not the default here. |
 
-Whatever the topology, these four must agree and point at **public** URLs (never `*.railway.internal` — the browser can't resolve the private mesh):
+Whatever the topology, these four must agree and point at **public** URLs (never `*.railway.internal`: the browser can't resolve the private mesh):
 - api `BETTER_AUTH_URL` → the **api** public URL
 - api `CORS_ORIGIN` → the **app** public origin (drives both `cors()` and BetterAuth `trustedOrigins`; must be a specific origin, not `*`, because requests are credentialed)
 - api `APP_URL` → the **app** public URL (used to build email links)
@@ -278,13 +305,13 @@ curl -i -X OPTIONS -H "Origin: https://<app-public-url>" -H "Access-Control-Requ
 
 ## 9. First deploy
 
-Railway's GitHub integration watches the `main` branch by default — push triggers auto-deploy per service, scoped by the `watchPatterns` in each `infra/railway/<service>.toml` (api won't rebuild when only `apps/app/` changes). No deploy webhook / GH Actions plumbing required.
+Railway's GitHub integration watches the `main` branch by default, push triggers auto-deploy per service, scoped by the `watchPatterns` in each `infra/railway/<service>.toml` (api won't rebuild when only `apps/app/` changes). No deploy webhook / GH Actions plumbing required.
 
 ```bash
 git push origin dev
 ```
 
-Open PR `dev → main`, merge as a **merge commit** (NOT squash — release flow requirement). semantic-release tags on `main` → Railway picks up the push → each service rebuilds if its `watchPatterns` matched the diff.
+Open PR `dev → main`, merge as a **merge commit** (NOT squash, release flow requirement). semantic-release tags on `main` → Railway picks up the push → each service rebuilds if its `watchPatterns` matched the diff.
 
 Release tag tracking: `GIT_SHA` and `BUILD_TIME` are auto-injected by Railway via `${{RAILWAY_GIT_COMMIT_SHA}}` and `${{RAILWAY_GIT_COMMIT_MESSAGE}}` reference vars (already wired in §4 per-service Variables). Sentry releases pick up the SHA automatically.
 
@@ -299,15 +326,15 @@ curl -i https://app.<your-domain>/health      # → 200 "OK" (Caddy)
 curl -i https://app.<your-domain>/            # → 200 index.html
 ```
 
-**Why `/livez` is bare.** Liveness/startup probes are public and unauthenticated, so they return only `{status, uptimeMs}`. Build metadata (`version`, `commitSha`, `runtime`) is an information-disclosure vector — version fingerprinting for CVE lookup, and for a private clone the commit SHA maps the running binary to exact source. It lives behind `/internal/build-info`, gated by the same signed-HMAC layer as the sweeps (`internalLayers`). Call it with a signed internal request (see `apps/api/src/shared/internal-routes/internal-fetch.ts`). **Never move build info back onto a public probe.**
+**Why `/livez` is bare.** Liveness/startup probes are public and unauthenticated, so they return only `{status, uptimeMs}`. Build metadata (`version`, `commitSha`, `runtime`) is an information-disclosure vector, version fingerprinting for CVE lookup, and for a private clone the commit SHA maps the running binary to exact source. It lives behind `/internal/build-info`, gated by the same signed-HMAC layer as the sweeps (`internalLayers`). Call it with a signed internal request (see `apps/api/src/shared/internal-routes/internal-fetch.ts`). **Never move build info back onto a public probe.**
 
-`/readyz` returning 503 means a *critical* probe failed (e.g. Postgres) — check `railway logs --service api` for the probe name. A `"warn"` status with `storage:s3 fail` is expected and non-critical when R2 isn't configured.
+`/readyz` returning 503 means a *critical* probe failed (e.g. Postgres): check `railway logs --service api` for the probe name. A `"warn"` status with `storage:s3 fail` is expected and non-critical when R2 isn't configured.
 
 ---
 
 ## 10. Smoke-test post-deploy
 
-Run through every primary flow. If any step fails, the deploy is **not validated** — fix forward.
+Run through every primary flow. If any step fails, the deploy is **not validated**: fix forward.
 
 1. **Sign-up via UI** → email arrives via Resend → click verification link → land on dashboard
 2. **Create organization** → verify `organization` + `member` rows in Postgres (`railway connect Postgres`)
@@ -324,7 +351,7 @@ Run through every primary flow. If any step fails, the deploy is **not validated
 
 ---
 
-## 11. Removability — switching providers
+## 11. Removability, switching providers
 
 Everything Railway-specific is in 3 places:
 - `infra/railway/*.toml`
@@ -371,15 +398,15 @@ Each switch keeps the Dockerfiles, the `apps/api/src/cron/sweep.ts` entrypoint, 
 
 | Symptom                                          | Likely cause                                                                  |
 | ------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `/livez` returns 200 but service shows "Crashed" | Railway `healthcheckPath` mismatch — verify it's `/livez` (api) / `/health` (app) in `infra/railway/<svc>.toml` |
-| Build fails: `Cannot find module '@packages/...'` | Root directory not set to `/` — Docker build context excludes `packages/`   |
-| `Dockerfile not found`                           | `dockerfilePath` is relative to repo root, not service root — keep as `apps/api/prod.Dockerfile` |
-| `BETTER_AUTH_SECRET min length 32`               | Empty or short — generate with `openssl rand -base64 32`                      |
-| `INTERNAL_AUTH_LAYERS must include "signature"`  | env-driven check at boot (`apps/api/src/shared/env.ts`) — set it             |
+| `/livez` returns 200 but service shows "Crashed" | Railway `healthcheckPath` mismatch, verify it's `/livez` (api) / `/health` (app) in `infra/railway/<svc>.toml` |
+| Build fails: `Cannot find module '@packages/...'` | Root directory not set to `/`: Docker build context excludes `packages/`   |
+| `Dockerfile not found`                           | `dockerfilePath` is relative to repo root, not service root, keep as `apps/api/prod.Dockerfile` |
+| `BETTER_AUTH_SECRET min length 32`               | Empty or short, generate with `openssl rand -base64 32`                      |
+| `INTERNAL_AUTH_LAYERS must include "signature"`  | env-driven check at boot (`apps/api/src/shared/env.ts`): set it             |
 | Sentry events missing                            | DSN typo; check `${{shared.SENTRY_DSN}}` resolved (Railway logs at boot)      |
 | Cron service runs forever                        | `restartPolicyType = "NEVER"` missing in `infra/railway/cron.toml`            |
 | `app` shows blank page after deploy              | `VITE_API_URL` build arg missing/wrong → bundle has `undefined` or fails `z.url()` parse → fetch fails. Must be a full **public** URL (`https://…`), never `*.railway.internal`. Rebuild. |
-| R2 returns 403 on presigned URL                  | API token scope too narrow — must include Object Write + Read for the bucket  |
+| R2 returns 403 on presigned URL                  | API token scope too narrow, must include Object Write + Read for the bucket  |
 | `app` deploy **FAILED with no logs** ("Stopping Container", phantom crash) | A Railway **Start Command** override is set on `app` and replaces the Caddy CMD; the Caddy image has no Node/pnpm → instant exit. Clear Settings → Deploy → Start Command. See §0. |
 | api boot crash: `unable to determine transport target for "pino-pretty"` | `NODE_ENV=development` service var overriding the Dockerfile → logger loads a devDep absent in `--prod`. Set `NODE_ENV=production` (or unset it). See §0. |
 | api boot crash: `Cannot find module 'better-auth/...'` (from a `@packages/*`) | A workspace package imports a third-party lib in its **runtime** source but declares it only as `peerDependencies`/`devDependencies` → not installed by `pnpm install --prod`. Declare it under `dependencies`. |

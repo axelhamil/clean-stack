@@ -1,20 +1,22 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  EMAIL_NOT_VERIFIED_REDIRECT,
+  SSO_REDIRECT_IN_PROGRESS,
+} from "@packages/web-kit/observability/error-classifier";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
 import type { SignInInput } from "../../../shared/auth/auth.schema";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { redirectToSsoIfRequired, resolveAuthError, SSO_REDIRECT_IN_PROGRESS } from "../auth-error";
-
-const EMAIL_NOT_VERIFIED_REDIRECT = "email-not-verified-redirect";
+import { redirectToSsoIfRequired, resolveAuthError } from "../auth-error";
+import { rememberPostVerifyRedirect } from "../post-verify-redirect";
+import { useCompleteSignIn } from "./use-complete-sign-in";
 
 export function useSignIn(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const completeSignIn = useCompleteSignIn();
 
   return useMutation({
     mutationKey: ["session", "sign-in"],
@@ -26,13 +28,14 @@ export function useSignIn(redirectTo?: string) {
       });
 
       if (error) {
-        const code = error.code ?? "";
-        if (code === "EMAIL_NOT_VERIFIED" || /verif/i.test(error.message ?? "")) {
+        if (error.code === "EMAIL_NOT_VERIFIED" || /verif/i.test(error.message ?? "")) {
+          rememberPostVerifyRedirect(redirectTo);
           void navigate({ to: "/verify-email" });
           throw new Error(EMAIL_NOT_VERIFIED_REDIRECT);
         }
 
-        if (await redirectToSsoIfRequired(error)) throw new Error(SSO_REDIRECT_IN_PROGRESS);
+        if (await redirectToSsoIfRequired(error, redirectTo))
+          throw new Error(SSO_REDIRECT_IN_PROGRESS);
 
         throw new Error(resolveAuthError(error, "signIn.failed", t, tErrors));
       }
@@ -41,14 +44,7 @@ export function useSignIn(redirectTo?: string) {
     },
     onSuccess: async () => {
       toast.success(t("signIn.success"));
-
-      await queryClient.refetchQueries({
-        queryKey: sessionQueryOptions.queryKey,
-      });
-
-      broadcastAuthChange();
-
-      void navigate({ to: redirectTo ?? "/" });
+      await completeSignIn(redirectTo);
     },
     onError: (err) => {
       if (err.message === EMAIL_NOT_VERIFIED_REDIRECT || err.message === SSO_REDIRECT_IN_PROGRESS)

@@ -7,7 +7,7 @@ interface UntranslatedBodyBannerProps {
 }
 
 // Shared by every legal page whose body prose stays English by design (R3,
-// extended to the whole legal surface — task 14 review round 1: a French
+// extended to the whole legal surface: a French
 // title over an English body with no disclosure is the "translating half a
 // page is worse than none" defect the recipe names). Each call site decides
 // `show` for its own reason:

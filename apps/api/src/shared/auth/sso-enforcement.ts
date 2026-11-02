@@ -5,7 +5,7 @@ export interface EnforcedProvider {
   readonly organizationId: string;
 }
 
-export type EnforcementLookup = (domain: string) => Promise<EnforcedProvider | null>;
+export type EnforcementLookup = (domain: string) => Promise<Option<EnforcedProvider>>;
 
 export function domainOf(email: string): string | null {
   const parts = email.split("@");
@@ -20,5 +20,5 @@ export async function isSsoEnforcedFor(
 ): Promise<Option<EnforcedProvider>> {
   const domain = domainOf(email);
   if (!domain) return Option.none();
-  return Option.fromNullable(await lookup(domain));
+  return lookup(domain);
 }

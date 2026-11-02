@@ -1,16 +1,15 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { sessionQueryOptions } from "../../../shared/api/queries/session";
-import { broadcastAuthChange } from "../../../shared/auth/auth-broadcast";
 import { authClient } from "../../../shared/auth/auth-client";
 import { resolveAuthError } from "../auth-error";
+import { takePostVerifyRedirect } from "../post-verify-redirect";
+import { useCompleteSignIn } from "./use-complete-sign-in";
 
-export function useVerifyEmail() {
+export function useVerifyEmail(redirectTo?: string) {
   const { t } = useTranslation("auth");
   const { t: tErrors } = useTranslation("errors");
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const completeSignIn = useCompleteSignIn();
+
   return useMutation({
     mutationKey: ["email", "verify"],
     mutationFn: async (token: string) => {
@@ -21,14 +20,10 @@ export function useVerifyEmail() {
 
       return data;
     },
-    onSuccess: async () => {
-      await queryClient.refetchQueries({
-        queryKey: sessionQueryOptions.queryKey,
-      });
+    onSuccess: () => {
+      const remembered = takePostVerifyRedirect();
 
-      broadcastAuthChange();
-
-      void navigate({ to: "/" });
+      return completeSignIn(redirectTo ?? remembered);
     },
   });
 }

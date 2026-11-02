@@ -281,21 +281,21 @@ describe("Aggregate", () => {
       aggregate.changeName("Jane");
 
       const events = aggregate.domainEvents;
-      expect(events[0].eventType).toBe("UserCreated");
-      expect(events[1].eventType).toBe("UserNameChanged");
+      expect(events[0]?.eventType).toBe("UserCreated");
+      expect(events[1]?.eventType).toBe("UserNameChanged");
     });
 
     it("should set correct aggregateId on events", () => {
       const id = new UUID("test-id");
       const aggregate = TestAggregate.create({ name: "John", age: 30 }, id);
 
-      expect(aggregate.domainEvents[0].aggregateId).toBe("test-id");
+      expect(aggregate.domainEvents[0]?.aggregateId).toBe("test-id");
     });
 
     it("should set dateOccurred on events", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
 
-      expect(aggregate.domainEvents[0].dateOccurred).toBeInstanceOf(Date);
+      expect(aggregate.domainEvents[0]?.dateOccurred).toBeInstanceOf(Date);
     });
   });
 });

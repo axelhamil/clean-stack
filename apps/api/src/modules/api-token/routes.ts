@@ -6,11 +6,28 @@ import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.mi
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
+import { type ApiTokenRecord, tokenOwnerForSession } from "../../shared/ports/api-token.port";
 import { zV } from "../../shared/validator";
 import { createTokenBodySchema } from "./application/dto/create-token.dto";
-import { tokenOwnerForSession } from "./application/ports/api-token.port";
 
 type Vars = AuthVariables;
+
+/** The JSON shape of a token: no secret material, absent values as `null`. */
+function toTokenJson(record: ApiTokenRecord) {
+  return {
+    id: record.id,
+    userId: record.userId,
+    organizationId: record.organizationId.toNull(),
+    name: record.name,
+    scopes: record.scopes,
+    tokenStart: record.tokenStart,
+    lastUsedAt: record.lastUsedAt.toNull(),
+    expiresAt: record.expiresAt.toNull(),
+    revokedAt: record.revokedAt.toNull(),
+    revokedReason: record.revokedReason.toNull(),
+    createdAt: record.createdAt,
+  };
+}
 
 export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
   .get("/", requireAuth, async (c) => {
@@ -19,9 +36,7 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
     const owner = tokenOwnerForSession(user.id, session.activeOrganizationId ?? null);
     const result = await di.ApiTokenService.list(owner);
     if (result.isFailure) throw new AppErrorException(result.getError());
-    return c.json({
-      items: result.getValue().map(({ tokenHmac: _hmac, pepperVersion: _pv, ...rest }) => rest),
-    });
+    return c.json({ items: result.getValue().map(toTokenJson) });
   })
   .post(
     "/",
@@ -39,9 +54,9 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
           throw new HTTPException(403, { message: "Organization mismatch" });
         }
         const noop = async () => {};
-        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path — conditional middleware composition
+        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path (conditional middleware composition)
         await requireOrg(c as any, noop);
-        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path — conditional middleware composition
+        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path (conditional middleware composition)
         await requireOrgPermission({ apiToken: ["create"] })(c as any, noop);
       }
 
@@ -55,8 +70,7 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
       });
       if (result.isFailure) throw new AppErrorException(result.getError());
       const { record, raw } = result.getValue();
-      const { tokenHmac: _hmac, pepperVersion: _pv, ...safeRecord } = record;
-      return c.json({ token: raw, record: safeRecord }, 201);
+      return c.json({ token: raw, record: toTokenJson(record) }, 201);
     },
   )
   .delete("/:id", requireAuth, requireCurrentPolicies, denyImpersonated, async (c) => {

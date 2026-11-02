@@ -17,7 +17,7 @@ export interface CreateI18nOptions {
  * one recipient's locale into the next one's message.
  *
  * The English catalog is always registered under `DEFAULT_LOCALE`, in
- * addition to the target locale's resources — `fallbackLng: DEFAULT_LOCALE`
+ * addition to the target locale's resources: `fallbackLng: DEFAULT_LOCALE`
  * is otherwise a no-op: i18next can only fall back to a language whose
  * resources are actually loaded into the instance. Without this, a key
  * missing from a non-English catalog renders as the raw key string instead

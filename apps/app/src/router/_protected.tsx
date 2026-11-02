@@ -7,5 +7,5 @@ export const Route = createFileRoute("/_protected")({
     if (!session) throw redirect({ to: "/sign-in", search: { redirect: location.href } });
     return { user: session.user, sessionToken: session.session.token };
   },
-  component: () => <Outlet />,
+  component: Outlet,
 });

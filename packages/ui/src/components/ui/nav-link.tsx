@@ -15,7 +15,7 @@ const navLinkVariants = cva(
       variant: {
         plain: "text-muted-foreground hover:text-foreground",
         pill: "rounded-md px-3 py-1.5",
-        underline: "relative h-10 px-3",
+        underline: "relative h-10 px-3 focus-visible:ring-inset",
       },
       active: {
         true: "",
@@ -26,7 +26,7 @@ const navLinkVariants = cva(
       {
         variant: "pill",
         active: true,
-        className: "bg-accent text-accent-foreground",
+        className: "bg-accent text-primary",
       },
       {
         variant: "pill",
@@ -37,7 +37,7 @@ const navLinkVariants = cva(
         variant: "underline",
         active: true,
         className:
-          "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-foreground",
+          "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary",
       },
       {
         variant: "underline",

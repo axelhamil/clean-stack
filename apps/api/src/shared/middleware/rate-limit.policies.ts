@@ -12,7 +12,10 @@ export interface PolicyConfig {
   // Set on auth/abuse-sensitive policies: a store outage must not silently disable
   // brute-force protection (OWASP A10:2025 / CWE-636). GLOBAL/CSP stay fail-open.
   failClosed?: boolean;
+  captchaAboveRatio?: number;
 }
+
+const CAPTCHA_ABOVE_RATIO = 0.8;
 
 function ipKeyFn(name: string): (c: Context) => string {
   return (c) => `${name}:${resolveClientIp(c)}`;
@@ -20,7 +23,7 @@ function ipKeyFn(name: string): (c: Context) => string {
 
 // Two windows with two different jobs: the minute window bounds a BURST, the hour
 // window is the sustained anti-abuse ceiling. They must be tuned against what one
-// page view actually costs — measured here, a signed-in page view fires up to 8 API
+// page view actually costs, measured here, a signed-in page view fires up to 8 API
 // calls (session, consents, policies, notifications stream + count, three
 // organization endpoints), so a 60/min burst window meant ~7 navigations per minute
 // before a legitimate user got a 429. 300/min tolerates ~35 navigations in a burst
@@ -29,7 +32,7 @@ function ipKeyFn(name: string): (c: Context) => string {
 // credential path carries its own far tighter, fail-closed policy below.
 //
 // `sessionMiddleware` deliberately nulls the user for `/api/auth/*`, so BetterAuth
-// traffic — including a signed-in user's session and organization queries — keys on
+// traffic, including a signed-in user's session and organization queries, keys on
 // the IP, not the user. Two signed-in users behind one NAT therefore share this
 // bucket for that traffic.
 export const GLOBAL_POLICY: PolicyConfig = {
@@ -50,6 +53,7 @@ export const AUTH_SIGN_IN_POLICY: PolicyConfig = {
   windows: [{ policyName: "auth-sign-in", windowSec: 900, maxRequests: 5 }],
   emitSecurityEvent: true,
   failClosed: true,
+  captchaAboveRatio: CAPTCHA_ABOVE_RATIO,
 };
 
 export const AUTH_FORGOT_PASSWORD_POLICY: PolicyConfig = {
@@ -68,7 +72,7 @@ export const AUTH_MAGIC_LINK_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
-// /send-verification-email: public POST taking an arbitrary email, no session — the
+// /send-verification-email: public POST taking an arbitrary email, no session, the
 // same "make the server email a stranger" primitive as request-password-reset and
 // sign-in/magic-link, and it gets the same ceiling. Without its own policy the global
 // burst window is its only bound, which is not a bound on abuse: that window exists to
@@ -88,14 +92,56 @@ export const AUTH_SIGN_UP_POLICY: PolicyConfig = {
   windows: [{ policyName: "auth-sign-up", windowSec: 3600, maxRequests: 10 }],
   emitSecurityEvent: true,
   failClosed: true,
+  captchaAboveRatio: CAPTCHA_ABOVE_RATIO,
 };
+
+export function visitorCapRoutes(
+  maxRequests: number | undefined,
+  windowSec: number,
+): ReadonlyArray<readonly [path: string, policy: PolicyConfig]> {
+  if (maxRequests === undefined) return [];
+
+  return [
+    [
+      "/sign-up/email",
+      {
+        name: "accounts-per-visitor",
+        keyFn: ipKeyFn("accounts-per-visitor"),
+        windows: [{ policyName: "accounts-per-visitor", windowSec, maxRequests }],
+        emitSecurityEvent: true,
+        failClosed: true,
+      },
+    ],
+  ];
+}
 
 // Two-factor verify paths: /two-factor/verify-totp, /two-factor/verify-otp,
 // /two-factor/verify-backup-code (BetterAuth twoFactor plugin, confirmed via dist grep).
+export const ADMIN_STEP_UP_USER_POLICY: PolicyConfig = {
+  name: "admin-step-up-user",
+  keyFn: (c) => {
+    const user = c.get("user") as { id: string } | null | undefined;
+    return `admin-step-up-user:${user?.id ?? resolveClientIp(c)}`;
+  },
+  windows: [{ policyName: "admin-step-up-user", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
+  failClosed: true,
+  advertiseBudget: false,
+};
+
 export const AUTH_TWO_FACTOR_POLICY: PolicyConfig = {
   name: "auth-two-factor",
   keyFn: ipKeyFn("auth-two-factor"),
   windows: [{ policyName: "auth-two-factor", windowSec: 900, maxRequests: 5 }],
+  emitSecurityEvent: true,
+  failClosed: true,
+  advertiseBudget: false,
+};
+
+export const ACCOUNT_DELETE_POLICY: PolicyConfig = {
+  name: "account-delete",
+  keyFn: (c) => `account-delete:${c.get("user")?.id}`,
+  windows: [{ policyName: "account-delete", windowSec: 900, maxRequests: 5 }],
   emitSecurityEvent: true,
   failClosed: true,
   advertiseBudget: false,
@@ -135,7 +181,7 @@ export const AUTH_PASSKEY_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
-// Cookie consent POST — public guest endpoint, keyed by IP.
+// Cookie consent POST, public guest endpoint, keyed by IP.
 // fail-open: a store outage must not block consent recording (guest flow).
 // emitSecurityEvent=false: consent spam is not a security signal.
 // advertiseBudget=false: no RateLimit headers on consent routes.
@@ -150,7 +196,7 @@ export const CONSENT_POST_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
-// API token access — two separate policies mounted in sequence.
+// API token access, two separate policies mounted in sequence.
 // One policy per axis prevents an attacker with N tokens from bypassing the IP
 // ceiling by rotating tokens (a composite key would merge both counters).
 // failClosed=true: authenticated surface; a store outage must not disable the guard.
@@ -169,7 +215,7 @@ export const API_TOKEN_IP_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
-// GitHub Secret Scanning webhook — machine-to-machine, low frequency, public.
+// GitHub Secret Scanning webhook, machine-to-machine, low frequency, public.
 // fail-open: a store outage must not block revocation notifications.
 export const GITHUB_SCANNING_POLICY: PolicyConfig = {
   name: "github-scanning",
@@ -182,12 +228,12 @@ export const GITHUB_SCANNING_POLICY: PolicyConfig = {
   advertiseBudget: false,
 };
 
-// SCIM (RFC 7644) directory sync — bearer-token protocol surface with no session,
+// SCIM (RFC 7644) directory sync, bearer-token protocol surface with no session,
 // so it previously ran at the loose 300/min GLOBAL_POLICY (tuned for smoothing a
 // signed-in user's page navigation, not for bounding a machine client). Also the
 // surface the post-PR-review SCIM hardening closed (`auth.ts`: `hooks.before` reads
 // the bearer header before the plugin's own token verification to gate seat cap and
-// snapshot the deprovisioning actor) — a tight, fail-closed ceiling here is defense
+// snapshot the deprovisioning actor), a tight, fail-closed ceiling here is defense
 // in depth on top of that fix, not a substitute for it. Keyed by IP.
 export const SCIM_POLICY: PolicyConfig = {
   name: "scim",
@@ -200,7 +246,7 @@ export const SCIM_POLICY: PolicyConfig = {
   failClosed: true,
 };
 
-// Browser-sent CSP violation reports — no user identity, keyed by IP.
+// Browser-sent CSP violation reports, no user identity, keyed by IP.
 // emitSecurityEvent=false: the violation itself is the signal (emitted unconditionally per report).
 // advertiseBudget=false: no RateLimit headers exposed to browsers.
 export const CSP_REPORT_POLICY: PolicyConfig = {

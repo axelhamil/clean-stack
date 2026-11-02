@@ -1,16 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogFooter,
-} from "@packages/ui/components/ui/alert-dialog";
 import { Form } from "@packages/ui/components/ui/form";
 import { FormTextField } from "@packages/ui/components/ui/form-text-field";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
-import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { buildDeletionOnError } from "../build-deletion-on-error";
+import { DeletionConfirmFooter } from "../components/deletion-confirm-footer";
 import { useRequestDeletion } from "../hooks/use-request-deletion";
 import { type RequestDeletionWithTotpInput, requestDeletionWithTotpSchema } from "../rgpd.schema";
 
@@ -19,11 +13,9 @@ interface RequestDeletionTotpFormProps {
 }
 
 export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProps) {
-  const { t } = useTranslation("errors");
-  const { t: tSettings } = useTranslation("settings");
-  const { t: tCommon } = useTranslation("common");
+  const { t } = useTranslation("settings");
+  const { t: tErrors } = useTranslation("errors");
   const mutation = useRequestDeletion({ onClose });
-  const guard = useImpersonationGuard();
   const form = useForm<RequestDeletionWithTotpInput>({
     resolver: zodResolver(requestDeletionWithTotpSchema),
     defaultValues: { totpCode: "" },
@@ -38,8 +30,8 @@ export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProp
               onClose,
               "TWO_FACTOR_INVALID",
               (msg) => form.setError("totpCode", { message: msg }),
+              tErrors,
               t,
-              tSettings,
             ),
           }),
         )}
@@ -49,23 +41,12 @@ export function RequestDeletionTotpForm({ onClose }: RequestDeletionTotpFormProp
         <FormTextField
           control={form.control}
           name="totpCode"
-          label={tSettings("deletion.totpLabel")}
+          label={t("deletion.totpLabel")}
           inputMode="numeric"
           autoComplete="one-time-code"
-          placeholder={tSettings("deletion.totpPlaceholder")}
+          placeholder={t("deletion.totpPlaceholder")}
         />
-        <AlertDialogFooter>
-          <AlertDialogCancel type="button">{tCommon("actions.cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            type="submit"
-            variant="destructive"
-            disabled={mutation.isPending || guard.blocked}
-            {...guard.describeProps(mutation.isPending)}
-          >
-            {mutation.isPending ? tSettings("deletion.submitting") : tSettings("deletion.confirm")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-        <ImpersonationReason guard={guard} />
+        <DeletionConfirmFooter isPending={mutation.isPending} />
       </form>
     </Form>
   );

@@ -25,12 +25,15 @@ describe("extractRouteFromChain", () => {
 });
 
 describe("listFrontConsumers", () => {
-  it("finds every call site in apps/app and attributes it to its file", () => {
+  it("finds every call site in both fronts and attributes it to its file", () => {
     const consumers = listFrontConsumers();
     expect(consumers.length).toBeGreaterThan(30);
 
     const presign = consumers.find((c) => c.route === "POST /uploads/presign");
     expect(presign?.file).toBe("apps/app/src/shared/api/mutations/create-upload.ts");
+
+    const me = consumers.find((c) => c.route === "GET /admin/me");
+    expect(me?.file).toBe("apps/admin/src/shared/api/queries/me.ts");
   });
 });
 
@@ -41,7 +44,7 @@ describe("listFrontConsumers case-insensitive __tests__ exclusion", () => {
     mkdirSync(testsDir);
     writeFileSync(join(testsDir, "fixture.ts"), "api.uploads.presign.$post();\n");
 
-    expect(listFrontConsumers(root)).toEqual([]);
+    expect(listFrontConsumers([root])).toEqual([]);
 
     rmSync(root, { recursive: true, force: true });
   });

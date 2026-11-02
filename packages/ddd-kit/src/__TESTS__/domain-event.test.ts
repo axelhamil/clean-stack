@@ -166,3 +166,25 @@ describe("BaseDomainEvent", () => {
     });
   });
 });
+
+class DatedEvent extends BaseDomainEvent<{ id: string }> {
+  readonly eventType = "test.dated";
+  readonly aggregateId = "agg-1";
+  readonly payload = { id: "agg-1" };
+}
+
+describe("BaseDomainEvent identity", () => {
+  it("a base domain event exposes a uuidv7 eventId and an injectable occurrence date", () => {
+    const occurredAt = new Date("2026-03-04T05:06:07.000Z");
+
+    const first = new DatedEvent(occurredAt);
+    const second = new DatedEvent();
+
+    expect(first.eventId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(second.eventId).not.toBe(first.eventId);
+    expect(first.dateOccurred).toBe(occurredAt);
+    expect(second.dateOccurred).toBeInstanceOf(Date);
+  });
+});

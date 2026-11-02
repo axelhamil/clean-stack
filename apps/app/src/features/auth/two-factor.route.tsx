@@ -2,17 +2,13 @@ import { Button } from "@packages/ui/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
+import { redirectSearchSchema } from "../../shared/auth/safe-redirect";
 import { AuthShell } from "./components/auth-shell";
 import { BackupCodeForm } from "./forms/backup-code-form";
 import { TwoFactorForm } from "./forms/two-factor-form";
 
-const twoFactorSearchSchema = z.object({
-  redirect: z.string().optional(),
-});
-
 export const Route = createFileRoute("/two-factor")({
-  validateSearch: twoFactorSearchSchema,
+  validateSearch: redirectSearchSchema,
   component: TwoFactorPage,
 });
 
@@ -36,7 +32,7 @@ function TwoFactorPage() {
       <Button
         type="button"
         variant="link"
-        className="w-full"
+        className="self-start"
         onClick={() => setMethod(method === "totp" ? "backup" : "totp")}
       >
         {method === "totp" ? t("twoFactor.useRecoveryCode") : t("twoFactor.useAuthenticatorApp")}

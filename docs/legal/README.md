@@ -1,6 +1,6 @@
 # Legal Templates
 
-Contractual templates to be sent to clients before or alongside the service agreement. Fill all placeholders before execution — see checklist below.
+Contractual templates to be sent to clients before or alongside the service agreement. Fill all placeholders before execution, see checklist below.
 
 ---
 
@@ -16,8 +16,8 @@ Contractual templates to be sent to clients before or alongside the service agre
 
 ## Templates
 
-- **[DPA-template.md](./DPA-template.md)** — Data Processing Agreement (GDPR Art. 28), 12 clauses.
-- **[DORA-annex-template.md](./DORA-annex-template.md)** — ICT Service Provider Annex (DORA Art. 30, in force 17 Jan 2025), 11 provisions.
+- **[DPA-template.md](./DPA-template.md)**: Data Processing Agreement (GDPR Art. 28), 12 clauses.
+- **[DORA-annex-template.md](./DORA-annex-template.md)**: ICT Service Provider Annex (DORA Art. 30, in force 17 Jan 2025), 11 provisions.
 
 ---
 
@@ -29,7 +29,7 @@ The canonical sub-processor list is maintained at `/legal/sub-processors` (front
 
 ## Placeholders to wire before production
 
-All `[PLACEHOLDER]` tokens across both templates — plus placeholders present in the front-end legal pages — must be replaced with real values before any document is sent to a client or published live.
+All `[PLACEHOLDER]` tokens across both templates, plus placeholders present in the front-end legal pages, must be replaced with real values before any document is sent to a client or published live.
 
 ### From DPA-template.md
 
@@ -56,8 +56,8 @@ All `[PLACEHOLDER]` tokens across both templates — plus placeholders present i
 | `[ISOLATION_TIER]` | DORA Clause 3 | Tenant isolation model (logical/physical/crypto) |
 | `[RETENTION_PERIOD]` | DORA Clause 3 | Post-termination data retention period |
 | `[SLA_AVAILABILITY]` | DORA Clause 4 | Monthly availability target (e.g., 99.9%) |
-| `[RPO]` | DORA Clause 4 | Recovery Point Objective — align with `docs/DISASTER-RECOVERY.md` |
-| `[RTO]` | DORA Clause 4 | Recovery Time Objective — align with `docs/DISASTER-RECOVERY.md` |
+| `[RPO]` | DORA Clause 4 | Recovery Point Objective, align with `docs/DISASTER-RECOVERY.md` |
+| `[RTO]` | DORA Clause 4 | Recovery Time Objective, align with `docs/DISASTER-RECOVERY.md` |
 | `[LATENCY_THRESHOLD]` | DORA Clause 4 | p99 latency threshold in ms |
 | `[ERROR_RATE_THRESHOLD]` | DORA Clause 4 | Error rate % triggering degraded state |
 | `[STATUS_PAGE_URL]` | DORA Clause 4 | URL of public or customer-facing status page |
@@ -80,6 +80,6 @@ All `[PLACEHOLDER]` tokens across both templates — plus placeholders present i
 
 | Placeholder | Page | Regulatory basis | Notes |
 |---|---|---|---|
-| `accessibility@[domain]` | `/legal/accessibility` | EAA Art. 14 — accessibility contact channel is mandatory | Replace `[domain]` with the real service domain (e.g., `accessibility@example.com`) |
-| `dpo@[domain]` | `/legal/sub-processors` | GDPR Art. 28§2 — DPA sub-processor change notifications | Replace `[domain]` with the real domain; must match `[DPO_EMAIL]` in the DPA |
+| `accessibility@[domain]` | `/legal/accessibility` | EAA Art. 14, accessibility contact channel is mandatory | Replace `[domain]` with the real service domain (e.g., `accessibility@example.com`) |
+| `dpo@[domain]` | `/legal/sub-processors` | GDPR Art. 28§2, DPA sub-processor change notifications | Replace `[domain]` with the real domain; must match `[DPO_EMAIL]` in the DPA |
 | National accessibility authority | `/legal/accessibility` | EAA / national transposition | Name the relevant authority for the jurisdiction (e.g., ARCOM in France); update before launch in each target market |

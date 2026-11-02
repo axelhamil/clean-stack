@@ -1,5 +1,10 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
+import {
+  TypographyInline,
+  TypographyMuted,
+  TypographySmall,
+} from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
@@ -36,13 +41,15 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
 
   const toggle = (selector: string, on: boolean) => {
     const next = new Set(selected);
+
     if (on) next.add(selector);
     else next.delete(selector);
+
     onChange([...next]);
   };
 
   return (
-    <div className="max-h-[45vh] space-y-4 overflow-y-auto pr-1">
+    <div className="flex max-h-96 flex-col gap-4 overflow-y-auto">
       {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
       <label className="flex items-center gap-2">
         <Checkbox
@@ -50,41 +57,49 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
           checked={allSelected}
           onCheckedChange={(c) => toggle("*", c === true)}
         />
-        <span className="font-medium">{t("webhooks.eventTypePicker.allEvents")}</span>
+        <TypographySmall>{t("webhooks.eventTypePicker.allEvents")}</TypographySmall>
       </label>
+      {allSelected && (
+        <TypographyMuted>{t("webhooks.eventTypePicker.allEventsNote")}</TypographyMuted>
+      )}
       {groups.map((g) => {
         const groupSelected = selected.has(g.wildcard);
-        const disabled = allSelected;
+
         return (
-          <fieldset key={g.group} className="space-y-2" disabled={disabled}>
+          <fieldset key={g.group} className="flex flex-col gap-2" disabled={allSelected}>
             {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
             <label className="flex items-center gap-2">
               <Checkbox
                 checked={groupSelected}
                 onCheckedChange={(c) => toggle(g.wildcard, c === true)}
               />
-              <span className="font-medium capitalize">
+              <TypographySmall>
                 {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
-              </span>
+              </TypographySmall>
             </label>
-            <div className="ml-6 space-y-1">
-              {g.events.map((type) => {
-                return (
-                  // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally
-                  <label key={type} className="flex items-start gap-2 text-sm">
-                    <Checkbox
-                      className="mt-0.5 shrink-0"
-                      checked={groupSelected || allSelected || selected.has(type)}
-                      disabled={groupSelected}
-                      onCheckedChange={(c) => toggle(type, c === true)}
-                    />
-                    <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                      <span className="break-all font-mono">{type}</span>
-                      <span className="text-muted-foreground">{descriptionFor(type)}</span>
-                    </span>
-                  </label>
-                );
-              })}
+            {groupSelected && !allSelected && (
+              <TypographyMuted>{t("webhooks.eventTypePicker.groupNote")}</TypographyMuted>
+            )}
+            <div className="ml-6 flex flex-col gap-1">
+              {g.events.map((type) => (
+                // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally
+                <label key={type} className="flex items-start gap-2">
+                  <Checkbox
+                    className="mt-0.5 shrink-0"
+                    checked={groupSelected || allSelected || selected.has(type)}
+                    disabled={groupSelected}
+                    onCheckedChange={(c) => toggle(type, c === true)}
+                  />
+                  <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <TypographyInline font="mono" size="sm" className="break-all">
+                      {type}
+                    </TypographyInline>
+                    <TypographyInline tone="muted" size="sm">
+                      {descriptionFor(type)}
+                    </TypographyInline>
+                  </span>
+                </label>
+              ))}
             </div>
           </fieldset>
         );

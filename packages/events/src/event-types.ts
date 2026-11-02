@@ -42,18 +42,22 @@ export const EventTypes = {
   WEBHOOK_ENDPOINT_SECRET_ROTATED: "webhook.endpoint.secret_rotated",
   WEBHOOK_ENDPOINT_DISABLED: "webhook.endpoint.disabled",
   WEBHOOK_DELIVERY_EXHAUSTED: "webhook.delivery.exhausted",
+  WEBHOOK_DELIVERY_REPLAYED: "webhook.delivery.replayed",
   API_TOKEN_CREATED: "api_token.created",
   API_TOKEN_REVOKED: "api_token.revoked",
   API_TOKEN_USED: "api_token.used",
   USER_POLICY_ACCEPTED: "user.policy.accepted",
   USER_COOKIE_CONSENT_GRANTED: "user.cookie_consent.granted",
   USER_COOKIE_CONSENT_WITHDRAWN: "user.cookie_consent.withdrawn",
+  USER_COOKIE_CONSENT_LINKED: "user.cookie_consent.linked",
   SECURITY_RATE_LIMIT_EXCEEDED: "security.rate_limit.exceeded",
   SECURITY_CSP_VIOLATION: "security.csp.violation",
   SECURITY_CSRF_REJECTED: "security.csrf.rejected",
   SECURITY_PASSWORD_BREACHED: "security.password.breached",
   SECURITY_SIGNUP_REJECTED: "security.signup.rejected",
   SECURITY_OPERATOR_AUDIT_ACCESSED: "security.operator.audit_accessed",
+  SECURITY_IMPOSSIBLE_TRAVEL_DETECTED: "security.impossible_travel.detected",
+  SECURITY_GEO_DENIED: "security.geo.denied",
   BILLING_SUBSCRIPTION_CREATED: "billing.subscription.created",
   BILLING_SUBSCRIPTION_UPDATED: "billing.subscription.updated",
   BILLING_SUBSCRIPTION_CANCELLED: "billing.subscription.cancelled",
@@ -63,10 +67,30 @@ export const EventTypes = {
   ADMIN_IMPERSONATION_STOPPED: "admin.impersonation.stopped",
   ADMIN_USER_BANNED: "admin.user.banned",
   ADMIN_USER_UNBANNED: "admin.user.unbanned",
-  ADMIN_USER_ROLE_CHANGED: "admin.user.role_changed",
   ADMIN_USER_PASSWORD_RESET: "admin.user.password_reset",
   ADMIN_USER_SESSIONS_REVOKED: "admin.user.sessions_revoked",
+  ADMIN_STAFF_ADDED: "admin.staff.added",
+  ADMIN_STAFF_ROLE_CHANGED: "admin.staff.role_changed",
+  ADMIN_STAFF_REVOKED: "admin.staff.revoked",
+  ADMIN_STAFF_OVERRIDE_SET: "admin.staff.override_set",
+  ADMIN_STAFF_OVERRIDE_REVOKED: "admin.staff.override_revoked",
+  ADMIN_OPS_OUTBOX_REQUEUED: "admin.ops.outbox_requeued",
+  ADMIN_OPS_STRIPE_EVENT_REPLAYED: "admin.ops.stripe_event_replayed",
+  ADMIN_PLAN_OVERRIDE_SET: "admin.plan_override.set",
+  ADMIN_PLAN_OVERRIDE_REVOKED: "admin.plan_override.revoked",
+  ADMIN_NOTE_ADDED: "admin.note.added",
+  ADMIN_VIEW_SAVED: "admin.view.saved",
+  ADMIN_VIEW_DELETED: "admin.view.deleted",
+  ADMIN_STEP_UP_VERIFIED: "admin.step_up.verified",
+  ADMIN_STEP_UP_FAILED: "admin.step_up.failed",
+  ADMIN_APPROVAL_REQUESTED: "admin.approval.requested",
+  ADMIN_APPROVAL_DECIDED: "admin.approval.decided",
+  ADMIN_APPROVAL_CANCELLED: "admin.approval.cancelled",
+  ADMIN_APPROVAL_EXPIRED: "admin.approval.expired",
+  ADMIN_APPROVAL_EXECUTED: "admin.approval.executed",
+  ADMIN_APPROVAL_FAILED: "admin.approval.failed",
   EMAIL_DELIVERY_EXHAUSTED: "email.delivery.exhausted",
+  OUTBOX_EVENT_DEAD: "outbox.event_dead",
   NOTIFICATION_PREFERENCE_UPDATED: "notification.preference.updated",
   NOTIFICATION_ORG_PREFERENCE_UPDATED: "notification.org_preference.updated",
   NOTIFICATION_READ: "notification.read",
@@ -79,6 +103,7 @@ export const EventTypes = {
   SSO_LOGIN_FAILURE: "sso.login.failure",
   SCIM_CONNECTION_CREATED: "scim.connection.created",
   SCIM_CONNECTION_DELETED: "scim.connection.deleted",
+  SCIM_CONNECTION_TOKEN_ROTATED: "scim.connection.token_rotated",
   SCIM_USER_CREATED: "scim.user.created",
   SCIM_USER_UPDATED: "scim.user.updated",
   SCIM_USER_DEACTIVATED: "scim.user.deactivated",
@@ -112,9 +137,8 @@ export function matchesSubscription(
 
 export function isSubscribableSelector(value: string): boolean {
   if (value === "*") return true;
-  if (value.endsWith(".*")) {
-    const group = value.slice(0, -2);
-    return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
-  }
-  return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+  if (!value.endsWith(".*")) return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+
+  const group = value.slice(0, -2);
+  return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);
 }

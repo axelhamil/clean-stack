@@ -2,7 +2,10 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  '@sentry/cli': true
   '@swc/core': true
   esbuild: true
   sharp: true
+packageExtensions:
+  dependency-cruiser:
+    dependencies:
+      typescript: ^6.0.3

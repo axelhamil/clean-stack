@@ -21,4 +21,18 @@ describe("upgradeSubscriptionMutationOptions", () => {
       expect.objectContaining({ plan: "pro", referenceId: "org1" }),
     );
   });
+
+  it("rejects with the BetterAuth status and code instead of a bare message", async () => {
+    vi.stubGlobal("window", { location: { origin: "http://localhost" } });
+    const { upgrade } = (authClient as unknown as MockSubscription).subscription;
+    upgrade.mockResolvedValueOnce({
+      error: { code: "SUBSCRIPTION_NOT_FOUND", status: 404, message: "no subscription" },
+    });
+    const fn = upgradeSubscriptionMutationOptions.mutationFn as (v: UpgradeInput) => Promise<void>;
+
+    const err = await fn({ tier: "pro", organizationId: "org1" }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toMatchObject({ status: 404, code: "SUBSCRIPTION_NOT_FOUND" });
+  });
 });

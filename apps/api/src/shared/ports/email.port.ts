@@ -1,7 +1,6 @@
 import type { Result } from "@packages/ddd-kit";
 import type { EmailTemplates } from "@packages/emails";
 import type { Locale } from "@packages/i18n";
-import type { ITransaction } from "../transaction";
 
 export type { EmailTemplates };
 export type TemplateVariables = Record<string, string | number>;
@@ -18,7 +17,6 @@ export type EmailError =
 export interface SendTemplateOptions {
   idempotencyKey?: string;
   from?: string;
-  tx?: ITransaction;
   /**
    * The recipient's locale. Named rather than positional so a call site that
    * has no locale to give simply omits it, instead of parking an `undefined`

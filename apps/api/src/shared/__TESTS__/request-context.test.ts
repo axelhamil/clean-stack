@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getRequestId, runWithRequestContext } from "../request-context";
+import { getClientIp, getRequestId, runWithRequestContext } from "../request-context";
 
 describe("request-context", () => {
   it("returns the id set for the current context", () => {
@@ -32,5 +32,25 @@ describe("request-context", () => {
     ]);
     expect(a).toBe("A");
     expect(b).toBe("B");
+  });
+
+  it("resolves the client ip lazily, only when read", () => {
+    let resolved = 0;
+    const clientIp = () => {
+      resolved += 1;
+      return "198.51.100.7";
+    };
+
+    const seen = runWithRequestContext({ requestId: "req-ip", clientIp }, () => {
+      expect(resolved).toBe(0);
+      return getClientIp();
+    });
+
+    expect(seen).toBe("198.51.100.7");
+    expect(resolved).toBe(1);
+  });
+
+  it("has no client ip outside any context", () => {
+    expect(getClientIp()).toBeUndefined();
   });
 });

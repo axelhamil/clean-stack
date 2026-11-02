@@ -1,2 +1,2 @@
-export * from "./render";
-export * from "./templates";
+export { EMAIL_TEMPLATE_KEYS, type RenderedEmail, renderTemplate } from "./render";
+export type { EmailProps, EmailTemplateKey, EmailTemplates } from "./templates";

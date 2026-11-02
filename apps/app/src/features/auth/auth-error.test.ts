@@ -29,6 +29,21 @@ describe("resolveAuthError", () => {
     ).toBe("Invalid password.");
   });
 
+  it("reads the code of a refusal in the API envelope, raised before BetterAuth", () => {
+    const withCaptchaCopy = ((key: string, opts?: { defaultValue?: string }) => {
+      if (key === "byCode.CAPTCHA_REQUIRED") return "Complete the captcha.";
+      return opts?.defaultValue ?? key;
+    }) as never;
+    expect(
+      resolveAuthError(
+        { status: 401, error: { code: "CAPTCHA_REQUIRED" } },
+        "fallback",
+        t,
+        withCaptchaCopy,
+      ),
+    ).toBe("Complete the captcha.");
+  });
+
   it("returns the caller fallback key translation when message and code are absent", () => {
     expect(resolveAuthError({ status: 500 }, "fallback message", t, tErrors)).toBe(
       "fallback message",

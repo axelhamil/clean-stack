@@ -1,5 +1,4 @@
 import { Badge } from "@packages/ui/components/ui/badge";
-import { Button } from "@packages/ui/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,17 +6,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@packages/ui/components/ui/dropdown-menu";
+import { Hint } from "@packages/ui/components/ui/hint";
+import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { TableCell, TableRow } from "@packages/ui/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@packages/ui/components/ui/tooltip";
+import { TruncatedText } from "@packages/ui/components/ui/truncated-text";
+import { TypographyInline } from "@packages/ui/components/ui/typography";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { MoreHorizontalIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import type { WebhookEndpoint } from "../api/webhooks.queries";
 import { ENDPOINT_STATUS_KEYS } from "../webhook-labels";
 
@@ -55,37 +52,34 @@ export function EndpointRow({
 
   return (
     <TableRow>
-      <TableCell className="max-w-xs truncate font-mono text-sm">{endpoint.url}</TableCell>
+      <TableCell>
+        <TruncatedText value={endpoint.url} font="mono" className="max-w-32 sm:max-w-xs" />
+        <TypographyInline tone="muted" size="xs" className="block sm:hidden">
+          {formatDate(endpoint.createdAt)}
+        </TypographyInline>
+      </TableCell>
       <TableCell>
         {status === "auto-disabled" ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="destructive" className="flex items-center gap-1">
-                  <TriangleAlertIcon className="size-3" />
-                  {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                {t("settings:webhooks.endpointRow.autoDisabledTooltip")}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Hint text={t("settings:webhooks.endpointRow.autoDisabledTooltip")}>
+            <Badge variant="destructive">
+              <TriangleAlertIcon />
+              {t(ENDPOINT_STATUS_KEYS["auto-disabled"])}
+            </Badge>
+          </Hint>
         ) : (
           <Badge variant={status === "active" ? "default" : "secondary"}>
             {t(ENDPOINT_STATUS_KEYS[status])}
           </Badge>
         )}
       </TableCell>
-      <TableCell>{endpoint.eventTypes.length}</TableCell>
-      <TableCell>{formatDate(endpoint.createdAt)}</TableCell>
+      <TableCell className="hidden sm:table-cell">{endpoint.eventTypes.length}</TableCell>
+      <TableCell className="hidden sm:table-cell">{formatDate(endpoint.createdAt)}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontalIcon className="size-4" />
-              <span className="sr-only">{t("settings:webhooks.endpointRow.openActions")}</span>
-            </Button>
+            <IconButton variant="ghost" label={t("settings:webhooks.endpointRow.openActions")}>
+              <MoreHorizontalIcon />
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onSelect(endpoint)}>
@@ -120,7 +114,7 @@ export function EndpointRow({
                   onClick={() => onDelete(endpoint)}
                   disabled={guard.blocked}
                   {...guard.describeProps()}
-                  className="text-destructive focus:text-destructive"
+                  variant="destructive"
                 >
                   {t("settings:webhooks.endpointRow.delete")}
                 </DropdownMenuItem>

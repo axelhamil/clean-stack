@@ -1,5 +1,4 @@
 import type { Result } from "@packages/ddd-kit";
-import type { ITransaction } from "../../../../shared/transaction";
 
 export type QuotaError = { code: "QUOTA_PROVIDER_FAILURE"; message: string };
 
@@ -11,18 +10,11 @@ export interface IQuotaUsageStore {
     resource: string,
     by: number,
     period: QuotaPeriod,
-    tx?: ITransaction,
   ): Promise<Result<number, QuotaError>>;
   current(
     orgId: string,
     resource: string,
     period: QuotaPeriod,
-    tx?: ITransaction,
   ): Promise<Result<number, QuotaError>>;
-  reset(
-    orgId: string,
-    resource: string,
-    period: QuotaPeriod,
-    tx?: ITransaction,
-  ): Promise<Result<void, QuotaError>>;
+  reset(orgId: string, resource: string, period: QuotaPeriod): Promise<Result<void, QuotaError>>;
 }

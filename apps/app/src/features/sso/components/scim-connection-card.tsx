@@ -1,84 +1,145 @@
 import { Button } from "@packages/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
+import { DestructiveActionDialog } from "@packages/ui/components/ui/destructive-action-dialog";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { TypographyMuted } from "@packages/ui/components/ui/typography";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "../../../shared/api/errors/toast";
+import { toast } from "sonner";
 import { activeOrgQueryOptions } from "../../../shared/api/queries/active-org";
+import { GuardHint } from "../../../shared/auth/guard-hint";
+import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
+import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
+import { QueryLoadError } from "../../../shared/components/query-load-error";
 import { SecretRevealDialog } from "../../../shared/components/secret-reveal-dialog";
 import { env } from "../../../shared/env";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
-import { generateScimTokenMutationOptions } from "../api/sso.mutations";
-import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries";
+import { disconnectScimMutationOptions, issueScimTokenMutationOptions } from "../api/sso.mutations";
+import {
+  primaryProviderFor,
+  scimConnectionQueryOptions,
+  ssoProvidersQueryOptions,
+} from "../api/sso.queries";
 import { CopyRow } from "./copy-row";
 
 const SCIM_BASE_URL = `${env.VITE_API_URL}/api/auth/scim/v2`;
 
 export function ScimConnectionCard() {
-  const { t } = useTranslation("settings");
-  const { data: org } = useQuery(activeOrgQueryOptions);
+  const { t } = useTranslation(["settings", "common", "errors"]);
+  const qc = useQueryClient();
+  const guard = useImpersonationGuard();
+  const formatDate = useFormatDate();
+  const orgQuery = useQuery(activeOrgQueryOptions);
+  const org = orgQuery.data;
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
-  const { role } = useAuthorization();
+  const { can } = useAuthorization();
   const [revealToken, setRevealToken] = useState<string | null>(null);
 
   const provider = primaryProviderFor(providers, org?.id);
-  // The `scim` plugin is configured with `requiredRole: ["owner"]` in apps/api/src/auth.ts
-  // — showing this to an admin would only ever end in a 403.
-  const canGenerate = role === "owner";
+  const canManage = can({ scim: ["manage"] });
+  const connectionQuery = useQuery({
+    ...scimConnectionQueryOptions,
+    enabled: canManage && provider !== undefined,
+  });
+  const connection = connectionQuery.data;
 
-  const generate = useMutation({
-    ...generateScimTokenMutationOptions,
-    onSuccess: (token) => setRevealToken(token),
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.generateScimToken", {
-          defaultValue: "Failed to generate the SCIM token",
-        }),
-      ),
+  const refreshConnection = () =>
+    qc.invalidateQueries({ queryKey: scimConnectionQueryOptions.queryKey });
+
+  const issue = useMutation({
+    ...issueScimTokenMutationOptions,
+    onSuccess: ({ token }) => {
+      setRevealToken(token);
+      void refreshConnection();
+    },
+    onError: (err) => toastError(err, errorFallback("generateScimToken")),
   });
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("sso.scimCard.title")}</CardTitle>
-        <CardDescription>{t("sso.scimCard.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {!provider ? (
-          <TypographyMuted>{t("sso.registerProviderFirst")}</TypographyMuted>
-        ) : !canGenerate ? (
-          <TypographyMuted>{t("sso.scimCard.onlyOwnerCanGenerate")}</TypographyMuted>
-        ) : (
-          <>
-            <CopyRow label={t("sso.scimCard.baseUrlLabel")} value={SCIM_BASE_URL} />
-            <Button
-              className="w-fit"
-              disabled={generate.isPending}
-              onClick={() =>
-                org && generate.mutate({ providerId: provider.providerId, organizationId: org.id })
-              }
-            >
-              {t("sso.scimCard.generateAction")}
-            </Button>
-          </>
-        )}
-      </CardContent>
+  const disconnect = useMutation({
+    ...disconnectScimMutationOptions,
+    onSuccess: () => {
+      toast.success(t("sso.scimCard.disconnectedToast"));
+      void refreshConnection();
+    },
+    onError: (err) => toastError(err, errorFallback("disconnectScim")),
+  });
 
+  const pending = issue.isPending || disconnect.isPending;
+
+  if (orgQuery.isLoadingError || connectionQuery.isLoadingError) {
+    return (
+      <SettingsSection title={t("sso.scimCard.title")} description={t("sso.scimCard.description")}>
+        <QueryLoadError
+          message={t("errors:fallback.loadScimConnection")}
+          isFetching={orgQuery.isFetching || connectionQuery.isFetching}
+          onRetry={() => {
+            if (orgQuery.isLoadingError) void orgQuery.refetch();
+            if (connectionQuery.isLoadingError) void connectionQuery.refetch();
+          }}
+        />
+      </SettingsSection>
+    );
+  }
+
+  return (
+    <SettingsSection title={t("sso.scimCard.title")} description={t("sso.scimCard.description")}>
+      {!provider ? (
+        <TypographyMuted>{t("sso.registerProviderFirst")}</TypographyMuted>
+      ) : !canManage ? (
+        <TypographyMuted>{t("sso.scimCard.onlyOwnerCanGenerate")}</TypographyMuted>
+      ) : (
+        <>
+          <CopyRow label={t("sso.scimCard.baseUrlLabel")} value={SCIM_BASE_URL} />
+          <TypographyMuted>
+            {connection?.tokenExpiresAt
+              ? t("sso.scimCard.connectedUntil", { date: formatDate(connection.tokenExpiresAt) })
+              : t("sso.scimCard.notConnected")}
+          </TypographyMuted>
+          <div className="flex flex-wrap gap-2">
+            <GuardHint guard={guard} otherwiseDisabled={pending}>
+              <Button
+                variant="outline"
+                disabled={pending || guard.blocked}
+                {...guard.describeProps(pending)}
+                onClick={() => issue.mutate()}
+              >
+                {connection ? t("sso.scimCard.rotateAction") : t("sso.scimCard.generateAction")}
+              </Button>
+            </GuardHint>
+            {connection && (
+              <GuardHint guard={guard} otherwiseDisabled={pending}>
+                <DestructiveActionDialog
+                  trigger={
+                    <Button
+                      variant="destructive"
+                      disabled={pending || guard.blocked}
+                      {...guard.describeProps(pending)}
+                    >
+                      {t("sso.scimCard.disconnectAction")}
+                    </Button>
+                  }
+                  title={t("sso.scimCard.disconnectDialogTitle")}
+                  description={t("sso.scimCard.disconnectDialogDescription")}
+                  actionLabel={t("sso.scimCard.disconnectAction")}
+                  cancelLabel={t("common:actions.cancel")}
+                  isPending={disconnect.isPending}
+                  onConfirm={() => disconnect.mutate()}
+                />
+              </GuardHint>
+            )}
+          </div>
+        </>
+      )}
+      <ImpersonationReason guard={guard} />
       <SecretRevealDialog
         secret={revealToken}
         onClose={() => setRevealToken(null)}
         title={t("sso.scimCard.secretDialogTitle")}
         description={t("sso.scimCard.secretDialogDescription")}
       />
-    </Card>
+    </SettingsSection>
   );
 }

@@ -1,7 +1,7 @@
+import { toastError, toastSuccess } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { toastError, toastSuccess } from "../../../shared/api/errors/toast";
 import { acceptPoliciesMutationOptions } from "../../../shared/api/mutations/accept-policies";
 import { policiesQueryOptions } from "../../../shared/api/queries/policies";
 

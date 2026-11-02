@@ -1,12 +1,14 @@
-"use client";
-
 import type * as React from "react";
-
 import { cn } from "../../libs/utils";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div
+      data-slot="table-container"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a horizontally scrolling region must be reachable by keyboard, WCAG 2.1.1
+      tabIndex={0}
+      className="relative w-full overflow-x-auto rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}

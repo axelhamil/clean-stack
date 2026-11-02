@@ -33,6 +33,16 @@
       ],
       "project": ["**/*.ts", "**/*.tsx"]
     },
+    "apps/admin": {
+      "entry": [
+        "routes.ts",
+        "src/router/*.tsx",
+        "src/features/**/*.route.tsx",
+        "a11y/*.setup.ts",
+        "a11y/*.spec.ts"
+      ],
+      "project": ["**/*.ts", "**/*.tsx"]
+    },
     "packages/ddd-kit": {
       "project": ["src/**/*.ts"],
       "ignore": ["**/stubs/**"]
@@ -50,6 +60,10 @@
     "packages/ui": {
       "entry": ["src/**/*.tsx", "src/**/*.ts"],
       "project": ["src/**/*.ts", "src/**/*.tsx"]
+    },
+    "packages/web-kit": {
+      "entry": ["src/**/*.ts"],
+      "project": ["src/**/*.ts"]
     },
     "packages/test": {
       "project": ["src/**/*.ts"]

@@ -1,5 +1,7 @@
 import { Alert, AlertDescription } from "@packages/ui/components/ui/alert";
 import { Button } from "@packages/ui/components/ui/button";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
@@ -9,6 +11,7 @@ import { stopImpersonationMutationOptions } from "../api/mutations/stop-imperson
 import { sessionQueryOptions } from "../api/queries/session";
 import { broadcastAuthChange } from "../auth/auth-broadcast";
 import { isImpersonating } from "../auth/is-impersonating";
+import { env } from "../env";
 import { displayName } from "../utils";
 
 export function ImpersonationBanner() {
@@ -21,10 +24,18 @@ export function ImpersonationBanner() {
   const mutation = useMutation({
     ...stopImpersonationMutationOptions,
     onSuccess: async () => {
+      const impersonatedUserId = session?.user.id;
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey });
       broadcastAuthChange({ identityChanged: true });
-      void navigate({ to: "/admin/users" });
+
+      if (env.VITE_ADMIN_URL && impersonatedUserId) {
+        window.location.assign(new URL(`/users/${impersonatedUserId}`, env.VITE_ADMIN_URL).href);
+        return;
+      }
+
+      void navigate({ to: "/dashboard" });
     },
+    onError: (err) => toastError(err, errorFallback("stopImpersonation")),
   });
 
   useEffect(() => {
@@ -46,14 +57,14 @@ export function ImpersonationBanner() {
   return (
     <Alert variant="banner">
       <ShieldAlert />
-      <AlertDescription className="flex items-center justify-between gap-4">
-        <span>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <span className="min-w-0 break-words">
           <Trans
             ns="common"
             i18nKey="impersonation.activeSession"
-            components={{ name: <strong>{name}</strong> }}
+            values={{ name, remaining }}
+            components={{ name: <strong /> }}
           />
-          {`. ${remaining}`}
         </span>
         <Button
           variant="secondary"

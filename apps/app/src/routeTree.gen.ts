@@ -29,7 +29,6 @@ import { Route as featuresLegalDataRightsDotrouteRouteImport } from './features/
 import { Route as featuresLegalPrivacyPolicyDotrouteRouteImport } from './features/legal/privacy-policy.route'
 import { Route as featuresLegalSubProcessorsDotrouteRouteImport } from './features/legal/sub-processors.route'
 import { Route as featuresLegalTermsDotrouteRouteImport } from './features/legal/terms.route'
-import { Route as routerAdminRouteImport } from './router/_admin'
 import { Route as featuresDashboardDashboardDotrouteRouteImport } from './features/dashboard/dashboard.route'
 import { Route as routerSettingsRouteImport } from './router/settings'
 import { Route as featuresLegalAcceptDotrouteRouteImport } from './features/legal/accept.route'
@@ -40,15 +39,10 @@ import { Route as featuresAccountAccountDotrouteRouteImport } from './features/a
 import { Route as featuresApiTokensApiTokensDotrouteRouteImport } from './features/api-tokens/api-tokens.route'
 import { Route as featuresNotificationsNotificationsDotrouteRouteImport } from './features/notifications/notifications.route'
 import { Route as featuresPrivacyPrivacyDotrouteRouteImport } from './features/privacy/privacy.route'
-import { Route as featuresAdminAuditLogAdminAuditLogDotrouteRouteImport } from './features/admin-audit-log/admin-audit-log.route'
-import { Route as featuresAdminOrgsAdminOrgsDotrouteRouteImport } from './features/admin-orgs/admin-orgs.route'
-import { Route as featuresAdminUsersAdminUsersDotrouteRouteImport } from './features/admin-users/admin-users.route'
 import { Route as featuresBillingBillingDotrouteRouteImport } from './features/billing/billing.route'
 import { Route as featuresOrganizationOrganizationDotrouteRouteImport } from './features/organization/organization.route'
 import { Route as featuresSsoSsoDotrouteRouteImport } from './features/sso/sso.route'
 import { Route as featuresWebhooksWebhooksDotrouteRouteImport } from './features/webhooks/webhooks.route'
-import { Route as featuresAdminOrgsAdminOrgDetailDotrouteRouteImport } from './features/admin-orgs/admin-org-detail.route'
-import { Route as featuresAdminUsersAdminUserDetailDotrouteRouteImport } from './features/admin-users/admin-user-detail.route'
 
 const routerIndexDotrouteRoute = routerIndexDotrouteRouteImport.update({
   id: '/',
@@ -163,10 +157,6 @@ const featuresLegalTermsDotrouteRoute =
     path: '/legal/terms',
     getParentRoute: () => rootRouteImport,
   } as any)
-const routerAdminRoute = routerAdminRouteImport.update({
-  id: '/_admin',
-  getParentRoute: () => routerShellRoute,
-} as any)
 const featuresDashboardDashboardDotrouteRoute =
   featuresDashboardDashboardDotrouteRouteImport.update({
     id: '/dashboard',
@@ -224,24 +214,6 @@ const featuresPrivacyPrivacyDotrouteRoute =
     path: '/privacy',
     getParentRoute: () => routerSettingsRoute,
   } as any)
-const featuresAdminAuditLogAdminAuditLogDotrouteRoute =
-  featuresAdminAuditLogAdminAuditLogDotrouteRouteImport.update({
-    id: '/admin/audit-log',
-    path: '/admin/audit-log',
-    getParentRoute: () => routerAdminRoute,
-  } as any)
-const featuresAdminOrgsAdminOrgsDotrouteRoute =
-  featuresAdminOrgsAdminOrgsDotrouteRouteImport.update({
-    id: '/admin/orgs',
-    path: '/admin/orgs',
-    getParentRoute: () => routerAdminRoute,
-  } as any)
-const featuresAdminUsersAdminUsersDotrouteRoute =
-  featuresAdminUsersAdminUsersDotrouteRouteImport.update({
-    id: '/admin/users',
-    path: '/admin/users',
-    getParentRoute: () => routerAdminRoute,
-  } as any)
 const featuresBillingBillingDotrouteRoute =
   featuresBillingBillingDotrouteRouteImport.update({
     id: '/billing',
@@ -264,18 +236,6 @@ const featuresWebhooksWebhooksDotrouteRoute =
     id: '/webhooks',
     path: '/webhooks',
     getParentRoute: () => routerOrgScopeRoute,
-  } as any)
-const featuresAdminOrgsAdminOrgDetailDotrouteRoute =
-  featuresAdminOrgsAdminOrgDetailDotrouteRouteImport.update({
-    id: '/admin/orgs/$orgId',
-    path: '/admin/orgs/$orgId',
-    getParentRoute: () => routerAdminRoute,
-  } as any)
-const featuresAdminUsersAdminUserDetailDotrouteRoute =
-  featuresAdminUsersAdminUserDetailDotrouteRouteImport.update({
-    id: '/admin/users/$id',
-    path: '/admin/users/$id',
-    getParentRoute: () => routerAdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -305,15 +265,10 @@ export interface FileRoutesByFullPath {
   '/settings/api-tokens': typeof featuresApiTokensApiTokensDotrouteRoute
   '/settings/notifications': typeof featuresNotificationsNotificationsDotrouteRoute
   '/settings/privacy': typeof featuresPrivacyPrivacyDotrouteRoute
-  '/admin/audit-log': typeof featuresAdminAuditLogAdminAuditLogDotrouteRoute
-  '/admin/orgs': typeof featuresAdminOrgsAdminOrgsDotrouteRoute
-  '/admin/users': typeof featuresAdminUsersAdminUsersDotrouteRoute
   '/settings/billing': typeof featuresBillingBillingDotrouteRoute
   '/settings/organization': typeof featuresOrganizationOrganizationDotrouteRoute
   '/settings/sso': typeof featuresSsoSsoDotrouteRoute
   '/settings/webhooks': typeof featuresWebhooksWebhooksDotrouteRoute
-  '/admin/orgs/$orgId': typeof featuresAdminOrgsAdminOrgDetailDotrouteRoute
-  '/admin/users/$id': typeof featuresAdminUsersAdminUserDetailDotrouteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof routerIndexDotrouteRoute
@@ -341,15 +296,10 @@ export interface FileRoutesByTo {
   '/settings/api-tokens': typeof featuresApiTokensApiTokensDotrouteRoute
   '/settings/notifications': typeof featuresNotificationsNotificationsDotrouteRoute
   '/settings/privacy': typeof featuresPrivacyPrivacyDotrouteRoute
-  '/admin/audit-log': typeof featuresAdminAuditLogAdminAuditLogDotrouteRoute
-  '/admin/orgs': typeof featuresAdminOrgsAdminOrgsDotrouteRoute
-  '/admin/users': typeof featuresAdminUsersAdminUsersDotrouteRoute
   '/settings/billing': typeof featuresBillingBillingDotrouteRoute
   '/settings/organization': typeof featuresOrganizationOrganizationDotrouteRoute
   '/settings/sso': typeof featuresSsoSsoDotrouteRoute
   '/settings/webhooks': typeof featuresWebhooksWebhooksDotrouteRoute
-  '/admin/orgs/$orgId': typeof featuresAdminOrgsAdminOrgDetailDotrouteRoute
-  '/admin/users/$id': typeof featuresAdminUsersAdminUserDetailDotrouteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -375,7 +325,6 @@ export interface FileRoutesById {
   '/_protected/_shell': typeof routerShellRouteWithChildren
   '/_protected/_shell/dashboard': typeof featuresDashboardDashboardDotrouteRoute
   '/_protected/legal/accept': typeof featuresLegalAcceptDotrouteRoute
-  '/_protected/_shell/_admin': typeof routerAdminRouteWithChildren
   '/_protected/_shell/settings': typeof routerSettingsRouteWithChildren
   '/_protected/_shell/settings/': typeof routerSettingsIndexDotrouteRoute
   '/_protected/_shell/org/new': typeof featuresOrganizationNewDotrouteRoute
@@ -384,15 +333,10 @@ export interface FileRoutesById {
   '/_protected/_shell/settings/notifications': typeof featuresNotificationsNotificationsDotrouteRoute
   '/_protected/_shell/settings/privacy': typeof featuresPrivacyPrivacyDotrouteRoute
   '/_protected/_shell/settings/_org-scope': typeof routerOrgScopeRouteWithChildren
-  '/_protected/_shell/_admin/admin/audit-log': typeof featuresAdminAuditLogAdminAuditLogDotrouteRoute
-  '/_protected/_shell/_admin/admin/orgs': typeof featuresAdminOrgsAdminOrgsDotrouteRoute
-  '/_protected/_shell/_admin/admin/users': typeof featuresAdminUsersAdminUsersDotrouteRoute
   '/_protected/_shell/settings/_org-scope/billing': typeof featuresBillingBillingDotrouteRoute
   '/_protected/_shell/settings/_org-scope/organization': typeof featuresOrganizationOrganizationDotrouteRoute
   '/_protected/_shell/settings/_org-scope/sso': typeof featuresSsoSsoDotrouteRoute
   '/_protected/_shell/settings/_org-scope/webhooks': typeof featuresWebhooksWebhooksDotrouteRoute
-  '/_protected/_shell/_admin/admin/orgs/$orgId': typeof featuresAdminOrgsAdminOrgDetailDotrouteRoute
-  '/_protected/_shell/_admin/admin/users/$id': typeof featuresAdminUsersAdminUserDetailDotrouteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -423,15 +367,10 @@ export interface FileRouteTypes {
     | '/settings/api-tokens'
     | '/settings/notifications'
     | '/settings/privacy'
-    | '/admin/audit-log'
-    | '/admin/orgs'
-    | '/admin/users'
     | '/settings/billing'
     | '/settings/organization'
     | '/settings/sso'
     | '/settings/webhooks'
-    | '/admin/orgs/$orgId'
-    | '/admin/users/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -459,15 +398,10 @@ export interface FileRouteTypes {
     | '/settings/api-tokens'
     | '/settings/notifications'
     | '/settings/privacy'
-    | '/admin/audit-log'
-    | '/admin/orgs'
-    | '/admin/users'
     | '/settings/billing'
     | '/settings/organization'
     | '/settings/sso'
     | '/settings/webhooks'
-    | '/admin/orgs/$orgId'
-    | '/admin/users/$id'
   id:
     | '__root__'
     | '/'
@@ -492,7 +426,6 @@ export interface FileRouteTypes {
     | '/_protected/_shell'
     | '/_protected/_shell/dashboard'
     | '/_protected/legal/accept'
-    | '/_protected/_shell/_admin'
     | '/_protected/_shell/settings'
     | '/_protected/_shell/settings/'
     | '/_protected/_shell/org/new'
@@ -501,15 +434,10 @@ export interface FileRouteTypes {
     | '/_protected/_shell/settings/notifications'
     | '/_protected/_shell/settings/privacy'
     | '/_protected/_shell/settings/_org-scope'
-    | '/_protected/_shell/_admin/admin/audit-log'
-    | '/_protected/_shell/_admin/admin/orgs'
-    | '/_protected/_shell/_admin/admin/users'
     | '/_protected/_shell/settings/_org-scope/billing'
     | '/_protected/_shell/settings/_org-scope/organization'
     | '/_protected/_shell/settings/_org-scope/sso'
     | '/_protected/_shell/settings/_org-scope/webhooks'
-    | '/_protected/_shell/_admin/admin/orgs/$orgId'
-    | '/_protected/_shell/_admin/admin/users/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -673,13 +601,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof featuresLegalTermsDotrouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_protected/_shell/_admin': {
-      id: '/_protected/_shell/_admin'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof routerAdminRouteImport
-      parentRoute: typeof routerShellRoute
-    }
     '/_protected/_shell/dashboard': {
       id: '/_protected/_shell/dashboard'
       path: '/dashboard'
@@ -750,27 +671,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof featuresPrivacyPrivacyDotrouteRouteImport
       parentRoute: typeof routerSettingsRoute
     }
-    '/_protected/_shell/_admin/admin/audit-log': {
-      id: '/_protected/_shell/_admin/admin/audit-log'
-      path: '/admin/audit-log'
-      fullPath: '/admin/audit-log'
-      preLoaderRoute: typeof featuresAdminAuditLogAdminAuditLogDotrouteRouteImport
-      parentRoute: typeof routerAdminRoute
-    }
-    '/_protected/_shell/_admin/admin/orgs': {
-      id: '/_protected/_shell/_admin/admin/orgs'
-      path: '/admin/orgs'
-      fullPath: '/admin/orgs'
-      preLoaderRoute: typeof featuresAdminOrgsAdminOrgsDotrouteRouteImport
-      parentRoute: typeof routerAdminRoute
-    }
-    '/_protected/_shell/_admin/admin/users': {
-      id: '/_protected/_shell/_admin/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof featuresAdminUsersAdminUsersDotrouteRouteImport
-      parentRoute: typeof routerAdminRoute
-    }
     '/_protected/_shell/settings/_org-scope/billing': {
       id: '/_protected/_shell/settings/_org-scope/billing'
       path: '/billing'
@@ -799,20 +699,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof featuresWebhooksWebhooksDotrouteRouteImport
       parentRoute: typeof routerOrgScopeRoute
     }
-    '/_protected/_shell/_admin/admin/orgs/$orgId': {
-      id: '/_protected/_shell/_admin/admin/orgs/$orgId'
-      path: '/admin/orgs/$orgId'
-      fullPath: '/admin/orgs/$orgId'
-      preLoaderRoute: typeof featuresAdminOrgsAdminOrgDetailDotrouteRouteImport
-      parentRoute: typeof routerAdminRoute
-    }
-    '/_protected/_shell/_admin/admin/users/$id': {
-      id: '/_protected/_shell/_admin/admin/users/$id'
-      path: '/admin/users/$id'
-      fullPath: '/admin/users/$id'
-      preLoaderRoute: typeof featuresAdminUsersAdminUserDetailDotrouteRouteImport
-      parentRoute: typeof routerAdminRoute
-    }
   }
 }
 
@@ -831,31 +717,6 @@ const routerGuestRouteChildren: routerGuestRouteChildren = {
 
 const routerGuestRouteWithChildren = routerGuestRoute._addFileChildren(
   routerGuestRouteChildren,
-)
-
-interface routerAdminRouteChildren {
-  featuresAdminAuditLogAdminAuditLogDotrouteRoute: typeof featuresAdminAuditLogAdminAuditLogDotrouteRoute
-  featuresAdminOrgsAdminOrgsDotrouteRoute: typeof featuresAdminOrgsAdminOrgsDotrouteRoute
-  featuresAdminUsersAdminUsersDotrouteRoute: typeof featuresAdminUsersAdminUsersDotrouteRoute
-  featuresAdminOrgsAdminOrgDetailDotrouteRoute: typeof featuresAdminOrgsAdminOrgDetailDotrouteRoute
-  featuresAdminUsersAdminUserDetailDotrouteRoute: typeof featuresAdminUsersAdminUserDetailDotrouteRoute
-}
-
-const routerAdminRouteChildren: routerAdminRouteChildren = {
-  featuresAdminAuditLogAdminAuditLogDotrouteRoute:
-    featuresAdminAuditLogAdminAuditLogDotrouteRoute,
-  featuresAdminOrgsAdminOrgsDotrouteRoute:
-    featuresAdminOrgsAdminOrgsDotrouteRoute,
-  featuresAdminUsersAdminUsersDotrouteRoute:
-    featuresAdminUsersAdminUsersDotrouteRoute,
-  featuresAdminOrgsAdminOrgDetailDotrouteRoute:
-    featuresAdminOrgsAdminOrgDetailDotrouteRoute,
-  featuresAdminUsersAdminUserDetailDotrouteRoute:
-    featuresAdminUsersAdminUserDetailDotrouteRoute,
-}
-
-const routerAdminRouteWithChildren = routerAdminRoute._addFileChildren(
-  routerAdminRouteChildren,
 )
 
 interface routerOrgScopeRouteChildren {
@@ -903,7 +764,6 @@ const routerSettingsRouteWithChildren = routerSettingsRoute._addFileChildren(
 
 interface routerShellRouteChildren {
   featuresDashboardDashboardDotrouteRoute: typeof featuresDashboardDashboardDotrouteRoute
-  routerAdminRoute: typeof routerAdminRouteWithChildren
   routerSettingsRoute: typeof routerSettingsRouteWithChildren
   featuresOrganizationNewDotrouteRoute: typeof featuresOrganizationNewDotrouteRoute
 }
@@ -911,7 +771,6 @@ interface routerShellRouteChildren {
 const routerShellRouteChildren: routerShellRouteChildren = {
   featuresDashboardDashboardDotrouteRoute:
     featuresDashboardDashboardDotrouteRoute,
-  routerAdminRoute: routerAdminRouteWithChildren,
   routerSettingsRoute: routerSettingsRouteWithChildren,
   featuresOrganizationNewDotrouteRoute: featuresOrganizationNewDotrouteRoute,
 }

@@ -1,12 +1,12 @@
-import type { OrgPermissions } from "@packages/access-control";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { cn } from "@packages/ui/libs/utils.js";
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuthorization } from "../auth/use-authorization";
+import { type NavigationRequirement, useAuthorization } from "../auth/use-authorization";
 
-interface TabItem {
+interface TabItem extends NavigationRequirement {
   to: string;
   labelKey:
     | "contextualTabs.organization"
@@ -18,8 +18,6 @@ interface TabItem {
     | "contextualTabs.privacy"
     | "contextualTabs.apiTokens";
   icon?: LucideIcon;
-  requires?: OrgPermissions;
-  requiresOrg?: boolean;
 }
 
 const SETTINGS_TABS: readonly TabItem[] = [
@@ -55,18 +53,20 @@ interface ContextualTabsProps {
 export function ContextualTabs({ className }: ContextualTabsProps) {
   const { t } = useTranslation("common");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { can, hasMembership } = useAuthorization();
+  const { canReach } = useAuthorization();
+  const visibleTabs = SETTINGS_TABS.filter(canReach);
+  const activeIndex = visibleTabs.findIndex((tab) => tab.to === pathname);
+  const navRef = useRef<HTMLElement>(null);
 
-  const visibleTabs = SETTINGS_TABS.filter((tab) => {
-    if (tab.requiresOrg && !hasMembership) return false;
-    if (tab.requires) return can(tab.requires);
-    return true;
-  });
+  useEffect(() => {
+    navRef.current?.children[activeIndex]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeIndex]);
 
   return (
     <nav
+      ref={navRef}
       aria-label={t("contextualTabs.ariaLabel")}
-      className={cn("flex items-center gap-1 overflow-x-auto", className)}
+      className={cn("scrollbar-none flex items-center gap-1 overflow-x-auto", className)}
     >
       {visibleTabs.map((tab) => {
         const Icon = tab.icon;

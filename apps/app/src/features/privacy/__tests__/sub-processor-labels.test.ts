@@ -4,7 +4,7 @@ import { SUB_PROCESSORS } from "../../../shared/sub-processors.config";
 
 describe("SUB_PROCESSOR_KEYS", () => {
   // `satisfies Record<SubProcessorId, …>` proves every id has a pair of keys.
-  // It cannot prove Resend's row points at Resend's copy — swapping two entries
+  // It cannot prove Resend's row points at Resend's copy; swapping two entries
   // type-checks and renders. Only naming each pair catches that.
   it("points each processor at its own purpose and region keys", () => {
     expect(SUB_PROCESSOR_KEYS).toStrictEqual({

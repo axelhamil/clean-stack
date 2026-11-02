@@ -23,6 +23,15 @@ export interface RateLimitDecision {
 
 export type RateLimitError = { code: "RATE_LIMITER_INTERNAL_ERROR"; message: string };
 
+export interface WindowUsage {
+  used: number;
+  limit: number;
+}
+
+export interface IRateLimitUsage {
+  usage(key: string, windows: WindowConfig[]): Promise<Result<WindowUsage[], RateLimitError>>;
+}
+
 export interface IRateLimiter {
   consume(key: string, windows: WindowConfig[]): Promise<Result<RateLimitDecision, RateLimitError>>;
 }

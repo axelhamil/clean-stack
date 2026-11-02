@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { UUID } from "../primitives/uuid";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { UUID, uuidv7 } from "../primitives/uuid";
 import { StubId } from "./stubs/uuid-stub";
 
 describe("UUID", () => {
@@ -167,5 +167,53 @@ describe("StubId", () => {
 
       expect(Object.prototype.toString.call(stubId)).toBe("[object StubId]");
     });
+  });
+});
+
+class XId extends UUID<string> {}
+
+describe("uuidv7 and UUID.parse", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uuidv7 ids generated in one millisecond sort strictly ascending", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+
+    const ids = Array.from({ length: 1000 }, () => uuidv7());
+
+    expect([...ids].sort()).toEqual(ids);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("uuidv7 stays ascending when the clock goes backwards", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_900_000_000_000);
+    const before = uuidv7();
+    now.mockReturnValue(1_899_999_999_000);
+
+    const after = uuidv7();
+
+    expect(after > before).toBe(true);
+  });
+
+  it("uuidv7 carries version 7 and the RFC variant", () => {
+    const ids = Array.from({ length: 50 }, () => uuidv7());
+
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(id[14]).toBe("7");
+      expect(["8", "9", "a", "b"]).toContain(id[19]);
+    }
+  });
+
+  it("parse normalizes case and whitespace and returns a typed id", () => {
+    const parsed = XId.parse("  0190A3C2-7B4D-7E8F-9A0B-1C2D3E4F5A6B ");
+
+    expect(parsed.getValue()).toBeInstanceOf(XId);
+    expect(parsed.getValue().value).toBe("0190a3c2-7b4d-7e8f-9a0b-1c2d3e4f5a6b");
+  });
+
+  it("parse rejects a non uuid string with its message", () => {
+    expect(XId.parse("nope").getError()).toBe('"nope" is not a uuid');
   });
 });

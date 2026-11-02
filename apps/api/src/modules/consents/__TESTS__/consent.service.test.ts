@@ -1,7 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockPort } from "@packages/test/bun";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
@@ -10,20 +12,6 @@ import type {
   IConsentStore,
 } from "../application/ports/consent.port";
 import { ConsentService } from "../application/services/consent.service";
-
-const fakeTx = {} as never;
-
-const noopUow: IUnitOfWork<never> = {
-  startTransaction: async (cb) => cb(fakeTx),
-  run: async (cb) => cb(fakeTx),
-};
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: async () => {},
-  findPendingBatch: async () => [],
-  markDispatched: async () => {},
-  markFailed: async () => {},
-};
 
 const activeRow: ConsentRecordRow = {
   id: "row-1",
@@ -34,6 +22,8 @@ const activeRow: ConsentRecordRow = {
   grantedAt: new Date(),
   withdrawnAt: Option.none(),
   expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+  ipAddress: Option.none(),
+  userAgent: Option.none(),
 };
 
 function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
@@ -45,7 +35,7 @@ function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
     findActiveByUser: mock(async () =>
       Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
     ),
-    linkSubjectToUser: mock(async () => Result.ok<ConsentError>()),
+    linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>([])),
     ...overrides,
   };
 }
@@ -53,22 +43,14 @@ function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
 describe("ConsentService", () => {
   describe("record", () => {
     it("inserts row with 'necessary' always included and emits USER_COOKIE_CONSENT_GRANTED", async () => {
-      const enqueued: Array<{ eventType: string; aggregateId: string; payload: unknown }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events)
-            enqueued.push({
-              eventType: e.eventType,
-              aggregateId: e.aggregateId,
-              payload: e.payload,
-            });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore();
-      const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.record({
         subjectId: "subj-1",
@@ -83,8 +65,10 @@ describe("ConsentService", () => {
         .calls[0]?.[0] as ConsentRecordRow;
       expect(insertedRow.categories).toContain("necessary");
       expect(insertedRow.categories).toContain("analytics");
+      expect(insertedRow.ipAddress.unwrapOr("none")).toBe("1.2.3.4");
+      expect(insertedRow.userAgent.isNone()).toBe(true);
 
-      const grantedEvents = enqueued.filter(
+      const grantedEvents = enqueuedEvents(spyOutbox).filter(
         (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_GRANTED,
       );
       expect(grantedEvents).toHaveLength(1);
@@ -99,12 +83,19 @@ describe("ConsentService", () => {
           }),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const outbox = mockPort<IOutboxRepository>();
+      const service = new ConsentService(
+        store,
+        outbox,
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.record({ subjectId: "subj-1", categories: [] });
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
+      expect(enqueuedEvents(outbox)).toHaveLength(0);
     });
 
     it("always inserts a new record when a user updates preferences (append-only)", async () => {
@@ -113,7 +104,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.record({
         subjectId: "subj-1",
@@ -132,17 +128,14 @@ describe("ConsentService", () => {
 
   describe("withdraw", () => {
     it("inserts a withdrawal row with empty categories + withdrawnAt set and emits USER_COOKIE_CONSENT_WITHDRAWN", async () => {
-      const enqueued: Array<{ eventType: string }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events) enqueued.push({ eventType: e.eventType });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore();
-      const service = new ConsentService(store, spyOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.withdraw({ subjectId: "subj-1" });
 
@@ -154,7 +147,7 @@ describe("ConsentService", () => {
       expect(insertedRow.categories).toEqual([]);
       expect(insertedRow.withdrawnAt.isSome()).toBe(true);
 
-      const withdrawnEvents = enqueued.filter(
+      const withdrawnEvents = enqueuedEvents(spyOutbox).filter(
         (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_WITHDRAWN,
       );
       expect(withdrawnEvents).toHaveLength(1);
@@ -169,12 +162,19 @@ describe("ConsentService", () => {
           }),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const outbox = mockPort<IOutboxRepository>();
+      const service = new ConsentService(
+        store,
+        outbox,
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.withdraw({ subjectId: "subj-1" });
 
       expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
+      expect(enqueuedEvents(outbox)).toHaveLength(0);
     });
   });
 
@@ -185,7 +185,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.getActive("subj-1", "2026-07-09", "u1");
 
@@ -205,7 +210,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.getActive("subj-1", "2026-07-09", "u1");
 
@@ -222,7 +232,12 @@ describe("ConsentService", () => {
           Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
         ),
       });
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.getActive("subj-1", "2026-07-09");
 
@@ -234,14 +249,44 @@ describe("ConsentService", () => {
   });
 
   describe("reconcile", () => {
-    it("links the browser's orphan consent records to the user", async () => {
-      const store = makeStore();
-      const service = new ConsentService(store, noopOutbox, noopUow, new NoOpInstrumentation());
+    it("links the browser's orphan consent records to the user and emits USER_COOKIE_CONSENT_LINKED", async () => {
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const store = makeStore({
+        linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>(["c1", "c2"])),
+      });
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
 
       const result = await service.reconcile("subj-1", "u1");
 
       expect(result.isSuccess).toBe(true);
       expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1");
+      expect(enqueuedEvents(spyOutbox)).toEqual([
+        {
+          eventType: EventTypes.USER_COOKIE_CONSENT_LINKED,
+          aggregateId: "u1",
+          payload: { userId: "u1", subjectId: "subj-1", consentRecordIds: ["c1", "c2"] },
+        },
+      ]);
+    });
+
+    it("emits nothing when every record was already linked", async () => {
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const service = new ConsentService(
+        makeStore(),
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        new NoOpInstrumentation(),
+      );
+
+      const result = await service.reconcile("subj-1", "u1");
+
+      expect(result.isSuccess).toBe(true);
+      expect(enqueuedEvents(spyOutbox)).toEqual([]);
     });
   });
 });

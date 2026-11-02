@@ -24,7 +24,7 @@ export function normalizeHop(hop: string): string {
 }
 
 // The `private` keyword expands to every range that is unreachable from the public
-// internet — on a PaaS (Railway, Fly, …) the only hop that can connect to the container
+// internet, on a PaaS (Railway, Fly, …) the only hop that can connect to the container
 // is the platform's edge proxy over the private network, so trusting these is safe and
 // avoids pinning a non-stable internal IP. Mirrors Caddy's `trusted_proxies private_ranges`.
 let cachedRef: readonly string[] | undefined;
@@ -67,6 +67,13 @@ function isTrusted(ip: string, list: BlockList): boolean {
   if (isIPv4(ip)) return list.check(ip, "ipv4");
   if (isIPv6(ip)) return list.check(ip, "ipv6");
   return false;
+}
+
+export function isFromTrustedProxy(c: Context): boolean {
+  const list = trustedList();
+  if (!list) return false;
+
+  return isTrusted(normalizeHop(getConnInfo(c).remote.address ?? ""), list);
 }
 
 export function resolveClientIp(c: Context): string {

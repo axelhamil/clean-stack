@@ -1,9 +1,8 @@
 import type { Option, Result } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
-import type { ITransaction } from "../transaction";
 
 export type EmailMessageKind = "template" | "raw";
-export type EmailMessageStatus = "pending" | "sent" | "failed";
+export type EmailMessageStatus = "pending" | "sent" | "failed" | "dead";
 
 export interface EmailMessageInsert {
   kind: EmailMessageKind;
@@ -31,28 +30,27 @@ export interface EmailMessageRecord {
   createdAt: Date;
 }
 
+export type EmailLease = Pick<EmailMessageRecord, "id" | "attempts">;
+
+export interface EmailClaimRequest {
+  limit: number;
+  leaseSeconds: number;
+  deadReplayWindowHours: number;
+}
+
+export type EmailFailure =
+  | { lastError: string; status: "failed" }
+  | { lastError: string; status: "pending" | "dead"; retryAfterSeconds: number };
+
 export type EmailQueueError = { code: "EMAIL_QUEUE_WRITE_FAILED"; message: string };
 
 export interface IEmailQueue {
-  enqueue(
-    rows: EmailMessageInsert[],
-    tx?: ITransaction,
-  ): Promise<Result<{ written: number }, EmailQueueError>>;
-  claimPending(
-    limit: number,
-    claimUntil: Date,
-    tx: ITransaction,
-  ): Promise<Result<EmailMessageRecord[], EmailQueueError>>;
+  enqueue(rows: EmailMessageInsert[]): Promise<Result<{ written: number }, EmailQueueError>>;
+  claim(request: EmailClaimRequest): Promise<Result<EmailMessageRecord[], EmailQueueError>>;
   markSent(
-    ids: string[],
-    sentAt: Date,
+    leases: EmailLease[],
     providerMessageIds: Record<string, string>,
-    tx: ITransaction,
-  ): Promise<Result<void, EmailQueueError>>;
-  markFailed(
-    id: string,
-    error: string,
-    nextAttemptAt: Option<Date>,
-    tx: ITransaction,
-  ): Promise<Result<void, EmailQueueError>>;
+  ): Promise<Result<EmailLease[], EmailQueueError>>;
+  markFailed(lease: EmailLease, failure: EmailFailure): Promise<Result<boolean, EmailQueueError>>;
+  release(leases: EmailLease[]): Promise<Result<number, EmailQueueError>>;
 }

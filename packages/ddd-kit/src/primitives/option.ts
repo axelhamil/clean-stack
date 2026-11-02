@@ -1,3 +1,7 @@
+import { Result } from "./result";
+
+const isThunk = <E>(error: E | (() => E)): error is () => E => typeof error === "function";
+
 export abstract class Option<T> {
   abstract isSome(): boolean;
   abstract isNone(): boolean;
@@ -13,6 +17,9 @@ export abstract class Option<T> {
   abstract flatMap<U>(f: (value: T) => Option<U>): Option<U>;
   abstract toUndefined(): T | undefined;
   abstract toNull(): T | null;
+  abstract toResult<E>(error: E | (() => E)): Result<T, E>;
+  abstract tryMap<U, E>(f: (value: T) => Result<U, E>): Result<Option<U>, E>;
+  abstract equals(other: Option<T>, same?: (left: T, right: T) => boolean): boolean;
 
   static some<T>(value: T): Option<T> {
     return Some.of(value);
@@ -93,6 +100,18 @@ export class Some<T> extends Option<T> {
     return this.value;
   }
 
+  toResult<E>(_error: E | (() => E)): Result<T, E> {
+    return Result.ok(this.value);
+  }
+
+  tryMap<U, E>(f: (value: T) => Result<U, E>): Result<Option<U>, E> {
+    return f(this.value).map((mapped) => Option.some(mapped));
+  }
+
+  equals(other: Option<T>, same: (left: T, right: T) => boolean = Object.is): boolean {
+    return other.isSome() && same(this.value, other.unwrap());
+  }
+
   toString(): string {
     return `Some(${this.value})`;
   }
@@ -161,6 +180,18 @@ export class None<T> extends Option<T> {
 
   toNull(): T | null {
     return null;
+  }
+
+  toResult<E>(error: E | (() => E)): Result<T, E> {
+    return Result.fail(isThunk(error) ? error() : error);
+  }
+
+  tryMap<U, E>(_f: (value: T) => Result<U, E>): Result<Option<U>, E> {
+    return Result.ok(Option.none<U>());
+  }
+
+  equals(other: Option<T>): boolean {
+    return other.isNone();
   }
 
   toString(): string {

@@ -1,79 +1,27 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
+import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
+const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({
+  ...realHonoBun,
   getConnInfo: () => ({ remote: { address: "1.2.3.4" } }),
 }));
 
 const warnSpy = mock(() => {});
 const debugSpy = mock(() => {});
+const realLogger = await import("../logger");
 mock.module("../logger", () => ({
+  ...realLogger,
   logger: { warn: warnSpy, info: () => {}, error: () => {}, debug: debugSpy },
-}));
-
-// Superset of @packages/drizzle exports used across the full test suite.
-mock.module("@packages/drizzle", () => ({
-  db: {},
-  outboxSchema: {},
-  auditLogSchema: {},
-  webhooksSchema: {},
-  authSchema: {},
-  multiTenantSchema: { organization: { id: {} } },
-  schema: {},
-  rateLimitSchema: {},
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  inArray: () => {},
-  eq: () => {},
-  lt: () => {},
-  isNotNull: () => {},
-  asc: () => {},
-  desc: () => {},
-  and: () => {},
-  sql: Object.assign(() => {}, { raw: () => ({}), identifier: () => ({}) }),
 }));
 
 const { cspReportCors, makeCspReportApp } = await import("../internal-routes/csp-report.route");
 
-function makeOutbox(): IOutboxRepository {
-  return {
-    enqueue: mock(async () => {}),
-    findPendingBatch: async () => [],
-    markDispatched: async () => {},
-    markFailed: async () => {},
-  };
+function makeOutbox() {
+  return mockPort<IOutboxRepository>();
 }
 
 const VALID_LEGACY_BODY = JSON.stringify({
@@ -254,6 +202,30 @@ describe("POST /csp-report", () => {
       expect(outbox.enqueue).not.toHaveBeenCalled();
     });
 
+    it("keeps a report from the back office host", async () => {
+      const outbox = makeOutbox();
+      const app = makeCspReportApp({
+        outbox,
+        appUrl: "https://app.example.com",
+        adminUrl: "https://admin.example.com",
+      });
+
+      await app.request("/csp-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/csp-report" },
+        body: JSON.stringify({
+          "csp-report": {
+            "document-uri": "https://admin.example.com/users",
+            "blocked-uri": "inline",
+            "violated-directive": "script-src",
+            "effective-directive": "script-src",
+          },
+        }),
+      });
+
+      expect(outbox.enqueue).toHaveBeenCalled();
+    });
+
     it("keeps a report whose document-uri matches our app origin → event emitted", async () => {
       const outbox = makeOutbox();
       const app = makeCspReportApp({ outbox, appUrl: "https://app.example.com" });
@@ -394,14 +366,8 @@ describe("POST /csp-report", () => {
 
   describe("emit failure resilience", () => {
     it("emitEvent throws → still returns 204 + logger.warn called", async () => {
-      const outbox: IOutboxRepository = {
-        enqueue: mock(async () => {
-          throw new Error("outbox down");
-        }),
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const outbox = mockPort<IOutboxRepository>();
+      outbox.enqueue.mockRejectedValue(new Error("outbox down"));
       const app = makeCspReportApp({ outbox });
 
       const res = await app.request("/csp-report", {

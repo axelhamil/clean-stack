@@ -5,8 +5,10 @@ builder = "DOCKERFILE"
 dockerfilePath = "apps/app/prod.Dockerfile"
 watchPatterns = [
   "apps/app/**",
+  "infra/caddy/**",
   "packages/ui/**",
   "packages/access-control/**",
+  "packages/web-kit/**",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
 ]

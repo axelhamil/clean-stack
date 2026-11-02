@@ -8,7 +8,8 @@ export interface FrontConsumer {
 }
 
 const REPO_ROOT = join(import.meta.dir, "../../../../..");
-const FRONT_SRC = join(REPO_ROOT, "apps/app/src");
+export const APP_SRC = join(REPO_ROOT, "apps/app/src");
+const ADMIN_SRC = join(REPO_ROOT, "apps/admin/src");
 
 /** `api` followed by any run of `.segment` or `["segment"]`, ending in `.$method`. */
 const CALL_SITE = /\bapi((?:\.[A-Za-z0-9_]+|\[["'][^"']+["']\])+)\.\$([a-z]+)/g;
@@ -24,10 +25,10 @@ export function extractRouteFromChain(chain: string): RouteKey {
   return `${match[2].toUpperCase()} /${segments.join("/")}`;
 }
 
-export function listFrontConsumers(rootDir = FRONT_SRC): FrontConsumer[] {
+export function listFrontConsumers(rootDirs = [APP_SRC, ADMIN_SRC]): FrontConsumer[] {
   const found: FrontConsumer[] = [];
 
-  for (const file of walk(rootDir)) {
+  for (const file of rootDirs.flatMap((rootDir) => [...walk(rootDir)])) {
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(CALL_SITE)) {
       found.push({

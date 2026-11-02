@@ -1,10 +1,10 @@
+import { toAuthClientError } from "@packages/web-kit/api/errors/api-error";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toAuthClientError } from "../../../shared/api/errors/api-error";
-import { toastError } from "../../../shared/api/errors/toast";
 import { authClient } from "../../../shared/auth/auth-client";
-import { getErrorsT } from "../../../shared/i18n/get-errors-t";
 import type { ChangeEmailInput } from "../account.schema";
 
 export function useChangeEmail() {
@@ -21,10 +21,6 @@ export function useChangeEmail() {
     onSuccess: () => {
       toast.success(t("account.emailConfirmationSentToast"));
     },
-    onError: (err) =>
-      toastError(
-        err,
-        getErrorsT()("fallback.changeEmail", { defaultValue: "Failed to request email change" }),
-      ),
+    onError: (err) => toastError(err, errorFallback("changeEmail")),
   });
 }

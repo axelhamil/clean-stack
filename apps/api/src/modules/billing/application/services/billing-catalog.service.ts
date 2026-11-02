@@ -1,5 +1,5 @@
+import { ENTITLEMENTS, type Feature, isTier, type Tier } from "../../../../shared/entitlements";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import { ENTITLEMENTS, type Feature, isTier, type Tier } from "../../config";
 import type { IStripeCatalogSource } from "../ports/stripe-catalog.port";
 
 export interface PlanCatalogItem {
@@ -39,6 +39,12 @@ export class BillingCatalogService {
       features: ENTITLEMENTS.free.features,
       maxMembers: ENTITLEMENTS.free.maxMembers,
     };
+  }
+
+  async configuredPriceIds(): Promise<string[]> {
+    const catalog = await this.getCatalog();
+
+    return catalog.flatMap(({ priceId }) => (priceId === null ? [] : [priceId]));
   }
 
   async getCatalog(): Promise<PlanCatalogItem[]> {

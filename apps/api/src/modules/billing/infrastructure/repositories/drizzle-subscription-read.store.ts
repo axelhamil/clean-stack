@@ -1,22 +1,22 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { and, billingSchema, db, eq, inArray } from "@packages/drizzle";
+import { and, billingSchema, eq, inArray, resolveExecutor } from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   BillingError,
   ISubscriptionReadStore,
   SubscriptionRow,
 } from "../../application/ports/subscription-read.port";
 
+const sub = billingSchema.subscription;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const ACTIVE_STATUSES = ["active", "trialing"] as const;
+const MANAGEABLE_STATUSES = [...ACTIVE_STATUSES, "past_due", "unpaid"] as const;
 
-function storeFailure(err: unknown, op: string): BillingError {
-  return {
-    code: "BILLING_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
+const storeFailure = dbOperationFailure("BILLING_PROVIDER_FAILURE");
+
+function activeSubscriptionOf(referenceId: string) {
+  return and(eq(sub.referenceId, referenceId), inArray(sub.status, [...ACTIVE_STATUSES]));
 }
 
 export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
@@ -24,34 +24,32 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
 
   async findCustomerIdByReference(
     referenceId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<string>, BillingError>> {
-    const invoker = tx ?? db;
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleSubscriptionReadStore > findCustomerIdByReference" },
       async () => {
         try {
-          const query = invoker
-            .select({
-              stripeCustomerId: billingSchema.subscription.stripeCustomerId,
-            })
-            .from(billingSchema.subscription)
+          const query = exec
+            .select({ stripeCustomerId: sub.stripeCustomerId })
+            .from(sub)
             .where(
-              and(
-                eq(billingSchema.subscription.referenceId, referenceId),
-                inArray(billingSchema.subscription.status, [...ACTIVE_STATUSES]),
-              ),
+              and(eq(sub.referenceId, referenceId), inArray(sub.status, [...MANAGEABLE_STATUSES])),
             )
             .limit(1);
-          const rows = await this.instrumentation.startSpan(
+
+          const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          const r = rows[0];
-          return Result.ok(r ? Option.fromNullable(r.stripeCustomerId) : Option.none());
+
+          return Result.ok(
+            Option.fromNullable(row).flatMap((r) => Option.fromNullable(r.stripeCustomerId)),
+          );
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findCustomerIdByReference"));
+          return Result.fail(storeFailure("findCustomerIdByReference"));
         }
       },
     );
@@ -59,35 +57,28 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
 
   async findActiveByReference(
     referenceId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<SubscriptionRow>, BillingError>> {
-    const invoker = tx ?? db;
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleSubscriptionReadStore > findActiveByReference" },
       async () => {
         try {
-          const query = invoker
-            .select({
-              tier: billingSchema.subscription.plan,
-              status: billingSchema.subscription.status,
-            })
-            .from(billingSchema.subscription)
-            .where(
-              and(
-                eq(billingSchema.subscription.referenceId, referenceId),
-                inArray(billingSchema.subscription.status, [...ACTIVE_STATUSES]),
-              ),
-            )
+          const query = exec
+            .select({ tier: sub.plan, status: sub.status })
+            .from(sub)
+            .where(activeSubscriptionOf(referenceId))
             .limit(1);
-          const rows = await this.instrumentation.startSpan(
+
+          const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          const r = rows[0];
-          return Result.ok(r ? Option.some({ tier: r.tier, status: r.status }) : Option.none());
+
+          return Result.ok(Option.fromNullable(row));
         } catch (err) {
           this.instrumentation.capture(err);
-          return Result.fail(storeFailure(err, "findActiveByReference"));
+          return Result.fail(storeFailure("findActiveByReference"));
         }
       },
     );

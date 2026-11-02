@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { generateToken, hmacToken } from "../../../shared/crypto/api-token";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import type { ApiTokenError, ApiTokenRecord } from "../../../shared/ports/api-token.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
-import type { ApiTokenError, ApiTokenRecord } from "../application/ports/api-token.port";
 import { GithubKeyVerifier } from "../infrastructure/services/github-key-verifier";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -154,7 +155,7 @@ describe("GithubKeyVerifier", () => {
 });
 
 // ── scanning.routes.ts endpoint tests ────────────────────────────────────────
-// Uses factory injection — no mock.module for container or auth-queries,
+// Uses factory injection (no mock.module for container or auth-queries),
 // so no global state pollution across the test suite.
 
 const TOKEN_PREFIX = "clean_";
@@ -166,16 +167,16 @@ const KNOWN_HMAC = hmacToken(KNOWN_RAW, TOKEN_PEPPER);
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
   userId: "user-1",
-  organizationId: null,
+  organizationId: Option.none(),
   name: "ci-token",
   scopes: ["read:profile"],
   tokenHmac: KNOWN_HMAC,
   pepperVersion: 1,
   tokenStart: KNOWN_RAW.slice(0, 14),
-  lastUsedAt: null,
-  expiresAt: null,
-  revokedAt: null,
-  revokedReason: null,
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
   createdAt: new Date("2024-01-01"),
 };
 
@@ -186,12 +187,9 @@ const mockFindByHmac = mock(async (_hmac: string) =>
 const mockRevoke = mock(async () => Result.ok<ApiTokenError>());
 const mockEnqueue = mock(async () => {});
 const mockSendTemplate = mock(async () => Result.ok());
-const mockFindUserById = mock(async () => ({
-  id: "user-1",
-  email: "user@example.com",
-  name: "Alice",
-  locale: "fr",
-}));
+const mockFindUserById = mock(async () =>
+  Option.some({ id: "user-1", email: "user@example.com", name: "Alice", locale: "fr" }),
+);
 
 const { createApiTokenScanningRoutes } = await import("../scanning.routes");
 
@@ -201,7 +199,7 @@ const app = new Hono()
     createApiTokenScanningRoutes({
       githubKeyVerifier: { verify: mockVerify },
       apiTokenRepository: { findByHmac: mockFindByHmac, revoke: mockRevoke },
-      transactionService: { run: async (cb) => cb({} as never) },
+      transactionService: mockUnitOfWork().unitOfWork,
       outboxRepository: { enqueue: mockEnqueue } as never,
       emailService: { sendTemplate: mockSendTemplate },
       instrumentation: new NoOpInstrumentation(),
@@ -243,12 +241,9 @@ describe("POST /api/token-scanning/github", () => {
     );
     mockRevoke.mockImplementation(async () => Result.ok());
     mockSendTemplate.mockImplementation(async () => Result.ok());
-    mockFindUserById.mockImplementation(async () => ({
-      id: "user-1",
-      email: "user@example.com",
-      name: "Alice",
-      locale: "fr",
-    }));
+    mockFindUserById.mockImplementation(async () =>
+      Option.some({ id: "user-1", email: "user@example.com", name: "Alice", locale: "fr" }),
+    );
   });
 
   it("returns 403 when signature headers are missing", async () => {
@@ -264,6 +259,13 @@ describe("POST /api/token-scanning/github", () => {
     mockVerify.mockImplementation(async () => false);
     const res = await postScan(makeBody([{ token: KNOWN_RAW, type: "clean_token" }]));
     expect(res.status).toBe(403);
+    expect(mockFindByHmac).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when the signed body is valid JSON but not a list of scan entries", async () => {
+    const res = await postScan(JSON.stringify({ token: "clean_x", type: "api_token" }));
+
+    expect(res.status).toBe(400);
     expect(mockFindByHmac).not.toHaveBeenCalled();
   });
 
@@ -293,7 +295,7 @@ describe("POST /api/token-scanning/github", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { label: string }[];
     expect(body[0]?.label).toBe("true_positive");
-    expect(mockRevoke).toHaveBeenCalledWith("tok-1", "leaked", expect.anything());
+    expect(mockRevoke).toHaveBeenCalledWith("tok-1", "leaked");
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
     // biome-ignore lint/style/noNonNullAssertion: guarded by toHaveBeenCalledTimes(1) above
     const [events] = (mockEnqueue as ReturnType<typeof mock>).mock.calls[0]!;
@@ -324,11 +326,9 @@ describe("POST /api/token-scanning/github", () => {
     const localRevoke = mock(async (): Promise<Result<void, ApiTokenError>> => Result.ok());
     const localEnqueue = mock(async () => {});
     const localSendTemplate = mock(async () => Result.ok());
-    const localFindUser = mock(async () => ({
-      id: "user-1",
-      email: "user@example.com",
-      name: "Alice",
-    }));
+    const localFindUser = mock(async () =>
+      Option.some({ id: "user-1", email: "user@example.com", name: "Alice" }),
+    );
 
     const appWithPrev = new Hono()
       .route(
@@ -336,7 +336,7 @@ describe("POST /api/token-scanning/github", () => {
         createApiTokenScanningRoutes({
           githubKeyVerifier: { verify: async () => true },
           apiTokenRepository: { findByHmac: localFindByHmac, revoke: localRevoke },
-          transactionService: { run: async (cb) => cb({} as never) },
+          transactionService: mockUnitOfWork().unitOfWork,
           outboxRepository: { enqueue: localEnqueue } as never,
           emailService: { sendTemplate: localSendTemplate },
           instrumentation: new NoOpInstrumentation(),
@@ -361,14 +361,14 @@ describe("POST /api/token-scanning/github", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { label: string }[];
     expect(body[0]?.label).toBe("true_positive");
-    expect(localRevoke).toHaveBeenCalledWith(prevRecord.id, "leaked", expect.anything());
+    expect(localRevoke).toHaveBeenCalledWith(prevRecord.id, "leaked");
   });
 
   it("returns true_positive and skips revoke for an already-revoked token", async () => {
     const revoked: ApiTokenRecord = {
       ...RECORD,
-      revokedAt: new Date("2024-06-01"),
-      revokedReason: "user",
+      revokedAt: Option.some(new Date("2024-06-01")),
+      revokedReason: Option.some("user"),
     };
     mockFindByHmac.mockImplementation(async (_hmac: string) =>
       Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.some(revoked)),

@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import * as realDrizzle from "@packages/drizzle";
 
 const fakeSql = Object.assign(
   (strings: TemplateStringsArray) => ({
@@ -10,70 +11,13 @@ const fakeSql = Object.assign(
   },
 );
 
-mock.module("@packages/drizzle", () => ({
-  db: {},
-  sql: fakeSql,
-  eq: () => ({}),
-  and: () => ({}),
-  or: () => ({}),
-  isNull: () => ({}),
-  isNotNull: () => ({}),
-  lt: () => ({}),
-  lte: () => ({}),
-  gt: () => ({}),
-  gte: () => ({}),
-  not: () => ({}),
-  asc: () => ({}),
-  desc: () => ({}),
-  like: () => ({}),
-  inArray: () => ({}),
-  count: () => ({}),
-  arrayContains: () => ({}),
-  outboxSchema: { outboxEvent: {} },
-  auditLogSchema: { auditLog: {} },
-  webhooksSchema: { webhookDelivery: {} },
-  multiTenantSchema: { organization: { id: {} } },
-  authSchema: {},
-  schema: {},
-  trackEventsOnSuccess: () => {},
-  TransactionService: class {},
-  rateLimitSchema: { rateLimitRecord: { key: {}, points: {}, expire: {} } },
-  billingSchema: {},
-  quotaUsageSchema: {
-    quotaUsage: { organizationId: {}, resource: {}, periodStart: {}, used: {}, updatedAt: {} },
-  },
-  policiesSchema: {},
-  consentSchema: {},
-  notificationSchema: {
-    notification: {
-      id: { name: "id" },
-      userId: { name: "user_id" },
-      organizationId: { name: "organization_id" },
-      category: { name: "category" },
-      eventType: { name: "event_type" },
-      groupKey: { name: "group_key" },
-      dedupKey: { name: "dedup_key" },
-      payload: { name: "payload" },
-      readAt: { name: "read_at" },
-      emailPendingAt: { name: "email_pending_at" },
-      emailSentAt: { name: "email_sent_at" },
-      createdAt: { name: "created_at" },
-    },
-    notificationPreference: {
-      id: { name: "id" },
-      scope: { name: "scope" },
-      scopeId: { name: "scope_id" },
-      category: { name: "category" },
-      channel: { name: "channel" },
-      enabled: { name: "enabled" },
-      frequency: { name: "frequency" },
-      locked: { name: "locked" },
-    },
-  },
-  apiTokenSchema: {},
-}));
+// The DDL has no interpolation, so joining the template's literal parts yields the
+// exact statement text; `@packages/drizzle` exposes no dialect to render a real `sql`.
+mock.module("@packages/drizzle", () => ({ ...realDrizzle, sql: fakeSql }));
 
-import { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } from "../notification-trigger";
+const { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } = await import(
+  "../notification-trigger"
+);
 
 describe("ensureNotificationTrigger", () => {
   function makeClient() {
@@ -86,7 +30,7 @@ describe("ensureNotificationTrigger", () => {
     return { client, executed };
   }
 
-  test("appelle execute et emet le DDL attendu", async () => {
+  test("issues the expected DDL through execute", async () => {
     const { client, executed } = makeClient();
 
     await ensureNotificationTrigger(client as never);
@@ -110,11 +54,11 @@ describe("ensureNotificationTrigger", () => {
     expect(readDdl).toContain("OLD.read_at IS DISTINCT FROM NEW.read_at");
   });
 
-  test("le signal de lecture passe par le meme canal que la creation", () => {
+  test("the read signal uses the same channel as creation", () => {
     expect(NOTIFICATION_NOTIFY_CHANNEL).toBe("notification_changed");
   });
 
-  test("est idempotent - deux appels ne levent pas d'erreur", async () => {
+  test("is idempotent: two calls do not throw", async () => {
     const { client } = makeClient();
 
     await ensureNotificationTrigger(client as never);

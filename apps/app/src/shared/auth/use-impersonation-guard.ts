@@ -10,7 +10,6 @@ import { isImpersonating } from "./is-impersonating";
  * receives never depends on the branch it came from.
  */
 export interface ImpersonationDescription {
-  title: string | undefined;
   "aria-describedby": string | undefined;
 }
 
@@ -27,11 +26,15 @@ export function impersonationGuard(session: Parameters<typeof isImpersonating>[0
   return { blocked: isImpersonating(session) };
 }
 
+export function isFrozenByGuard(guard: { blocked: boolean }, otherwiseDisabled = false): boolean {
+  return guard.blocked && !otherwiseDisabled;
+}
+
 /**
  * Builds the description a frozen control carries, and refuses to claim the
  * freeze when something else already owns it.
  *
- * `otherwiseDisabled` is whatever ELSE holds the control shut right now — a
+ * `otherwiseDisabled` is whatever ELSE holds the control shut right now: a
  * pending mutation, a cooldown, a missing prerequisite, an unmet precondition.
  * When it is true the control would be disabled with or without impersonation,
  * so naming impersonation as the cause would tell the user something false.
@@ -42,25 +45,24 @@ export function describeImpersonation(
   guard: { blocked: boolean; reason: string | undefined; descriptionId: string },
   otherwiseDisabled = false,
 ): ImpersonationDescription {
-  const ours = guard.blocked && !otherwiseDisabled;
+  const ours = isFrozenByGuard(guard, otherwiseDisabled);
   return {
-    title: ours ? guard.reason : undefined,
     "aria-describedby": ours ? guard.descriptionId : undefined,
   };
 }
 
 /**
- * A disabled control is skipped by Tab, so `title` alone never reaches a
- * keyboard/screen-reader user — it is mouse-only. `descriptionId` names a
+ * A disabled control is skipped by Tab and takes no pointer events, so the
+ * sighted explanation is `GuardHint` around it. `descriptionId` names a
  * DOM element (rendered by `ImpersonationReason` below) that `describeProps`
  * wires in via `aria-describedby`, which screen readers do read in browse mode
- * even though the control itself is unreachable by Tab. One id per guard call —
+ * even though the control itself is unreachable by Tab. One id per guard call:
  * every control on the same page shares it, per the "one element, several
  * aria-describedby" rule: duplicating the text node per control is worse,
  * not more correct.
  *
  * Call sites spread `guard.describeProps(otherwiseDisabled)` onto the control
- * and never assemble `title`/`aria-describedby` themselves: the "is the freeze
+ * and never assemble `aria-describedby` themselves: the "is the freeze
  * actually ours?" test belongs to the guard, not to 24 copies of it.
  */
 export function useImpersonationGuard(): ImpersonationGuard {

@@ -1,5 +1,5 @@
 import { Option, Result } from "@packages/ddd-kit";
-import { and, db, eq, sql, type Transaction, webhooksSchema } from "@packages/drizzle";
+import { and, eq, resolveExecutor, sql, webhooksSchema } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
@@ -35,11 +35,8 @@ function toRecord(row: typeof we.$inferSelect): WebhookEndpointRecord {
 export class DrizzleWebhookEndpointRepository implements IWebhookEndpointRepository {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async create(
-    args: CreateEndpointArgs,
-    tx?: Transaction,
-  ): Promise<Result<WebhookEndpointRecord, WebhookRepoError>> {
-    const exec = tx ?? db;
+  async create(args: CreateEndpointArgs): Promise<Result<WebhookEndpointRecord, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > create" },
       async () => {
@@ -75,9 +72,8 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
 
   async update(
     args: UpdateEndpointArgs,
-    tx?: Transaction,
   ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>> {
-    const exec = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > update" },
       async () => {
@@ -109,12 +105,8 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     );
   }
 
-  async delete(
-    id: string,
-    organizationId: string,
-    tx?: Transaction,
-  ): Promise<Result<boolean, WebhookRepoError>> {
-    const exec = tx ?? db;
+  async delete(id: string, organizationId: string): Promise<Result<boolean, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > delete" },
       async () => {
@@ -137,11 +129,12 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
   }
 
   async findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > findById" },
       async () => {
         try {
-          const query = db
+          const query = exec
             .select()
             .from(we)
             .where(and(eq(we.id, id), eq(we.organizationId, organizationId)))
@@ -162,11 +155,12 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
   async listByOrg(
     organizationId: string,
   ): Promise<Result<WebhookEndpointRecord[], WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > listByOrg" },
       async () => {
         try {
-          const query = db.select().from(we).where(eq(we.organizationId, organizationId));
+          const query = exec.select().from(we).where(eq(we.organizationId, organizationId));
           const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
@@ -180,21 +174,19 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     );
   }
 
-  async applySecretRotation(
-    args: {
-      id: string;
-      organizationId: string;
-      secretCipher: string;
-      previousSecretCipher: string;
-      previousSecretExpiresAt: Date;
-    },
-    tx: Transaction,
-  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>> {
+  async applySecretRotation(args: {
+    id: string;
+    organizationId: string;
+    secretCipher: string;
+    previousSecretCipher: string;
+    previousSecretExpiresAt: Date;
+  }): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > applySecretRotation" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({
               secretCipher: args.secretCipher,
@@ -219,15 +211,15 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
   async bumpFailure(
     id: string,
     organizationId: string,
-    tx: Transaction,
   ): Promise<
     Result<Option<{ consecutiveFailures: number; firstFailedAt: Date }>, WebhookRepoError>
   > {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > bumpFailure" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({
               consecutiveFailures: sql`${we.consecutiveFailures} + 1`,
@@ -259,16 +251,13 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     );
   }
 
-  async resetFailure(
-    id: string,
-    organizationId: string,
-    tx: Transaction,
-  ): Promise<Result<void, WebhookRepoError>> {
+  async resetFailure(id: string, organizationId: string): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > resetFailure" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({ consecutiveFailures: 0, firstFailedAt: null })
             .where(and(eq(we.id, id), eq(we.organizationId, organizationId)));
@@ -289,13 +278,13 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     id: string,
     organizationId: string,
     disabledAt: Date,
-    tx: Transaction,
   ): Promise<Result<void, WebhookRepoError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > markDisabled" },
       async () => {
         try {
-          const query = tx
+          const query = exec
             .update(we)
             .set({ enabled: false, disabledAt })
             .where(and(eq(we.id, id), eq(we.organizationId, organizationId)));

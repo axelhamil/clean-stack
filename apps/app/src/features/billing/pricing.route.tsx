@@ -1,5 +1,5 @@
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
-import { TypographyH1, TypographyMuted } from "@packages/ui/components/ui/typography";
+import { PageHeader } from "@packages/ui/components/ui/page-header";
 import { cn } from "@packages/ui/libs/utils.js";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -7,19 +7,25 @@ import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../../shared/api/queries/active-org";
 import { sessionQueryOptions } from "../../shared/api/queries/session";
 import { subscriptionQueryOptions } from "../../shared/api/queries/subscription";
-import { useActiveOrgId } from "../../shared/auth/use-active-org-id";
 import { PricingTable } from "../../shared/components/pricing-table";
 
 export const Route = createFileRoute("/pricing")({
-  validateSearch: (s: Record<string, unknown>) => ({ plan: (s.plan as string) ?? undefined }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    plan: typeof s.plan === "string" ? s.plan : undefined,
+  }),
   component: PricingPage,
 });
 
 function PricingPage() {
   const { t } = useTranslation("common");
-  const { data: session } = useQuery(sessionQueryOptions);
+  const {
+    data: session,
+    isPending: isSessionPending,
+    isError: isSessionError,
+  } = useQuery(sessionQueryOptions);
+  const isAuthenticated = session ? true : isSessionPending || isSessionError ? null : false;
   const { data: activeOrg } = useQuery({ ...activeOrgQueryOptions, enabled: Boolean(session) });
-  const organizationId = useActiveOrgId();
+  const organizationId = activeOrg?.id ?? null;
   const { data: sub } = useQuery({
     ...subscriptionQueryOptions(organizationId),
     enabled: organizationId !== null && Boolean(session),
@@ -27,14 +33,11 @@ function PricingPage() {
 
   return (
     <main className={cn(pageContainerVariants(), "flex flex-col gap-8 py-8")}>
-      <header className="flex flex-col gap-2">
-        <TypographyH1>{t("pricing.title")}</TypographyH1>
-        <TypographyMuted>{t("pricing.subtitle")}</TypographyMuted>
-      </header>
+      <PageHeader title={t("pricing.title")} description={t("pricing.subtitle")} />
       <PricingTable
-        isAuthenticated={Boolean(session)}
+        isAuthenticated={isAuthenticated}
         currentTier={sub?.tier ?? null}
-        activeOrgId={activeOrg?.id ?? null}
+        activeOrgId={organizationId}
       />
     </main>
   );

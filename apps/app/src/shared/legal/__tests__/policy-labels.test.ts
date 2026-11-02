@@ -4,7 +4,7 @@ import { isPolicyType, POLICY_TITLE_KEYS, policyLabelFor } from "../policy-label
 
 describe("POLICY_TITLE_KEYS", () => {
   // `satisfies Record<PolicyType, string>` proves every type has a key. It
-  // cannot prove privacy points at the privacy copy — swapping the two
+  // cannot prove privacy points at the privacy copy: swapping the two
   // entries type-checks and renders. Only naming each pair catches that.
   it("points each policy type at its own title key", () => {
     expect(POLICY_TITLE_KEYS).toStrictEqual({

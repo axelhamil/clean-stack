@@ -1,3 +1,4 @@
+import { totpCodeSchema } from "@packages/web-kit/auth/totp-code.schema";
 import { z } from "zod";
 
 export const passwordSchema = z.string().min(1);
@@ -10,10 +11,6 @@ export const nameSchema = z.string().min(2).max(80);
 // generic length copy from the global map, and a 5-digit entry reading "Must be
 // at least 6 characters" is exactly the field-specific message extraction was
 // not supposed to lose.
-export const totpCodeSchema = z.string().refine((value) => /^\d{6}$/.test(value), {
-  params: { i18nKey: "validation.totpCode" },
-});
-
 export const signInSchema = z.object({
   email: z.email(),
   password: passwordSchema,

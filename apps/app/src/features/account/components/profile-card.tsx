@@ -1,13 +1,6 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@packages/ui/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -15,9 +8,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@packages/ui/components/ui/dialog";
-import { TypographyMuted } from "@packages/ui/components/ui/typography";
+import { SettingsSection } from "@packages/ui/components/ui/settings-section";
+import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { ImpersonationReason } from "../../../shared/auth/impersonation-reason";
 import { useImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import { ChangeEmailForm } from "../forms/change-email-form";
@@ -31,6 +26,7 @@ interface ProfileCardProps {
 
 export function ProfileCard({ name, email, pendingEmail }: ProfileCardProps) {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const [open, setOpen] = useState(false);
   // `/update-user` and `/change-email` are both on the BetterAuth
   // impersonation blocklist (apps/api/src/shared/middleware/impersonation-blocklist.ts),
@@ -38,24 +34,23 @@ export function ProfileCard({ name, email, pendingEmail }: ProfileCardProps) {
   const guard = useImpersonationGuard();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("account.profileTitle")}</CardTitle>
-        <CardDescription>{t("account.profileDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        <UpdateProfileForm name={name} guard={guard} />
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col items-start gap-1">
-            <TypographyMuted>{t("account.emailLabel")}</TypographyMuted>
-            <span>{email}</span>
-            {pendingEmail ? (
-              <Badge variant="secondary">
-                {t("account.pendingEmailChange", { email: pendingEmail })}
-              </Badge>
-            ) : null}
-          </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+    <SettingsSection
+      title={t("account.profileTitle")}
+      description={t("account.profileDescription")}
+    >
+      <UpdateProfileForm name={name} guard={guard} />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-col items-start gap-1 break-words">
+          <TypographyMuted>{t("account.emailLabel")}</TypographyMuted>
+          <TypographyP>{email}</TypographyP>
+          {pendingEmail ? (
+            <Badge variant="secondary">
+              {t("account.pendingEmailChange", { email: pendingEmail })}
+            </Badge>
+          ) : null}
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <GuardHint guard={guard}>
             <DialogTrigger asChild>
               <Button
                 variant="outline"
@@ -66,17 +61,17 @@ export function ProfileCard({ name, email, pendingEmail }: ProfileCardProps) {
                 {t("account.changeEmail")}
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t("account.changeEmailDialogTitle")}</DialogTitle>
-                <DialogDescription>{t("account.changeEmailDialogDescription")}</DialogDescription>
-              </DialogHeader>
-              <ChangeEmailForm onSuccess={() => setOpen(false)} />
-            </DialogContent>
-          </Dialog>
-        </div>
-        <ImpersonationReason guard={guard} />
-      </CardContent>
-    </Card>
+          </GuardHint>
+          <DialogContent closeLabel={tCommon("actions.close")}>
+            <DialogHeader>
+              <DialogTitle>{t("account.changeEmailDialogTitle")}</DialogTitle>
+              <DialogDescription>{t("account.changeEmailDialogDescription")}</DialogDescription>
+            </DialogHeader>
+            <ChangeEmailForm onSuccess={() => setOpen(false)} />
+          </DialogContent>
+        </Dialog>
+      </div>
+      <ImpersonationReason guard={guard} />
+    </SettingsSection>
   );
 }

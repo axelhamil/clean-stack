@@ -1,5 +1,4 @@
 import { passkeyClient } from "@better-auth/passkey/client";
-import { scimClient } from "@better-auth/scim/client";
 import { ssoClient } from "@better-auth/sso/client";
 import { stripeClient } from "@better-auth/stripe/client";
 import { ac, roles } from "@packages/access-control";
@@ -7,9 +6,10 @@ import type { BetterAuthClientPlugin } from "better-auth/client";
 import { magicLinkClient, organizationClient, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { env } from "../env";
+import { twoFactorPathFromSearch } from "./safe-redirect";
 
 // Cast erases the $InferServerPlugin field that transitively references stripe SDK
-// types through apps/api/node_modules — preventing TS2883 without a stripe devDep.
+// types through apps/api/node_modules, preventing TS2883 without a stripe devDep.
 const _stripeClientPlugin = stripeClient({ subscription: true }) as unknown as {
   id: "stripe-client";
   version: string;
@@ -26,7 +26,7 @@ export const authClient = createAuthClient({
   plugins: [
     twoFactorClient({
       onTwoFactorRedirect() {
-        window.location.href = "/two-factor";
+        window.location.href = twoFactorPathFromSearch(window.location.search);
       },
     }),
     magicLinkClient(),
@@ -37,9 +37,8 @@ export const authClient = createAuthClient({
     }),
     _stripeClientPlugin,
     // `domainVerification: { enabled: true }` must mirror the server's `sso()` config
-    // in apps/api/src/auth.ts — it gates whether the client's inferred types include
+    // in apps/api/src/auth.ts: it gates whether the client's inferred types include
     // requestDomainVerification/verifyDomain at all.
     ssoClient({ domainVerification: { enabled: true } }),
-    scimClient(),
   ],
 });

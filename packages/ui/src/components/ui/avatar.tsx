@@ -2,7 +2,6 @@
 
 import { Avatar as AvatarPrimitive } from "radix-ui";
 import type * as React from "react";
-
 import { cn } from "../../libs/utils";
 
 function Avatar({

@@ -1,13 +1,25 @@
-import { createOTP } from "@better-auth/utils/otp";
 import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
-import { and, db, eq, gt, inArray, isNull, like, lte, not, or, schema } from "@packages/drizzle";
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  like,
+  lte,
+  not,
+  or,
+  resolveExecutor,
+  schema,
+  staffSchema,
+} from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
-import { symmetricDecrypt, verifyPassword as verifyHash } from "better-auth/crypto";
-import { env } from "../../../../shared/env";
+import { verifyPassword as verifyHash } from "better-auth/crypto";
+import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
+import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { Logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
-import type { ITransaction } from "../../../../shared/transaction";
 import type {
   ExecuteWipeOutput,
   IRgpdRepository,
@@ -22,13 +34,7 @@ const dbAttrs = { "db.system.name": "postgresql" } as const;
 const ANONYMIZED_DOMAIN = "anonymized.local";
 const ANONYMIZED_NAME = "[deleted]";
 
-function repositoryFailure(err: unknown, op: string): RgpdError {
-  return {
-    code: "RGPD_REPOSITORY_PROVIDER_FAILURE",
-    message: `database operation failed: ${op}`,
-    metadata: { cause: err instanceof Error ? err.message : String(err) },
-  };
-}
+const repositoryFailure = dbOperationFailure("RGPD_REPOSITORY_PROVIDER_FAILURE");
 
 export class DrizzleRgpdRepository implements IRgpdRepository {
   constructor(
@@ -38,18 +44,17 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
 
   async findSoleOwnedNonPersonalOrgsWithMembers(
     userId: string,
-    tx?: ITransaction,
   ): Promise<Result<SoleOwnedOrgWithMembers[], RgpdError>> {
-    const invoker = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > findSoleOwnedNonPersonalOrgsWithMembers" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .select({
               orgId: schema.organization.id,
               orgName: schema.organization.name,
-              memberCount: invoker.$count(
+              memberCount: exec.$count(
                 schema.member,
                 eq(schema.member.organizationId, schema.organization.id),
               ),
@@ -65,7 +70,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
                 eq(schema.member.role, "owner"),
                 not(like(schema.organization.slug, PERSONAL_ORG_SLUG_LIKE_PATTERN)),
                 eq(
-                  invoker.$count(
+                  exec.$count(
                     schema.member,
                     and(
                       eq(schema.member.organizationId, schema.organization.id),
@@ -75,7 +80,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
                   1,
                 ),
                 gt(
-                  invoker.$count(
+                  exec.$count(
                     schema.member,
                     eq(schema.member.organizationId, schema.organization.id),
                   ),
@@ -101,22 +106,19 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             { err, userId },
             "RgpdRepository.findSoleOwnedNonPersonalOrgsWithMembers failed",
           );
-          return Result.fail(repositoryFailure(err, "findSoleOwnedNonPersonalOrgsWithMembers"));
+          return Result.fail(repositoryFailure("findSoleOwnedNonPersonalOrgsWithMembers"));
         }
       },
     );
   }
 
-  async collectUserDataForExport(
-    userId: string,
-    tx?: ITransaction,
-  ): Promise<Result<UserExportPayload, RgpdError>> {
-    const invoker = tx ?? db;
+  async collectUserDataForExport(userId: string): Promise<Result<UserExportPayload, RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > collectUserDataForExport" },
       async () => {
         try {
-          const userQuery = invoker
+          const userQuery = exec
             .select()
             .from(schema.user)
             .where(eq(schema.user.id, userId))
@@ -125,19 +127,20 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           if (!u)
             return Result.fail({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "user not found" });
 
-          const sessionsQuery = invoker
+          const sessionsQuery = exec
             .select({
               id: schema.session.id,
               createdAt: schema.session.createdAt,
               expiresAt: schema.session.expiresAt,
               ipAddress: schema.session.ipAddress,
+              country: schema.session.country,
               userAgent: schema.session.userAgent,
             })
             .from(schema.session)
             .where(eq(schema.session.userId, userId));
           const sessions = await sessionsQuery.execute();
 
-          const membershipsQuery = invoker
+          const membershipsQuery = exec
             .select({
               organizationId: schema.organization.id,
               organizationName: schema.organization.name,
@@ -153,7 +156,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             .where(eq(schema.member.userId, userId));
           const memberships = await membershipsQuery.execute();
 
-          const invitationsQuery = invoker
+          const invitationsQuery = exec
             .select({
               id: schema.invitation.id,
               organizationId: schema.invitation.organizationId,
@@ -183,6 +186,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               createdAt: s.createdAt.toISOString(),
               expiresAt: s.expiresAt.toISOString(),
               ipAddress: s.ipAddress,
+              country: s.country,
               userAgent: s.userAgent,
             })),
             memberships: memberships.map((m) => ({
@@ -204,23 +208,19 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.collectUserDataForExport failed");
-          return Result.fail(repositoryFailure(err, "collectUserDataForExport"));
+          return Result.fail(repositoryFailure("collectUserDataForExport"));
         }
       },
     );
   }
 
-  async markPendingDeletion(
-    userId: string,
-    until: Date,
-    tx?: ITransaction,
-  ): Promise<Result<void, RgpdError>> {
-    const invoker = tx ?? db;
+  async markPendingDeletion(userId: string, until: Date): Promise<Result<void, RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > markPendingDeletion" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .update(schema.user)
             .set({ pendingDeletionUntil: until })
             .where(eq(schema.user.id, userId));
@@ -232,19 +232,19 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.markPendingDeletion failed");
-          return Result.fail(repositoryFailure(err, "markPendingDeletion"));
+          return Result.fail(repositoryFailure("markPendingDeletion"));
         }
       },
     );
   }
 
-  async clearPendingDeletion(userId: string, tx?: ITransaction): Promise<Result<void, RgpdError>> {
-    const invoker = tx ?? db;
+  async clearPendingDeletion(userId: string): Promise<Result<void, RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > clearPendingDeletion" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .update(schema.user)
             .set({ pendingDeletionUntil: null })
             .where(eq(schema.user.id, userId));
@@ -256,22 +256,19 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.clearPendingDeletion failed");
-          return Result.fail(repositoryFailure(err, "clearPendingDeletion"));
+          return Result.fail(repositoryFailure("clearPendingDeletion"));
         }
       },
     );
   }
 
-  async findUsersReadyForWipe(
-    limit: number,
-    tx?: ITransaction,
-  ): Promise<Result<PendingDeletionRow[], RgpdError>> {
-    const invoker = tx ?? db;
+  async findUsersReadyForWipe(limit: number): Promise<Result<PendingDeletionRow[], RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > findUsersReadyForWipe" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .select({
               userId: schema.user.id,
               email: schema.user.email,
@@ -282,37 +279,39 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
               and(lte(schema.user.pendingDeletionUntil, new Date()), isNull(schema.user.deletedAt)),
             )
             .limit(limit);
-          const rows = (await this.instrumentation.startSpan(
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
-          )) as PendingDeletionRow[];
+          );
 
-          return Result.ok(rows);
+          return Result.ok(
+            rows.flatMap(({ pendingDeletionUntil, ...row }): PendingDeletionRow[] =>
+              pendingDeletionUntil ? [{ ...row, pendingDeletionUntil }] : [],
+            ),
+          );
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, limit }, "RgpdRepository.findUsersReadyForWipe failed");
-          return Result.fail(repositoryFailure(err, "findUsersReadyForWipe"));
+          return Result.fail(repositoryFailure("findUsersReadyForWipe"));
         }
       },
     );
   }
 
-  async executeWipe(
-    userId: string,
-    tx: ITransaction,
-  ): Promise<Result<ExecuteWipeOutput, RgpdError>> {
+  async executeWipe(userId: string): Promise<Result<ExecuteWipeOutput, RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > executeWipe" },
       async () => {
         try {
-          const userOrgRows = await tx
+          const userOrgRows = await exec
             .select({ id: schema.member.organizationId })
             .from(schema.member)
             .where(eq(schema.member.userId, userId));
           const userOrgIds = userOrgRows.map((r) => r.id);
 
           const anonymizedEmail = `deleted-${crypto.randomUUID()}@${ANONYMIZED_DOMAIN}`;
-          const updatedRows = await tx
+          const updatedRows = await exec
             .update(schema.user)
             .set({
               email: anonymizedEmail,
@@ -330,20 +329,30 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             // Another overlapping run already wiped this account between our
             // pending-deletion read and this transaction: nothing left to do,
             // and the caller must not emit USER_DELETED a second time.
-            return Result.ok({ deletedOrgIds: [], anonymizedEmail: "", alreadyWiped: true });
+            return Result.ok({
+              deletedOrgIds: [],
+              anonymizedEmail: "",
+              alreadyWiped: true,
+              endedImpersonations: [],
+            });
           }
 
-          await tx.delete(schema.session).where(eq(schema.session.userId, userId));
-          await tx.delete(schema.account).where(eq(schema.account.userId, userId));
-          await tx.delete(schema.twoFactor).where(eq(schema.twoFactor.userId, userId));
-          await tx.delete(schema.passkey).where(eq(schema.passkey.userId, userId));
-          await tx.delete(schema.member).where(eq(schema.member.userId, userId));
-          await tx.delete(schema.invitation).where(eq(schema.invitation.inviterId, userId));
+          await exec.delete(staffSchema.staffNote).where(eq(staffSchema.staffNote.userId, userId));
+          await exec.delete(staffSchema.savedView).where(eq(staffSchema.savedView.ownerId, userId));
+          const endedSessions = await exec
+            .delete(schema.session)
+            .where(eq(schema.session.userId, userId))
+            .returning(ENDED_SESSION_COLUMNS);
+          await exec.delete(schema.account).where(eq(schema.account.userId, userId));
+          await exec.delete(schema.twoFactor).where(eq(schema.twoFactor.userId, userId));
+          await exec.delete(schema.passkey).where(eq(schema.passkey.userId, userId));
+          await exec.delete(schema.member).where(eq(schema.member.userId, userId));
+          await exec.delete(schema.invitation).where(eq(schema.invitation.inviterId, userId));
 
           const deletedOrgs =
             userOrgIds.length === 0
               ? []
-              : await tx
+              : await exec
                   .delete(schema.organization)
                   .where(
                     and(
@@ -351,7 +360,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
                       or(
                         like(schema.organization.slug, PERSONAL_ORG_SLUG_LIKE_PATTERN),
                         eq(
-                          tx.$count(
+                          exec.$count(
                             schema.member,
                             eq(schema.member.organizationId, schema.organization.id),
                           ),
@@ -366,27 +375,24 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             deletedOrgIds: deletedOrgs.map((o) => o.id),
             anonymizedEmail,
             alreadyWiped: false,
+            endedImpersonations: endedImpersonationsOf(endedSessions),
           });
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.executeWipe failed");
-          return Result.fail(repositoryFailure(err, "executeWipe"));
+          return Result.fail(repositoryFailure("executeWipe"));
         }
       },
     );
   }
 
-  async verifyPassword(
-    userId: string,
-    password: string,
-    tx?: ITransaction,
-  ): Promise<Result<boolean, RgpdError>> {
-    const invoker = tx ?? db;
+  async verifyPassword(userId: string, password: string): Promise<Result<boolean, RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > verifyPassword" },
       async () => {
         try {
-          const accQuery = invoker
+          const accQuery = exec
             .select({ password: schema.account.password })
             .from(schema.account)
             .where(
@@ -403,61 +409,19 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.verifyPassword failed");
-          return Result.fail(repositoryFailure(err, "verifyPassword"));
+          return Result.fail(repositoryFailure("verifyPassword"));
         }
       },
     );
   }
 
-  async verifyTotp(
-    userId: string,
-    code: string,
-    tx?: ITransaction,
-  ): Promise<Result<boolean, RgpdError>> {
-    const invoker = tx ?? db;
-    return this.instrumentation.startSpan(
-      { name: "DrizzleRgpdRepository > verifyTotp" },
-      async () => {
-        try {
-          const tfQuery = invoker
-            .select({ secret: schema.twoFactor.secret })
-            .from(schema.twoFactor)
-            .where(eq(schema.twoFactor.userId, userId))
-            .limit(1);
-          const [tf] = await this.instrumentation.startSpan(
-            { name: tfQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => tfQuery.execute(),
-          );
-          if (!tf?.secret) return Result.ok(false);
-          try {
-            const decrypted = await symmetricDecrypt({
-              key: env.BETTER_AUTH_SECRET,
-              data: tf.secret,
-            });
-            const ok = await createOTP(decrypted, { period: 30, digits: 6 }).verify(code);
-            return Result.ok(ok);
-          } catch {
-            return Result.ok(false);
-          }
-        } catch (err) {
-          this.instrumentation.capture(err);
-          this.logger.error({ err, userId }, "RgpdRepository.verifyTotp failed");
-          return Result.fail(repositoryFailure(err, "verifyTotp"));
-        }
-      },
-    );
-  }
-
-  async touchExportRequestedAt(
-    userId: string,
-    tx?: ITransaction,
-  ): Promise<Result<void, RgpdError>> {
-    const invoker = tx ?? db;
+  async touchExportRequestedAt(userId: string): Promise<Result<void, RgpdError>> {
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > touchExportRequestedAt" },
       async () => {
         try {
-          const query = invoker
+          const query = exec
             .update(schema.user)
             .set({ lastExportRequestedAt: new Date() })
             .where(eq(schema.user.id, userId));
@@ -469,7 +433,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.touchExportRequestedAt failed");
-          return Result.fail(repositoryFailure(err, "touchExportRequestedAt"));
+          return Result.fail(repositoryFailure("touchExportRequestedAt"));
         }
       },
     );
@@ -477,14 +441,13 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
 
   async getUserDeletionState(
     userId: string,
-    tx?: ITransaction,
   ): Promise<Result<Option<UserDeletionState>, RgpdError>> {
-    const invoker = tx ?? db;
+    const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleRgpdRepository > getUserDeletionState" },
       async () => {
         try {
-          const uQuery = invoker
+          const uQuery = exec
             .select({
               email: schema.user.email,
               name: schema.user.name,
@@ -516,7 +479,7 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
         } catch (err) {
           this.instrumentation.capture(err);
           this.logger.error({ err, userId }, "RgpdRepository.getUserDeletionState failed");
-          return Result.fail(repositoryFailure(err, "getUserDeletionState"));
+          return Result.fail(repositoryFailure("getUserDeletionState"));
         }
       },
     );

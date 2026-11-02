@@ -1,6 +1,12 @@
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { CodeBlock } from "@packages/ui/components/ui/code-block";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@packages/ui/components/ui/collapsible";
+import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { Panel } from "@packages/ui/components/ui/panel";
 import {
   Sheet,
@@ -9,13 +15,33 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@packages/ui/components/ui/sheet";
+import {
+  TypographyInline,
+  TypographyMuted,
+  TypographySmall,
+} from "@packages/ui/components/ui/typography";
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRightIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { GuardHint } from "../../../shared/auth/guard-hint";
 import { useActiveOrgId } from "../../../shared/auth/use-active-org-id";
 import type { ImpersonationGuard } from "../../../shared/auth/use-impersonation-guard";
 import type { DeliveryAttempt, DeliveryListItem } from "../api/webhooks.queries";
 import { webhookDeliveryDetailQueryOptions } from "../api/webhooks.queries";
 import { DELIVERY_STATUS_KEYS, isDeliveryStatus } from "../webhook-labels";
+
+type AttemptSectionKey = "requestHeaders" | "requestBody" | "responseHeaders" | "responseBody";
+
+const ATTEMPT_SECTIONS: readonly AttemptSectionKey[] = [
+  "requestHeaders",
+  "requestBody",
+  "responseHeaders",
+  "responseBody",
+];
+
+function formatSection(value: DeliveryAttempt[AttemptSectionKey]): string {
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
 
 interface RequestResponseProps {
   attempt: DeliveryAttempt;
@@ -25,47 +51,25 @@ function RequestResponse({ attempt }: RequestResponseProps) {
   const { t } = useTranslation("settings");
 
   return (
-    <div className="mt-2 flex flex-col gap-1">
-      {attempt.requestHeaders !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.requestHeaders")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {JSON.stringify(attempt.requestHeaders, null, 2)}
-          </CodeBlock>
-        </details>
-      )}
-      {attempt.requestBody !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.requestBody")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {attempt.requestBody}
-          </CodeBlock>
-        </details>
-      )}
-      {attempt.responseHeaders !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.responseHeaders")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {JSON.stringify(attempt.responseHeaders, null, 2)}
-          </CodeBlock>
-        </details>
-      )}
-      {attempt.responseBody !== null && (
-        <details>
-          <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t("webhooks.deliverySheet.responseBody")}
-          </summary>
-          <CodeBlock size="sm" className="mt-1">
-            {attempt.responseBody}
-          </CodeBlock>
-        </details>
-      )}
+    <div className="flex min-w-0 flex-col items-start gap-2">
+      {ATTEMPT_SECTIONS.map((key) => {
+        const value = attempt[key];
+        if (value === null) return null;
+
+        return (
+          <Collapsible key={key} className="flex w-full min-w-0 flex-col items-start gap-1">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="xs" className="group">
+                <ChevronRightIcon className="transition-transform group-data-[state=open]:rotate-90" />
+                {t(`webhooks.deliverySheet.${key}`)}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="w-full">
+              <CodeBlock size="sm">{formatSection(value)}</CodeBlock>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
     </div>
   );
 }
@@ -87,7 +91,7 @@ export function DeliverySheet({
   onClose,
   guard,
 }: DeliverySheetProps) {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t } = useTranslation(["settings", "common", "errors"]);
   const organizationId = useActiveOrgId();
   const detail = useQuery(
     webhookDeliveryDetailQueryOptions(organizationId, endpointId, delivery?.id ?? ""),
@@ -95,11 +99,15 @@ export function DeliverySheet({
 
   return (
     <Sheet open={delivery !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl">
+      <SheetContent closeLabel={t("common:actions.close")} className="w-full sm:max-w-xl">
         {delivery && (
           <>
             <SheetHeader>
-              <SheetTitle className="font-mono text-sm">{delivery.eventType}</SheetTitle>
+              <SheetTitle>
+                <TypographyInline font="mono" size="sm">
+                  {delivery.eventType}
+                </TypographyInline>
+              </SheetTitle>
               <SheetDescription>
                 {t("webhooks.deliverySheet.statusLine", {
                   status: isDeliveryStatus(delivery.status)
@@ -109,59 +117,72 @@ export function DeliverySheet({
                 })}
               </SheetDescription>
             </SheetHeader>
-            {canReplay && (
-              <Button
-                className="my-4"
-                variant="outline"
-                disabled={guard.blocked}
-                {...guard.describeProps()}
-                onClick={() => onReplay(delivery.id)}
-              >
-                {t("webhooks.deliverySheet.replay")}
-              </Button>
-            )}
-            {detail.isLoading && (
-              <p className="text-sm text-muted-foreground">
-                {t("webhooks.deliverySheet.loadingAttempts")}
-              </p>
-            )}
-            {detail.data && (
-              <ol className="space-y-4">
-                {detail.data.attemptHistory.map((a) => (
-                  <Panel key={a.id} asChild className="text-xs">
-                    <li>
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">
-                          {t("webhooks.deliverySheet.attemptNumber", { number: a.attemptNumber })}
-                        </span>
-                        <Badge
-                          variant={
-                            a.responseStatus !== null && a.responseStatus < 400
-                              ? "default"
-                              : "destructive"
-                          }
-                        >
-                          {a.responseStatus ?? a.error ?? t("webhooks.deliverySheet.noResponse")}
-                        </Badge>
-                      </div>
-                      {a.durationMs !== null && (
-                        <p className="text-muted-foreground">{a.durationMs} ms</p>
-                      )}
-                      {a.error && <p className="text-destructive">{a.error}</p>}
-                      <RequestResponse attempt={a} />
-                    </li>
-                  </Panel>
-                ))}
-              </ol>
-            )}
-            {detail.data && (
-              <section className="mt-6">
-                <h3 className="mb-2 text-sm font-medium">{t("webhooks.deliverySheet.payload")}</h3>
-                <CodeBlock>
-                  <code>{JSON.stringify(detail.data.payload, null, 2)}</code>
-                </CodeBlock>
-              </section>
-            )}
+            <div className="flex min-w-0 flex-col items-start gap-4 px-4 pb-4">
+              {canReplay && (
+                <GuardHint guard={guard}>
+                  <Button
+                    disabled={guard.blocked}
+                    {...guard.describeProps()}
+                    onClick={() => onReplay(delivery.id)}
+                  >
+                    {t("webhooks.deliverySheet.replay")}
+                  </Button>
+                </GuardHint>
+              )}
+              {detail.isLoading && (
+                <TypographyMuted role="status">
+                  {t("webhooks.deliverySheet.loadingAttempts")}
+                </TypographyMuted>
+              )}
+              {detail.isLoadingError && (
+                <LoadErrorAlert message={t("errors:fallback.loadWebhookDeliveryDetail")} />
+              )}
+              {detail.data && (
+                <>
+                  <ol className="flex w-full min-w-0 flex-col gap-2">
+                    {detail.data.attemptHistory.map((a) => (
+                      <Panel key={a.id} asChild className="flex min-w-0 flex-col gap-2">
+                        <li>
+                          <div className="flex items-center justify-between gap-2">
+                            <TypographySmall>
+                              {t("webhooks.deliverySheet.attemptNumber", {
+                                number: a.attemptNumber,
+                              })}
+                            </TypographySmall>
+                            <Badge
+                              variant={
+                                a.responseStatus !== null && a.responseStatus < 400
+                                  ? "default"
+                                  : "destructive"
+                              }
+                            >
+                              {a.responseStatus ?? t("webhooks.deliverySheet.noResponse")}
+                            </Badge>
+                          </div>
+                          {a.durationMs !== null && (
+                            <TypographyInline tone="muted" size="xs">
+                              {t("webhooks.deliverySheet.duration", { ms: a.durationMs })}
+                            </TypographyInline>
+                          )}
+                          {a.error && (
+                            <TypographyInline tone="destructive" size="xs" className="break-words">
+                              {a.error}
+                            </TypographyInline>
+                          )}
+                          <RequestResponse attempt={a} />
+                        </li>
+                      </Panel>
+                    ))}
+                  </ol>
+                  <section className="flex w-full min-w-0 flex-col gap-2">
+                    <TypographySmall>{t("webhooks.deliverySheet.payload")}</TypographySmall>
+                    <CodeBlock>
+                      <code>{JSON.stringify(detail.data.payload, null, 2)}</code>
+                    </CodeBlock>
+                  </section>
+                </>
+              )}
+            </div>
           </>
         )}
       </SheetContent>

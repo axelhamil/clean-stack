@@ -8,6 +8,7 @@ const TIER_RANK: Record<Tier, number> = { free: 0, pro: 1, business: 2 };
 export interface EntitlementsData {
   tier: Tier;
   status: string;
+  hasSubscription: boolean;
   rank: number;
   features: readonly string[];
   maxMembers: number | null;
@@ -17,6 +18,7 @@ export interface EntitlementsData {
 const FREE_DATA: EntitlementsData = {
   tier: "free",
   status: "free",
+  hasSubscription: false,
   rank: 0,
   features: [],
   maxMembers: 3,
@@ -29,6 +31,7 @@ export function buildEntitlementsView(data: EntitlementsData | undefined) {
   return {
     tier: d.tier,
     status: d.status,
+    hasSubscription: d.hasSubscription,
     rank: d.rank,
     features: d.features,
     maxMembers: max,

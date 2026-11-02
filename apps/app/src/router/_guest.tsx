@@ -3,8 +3,10 @@ import { sessionQueryOptions } from "../shared/api/queries/session";
 
 export const Route = createFileRoute("/_guest")({
   beforeLoad: async ({ context }) => {
-    const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
+    const session = await context.queryClient
+      .ensureQueryData(sessionQueryOptions)
+      .catch(() => null);
     if (session) throw redirect({ to: "/dashboard" });
   },
-  component: () => <Outlet />,
+  component: Outlet,
 });

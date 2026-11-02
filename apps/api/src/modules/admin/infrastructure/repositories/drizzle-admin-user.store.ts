@@ -1,193 +1,333 @@
-import { Option } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
   db,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
-  lt,
+  isNull,
+  lte,
   multiTenantSchema,
   or,
+  resolveExecutor,
 } from "@packages/drizzle";
+import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
+import { createDbFailure } from "../../../../shared/db-failure";
+import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListUsersInput } from "../../application/dto/list-users.dto";
 import type {
   AdminMembershipRow,
   AdminSessionRow,
+  AdminStoreError,
+  AdminUserListRow,
   AdminUserRow,
+  BanWrite,
+  EndedSessions,
   IAdminUserStore,
+  UnbanOutcome,
 } from "../../application/ports/admin-user-store.port";
+
+const fail = createDbFailure("ADMIN_QUERY_PROVIDER_FAILURE");
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+
+// Built per call, not at import: schema columns are read lazily so a test that
+// stands in for the drizzle package without them can still import this file.
+function userColumns() {
+  const { user } = authSchema;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    banned: user.banned,
+    banReason: user.banReason,
+    banExpires: user.banExpires,
+    twoFactorEnabled: user.twoFactorEnabled,
+    createdAt: user.createdAt,
+  };
+}
+
+type UserSelection = Pick<
+  typeof authSchema.user.$inferSelect,
+  keyof ReturnType<typeof userColumns>
+>;
+
+type SessionSelection = Pick<
+  typeof authSchema.session.$inferSelect,
+  "id" | "createdAt" | "expiresAt" | "ipAddress" | "userAgent" | "impersonatedBy"
+>;
+
+function toUserRow(row: UserSelection): AdminUserRow {
+  const isBanOver = row.banExpires !== null && row.banExpires.getTime() <= Date.now();
+  const isBanned = row.banned === true && !isBanOver;
+
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    banned: isBanned,
+    banReason: Option.fromNullable(isBanned ? row.banReason : null),
+    banExpires: Option.fromNullable(isBanned ? row.banExpires : null),
+    twoFactorEnabled: row.twoFactorEnabled === true,
+    createdAt: row.createdAt,
+  };
+}
+
+function toSessionRow(row: SessionSelection): AdminSessionRow {
+  return {
+    id: row.id,
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
+    ipAddress: Option.fromNullable(row.ipAddress),
+    userAgent: Option.fromNullable(row.userAgent),
+    impersonatedBy: Option.fromNullable(row.impersonatedBy),
+  };
+}
+
+function liveBanIs(banned: boolean) {
+  const { user } = authSchema;
+  const now = new Date();
+
+  return banned
+    ? and(eq(user.banned, true), or(isNull(user.banExpires), gt(user.banExpires, now)))
+    : or(isNull(user.banned), eq(user.banned, false), lte(user.banExpires, now));
+}
+
+function sessionsHeldOrImpersonatedBy(userId: string) {
+  const { session } = authSchema;
+
+  return or(eq(session.userId, userId), eq(session.impersonatedBy, userId));
+}
+
+function endedSessionsOf(rows: Parameters<typeof endedImpersonationsOf>[0]): EndedSessions {
+  return {
+    sessions: rows.map((row) => ({ id: row.sessionId, userId: row.userId })),
+    impersonations: endedImpersonationsOf(rows),
+  };
+}
 
 export class DrizzleAdminUserStore implements IAdminUserStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async listUsers(input: ListUsersInput): Promise<AdminUserRow[]> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminUserStore > listUsers" },
-        async () => {
+  async listUsers(input: ListUsersInput): Promise<Result<AdminUserListRow[], AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > listUsers" },
+      async () => {
+        try {
+          const { user } = authSchema;
+          const { member } = multiTenantSchema;
           const conditions = [];
           if (input.search) {
             conditions.push(
-              or(
-                ilike(authSchema.user.email, `%${input.search}%`),
-                ilike(authSchema.user.name, `%${input.search}%`),
-              ),
+              or(ilike(user.email, `%${input.search}%`), ilike(user.name, `%${input.search}%`)),
             );
           }
-          if (input.role) conditions.push(eq(authSchema.user.role, input.role));
-          if (input.banned !== undefined) conditions.push(eq(authSchema.user.banned, input.banned));
-          if (input.cursor) conditions.push(lt(authSchema.user.createdAt, new Date(input.cursor)));
+          if (input.banned !== undefined) conditions.push(liveBanIs(input.banned));
+          if (input.cursor) {
+            conditions.push(afterTimeIdCursor(user.createdAt, user.id, input.cursor));
+          }
           if (input.organizationId) {
             conditions.push(
               inArray(
-                authSchema.user.id,
+                user.id,
                 db
-                  .select({ userId: multiTenantSchema.member.userId })
-                  .from(multiTenantSchema.member)
-                  .where(eq(multiTenantSchema.member.organizationId, input.organizationId)),
+                  .select({ userId: member.userId })
+                  .from(member)
+                  .where(eq(member.organizationId, input.organizationId)),
               ),
             );
           }
 
           const query = db
-            .select({
-              id: authSchema.user.id,
-              email: authSchema.user.email,
-              name: authSchema.user.name,
-              role: authSchema.user.role,
-              banned: authSchema.user.banned,
-              banReason: authSchema.user.banReason,
-              banExpires: authSchema.user.banExpires,
-              twoFactorEnabled: authSchema.user.twoFactorEnabled,
-              createdAt: authSchema.user.createdAt,
-            })
-            .from(authSchema.user)
+            .select({ ...userColumns(), cursorAt: exactInstant(user.createdAt) })
+            .from(user)
             .where(conditions.length ? and(...conditions) : undefined)
-            .orderBy(desc(authSchema.user.createdAt))
+            .orderBy(desc(user.createdAt), desc(user.id))
             .limit(input.limit);
 
-          return this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+
+          return Result.ok(rows.map((row) => ({ ...toUserRow(row), cursorAt: row.cursorAt })));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin user list failed");
+        }
+      },
+    );
   }
 
-  async findUserById(id: string): Promise<Option<AdminUserRow>> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminUserStore > findUserById" },
-        async () => {
+  async findUserById(id: string): Promise<Result<Option<AdminUserRow>, AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > findUserById" },
+      async () => {
+        try {
+          const { user } = authSchema;
+          const query = db.select(userColumns()).from(user).where(eq(user.id, id)).limit(1);
+
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(Option.fromNullable(row).map(toUserRow));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin user lookup failed");
+        }
+      },
+    );
+  }
+
+  async listSessionsFor(userId: string): Promise<Result<AdminSessionRow[], AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > listSessionsFor" },
+      async () => {
+        try {
+          const { session } = authSchema;
           const query = db
             .select({
-              id: authSchema.user.id,
-              email: authSchema.user.email,
-              name: authSchema.user.name,
-              role: authSchema.user.role,
-              banned: authSchema.user.banned,
-              banReason: authSchema.user.banReason,
-              banExpires: authSchema.user.banExpires,
-              twoFactorEnabled: authSchema.user.twoFactorEnabled,
-              createdAt: authSchema.user.createdAt,
+              id: session.id,
+              createdAt: session.createdAt,
+              expiresAt: session.expiresAt,
+              ipAddress: session.ipAddress,
+              userAgent: session.userAgent,
+              impersonatedBy: session.impersonatedBy,
             })
-            .from(authSchema.user)
-            .where(eq(authSchema.user.id, id))
-            .limit(1);
+            .from(session)
+            .where(eq(session.userId, userId))
+            .orderBy(desc(session.createdAt));
 
           const rows = await this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Option.fromNullable(rows[0] ?? null);
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+
+          return Result.ok(rows.map(toSessionRow));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin session list failed");
+        }
+      },
+    );
   }
 
-  async listSessionsFor(userId: string): Promise<AdminSessionRow[]> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminUserStore > listSessionsFor" },
-        async () => {
+  async listMembershipsFor(userId: string): Promise<Result<AdminMembershipRow[], AdminStoreError>> {
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > listMembershipsFor" },
+      async () => {
+        try {
+          const { member, organization } = multiTenantSchema;
           const query = db
             .select({
-              id: authSchema.session.id,
-              createdAt: authSchema.session.createdAt,
-              expiresAt: authSchema.session.expiresAt,
-              ipAddress: authSchema.session.ipAddress,
-              userAgent: authSchema.session.userAgent,
-              impersonatedBy: authSchema.session.impersonatedBy,
+              organizationId: member.organizationId,
+              organizationName: organization.name,
+              role: member.role,
             })
-            .from(authSchema.session)
-            .where(eq(authSchema.session.userId, userId))
-            .orderBy(desc(authSchema.session.createdAt));
+            .from(member)
+            .innerJoin(organization, eq(member.organizationId, organization.id))
+            .where(eq(member.userId, userId));
 
-          return this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+
+          return Result.ok(rows);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin membership list failed");
+        }
+      },
+    );
   }
 
-  async listMembershipsFor(userId: string): Promise<AdminMembershipRow[]> {
-    try {
-      return await this.instrumentation.startSpan(
-        { name: "DrizzleAdminUserStore > listMembershipsFor" },
-        async () => {
-          const query = db
-            .select({
-              organizationId: multiTenantSchema.member.organizationId,
-              organizationName: multiTenantSchema.organization.name,
-              role: multiTenantSchema.member.role,
-            })
-            .from(multiTenantSchema.member)
-            .innerJoin(
-              multiTenantSchema.organization,
-              eq(multiTenantSchema.member.organizationId, multiTenantSchema.organization.id),
-            )
-            .where(eq(multiTenantSchema.member.userId, userId));
+  async ban(input: BanWrite): Promise<Result<Option<EndedSessions>, AdminStoreError>> {
+    const exec = resolveExecutor();
 
-          return this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
+    return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > ban" }, async () => {
+      try {
+        const { session, user } = authSchema;
+        const written = await exec
+          .update(user)
+          .set({
+            banned: true,
+            banReason: input.reason,
+            banExpires: input.expiresAt.toNull(),
+            updatedAt: new Date(),
+          })
+          .where(eq(user.id, input.userId))
+          .returning({ id: user.id });
+        if (written.length === 0) return Result.ok(Option.none());
+
+        const ended = await exec
+          .delete(session)
+          .where(sessionsHeldOrImpersonatedBy(input.userId))
+          .returning(ENDED_SESSION_COLUMNS);
+
+        return Result.ok(Option.some(endedSessionsOf(ended)));
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin ban failed");
+      }
+    });
+  }
+
+  async unban(userId: string): Promise<Result<UnbanOutcome, AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan({ name: "DrizzleAdminUserStore > unban" }, async () => {
+      try {
+        const { user } = authSchema;
+        const written = await exec
+          .update(user)
+          .set({ banned: false, banReason: null, banExpires: null, updatedAt: new Date() })
+          .where(and(eq(user.id, userId), eq(user.banned, true)))
+          .returning({ id: user.id });
+        if (written.length > 0) return Result.ok("unbanned");
+
+        const [existing] = await exec
+          .select({ id: user.id })
+          .from(user)
+          .where(eq(user.id, userId))
+          .limit(1);
+
+        return Result.ok(existing ? "not_banned" : "not_found");
+      } catch (err) {
+        this.instrumentation.capture(err);
+        return fail(err, "admin unban failed");
+      }
+    });
+  }
+
+  async deleteSessions(userId: string): Promise<Result<EndedSessions, AdminStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleAdminUserStore > deleteSessions" },
+      async () => {
+        try {
+          const { session } = authSchema;
+          const query = exec
+            .delete(session)
+            .where(sessionsHeldOrImpersonatedBy(userId))
+            .returning(ENDED_SESSION_COLUMNS);
+          const ended = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-        },
-      );
-    } catch (err) {
-      this.instrumentation.capture(err);
-      throw err;
-    }
+
+          return Result.ok(endedSessionsOf(ended));
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return fail(err, "admin session deletion failed");
+        }
+      },
+    );
   }
 }

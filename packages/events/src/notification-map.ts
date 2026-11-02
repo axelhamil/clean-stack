@@ -1,7 +1,12 @@
-import type { OrgPermissions } from "@packages/access-control";
+import type { OrgPermissions, StaffPermission } from "@packages/access-control";
 import type { EventType } from "./event-types";
 
-export type Audience = "self" | "actor" | "org:all" | { can: OrgPermissions };
+export type Audience =
+  | "self"
+  | "actor"
+  | "org:all"
+  | { can: OrgPermissions }
+  | { staff: StaffPermission };
 
 export const NOTIFICATION_CHANNELS = ["in_app", "email"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -23,8 +28,8 @@ export type NotificationConfig = {
    *
    * Required, and empty is a valid answer: what crosses to the client is
    * chosen, never inherited. A notification stores the whole event payload,
-   * and event payloads legitimately carry internal handles — invitation
-   * tokens, storage keys, subscription and invoice ids. Without a list here,
+   * and event payloads legitimately carry internal handles (invitation
+   * tokens, storage keys, subscription and invoice ids). Without a list here,
    * every field added to a payload tomorrow would ship to the recipient's
    * browser by default, silently and forever.
    */
@@ -34,7 +39,26 @@ export type NotificationConfig = {
   dedupWindow?: "hour" | "day";
 };
 
+const APPROVAL_NOTICE = {
+  audience: { staff: "approvals.decide" },
+  category: "security",
+  forced: true,
+  payloadFields: ["approvalId", "action", "userId"],
+} as const;
+
 const _map = {
+  "admin.approval.requested": APPROVAL_NOTICE,
+  "admin.approval.cancelled": APPROVAL_NOTICE,
+  "admin.approval.expired": APPROVAL_NOTICE,
+  "admin.approval.executed": APPROVAL_NOTICE,
+  "admin.approval.decided": {
+    ...APPROVAL_NOTICE,
+    payloadFields: ["approvalId", "action", "userId", "outcome"],
+  },
+  "admin.approval.failed": {
+    ...APPROVAL_NOTICE,
+    payloadFields: ["approvalId", "action", "userId", "reason"],
+  },
   "user.password_changed": {
     audience: "self",
     category: "security",
@@ -156,7 +180,7 @@ export function isNotifiable(eventType: string): boolean {
 
 /**
  * Narrows a stored notification payload to the fields its event declares as
- * client-visible. An unknown event type yields `{}` — a build that does not
+ * client-visible. An unknown event type yields `{}`: a build that does not
  * know what a payload contains has no basis for forwarding any of it.
  */
 export function publicNotificationPayload(
@@ -165,6 +189,7 @@ export function publicNotificationPayload(
 ): Record<string, unknown> {
   const config = notificationConfigOf(eventType);
   if (!config || typeof payload !== "object" || payload === null) return {};
+
   const source = payload as Record<string, unknown>;
   const visible: Record<string, unknown> = {};
   for (const field of config.payloadFields) {

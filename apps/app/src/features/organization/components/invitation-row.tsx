@@ -2,15 +2,15 @@ import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import { ListRow, ListRowAction, ListRowContent } from "@packages/ui/components/ui/list-row";
 import { TypographyMuted, TypographyP } from "@packages/ui/components/ui/typography";
+import { toastError } from "@packages/web-kit/api/errors/toast";
+import { useFormatDate } from "@packages/web-kit/i18n/use-format-date";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { toastError } from "../../../shared/api/errors/toast";
 import { cancelInvitationMutationOptions } from "../../../shared/api/mutations/cancel-invitation";
 import { orgInvitationsQueryOptions } from "../../../shared/api/queries/org-invitations";
 import { isOrgRole, ROLE_LABEL_KEYS } from "../../../shared/auth/role-labels";
 import { useAuthorization } from "../../../shared/auth/use-authorization";
-import { useFormatDate } from "../../../shared/i18n/use-format-date";
 import { INVITATION_STATUS_LABEL_KEYS, isInvitationStatus } from "../invitation-status-labels";
 
 export interface InvitationRowProps {
@@ -43,8 +43,8 @@ export function InvitationRow({ invitation, organizationId }: InvitationRowProps
   });
 
   return (
-    <ListRow>
-      <ListRowContent>
+    <ListRow variant="plain" className="flex-wrap">
+      <ListRowContent className="min-w-0 break-words">
         <TypographyP>{invitation.email}</TypographyP>
         <TypographyMuted>
           {t("organization.invitationExpiry", {

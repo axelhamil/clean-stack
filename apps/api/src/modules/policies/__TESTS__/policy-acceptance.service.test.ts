@@ -1,29 +1,18 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { IUnitOfWork } from "@packages/ddd-kit";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { POLICY_TYPES, POLICY_VERSIONS } from "@packages/policies";
+import { mockPort } from "@packages/test/bun";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IPolicyAcceptanceStore,
+  PolicyAcceptanceRecord,
   PolicyError,
 } from "../application/ports/policy-acceptance.port";
 import { PolicyAcceptanceService } from "../application/services/policy-acceptance.service";
-
-const fakeTx = {} as never;
-
-const noopUow: IUnitOfWork<never> = {
-  startTransaction: async (cb) => cb(fakeTx),
-  run: async (cb) => cb(fakeTx),
-};
-
-const noopOutbox: IOutboxRepository = {
-  enqueue: async () => {},
-  findPendingBatch: async () => [],
-  markDispatched: async () => {},
-  markFailed: async () => {},
-};
 
 function makeStore(overrides: Partial<IPolicyAcceptanceStore> = {}): IPolicyAcceptanceStore {
   return {
@@ -38,39 +27,29 @@ function makeStore(overrides: Partial<IPolicyAcceptanceStore> = {}): IPolicyAcce
 describe("PolicyAcceptanceService", () => {
   describe("accept", () => {
     it("calls store.insert once per type with current versions and emits USER_POLICY_ACCEPTED", async () => {
-      const enqueued: Array<{ eventType: string; aggregateId: string; payload: unknown }> = [];
-      const spyOutbox: IOutboxRepository = {
-        enqueue: async (events) => {
-          for (const e of events)
-            enqueued.push({
-              eventType: e.eventType,
-              aggregateId: e.aggregateId,
-              payload: e.payload,
-            });
-        },
-        findPendingBatch: async () => [],
-        markDispatched: async () => {},
-        markFailed: async () => {},
-      };
+      const spyOutbox = mockPort<IOutboxRepository>();
       const store = makeStore();
       const service = new PolicyAcceptanceService(
         store,
         spyOutbox,
-        noopUow,
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
-      const result = await service.accept("u1", ["privacy", "terms"]);
+      const result = await service.accept("u1", ["privacy", "terms"], "198.51.100.7");
 
       expect(result.isSuccess).toBe(true);
       expect(store.insert).toHaveBeenCalledTimes(2);
+      const insertedRow = (store.insert as ReturnType<typeof mock>).mock.calls[0]?.[0] as
+        | PolicyAcceptanceRecord
+        | undefined;
+      expect(insertedRow?.ipAddress.unwrapOr("none")).toBe("198.51.100.7");
       expect(store.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: "u1",
           policyType: "privacy",
           policyVersion: POLICY_VERSIONS.privacy,
         }),
-        fakeTx,
       );
       expect(store.insert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -78,10 +57,11 @@ describe("PolicyAcceptanceService", () => {
           policyType: "terms",
           policyVersion: POLICY_VERSIONS.terms,
         }),
-        fakeTx,
       );
 
-      const policyEvents = enqueued.filter((e) => e.eventType === EventTypes.USER_POLICY_ACCEPTED);
+      const policyEvents = enqueuedEvents(spyOutbox).filter(
+        (e) => e.eventType === EventTypes.USER_POLICY_ACCEPTED,
+      );
       expect(policyEvents).toHaveLength(2);
       expect(
         policyEvents.some((e) => (e.payload as Record<string, unknown>).policyType === "privacy"),
@@ -95,8 +75,8 @@ describe("PolicyAcceptanceService", () => {
       const store = makeStore();
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -117,8 +97,8 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -141,8 +121,8 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -167,8 +147,8 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -188,8 +168,8 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -216,8 +196,8 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -238,8 +218,8 @@ describe("PolicyAcceptanceService", () => {
       });
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 
@@ -253,8 +233,8 @@ describe("PolicyAcceptanceService", () => {
       const store = makeStore();
       const service = new PolicyAcceptanceService(
         store,
-        noopOutbox,
-        noopUow,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
         new NoOpInstrumentation(),
       );
 

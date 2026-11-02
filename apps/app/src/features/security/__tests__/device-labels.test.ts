@@ -3,7 +3,7 @@ import { DEVICE_KEYS, type DeviceKind, summarizeUserAgent } from "../components/
 
 // `satisfies Record<DeviceKind, string>` proves every kind has *a* key; it can
 // never prove the key is the right one. Two entries swapped compile, type-check
-// and render — only an entry-by-entry assertion catches that.
+// and render; only an entry-by-entry assertion catches that.
 describe("DEVICE_KEYS", () => {
   it("maps each device kind to its own catalog key", () => {
     expect(DEVICE_KEYS).toStrictEqual({
