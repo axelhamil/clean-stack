@@ -25,14 +25,30 @@ const updatedTo = (status: string) =>
     metadata: {},
   });
 
-function setup(row: SubscriptionSyncState | null, atStripe: SubscriptionSyncState = ACTIVE) {
+const OUR_PRICE = "price_ours";
+const subscriptionObject = (price = OUR_PRICE) => ({
+  id: "sub_1",
+  status: "canceled",
+  customer: "cus_1",
+  metadata: {},
+  items: { data: [{ price: { id: price } }] },
+});
+
+function setup(
+  row: SubscriptionSyncState | null,
+  atStripe: SubscriptionSyncState = ACTIVE,
+  customerKnown = true,
+) {
   const store = mockPort<ISubscriptionSyncStore>();
   store.findSyncState.mockImplementation(async () => Result.ok(Option.fromNullable(row)));
+  store.isKnownCustomer.mockImplementation(async () => Result.ok(customerKnown));
 
   const gateway = mockPort<IStripeEventGateway>();
   gateway.currentSubscription.mockImplementation(async () => Result.ok(atStripe));
 
-  return { store, gateway, verifier: new StripeSyncVerifier(store, gateway) };
+  const verifier = new StripeSyncVerifier(store, gateway, async () => [OUR_PRICE]);
+
+  return { store, gateway, verifier };
 }
 
 describe("StripeSyncVerifier", () => {
@@ -75,8 +91,7 @@ describe("StripeSyncVerifier", () => {
 
   it("only asks a created subscription to exist, the checkout completes it later", async () => {
     const created = eventOf("customer.subscription.created", {
-      id: "sub_1",
-      status: "active",
+      ...subscriptionObject(),
       metadata: { subscriptionId: "local-1" },
     });
 
@@ -89,6 +104,32 @@ describe("StripeSyncVerifier", () => {
       stripeSubscriptionId: "sub_1",
       localId: Option.some("local-1"),
     });
+  });
+
+  it("raises no alarm for a subscription the plugin refuses on purpose", async () => {
+    const created = (price: string) =>
+      eventOf("customer.subscription.created", subscriptionObject(price));
+    const deleted = eventOf("customer.subscription.deleted", subscriptionObject("price_other"));
+
+    expect((await setup(null).verifier.check(created("price_other"))).isNone()).toBe(true);
+    expect((await setup(null).verifier.check(deleted)).isNone()).toBe(true);
+    expect((await setup(null, ACTIVE, false).verifier.check(created(OUR_PRICE))).isNone()).toBe(
+      true,
+    );
+  });
+
+  it("still reports a missing row for a known customer on a configured plan", async () => {
+    const deleted = eventOf("customer.subscription.deleted", subscriptionObject());
+
+    expect((await setup(null).verifier.check(deleted)).isSome()).toBe(true);
+  });
+
+  it("leaves a missing row to the created event when an update arrives before it", async () => {
+    const { verifier } = setup(null);
+
+    const mismatch = await verifier.check(updatedTo("active"));
+
+    expect(mismatch.isNone()).toBe(true);
   });
 
   it("reports a completed checkout whose subscription never landed", async () => {

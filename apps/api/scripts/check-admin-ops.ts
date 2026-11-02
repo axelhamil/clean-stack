@@ -9,6 +9,7 @@
 import "./check-admin-ops.env";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
+  and,
   billingSchema,
   db,
   eq,
@@ -16,6 +17,7 @@ import {
   like,
   or,
   outboxSchema,
+  schema,
   sql,
   sweepSchema,
 } from "@packages/drizzle";
@@ -44,9 +46,11 @@ const SUBSCRIPTION = `sub_check_${RUN}`;
 const REFERENCE = `org_check_${RUN}`;
 const SWEEP_LABEL = "sweep-stripe-events";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CONFIGURED_PRICE = `price_check_${RUN}`;
 
 const oe = outboxSchema.outboxEvent;
-const { stripeEvent } = billingSchema;
+const { stripeEvent, subscription: sub } = billingSchema;
+const subscriptionRowIds: string[] = [];
 const { sweepRun } = sweepSchema;
 
 const probes = adminProbes(`check-admin-ops-${RUN}`);
@@ -61,9 +65,11 @@ async function cleanup(): Promise<void> {
         eq(oe.eventType, PROBE_TYPE),
         eq(oe.aggregateId, PROBE_AGGREGATE),
         eq(oe.aggregateId, SUBSCRIPTION),
+        inArray(oe.aggregateId, subscriptionRowIds),
         like(oe.aggregateId, `${STRIPE_PREFIX}%`),
       ),
     );
+  await db.delete(sub).where(inArray(sub.id, subscriptionRowIds));
   await db.delete(stripeEvent).where(like(stripeEvent.id, `${STRIPE_PREFIX}%`));
   await db.delete(sweepRun).where(eq(sweepRun.label, SWEEP_LABEL));
   await probes.cleanup();
@@ -400,6 +406,204 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
   );
 }
 
+function signedWebhook(event: Stripe.Event | Record<string, unknown>): Promise<Response> {
+  const payload = JSON.stringify(event);
+
+  return stripeClient.webhooks
+    .generateTestHeaderStringAsync({ payload, secret: env.STRIPE_WEBHOOK_SECRET ?? "" })
+    .then((signature) =>
+      auth.handler(
+        new Request("http://localhost/api/auth/stripe/webhook", {
+          method: "POST",
+          headers: { "content-type": "application/json", "stripe-signature": signature },
+          body: payload,
+        }),
+      ),
+    );
+}
+
+function subscriptionEvent(
+  type: string,
+  suffix: string,
+  overrides: { id: string; customer: string; price?: string; status?: string },
+) {
+  const now = Math.floor(Date.now() / 1000);
+  const { id, customer, price = CONFIGURED_PRICE, status = "active" } = overrides;
+
+  return {
+    id: `${STRIPE_PREFIX}_${suffix}`,
+    object: "event",
+    type,
+    data: {
+      object: {
+        id,
+        object: "subscription",
+        customer,
+        status,
+        metadata: {},
+        cancel_at_period_end: false,
+        items: {
+          data: [
+            {
+              price: { id: price, recurring: { interval: "month" } },
+              quantity: 1,
+              current_period_start: now,
+              current_period_end: now + 2_592_000,
+            },
+          ],
+        },
+      },
+    },
+  };
+}
+
+async function stripeRowStatus(suffix: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ status: stripeEvent.status })
+    .from(stripeEvent)
+    .where(eq(stripeEvent.id, `${STRIPE_PREFIX}_${suffix}`));
+
+  return row?.status;
+}
+
+async function lifecycleCount(eventType: string, subscriptionRowId: string): Promise<number> {
+  const rows = await db
+    .select({ id: oe.id })
+    .from(oe)
+    .where(and(eq(oe.eventType, eventType), eq(oe.aggregateId, subscriptionRowId)));
+
+  return rows.length;
+}
+
+async function proveSubscriptionLifecycle(managerId: string): Promise<void> {
+  const customer = `cus_check_${RUN}`;
+  await db
+    .update(schema.user)
+    .set({ stripeCustomerId: customer })
+    .where(eq(schema.user.id, managerId));
+  di.BillingCatalogService.getCatalog = async () => [
+    {
+      tier: "pro",
+      name: "Pro",
+      priceId: CONFIGURED_PRICE,
+      unitAmount: 1000,
+      currency: "usd",
+      interval: "month",
+      marketingFeatures: [],
+      rank: 1,
+      features: [],
+      maxMembers: null,
+    },
+  ];
+
+  await signedWebhook(
+    subscriptionEvent("customer.subscription.created", "foreign", {
+      id: `${SUBSCRIPTION}_foreign`,
+      customer,
+      price: "price_other_product",
+    }),
+  );
+  check(
+    "another product on the account is no failure",
+    (await stripeRowStatus("foreign")) === "received",
+  );
+
+  await signedWebhook(
+    subscriptionEvent("customer.subscription.created", "stranger", {
+      id: `${SUBSCRIPTION}_stranger`,
+      customer: `cus_stranger_${RUN}`,
+    }),
+  );
+  check(
+    "a customer of nobody here is no failure",
+    (await stripeRowStatus("stranger")) === "received",
+  );
+
+  await signedWebhook(
+    subscriptionEvent("customer.subscription.updated", "early", { id: SUBSCRIPTION, customer }),
+  );
+  check(
+    "an update ahead of its created is no failure",
+    (await stripeRowStatus("early")) === "received",
+  );
+
+  await signedWebhook(
+    subscriptionEvent("customer.subscription.created", "created", { id: SUBSCRIPTION, customer }),
+  );
+  const [created] = await db
+    .select({ id: sub.id })
+    .from(sub)
+    .where(eq(sub.stripeSubscriptionId, SUBSCRIPTION));
+  if (!created) throw new Error("the dashboard subscription landed no row");
+  subscriptionRowIds.push(created.id);
+  check(
+    "a dashboard subscription announces its creation once",
+    (await lifecycleCount(EventTypes.BILLING_SUBSCRIPTION_CREATED, created.id)) === 1,
+  );
+
+  await signedWebhook(
+    subscriptionEvent("customer.subscription.deleted", "deleted", {
+      id: SUBSCRIPTION,
+      customer,
+      status: "canceled",
+    }),
+  );
+  check(
+    "a real cancellation is announced",
+    (await lifecycleCount(EventTypes.BILLING_SUBSCRIPTION_CANCELLED, created.id)) === 1,
+  );
+
+  await signedWebhook(
+    subscriptionEvent("customer.subscription.updated", "late", {
+      id: SUBSCRIPTION,
+      customer,
+      status: "canceled",
+    }),
+  );
+  check(
+    "an update to canceled does not announce it twice",
+    (await lifecycleCount(EventTypes.BILLING_SUBSCRIPTION_CANCELLED, created.id)) === 1,
+  );
+}
+
+async function provePastDueReachesThePortal(): Promise<void> {
+  const rowIds = await db
+    .insert(sub)
+    .values({
+      id: uuidv7(),
+      plan: "pro",
+      referenceId: REFERENCE,
+      stripeCustomerId: `cus_past_due_${RUN}`,
+      status: "past_due",
+    })
+    .returning({ id: sub.id });
+  subscriptionRowIds.push(...rowIds.map(({ id }) => id));
+
+  const view = await di.EntitlementsService.getEntitlements(REFERENCE);
+  const customer = await di.ISubscriptionReadStore.findCustomerIdByReference(REFERENCE);
+  check(
+    "a past due org keeps its tier and sees the billing button",
+    view.tier === "free" && view.hasSubscription,
+    view,
+  );
+  check("a past due org reaches the portal", customer.isSuccess && customer.getValue().isSome());
+}
+
+async function proveUnprocessedEventRefused(actorUserId: string): Promise<void> {
+  const id = `${STRIPE_PREFIX}_invoice_paid`;
+  await db.insert(stripeEvent).values({ id, type: "invoice.paid", status: "received" });
+
+  const refused = await replayOver(id).replay({
+    actorUserId,
+    stripeEventId: id,
+    handler: (request) => auth.handler(request),
+  });
+  check(
+    "an event type with no processing is refused",
+    refused.isFailure && refused.getError().code === "ADMIN_STRIPE_REPLAY_BLOCKED",
+  );
+}
+
 async function main(): Promise<void> {
   const cookie = await confirmedManager("manager");
   const managerId = `check-admin-ops-${RUN}-manager`;
@@ -407,6 +611,9 @@ async function main(): Promise<void> {
   await proveRequeueThenRedelivery(cookie);
   await proveSweepHeartbeat();
   await proveStripeReplay(managerId);
+  await proveSubscriptionLifecycle(managerId);
+  await provePastDueReachesThePortal();
+  await proveUnprocessedEventRefused(managerId);
   await cleanup();
 
   if (checks.failures > 0) {

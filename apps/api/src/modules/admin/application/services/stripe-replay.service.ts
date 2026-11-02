@@ -3,13 +3,15 @@ import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
-import type {
-  IStripeEventGateway,
-  IStripeEventStore,
-  StripeEventRetrieveError,
-  StripeEventRow,
-  StripeEventStoreError,
-  StripeWebhookHandler,
+import {
+  type IStripeEventGateway,
+  type IStripeEventStore,
+  isReplayableStripeEvent,
+  type StripeEventRetrieveError,
+  type StripeEventRow,
+  type StripeEventStoreError,
+  type StripeGatewayError,
+  type StripeWebhookHandler,
 } from "../../../../shared/ports/stripe-event.port";
 
 export const STRIPE_EVENTS_PAGE = 100;
@@ -21,6 +23,7 @@ export type StripeReplayError =
   | StripeEventRetrieveError
   | AppError<"ADMIN_STRIPE_UNAVAILABLE">
   | AppError<"ADMIN_STRIPE_EVENT_NOT_FOUND">
+  | AppError<"ADMIN_STRIPE_REPLAY_BLOCKED">
   | AppError<"ADMIN_STRIPE_REPLAY_CONFLICT">
   | AppError<"ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE">;
 
@@ -65,6 +68,13 @@ export class StripeReplayService {
     }
 
     const { id, type } = known.unwrap();
+    if (!isReplayableStripeEvent(type)) {
+      return Result.fail({
+        code: "ADMIN_STRIPE_REPLAY_BLOCKED",
+        message: `The platform does not process ${type} events, a replay would change nothing.`,
+      });
+    }
+
     const copy = await this.gateway.retrieve(id);
     if (copy.isFailure) return Result.fail(copy.getError());
 
@@ -78,9 +88,7 @@ export class StripeReplayService {
     }
 
     const delivered = await this.gateway.redeliver(copy.getValue(), input.handler);
-    const failure = delivered.isFailure
-      ? Option.some(delivered.getError().message)
-      : await this.recordedFailure(id);
+    const failure = await this.failureOf(id, delivered);
 
     const settled = await this.uow.run(async (): Promise<Result<void, StripeEventStoreError>> => {
       const written = failure.isSome()
@@ -104,6 +112,16 @@ export class StripeReplayService {
       code: "ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE",
       message: failure.unwrap(),
     });
+  }
+
+  private async failureOf(
+    id: string,
+    delivered: Result<void, StripeGatewayError>,
+  ): Promise<Option<string>> {
+    const recorded = await this.recordedFailure(id);
+    if (delivered.isSuccess || recorded.isSome()) return recorded;
+
+    return Option.some(delivered.getError().message);
   }
 
   private async recordedFailure(id: string): Promise<Option<string>> {

@@ -13,4 +13,5 @@ export interface ISubscriptionSyncStore {
   findSyncState(
     key: SubscriptionSyncKey,
   ): Promise<Result<Option<SubscriptionSyncState>, BillingError>>;
+  isKnownCustomer(stripeCustomerId: string): Promise<Result<boolean, BillingError>>;
 }

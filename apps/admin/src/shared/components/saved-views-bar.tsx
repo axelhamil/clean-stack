@@ -1,4 +1,4 @@
-import type { StaffView, StaffViewScreen } from "@packages/access-control";
+import { type StaffView, type StaffViewScreen, storedStaffView } from "@packages/access-control";
 import { Button } from "@packages/ui/components/ui/button";
 import { IconButton } from "@packages/ui/components/ui/icon-button";
 import { toastError } from "@packages/web-kit/api/errors/toast";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { deleteViewMutationOptions, saveViewMutationOptions } from "../api/mutations/saved-views";
 import { SAVED_VIEWS_QUERY_KEY, savedViewsQueryOptions } from "../api/queries/saved-views";
 import { useOpenSavedView } from "../hooks/use-open-saved-view";
-import { hasFilters, sameFilters } from "../saved-view-filters";
+import { hasFilters, sameFilters, screenFilters } from "../saved-view-filters";
 import { LoadErrorRetry } from "./load-error-retry";
 import { SaveViewDialog } from "./save-view-dialog";
 
@@ -25,7 +25,8 @@ export function SavedViewsBar(props: SavedViewsBarProps) {
   const query = useQuery(savedViewsQueryOptions);
   const refresh = () => queryClient.invalidateQueries({ queryKey: SAVED_VIEWS_QUERY_KEY });
   const views = query.data?.items.filter((view) => view.screen === props.screen) ?? [];
-  const isSaved = views.some((view) => sameFilters(view.filters, props.filters));
+  const filters = screenFilters(props.screen, props.filters);
+  const isSaved = views.some((view) => sameFilters(view.filters, filters));
 
   const save = useMutation({
     ...saveViewMutationOptions,
@@ -47,13 +48,13 @@ export function SavedViewsBar(props: SavedViewsBarProps) {
     return <LoadErrorRetry message={t("backOffice.views.loadFailed")} onRetry={query.refetch} />;
   }
 
-  const canSave = hasFilters(props.filters) && !isSaved;
+  const canSave = hasFilters(filters) && !isSaved;
   if (views.length === 0 && !canSave) return null;
 
   return (
     <ul aria-label={t("backOffice.views.label")} className="flex flex-wrap items-center gap-2">
       {views.map((view) => {
-        const isApplied = sameFilters(view.filters, props.filters);
+        const isApplied = sameFilters(view.filters, filters);
 
         return (
           <li key={view.id} className="flex max-w-full min-w-0 items-center gap-1">
@@ -82,18 +83,18 @@ export function SavedViewsBar(props: SavedViewsBarProps) {
         <li>
           <SaveViewDialog
             isPending={save.isPending}
-            onSave={(name, close) =>
-              save.mutate(
-                { ...props, name },
-                {
-                  onSuccess: () => {
-                    close();
-                    toast.success(t("backOffice.views.saved"));
-                    void refresh();
-                  },
+            onSave={(name, close) => {
+              const view = storedStaffView({ screen: props.screen, name, filters });
+              if (!view) return;
+
+              save.mutate(view, {
+                onSuccess: () => {
+                  close();
+                  toast.success(t("backOffice.views.saved"));
+                  void refresh();
                 },
-              )
-            }
+              });
+            }}
           />
         </li>
       )}

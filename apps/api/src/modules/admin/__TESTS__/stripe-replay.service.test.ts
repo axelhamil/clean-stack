@@ -22,10 +22,16 @@ const KNOWN: StripeEventRow = {
   replayedAt: Option.none(),
 };
 
-function setup(given: { known?: boolean; configured?: boolean; claimed?: boolean } = {}) {
+function setup(
+  given: { known?: boolean; configured?: boolean; claimed?: boolean; type?: string } = {},
+) {
   const stripeEvents = mockPort<IStripeEventStore>();
   stripeEvents.find.mockImplementation(async () =>
-    Result.ok(given.known === false ? Option.none() : Option.some(KNOWN)),
+    Result.ok(
+      given.known === false
+        ? Option.none()
+        : Option.some({ ...KNOWN, type: given.type ?? KNOWN.type }),
+    ),
   );
   stripeEvents.claimReplay.mockImplementation(async () => Result.ok(given.claimed ?? true));
   stripeEvents.releaseReplay.mockImplementation(async () => Result.ok());
@@ -67,6 +73,17 @@ describe("StripeReplayService", () => {
     expect(result.getError().code).toBe("ADMIN_STRIPE_EVENT_NOT_FOUND");
     expect(result.getError().message).toContain("purged");
     expect(gateway.retrieve).not.toHaveBeenCalled();
+  });
+
+  it("refuses an event type the platform does not process, with no effect", async () => {
+    const { service, gateway, stripeEvents, outbox } = setup({ type: "invoice.paid" });
+
+    const result = await service.replay(replay);
+
+    expect(result.getError().code).toBe("ADMIN_STRIPE_REPLAY_BLOCKED");
+    expect(gateway.retrieve).not.toHaveBeenCalled();
+    expect(stripeEvents.claimReplay).not.toHaveBeenCalled();
+    expect(enqueuedEvents(outbox)).toEqual([]);
   });
 
   it("passes on Stripe no longer holding the event, without claiming the replay", async () => {
@@ -135,6 +152,34 @@ describe("StripeReplayService", () => {
       lastError: Option.some("handler answered 400"),
     });
     expect(enqueuedEvents(outbox)).toMatchObject([{ payload: { outcome: "failed" } }]);
+  });
+
+  it("keeps the reason the handler recorded on a refused delivery", async () => {
+    const { service, stripeEvents, gateway } = setup();
+    const recorded = "Error: scrubbed reason";
+    gateway.redeliver.mockImplementation(async () =>
+      Result.fail({ code: "STRIPE_PROVIDER_FAILURE", message: "The handler answered 400." }),
+    );
+    stripeEvents.find
+      .mockImplementationOnce(async () => Result.ok(Option.some(KNOWN)))
+      .mockImplementationOnce(async () =>
+        Result.ok(
+          Option.some({
+            ...KNOWN,
+            status: "failed" as const,
+            lastError: Option.some(recorded),
+          }),
+        ),
+      );
+
+    const result = await service.replay(replay);
+
+    expect(result.getError().message).toBe(recorded);
+    expect(stripeEvents.recordDelivery).toHaveBeenCalledWith({
+      id: KNOWN.id,
+      type: KNOWN.type,
+      lastError: Option.some(recorded),
+    });
   });
 
   it("never answers ok when the handler said 200 but the sync check recorded a failure", async () => {

@@ -1,3 +1,5 @@
+import { type StaffViewScreen, storedStaffView } from "@packages/access-control";
+
 export type ViewFilters = Record<string, string | undefined>;
 
 function canonical(filters: ViewFilters): string {
@@ -12,4 +14,8 @@ export function hasFilters(filters: ViewFilters): boolean {
 
 export function sameFilters(a: ViewFilters, b: ViewFilters): boolean {
   return canonical(a) === canonical(b);
+}
+
+export function screenFilters(screen: StaffViewScreen, filters: ViewFilters): ViewFilters {
+  return storedStaffView({ screen, name: screen, filters })?.filters ?? {};
 }

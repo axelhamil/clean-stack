@@ -65,12 +65,15 @@ export const billingModule = defineModule()((b) =>
       (c): ISubscriptionSyncStore => new DrizzleSubscriptionSyncStore(c.IInstrumentation),
     )
     .add(
-      "StripeSyncVerifier",
-      (c) => new StripeSyncVerifier(c.ISubscriptionSyncStore, c.IStripeEventGateway),
-    )
-    .add(
       "BillingCatalogService",
       (c) => new BillingCatalogService(c.IStripeCatalogSource, c.IInstrumentation),
+    )
+    .add(
+      "StripeSyncVerifier",
+      (c) =>
+        new StripeSyncVerifier(c.ISubscriptionSyncStore, c.IStripeEventGateway, () =>
+          c.BillingCatalogService.configuredPriceIds(),
+        ),
     )
     .add(
       "BillingPortalService",

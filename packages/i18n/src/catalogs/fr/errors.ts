@@ -136,6 +136,8 @@ export default {
     ADMIN_STRIPE_UNAVAILABLE: "Stripe n'est pas configuré sur cette plateforme.",
     ADMIN_STRIPE_EVENT_NOT_FOUND:
       "Cet événement Stripe n'est pas enregistré : il n'est jamais arrivé ou sa ligne a été purgée après la durée de conservation.",
+    ADMIN_STRIPE_REPLAY_BLOCKED:
+      "La plateforme ne traite pas ce type d'événement, le rejouer ne changerait rien.",
     ADMIN_STRIPE_REPLAY_CONFLICT:
       "Cet événement a déjà été rejoué ou un collègue est en train de le rejouer. Rechargez la liste.",
     ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE:

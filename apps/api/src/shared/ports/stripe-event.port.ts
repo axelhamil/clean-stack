@@ -2,6 +2,18 @@ import type { AppError, Option, Result } from "@packages/ddd-kit";
 
 export type StripeEventStatus = "received" | "failed";
 
+const PROCESSED_STRIPE_EVENT_TYPES: readonly string[] = [
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
+];
+
+export function isReplayableStripeEvent(type: string): boolean {
+  return PROCESSED_STRIPE_EVENT_TYPES.includes(type);
+}
+
 export type StripeEventRow = {
   id: string;
   type: string;

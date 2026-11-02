@@ -4,6 +4,7 @@ import { auth } from "../../auth";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { requireStaffPermission, requireStepUp } from "../../shared/middleware/staff.middleware";
+import { isReplayableStripeEvent } from "../../shared/ports/stripe-event.port";
 import { zV } from "../../shared/validator";
 import { requeueOutboxBodySchema } from "./application/dto/requeue-outbox.dto";
 
@@ -73,6 +74,7 @@ export const adminOpsRoutes = new Hono<{ Variables: AuthVariables }>()
         receivedAt: row.receivedAt.toISOString(),
         lastError: row.lastError.toNull(),
         replayedAt: row.replayedAt.map((date) => date.toISOString()).toNull(),
+        replayable: isReplayableStripeEvent(row.type),
       })),
     });
   })

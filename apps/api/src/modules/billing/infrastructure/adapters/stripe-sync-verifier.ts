@@ -23,6 +23,7 @@ export class StripeSyncVerifier {
   constructor(
     private readonly subscriptions: ISubscriptionSyncStore,
     private readonly gateway: IStripeEventGateway,
+    private readonly configuredPriceIds: () => Promise<readonly string[]>,
   ) {}
 
   async check(event: Stripe.Event): Promise<Option<string>> {
@@ -30,9 +31,10 @@ export class StripeSyncVerifier {
       case "checkout.session.completed":
         return this.checkCheckout(event.data.object);
       case "customer.subscription.created": {
-        const { id, metadata } = event.data.object;
+        const subscription = event.data.object;
+        const key = keyOf(subscription.id, subscription.metadata);
 
-        return this.checkExists(keyOf(id, metadata));
+        return this.checkExists(key, () => this.missingRow(subscription));
       }
       case "customer.subscription.updated": {
         const { id, metadata, status, cancel_at_period_end } = event.data.object;
@@ -42,12 +44,8 @@ export class StripeSyncVerifier {
           cancelAtPeriodEnd: cancel_at_period_end,
         });
       }
-      case "customer.subscription.deleted": {
-        const { id } = event.data.object;
-        const key = { stripeSubscriptionId: id, localId: Option.none<string>() };
-
-        return this.checkCanceled(key);
-      }
+      case "customer.subscription.deleted":
+        return this.checkCanceled(event.data.object);
       default:
         return Option.none();
     }
@@ -64,33 +62,51 @@ export class StripeSyncVerifier {
       return Promise.resolve(Option.none());
     }
 
-    return this.checkExists({
-      stripeSubscriptionId: session.subscription,
-      localId: Option.none(),
-    });
+    const missing = Option.some(`No local subscription row for ${session.subscription}.`);
+
+    return this.checkExists(
+      { stripeSubscriptionId: session.subscription, localId: Option.none() },
+      () => Promise.resolve(missing),
+    );
   }
 
-  private async checkExists(key: SubscriptionSyncKey): Promise<Option<string>> {
+  private async missingRow(subscription: Stripe.Subscription): Promise<Option<string>> {
+    const priceIds = await this.configuredPriceIds();
+    const isOurPlan = subscription.items.data.some(({ price }) => priceIds.includes(price.id));
+    if (!isOurPlan) return Option.none();
+
+    const customerId =
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+    const known = await this.subscriptions.isKnownCustomer(customerId);
+    if (known.isFailure) return Option.some(UNVERIFIABLE);
+    if (!known.getValue()) return Option.none();
+
+    return Option.some(`No local subscription row for ${subscription.id}.`);
+  }
+
+  private async checkExists(
+    key: SubscriptionSyncKey,
+    whenMissing: () => Promise<Option<string>>,
+  ): Promise<Option<string>> {
     const found = await this.subscriptions.findSyncState(key);
     if (found.isFailure) return Option.some(UNVERIFIABLE);
 
-    return found.getValue().isNone()
-      ? Option.some(`No local subscription row for ${key.stripeSubscriptionId}.`)
-      : Option.none();
+    return found.getValue().isNone() ? whenMissing() : Option.none();
   }
 
-  private async checkCanceled(key: SubscriptionSyncKey): Promise<Option<string>> {
-    const found = await this.subscriptions.findSyncState(key);
+  private async checkCanceled(subscription: Stripe.Subscription): Promise<Option<string>> {
+    const found = await this.subscriptions.findSyncState({
+      stripeSubscriptionId: subscription.id,
+      localId: Option.none(),
+    });
     if (found.isFailure) return Option.some(UNVERIFIABLE);
 
     const row = found.getValue();
-    if (row.isNone()) {
-      return Option.some(`No local subscription row for ${key.stripeSubscriptionId}.`);
-    }
+    if (row.isNone()) return this.missingRow(subscription);
 
     return row.unwrap().status === "canceled"
       ? Option.none()
-      : this.againstStripe(key.stripeSubscriptionId, row.unwrap());
+      : this.againstStripe(subscription.id, row.unwrap());
   }
 
   private async checkMatches(
@@ -101,9 +117,7 @@ export class StripeSyncVerifier {
     if (found.isFailure) return Option.some(UNVERIFIABLE);
 
     const row = found.getValue();
-    if (row.isNone()) {
-      return Option.some(`No local subscription row for ${key.stripeSubscriptionId}.`);
-    }
+    if (row.isNone()) return Option.none();
 
     return differs(row.unwrap(), expected)
       ? this.againstStripe(key.stripeSubscriptionId, row.unwrap())

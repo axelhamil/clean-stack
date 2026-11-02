@@ -138,6 +138,8 @@ export default {
     ADMIN_STRIPE_UNAVAILABLE: "Stripe is not configured on this platform.",
     ADMIN_STRIPE_EVENT_NOT_FOUND:
       "This Stripe event is not on record: it never arrived or its row was purged after the retention window.",
+    ADMIN_STRIPE_REPLAY_BLOCKED:
+      "The platform does not process this type of event, a replay would change nothing.",
     ADMIN_STRIPE_REPLAY_CONFLICT:
       "This event was already replayed or a colleague is replaying it. Reload the list.",
     ADMIN_STRIPE_REPLAY_PROVIDER_FAILURE:

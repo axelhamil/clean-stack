@@ -191,6 +191,13 @@ test.describe("back office screens", () => {
     await expectHoldsFocus(page, page.getByRole("alertdialog"), opener);
   });
 
+  test("an event the platform does not process offers no replay", async ({ page }) => {
+    await page.goto("/operations");
+
+    await expect(page.getByText("invoice.paid")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Replay" })).toHaveCount(1);
+  });
+
   test("staff who can read operations are offered no action", async ({ page }) => {
     await stubMe(page, ["ops.read"]);
     await page.goto("/operations");
@@ -408,7 +415,7 @@ test.describe("back office screens", () => {
     await page.getByRole("button", { name: "Delete the view Suspended" }).click();
     await expect.poll(() => calls).toEqual([{ method: "DELETE", body: null }]);
 
-    await page.goto("/users?org=acme");
+    await page.goto("/users?org=acme&search=stray");
     const opener = page.getByRole("button", { name: "Save this view" });
     await opener.click();
     const dialog = page.getByRole("dialog", { name: "Save this view" });

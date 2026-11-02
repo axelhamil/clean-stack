@@ -59,6 +59,7 @@ import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
 import {
   authorizeSubscriptionAction,
+  subscriptionEventSource,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stripe-payment-failure";
@@ -440,6 +441,7 @@ async function emitSubscriptionEvent(
     referenceId: string;
     status: string;
     periodEnd?: Date | null;
+    stripeSubscriptionId?: string | null;
   },
   tier: string,
   stripeEventId: string,
@@ -458,7 +460,14 @@ async function emitSubscriptionEvent(
       currentPeriodEnd: subscription.periodEnd ?? null,
     },
     subscription.referenceId,
-    derivedEventId(stripeEventId, eventType),
+    derivedEventId(
+      subscriptionEventSource(
+        subscription.status,
+        stripeEventId,
+        subscription.stripeSubscriptionId,
+      ),
+      eventType,
+    ),
   );
 }
 
@@ -816,6 +825,22 @@ const authOptions = {
             EventTypes.BILLING_SUBSCRIPTION_CREATED,
             subscription,
             plan.name,
+            event.id,
+          );
+        },
+        onSubscriptionCreated: async ({ event, subscription, plan }) => {
+          await emitSubscriptionEvent(
+            EventTypes.BILLING_SUBSCRIPTION_CREATED,
+            subscription,
+            plan.name,
+            event.id,
+          );
+        },
+        onSubscriptionDeleted: async ({ event, subscription }) => {
+          await emitSubscriptionEvent(
+            EventTypes.BILLING_SUBSCRIPTION_CANCELLED,
+            subscription,
+            subscription.plan,
             event.id,
           );
         },

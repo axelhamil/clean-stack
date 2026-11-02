@@ -14,24 +14,24 @@ import type { ISubscriptionReadStore, SubscriptionRow } from "../ports/subscript
 
 const OVERRIDE_STATUS = "override";
 
-function freeView(): EntitlementsView {
-  return { tier: "free", status: "free", hasSubscription: false, ...entitlementsForTier("free") };
+function freeView(hasSubscription = false): EntitlementsView {
+  return { tier: "free", status: "free", hasSubscription, ...entitlementsForTier("free") };
 }
 
 function viewOf(
   subscription: Option<SubscriptionRow>,
   override: Option<ActivePlanOverride>,
+  hasSubscription: boolean,
 ): EntitlementsView {
   const overrideTier = override.map(({ tier }) => tier).toNull();
-  const hasSubscription = subscription.isSome();
 
   if (overrideTier !== null && isTier(overrideTier)) {
-    const status = hasSubscription ? subscription.unwrap().status : OVERRIDE_STATUS;
+    const status = subscription.isSome() ? subscription.unwrap().status : OVERRIDE_STATUS;
 
     return { tier: overrideTier, status, hasSubscription, ...entitlementsForTier(overrideTier) };
   }
 
-  if (!hasSubscription) return freeView();
+  if (subscription.isNone()) return freeView(hasSubscription);
 
   const { tier: rawTier, status } = subscription.unwrap();
   const tier = isTier(rawTier) ? rawTier : "free";
@@ -50,7 +50,10 @@ export class EntitlementsService {
     return this.instrumentation.startSpan(
       { name: "EntitlementsService > getEntitlements" },
       async () => {
-        const [override, subscription] = await this.readSources(orgId);
+        const [override, subscription, customer] = await this.readSources(orgId);
+        if (customer.isFailure)
+          this.instrumentation.capture(new Error(customer.getError().message));
+        const hasSubscription = customer.isSuccess && customer.getValue().isSome();
 
         if (subscription.isFailure) {
           this.instrumentation.capture(new Error(subscription.getError().message));
@@ -59,10 +62,10 @@ export class EntitlementsService {
 
         if (override.isFailure) {
           this.instrumentation.capture(new Error(override.getError().message));
-          return viewOf(subscription.getValue(), Option.none());
+          return viewOf(subscription.getValue(), Option.none(), hasSubscription);
         }
 
-        return viewOf(subscription.getValue(), override.getValue());
+        return viewOf(subscription.getValue(), override.getValue(), hasSubscription);
       },
     );
   }
@@ -71,16 +74,23 @@ export class EntitlementsService {
     return this.instrumentation.startSpan(
       { name: "EntitlementsService > readEntitlements" },
       async () => {
-        const [override, subscription] = await this.readSources(orgId);
+        const [override, subscription, customer] = await this.readSources(orgId);
         if (override.isFailure) return Result.fail(override.getError());
         if (subscription.isFailure) return Result.fail(subscription.getError());
+        if (customer.isFailure) return Result.fail(customer.getError());
 
-        return Result.ok(viewOf(subscription.getValue(), override.getValue()));
+        return Result.ok(
+          viewOf(subscription.getValue(), override.getValue(), customer.getValue().isSome()),
+        );
       },
     );
   }
 
   private readSources(orgId: string) {
-    return Promise.all([this.overrides.findActive(orgId), this.store.findActiveByReference(orgId)]);
+    return Promise.all([
+      this.overrides.findActive(orgId),
+      this.store.findActiveByReference(orgId),
+      this.store.findCustomerIdByReference(orgId),
+    ]);
   }
 }

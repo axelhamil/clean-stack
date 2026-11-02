@@ -15,7 +15,11 @@ import type {
 } from "../application/ports/subscription-read.port";
 import { EntitlementsService } from "../application/services/entitlements.service";
 
-function makeStore(row: SubscriptionRow | null, fail = false): ISubscriptionReadStore {
+function makeStore(
+  row: SubscriptionRow | null,
+  fail = false,
+  customer: string | null = row && "cus_1",
+): ISubscriptionReadStore {
   return {
     findActiveByReference: mock(async () =>
       fail
@@ -26,7 +30,7 @@ function makeStore(row: SubscriptionRow | null, fail = false): ISubscriptionRead
         : Result.ok<Option<SubscriptionRow>, BillingError>(Option.fromNullable(row)),
     ),
     findCustomerIdByReference: mock(async () =>
-      Result.ok<Option<string>, BillingError>(Option.none()),
+      Result.ok<Option<string>, BillingError>(Option.fromNullable(customer)),
     ),
   };
 }
@@ -73,6 +77,16 @@ describe("EntitlementsService", () => {
     const view = await svc.getEntitlements("org1");
     expect(view.tier).toBe("free");
     expect(view.status).toBe("free");
+  });
+
+  it("keeps a past due org on the free tier and still offers it the billing portal", async () => {
+    const svc = serviceOver(makeStore(null, false, "cus_1"));
+
+    const view = await svc.getEntitlements("org1");
+
+    expect(view.tier).toBe("free");
+    expect(view.status).toBe("free");
+    expect(view.hasSubscription).toBe(true);
   });
 
   it("fails closed to free when the store errors", async () => {

@@ -97,19 +97,21 @@ export function StripeEventsSection() {
                   </TableCell>
                   {canReplay && (
                     <TableCell>
-                      <DestructiveActionDialog
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            {t("operations.stripe.replay")}
-                          </Button>
-                        }
-                        title={t("operations.stripe.replayTitle")}
-                        description={t("operations.stripe.replayDescription")}
-                        actionLabel={t("operations.stripe.replay")}
-                        cancelLabel={t("common:actions.cancel")}
-                        isPending={replay.isPending}
-                        onConfirm={() => replay.mutate(event.id)}
-                      />
+                      {event.replayable && (
+                        <DestructiveActionDialog
+                          trigger={
+                            <Button variant="outline" size="sm">
+                              {t("operations.stripe.replay")}
+                            </Button>
+                          }
+                          title={t("operations.stripe.replayTitle")}
+                          description={t("operations.stripe.replayDescription")}
+                          actionLabel={t("operations.stripe.replay")}
+                          cancelLabel={t("common:actions.cancel")}
+                          isPending={replay.isPending}
+                          onConfirm={() => replay.mutate(event.id)}
+                        />
+                      )}
                     </TableCell>
                   )}
                 </TableRow>

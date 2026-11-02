@@ -19,6 +19,14 @@ export function authorizeSubscriptionAction(action: string, role: OrgRole | unde
   return false;
 }
 
+export function subscriptionEventSource(
+  status: string,
+  stripeEventId: string,
+  stripeSubscriptionId: string | null | undefined,
+): string {
+  return status === "canceled" && stripeSubscriptionId ? stripeSubscriptionId : stripeEventId;
+}
+
 export function subscriptionEventType(status: string): EventType {
   if (status === "canceled" || status === "incomplete_expired" || status === "unpaid") {
     return EventTypes.BILLING_SUBSCRIPTION_CANCELLED;

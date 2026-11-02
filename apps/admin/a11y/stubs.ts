@@ -134,6 +134,16 @@ export const STUB_STRIPE_EVENTS = {
       receivedAt: CREATED_AT,
       lastError: "The handler answered 400.",
       replayedAt: CREATED_AT,
+      replayable: true,
+    },
+    {
+      id: "evt_stub_paid",
+      type: "invoice.paid",
+      status: "received",
+      receivedAt: CREATED_AT,
+      lastError: null,
+      replayedAt: null,
+      replayable: false,
     },
   ],
 };

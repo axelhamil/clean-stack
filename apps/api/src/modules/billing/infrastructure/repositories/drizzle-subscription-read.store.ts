@@ -11,6 +11,7 @@ import type {
 const sub = billingSchema.subscription;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const ACTIVE_STATUSES = ["active", "trialing"] as const;
+const MANAGEABLE_STATUSES = [...ACTIVE_STATUSES, "past_due", "unpaid"] as const;
 
 const storeFailure = dbOperationFailure("BILLING_PROVIDER_FAILURE");
 
@@ -33,7 +34,9 @@ export class DrizzleSubscriptionReadStore implements ISubscriptionReadStore {
           const query = exec
             .select({ stripeCustomerId: sub.stripeCustomerId })
             .from(sub)
-            .where(activeSubscriptionOf(referenceId))
+            .where(
+              and(eq(sub.referenceId, referenceId), inArray(sub.status, [...MANAGEABLE_STATUSES])),
+            )
             .limit(1);
 
           const [row] = await this.instrumentation.startSpan(
