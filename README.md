@@ -150,7 +150,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 **Infra, ops & DX**
 - Hono RPC end-to-end types (`hcWithType`) · `pino` logging with single error envelope · CQRS error contract
 - Health probes (`/livez` `/readyz` `/startupz`) + graceful shutdown · Sentry error tracking (RGPD-scrubbed, NoOp without DSN)
-- Disaster-recovery runbook (PITR-first) · Coolify reference deploy on a VPS (config-as-code, deploy by digest)
+- Postgres PITR with pgBackRest to R2 and restore drills · Coolify reference deploy on a VPS (config-as-code, deploy by digest, hardened host)
 - `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
 - Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
 - WCAG 2.1 AA gate on every PR: `@axe-core/playwright` over 11 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
@@ -302,7 +302,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 
 **Health probes**: three endpoints (`/livez`, `/readyz`, `/startupz`) following K8s 2026 convention + IETF `draft-inadarei` format, with tri-state aggregation (pass/warn/fail) and `SIGTERM`-driven graceful shutdown. Per-platform recipes (Coolify, Fly, Render, K8s, Cloud Run) in [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md).
 
-**Disaster recovery**: PITR-first (delegated to your managed Postgres provider), with copy-paste recipes for a weekly portable `pg_dump` export and a monthly automated restore-test. RPO/RTO targets, restore runbook, lifecycle + versioning snippets in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
+**Disaster recovery**: on the reference deploy, a Postgres 18 image with pgBackRest archives WAL continuously to an encrypted R2 repository (full weekly, differential daily, about 1 min RPO), with a local restore drill and a monthly drill in CI; on a managed Postgres, the provider's PITR. RPO/RTO targets, restore runbook and an optional weekly `pg_dump` export in [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md).
 
 **Observability**: error tracking via Sentry on api + app, RGPD-clean payload scrubbing by default, pino integration for log breadcrumbs, global TanStack Query/mutation error capture + user-id tagging on the front, NoOp without `SENTRY_DSN`. OpenTelemetry tracing and Prometheus `/metrics` are deferred to Phase D.1 (managed alongside dashboards). Port usage, removability runbook, provider swap recipe (GlitchTip / Highlight) in [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
@@ -338,7 +338,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **Integrations** | [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): BetterAuth, Stripe, Resend, R2, email DNS |
 | **Events** | [`docs/EVENTS.md`](docs/EVENTS.md): DX guide · [`docs/EVENT_PIPELINE.md`](docs/EVENT_PIPELINE.md): visual walkthrough |
 | **Health probes** | [`docs/HEALTH-PROBES.md`](docs/HEALTH-PROBES.md): endpoints, registry, graceful shutdown, per-PaaS recipes |
-| **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md): PITR-first, restore runbook, weekly export + monthly restore-test recipes |
+| **Disaster recovery** | [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md): pgBackRest PITR to R2, restore runbook, local and monthly drills, managed-Postgres alternative |
 | **Observability** | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md): Sentry api+app, RGPD scrubbing, removability runbook, provider swap recipe |
 | **Deploy (Coolify)** | [`docs/DEPLOY-COOLIFY.md`](docs/DEPLOY-COOLIFY.md): VPS and Coolify runbook, apply, deploy by digest, rollback, boot-trap gotchas, cookie topology |
 | **History** | [`docs/HISTORY.md`](docs/HISTORY.md): design decisions trail |

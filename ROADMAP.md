@@ -21,7 +21,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 3 | **Review pass** | Delivered | End-to-end review of the server surface, the customer screens and the clone path, defects fixed | The only thing between "feature-complete" and "clone-ready" |
 | 4 | **C.1 remainder** | Delivered | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Delivered | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
-| 6 | **Phase L** | In progress | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; then Postgres backups with PITR | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
+| 6 | **Phase L** | Delivered | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; Postgres backups with PITR and a hardened host | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -98,14 +98,15 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Reference deploy on a VPS: **Phase L**
 
-- **Status**: lot 1 delivered (Coolify rail). Lot 2 open: Postgres with continuous archiving and PITR to R2, host bootstrap and firewall, a monthly restore drill.
+- **Status**: delivered. Lot 1: Coolify rail. Lot 2: Postgres backups and host. Open on a real VPS: the checks of `docs/DEPLOY-COOLIFY.md` section 11.
 - **Date**: after Phase K.
 - **Why**: Railway outages took the reference deploy down with them, and a managed PaaS hides the knobs a cloner needs (stop grace, registry, network). A VPS run by Coolify costs less, keeps the Dockerfiles portable and is the model a sister project already runs.
 - **Model**: the OpenUp Coolify rail, kept to what any SaaS needs. Its vault, worker, ClickHouse and cutover flag stay out.
 - **Scope, lot 1**: `infra/coolify/` (`@infra/deploy`): desired `api`, `app`, `admin` apps and the `sweep` task in `services.ts`, `apply.ts` (dry run by default, never deletes, a secret is set when its key exists, a hidden value is unknown and `--apply` rewrites every literal, no `read:sensitive` token), `deploy.ts` (by sha256 digest, `api` then `app` then `admin` in a 45 min budget, waits for an idle `sweep`, writes `GIT_SHA`, restores the previous image on failure, stops at the first skip or failure), `gates.ts` (`/readyz` and both `/health`). `.github/workflows/deploy.yml` after a green CI on a push (`dev` to staging, `main` to production, off until `COOLIFY_DEPLOY` is `on`), `rollback.yml` without a build. CI now also runs on pushes to `dev` and `main`. `infra/railway/` and its runbook removed, `docs/DEPLOY-COOLIFY.md` added. The Railway project itself is untouched.
+- **Scope, lot 2**: `infra/docker/postgres-pgbackrest.Dockerfile` (Postgres 18.6 by digest, pgBackRest 2.60.0, kept after its 2026 revival), `infra/pgbackrest/` (stanza `clean-stack`, R2 repository per environment path, `aes-256-cbc`, 4 full and 7 differential, async archive, secrets from the environment only; `drill.sh` proves backup then PITR on a local SeaweedFS behind TLS), image built by `deploy.yml` and upgraded by hand, `pgbackrest-drill.yml` monthly with a read-only key behind `PGBACKREST_DRILL_ENABLED`; `infra/vps/` (`bootstrap.sh` for Debian 13: unattended upgrades, Docker, Tailscale SSH, nftables firewall letting in only loopback, established, `tailscale0`, the Coolify bridge and Cloudflare on 80 and 443; `--pgbackrest` timers full Sunday, diff Monday to Saturday 00:00 UTC, check 05:00 UTC, each run serialized by a lock and waiting for Postgres, with heartbeats; reboot slot 05:30 UTC). `docs/DISASTER-RECOVERY.md` rewritten around them.
 - **Out of scope**: Workers for the SPAs (their CSP is templated by Caddy at runtime), a migrator in CI (no database path from CI), a secrets vault.
 - **Done when**: lot 1, the repo checks green and `infra/coolify` tested without network; lot 2, a restore drill proves a point in time.
-- **References**: [`docs/DEPLOY-COOLIFY.md`](docs/DEPLOY-COOLIFY.md), `infra/coolify/`, `.github/workflows/deploy.yml`.
+- **References**: [`docs/DEPLOY-COOLIFY.md`](docs/DEPLOY-COOLIFY.md), [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md), `infra/coolify/`, `infra/pgbackrest/`, `infra/vps/`, `.github/workflows/deploy.yml`, `.github/workflows/pgbackrest-drill.yml`.
 
 ---
 

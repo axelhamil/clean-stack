@@ -1,0 +1,118 @@
+name: pgBackRest drill
+
+on:
+  schedule:
+    - cron: "0 4 12 * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "PITR point, UTC time like 2026-11-01 03:00:00+00; empty: 24 h ago"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pgbackrest-drill
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  drill:
+    name: Restore the latest backup and one PITR point on a scratch instance
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || vars.PGBACKREST_DRILL_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    environment: pgbackrest-drill
+    timeout-minutes: 180
+    env:
+      PGBACKREST_REPO1_S3_ENDPOINT: ${{ secrets.PGBACKREST_REPO1_S3_ENDPOINT }}
+      PGBACKREST_REPO1_S3_KEY: ${{ secrets.PGBACKREST_REPO1_S3_KEY }}
+      PGBACKREST_REPO1_S3_KEY_SECRET: ${{ secrets.PGBACKREST_REPO1_S3_KEY_SECRET }}
+      PGBACKREST_REPO1_CIPHER_PASS: ${{ secrets.PGBACKREST_REPO1_CIPHER_PASS }}
+      PGBACKREST_REPO1_S3_BUCKET: ${{ vars.PGBACKREST_REPO1_S3_BUCKET || 'clean-stack-pgbackrest' }}
+      PGBACKREST_REPO1_PATH: ${{ vars.PGBACKREST_REPO1_PATH || '/production' }}
+      HEARTBEAT_URL_PGBACKREST_DRILL: ${{ secrets.HEARTBEAT_URL_PGBACKREST_DRILL }}
+      PITR_TARGET: ${{ inputs.target }}
+      RESTORED_DATABASE: ${{ vars.PGBACKREST_DRILL_DATABASE || 'postgres' }}
+      RESTORED_USER: ${{ vars.PGBACKREST_DRILL_USER || 'postgres' }}
+      IMAGE: clean-stack/postgres-pgbackrest:drill
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Ping the start
+        if: env.HEARTBEAT_URL_PGBACKREST_DRILL != ''
+        run: curl --fail --silent --show-error --max-time 10 --retry 3 "$HEARTBEAT_URL_PGBACKREST_DRILL/start" > /dev/null
+
+      - name: Build the image
+        run: docker build --file infra/docker/postgres-pgbackrest.Dockerfile --tag "$IMAGE" .
+
+      - name: Restore and check
+        run: |
+          set -euo pipefail
+          printf 'local all all trust\nhost all all 127.0.0.1/32 trust\n' > "$RUNNER_TEMP/drill_hba.conf"
+          chmod 0644 "$RUNNER_TEMP/drill_hba.conf"
+          repository=(--env PGBACKREST_REPO1_S3_ENDPOINT --env PGBACKREST_REPO1_S3_KEY --env PGBACKREST_REPO1_S3_KEY_SECRET --env PGBACKREST_REPO1_CIPHER_PASS --env PGBACKREST_REPO1_S3_BUCKET --env PGBACKREST_REPO1_PATH)
+
+          sql() {
+            docker exec "$1" psql -U "$RESTORED_USER" -d "$RESTORED_DATABASE" -v ON_ERROR_STOP=1 -Atqc "$2"
+          }
+
+          drill() {
+            local name="$1"
+            shift
+            local started
+            started="$(date +%s)"
+
+            docker volume create "$name" > /dev/null
+            docker run --rm --volume "$name:/var/lib/postgresql" --entrypoint sh "$IMAGE" -c 'mkdir -p "$PGDATA" && chmod 0700 "$PGDATA"'
+            docker run --rm --volume "$name:/var/lib/postgresql" "${repository[@]}" \
+              --entrypoint pgbackrest "$IMAGE" --stanza=clean-stack --archive-mode=off "$@" restore
+            docker run --detach --name "$name" --volume "$name:/var/lib/postgresql" \
+              --volume "$RUNNER_TEMP/drill_hba.conf:/etc/postgresql/drill_hba.conf:ro" "${repository[@]}" \
+              "$IMAGE" postgres -c config_file=/etc/postgresql/postgresql.conf -c archive_mode=off -c hba_file=/etc/postgresql/drill_hba.conf > /dev/null
+
+            until [ "$(docker exec "$name" psql -U "$RESTORED_USER" -d "$RESTORED_DATABASE" -Atqc 'select pg_is_in_recovery()' 2> /dev/null)" = "f" ]; do
+              if [ "$(docker inspect --format '{{.State.Running}}' "$name")" != "true" ]; then
+                echo "${name}: stopped during the replay" >&2
+                docker logs --tail 50 "$name" >&2
+                exit 1
+              fi
+              if [ $(($(date +%s) - started)) -ge 3600 ]; then
+                echo "${name}: not promoted after 3600s" >&2
+                docker logs --tail 50 "$name" >&2
+                exit 1
+              fi
+              sleep 5
+            done
+            echo "${name}: promoted, RTO $(($(date +%s) - started))s"
+
+            test "$(sql "$name" 'select 1')" = "1"
+            migrations="$(sql "$name" 'select count(*) from drizzle.__drizzle_migrations')"
+            if [ "$migrations" -lt 1 ]; then
+              echo "${name}: drizzle.__drizzle_migrations is empty in ${RESTORED_DATABASE}" >&2
+              exit 1
+            fi
+            echo "${name}: ${migrations} migrations applied, ${RESTORED_DATABASE} answers"
+
+            docker rm --force "$name" > /dev/null
+            docker volume rm "$name" > /dev/null
+          }
+
+          target="${PITR_TARGET:-$(date -u -d '24 hours ago' '+%Y-%m-%d %H:%M:%S+00')}"
+          oldest="$(docker run --rm "${repository[@]}" --entrypoint pgbackrest "$IMAGE" --stanza=clean-stack --output=json info | jq -r '.[0].backup[0].timestamp.stop')"
+          if [ "$(date -u -d "$target" +%s)" -le "$oldest" ]; then
+            echo "PITR target ${target} is older than the oldest backup, which ended at $(date -u -d "@${oldest}" '+%Y-%m-%d %H:%M:%S+00')" >&2
+            exit 1
+          fi
+
+          drill pgbackrest-latest
+          drill pgbackrest-pitr --type=time "--target=${target}" --target-action=promote
+
+      - name: Ping the end
+        if: always() && env.HEARTBEAT_URL_PGBACKREST_DRILL != ''
+        env:
+          OUTCOME: ${{ job.status != 'success' && '/fail' || '' }}
+        run: curl --fail --silent --show-error --max-time 10 --retry 3 "$HEARTBEAT_URL_PGBACKREST_DRILL$OUTCOME" > /dev/null

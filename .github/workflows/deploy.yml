@@ -92,6 +92,21 @@ jobs:
             VITE_SENTRY_ENVIRONMENT=${{ env.DEPLOY_ENVIRONMENT }}
             VITE_GIT_SHA=${{ github.event.workflow_run.head_sha }}
 
+      - id: postgres
+        name: Build the postgres image, never deployed by this workflow
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/postgres-pgbackrest.Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.owner.outputs.name }}/clean-stack-postgres:sha-${{ github.event.workflow_run.head_sha }}
+          labels: org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+
+      - name: Print the postgres image to upgrade by hand
+        env:
+          POSTGRES_IMAGE: ghcr.io/${{ steps.owner.outputs.name }}/clean-stack-postgres@${{ steps.postgres.outputs.digest }}
+        run: echo "Postgres image to set by hand on the Coolify database resource (docs/DEPLOY-COOLIFY.md) is $POSTGRES_IMAGE" >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: Deploy and check
     needs: build

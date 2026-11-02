@@ -3,10 +3,27 @@
   "extends": ["//"],
   "tasks": {
     "test": {
-      "inputs": ["coolify/**", "package.json", "tsconfig.json", "$TURBO_ROOT$/.github/workflows/**"]
+      "inputs": [
+        "coolify/**",
+        "docker/**",
+        "pgbackrest/**",
+        "vps/**",
+        "test-support.ts",
+        "package.json",
+        "tsconfig.json",
+        "$TURBO_ROOT$/.github/workflows/**",
+        "$TURBO_ROOT$/docker-compose.yaml"
+      ]
     },
     "type-check": {
-      "inputs": ["coolify/**", "package.json", "tsconfig.json"]
+      "inputs": [
+        "coolify/**",
+        "pgbackrest/**",
+        "vps/**",
+        "test-support.ts",
+        "package.json",
+        "tsconfig.json"
+      ]
     }
   }
 }

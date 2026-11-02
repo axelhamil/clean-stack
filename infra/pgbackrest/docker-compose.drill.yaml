@@ -1,0 +1,77 @@
+name: clean-stack-pgbackrest-drill
+
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+    command: server -s3 -dir=/data
+    volumes:
+      - seaweedfs_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8333/"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - drill
+
+  seaweedfs-init:
+    image: chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - echo 's3.bucket.create -name clean-stack-pgbackrest-drill' | weed shell -master=seaweedfs:9333
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    networks:
+      - drill
+
+  s3:
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    command: ["caddy", "reverse-proxy", "--from", "https://s3", "--to", "http://seaweedfs:8333", "--internal-certs", "--disable-redirects"]
+    depends_on:
+      seaweedfs-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "443"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - drill
+
+  postgres:
+    build:
+      context: ../..
+      dockerfile: infra/docker/postgres-pgbackrest.Dockerfile
+    image: clean-stack/postgres-pgbackrest:drill
+    environment:
+      POSTGRES_PASSWORD: ${DRILL_POSTGRES_PASSWORD:?drill.sh sets it}
+      POSTGRES_DB: drill
+      PGBACKREST_REPO1_PATH: /drill
+      PGBACKREST_REPO1_S3_BUCKET: clean-stack-pgbackrest-drill
+      PGBACKREST_REPO1_S3_ENDPOINT: s3
+      PGBACKREST_REPO1_S3_URI_STYLE: path
+      PGBACKREST_REPO1_STORAGE_VERIFY_TLS: "n"
+      PGBACKREST_REPO1_S3_KEY: ${PGBACKREST_REPO1_S3_KEY:?drill.sh sets it}
+      PGBACKREST_REPO1_S3_KEY_SECRET: ${PGBACKREST_REPO1_S3_KEY_SECRET:?drill.sh sets it}
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?drill.sh sets it}
+    depends_on:
+      s3:
+        condition: service_healthy
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "drill"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - drill
+
+volumes:
+  seaweedfs_data:
+  pgdata:
+
+networks:
+  drill:
+    internal: true

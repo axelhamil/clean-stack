@@ -6,6 +6,6 @@
     "moduleResolution": "bundler",
     "types": ["bun"]
   },
-  "include": ["coolify/**/*.ts"],
+  "include": ["coolify/**/*.ts", "pgbackrest/**/*.ts", "vps/**/*.ts", "test-support.ts"],
   "exclude": ["node_modules"]
 }

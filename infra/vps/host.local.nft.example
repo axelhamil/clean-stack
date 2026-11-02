@@ -1,0 +1,2 @@
+add element inet clean_stack_host public_interfaces { "eth0" }
+add element inet clean_stack_host container_to_host { "br-0123456789ab" . 22 }
