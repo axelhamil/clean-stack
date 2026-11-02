@@ -1,3 +1,22 @@
+## [2.1.0](https://github.com/axelhamil/clean-stack/compare/v2.0.0...v2.1.0) (2026-11-02)
+
+### Features
+
+* **admin:** announce every session the back office ends as signed out ([0a0e6c4](https://github.com/axelhamil/clean-stack/commit/0a0e6c45bdd170e34401a019d348dd3d17ccba3b))
+* **app:** show the not-found page inside the app shell when signed in ([799d88d](https://github.com/axelhamil/clean-stack/commit/799d88da992fbe7ebcd308fc155099fa7d262780))
+
+### Bug Fixes
+
+* **billing:** answer 402 when an organization has no seat left ([d72c20b](https://github.com/axelhamil/clean-stack/commit/d72c20b4aae95ea9eccd405cd9f70054048b842c))
+
+### Performance
+
+* **billing:** index the stripe customer id of users ([6cf7fd5](https://github.com/axelhamil/clean-stack/commit/6cf7fd5cbd1806b2ebc1eafaf060d5b671709181))
+
+### Documentation
+
+* **roadmap:** close the post phase k open items ([d6b86a0](https://github.com/axelhamil/clean-stack/commit/d6b86a0914dcb5315104be9ac67b7fbef75d2e20))
+
 ## [2.0.0](https://github.com/axelhamil/clean-stack/compare/v1.24.1...v2.0.0) (2026-11-02)
 
 ### ⚠ BREAKING CHANGES
