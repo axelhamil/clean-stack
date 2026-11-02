@@ -14,6 +14,8 @@ export default {
     // front reads it back off `error.message` (see provider-card.tsx); the
     // catalog lookup itself is keyed the same as every other code either way.
     SSO_PLAN_REQUIRED: "Your plan does not include SSO.",
+    ORGANIZATION_SEAT_PAYMENT_REQUIRED:
+      "This organization has no free seat left. An owner or admin must upgrade the plan or remove a member.",
     SSO_ORGANIZATION_REQUIRED: "No active organization.",
     SCIM_CONNECTION_NOT_FOUND: "This organization has no directory connection to disconnect.",
     SCIM_CONNECTION_PROVIDER_FAILURE:

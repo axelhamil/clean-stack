@@ -355,7 +355,12 @@ async function proveSeatCap(cookie: string, ownerId: string): Promise<void> {
     );
 
   const refused = await invite();
-  check("at the free cap an invitation is refused", refused.status >= 400, refused.status);
+  const refusal = await refused.json().catch(() => null);
+  check(
+    "at the free cap an invitation is refused with a 402 and the seat code",
+    refused.status === 402 && refusal?.code === "ORGANIZATION_SEAT_PAYMENT_REQUIRED",
+    { status: refused.status, body: refusal },
+  );
 
   await db.insert(planOverride).values({
     id: uuidv7(),
