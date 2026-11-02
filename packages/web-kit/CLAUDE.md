@@ -1,6 +1,6 @@
 # web-kit rules
 
-The browser foundation every React app of the monorepo shares: api-client and query-client factories, error classifier and toasts, session query factory, i18n boot, Zod error map, theme, auth broadcast, safe redirects. Auto-loaded under `packages/web-kit/`. How `apps/app` consumes it: `apps/app/CLAUDE.md`.
+The browser foundation every React app of the monorepo shares: api-client and query-client factories, error classifier and toasts, session query factory, i18n boot, router defaults, Zod error map, theme, auth broadcast, safe redirects. Auto-loaded under `packages/web-kit/`. How `apps/app` consumes it: `apps/app/CLAUDE.md`.
 
 ## Rules
 

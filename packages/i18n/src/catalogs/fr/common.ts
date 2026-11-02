@@ -18,6 +18,12 @@ export default {
     title: "Une erreur est survenue",
     body: "Cette page n'a pas pu se charger. Essayez de la recharger.",
   },
+  notFound: {
+    title: "Page introuvable",
+    description:
+      "Cette page n'existe pas ou a été déplacée. Vérifiez l'adresse, ou revenez à l'accueil.",
+    backHome: "Revenir à l'accueil",
+  },
   nav: {
     dashboard: "Tableau de bord",
     settings: "Paramètres",
