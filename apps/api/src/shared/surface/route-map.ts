@@ -64,6 +64,33 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "DELETE /admin/staff/:id/overrides/:overrideId": {
     consumer: "apps/admin/src/features/team/api/team.mutations.ts",
   },
+  "GET /admin/ops/dead-letters": {
+    consumer: "apps/admin/src/features/operations/api/ops.queries.ts",
+  },
+  "GET /admin/ops/stripe-events": {
+    consumer: "apps/admin/src/features/operations/api/ops.queries.ts",
+  },
+  "GET /admin/ops/sweeps": { consumer: "apps/admin/src/features/operations/api/ops.queries.ts" },
+  "POST /admin/ops/outbox/requeue": {
+    consumer: "apps/admin/src/features/operations/api/ops.mutations.ts",
+  },
+  "POST /admin/ops/stripe-events/:id/replay": {
+    consumer: "apps/admin/src/features/operations/api/ops.mutations.ts",
+  },
+  "GET /admin/orgs/:id/notes": { consumer: "apps/admin/src/shared/api/queries/notes.ts" },
+  "POST /admin/orgs/:id/notes": { consumer: "apps/admin/src/shared/api/mutations/add-note.ts" },
+  "POST /admin/orgs/:id/plan-override": {
+    consumer: "apps/admin/src/features/orgs/api/orgs.mutations.ts",
+  },
+  "DELETE /admin/orgs/:id/plan-override": {
+    consumer: "apps/admin/src/features/orgs/api/orgs.mutations.ts",
+  },
+  "GET /admin/users/:id/notes": { consumer: "apps/admin/src/shared/api/queries/notes.ts" },
+  "POST /admin/users/:id/notes": { consumer: "apps/admin/src/shared/api/mutations/add-note.ts" },
+  "GET /admin/inbox": { consumer: "apps/admin/src/features/home/api/inbox.queries.ts" },
+  "GET /admin/views": { consumer: "apps/admin/src/shared/api/queries/saved-views.ts" },
+  "POST /admin/views": { consumer: "apps/admin/src/shared/api/mutations/saved-views.ts" },
+  "DELETE /admin/views/:id": { consumer: "apps/admin/src/shared/api/mutations/saved-views.ts" },
   "GET /admin/staff": { consumer: "apps/admin/src/features/team/api/team.queries.ts" },
   "GET /admin/users": { consumer: "apps/app/src/features/admin-users/api/admin-users.queries.ts" },
   "GET /admin/users/:id": {
@@ -141,6 +168,7 @@ export const ROUTE_MAP: Record<RouteKey, SurfaceEntry> = {
   "POST /internal/sweep-consents": { uiLess: "internal-cron" },
   "POST /internal/sweep-email-messages": { uiLess: "internal-cron" },
   "POST /internal/sweep-notifications": { uiLess: "internal-cron" },
+  "POST /internal/sweep-stripe-events": { uiLess: "internal-cron" },
   "POST /internal/sweep-outbox": { uiLess: "internal-cron" },
   "POST /internal/sweep-webhook-delivery": { uiLess: "internal-cron" },
   "POST /me/delete": { consumer: "apps/app/src/shared/api/mutations/request-account-deletion.ts" },

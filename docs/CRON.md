@@ -10,6 +10,7 @@ internal endpoints (`POST /internal/<job>`); you wire your own scheduler.
 | `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun, truncated }`. `processed` is `succeeded.length + failed.length`: accounts actually attempted, not the batch size, so a truncated run reports what it really did. Time-budgeted like the retention sweeps below (checked *between* account wipes, never inside one, an account wipe is a single transaction and must never be cut in half), but deliberately holds no lease and its selection query is not `SKIP LOCKED`, so two overlapping runs can pick the same account; the anonymizing update is guarded by `deletedAt IS NULL`, making the wipe itself idempotent so the loser of the race short-circuits without double-wiping. |
 | `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups notification emails that have **come due** into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Due-ness is decided at fan-out, not here, see § Digest windows below. Note: "immediate" frequency means "at the next cron tick", true real-time delivery is handled by the SSE event stream, not email. Holds the `flush-notification-emails` lease (§ Single-flight) and answers `{ skipped: true }` when another run holds it. |
 | `POST /internal/sweep-admin-approvals` | `{ batchSize?: number; dryRun?: boolean }` | Moves pending four-eyes requests past `expires_at` to `expired`, one `admin.approval.expired` per row. `deleted` in the response counts expired rows. |
+| `POST /internal/sweep-stripe-events` | `{ batchSize?: number; dryRun?: boolean }` | Deletes `stripe_event` rows older than `STRIPE_EVENT_RETENTION_DAYS`. |
 | `POST /internal/sweep-notifications` | `{ batchSize?: number; dryRun?: boolean }` | Purges read notifications older than `NOTIFICATION_RETENTION_DAYS` (default 30d). Unread notifications are never purged regardless of age. Recommended cadence: daily. |
 
 ## Authentication
@@ -90,6 +91,10 @@ Two consequences worth knowing:
 An empty window sends nothing: the flush selects due rows and returns
 `{ flushed: 0, notifications: 0 }` without touching the email queue when there
 are none, the digest is never an empty email.
+
+### Late jobs
+
+The back office derives a `late` state from the last heartbeat rather than storing one (`shared/internal-routes/sweep-cadence.ts`): a daily sweep is late past 26 hours, the notification flush past 15 minutes. A job that never ran has no heartbeat and stays invisible, it shows up only once it reported at least once.
 
 ### Single-flight
 

@@ -1,4 +1,6 @@
-export type Tier = "free" | "pro" | "business";
+import type { Tier } from "@packages/access-control";
+
+export type { Tier };
 export type Feature = "audit_log" | "api" | "sso";
 
 export type PlanCatalogItem = {
@@ -20,5 +22,6 @@ export type EntitlementsView = {
   maxMembers: number | null;
   tier: Tier;
   status: string;
+  hasSubscription: boolean;
   quotas: Record<string, number | null>;
 };

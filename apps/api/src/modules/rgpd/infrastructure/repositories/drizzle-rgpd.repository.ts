@@ -12,6 +12,7 @@ import {
   or,
   resolveExecutor,
   schema,
+  staffSchema,
 } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
 import { verifyPassword as verifyHash } from "better-auth/crypto";
@@ -330,6 +331,8 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
             return Result.ok({ deletedOrgIds: [], anonymizedEmail: "", alreadyWiped: true });
           }
 
+          await exec.delete(staffSchema.staffNote).where(eq(staffSchema.staffNote.userId, userId));
+          await exec.delete(staffSchema.savedView).where(eq(staffSchema.savedView.ownerId, userId));
           await exec.delete(schema.session).where(eq(schema.session.userId, userId));
           await exec.delete(schema.account).where(eq(schema.account.userId, userId));
           await exec.delete(schema.twoFactor).where(eq(schema.twoFactor.userId, userId));

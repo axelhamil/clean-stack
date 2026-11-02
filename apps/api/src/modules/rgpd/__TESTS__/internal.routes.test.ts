@@ -32,9 +32,15 @@ const mockedExecute = mock<(...args: unknown[]) => Promise<SweepResult>>(async (
   Result.ok(SWEEP_OK),
 );
 
+const mockedRecord = mock<
+  (run: { label: string; outcome: string; count: number }) => Promise<void>
+>(async () => {});
+
 mock.module("../../../container", () => ({
   di: {
     RgpdService: { processPendingDeletions: mockedExecute },
+    IInstrumentation: new NoOpInstrumentation(),
+    ISweepRunStore: { record: mockedRecord },
   },
 }));
 
@@ -85,7 +91,32 @@ async function postSignedSweep(body: object) {
 describe("POST /internal/rgpd-sweep", () => {
   beforeEach(() => {
     mockedExecute.mockClear();
+    mockedRecord.mockClear();
     mockedExecute.mockResolvedValue(Result.ok(SWEEP_OK));
+  });
+
+  describe("heartbeat", () => {
+    it("records a run with a failed account as a batch error", async () => {
+      mockedExecute.mockResolvedValue(
+        Result.ok({ ...SWEEP_OK, failed: [{ userId: "u3", errorCode: "X" }] }),
+      );
+
+      await postSignedSweep({});
+
+      expect(mockedRecord.mock.calls[0]?.[0]).toMatchObject({
+        label: "rgpd-sweep",
+        outcome: "batch-error",
+        count: 2,
+      });
+    });
+
+    it("leaves the last real run in place on a dry run", async () => {
+      mockedExecute.mockResolvedValue(Result.ok({ ...SWEEP_OK, dryRun: true }));
+
+      await postSignedSweep({ dryRun: true });
+
+      expect(mockedRecord).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the request carries a valid signature", () => {

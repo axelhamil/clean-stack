@@ -1,5 +1,12 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
+import { entitlementsForTier } from "../../../shared/entitlements";
+import type { IEntitlementsReader } from "../../../shared/ports/entitlements-reader.port";
+import type {
+  ActivePlanOverride,
+  IPlanOverrideReader,
+} from "../../../shared/ports/plan-override.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { AdminOrgListRow, IAdminOrgStore } from "../application/ports/admin-org-store.port";
 import type {
@@ -60,13 +67,37 @@ function orgStore(overrides: Partial<IAdminOrgStore> = {}): IAdminOrgStore {
     listOrgs: mock(async () => ok([ORG])),
     findOrgById: mock(async () => ok(Option.some(ORG))),
     listMembersOf: mock(async () => ok([])),
-    findPlanFor: mock(async () => ok(Option.none<string>())),
     ...overrides,
   };
 }
 
-function service(users = userStore(), orgs = orgStore()) {
-  return new AdminQueryService(users, new NoOpInstrumentation(), orgs);
+const PRO_VIEW = {
+  tier: "pro" as const,
+  status: "active",
+  hasSubscription: true,
+  ...entitlementsForTier("pro"),
+};
+
+function entitlementsReader(
+  read: IEntitlementsReader["readEntitlements"] = async () => Result.ok(PRO_VIEW),
+): IEntitlementsReader {
+  return { getEntitlements: mock(async () => PRO_VIEW), readEntitlements: mock(read) };
+}
+
+function overrideStore(active: Option<ActivePlanOverride> = Option.none()): IPlanOverrideReader {
+  const store = mockPort<IPlanOverrideReader>();
+  store.findActive.mockImplementation(async () => Result.ok(active));
+
+  return store;
+}
+
+function service(
+  users = userStore(),
+  orgs = orgStore(),
+  overrides = overrideStore(),
+  entitlements = entitlementsReader(),
+) {
+  return new AdminQueryService(users, new NoOpInstrumentation(), orgs, entitlements, overrides);
 }
 
 describe("AdminQueryService", () => {
@@ -172,17 +203,37 @@ describe("AdminQueryService", () => {
       expect(result.getValue().isNone()).toBe(true);
     });
 
-    it("exposes the plan as an Option when the org has no subscription", async () => {
-      const orgs = orgStore({
-        listMembersOf: mock(async () =>
-          ok([{ userId: "u-1", email: "a@example.com", role: "owner" }]),
+    it("surfaces a failed plan read instead of showing the org as free", async () => {
+      const result = await service(
+        userStore(),
+        orgStore(),
+        overrideStore(),
+        entitlementsReader(async () =>
+          Result.fail({ code: "BILLING_PROVIDER_FAILURE", message: "db down" }),
         ),
-      });
+      ).getOrg("o-1");
 
-      const detail = (await service(userStore(), orgs).getOrg("o-1")).getValue().unwrap();
+      expect(result.getError().code).toBe("BILLING_PROVIDER_FAILURE");
+    });
 
-      expect(detail.plan.isNone()).toBe(true);
-      expect(detail.members).toHaveLength(1);
+    it("shows the plan the gates apply and the override behind it", async () => {
+      const active: ActivePlanOverride = {
+        id: "ov-1",
+        organizationId: "o-1",
+        tier: "pro",
+        expiresAt: new Date("2030-01-01"),
+        note: "Pilot",
+        createdAt: new Date("2026-01-01"),
+      };
+
+      const detail = (
+        await service(userStore(), orgStore(), overrideStore(Option.some(active))).getOrg("o-1")
+      )
+        .getValue()
+        .unwrap();
+
+      expect(detail.plan).toBe("pro");
+      expect(detail.planOverride.unwrap().expiresAt).toEqual(active.expiresAt);
     });
   });
 });

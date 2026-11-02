@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { buildDigests, digestIdempotencyKey } from "../flush-notification-emails.route";
+import {
+  beatOfFlush,
+  buildDigests,
+  digestIdempotencyKey,
+} from "../flush-notification-emails.route";
 
 const row = (userId: string, category: string, id: string, locale: string | null = null) => ({
   id,
@@ -41,5 +45,20 @@ describe("digestIdempotencyKey", () => {
     const key500 = await digestIdempotencyKey(Array.from({ length: 500 }, (_, i) => `n${i}`));
     expect(key2).toHaveLength(64);
     expect(key500).toHaveLength(64);
+  });
+});
+
+describe("beatOfFlush", () => {
+  test("records a real run with what it flushed", () => {
+    const beat = beatOfFlush({ dryRun: false, skipped: false, flushed: 3, notifications: 9 });
+
+    expect(beat).toEqual({ outcome: "ok", count: 3 });
+  });
+
+  test("leaves the last real run in place when refused the lease or dry", () => {
+    expect(beatOfFlush({ dryRun: false, skipped: true, flushed: 0, notifications: 0 })).toBe(
+      undefined,
+    );
+    expect(beatOfFlush({ dryRun: true, flushed: 0, notifications: 0 })).toBe(undefined);
   });
 });

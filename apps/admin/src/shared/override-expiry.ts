@@ -1,4 +1,4 @@
-const FURTHEST_YEARS = 10;
+import { OVERRIDE_MAX_YEARS } from "@packages/access-control";
 
 export type OverrideExpiry = { kind: "none" } | { kind: "at"; iso: string } | { kind: "invalid" };
 
@@ -14,7 +14,7 @@ export function earliestExpiryDay(now: Date): string {
 }
 
 export function latestExpiryDay(now: Date): string {
-  return `${now.getFullYear() + FURTHEST_YEARS}-12-31`;
+  return `${now.getFullYear() + OVERRIDE_MAX_YEARS}-12-31`;
 }
 
 export function overrideExpiryOf(day: string, now: Date = new Date()): OverrideExpiry {

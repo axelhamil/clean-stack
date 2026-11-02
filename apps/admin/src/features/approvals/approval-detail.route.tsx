@@ -22,8 +22,8 @@ import { requireSection } from "../../shared/auth/require-section";
 import { useStaff } from "../../shared/auth/use-staff";
 import { BackIcon, BackLink } from "../../shared/components/back-link";
 import { DetailState } from "../../shared/components/detail-state";
+import { approvalActionLabelKey } from "../../shared/labels/approval-action";
 import { approvalQueryOptions } from "./api/approvals.queries";
-import { approvalActionLabelKey } from "./approval-labels";
 import { ApprovalParamRows } from "./components/approval-param-rows";
 import { DecideDialog } from "./components/decide-dialog";
 

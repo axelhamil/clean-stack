@@ -3,6 +3,7 @@ import type { PinoLogger } from "hono-pino";
 import { di } from "../../container";
 import { env } from "../env";
 import { countEligibleWithTimeout } from "./sweep-count";
+import { beatOfSweep, withSweepHeartbeat } from "./sweep-heartbeat";
 import { sweepLockFor } from "./sweep-lock";
 import { purgeBatchWithTimeout } from "./sweep-purge";
 import {
@@ -65,13 +66,23 @@ export function runSweepRequest(opts: {
 }): Promise<SweepResponse> {
   const spans = sweepSpans(di.IInstrumentation);
 
-  return runRetentionSweep({
-    body: opts.body,
-    spans,
-    passes: opts.passes(spans),
-    logger: opts.logger,
-    label: opts.label,
-    deadlineMs: env.SWEEP_DEADLINE_MS,
-    lock: sweepLockFor(opts.label, spans),
-  });
+  return withSweepHeartbeat(
+    {
+      label: opts.label,
+      store: di.ISweepRunStore,
+      spans,
+      beatOf: beatOfSweep,
+      dryRun: opts.body.dryRun,
+    },
+    () =>
+      runRetentionSweep({
+        body: opts.body,
+        spans,
+        passes: opts.passes(spans),
+        logger: opts.logger,
+        label: opts.label,
+        deadlineMs: env.SWEEP_DEADLINE_MS,
+        lock: sweepLockFor(opts.label, spans),
+      }),
+  );
 }

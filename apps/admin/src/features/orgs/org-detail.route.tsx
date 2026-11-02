@@ -6,6 +6,7 @@ import {
 } from "@packages/ui/components/ui/description-list";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { PageHeader } from "@packages/ui/components/ui/page-header";
+import { Separator } from "@packages/ui/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -23,9 +24,12 @@ import { requireSection } from "../../shared/auth/require-section";
 import { useStaff } from "../../shared/auth/use-staff";
 import { BackIcon, BackLink } from "../../shared/components/back-link";
 import { DetailState } from "../../shared/components/detail-state";
+import { NotesSection } from "../../shared/components/notes-section";
 import { orgRoleLabelKey } from "../../shared/labels/org-role";
 import { orgQueryOptions } from "./api/orgs.queries";
+import { PlanOverrideSection } from "./components/plan-override-section";
 import { SsoEnforcementSwitch } from "./components/sso-enforcement-switch";
+import { planLabelKey } from "./plan-labels";
 
 export const Route = createFileRoute("/_staff/orgs/$id")({
   beforeLoad: requireSection("orgs"),
@@ -72,12 +76,12 @@ function OrgDetailPage() {
                     {org.slug}
                   </DescriptionDetails>
                 </DescriptionItem>
-                {org.plan && (
-                  <DescriptionItem>
-                    <DescriptionTerm>{t("orgs.detail.planLabel")}</DescriptionTerm>
-                    <DescriptionDetails>{org.plan}</DescriptionDetails>
-                  </DescriptionItem>
-                )}
+                <DescriptionItem>
+                  <DescriptionTerm>{t("orgs.detail.planLabel")}</DescriptionTerm>
+                  <DescriptionDetails>
+                    <EffectivePlan plan={org.plan} />
+                  </DescriptionDetails>
+                </DescriptionItem>
                 <DescriptionItem>
                   <DescriptionTerm>{t("orgs.detail.createdLabel")}</DescriptionTerm>
                   <DescriptionDetails>{formatDate(org.createdAt)}</DescriptionDetails>
@@ -129,8 +133,23 @@ function OrgDetailPage() {
               )}
             </section>
           </div>
+
+          <Separator />
+
+          <PlanOverrideSection organizationId={org.id} planOverride={org.planOverride} />
+
+          <Separator />
+
+          <NotesSection subject={{ type: "org", id: org.id }} />
         </>
       )}
     </DetailState>
   );
+}
+
+function EffectivePlan({ plan }: { plan: string }) {
+  const { t } = useTranslation("admin");
+  const labelKey = planLabelKey(plan);
+
+  return labelKey ? t(labelKey) : plan;
 }

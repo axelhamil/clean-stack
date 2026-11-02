@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { session, user } from "./auth";
+import { organization } from "./multi-tenant";
 
 export const staffMember = pgTable(
   "staff_member",
@@ -97,5 +98,46 @@ export const adminApproval = pgTable(
       "admin_approval_action_check",
       sql`${table.action} IN ('user.ban_permanent', 'staff.role_change', 'staff.revoke', 'staff.permission_override')`,
     ),
+  ],
+);
+
+export const staffNote = pgTable(
+  "staff_note",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("staff_note_user_created_idx").on(table.userId, table.createdAt),
+    index("staff_note_organization_created_idx").on(table.organizationId, table.createdAt),
+    check(
+      "staff_note_one_subject_check",
+      sql`num_nonnulls(${table.userId}, ${table.organizationId}) = 1`,
+    ),
+  ],
+);
+
+export const savedView = pgTable(
+  "saved_view",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    screen: text("screen").notNull(),
+    name: text("name").notNull(),
+    filters: jsonb("filters").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("saved_view_owner_screen_name_uq").on(table.ownerId, table.screen, table.name),
+    check("saved_view_screen_check", sql`${table.screen} IN ('users', 'orgs', 'audit')`),
   ],
 );

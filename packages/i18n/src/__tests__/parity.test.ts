@@ -127,6 +127,8 @@ describe("catalog parity", () => {
     // (list table header, detail page label) so a translator can still word
     // them differently later.
     "admin.orgs.table.slug",
+    "admin.orgs.plan.pro",
+    "admin.orgs.plan.business",
     "admin.orgs.detail.slugLabel",
     // Same word in French too, matching the existing "Actions" / "Webhooks"
     // cognate exemptions above.

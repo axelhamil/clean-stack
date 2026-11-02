@@ -10,8 +10,10 @@ import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.ro
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
 import { adminApprovalRoutes } from "./modules/admin/approvals.routes";
 import { adminInternalRoutes } from "./modules/admin/internal.routes";
+import { adminOpsRoutes } from "./modules/admin/ops.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { adminStaffRoutes } from "./modules/admin/staff.routes";
+import { adminWorkspaceRoutes } from "./modules/admin/workspace.routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { auditLogRoutes } from "./modules/audit-log/routes";
@@ -36,6 +38,7 @@ import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.rou
 import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
 import { sweepNotificationsRoutes } from "./shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
+import { sweepStripeEventsRoutes } from "./shared/internal-routes/sweep-stripe-events.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { type AuthVariables, sessionMiddleware } from "./shared/middleware/auth.middleware";
 import { requireCsrf } from "./shared/middleware/csrf.middleware";
@@ -201,6 +204,7 @@ app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
 app.route("/internal", sweepConsentsRoutes);
+app.route("/internal", sweepStripeEventsRoutes);
 app.route("/internal", sweepEmailMessagesRoutes);
 app.route("/internal", sweepNotificationsRoutes);
 app.route("/internal", flushNotificationEmailsRoutes);
@@ -246,9 +250,11 @@ const routes = app
   .route("/me/policies", policyRoutes)
   .route("/uploads", uploadsRoutes)
   .route("/admin", adminStaffRoutes)
+  .route("/admin", adminWorkspaceRoutes)
   .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
+  .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", auditLogRoutes)
   .route("/settings/tokens", apiTokenRoutes)

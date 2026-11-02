@@ -31,6 +31,7 @@ import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.port";
 import type { ISessionGeoStore } from "./shared/ports/session-geo.port";
+import type { ISweepRunStore } from "./shared/ports/sweep-run.port";
 import type { ITotpVerifier } from "./shared/ports/totp-verifier.port";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
@@ -39,6 +40,7 @@ import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service"
 import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
+import { DrizzleSweepRunStore } from "./shared/services/drizzle-sweep-run.store";
 import { DrizzleTotpVerifier } from "./shared/services/drizzle-totp-verifier";
 import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
@@ -70,6 +72,7 @@ declare module "inwire" {
     IEmailService: IEmailService;
     ITotpVerifier: ITotpVerifier;
     IOutboxRepository: IOutboxRepository;
+    ISweepRunStore: ISweepRunStore;
     IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
     IPasswordBreachService: IPasswordBreachService;
@@ -95,6 +98,7 @@ export const di = container()
     (): IInstrumentation =>
       env.SENTRY_DSN ? new SentryInstrumentation() : new LoggingInstrumentation(logger),
   )
+  .add("ISweepRunStore", (c): ISweepRunStore => new DrizzleSweepRunStore(c.IInstrumentation))
   .add(
     "IOutboxRepository",
     (c): IOutboxRepository => new DrizzleOutboxRepository(c.IInstrumentation),

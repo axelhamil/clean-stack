@@ -58,5 +58,6 @@ export interface IOutboxRepository {
   markDelivered(lease: OutboxLease, deliveries: OutboxDeliveries): Promise<Result<boolean, string>>;
   markFailed(lease: OutboxLease, failure: OutboxFailure): Promise<Result<boolean, string>>;
   release(lease: OutboxLease): Promise<Result<boolean, string>>;
+  requeueDead(ids: string[], leaseSeconds: number): Promise<Result<string[], string>>;
   retireNotifyTrigger(): Promise<Result<void, string>>;
 }

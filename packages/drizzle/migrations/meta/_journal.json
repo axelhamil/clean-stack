@@ -225,6 +225,34 @@
       "when": 1793377577732,
       "tag": "0031_admin_approval_override_action",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793452159553,
+      "tag": "0032_admin_ops",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793452954429,
+      "tag": "0033_admin_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793453721410,
+      "tag": "0034_admin_saved_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793455967412,
+      "tag": "0035_rapid_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

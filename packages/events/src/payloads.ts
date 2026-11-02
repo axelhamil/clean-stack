@@ -511,6 +511,54 @@ export const AdminStaffOverrideRevokedPayload = ActorRef.extend(UserRef.shape).e
 });
 export type AdminStaffOverrideRevokedPayload = z.infer<typeof AdminStaffOverrideRevokedPayload>;
 
+export const AdminOpsOutboxRequeuedPayload = ActorRef.extend({
+  requeued: z.number().int().positive(),
+  eventIds: z.array(z.string()),
+});
+export type AdminOpsOutboxRequeuedPayload = z.infer<typeof AdminOpsOutboxRequeuedPayload>;
+
+export const AdminOpsStripeEventReplayedPayload = ActorRef.extend({
+  stripeEventId: z.string(),
+  stripeEventType: z.string(),
+  outcome: z.enum(["succeeded", "failed"]),
+});
+export type AdminOpsStripeEventReplayedPayload = z.infer<typeof AdminOpsStripeEventReplayedPayload>;
+
+export const AdminPlanOverrideSetPayload = ActorRef.extend({
+  overrideId: z.string(),
+  organizationId: z.string(),
+  tier: z.string(),
+  expiresAt: z.string(),
+  replacedOverrideId: z.string().nullable(),
+});
+export type AdminPlanOverrideSetPayload = z.infer<typeof AdminPlanOverrideSetPayload>;
+
+export const AdminPlanOverrideRevokedPayload = ActorRef.extend({
+  overrideId: z.string(),
+  organizationId: z.string(),
+  tier: z.string(),
+});
+export type AdminPlanOverrideRevokedPayload = z.infer<typeof AdminPlanOverrideRevokedPayload>;
+
+export const AdminNoteAddedPayload = ActorRef.extend({
+  noteId: z.string(),
+  subjectType: z.enum(["user", "org"]),
+  subjectId: z.string(),
+});
+export type AdminNoteAddedPayload = z.infer<typeof AdminNoteAddedPayload>;
+
+export const AdminViewSavedPayload = ActorRef.extend({
+  viewId: z.string(),
+  screen: z.string(),
+});
+export type AdminViewSavedPayload = z.infer<typeof AdminViewSavedPayload>;
+
+export const AdminViewDeletedPayload = ActorRef.extend({
+  viewId: z.string(),
+  screen: z.string(),
+});
+export type AdminViewDeletedPayload = z.infer<typeof AdminViewDeletedPayload>;
+
 export const AdminStepUpVerifiedPayload = UserRef.extend({
   validUntil: z.string(),
   ip: z.string().nullable(),
@@ -790,6 +838,13 @@ export const PayloadByEventType = {
   [EventTypes.ADMIN_STAFF_REVOKED]: AdminStaffRevokedPayload,
   [EventTypes.ADMIN_STAFF_OVERRIDE_SET]: AdminStaffOverrideSetPayload,
   [EventTypes.ADMIN_STAFF_OVERRIDE_REVOKED]: AdminStaffOverrideRevokedPayload,
+  [EventTypes.ADMIN_OPS_OUTBOX_REQUEUED]: AdminOpsOutboxRequeuedPayload,
+  [EventTypes.ADMIN_OPS_STRIPE_EVENT_REPLAYED]: AdminOpsStripeEventReplayedPayload,
+  [EventTypes.ADMIN_PLAN_OVERRIDE_SET]: AdminPlanOverrideSetPayload,
+  [EventTypes.ADMIN_PLAN_OVERRIDE_REVOKED]: AdminPlanOverrideRevokedPayload,
+  [EventTypes.ADMIN_NOTE_ADDED]: AdminNoteAddedPayload,
+  [EventTypes.ADMIN_VIEW_SAVED]: AdminViewSavedPayload,
+  [EventTypes.ADMIN_VIEW_DELETED]: AdminViewDeletedPayload,
   [EventTypes.ADMIN_STEP_UP_VERIFIED]: AdminStepUpVerifiedPayload,
   [EventTypes.ADMIN_STEP_UP_FAILED]: AdminStepUpFailedPayload,
   [EventTypes.ADMIN_APPROVAL_REQUESTED]: AdminApprovalRequestedPayload,

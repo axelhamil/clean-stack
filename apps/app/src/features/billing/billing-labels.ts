@@ -27,6 +27,7 @@ const SUBSCRIPTION_STATUSES = [
   "incomplete",
   "incomplete_expired",
   "paused",
+  "override",
 ] as const;
 
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
@@ -45,4 +46,5 @@ export const STATUS_KEYS = {
   incomplete: "billing.status.incomplete",
   incomplete_expired: "billing.status.incompleteExpired",
   paused: "billing.status.paused",
+  override: "billing.status.override",
 } as const satisfies Record<SubscriptionStatus, string>;

@@ -1,0 +1,119 @@
+import { Option, Result } from "@packages/ddd-kit";
+import {
+  count,
+  desc,
+  emailSchema,
+  eq,
+  outboxSchema,
+  resolveExecutor,
+  webhooksSchema,
+} from "@packages/drizzle";
+import { dbOperationFailure } from "../../../../shared/db-failure";
+import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type {
+  DeadOutboxPage,
+  DeadQueueCounts,
+  IOpsStore,
+  OpsStoreError,
+} from "../../application/ports/ops-store.port";
+
+const oe = outboxSchema.outboxEvent;
+const { emailMessage } = emailSchema;
+const { webhookDelivery } = webhooksSchema;
+const failure = dbOperationFailure("ADMIN_OPS_PROVIDER_FAILURE");
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+const { deadRow } = outboxSchema;
+
+export class DrizzleOpsStore implements IOpsStore {
+  constructor(private readonly instrumentation: IInstrumentation) {}
+
+  async listDeadOutbox(limit: number): Promise<Result<DeadOutboxPage, OpsStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleOpsStore > listDeadOutbox" },
+      async () => {
+        try {
+          const rows = await exec
+            .select({
+              id: oe.id,
+              eventType: oe.eventType,
+              deadAt: oe.deadAt,
+              attempts: oe.attempts,
+              lastError: oe.lastError,
+            })
+            .from(oe)
+            .where(deadRow)
+            .orderBy(desc(oe.deadAt))
+            .limit(limit);
+          const [total] = await exec.select({ value: count() }).from(oe).where(deadRow);
+
+          return Result.ok({
+            items: rows.flatMap((row) =>
+              row.deadAt
+                ? [
+                    {
+                      ...row,
+                      deadAt: row.deadAt,
+                      lastError: Option.fromNullable(row.lastError),
+                    },
+                  ]
+                : [],
+            ),
+            total: total?.value ?? 0,
+          });
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("list dead outbox events"));
+        }
+      },
+    );
+  }
+
+  async countDeadOutbox(): Promise<Result<number, OpsStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleOpsStore > countDeadOutbox" },
+      async () => {
+        try {
+          const query = exec.select({ value: count() }).from(oe).where(deadRow);
+          const [total] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(total?.value ?? 0);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("count dead outbox events"));
+        }
+      },
+    );
+  }
+
+  async countDeadQueues(): Promise<Result<DeadQueueCounts, OpsStoreError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleOpsStore > countDeadQueues" },
+      async () => {
+        try {
+          const [emails] = await exec
+            .select({ value: count() })
+            .from(emailMessage)
+            .where(eq(emailMessage.status, "dead"));
+          const [webhooks] = await exec
+            .select({ value: count() })
+            .from(webhookDelivery)
+            .where(eq(webhookDelivery.status, "dead_letter"));
+
+          return Result.ok({ emails: emails?.value ?? 0, webhooks: webhooks?.value ?? 0 });
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("count dead queues"));
+        }
+      },
+    );
+  }
+}

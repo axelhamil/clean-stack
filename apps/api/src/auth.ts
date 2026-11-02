@@ -10,9 +10,11 @@ import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
+import { Option } from "@packages/ddd-kit";
 import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
+import { scrubText } from "@packages/sentry-scrub";
 import {
   type BetterAuthOptions,
   type BetterAuthPlugin,
@@ -57,8 +59,10 @@ import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
 import {
   authorizeSubscriptionAction,
+  subscriptionEventSource,
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
+import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stripe-payment-failure";
 import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { redirectQuery } from "./shared/auth/email-redirect";
 import { markPasswordResetDelivered } from "./shared/auth/password-reset-delivery";
@@ -78,7 +82,7 @@ import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env, FRONT_ORIGINS } from "./shared/env";
-import { emitEvent, emitEventBestEffort } from "./shared/event-emitter";
+import { derivedEventId, emitEvent, emitEventBestEffort } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import { assertSeat } from "./shared/middleware/billing.middleware";
 import {
@@ -211,9 +215,11 @@ async function emit<TPayload>(
   aggregateId: string,
   payload: TPayload,
   organizationId?: string | null,
+  eventId?: string,
 ): Promise<void> {
   await emitEvent(di.IOutboxRepository, eventType, aggregateType, aggregateId, payload, {
     organizationId,
+    eventId,
   });
 }
 
@@ -400,6 +406,30 @@ async function emitScimUserEvents(
 }
 
 /**
+ * Stripe is the caller, so a failed invoice names no user. Bookkeeping aside, this is all
+ * the platform does with a webhook on top of the plugin's own subscription sync.
+ */
+async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+  const failure = paymentFailureOf(event);
+  if (failure.isNone()) return;
+
+  const { organizationId, subscriptionId, invoiceId } = failure.unwrap();
+  await emit(
+    EventTypes.BILLING_PAYMENT_FAILED,
+    "subscription",
+    subscriptionId || invoiceId,
+    { organizationId, subscriptionId, invoiceId, actorUserId: null },
+    organizationId,
+    derivedEventId(event.id, EventTypes.BILLING_PAYMENT_FAILED),
+  );
+}
+
+/** Delivery bookkeeping: a store failure is captured there and must not make Stripe retry. */
+async function recordStripeDelivery(event: Stripe.Event, lastError: Option<string>): Promise<void> {
+  await di.IStripeEventStore.recordDelivery({ id: event.id, type: event.type, lastError });
+}
+
+/**
  * `billing.subscription.*` for a Stripe subscription lifecycle callback. Stripe is the
  * caller, so the actor is resolved as the org owner, the one member who can have
  * started or changed the subscription.
@@ -411,8 +441,10 @@ async function emitSubscriptionEvent(
     referenceId: string;
     status: string;
     periodEnd?: Date | null;
+    stripeSubscriptionId?: string | null;
   },
   tier: string,
+  stripeEventId: string,
 ): Promise<void> {
   const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
   await emit(
@@ -428,6 +460,14 @@ async function emitSubscriptionEvent(
       currentPeriodEnd: subscription.periodEnd ?? null,
     },
     subscription.referenceId,
+    derivedEventId(
+      subscriptionEventSource(
+        subscription.status,
+        stripeEventId,
+        subscription.stripeSubscriptionId,
+      ),
+      eventType,
+    ),
   );
 }
 
@@ -780,41 +820,48 @@ const authOptions = {
 
           return authorizeSubscriptionAction(action, orgRole);
         },
-        onSubscriptionComplete: async ({ subscription, plan }) => {
+        onSubscriptionComplete: async ({ event, subscription, plan }) => {
           await emitSubscriptionEvent(
             EventTypes.BILLING_SUBSCRIPTION_CREATED,
             subscription,
             plan.name,
+            event.id,
           );
         },
-        onSubscriptionUpdate: async ({ subscription }) => {
+        onSubscriptionCreated: async ({ event, subscription, plan }) => {
+          await emitSubscriptionEvent(
+            EventTypes.BILLING_SUBSCRIPTION_CREATED,
+            subscription,
+            plan.name,
+            event.id,
+          );
+        },
+        onSubscriptionDeleted: async ({ event, subscription }) => {
+          await emitSubscriptionEvent(
+            EventTypes.BILLING_SUBSCRIPTION_CANCELLED,
+            subscription,
+            subscription.plan,
+            event.id,
+          );
+        },
+        onSubscriptionUpdate: async ({ event, subscription }) => {
           await emitSubscriptionEvent(
             subscriptionEventType(subscription.status),
             subscription,
             subscription.plan,
+            event.id,
           );
         },
       },
       onEvent: async (event) => {
-        if (event.type !== "invoice.payment_failed") return;
-        const invoice = event.data.object as Stripe.Invoice;
-        const subDetails = invoice.parent?.subscription_details;
-        const referenceId = subDetails?.metadata?.referenceId;
-        if (!referenceId) return;
-        const subscriptionId =
-          typeof subDetails?.subscription === "string" ? subDetails.subscription : "";
-        await emit(
-          EventTypes.BILLING_PAYMENT_FAILED,
-          "subscription",
-          subscriptionId || invoice.id,
-          {
-            organizationId: referenceId,
-            subscriptionId,
-            invoiceId: invoice.id,
-            actorUserId: null,
-          },
-          referenceId,
-        );
+        try {
+          await handleStripeEvent(event);
+        } catch (err) {
+          await recordStripeDelivery(event, Option.some(scrubText(String(err))));
+          throw err;
+        }
+
+        await recordStripeDelivery(event, await di.StripeSyncVerifier.check(event));
       },
     }),
     bearer(),

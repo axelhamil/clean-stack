@@ -1,34 +1,11 @@
-/**
- * Command palette (⌘K / Ctrl+K).
- *
- * Each group is built by its own `useXxxGroup()` hook returning a
- * `CommandGroupConfig` (or `null` to hide it conditionally). All hooks are
- * composed in `useCommandGroups()`: the rendering loop is data-driven.
- *
- * Extend:
- *  - new entry in an existing group → push into the relevant array
- *    (e.g. `NAVIGATION_ROUTES`, items of `useActionsGroup`)
- *  - new group entirely → write `useXxxGroup(): CommandGroupConfig | null`
- *    then add it to the composition in `useCommandGroups`
- *
- * Shortcuts:
- *  - declare `{ display, match }` on an entry
- *  - the global keybind handler fires the action when `match(e)` returns true
- *    (suppressed while typing in inputs/textareas/contenteditable)
- */
-
 import type { StaffPermission } from "@packages/access-control";
 import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-  CommandShortcut,
-} from "@packages/ui/components/ui/command";
-import { CommandHint } from "@packages/ui/components/ui/command-hint";
+  CommandPaletteDialog,
+  type CommandPaletteEntry,
+  type CommandPaletteGroup,
+  useEntryShortcuts,
+  useTogglePaletteShortcut,
+} from "@packages/ui/components/ui/command-palette";
 import { toastError, toastSuccess } from "@packages/web-kit/api/errors/toast";
 import { useTheme } from "@packages/web-kit/theme/use-theme";
 import { useQuery } from "@tanstack/react-query";
@@ -52,7 +29,7 @@ import {
   Users,
   Webhook,
 } from "lucide-react";
-import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { activeOrgQueryOptions } from "../api/queries/active-org";
 import { orgsListQueryOptions } from "../api/queries/orgs-list";
@@ -61,26 +38,6 @@ import { useSetActiveOrg } from "../auth/use-set-active-org";
 import { SIGN_OUT_SHORTCUT, useSignOut } from "../auth/use-sign-out";
 import { useStaffAccess } from "../auth/use-staff-access";
 import { LEGAL_ROUTES } from "../legal-routes";
-
-interface CommandShortcutBinding {
-  display: string;
-  match: (event: KeyboardEvent) => boolean;
-}
-
-interface CommandEntry {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  searchValue?: string;
-  hint?: string;
-  shortcut?: CommandShortcutBinding;
-  run: () => void | Promise<void>;
-}
-
-interface CommandGroupConfig {
-  heading: string;
-  items: CommandEntry[];
-}
 
 interface NavigationRoute extends NavigationRequirement {
   to: string;
@@ -122,7 +79,7 @@ const NAVIGATION_ROUTES: readonly NavigationRoute[] = [
   { to: "/developers/events", labelKey: "commandPalette.nav.eventCatalog", icon: BookOpen },
 ];
 
-function useNavigationGroup(t: TFunction<"common">): CommandGroupConfig {
+function useNavigationGroup(t: TFunction<"common">): CommandPaletteGroup {
   const navigate = useNavigate();
   const { canReach } = useAuthorization();
   const visible = NAVIGATION_ROUTES.filter(canReach);
@@ -138,7 +95,7 @@ function useNavigationGroup(t: TFunction<"common">): CommandGroupConfig {
   };
 }
 
-function useOrganizationGroup(t: TFunction<"common">): CommandGroupConfig | null {
+function useOrganizationGroup(t: TFunction<"common">): CommandPaletteGroup | null {
   const navigate = useNavigate();
   const { data: orgs = [] } = useQuery(orgsListQueryOptions);
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
@@ -149,7 +106,7 @@ function useOrganizationGroup(t: TFunction<"common">): CommandGroupConfig | null
   return {
     heading: t("commandPalette.groups.switchOrganization"),
     items: [
-      ...orgs.map<CommandEntry>((org) => ({
+      ...orgs.map<CommandPaletteEntry>((org) => ({
         id: `org:${org.id}`,
         label: org.name,
         icon: Building2,
@@ -205,7 +162,7 @@ const OPERATOR_ROUTES: readonly OperatorRoute[] = [
   },
 ];
 
-function useOperatorGroup(t: TFunction<"common">): CommandGroupConfig | null {
+function useOperatorGroup(t: TFunction<"common">): CommandPaletteGroup | null {
   const navigate = useNavigate();
   const { can } = useStaffAccess();
   const reachable = OPERATOR_ROUTES.filter((route) => can(route.permission));
@@ -222,7 +179,7 @@ function useOperatorGroup(t: TFunction<"common">): CommandGroupConfig | null {
   };
 }
 
-function useLegalGroup(t: TFunction<"common">): CommandGroupConfig {
+function useLegalGroup(t: TFunction<"common">): CommandPaletteGroup {
   const navigate = useNavigate();
   return {
     heading: t("commandPalette.groups.legal"),
@@ -243,13 +200,13 @@ function themeOptionsFor(t: TFunction<"common">) {
   ] as const;
 }
 
-function useActionsGroup(t: TFunction<"common">): CommandGroupConfig {
+function useActionsGroup(t: TFunction<"common">): CommandPaletteGroup {
   const { setTheme, theme } = useTheme();
   const signOut = useSignOut();
   const { data: activeOrg } = useQuery(activeOrgQueryOptions);
   const themeOptions = themeOptionsFor(t);
 
-  const items: CommandEntry[] = themeOptions.map((option) => ({
+  const items: CommandPaletteEntry[] = themeOptions.map((option) => ({
     id: `theme:${option.value}`,
     label: option.label,
     icon: option.icon,
@@ -281,7 +238,7 @@ function useActionsGroup(t: TFunction<"common">): CommandGroupConfig {
   return { heading: t("commandPalette.groups.actions"), items };
 }
 
-function useCommandGroups(t: TFunction<"common">): CommandGroupConfig[] {
+function useCommandGroups(t: TFunction<"common">): CommandPaletteGroup[] {
   const navigation = useNavigationGroup(t);
   const organization = useOrganizationGroup(t);
   const operator = useOperatorGroup(t);
@@ -289,104 +246,29 @@ function useCommandGroups(t: TFunction<"common">): CommandGroupConfig[] {
   const actions = useActionsGroup(t);
 
   return [navigation, organization, operator, legal, actions].filter(
-    (group): group is CommandGroupConfig => group !== null,
+    (group): group is CommandPaletteGroup => group !== null,
   );
-}
-
-function isTypingInField(): boolean {
-  const target = document.activeElement;
-  if (!target) return false;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || (target as HTMLElement).isContentEditable;
-}
-
-function useTogglePaletteShortcut(setOpen: Dispatch<SetStateAction<boolean>>) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey) {
-        e.preventDefault();
-        setOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [setOpen]);
-}
-
-function useEntryShortcuts(groups: CommandGroupConfig[], t: TFunction<"common">) {
-  const groupsRef = useRef(groups);
-  groupsRef.current = groups;
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (isTypingInField()) return;
-      for (const group of groupsRef.current) {
-        for (const entry of group.items) {
-          if (entry.shortcut?.match(e)) {
-            e.preventDefault();
-            Promise.resolve(entry.run()).catch((err) =>
-              toastError(err, t("commandPalette.actionFailed")),
-            );
-            return;
-          }
-        }
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [t]);
-}
-
-function buildSearchValue(entry: CommandEntry): string {
-  return entry.searchValue ? `${entry.label} ${entry.searchValue}` : entry.label;
 }
 
 export function CommandPalette() {
   const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const groups = useCommandGroups(t);
+  const onEntryFailed = (err: unknown) => toastError(err, t("commandPalette.actionFailed"));
   useTogglePaletteShortcut(setOpen);
-  useEntryShortcuts(groups, t);
-
-  const selectEntry = (entry: CommandEntry) => () => {
-    setOpen(false);
-    Promise.resolve(entry.run()).catch((err) => toastError(err, t("commandPalette.actionFailed")));
-  };
+  useEntryShortcuts(groups, onEntryFailed);
 
   return (
-    <CommandDialog
+    <CommandPaletteDialog
       open={open}
       onOpenChange={setOpen}
+      groups={groups}
       title={t("commandPalette.title")}
       description={t("commandPalette.description")}
       closeLabel={t("actions.close")}
-    >
-      <CommandInput placeholder={t("commandPalette.searchPlaceholder")} />
-      <CommandList>
-        <CommandEmpty>{t("commandPalette.noResults")}</CommandEmpty>
-        {groups.map((group, index) => (
-          <Fragment key={group.heading}>
-            {index > 0 && <CommandSeparator />}
-            <CommandGroup heading={group.heading}>
-              {group.items.map((entry) => {
-                const Icon = entry.icon;
-                return (
-                  <CommandItem
-                    key={entry.id}
-                    value={buildSearchValue(entry)}
-                    onSelect={selectEntry(entry)}
-                  >
-                    <Icon />
-                    <span className="min-w-0 flex-1 break-words">{entry.label}</span>
-                    {entry.hint && <CommandHint>{entry.hint}</CommandHint>}
-                    {entry.shortcut && <CommandShortcut>{entry.shortcut.display}</CommandShortcut>}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </Fragment>
-        ))}
-      </CommandList>
-    </CommandDialog>
+      searchPlaceholder={t("commandPalette.searchPlaceholder")}
+      emptyLabel={t("commandPalette.noResults")}
+      onEntryFailed={onEntryFailed}
+    />
   );
 }

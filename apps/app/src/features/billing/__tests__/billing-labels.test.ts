@@ -34,6 +34,7 @@ describe("STATUS_KEYS", () => {
       incomplete: "billing.status.incomplete",
       incomplete_expired: "billing.status.incompleteExpired",
       paused: "billing.status.paused",
+      override: "billing.status.override",
     });
   });
 

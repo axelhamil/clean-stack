@@ -163,7 +163,24 @@ export function adminProbes(prefix: string) {
     return rows.length;
   }
 
+  async function confirmedManager(
+    name: string,
+    attemptWithoutStepUp: (cookie: string) => Promise<AppCall>,
+  ): Promise<{ cookie: string; id: string; unconfirmedRefusal: string | undefined }> {
+    const probe = await manager(name);
+    const cookie = await sessionCookie(probe);
+    await enrolTwoFactor(probe);
+
+    const refused = await attemptWithoutStepUp(cookie);
+    const code = await codeAt(probe, currentCounter());
+    const confirmed = await appCall(cookie, "POST", "/admin/step-up", { code });
+    if (confirmed.status !== 200) throw new Error(`step-up refused: ${confirmed.status}`);
+
+    return { cookie, id: probe.id, unconfirmedRefusal: codeOf(refused) };
+  }
+
   return {
+    confirmedManager,
     password: PASSWORD,
     user,
     manager,

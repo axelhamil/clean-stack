@@ -27,12 +27,14 @@ export { alias } from "drizzle-orm/pg-core";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
 export {
   claimedSet,
+  dbClockNow,
   dbNow,
   deadShareOf,
   isDeadDue,
   isDue,
   leasedBy,
   releasedSet,
+  secondsFromClock,
   secondsFromNow,
 } from "./lease";
 export {

@@ -35,7 +35,12 @@ export const STUB_ORG = {
   name: LONG_NAME,
   slug: "northwind-industries-holdings-international-subsidiaries-europe",
   ssoEnforced: true,
-  plan: null,
+  plan: "business",
+  planOverride: {
+    tier: "business",
+    note: LONG_NAME.repeat(4),
+    expiresAt: "2030-01-01T00:00:00.000Z",
+  },
   memberCount: 1284,
   createdAt: CREATED_AT,
   members: [{ userId: STUB_USER_ID, email: LONG_EMAIL, role: "owner" }],
@@ -82,4 +87,137 @@ export const STUB_OVERRIDE = {
   effect: "grant",
   expiresAt: "2030-01-01T00:00:00.000Z",
   createdAt: CREATED_AT,
+};
+
+export const STUB_DEAD_LETTERS = {
+  outbox: {
+    total: 2,
+    items: [
+      {
+        id: "dead-event-stub",
+        eventType: "billing.subscription.updated",
+        deadAt: CREATED_AT,
+        attempts: 25,
+        lastError: `audit-log: ${LONG_EMAIL} ${LONG_NAME}`,
+      },
+    ],
+  },
+  queues: { emails: 3, webhooks: 1 },
+};
+
+export const STUB_SWEEPS = {
+  items: [
+    {
+      label: "sweep-email-messages",
+      finishedAt: CREATED_AT,
+      outcome: "ok",
+      late: true,
+      count: 40,
+    },
+    {
+      label: "sweep-audit-log",
+      finishedAt: CREATED_AT,
+      outcome: "batch-error",
+      late: false,
+      count: 0,
+    },
+  ],
+};
+
+export const STUB_STRIPE_EVENTS = {
+  configured: true,
+  items: [
+    {
+      id: "evt_stub",
+      type: "customer.subscription.updated",
+      status: "failed",
+      receivedAt: CREATED_AT,
+      lastError: "The handler answered 400.",
+      replayedAt: CREATED_AT,
+      replayable: true,
+    },
+    {
+      id: "evt_stub_paid",
+      type: "invoice.paid",
+      status: "received",
+      receivedAt: CREATED_AT,
+      lastError: null,
+      replayedAt: null,
+      replayable: false,
+    },
+  ],
+};
+
+export const STUB_VIEWS = {
+  items: [
+    {
+      id: "view-long",
+      screen: "users",
+      name: LONG_NAME.slice(0, 60),
+      filters: { q: "montgomery" },
+    },
+    {
+      id: "view-suspended",
+      screen: "users",
+      name: "Suspended",
+      filters: { status: "suspended" },
+    },
+    {
+      id: "view-org",
+      screen: "orgs",
+      name: "Northwind",
+      filters: { q: "north" },
+    },
+    {
+      id: "view-audit",
+      screen: "audit",
+      name: "Billing",
+      filters: { action: "billing." },
+    },
+  ],
+};
+
+export const STUB_INBOX = {
+  approvals: {
+    status: "ok",
+    total: 25,
+    items: [
+      {
+        id: "approval-stub",
+        action: "user.ban_permanent",
+        requestedBy: "someone-else",
+        createdAt: CREATED_AT,
+      },
+      {
+        id: "approval-mine",
+        action: "staff.revoke",
+        requestedBy: "staff-id",
+        createdAt: CREATED_AT,
+      },
+    ],
+  },
+  queues: { status: "ok", deadEvents: 2, deadEmails: 1, deadWebhooks: 0 },
+  sweeps: {
+    status: "ok",
+    items: [
+      {
+        label: "sweep-audit-log-with-a-very-long-label-that-should-wrap-on-a-phone-screen",
+        outcome: "batch-error",
+        late: false,
+        finishedAt: CREATED_AT,
+      },
+    ],
+  },
+};
+
+export const STUB_NOTES = {
+  items: [
+    {
+      id: "note-stub",
+      authorName: LONG_NAME,
+      body: `${LONG_EMAIL} ${LONG_NAME.repeat(3)}`,
+      createdAt: CREATED_AT,
+    },
+    { id: "note-orphan", authorName: null, body: "Called back.", createdAt: CREATED_AT },
+  ],
 };

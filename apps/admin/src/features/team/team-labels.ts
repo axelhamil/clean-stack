@@ -14,6 +14,7 @@ export const STAFF_PERMISSION_LABEL_KEYS = {
   "users.impersonate": "team.permissions.name.usersImpersonate",
   "orgs.read": "team.permissions.name.orgsRead",
   "orgs.sso": "team.permissions.name.orgsSso",
+  "notes.write": "team.permissions.name.notesWrite",
   "audit.read": "team.permissions.name.auditRead",
   "ops.read": "team.permissions.name.opsRead",
   "ops.manage": "team.permissions.name.opsManage",

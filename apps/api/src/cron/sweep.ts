@@ -2,8 +2,11 @@ import {
   DEFAULT_INTERNAL_FETCH_TIMEOUT_MS,
   signedInternalFetch,
 } from "../shared/internal-routes/internal-fetch";
+import {
+  classifySweepResult,
+  type SweepResponseShape,
+} from "../shared/internal-routes/sweep-result";
 import { HttpHeartbeat } from "./http-heartbeat";
-import { classifySweepResult, type SweepResponseShape } from "./sweep-result";
 
 const baseUrl = process.env.API_URL;
 const signingKey = process.env.INTERNAL_SIGNING_KEY;
@@ -39,6 +42,7 @@ const sweeps = [
   "/internal/sweep-consents",
   "/internal/sweep-notifications",
   "/internal/sweep-admin-approvals",
+  "/internal/sweep-stripe-events",
 ] as const;
 
 const heartbeat = new HttpHeartbeat(process.env.SWEEP_HEARTBEAT_URL, (message) =>

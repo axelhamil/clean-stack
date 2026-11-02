@@ -26,17 +26,21 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
 
 const { adminApprovalRoutes } = await import("../approvals.routes");
 const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
+const { adminOpsRoutes } = await import("../ops.routes");
 const { adminOrgRoutes } = await import("../admin-orgs.routes");
 const { adminUserRoutes } = await import("../routes");
 const { adminStaffRoutes } = await import("../staff.routes");
+const { adminWorkspaceRoutes } = await import("../workspace.routes");
 const { auditLogRoutes } = await import("../../audit-log/routes");
 const { listBackRoutes } = await import("../../../shared/surface/back-routes");
 
 const app = new Hono()
   .route("/admin", adminStaffRoutes)
+  .route("/admin", adminWorkspaceRoutes)
   .route("/admin/approvals", adminApprovalRoutes)
   .route("/admin/users", adminUserRoutes)
   .route("/admin/orgs", adminOrgRoutes)
+  .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", auditLogRoutes);
 app.onError((err, c) =>
@@ -46,6 +50,10 @@ app.onError((err, c) =>
 const REQUIRED: Record<string, string> = {
   "GET /admin/me": "staff",
   "POST /admin/step-up": "staff",
+  "GET /admin/inbox": "staff",
+  "GET /admin/views": "staff",
+  "POST /admin/views": "staff",
+  "DELETE /admin/views/:id": "staff",
   "GET /admin/staff": "staff.manage",
   "PUT /admin/staff/:id/role": "staff.manage",
   "DELETE /admin/staff/:id": "staff.manage",
@@ -58,6 +66,8 @@ const REQUIRED: Record<string, string> = {
   "POST /admin/approvals/:id/cancel": "staff",
   "GET /admin/users": "users.read",
   "GET /admin/users/:id": "users.read",
+  "GET /admin/users/:id/notes": "users.read",
+  "POST /admin/users/:id/notes": "notes.write",
   "POST /admin/users/:id/ban": "users.moderate",
   "POST /admin/users/:id/unban": "users.moderate",
   "POST /admin/users/:id/reset-password": "users.moderate",
@@ -66,6 +76,15 @@ const REQUIRED: Record<string, string> = {
   "GET /admin/orgs": "orgs.read",
   "GET /admin/orgs/:id": "orgs.read",
   "POST /admin/orgs/:id/sso-enforcement": "orgs.sso",
+  "POST /admin/orgs/:id/plan-override": "billing.override",
+  "DELETE /admin/orgs/:id/plan-override": "billing.override",
+  "GET /admin/orgs/:id/notes": "orgs.read",
+  "POST /admin/orgs/:id/notes": "notes.write",
+  "GET /admin/ops/dead-letters": "ops.read",
+  "POST /admin/ops/outbox/requeue": "ops.manage",
+  "GET /admin/ops/sweeps": "ops.read",
+  "GET /admin/ops/stripe-events": "ops.read",
+  "POST /admin/ops/stripe-events/:id/replay": "ops.manage",
   "GET /admin/audit-log": "audit.read",
   "GET /admin/audit-log/verify": "audit.read",
 };

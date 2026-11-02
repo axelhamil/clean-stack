@@ -253,6 +253,7 @@ Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC)
 | `outbox_event` | `OUTBOX_RETENTION_DAYS` | **7d** | `dispatched_at IS NOT NULL AND dispatched_at < cutoff` | NServiceBus / industry consensus 2025: debug window |
 | `audit_log` (operational) | `AUDIT_LOG_OPERATIONAL_RETENTION_DAYS` | **90d** | `retention = 'operational' AND occurred_at < cutoff` | SOC2 minimum-safe (operational logs); RGPD minimisation |
 | `audit_log` (compliance) | `AUDIT_LOG_COMPLIANCE_RETENTION_DAYS` | **365d** | `retention = 'compliance' AND occurred_at < cutoff` | SOC2 Type II ≥ 12 months; PCI-DSS 10.7; NIS2 baseline |
+| `stripe_event` | `STRIPE_EVENT_RETENTION_DAYS` | **30d** | `received_at < cutoff` (ids and statuses only, no payload) | Replay window of the operations screen |
 | `webhook_delivery` | `WEBHOOK_DELIVERY_RETENTION_DAYS` | **30d** | `status IN ('success','dead_letter') AND created_at < cutoff` (replayable and terminal `dead_letter` alike) | Stripe / GitHub / Hookdeck convergence |
 
 Notes:
@@ -488,6 +489,19 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 - `ADMIN_STAFF_OVERRIDE_SET` (`admin.staff.override_set`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny", expiresAt: string | null }`. It replaces a live override of the same permission.
 - `ADMIN_STAFF_OVERRIDE_REVOKED` (`admin.staff.override_revoked`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny" }`.
 
+### Via `OpsService` (Phase K)
+
+- `ADMIN_OPS_OUTBOX_REQUEUED` (`admin.ops.outbox_requeued`): `POST /admin/ops/outbox/requeue` sent dead events back to delivery. One event per staff action, not per row, and none when no row moved. Payload `{ actorUserId: string, requeued: number, eventIds: string[] }`.
+- `ADMIN_OPS_STRIPE_EVENT_REPLAYED` (`admin.ops.stripe_event_replayed`): `POST /admin/ops/stripe-events/:id/replay` delivered a received Stripe event again. Payload `{ actorUserId: string, stripeEventId: string, stripeEventType: string }`. Rolled back with a refused delivery.
+
+### Via `PlanOverrideService`, `StaffNoteService` and `SavedViewService` (Phase K)
+
+- `ADMIN_PLAN_OVERRIDE_SET` (`admin.plan_override.set`): `POST /admin/orgs/:id/plan-override` set a plan until an end date. Payload `{ actorUserId: string, overrideId: string, organizationId: string, tier: string, expiresAt: string, replacedOverrideId: string | null }`. The reason stays on the row.
+- `ADMIN_PLAN_OVERRIDE_REVOKED` (`admin.plan_override.revoked`): `DELETE /admin/orgs/:id/plan-override` ended it early. Payload `{ actorUserId: string, overrideId: string, organizationId: string, tier: string }`. Reaching the end date announces nothing: expiry is a read filter, not a write.
+- `ADMIN_NOTE_ADDED` (`admin.note.added`): a staff note was added on an account or an organization. Payload `{ actorUserId: string, noteId: string, subjectType: "user" | "org", subjectId: string }`, never the body, since the audit trail outlives an erasure. Internal and emitted without an organization scope, so no customer reads it.
+- `ADMIN_VIEW_SAVED` (`admin.view.saved`): `POST /admin/views` saved a private view, new or replacing one of the same name. Payload `{ actorUserId: string, viewId: string, screen: string }`, never the name or the filters, which can hold a searched email.
+- `ADMIN_VIEW_DELETED` (`admin.view.deleted`): `DELETE /admin/views/:id` removed the staff member's own view. Payload as above. A view of someone else answers 404 and announces nothing.
+
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 
 ### Via `PolicyAcceptanceService` (Phase A.2)
@@ -518,11 +532,11 @@ Ces 3 events ne sont pas des state-changes métier : ils signalent des rejets de
 
 ### Via subscription events (`auth.ts` `@better-auth/stripe` callbacks: Phase B.1)
 
-Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin callbacks wired in `apps/api/src/auth.ts` (`onSubscriptionComplete`, `onSubscriptionUpdate`, and the `onEvent` invoice.payment_failed handler). These are Stripe-originated lifecycle events, not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
+Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin callbacks wired in `apps/api/src/auth.ts` (`onSubscriptionComplete`, `onSubscriptionCreated`, `onSubscriptionUpdate`, `onSubscriptionDeleted`, and the `onEvent` invoice.payment_failed handler). These are Stripe-originated lifecycle events, not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
 
-- `BILLING_SUBSCRIPTION_CREATED` (`billing.subscription.created`): emitted on `customer.subscription.created` Stripe webhook (first active subscription for an org). Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null, currentPeriodEnd }`, retention `compliance`.
+- `BILLING_SUBSCRIPTION_CREATED` (`billing.subscription.created`): emitted when a checkout completes and on the `customer.subscription.created` webhook of a subscription started outside a checkout (dashboard). Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null, currentPeriodEnd }`, retention `compliance`.
 - `BILLING_SUBSCRIPTION_UPDATED` (`billing.subscription.updated`): emitted on `customer.subscription.updated` when the new status is not terminal. Same payload shape as `created`, retention `compliance`.
-- `BILLING_SUBSCRIPTION_CANCELLED` (`billing.subscription.cancelled`): emitted on `customer.subscription.updated` when status is `canceled` / `incomplete_expired` / `unpaid`. Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null }`, retention `compliance`.
+- `BILLING_SUBSCRIPTION_CANCELLED` (`billing.subscription.cancelled`): emitted on `customer.subscription.deleted`, and on `customer.subscription.updated` when status is `canceled` / `incomplete_expired` / `unpaid`. A `canceled` one takes an id derived from the Stripe subscription, so both webhooks announce one end. Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null }`, retention `compliance`.
 - `BILLING_PAYMENT_FAILED` (`billing.payment.failed`): emitted on `invoice.payment_failed` Stripe webhook. Payload: `{ organizationId, subscriptionId, invoiceId, actorUserId: null }`, retention `compliance` (kept long-term as part of the billing/financial audit trail: the whole `billing.*` family is `compliance` so there is no retention divergence within it).
 
 **Status mapping**: `subscriptionEventType(status)` in `apps/api/src/modules/billing/application/subscription-events.ts` maps Stripe subscription statuses to the three state events: `canceled` / `incomplete_expired` / `unpaid` → `BILLING_SUBSCRIPTION_CANCELLED`; all other statuses → `BILLING_SUBSCRIPTION_UPDATED`. `BILLING_SUBSCRIPTION_CREATED` fires only on the initial `customer.subscription.created` webhook path.

@@ -41,6 +41,12 @@ export class BillingCatalogService {
     };
   }
 
+  async configuredPriceIds(): Promise<string[]> {
+    const catalog = await this.getCatalog();
+
+    return catalog.flatMap(({ priceId }) => (priceId === null ? [] : [priceId]));
+  }
+
   async getCatalog(): Promise<PlanCatalogItem[]> {
     if (this.cache && this.now() - this.cache.at < TTL_MS) return this.cache.items;
 

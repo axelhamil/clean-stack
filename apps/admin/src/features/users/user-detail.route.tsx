@@ -35,6 +35,7 @@ import { useStaff } from "../../shared/auth/use-staff";
 import { AwaitingApprovalNotice } from "../../shared/components/awaiting-approval-notice";
 import { BackIcon, BackLink } from "../../shared/components/back-link";
 import { DetailState } from "../../shared/components/detail-state";
+import { NotesSection } from "../../shared/components/notes-section";
 import { env } from "../../shared/env";
 import { orgRoleLabelKey } from "../../shared/labels/org-role";
 import {
@@ -304,6 +305,10 @@ function UserDetailPage() {
           <Separator />
 
           <SessionsSection sessions={user.sessions} />
+
+          <Separator />
+
+          <NotesSection subject={{ type: "user", id: user.id }} />
         </>
       )}
     </DetailState>

@@ -1,4 +1,4 @@
-import { isNotNull, sql } from "drizzle-orm";
+import { and, isNotNull, isNull, sql } from "drizzle-orm";
 import { check, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export type OutboxEventMetadata = {
@@ -45,3 +45,5 @@ export const outboxEvent = pgTable(
     index("outbox_event_aggregate_idx").on(table.aggregateType, table.aggregateId),
   ],
 );
+
+export const deadRow = and(isNull(outboxEvent.dispatchedAt), isNotNull(outboxEvent.deadAt));

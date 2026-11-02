@@ -1,3 +1,4 @@
+import { auditViewFiltersSchema } from "@packages/access-control";
 import { z } from "zod";
 
 export const AUDIT_ACTION_PREFIXES = {
@@ -9,14 +10,12 @@ export const AUDIT_ACTION_PREFIXES = {
   "admin.": "auditLog.actionPrefix.admin",
 } as const;
 
-const prefixSchema = z.enum(["user.", "org.", "billing.", "security.", "webhook.", "admin."]);
-
 export const auditSearchSchema = z.object({
-  action: prefixSchema.optional().catch(undefined),
-  actor: z.string().optional().catch(undefined),
-  org: z.string().optional().catch(undefined),
-  from: z.iso.date().optional().catch(undefined),
-  to: z.iso.date().optional().catch(undefined),
+  action: auditViewFiltersSchema.shape.action.catch(undefined),
+  actor: auditViewFiltersSchema.shape.actor.catch(undefined),
+  org: auditViewFiltersSchema.shape.org.catch(undefined),
+  from: auditViewFiltersSchema.shape.from.catch(undefined),
+  to: auditViewFiltersSchema.shape.to.catch(undefined),
 });
 
 export type AuditSearch = z.infer<typeof auditSearchSchema>;
