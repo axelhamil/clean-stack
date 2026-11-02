@@ -32,6 +32,7 @@ export const PUBLIC_PAGES: readonly AuditedPage[] = [
   { name: "sub-processors", path: "/legal/sub-processors" },
   { name: "event catalog", path: "/developers/events" },
   { name: "pricing", path: "/pricing" },
+  { name: "not found", path: "/no-such-page" },
 ];
 
 /**

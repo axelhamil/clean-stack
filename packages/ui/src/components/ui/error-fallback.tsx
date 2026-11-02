@@ -1,7 +1,5 @@
-import { cn } from "../../libs/utils";
 import { Button } from "./button";
-import { pageContainerVariants } from "./page-container";
-import { PageHeader } from "./page-header";
+import { PageFallback } from "./page-fallback";
 
 export interface ErrorFallbackProps {
   title: string;
@@ -11,12 +9,15 @@ export interface ErrorFallbackProps {
 
 function ErrorFallback({ title, description, reloadLabel }: ErrorFallbackProps) {
   return (
-    <main className={cn(pageContainerVariants({ width: "form" }), "flex flex-col gap-6 py-16")}>
-      <PageHeader title={title} description={description} />
-      <Button variant="outline" className="w-fit" onClick={() => window.location.reload()}>
-        {reloadLabel}
-      </Button>
-    </main>
+    <PageFallback
+      title={title}
+      description={description}
+      action={
+        <Button variant="outline" className="w-fit" onClick={() => window.location.reload()}>
+          {reloadLabel}
+        </Button>
+      }
+    />
   );
 }
 

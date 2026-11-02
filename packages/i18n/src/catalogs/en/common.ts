@@ -18,6 +18,12 @@ export default {
     title: "Something went wrong",
     body: "This page could not load. Try reloading it.",
   },
+  notFound: {
+    title: "Page not found",
+    description:
+      "This page does not exist or has moved. Check the address, or go back to the home page.",
+    backHome: "Back to home",
+  },
   nav: {
     dashboard: "Dashboard",
     settings: "Settings",

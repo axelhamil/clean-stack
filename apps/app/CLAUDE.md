@@ -11,7 +11,7 @@ apps/app/
   a11y/                         Accessibility gate (Playwright + axe), see a11y/README.md
   src/
     main.tsx                    createRoot + <AppProviders />
-    router.tsx                  createRouter({ routeTree, context: { queryClient }, preload/pending defaults }) + `watchPolicyRefusals` wiring. routeTree.gen.ts is generated but versioned
+    router.tsx                  createRouter({ routeTree, context: { queryClient }, ...ROUTER_DEFAULTS from web-kit }) + `watchPolicyRefusals` wiring. routeTree.gen.ts is generated but versioned
     router/                     One file per layout/gate (`__root`, `_guest`, `_protected`, `_shell`, `_org-scope`, `settings`) + non-route leaves (`index.route.tsx`, `settings-index.route.tsx`, `should-redirect-to-legal-accept.ts`)
     shared/                     Cross-cutting (no business): api client + errors, auth, i18n, notifications, observability, legal, hooks (see "Shared")
     features/<feature>/         Sub-domain: a vertical slice (see "Features")
