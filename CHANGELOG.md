@@ -1,3 +1,10 @@
+## [2.2.0](https://github.com/axelhamil/clean-stack/compare/v2.1.0...v2.2.0) (2026-11-02)
+
+### Features
+
+* **infra:** back up postgres with pgbackrest and harden the vps host ([8f29788](https://github.com/axelhamil/clean-stack/commit/8f297885b0bf24ba9dd7a0e72f84935b2634ad9f))
+* **infra:** deploy to a vps through coolify instead of railway ([fac42c4](https://github.com/axelhamil/clean-stack/commit/fac42c4accfef9055880b1e0606fa200a4931dad))
+
 ## [2.1.0](https://github.com/axelhamil/clean-stack/compare/v2.0.0...v2.1.0) (2026-11-02)
 
 ### Features
