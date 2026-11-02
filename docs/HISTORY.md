@@ -345,6 +345,8 @@ Front (`@sentry/react`): `Sentry.ErrorBoundary` wraps the router with shadcn `Ap
 
 **Why**: SOC2 §A.1 + ISO 27001 A.12.3 require a tested backup/restore policy. The original roadmap expected a `pg_dump` cron route in the API; SOTA 2026 audit reversed that decision.
 
+> Superseded by Phase L: the Coolify reference deploy now ships pgBackRest PITR to R2 with restore drills, see [`DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md).
+
 **Why no code shipped**: Every managed Postgres provider (Railway, Neon, Supabase, AWS RDS, Fly) ships PITR one-click with sub-minute RPO and 7 to 35 d retention. [`pgBackRest` lost its maintainer in 2026](https://thebuild.com/blog/2026/04/30/after-pgbackrest/): building a clean-stack route on top would have duplicated what the platform already does, forced `postgresql-client` into the Docker image, and introduced streaming/OOM/timeout failure modes the cloneur inherits for zero value. clean-stack ships cross-cutting multi-tenant infrastructure: backup is infra DB, owned by the provider.
 
 Deliverables: `docs/DISASTER-RECOVERY.md` covering RPO/RTO targets, 3-2-1 rule applied, restore runbook, PITR pointers per provider (Railway, Neon, Supabase, AWS RDS, Fly, self-hosted WAL-G: pgBackRest flagged unmaintained), weekly portable `pg_dump` export recipes (GitHub Actions, Railway Cron, K8s CronJob), monthly automated restore-test recipe.

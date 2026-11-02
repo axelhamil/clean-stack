@@ -1,9 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { file, YAML } from "bun";
-import z from "zod";
+import { type Job, textOf, workflowOf } from "../test-support";
 import { DEPLOY_BUDGET_MINUTES } from "./deploy";
 
-const ROOT = new URL("../../", import.meta.url);
 const CI = ".github/workflows/ci.yml";
 const DEPLOY = ".github/workflows/deploy.yml";
 const ROLLBACK = ".github/workflows/rollback.yml";
@@ -21,48 +19,7 @@ const DEPLOY_CALL = "infra/coolify/deploy.ts";
 const GATES_CALL = "infra/coolify/gates.ts";
 const BUILD_ACTION = "docker/build-push-action@";
 const SETUP_AND_GATES_MINUTES = 10;
-
-const stepSchema = z.looseObject({
-  uses: z.string().optional(),
-  run: z.string().optional(),
-  with: z.record(z.string(), z.unknown()).optional(),
-});
-const jobSchema = z.looseObject({
-  if: z.string().optional(),
-  needs: z.union([z.string(), z.array(z.string())]).optional(),
-  environment: z.string().optional(),
-  "timeout-minutes": z.number().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  permissions: z.record(z.string(), z.string()).optional(),
-  steps: z.array(stepSchema),
-});
-const workflowSchema = z.looseObject({
-  name: z.string(),
-  on: z.looseObject({
-    push: z.looseObject({ branches: z.array(z.string()) }).optional(),
-    workflow_run: z
-      .looseObject({
-        workflows: z.array(z.string()),
-        types: z.array(z.string()),
-        branches: z.array(z.string()),
-      })
-      .optional(),
-    workflow_dispatch: z.unknown().optional(),
-  }),
-  permissions: z.record(z.string(), z.string()).optional(),
-  concurrency: z.looseObject({ group: z.string(), "cancel-in-progress": z.boolean() }),
-  jobs: z.record(z.string(), jobSchema),
-});
-
-type Job = z.infer<typeof jobSchema>;
-
-async function textOf(path: string): Promise<string> {
-  return file(new URL(path, ROOT)).text();
-}
-
-async function workflowOf(path: string) {
-  return workflowSchema.parse(YAML.parse(await textOf(path)));
-}
+const POSTGRES_DOCKERFILE = "infra/docker/postgres-pgbackrest.Dockerfile";
 
 function jobWith(jobs: Record<string, Job>, script: string): Job {
   const job = Object.values(jobs).find((candidate) =>
@@ -140,7 +97,7 @@ describe("the coolify deploy and rollback workflows", () => {
     });
   });
 
-  it("builds the three images in build only, the only job allowed to write packages", async () => {
+  it("builds the four images in build only, the only job allowed to write packages", async () => {
     const deploy = await workflowOf(DEPLOY);
     const builds = (deploy.jobs.build?.steps ?? []).filter((step) =>
       step.uses?.startsWith(BUILD_ACTION),
@@ -153,6 +110,7 @@ describe("the coolify deploy and rollback workflows", () => {
       "apps/api/prod.Dockerfile",
       "apps/app/prod.Dockerfile",
       "apps/admin/prod.Dockerfile",
+      POSTGRES_DOCKERFILE,
     ]);
     expect(writers.map(([name]) => name)).toEqual(["build"]);
     expect(deploy.permissions).toEqual({ contents: "read" });

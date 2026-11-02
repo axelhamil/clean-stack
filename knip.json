@@ -69,8 +69,8 @@
       "project": ["src/**/*.ts"]
     },
     "infra": {
-      "entry": ["coolify/apply.ts", "coolify/*.test.ts"],
-      "project": ["coolify/**/*.ts"]
+      "entry": ["coolify/apply.ts", "coolify/*.test.ts", "pgbackrest/*.test.ts", "vps/*.test.ts"],
+      "project": ["coolify/**/*.ts", "pgbackrest/**/*.ts", "vps/**/*.ts", "test-support.ts"]
     }
   },
   "ignoreBinaries": ["src/index.ts"],

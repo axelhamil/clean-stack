@@ -1,289 +1,195 @@
 # Disaster recovery
 
-> **TL;DR**: **activate PITR on your managed Postgres provider. That's your primary defense.** The weekly `pg_dump` export recipe below is for portable / anti-vendor-lock-in only, not your DR plan. clean-stack ships no backup code on purpose: every modern Postgres host does this better than a custom cron would, and `pgBackRest` lost its maintainer in 2026, building on top of it would have been a regression.
+> **TL;DR**: on the reference deploy (Postgres as a Coolify resource on your VPS), clean-stack ships **pgBackRest** with continuous WAL archiving to an S3-compatible bucket (Cloudflare R2), encrypted with `aes-256-cbc`: a full backup every Sunday, a differential every other day, a daily `check`, a local restore drill and a monthly restore drill in CI. On a managed Postgres (Neon, Supabase, RDS), turn on the provider's PITR instead and skip the pgBackRest parts. A weekly logical `pg_dump` stays an optional extra against vendor lock-in.
 
-This doc covers: RPO/RTO targets, the 3-2-1 rule applied to a clean-stack deployment, PITR setup per provider, the restore runbook, optional weekly portable export, optional monthly automated restore-test, lifecycle + versioning on the backup bucket, and known caveats.
+This doc covers: RPO and RTO, the 3-2-1 rule, what ships, the repository and its keys, the schedule and retention, the restore runbook (side, point in time, in place), the drills, the managed-Postgres alternative, the optional logical export, the bucket rules and known caveats. Coolify setup steps live in [DEPLOY-COOLIFY.md](DEPLOY-COOLIFY.md#13-postgres-backups-with-pgbackrest).
 
 ## RPO / RTO targets
 
-| Metric | With PITR (recommended) | With weekly `pg_dump` only (fallback) |
-|---|---|---|
-| **RPO** (max acceptable data loss) | 1 to 5 min (WAL replay) | up to 7 days |
-| **RTO** (max acceptable downtime) | 1 h | 2 to 4 h (provision Postgres + restore dump + smoke) |
+| Metric | pgBackRest PITR (reference deploy) | Provider PITR (managed Postgres) | Weekly `pg_dump` only |
+|---|---|---|---|
+| **RPO** (max data loss) | about 1 min: `archive_timeout = 60` forces a WAL segment out every minute | 1 to 5 min | up to 7 days |
+| **RTO** (max downtime) | 30 to 60 min, measured by each drill (`RTO <n>s` in its log) | about 1 h | 2 to 4 h |
 
-If your business can't tolerate a 24h+ data loss on prod, PITR isn't optional. For early-stage SaaS with a tiny user base, a daily provider snapshot + the weekly portable export is enough, just be honest about what you're committing to.
+The unattended upgrades reboot the host at 05:30 UTC, after the 4 h backup grace and the 05:00 check.
+
+The RPO holds only while archiving keeps up: `archive-async` queues WAL in a local spool and `archive-push-queue-max=5GiB` drops WAL rather than fill the disk if the bucket is unreachable for long. A dropped segment breaks PITR across that gap until the next full backup, which is why the daily `check` pings a heartbeat.
 
 ## 3-2-1 rule applied
 
 | Copy | Where | Who manages it |
 |---|---|---|
-| **Live** | Your provider's primary Postgres | Provider (replicated automatically on Neon/Supabase/RDS) |
-| **PITR / daily snapshot** | Same provider, separate storage tier | Provider (continuous WAL or daily snapshots, retention 7 to 35 d) |
-| **Weekly portable export** | Your S3-compatible bucket (R2 / SeaweedFS / S3), preferably **different region** | You (the recipe below) |
+| **Live** | The Coolify Postgres resource on the VPS volume | Postgres |
+| **Backups and WAL** | The R2 bucket, encrypted, another provider than the VPS | pgBackRest, scheduled by systemd timers on the host |
+| **Optional logical export** | A second bucket or region, `pg_dump` | You (recipe below) |
 
-Provider PITR + provider snapshot count as one logical copy (same blast radius if the provider account is compromised or terminated). The weekly portable export is what survives "the provider deleted my account by mistake" or "I want to leave this vendor".
+The VPS and R2 are two providers, so losing the VPS account leaves the backups. Losing the R2 account or the cipher passphrase loses every backup: keep the passphrase in a password manager outside both, and consider the optional export to another provider.
 
-## PITR setup per provider
+## What ships
 
-Short pointers only, every provider's UI changes faster than docs. Search "PITR" in your dashboard.
+| Piece | Path |
+|---|---|
+| Postgres 18 image with pgBackRest 2.60.0, pinned by digest | `infra/docker/postgres-pgbackrest.Dockerfile`, built by `.github/workflows/deploy.yml`, never deployed by it |
+| pgBackRest config: stanza `clean-stack`, R2 repository, `aes-256-cbc`, 4 full and 7 differential, async archive | `infra/pgbackrest/pgbackrest.conf` |
+| Postgres config: `wal_level = replica`, `archive_mode = on`, `archive_command` through pgBackRest | `infra/pgbackrest/postgresql.conf` |
+| Host timers (full, diff, check) with optional heartbeat pings | `infra/vps/bootstrap.sh --pgbackrest`, `infra/vps/pgbackrest-run.sh`, `infra/vps/pgbackrest.env.example` |
+| Local drill: backup, then PITR restore, count checked | `infra/pgbackrest/drill.sh`, `infra/pgbackrest/docker-compose.drill.yaml` |
+| Monthly drill against the real repository, read-only key | `.github/workflows/pgbackrest-drill.yml` |
+| Guards on all of the above | `infra/pgbackrest/pgbackrest-config.test.ts`, `infra/vps/host.test.ts` |
 
-- **Coolify (reference deploy)**: a Postgres database resource on the VPS has no PITR of its own. Enable the resource's scheduled backup to an S3-compatible bucket (R2) for a daily dump until continuous archiving ships (a later lot). Restore from the resource's backup list in the dashboard. See [DEPLOY-COOLIFY.md](DEPLOY-COOLIFY.md).
-- **Neon**: branch-based PITR is built-in (sub-second granularity on Scale+). Restore = create a new branch from a point in time, swap the connection string. CLI: `neon branches restore`.
-- **Supabase**: daily automated backups (Pro). PITR is an add-on (Pro+) with up to 7 d granularity. Restore via the dashboard.
-- **AWS RDS**: automated backups on by default (7 d retention, up to 35 d). PITR sub-minute granularity. Restore via `aws rds restore-db-instance-to-point-in-time`.
-- **Fly.io Postgres**: daily volume snapshots (5 d retention). For PITR, attach a continuous backup target (S3 via `fly pg backup`) or migrate to a managed provider.
-- **Self-hosted Postgres**: point to [WAL-G](https://github.com/wal-g/wal-g) (sidecar, S3-compatible, well-suited to Kubernetes and Docker Compose). Notice: [pgBackRest is unmaintained since 2026](https://thebuild.com/blog/2026/04/30/after-pgbackrest/): don't start new projects on it. Barman (EDB-backed) is the alternative for multi-cluster ops.
+No secret lives in a file: the bucket keys and the cipher passphrase come from the environment of the container (`PGBACKREST_REPO1_S3_KEY`, `PGBACKREST_REPO1_S3_KEY_SECRET`, `PGBACKREST_REPO1_CIPHER_PASS`), and an environment variable overrides the config file, so `PGBACKREST_REPO1_PATH` and `PGBACKREST_REPO1_S3_BUCKET` pick the environment's repository.
 
-Whichever you pick, **test the restore** before you need it (see § Restore runbook below).
+## pgBackRest status
+
+pgBackRest's long-time maintainer stepped down on 2026-04-27. The project was revived on 2026-05-18 by a group of sponsors (AWS, Supabase, Percona and others) and keeps releasing: 2.60.0 shipped on 2026-10-18, the version this image pins. A fork, pgxbackup, was announced at the same time; clean-stack stays on upstream. Watch the [news page](https://pgbackrest.org/news.html) before each image upgrade.
+
+## Repository and keys
+
+- **Bucket**: one R2 bucket for backups only (default name `clean-stack-pgbackrest`), EU jurisdiction, public access off, never the uploads bucket of the api. One path per environment: `/production` (the default in the config) and `/staging`.
+- **Write key**: an R2 token with Object Read and Write on that bucket only, set on the Postgres resource of each environment. pgBackRest needs delete too, for `expire`.
+- **Read-only key**: an R2 token with Object Read only, for the monthly drill in GitHub. A leaked drill secret can read encrypted backups, never delete them.
+- **Cipher passphrase**: `openssl rand -base64 48`, one per environment, set once at `stanza-create` and never changed. Without it the repository is unreadable.
+
+## Schedule and retention
+
+| Run | When (UTC) | What |
+|---|---|---|
+| WAL archiving | continuous, at least one segment a minute | `archive_command` pushes each segment through the async spool |
+| Full backup | Sunday 00:00 | `clean-stack-pgbackrest-full.timer` |
+| Differential backup | Monday to Saturday 00:00 | `clean-stack-pgbackrest-diff.timer` |
+| `pgbackrest check` | daily 05:00 | `clean-stack-pgbackrest-check.timer`, proves archiving works end to end |
+| Monthly drill | the 12th, 04:00, once `PGBACKREST_DRILL_ENABLED=true` | `pgbackrest-drill.yml` |
+
+`repo1-retention-full=4` keeps four full backups (about four weeks of PITR), `repo1-retention-diff=7` the last seven differentials. pgBackRest expires older backups and their WAL itself after each backup. The timers are `Persistent=true`: a run missed while the host was down starts at boot. Runs never overlap: each takes a `flock` on `/run/clean-stack-pgbackrest.lock` and waits up to 2 min for `pg_isready` in the container (after a reboot or a resource restart) before it starts. Each run pings `<url>/start`, then `<url>` or `<url>/fail` when its heartbeat URL is set, the same protocol as `apps/api/src/cron/http-heartbeat.ts`, rewritten in bash on purpose since the host has no bun.
 
 ## Restore runbook
 
-The runbook assumes the dump is a plain SQL `*.sql.gz` produced by the export recipe in the next section. Adapt the commands for `pg_restore` if you switch to `--format=custom`.
+Always restore to the side first, unless the live cluster is already gone. Commands assume the image `ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>` and the environment of the repository to read (`PGBACKREST_REPO1_S3_ENDPOINT`, `PGBACKREST_REPO1_S3_BUCKET`, `PGBACKREST_REPO1_PATH`, both keys, the cipher passphrase) exported in the shell.
 
-### 1. Provision an ephemeral target
-
-Don't restore over the live DB until you've verified the dump on a sandbox first.
+### 1. List what can be restored
 
 ```bash
-docker run --rm -d \
-  --name pg-restore-test \
-  -p 5436:5432 \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=postgres \
-  postgres:18-alpine
+IMAGE=ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>
+REPO=(--env PGBACKREST_REPO1_S3_ENDPOINT --env PGBACKREST_REPO1_S3_BUCKET --env PGBACKREST_REPO1_PATH \
+  --env PGBACKREST_REPO1_S3_KEY --env PGBACKREST_REPO1_S3_KEY_SECRET --env PGBACKREST_REPO1_CIPHER_PASS)
+
+docker run --rm "${REPO[@]}" --entrypoint pgbackrest "$IMAGE" --stanza=clean-stack info
 ```
 
-### 2. Download the dump
+Expect the backups with their timestamps and the WAL range: a point in time is restorable when it falls after the oldest full backup's start and before the last archived segment.
+
+### 2. Restore to the side
 
 ```bash
-aws s3 cp \
-  "s3://${S3_BUCKET}/backups/postgres/<YYYY-MM-DDTHHMMSSZ>.sql.gz" \
-  ./latest.sql.gz \
-  --endpoint-url "$S3_ENDPOINT"
+docker volume create pg-side
+docker run --rm -v pg-side:/var/lib/postgresql --entrypoint sh "$IMAGE" -c 'mkdir -p "$PGDATA" && chmod 0700 "$PGDATA"'
+docker run --rm -v pg-side:/var/lib/postgresql "${REPO[@]}" --entrypoint pgbackrest "$IMAGE" \
+  --stanza=clean-stack --archive-mode=off \
+  --type=time "--target=2026-11-01 03:00:00+00" --target-action=promote restore
+docker run -d --name pg-side -v pg-side:/var/lib/postgresql "${REPO[@]}" "$IMAGE" \
+  postgres -c config_file=/etc/postgresql/postgresql.conf -c archive_mode=off
 ```
 
-For PITR restores, this step doesn't apply, use the provider console / CLI; the runbook resumes at step 4.
+Drop `--type=time --target=... --target-action=promote` to restore the latest state (end of the archived WAL). `--archive-mode=off` and `-c archive_mode=off` keep the side instance from pushing WAL into the live repository: never start a restored copy with archiving on, it would fork the timeline the live cluster writes to.
 
-### 3. Restore
+Wait until `docker exec pg-side psql -U postgres -Atqc 'select pg_is_in_recovery()'` answers `f`.
+
+### 3. Verify
 
 ```bash
-gunzip -c latest.sql.gz \
-  | psql -h localhost -p 5436 -U postgres -d postgres
+docker exec pg-side psql -U postgres -d <database> -Atqc 'select 1'
+docker exec pg-side psql -U postgres -d <database> -Atqc 'select count(*), max(created_at) from drizzle.__drizzle_migrations'
+docker exec pg-side psql -U postgres -d <database> -Atqc 'select count(*) from "user"'
+docker exec pg-side psql -U postgres -d <database> -Atqc 'select max(created_at) from outbox_event'
 ```
 
-Expect a flood of `CREATE TABLE` / `COPY` / `ALTER TABLE`. `NOTICE` lines about already-present extensions are fine; `ERROR` lines are not, abort and investigate.
+The migration count must match the release that ran at the target time, and the latest `outbox_event` must sit just before the target: every state change emits one, so it is the best clock of the last write you kept.
 
-### 4. Verify
-
-Sanity check: every table has the row counts you'd expect. Inline 15-line smoke script, drop in `apps/api/scripts/db-smoke.ts` if you want to keep it (clean-stack doesn't ship it by default, infra-specific):
-
-```ts
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { schema } from "@packages/drizzle";
-import { sql } from "drizzle-orm";
-
-const db = drizzle(postgres(process.env.DATABASE_URL!), { schema });
-const tables = ["user", "session", "organization", "member", "outbox_event", "audit_log", "webhook_delivery"];
-for (const t of tables) {
-  const [{ count }] = await db.execute<{ count: number }>(sql`select count(*)::int as count from ${sql.identifier(t)}`);
-  console.log(JSON.stringify({ table: t, count }));
-}
-process.exit(0);
-```
-
-Run it against the restored DB:
-
-```bash
-DATABASE_URL=postgres://postgres:postgres@localhost:5436/postgres \
-  bun run db-smoke.ts
-```
-
-Any row of `{ count: 0 }` on a table you expect data in = corrupted dump or wrong source. Stop. Investigate before doing anything to the live DB.
-
-### 5. Decide: roll forward, restore in place, or restore to side
+### 4. Decide
 
 | Situation | Action |
 |---|---|
-| Data corruption isolated, recent (≤ minutes), no schema damage | **Roll forward** via PITR to just before the bad write |
-| Data corruption widespread or old, schema intact | **Restore in place** to the most recent good backup, replay business events since via the outbox if possible |
-| Schema corruption, ransomware, account compromise | **Restore to side** (new instance), validate, then cut over DNS/connection-strings |
+| A bad write at a known minute, schema intact | **PITR in place** to just before it (section 5) |
+| The VPS or its volume is lost | **Latest in place** on a new resource (section 5, without a target) |
+| Ransomware, account compromise, unknown extent | **Restore to the side**, validate, then point `DATABASE_URL` at it |
 
-Don't roll forward if you don't know exactly when the bad write happened. Don't restore in place if you haven't first validated on the side instance.
+Don't roll forward without knowing when the bad write happened: pick the target from the side copy first.
 
-## Optional, weekly portable export
+### 5. Restore in place on the Coolify resource
 
-The recipes below produce one `*.sql.gz` per week in `backups/postgres/<ISO-timestamp>.sql.gz`. They're a fallback against vendor lock-in or provider account loss, not your primary DR. Pick **one** scheduler.
+1. Stop the `api` app, then the Postgres resource, in Coolify. Note the resource's container and volume names (`docker ps -a`, `docker volume ls`).
+2. Run the restore against that volume, with the resource's own environment:
 
-### GitHub Actions
+```bash
+docker run --rm -v <volume>:/var/lib/postgresql "${REPO[@]}" --entrypoint pgbackrest "$IMAGE" \
+  --stanza=clean-stack --delta --type=time "--target=<UTC time>" --target-action=promote restore
+```
+
+3. Start the resource; wait for `pg_is_in_recovery()` to answer `f`. Then `docker exec --user postgres <container> pgbackrest --stanza=clean-stack check`, and a full backup at once (`systemctl start clean-stack-pgbackrest@full.service`): the promotion opened a new timeline.
+4. Start `api`; its migrator applies whatever the restored schema misses. Run the checks of section 3.
+
+`--delta` reuses the files already on the volume and only fetches what differs, which keeps the RTO short on a large database.
+
+## Drills
+
+A backup never restored is a backup you don't know works.
+
+- **Local**: `bash infra/pgbackrest/drill.sh` builds the image, starts a throwaway SeaweedFS behind a TLS proxy on an internal Docker network (pgBackRest speaks S3 over HTTPS only), creates the stanza, writes 1000 rows, takes a full backup, writes 500 more, notes the time, writes 700 more, then wipes the volume, restores to the noted time and expects 1500 rows. It never reads a real secret nor touches a real bucket. Last line: `drill passed: restored 1500 rows at <time>, RTO <n>s`.
+- **Monthly in CI**: `pgbackrest-drill.yml` restores the latest state and a point 24 h back (or the `target` input) from the production repository into two scratch instances on the runner, with archiving off, then checks `select 1` and that `drizzle.__drizzle_migrations` is not empty. Its environment `pgbackrest-drill` holds the read-only key; the schedule runs only once `PGBACKREST_DRILL_ENABLED` is `true` (run it by hand first). A heartbeat URL pages you when it fails or stops running.
+
+## Managed Postgres instead
+
+If you don't self-host Postgres, skip pgBackRest and turn on the provider's PITR; test its restore the same way (to the side, then section 3).
+
+- **Neon**: branch-based PITR built in. Restore = a branch from a point in time, then swap the connection string.
+- **Supabase**: daily backups on Pro, PITR as an add-on.
+- **AWS RDS**: automated backups on by default (7 to 35 d), `aws rds restore-db-instance-to-point-in-time`.
+- **Fly.io Postgres**: daily volume snapshots; for PITR, attach a continuous backup target or move to a managed provider.
+- **Other self-hosting**: pgBackRest as shipped here, [WAL-G](https://github.com/wal-g/wal-g) or Barman do the same job; keep one tool, not two.
+
+## Optional, weekly logical export
+
+A `pg_dump` is portable across Postgres majors and providers: it is what you use to leave a host, and a second copy outside R2. It is not a PITR. On the reference deploy CI cannot reach Postgres (tailnet only), so run it from the database host: in the Coolify Postgres resource's Backups tab, schedule `0 3 * * 0` to an S3 destination in another bucket than the pgBackRest one. With a reachable managed database, a GitHub Actions job does the same:
 
 ```yaml
-# .github/workflows/postgres-export.yml
 name: Postgres weekly export
 on:
   schedule:
-    - cron: "0 3 * * 0"   # Sunday 03:00 UTC
+    - cron: "0 3 * * 0"
   workflow_dispatch:
 jobs:
   export:
     runs-on: ubuntu-latest
     steps:
-      - name: Install postgresql-client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Dump → gzip → S3
+      - name: Dump, compress, upload
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DATABASE_URL: ${{ secrets.EXPORT_DATABASE_URL }}
+          S3_BUCKET: ${{ secrets.EXPORT_S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.EXPORT_S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.EXPORT_S3_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.EXPORT_S3_KEY_SECRET }}
           AWS_DEFAULT_REGION: auto
         run: |
-          KEY="backups/postgres/$(date -u +%Y-%m-%dT%H%M%SZ).sql.gz"
-          pg_dump --no-owner --no-privileges "$DATABASE_URL" \
-            | gzip \
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          KEY="postgres/$(date -u +%Y-%m-%dT%H%M%SZ).sql.gz"
+          pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip \
             | aws s3 cp - "s3://${S3_BUCKET}/${KEY}" --endpoint-url "$S3_ENDPOINT"
-          echo "key=$KEY" >> "$GITHUB_OUTPUT"
 ```
 
-Set `secrets.DATABASE_URL` to a **read-only** Postgres role (`GRANT CONNECT, USAGE, SELECT` on the relevant schemas): `pg_dump` doesn't need superuser, and a leaked CI secret should not be able to write.
+Use a read-only role for `EXPORT_DATABASE_URL`. Restore a dump into a fresh instance with `gunzip -c <file>.sql.gz | psql <url>`, then run section 3.
 
-### Coolify scheduled backup (reference deploy)
+## Bucket rules and caveats
 
-The Postgres database resource carries its own backup schedule: set the frequency to `0 3 * * 0` and an S3 destination (the R2 bucket, prefix `backups/postgres/`) in the resource's Backups tab. Coolify runs `pg_dump` in the database container, so no extra image or tool is needed. The R2 credentials live in Coolify's S3 storage settings, not in the api environment.
-
-### Kubernetes CronJob
-
-```yaml
-apiVersion: batch/v1
-kind: CronJob
-metadata: { name: postgres-export }
-spec:
-  schedule: "0 3 * * 0"
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          restartPolicy: OnFailure
-          containers:
-            - name: dump
-              image: postgres:18-alpine
-              command: ["sh", "-c"]
-              args:
-                - |
-                  apk add --no-cache aws-cli
-                  KEY="backups/postgres/$(date -u +%Y-%m-%dT%H%M%SZ).sql.gz"
-                  pg_dump --no-owner --no-privileges "$DATABASE_URL" \
-                    | gzip \
-                    | aws s3 cp - "s3://${S3_BUCKET}/${KEY}" --endpoint-url "$S3_ENDPOINT"
-              envFrom: [{ secretRef: { name: postgres-export } }]
-```
-
-## Optional, monthly automated restore-test
-
-A backup that's never restored is a backup you don't know works. This recipe restores the latest dump to an ephemeral Postgres and fails loudly if it can't.
-
-```yaml
-# .github/workflows/postgres-restore-test.yml
-name: Postgres restore-test
-on:
-  schedule:
-    - cron: "0 4 1 * *"   # 1st of each month, 04:00 UTC
-  workflow_dispatch:
-jobs:
-  restore-test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
-        ports: ["5436:5432"]
-        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install postgresql-client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Download latest dump
-        env:
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          LATEST=$(aws s3 ls "s3://${S3_BUCKET}/backups/postgres/" --endpoint-url "$S3_ENDPOINT" \
-            | sort | tail -n1 | awk '{print $4}')
-          aws s3 cp "s3://${S3_BUCKET}/backups/postgres/${LATEST}" ./latest.sql.gz \
-            --endpoint-url "$S3_ENDPOINT"
-      - name: Restore
-        run: gunzip -c latest.sql.gz | psql -h localhost -p 5436 -U postgres -d postgres
-      - name: Smoke check (every table has rows)
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5436/postgres
-        run: |
-          for t in user session organization member outbox_event audit_log; do
-            COUNT=$(psql "$DATABASE_URL" -tAc "select count(*) from \"$t\"")
-            echo "{\"table\":\"$t\",\"count\":$COUNT}"
-            [ "$COUNT" -ge 0 ] || exit 1
-          done
-```
-
-If this job fails, page someone. A green job a month is a thin signal, a red job after weeks of green is the only thing standing between you and a real outage.
-
-## Backup bucket, lifecycle + versioning
-
-S3-compatible buckets (R2, SeaweedFS, AWS S3) all support lifecycle rules and versioning, with subtle differences. Below = AWS-flavoured CLI; adapt the endpoint for R2 or SeaweedFS.
-
-### Lifecycle, expire dailies, keep monthlies
-
-This rule expires anything older than 30 days under `backups/postgres/` and transitions monthly snapshots (under `backups/postgres-monthly/`) to a cold-storage class after 30 days, keeping them 1 year. Re-target the prefix paths for your layout.
-
-```bash
-aws s3api put-bucket-lifecycle-configuration \
-  --bucket "$S3_BUCKET" \
-  --endpoint-url "$S3_ENDPOINT" \
-  --lifecycle-configuration '{
-    "Rules": [
-      {
-        "ID": "expire-weekly-exports-30d",
-        "Status": "Enabled",
-        "Filter": { "Prefix": "backups/postgres/" },
-        "Expiration": { "Days": 30 }
-      },
-      {
-        "ID": "monthly-to-cold-1y",
-        "Status": "Enabled",
-        "Filter": { "Prefix": "backups/postgres-monthly/" },
-        "Transitions": [{ "Days": 30, "StorageClass": "GLACIER" }],
-        "Expiration": { "Days": 365 }
-      }
-    ]
-  }'
-```
-
-### Versioning + delete protection
-
-Enable versioning so an accidental `aws s3 rm` doesn't permanently destroy the latest backup:
-
-```bash
-aws s3api put-bucket-versioning \
-  --bucket "$S3_BUCKET" \
-  --endpoint-url "$S3_ENDPOINT" \
-  --versioning-configuration Status=Enabled
-```
-
-For production: enable **MFA delete** (AWS S3 only, not R2/SeaweedFS): requires a TOTP factor on every permanent delete.
-
-### Caveats
-
-- **Cloudflare R2**: no GLACIER class. Use **Infrequent Access** (`StorageClass: STANDARD_IA`) instead, or accept that monthly snapshots cost the same as dailies. R2 lifecycle support is more limited than AWS S3; check current capability before relying on transition rules.
-- **SeaweedFS**: lifecycle rules and versioning are partially supported depending on version. Treat the snippets above as production guidance; locally, focus on the dump path itself, not the lifecycle.
+- **No lifecycle rule on the pgBackRest bucket.** pgBackRest expires backups and the WAL they need; a bucket rule that deletes by age removes WAL a kept backup still needs and breaks PITR silently. Lifecycle rules belong on the export bucket only.
+- **Versioning or a bucket lock** protects against a stolen write key deleting everything. A lock shorter than the retention (for example 7 days) still lets `expire` work on older objects; check R2's current bucket lock rules before relying on it.
+- **Postgres major upgrades** change the system id: after a `pg_upgrade` run `pgbackrest --stanza=clean-stack stanza-upgrade`; after a dump and reload into a new major, start a new repository path. The image pins one major on purpose; upgrading it is a planned operation, not an image bump.
+- **The cipher passphrase cannot be rotated** on an existing repository: rotating means a new path, a new stanza and a full backup.
+- **SeaweedFS** serves the local drill only; lifecycle and versioning support there is partial, so it proves the restore path, not the bucket rules.
 
 ## Sources
 
-- [After pgBackRest, Christophe Pettus (April 2026)](https://thebuild.com/blog/2026/04/30/after-pgbackrest/): why the tool is unmaintained and what to migrate to.
-- [Set up PostgreSQL backups with WAL-G on Kubernetes (Feb 2026)](https://oneuptime.com/blog/post/2026-02-09-postgresql-backups-walg-kubernetes/view): sidecar pattern for self-hosted.
-- [Best PostgreSQL hosting in 2026: RDS vs Supabase vs Neon vs Self-hosted](https://dev.to/philip_mcclarence_2ef9475/best-postgresql-hosting-in-2026-rds-vs-supabase-vs-neon-vs-self-hosted-5fkp): provider PITR comparison.
-- [Why you don't need PITR for most Postgres DBs in 2026](https://medium.com/@pawale7663/why-you-dont-need-pitr-and-incremental-backups-for-most-postgresql-databases-in-2026-b2a1f3ec6833): counterpoint, RPO-honesty perspective.
-- **SOC 2** Trust Services Criteria § A.1 (Availability, backup + recovery).
-- **ISO 27001** Annex A § A.12.3 (Backup).
+- [pgBackRest news](https://pgbackrest.org/news.html): maintenance handover (2026-04-27), revival by a sponsor group (2026-05-18), 2.60.0 (2026-10-18).
+- [pgBackRest user guide](https://pgbackrest.org/user-guide.html): S3 repository, encryption, async archiving, PITR restore, `--delta`.
+- [After pgBackRest, Christophe Pettus (April 2026)](https://thebuild.com/blog/2026/04/30/after-pgbackrest/): announces the pgxbackup fork.
+- **SOC 2** Trust Services Criteria A.1 (availability, backup and recovery).
+- **ISO 27001** Annex A 8.13 (information backup).

@@ -394,4 +394,4 @@ The email queue itself is not driven by this cron: `EmailDeliveryWorker` claims 
 
 ## Not an internal endpoint, Postgres backups
 
-The weekly `pg_dump` portable export and monthly restore-test are scheduled crons too, but **not** API endpoints. They run outside the API process (your scheduler invokes `pg_dump` directly against the DB, streams to S3). See [`./DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md): copy-paste recipes for GitHub Actions, a Coolify scheduled task, and K8s CronJob, plus the restore runbook. PITR comes from the Postgres host: a managed provider (Neon/Supabase/RDS), or continuous archiving on the Coolify VPS (a later lot).
+Backups are scheduled too, but **not** API endpoints. On the Coolify VPS, systemd timers installed by `infra/vps/bootstrap.sh --pgbackrest` run pgBackRest inside the Postgres container (full Sunday 00:00 UTC, differential Monday to Saturday 00:00 UTC, `check` daily 05:00 UTC), and `.github/workflows/pgbackrest-drill.yml` restores the repository monthly. The optional weekly `pg_dump` export runs outside the API process too. See [`./DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md).

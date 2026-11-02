@@ -43,7 +43,7 @@ uuid("id").primaryKey().default(sql`uuidv7()`)
 | **Monorepo tooling** (pnpm 12 + Turborepo TUI + Biome 2 + Husky + commitlint conventional + semantic-release with `breaking: true` precedence + jscpd + knip all-workspaces + zero-warning pre-push) | **€600 to €1 000** | 2j |
 | **AI-pair ready** (`CLAUDE.md` root + one per app and per package, auto-loaded by Claude Code + `docs/HISTORY.md` + `docs/CRON.md` + `docs/INTEGRATIONS.md` + `docs/FEATURES.md` + `docs/OVERVIEW.md`) | **€300 to €600** | 1j |
 | **Health probes** (0.2) (`/livez` + `/readyz` + `/startupz` IETF format, registry pattern, graceful shutdown, asymmetric cache) | **€500 to €900** | 1-2j |
-| **Backups + DR** (0.3) (daily `pg_dump` cron, R2 lifecycle 30d/1y cold, monthly automated restore-test, RPO/RTO doc, PITR doc) | **€1 000 to €1 800** | 2-3j |
+| **Backups + DR** (0.3, Phase L) (pgBackRest PITR to R2 with full, differential and WAL archiving, host timers, local and monthly restore drills, RPO/RTO doc, managed-Postgres PITR alternative) | **€1 000 to €1 800** | 2-3j |
 | **Observability, Sentry** (0.4) (Sentry api+app removable, `IInstrumentation` port + NoOp default, RGPD scrubbing, source maps CI, release tracking, OTel + Prometheus deferred to D.1) | **€2 500 to €4 000** | 5-6j |
 | **Profile + NIST 800-63B-4 password** (A.1) (rectification UI, email re-verification, avatar upload, HIBP screening, min length 15 universal, no MFA exception, ban complexity rules) | **€1 200 to €2 000** | 3-4j |
 | **Privacy policy / Terms versioning** (A.2) (DB schema, `@packages/policies` version SSOT, `requireCurrentPolicies` middleware, `/legal/accept` diff view) | **€600 to €1 000** | 1-2j |

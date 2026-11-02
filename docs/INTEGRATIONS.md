@@ -278,8 +278,9 @@ root is the up-to-date template.
   `drizzle-kit push --force` because it executes under Turbo's non-TTY pipe;
   drizzle-kit's interactive data-loss prompt would otherwise hang. Safe in dev
   (push is dev-only); prod uses `db:migrate` which doesn't prompt.
-- **Backups**: configured at the managed-Postgres level. Test restore
-  procedure before going live, a backup you can't restore is not a backup.
+- **Backups**: pgBackRest PITR to R2 on the Coolify reference deploy, the
+  provider's PITR on a managed Postgres ([DISASTER-RECOVERY.md](DISASTER-RECOVERY.md)).
+  Run a restore drill before going live, a backup you can't restore is not a backup.
 - **Pool sizing**: defaults match Bun's connection pooling; tune
   `DATABASE_URL` query params (`?max=10`) only after measuring contention.
 

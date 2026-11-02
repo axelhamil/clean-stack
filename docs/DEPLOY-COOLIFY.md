@@ -2,7 +2,7 @@
 
 Runbook for shipping clean-stack on a VPS run by [Coolify](https://coolify.io) v4. The desired state lives in `infra/coolify/services.ts`, `infra/coolify/apply.ts` reconciles it through the Coolify API, and `.github/workflows/deploy.yml` builds the images and deploys them by digest once CI is green.
 
-> **TL;DR**: 1 VPS, Coolify pinned, its dashboard and API on a Tailscale tailnet only, Cloudflare in front of the public hosts. 3 Coolify apps (`api`, `app`, `admin`) running `ghcr.io/<owner>/clean-stack-<app>@sha256:<digest>`, 1 Postgres resource made by hand, the sweep cron as a scheduled task on `api`. Cloudflare R2, Resend and Sentry stay external.
+> **TL;DR**: 1 VPS bootstrapped by `infra/vps/bootstrap.sh` (Tailscale, nftables, unattended upgrades), Coolify pinned, its dashboard and API on a Tailscale tailnet only, Cloudflare in front of the public hosts. 3 Coolify apps (`api`, `app`, `admin`) running `ghcr.io/<owner>/clean-stack-<app>@sha256:<digest>`, 1 Postgres resource per environment made by hand from `ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>` with pgBackRest archiving to R2, the sweep cron as a scheduled task on `api`. Cloudflare R2, Resend and Sentry stay external.
 
 ---
 
@@ -43,6 +43,8 @@ group by 1 having count(*) > 1;
 | Rollback to previous digests | `.github/workflows/rollback.yml` | manual dispatch |
 | Secrets and operator values (`DATABASE_URL`, URLs, keys) | Coolify app environment | the operator, by hand; `apply.ts` reports the missing ones and never writes or prints a value |
 | Domains, Postgres resource, registry login | Coolify dashboard and the host | the operator, by hand |
+| Host firewall, Tailscale, unattended upgrades, backup timers | `infra/vps/` | `bootstrap.sh`, run once as root, safe to rerun |
+| Postgres image with pgBackRest, its config, restore drills | `infra/docker/postgres-pgbackrest.Dockerfile`, `infra/pgbackrest/`, `.github/workflows/pgbackrest-drill.yml` | built by `deploy.yml`, upgraded by hand (section 13) |
 
 The Dockerfiles (`apps/*/prod.Dockerfile`) and Caddyfiles are portable: nothing Coolify specific lives in them.
 
@@ -50,19 +52,24 @@ The Dockerfiles (`apps/*/prod.Dockerfile`) and Caddyfiles are portable: nothing 
 
 ## 2. The host
 
-1. A VPS with 4 GB RAM or more (the image builds run in GitHub Actions, not on the VPS), Debian or Ubuntu LTS, in an EU region for RGPD.
-2. Join it to a Tailscale tailnet, prove Tailscale SSH from a second terminal, then close public SSH.
-3. Firewall: inbound 80 and 443 only, plus the tailnet. Restrict 80 and 443 to the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) so the origin is never reached around the CDN.
-4. Install Coolify v4 at a pinned version (pass the version to the install script, never the floating latest), then set `AUTOUPDATE=false` in `/data/coolify/source/.env`. Note the version installed in this runbook's commit message or your ops notes.
-5. Set the Coolify instance domain to the host's tailnet name: the dashboard and the API answer on the tailnet only. Never expose the dashboard publicly.
-6. Registry access: the GHCR packages are private by default. On the host, `docker login ghcr.io` with a token that only has `read:packages`, or add it as a private registry in Coolify, so Coolify can pull `ghcr.io/<owner>/clean-stack-*`.
-7. Back up `/data/coolify/source/.env` (its `APP_KEY` decrypts Coolify's own database) and `/data/coolify/ssh/keys` in a password manager.
+`infra/vps/bootstrap.sh` sets the host up from a checkout of the repo, as root, on a fresh **Debian 13** (it refuses anything else). It installs unattended security upgrades with a reboot at 05:30 UTC (after the 00:00 backups and their 4 h grace, and after the 05:00 check), Docker CE on the iptables backend, Tailscale with Tailscale SSH (tag `tag:server`), and the nftables firewall `infra/vps/host.nft` as the `clean-stack-host-firewall` unit, loaded before Docker. The firewall drops every inbound packet except loopback, established flows, `tailscale0`, the Coolify bridge to the host sshd, and TCP 80 and 443 from the [Cloudflare ranges](https://www.cloudflare.com/ips/), fetched by the script into `/etc/clean-stack/cloudflare.nft`. A published container port is DNAT then forward, never input, so the same rule sits in a forward chain, matched on the original destination port (`ct original proto-dst`) since DNAT has already rewritten it to the container's port: whatever Docker opens, only Cloudflare reaches 80 and 443 from the public interface. After loading it, the script fails unless every `public_interfaces` entry exists under `/sys/class/net` and the default route (`ip -o route get 1.1.1.1`) leaves through one of them. Docker's own tables stay untouched.
+
+1. A VPS with 4 GB RAM or more (the image builds run in GitHub Actions, not on the VPS), Debian 13, in an EU region for RGPD. Check that the provider's console or rescue mode works: it is the break glass once public SSH is closed.
+2. `mkdir -p /etc/clean-stack`, copy `infra/vps/host.local.nft.example` to `/etc/clean-stack/host.local.nft` and set the public interface (`ip -br link`). Keep the `container_to_host` line for now; step 5 fills it.
+3. `TS_AUTHKEY=<one off key> infra/vps/bootstrap.sh --hostname <tailnet name>`. Last line: `host <name> ready`. Prove `ssh root@<tailnet name>` over Tailscale SSH from a second terminal before going further.
+4. Install Coolify v4 at a pinned version (pass the version to the install script, never the floating latest), then set `AUTOUPDATE=false` in `/data/coolify/source/.env`. Note the version installed in your ops notes.
+5. Coolify manages its own host over SSH from its container. Put the bridge of the `coolify` Docker network in `container_to_host`: `echo br-$(docker network inspect coolify -f '{{.Id}}' | cut -c1-12)`, edit `/etc/clean-stack/host.local.nft`, then `systemctl reload clean-stack-host-firewall`. Keep sshd running for that bridge, key only (`PasswordAuthentication no`); the firewall already drops it on the public interface.
+6. Set the Coolify instance domain to the host's tailnet name: the dashboard and the API answer on the tailnet only. Never expose the dashboard publicly.
+7. Registry access: the GHCR packages are private by default. On the host, `docker login ghcr.io` with a token that only has `read:packages`, or add it as a private registry in Coolify, so Coolify can pull `ghcr.io/<owner>/clean-stack-*`.
+8. Back up `/data/coolify/source/.env` (its `APP_KEY` decrypts Coolify's own database) and `/data/coolify/ssh/keys` in a password manager.
+
+Verify: reboot, then `systemctl is-active clean-stack-host-firewall` answers `active` and `nft list set inet clean_stack_host public_interfaces` shows the interface; from outside the tailnet, `nmap -Pn -p- <public ipv4>` shows every port filtered (80 and 443 answer only through Cloudflare). Rerun `bootstrap.sh` to refresh the Cloudflare ranges.
 
 ---
 
 ## 3. Cloudflare in front
 
-- DNS: `api.<domain>`, `app.<domain>`, `admin.<domain>` as proxied records to the VPS public IP. SSL mode **Full (strict)**; Coolify's Traefik gets the origin certificates from Let's Encrypt.
+- DNS: `api.<domain>`, `app.<domain>`, `admin.<domain>` as proxied records to the VPS public IP. SSL mode **Full (strict)**; Coolify's Traefik gets the origin certificates from Let's Encrypt over HTTP through Cloudflare, so keep `/.well-known/acme-challenge/` reachable on port 80 (no Cloudflare rule that blocks it). Only Cloudflare reaches 80 and 443 (section 2): a record that is not proxied stops answering.
 - Behind Cloudflare and Traefik, the api resolves the client IP from `X-Forwarded-For` through the trusted private hop (`TRUSTED_PROXIES=private`). Verify on the real server (section 11) that two clients get two rate-limit keys.
 
 ---
@@ -70,7 +77,7 @@ The Dockerfiles (`apps/*/prod.Dockerfile`) and Caddyfiles are portable: nothing 
 ## 4. Coolify project, environments and Postgres
 
 1. Create one project (e.g. `clean-stack`) with two environments named exactly `staging` and `production`. `apply.ts` and `deploy.ts` find them by name. Note the project uuid and the server uuid.
-2. In each environment, create a **Postgres 18** database resource by hand, with a persistent volume. Copy its internal URL: it becomes `DATABASE_URL` on the `api` app of that environment. Backups land in a later lot; until then, enable Coolify's scheduled database backup to S3 (R2).
+2. In each environment, create a **Postgres 18** database resource by hand from the image of section 13, with its persistent storage mounted on `/var/lib/postgresql`. Copy its internal URL: it becomes `DATABASE_URL` on the `api` app of that environment. Backups and their timers: section 13.
 3. Never run `api` with more than one replica (section 0, migrations).
 
 ---
@@ -99,6 +106,12 @@ Create the environments `staging` and `production`; restrict the deployment bran
 | Variable | `VITE_SENTRY_DSN`, `VITE_ADMIN_SENTRY_DSN` | environment | Sentry DSNs of the app and the admin, empty for none |
 | Variable | `COOLIFY_PROJECT_UUID` | repository | section 4 |
 | Variable | `COOLIFY_DEPLOY` | repository | `on` once both environments exist in Coolify; any other value skips every deploy |
+| Secret | `PGBACKREST_REPO1_S3_ENDPOINT`, `PGBACKREST_REPO1_S3_KEY`, `PGBACKREST_REPO1_S3_KEY_SECRET`, `PGBACKREST_REPO1_CIPHER_PASS` | environment `pgbackrest-drill` | the R2 endpoint, a **read-only** R2 key on the backup bucket, the production cipher passphrase (section 13) |
+| Secret | `HEARTBEAT_URL_PGBACKREST_DRILL` | environment `pgbackrest-drill` | a heartbeat check for the monthly drill, empty for none |
+| Variable | `PGBACKREST_REPO1_S3_BUCKET`, `PGBACKREST_REPO1_PATH`, `PGBACKREST_DRILL_DATABASE`, `PGBACKREST_DRILL_USER` | environment `pgbackrest-drill` | default `clean-stack-pgbackrest`, `/production`, `postgres` and `postgres`: the database the drill queries and the role it queries as |
+| Variable | `PGBACKREST_DRILL_ENABLED` | repository | `true` once a manual run of `pgBackRest drill` passed; anything else skips the schedule |
+
+Restrict the deployment branches of `pgbackrest-drill` to `main`, like `production`.
 
 `COOLIFY_DEPLOY` is off on a fresh clone: CI never tries to deploy before the operator says so.
 
@@ -190,6 +203,11 @@ The Coolify API calls follow the Coolify v4 API reference and the sister project
 - [ ] The `sweep` task runs at 03:17 UTC and its executions show up in `GET /applications/<uuid>/scheduled-tasks/<task>/executions`. Observed:
 - [ ] Client IP behind Cloudflare and Traefik: two clients get two rate-limit keys; if every request shares a Cloudflare edge address, add the Cloudflare ranges to `TRUSTED_PROXIES` in `services.ts`. Observed:
 - [ ] `docker stop` of the api takes under 45 s and the log shows every shutdown step. Observed:
+- [ ] The Postgres resource runs the custom image with the volume on `/var/lib/postgresql`, its environment reaches the container (`docker exec <container> env | grep -c PGBACKREST_REPO1`), and with "Custom PostgreSQL Configuration" empty the image's `CMD` loads `/etc/postgresql/postgresql.conf` (`show archive_mode` answers `on`). Observed:
+- [ ] `pgbackrest --stanza=clean-stack info` shows WAL archived continuously, and a stopped container makes `systemctl start clean-stack-pgbackrest@diff.service` fail and ping `/fail`. Observed:
+- [ ] Coolify still manages its own host once the firewall is loaded (server validated, `container_to_host` holds the `coolify` bridge). Observed:
+- [ ] From outside the tailnet, IPv4 and IPv6: `nmap -Pn -p- <public ip>` shows every port filtered, and the public hosts still answer through Cloudflare. Observed:
+- [ ] `pgBackRest drill` run by hand on `main`: both restores promoted, migrations counted, RTO noted. Observed:
 
 ---
 
@@ -210,3 +228,38 @@ The Coolify API calls follow the Coolify v4 API reference and the sister project
 | `/internal/build-info` shows `unknown` | `GIT_SHA` not written: the app was deployed from the dashboard, not by `deploy.ts` |
 | Sweep answers 401 | `API_URL` is not loopback, so `private-network` refuses it: keep `http://localhost:3000` |
 | R2 answers 403 on a presigned URL | the R2 token lacks Object Read and Write on the bucket |
+| Coolify shows its own server unreachable after `bootstrap.sh` | the `coolify` bridge is missing from `container_to_host` (section 2, step 5) |
+| A public host times out behind Cloudflare | `/etc/clean-stack/cloudflare.nft` is stale or the record is not proxied: rerun `bootstrap.sh`, check the orange cloud |
+| `pgbackrest check` fails with `archive_command` errors | an S3 or cipher variable is missing on the Postgres resource, or the bucket path is not the one `stanza-create` used |
+| `pg_wal` grows and the disk fills | archiving fails: `pgbackrest check`, then the resource's log; the async queue drops WAL past 5 GiB |
+
+---
+
+## 13. Postgres backups with pgBackRest
+
+Each Postgres resource archives its WAL continuously and takes its backups with pgBackRest to an R2 bucket, encrypted. Why, retention, restore and drills: [DISASTER-RECOVERY.md](DISASTER-RECOVERY.md).
+
+**The image.** `deploy.yml` builds `infra/docker/postgres-pgbackrest.Dockerfile` (Postgres 18 pinned by digest, pgBackRest 2.60.0) on every deploy and prints `ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>` in the run summary. It never deploys it: the database restarts only when the operator says so.
+
+**The bucket and its keys.** One R2 bucket for backups only (`clean-stack-pgbackrest` unless you set `PGBACKREST_REPO1_S3_BUCKET`), EU jurisdiction, public access off, **no lifecycle rule**. One R2 token with Object Read and Write on that bucket for the resources, one with Object Read only for the drill (section 6).
+
+**Per environment, in Coolify:**
+
+1. On the Postgres resource: image `ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>`, persistent storage on `/var/lib/postgresql`, "Custom PostgreSQL Configuration" left empty (the image's `CMD` loads `/etc/postgresql/postgresql.conf`; a custom one replaces that file whole, so it must keep the archive settings).
+2. Free disk: the host disk holds the volume (the database and its `pg_wal`) and the container's spool `/var/spool/pgbackrest`, where up to 5 GiB of WAL queue while R2 is unreachable (`archive-push-queue-max=5GiB`), and `pg_wal` keeps growing until the queue drains. Keep at least 10 GiB free beyond the database size, more for a write-heavy one, and turn on Coolify's disk usage notification.
+3. Environment variables of the resource:
+
+| Key | Value |
+| --- | --- |
+| `PGBACKREST_REPO1_S3_ENDPOINT` | `<account>.r2.cloudflarestorage.com`, no scheme |
+| `PGBACKREST_REPO1_PATH` | `/production` or `/staging`: never the same path for two environments |
+| `PGBACKREST_REPO1_S3_KEY`, `PGBACKREST_REPO1_S3_KEY_SECRET` | the read and write R2 token |
+| `PGBACKREST_REPO1_CIPHER_PASS` | `openssl rand -base64 48`, one per environment, kept in a password manager: lost, every backup is unreadable |
+
+4. Start the resource, then on the host: `docker exec --user postgres <container> pgbackrest --stanza=clean-stack stanza-create`, then `... check`. Expect `check command end: completed successfully`.
+
+**On the host, once for all environments:** copy `infra/vps/pgbackrest.env.example` to `/etc/clean-stack/pgbackrest.env`, set `PGBACKREST_CONTAINERS` to the container names of the resources, space separated (`docker ps --format '{{.Names}}'`), and the optional `HEARTBEAT_URL_PGBACKREST_FULL`, `_DIFF`, `_CHECK` (one Healthchecks check each, cron UTC `0 0 * * 0` grace 4 h, `0 0 * * 1-6` grace 4 h, `0 5 * * *` grace 1 day). Then `infra/vps/bootstrap.sh --hostname <tailnet name> --pgbackrest`: it installs `/usr/local/sbin/pgbackrest-run.sh` and the timers `clean-stack-pgbackrest-{full,diff,check}.timer` (full Sunday 00:00 UTC, differential Monday to Saturday 00:00 UTC, check daily 05:00 UTC), one run at a time under a lock, each waiting up to 2 min for `pg_isready`. The pings follow `apps/api/src/cron/http-heartbeat.ts` on purpose, in bash because the host has no bun. Verify: `systemctl list-timers 'clean-stack-pgbackrest-*'` lists three, and `systemctl start clean-stack-pgbackrest@full.service` takes the first full backup. Coolify schedules tasks on applications, not on database resources, hence systemd.
+
+**Upgrading the image by hand** (a pgBackRest or Postgres minor release, same major): take the digest from the latest `Deploy` run summary, set it on the resource during a quiet hour, restart it (a few seconds of downtime, the api reconnects), then `pgbackrest --stanza=clean-stack check`. Do staging first. A new Postgres **major** is not an image bump: plan a `pg_upgrade` plus `stanza-upgrade`, or a dump and reload into a new repository path (DISASTER-RECOVERY.md, caveats).
+
+**Drills.** `bash infra/pgbackrest/drill.sh` on any machine with Docker proves backup and PITR on a throwaway local S3. `pgBackRest drill` (`pgbackrest-drill.yml`) restores the real production repository monthly once `PGBACKREST_DRILL_ENABLED` is `true`; run it by hand once first.
