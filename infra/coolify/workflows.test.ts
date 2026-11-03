@@ -116,6 +116,32 @@ describe("the coolify deploy and rollback workflows", () => {
     expect(deploy.permissions).toEqual({ contents: "read" });
   });
 
+  it("bakes every key a single page app reads into its image", async () => {
+    const deploy = await workflowOf(DEPLOY);
+    const builds = deploy.jobs.build?.steps ?? [];
+
+    for (const app of ["app", "admin"]) {
+      const dockerfile = `apps/${app}/prod.Dockerfile`;
+      const read = [
+        ...(await textOf(`apps/${app}/src/shared/env.ts`)).matchAll(/^\s+(VITE_\w+):/gm),
+      ];
+      const declared = await textOf(dockerfile);
+      const buildArgs = String(
+        builds.find((step) => step.with?.file === dockerfile)?.with?.["build-args"],
+      );
+      const passed = [...buildArgs.matchAll(/^\s*(VITE_\w+)=/gm)].map(([, key]) => key);
+
+      for (const [, key] of read) {
+        expect({ app, key, declared: declared.includes(`ARG ${key}\n`) }).toEqual({
+          app,
+          key,
+          declared: true,
+        });
+        expect({ app, passed }).toEqual({ app, passed: expect.arrayContaining([key]) });
+      }
+    }
+  });
+
   it("gates every deploy and rollback on the health checks", async () => {
     for (const path of [DEPLOY, ROLLBACK]) {
       const { jobs } = await workflowOf(path);

@@ -1,153 +1,17 @@
-import {
-  DEFAULT_INTERNAL_FETCH_TIMEOUT_MS,
-  signedInternalFetch,
-} from "../shared/internal-routes/internal-fetch";
-import {
-  classifySweepResult,
-  type SweepResponseShape,
-} from "../shared/internal-routes/sweep-result";
-import { HttpHeartbeat } from "./http-heartbeat";
+import { runInternalJob } from "./internal-job";
 
-const baseUrl = process.env.API_URL;
-const signingKey = process.env.INTERNAL_SIGNING_KEY;
-
-if (!baseUrl) throw new Error("API_URL is required");
-if (!signingKey || signingKey.length < 32) {
-  throw new Error("INTERNAL_SIGNING_KEY is required (min 32 chars)");
-}
-
-// Kept in sync with `env.INTERNAL_FETCH_TIMEOUT_MS`'s schema default, this script is a
-// standalone process reading `process.env` directly and cannot import the API's `env`,
-// so it repeats its own defensive parsing rather than inheriting `shared/env.ts`'s
-// "" → undefined normalization: an empty string or a non-numeric value must fall back
-// to the default rather than yielding `Number.NaN`/`0` and aborting every sweep instantly.
-const rawTimeoutMs = process.env.INTERNAL_FETCH_TIMEOUT_MS;
-const parsedTimeoutMs = rawTimeoutMs ? Number(rawTimeoutMs) : Number.NaN;
-const timeoutMsValid = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= 1000;
-if (rawTimeoutMs !== undefined && !timeoutMsValid) {
-  // Silently falling back would let an operator believe they tightened the budget
-  // (e.g. "500") when they actually loosened it 300x back to the default, the API
-  // itself refuses to boot on the same out-of-range value (`.min(1000)`).
-  console.warn(
-    `[sweep] INTERNAL_FETCH_TIMEOUT_MS=${rawTimeoutMs} is invalid (must be a number >= 1000), falling back to ${DEFAULT_INTERNAL_FETCH_TIMEOUT_MS}ms`,
-  );
-}
-const timeoutMs = timeoutMsValid ? parsedTimeoutMs : DEFAULT_INTERNAL_FETCH_TIMEOUT_MS;
-
-const sweeps = [
-  "/internal/sweep-email-messages",
-  "/internal/sweep-webhook-delivery",
-  "/internal/sweep-audit-log",
-  "/internal/sweep-outbox",
-  "/internal/sweep-consents",
-  "/internal/sweep-notifications",
-  "/internal/sweep-admin-approvals",
-  "/internal/sweep-admin-impersonations",
-  "/internal/sweep-stripe-events",
-] as const;
-
-const heartbeat = new HttpHeartbeat(process.env.SWEEP_HEARTBEAT_URL, (message) =>
-  console.warn(`[sweep] ${message}`),
-);
-
-let anyFailure = false;
-
-await heartbeat.start();
-
-for (const path of sweeps) {
-  const started = Date.now();
-  let res: Response;
-  try {
-    res = await signedInternalFetch({
-      baseUrl,
-      method: "POST",
-      path,
-      body: { dryRun: false },
-      signingKey,
-      timeoutMs,
-    });
-  } catch (err) {
-    // Bun does not document the error raised on abort, so report elapsed time and
-    // message rather than matching a name.
-    console.error(
-      `[sweep] UNREACHABLE ${path} after ${Date.now() - started}ms (budget ${timeoutMs}ms): ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
-    await heartbeat.finish(1);
-    process.exit(1);
-  }
-
-  let body: string;
-  try {
-    body = await res.text();
-  } catch (err) {
-    // A body-read failure mid-transfer, unlike the fetch call itself throwing above,
-    // means the API answered and the socket dropped afterward, evidence of a flaky
-    // transfer for this one route, not that the API is down. Accumulate and move on
-    // so it cannot starve the routes after it either.
-    console.error(
-      `[sweep] TRUNCATED BODY ${path} after ${Date.now() - started}ms: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
-    anyFailure = true;
-    continue;
-  }
-
-  if (!res.ok) {
-    // A non-2xx response (most often the bare-`throw` default for a route with no
-    // onBatchError, turned into a 500 by the error middleware) must not starve every
-    // sweep after it, that is exactly the failure mode this branch exists to remove.
-    console.error(
-      `[sweep] FAIL ${path} → ${res.status} in ${Date.now() - started}ms: ${body.slice(0, 500)}`,
-    );
-    anyFailure = true;
-    continue;
-  }
-
-  const elapsed = Date.now() - started;
-  let parsed: SweepResponseShape;
-  try {
-    parsed = JSON.parse(body);
-  } catch {
-    // Substring-matching JSON would misread a reordered or reformatted body; a body
-    // that will not parse at all is itself the anomaly worth reporting. Same reasoning
-    // as FAIL/TRUNCATED BODY: the API answered, so this is this route's problem, not
-    // proof the rest will fail identically.
-    console.error(`[sweep] UNPARSEABLE ${path} in ${elapsed}ms: ${body.slice(0, 500)}`);
-    anyFailure = true;
-    continue;
-  }
-
-  const classification = classifySweepResult(parsed);
-
-  switch (classification.kind) {
-    case "skipped":
-      // Healthy under a slow drain, alarming if it never clears: another run holds the
-      // lease, which after a crash lasts until the lease expires.
-      console.warn(`[sweep] SKIPPED ${path} in ${elapsed}ms, another run holds the lease`);
-      break;
-    case "batch-error":
-      // A batch error recurs every tick until someone looks at the data. Never let it
-      // hide behind the truncation warning, but it must not starve every sweep after
-      // it either, so accumulate and keep going; the process still exits non-zero.
-      console.error(
-        `[sweep] BATCH ERROR ${path} in ${elapsed}ms on ${classification.passes.join(", ")}: ${body}`,
-      );
-      anyFailure = true;
-      continue;
-    case "truncated":
-      // A healthy outcome for a backlog: the budget was spent and the next tick resumes.
-      // Truncating on *every* tick is not, it means the backlog outpaces the cadence.
-      console.warn(`[sweep] TRUNCATED ${path} in ${elapsed}ms: ${body}`);
-      break;
-    case "ok":
-      console.log(`[sweep] OK ${path} in ${elapsed}ms: ${body}`);
-      break;
-  }
-}
-
-const exitCode = anyFailure ? 1 : 0;
-await heartbeat.finish(exitCode);
-process.exit(exitCode);
+await runInternalJob({
+  label: "sweep",
+  paths: [
+    "/internal/sweep-email-messages",
+    "/internal/sweep-webhook-delivery",
+    "/internal/sweep-audit-log",
+    "/internal/sweep-outbox",
+    "/internal/sweep-consents",
+    "/internal/sweep-notifications",
+    "/internal/sweep-admin-approvals",
+    "/internal/sweep-admin-impersonations",
+    "/internal/sweep-stripe-events",
+  ],
+  heartbeatUrl: process.env.SWEEP_HEARTBEAT_URL,
+});

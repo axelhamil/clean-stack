@@ -175,7 +175,7 @@ the grace period exists to avoid.
 
 **The boot-time ordering check only covers the API process.** `INTERNAL_FETCH_TIMEOUT_MS`
 is validated in `apps/api/src/shared/env.ts` but read nowhere in the API, its only
-consumer is `apps/api/src/cron/sweep.ts`, a standalone script that runs as its own
+consumer is the cron runner `apps/api/src/cron/internal-job.ts`, a standalone script that runs as its own
 process (a Coolify scheduled task, a K8s CronJob) with its own environment and parses `process.env`
 directly, unchecked against the other two bounds. Raising `SERVER_IDLE_TIMEOUT_SECONDS`
 on the API without also raising `INTERNAL_FETCH_TIMEOUT_MS` where the cron runs leaves
@@ -208,8 +208,9 @@ dryRun, batchCount, deletedPerPass, stopReasons, truncated, skipped }`.
   raising.
 - `stopReasons[pass]`: `exhausted` (drained), `budget`, `batch-cap`, or
   `batch-error`. **`batch-error` is not truncation**: the batch failed and will
-  fail again next tick. The bundled cron (`apps/api/src/cron/sweep.ts`, via
-  `classifySweepResult`) exits non-zero on it.
+  fail again next tick. The bundled cron (`apps/api/src/cron/`, via
+  `classifySweepResult`) exits non-zero on it, and on an `rgpd-sweep` answer
+  whose `failed` array is not empty.
 
 `batchSize` bounds rows, not time. Each batch carries its own
 `statement_timeout`: 5 s for a purge, 10 s for a dry-run count (the shared
@@ -258,21 +259,15 @@ now reported to telemetry. A batch failure with no `onBatchError` rethrows, and
 The boilerplate ships `apps/api/src/shared/internal-routes/internal-fetch.ts`. Same module the
 caller imports; same canonical-message function the API uses to verify.
 
-**The wrapper script you write** (called `rgpd-sweep.ts` below, name and path are yours; the wiring sections show it under `/app/`, `.github/cron/`, your scheduler's startCommand, etc.). Not part of the API bundle, not checked into `apps/api/`. Lives in whatever repo runs your cron:
+**Shipped entrypoints**, one per job, run from source with `bun` and reading `API_URL`, `INTERNAL_SIGNING_KEY` and `INTERNAL_FETCH_TIMEOUT_MS`:
 
-```ts
-// rgpd-sweep.ts (in your scheduler service / GH Actions repo / K8s image)
-import { signedInternalFetch } from "@apps/api/src/shared/internal-routes/internal-fetch";
+| Command | Calls | Cadence |
+|---|---|---|
+| `bun apps/api/src/cron/rgpd-sweep.ts` | `/internal/rgpd-sweep` | daily |
+| `bun apps/api/src/cron/sweep.ts` | the retention sweeps, in order | daily |
+| `bun apps/api/src/cron/flush-notification-emails.ts` | `/internal/flush-notification-emails` | every minute |
 
-const res = await signedInternalFetch({
-  baseUrl: process.env.INTERNAL_API_URL!,   // http://localhost:3000 from a task in the api container
-  method: "POST",
-  path: "/internal/rgpd-sweep",
-  body: { dryRun: false },
-  signingKey: process.env.INTERNAL_SIGNING_KEY!,
-});
-if (!res.ok) throw new Error(`rgpd-sweep failed: ${res.status} ${await res.text()}`);
-```
+All three go through `cron/internal-job.ts`: it signs each call, logs one line per route, treats a `skipped` answer (lease held) as success and exits non-zero on an unreachable API, a non-2xx, an unparseable body or a batch error (`rgpd-sweep` with a non-empty `failed`). Any scheduler that can run a command in the api image needs nothing else; one that cannot (a separate GH Actions repo, Inngest) calls `signedInternalFetch` itself.
 
 For ad-hoc curl in dev, mint a signature with a tiny script, don't try to
 build the canonical message by hand from the shell, it's how you ship a
@@ -286,14 +281,11 @@ A scheduled task on the `api` app runs inside the api container, so it reaches
 the API on loopback (`http://localhost:3000`) and signs each request. With
 `INTERNAL_AUTH_LAYERS=signature,private-network` both barriers are active:
 the `private-network` layer refuses anything that comes through Traefik.
-Declare the task in `infra/coolify/services.ts` (the shipped `sweep` task is the
-model) and `infra/coolify/apply.ts` creates it:
-
-```ts
-{ name: "rgpd-sweep", command: "bun rgpd-sweep.ts", schedule: "0 3 * * *", timeoutSeconds: 1_800, enabled: true }
-```
-
-`rgpd-sweep.ts` is a one-shot wrapper you write that imports `signedInternalFetch` and calls `/internal/rgpd-sweep`. Not part of the API bundle.
+`infra/coolify/services.ts` ships three tasks on it and `infra/coolify/apply.ts`
+creates them: `rgpd-sweep` (`47 2 * * *`, 1800 s), `sweep` (`17 3 * * *`, 1800 s)
+and `flush-notification-emails` (`* * * * *`, 180 s). `infra/coolify/deploy.ts`
+waits for a running `rgpd-sweep` or `sweep` to end before it redeploys the api,
+never for the per-minute flush.
 
 ### GitHub Actions cron
 
@@ -311,17 +303,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v1
       - run: bun install
-      - run: bun .github/cron/rgpd-sweep.ts
+      - run: bun apps/api/src/cron/rgpd-sweep.ts
         env:
-          INTERNAL_API_URL: ${{ secrets.API_URL }}
+          API_URL: ${{ secrets.API_URL }}
           INTERNAL_SIGNING_KEY: ${{ secrets.INTERNAL_SIGNING_KEY }}
 ```
 
-`.github/cron/rgpd-sweep.ts` is your 10-line wrapper around `signedInternalFetch`: checked into the repo running the cron, not the API.
+From a checkout of this repo the shipped entrypoint runs as is. The runner calls the public `API_URL`, so this setup needs `INTERNAL_AUTH_LAYERS=signature`: `private-network` refuses it.
 
 ### K8s CronJob
 
-Build a small image that includes the script and run it on a schedule:
+Run the shipped entrypoint from the api image on a schedule:
 
 ```yaml
 apiVersion: batch/v1
@@ -336,10 +328,10 @@ spec:
         spec:
           containers:
             - name: rgpd-sweep
-              image: your-registry/cron-runner:latest
-              command: ["bun", "/app/rgpd-sweep.ts"]
+              image: your-registry/clean-stack-api:latest
+              command: ["bun", "apps/api/src/cron/rgpd-sweep.ts"]
               env:
-                - name: INTERNAL_API_URL
+                - name: API_URL
                   value: "http://api.svc.cluster.local:3000"
                 - name: INTERNAL_SIGNING_KEY
                   valueFrom:

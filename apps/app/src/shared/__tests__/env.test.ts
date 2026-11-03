@@ -18,7 +18,6 @@ describe("env", () => {
       "VITE_SENTRY_ENVIRONMENT",
       "VITE_GIT_SHA",
       "VITE_ANALYTICS_SRC",
-      "VITE_STRIPE_PUBLISHABLE_KEY",
     ]) {
       vi.stubEnv(key, "");
     }
@@ -29,7 +28,6 @@ describe("env", () => {
     expect(env.VITE_SENTRY_ENVIRONMENT).toBeUndefined();
     expect(env.VITE_GIT_SHA).toBeUndefined();
     expect(env.VITE_ANALYTICS_SRC).toBeUndefined();
-    expect(env.VITE_STRIPE_PUBLISHABLE_KEY).toBeUndefined();
   });
 
   it("keeps a set value", async () => {

@@ -149,7 +149,12 @@ describe("plan", () => {
   it("plans a task update when the sweep schedule drifts", () => {
     const remote = inSync.map((app) =>
       app.name === "api"
-        ? { ...app, tasks: app.tasks.map((task) => ({ ...task, schedule: "0 * * * *" })) }
+        ? {
+            ...app,
+            tasks: app.tasks.map((task) =>
+              task.name === "sweep" ? { ...task, schedule: "0 * * * *" } : task,
+            ),
+          }
         : app,
     );
 

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { file } from "bun";
+import { file, Glob } from "bun";
 import { envSchema, PRODUCTION_REQUIRED } from "../../apps/api/src/shared/env-schema";
 import { servicesFor } from "./services";
 
-const SWEEP_SOURCE = new URL("../../apps/api/src/cron/sweep.ts", import.meta.url);
+const CRON_DIR = new URL("../../apps/api/src/cron/", import.meta.url).pathname;
 
 const fields = Object.entries(envSchema.shape);
 
@@ -12,13 +12,18 @@ const requiredByApi = [
   ...PRODUCTION_REQUIRED.map(([key]) => key),
 ];
 
-async function keysKnownToApi(): Promise<Set<string>> {
-  const sweep = await file(SWEEP_SOURCE).text();
-  const sweepKeys = [...sweep.matchAll(/process\.env\.([A-Z0-9_]+)/g)].flatMap(([, key]) =>
-    key ? [key] : [],
+async function cronKeys(): Promise<string[]> {
+  const sources = await Promise.all(
+    [...new Glob("*.ts").scanSync(CRON_DIR)].map((name) => file(`${CRON_DIR}${name}`).text()),
   );
 
-  return new Set([...fields.map(([key]) => key), ...sweepKeys]);
+  return sources.flatMap((source) =>
+    [...source.matchAll(/process\.env\.([A-Z0-9_]+)/g)].flatMap(([, key]) => (key ? [key] : [])),
+  );
+}
+
+async function keysKnownToApi(): Promise<Set<string>> {
+  return new Set([...fields.map(([key]) => key), ...(await cronKeys())]);
 }
 
 function declaredApiKeys(): string[] {

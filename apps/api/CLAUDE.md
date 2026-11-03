@@ -24,7 +24,7 @@ apps/api/src/
     v1/                         Route files exposed to PAT consumers (opt-in only, each route file is explicit)
     index.ts                    `createPublicApiV1(deps)` factory, mounts `requireApiToken` + dual rate-limit
     require-scope.ts            `requireScope(scope)` guard used inside `/api/v1/*` route files
-  cron/                         Standalone bundled sweep caller (`sweep.ts`), runs as its own process, see `docs/CRON.md`
+  cron/                         Standalone cron entrypoints (`sweep.ts`, `rgpd-sweep.ts`, `flush-notification-emails.ts`) over one runner (`internal-job.ts`), each its own process, see `docs/CRON.md`
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   auth.ts                       BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`).
   auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), reading `resolveExecutor()`. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
