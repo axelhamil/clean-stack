@@ -107,14 +107,17 @@ export function parseArgs(argv: readonly string[]): DeployOptions {
 async function idleTasks(
   client: DeployDeps["client"],
   uuid: string,
+  holding: readonly string[],
   wait: TaskWait,
 ): Promise<string[]> {
   const deadline = Date.now() + wait.timeoutMs;
-  let running = await client.runningTasks(uuid);
+  const runningHolders = async () =>
+    (await client.runningTasks(uuid)).filter((name) => holding.includes(name));
+  let running = await runningHolders();
 
   while (running.length > 0 && Date.now() < deadline) {
     await sleep(Math.min(wait.pollMs, Math.max(0, deadline - Date.now())));
-    running = await client.runningTasks(uuid);
+    running = await runningHolders();
   }
 
   return running;
@@ -198,9 +201,11 @@ export async function runDeploy(options: DeployOptions, deps: DeployDeps): Promi
         throw new Error(`deploy time budget spent before ${name}`);
       }
 
-      if (app.tasks.length > 0) {
+      const holding = app.tasks.filter((task) => task.holdsDeploy).map((task) => task.name);
+
+      if (holding.length > 0) {
         const wait = options.taskWait ?? DEFAULT_TASK_WAIT;
-        const running = await idleTasks(deps.client, uuid, {
+        const running = await idleTasks(deps.client, uuid, holding, {
           ...wait,
           timeoutMs: Math.min(wait.timeoutMs, remaining()),
         });

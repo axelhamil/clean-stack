@@ -2,7 +2,7 @@
 
 Runbook for shipping clean-stack on a VPS run by [Coolify](https://coolify.io) v4. The desired state lives in `infra/coolify/services.ts`, `infra/coolify/apply.ts` reconciles it through the Coolify API, and `.github/workflows/deploy.yml` builds the images and deploys them by digest once CI is green.
 
-> **TL;DR**: 1 VPS bootstrapped by `infra/vps/bootstrap.sh` (Tailscale, nftables, unattended upgrades), Coolify pinned, its dashboard and API on a Tailscale tailnet only, Cloudflare in front of the public hosts. 3 Coolify apps (`api`, `app`, `admin`) running `ghcr.io/<owner>/clean-stack-<app>@sha256:<digest>`, 1 Postgres resource per environment made by hand from `ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>` with pgBackRest archiving to R2, the sweep cron as a scheduled task on `api`. Cloudflare R2, Resend and Sentry stay external.
+> **TL;DR**: 1 VPS bootstrapped by `infra/vps/bootstrap.sh` (Tailscale, nftables, unattended upgrades), Coolify pinned, its dashboard and API on a Tailscale tailnet only, Cloudflare in front of the public hosts. 3 Coolify apps (`api`, `app`, `admin`) running `ghcr.io/<owner>/clean-stack-<app>@sha256:<digest>`, 1 Postgres resource per environment made by hand from `ghcr.io/<owner>/clean-stack-postgres@sha256:<digest>` with pgBackRest archiving to R2, the `rgpd-sweep`, `sweep` and `flush-notification-emails` crons as scheduled tasks on `api`. Cloudflare R2, Resend and Sentry stay external.
 
 ---
 
@@ -30,7 +30,7 @@ group by 1 having count(*) > 1;
 
 **Stop the old api before a release that ships outbox migration `0024`.** An api built before it recreates the `outbox_notify` trigger every time it boots. Stop the `api` app in Coolify before deploying that release so no old container restarts after the migration. See `docs/EVENTS.md`, delivery section.
 
-**The sweep calls the api on loopback.** The `sweep` scheduled task runs `bun apps/api/src/cron/sweep.ts` inside the `api` container with `API_URL=http://localhost:3000`, so `INTERNAL_AUTH_LAYERS=signature,private-network` holds: the `private-network` layer accepts loopback and refuses anything that comes through Traefik. `sweep.ts` chains the retention sweeps only: `POST /internal/rgpd-sweep` (daily, required for Art. 17) and `POST /internal/flush-notification-emails` (every minute) need their own task, declared next to `sweep` in `services.ts` (wrappers in [CRON.md](CRON.md)).
+**The crons call the api on loopback.** Three scheduled tasks run inside the `api` container with `API_URL=http://localhost:3000`, so `INTERNAL_AUTH_LAYERS=signature,private-network` holds: the `private-network` layer accepts loopback and refuses anything that comes through Traefik. `rgpd-sweep` (`bun apps/api/src/cron/rgpd-sweep.ts`, 02:47 UTC, required for Art. 17) wipes the accounts past their grace window, `sweep` (`bun apps/api/src/cron/sweep.ts`, 03:17 UTC) chains the retention sweeps, `flush-notification-emails` (`bun apps/api/src/cron/flush-notification-emails.ts`, every minute) enqueues the notification digests. Details in [CRON.md](CRON.md).
 
 ---
 
@@ -38,7 +38,7 @@ group by 1 having count(*) > 1;
 
 | Piece | Where | Managed by |
 | --- | --- | --- |
-| Desired apps, ports, health checks, stop grace, literal env, `sweep` task | `infra/coolify/services.ts` | `apply.ts` (dry run by default, `--apply` writes, never deletes) |
+| Desired apps, ports, health checks, stop grace, literal env, scheduled tasks | `infra/coolify/services.ts` | `apply.ts` (dry run by default, `--apply` writes, never deletes) |
 | Image build and deploy by digest, release sha, gates | `.github/workflows/deploy.yml`, `infra/coolify/deploy.ts`, `infra/coolify/gates.ts` | GitHub Actions after a green CI |
 | Rollback to previous digests | `.github/workflows/rollback.yml` | manual dispatch |
 | Secrets and operator values (`DATABASE_URL`, URLs, keys) | Coolify app environment | the operator, by hand; `apply.ts` reports the missing ones and never writes or prints a value |
@@ -149,7 +149,7 @@ Rerun the dry run: it must report no change and no missing secret. A secret coun
 GitHub fires `workflow_run` only from the workflow file on the default branch. Staging deploys therefore start once `deploy.yml` reaches `main`, and an edit of `deploy.yml` merged on `dev` takes effect only after the next release. For the same reason `github.ref` is `main` for both environments (section 6).
 
 1. **Build**: the three `apps/*/prod.Dockerfile` images, tagged `sha-<commit>` and pushed to GHCR; the job outputs their digests.
-2. **Deploy**: `deploy.ts` deploys `api`, then `app`, then `admin`, within one 45 min budget (the job allows 60). Before `api` it waits for an idle `sweep`: only the latest execution counts, and one older than the task timeout plus 5 min counts as ended. A `sweep` still running after 30 min skips `api`, and the run stops there. Per app it notes the current image and `GIT_SHA`, writes the new ones, starts the deployment and follows it. When that fails or outlives the budget it writes the noted image and `GIT_SHA` back (a hidden `GIT_SHA` stays at the new release, and the report says so) and stops. The report gives every app's state, `app` and `admin` read `not deployed` after an `api` skip or failure, and the job fails. A deployment that outlived the budget reads `still running in Coolify, config restored`: check it in the dashboard. A failed restore reads `restore failed`: fix the image and `GIT_SHA` by hand.
+2. **Deploy**: `deploy.ts` deploys `api`, then `app`, then `admin`, within one 45 min budget (the job allows 60). Before `api` it waits for an idle `sweep` and `rgpd-sweep` (never for the per-minute flush): only the latest execution counts, and one older than the task timeout plus 5 min counts as ended. One still running after 30 min skips `api`, and the run stops there. Per app it notes the current image and `GIT_SHA`, writes the new ones, starts the deployment and follows it. When that fails or outlives the budget it writes the noted image and `GIT_SHA` back (a hidden `GIT_SHA` stays at the new release, and the report says so) and stops. The report gives every app's state, `app` and `admin` read `not deployed` after an `api` skip or failure, and the job fails. A deployment that outlived the budget reads `still running in Coolify, config restored`: check it in the dashboard. A failed restore reads `restore failed`: fix the image and `GIT_SHA` by hand.
 3. **Gates**: `gates.ts` asks `<api>/readyz`, `<app>/health` and `<admin>/health` for a 200, 5 tries 5 s apart each.
 
 Every image is a digest of the commit CI tested (`workflow_run.head_sha`), never a tag. Two deploys of one environment never run at once (`concurrency: deploy-<env>`, no cancel).
@@ -163,7 +163,7 @@ curl -i https://api.<domain>/internal/build-info   # 401 unsigned
 curl -i https://app.<domain>/health    # 200 "OK"
 ```
 
-Then the smoke test: sign up through the UI and receive the email, create an organization, upload an avatar, request an RGPD export (an `outbox_event` and an `audit_log` row with an actor), force a 500 and see it in Sentry with the release sha, and run the `sweep` task once from the Coolify dashboard (expect one `[sweep] OK` line per sweep).
+Then the smoke test: sign up through the UI and receive the email, create an organization, upload an avatar, request an RGPD export (an `outbox_event` and an `audit_log` row with an actor), force a 500 and see it in Sentry with the release sha, and run each task once from the Coolify dashboard (expect one `[sweep] OK` line per sweep, one `[rgpd-sweep] OK` line, one `[flush-notification-emails] OK` or `SKIPPED` line).
 
 ---
 
@@ -201,7 +201,7 @@ The Coolify API calls follow the Coolify v4 API reference and the sister project
 - [ ] A digest in the image field: `docker_registry_image_tag` set to `sha256:<digest>` is accepted and the container runs that digest (`docker inspect --format '{{.Image}}'`). Observed:
 - [ ] `health_check_command` (`wget -qO- http://127.0.0.1:<port><path>`) is honoured and Coolify shows each app healthy. Observed:
 - [ ] The deploy token with read, write and deploy can update the image and start a deployment. Observed:
-- [ ] The `sweep` task runs at 03:17 UTC and its executions show up in `GET /applications/<uuid>/scheduled-tasks/<task>/executions`. Observed:
+- [ ] The `rgpd-sweep` task runs at 02:47 UTC, `sweep` at 03:17 UTC, `flush-notification-emails` every minute, and their executions show up in `GET /applications/<uuid>/scheduled-tasks/<task>/executions`. Observed:
 - [ ] Client IP behind Cloudflare and Traefik: two clients get two rate-limit keys; if every request shares a Cloudflare edge address, add the Cloudflare ranges to `TRUSTED_PROXIES` in `services.ts`. Observed:
 - [ ] `docker stop` of the api takes under 45 s and the log shows every shutdown step. Observed:
 - [ ] The Postgres resource runs the custom image with the volume on `/var/lib/postgresql`, its environment reaches the container (`docker exec <container> env | grep -c PGBACKREST_REPO1`), and with "Custom PostgreSQL Configuration" empty the image's `CMD` loads `/etc/postgresql/postgresql.conf` (`show archive_mode` answers `on`). Observed:

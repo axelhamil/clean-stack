@@ -41,4 +41,25 @@ describe("classifySweepResult", () => {
     const result = classifySweepResult({ truncated: false, skipped: false, stopReasons: {} });
     expect(result).toEqual({ kind: "ok" });
   });
+
+  it("classifies a flush that found the lease held as skipped, a success", () => {
+    const flush = { dryRun: false, skipped: true, flushed: 0, notifications: 0 };
+    expect(classifySweepResult(flush)).toEqual({ kind: "skipped" });
+  });
+
+  it("classifies an rgpd sweep with a failed wipe as a batch error", () => {
+    const rgpd = {
+      processed: 2,
+      succeeded: ["u1"],
+      failed: [{ userId: "u2", errorCode: "WIPE_UNCAUGHT" }],
+      dryRun: false,
+      truncated: true,
+    };
+    expect(classifySweepResult(rgpd)).toEqual({ kind: "batch-error", passes: [] });
+  });
+
+  it("classifies an rgpd sweep with no failed wipe as ok", () => {
+    const rgpd = { processed: 1, succeeded: ["u1"], failed: [], dryRun: false, truncated: false };
+    expect(classifySweepResult(rgpd)).toEqual({ kind: "ok" });
+  });
 });

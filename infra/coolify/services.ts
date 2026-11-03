@@ -17,6 +17,10 @@ export interface ScheduledTask {
   enabled: boolean;
 }
 
+export interface AppTask extends ScheduledTask {
+  holdsDeploy: boolean;
+}
+
 export interface CoolifyApp {
   name: AppName;
   image: string;
@@ -24,13 +28,12 @@ export interface CoolifyApp {
   healthCheck: string;
   stopGraceSeconds: number;
   env: Record<string, EnvSource>;
-  tasks: ScheduledTask[];
+  tasks: AppTask[];
 }
 
 const API_PORT = 3000;
 const SPA_PORT = 80;
-const SWEEP_SCHEDULE = "17 3 * * *";
-const SWEEP_COMMAND = "bun apps/api/src/cron/sweep.ts";
+const cron = (job: string) => `bun apps/api/src/cron/${job}.ts`;
 
 const API_SECRETS = [
   "DATABASE_URL",
@@ -94,11 +97,28 @@ export function servicesFor(environment: CoolifyEnvironment, owner: string): Coo
       env: apiEnv(environment),
       tasks: [
         {
-          name: "sweep",
-          command: SWEEP_COMMAND,
-          schedule: SWEEP_SCHEDULE,
+          name: "rgpd-sweep",
+          command: cron("rgpd-sweep"),
+          schedule: "47 2 * * *",
           timeoutSeconds: 1_800,
           enabled: true,
+          holdsDeploy: true,
+        },
+        {
+          name: "sweep",
+          command: cron("sweep"),
+          schedule: "17 3 * * *",
+          timeoutSeconds: 1_800,
+          enabled: true,
+          holdsDeploy: true,
+        },
+        {
+          name: "flush-notification-emails",
+          command: cron("flush-notification-emails"),
+          schedule: "* * * * *",
+          timeoutSeconds: 180,
+          enabled: true,
+          holdsDeploy: false,
         },
       ],
     },
@@ -204,6 +224,6 @@ export function stateOf(app: CoolifyApp): AppState {
     stopGraceSeconds: app.stopGraceSeconds,
     env,
     secrets,
-    tasks: app.tasks,
+    tasks: app.tasks.map(({ holdsDeploy: _, ...task }) => task),
   };
 }

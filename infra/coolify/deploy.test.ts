@@ -50,11 +50,13 @@ function stagingAndProduction(): FakeApp[] {
   ]);
 }
 
-function withSweep(executions: Execution[][]): FakeApp[] {
+function withTask(name: string, executions: Execution[][]): FakeApp[] {
   return stagingAndProduction().map((app) =>
-    app.uuid === "staging-api" ? { ...app, tasks: [{ name: "sweep", executions }] } : app,
+    app.uuid === "staging-api" ? { ...app, tasks: [{ name, executions }] } : app,
   );
 }
+
+const withSweep = (executions: Execution[][]) => withTask("sweep", executions);
 
 function answerFor(apps: FakeApp[], fake: FakeOptions) {
   const reads = new Map<string, number>();
@@ -283,15 +285,21 @@ describe("deploy", () => {
     ]);
   });
 
-  it("waits for a running sweep to end before deploying the api", async () => {
-    const { deploys, deps } = fakeCoolify(
-      withSweep([[execution("running")], [execution("success")]]),
-    );
+  it.each(["sweep", "rgpd-sweep"])(
+    "waits for a running %s to end before deploying the api",
+    async (task) => {
+      const { deploys, deps } = fakeCoolify(
+        withTask(task, [[execution("running")], [execution("success")]]),
+      );
 
-    await runDeploy({ ...options({ api: API }), taskWait: { timeoutMs: 1_000, pollMs: 1 } }, deps);
+      await runDeploy(
+        { ...options({ api: API }), taskWait: { timeoutMs: 1_000, pollMs: 1 } },
+        deps,
+      );
 
-    expect(deploys()).toContain("/api/v1/deploy?uuid=staging-api&force=false");
-  });
+      expect(deploys()).toContain("/api/v1/deploy?uuid=staging-api&force=false");
+    },
+  );
 
   it.each([
     ["an older execution still marked running", [execution("success"), execution("running", 1)]],
@@ -301,6 +309,16 @@ describe("deploy", () => {
     ],
   ])("deploys the api at once despite %s", async (_case, executions) => {
     const { deploys, deps } = fakeCoolify(withSweep([executions]));
+
+    await runDeploy({ ...options({ api: API }), taskWait: FAST }, deps);
+
+    expect(deploys()).toEqual(["/api/v1/deploy?uuid=staging-api&force=false"]);
+  });
+
+  it("deploys the api at once while the notification email flush runs", async () => {
+    const { deploys, deps } = fakeCoolify(
+      withTask("flush-notification-emails", [[execution("running")]]),
+    );
 
     await runDeploy({ ...options({ api: API }), taskWait: FAST }, deps);
 
