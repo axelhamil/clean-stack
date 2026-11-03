@@ -13,7 +13,7 @@ export type SweepClassification =
 
 /**
  * Decides how a parsed sweep response should be reported, in priority order:
- * a skipped run (lease held elsewhere) beats everything else because nothing
+ * a skipped run (another run in progress) beats everything else because nothing
  * happened; a batch error (a failed pass, or failed items) beats a mere truncation because it recurs every
  * tick until someone looks at the data, whereas truncation alone is an
  * honest, self-resolving backlog signal.

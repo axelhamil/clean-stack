@@ -465,9 +465,8 @@ describe("runRetentionSweep instrumentation", () => {
 });
 
 describe("releaseLease", () => {
-  // The flush route used to `await lock.release()` bare in its `finally`: a release
-  // failure after a committed flush turned a successful run into a 500, and masked
-  // the original error when the flush itself had thrown.
+  // A bare `await lock.release()` in a `finally` turned a committed run into a 500
+  // on a release failure, and masked the original error when the run had thrown.
   it("resolves when the release throws, and logs and captures the failure", async () => {
     const instrumentation = new NoOpInstrumentation();
     const capture = spyOn(instrumentation, "capture");
@@ -482,7 +481,7 @@ describe("releaseLease", () => {
             throw releaseFailure;
           },
         },
-        "flush-notification-emails",
+        "sweep-x",
         { error: (obj: unknown) => errors.push(obj) } as never,
         sweepSpans(instrumentation),
       ),
@@ -490,7 +489,7 @@ describe("releaseLease", () => {
 
     expect(errors).toHaveLength(1);
     expect(capture).toHaveBeenCalledWith(releaseFailure, {
-      metadata: { label: "flush-notification-emails", phase: "lease-release" },
+      metadata: { label: "sweep-x", phase: "lease-release" },
     });
   });
 });
