@@ -414,7 +414,7 @@ export class RgpdService {
 
   async processPendingDeletions(
     input: ProcessPendingDeletionsInput,
-  ): Promise<Result<ProcessPendingDeletionsOutput, never>> {
+  ): Promise<Result<ProcessPendingDeletionsOutput, RgpdError>> {
     return this.instrumentation.startSpan(
       { name: "RgpdService > processPendingDeletions", op: "function" },
       async () => {
@@ -426,7 +426,7 @@ export class RgpdService {
             { code: batchResult.getError().code },
             "rgpd sweep aborted: could not load batch",
           );
-          return Result.ok({ processed: 0, succeeded: [], failed: [], dryRun, truncated: false });
+          return Result.fail(batchResult.getError());
         }
 
         const batch = batchResult.getValue();

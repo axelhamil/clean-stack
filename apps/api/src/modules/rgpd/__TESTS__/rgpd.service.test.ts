@@ -852,6 +852,23 @@ describe("RgpdService", () => {
       expect(repo.executeWipe).not.toHaveBeenCalled();
     });
 
+    it("fails the sweep when the batch cannot be loaded", async () => {
+      const repo = makeBatchRepo([], {
+        findUsersReadyForWipe: mock(async () =>
+          Result.fail<PendingDeletionRow[], RgpdError>({
+            code: "RGPD_REPOSITORY_PROVIDER_FAILURE",
+            message: "down",
+          }),
+        ),
+      });
+      const service = buildService({ repo, email });
+
+      const result = await service.processPendingDeletions({});
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("RGPD_REPOSITORY_PROVIDER_FAILURE");
+    });
+
     it("only requests up to batchSize rows from the repo", async () => {
       const repo = makeBatchRepo(pendingRows.slice(0, 2), {
         findUsersReadyForWipe: mock(async (limit: number) =>
