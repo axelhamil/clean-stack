@@ -111,8 +111,7 @@ async function idleTasks(
   wait: TaskWait,
 ): Promise<string[]> {
   const deadline = Date.now() + wait.timeoutMs;
-  const runningHolders = async () =>
-    (await client.runningTasks(uuid)).filter((name) => holding.includes(name));
+  const runningHolders = () => client.runningTasks(uuid, holding);
   let running = await runningHolders();
 
   while (running.length > 0 && Date.now() < deadline) {

@@ -182,6 +182,22 @@ describe("CoolifyClient", () => {
     expect(calls.some((call) => call.url.includes("production-api"))).toBe(false);
   });
 
+  it("reads the executions of the asked tasks only", async () => {
+    const { calls, fetchFn } = recordingFetch((call) =>
+      call.url.endsWith("/scheduled-tasks")
+        ? Response.json([
+            { uuid: "task-sweep", name: "sweep", timeout: 1800 },
+            { uuid: "task-flush", name: "flush-notification-emails", timeout: 180 },
+          ])
+        : Response.json([{ status: "running", created_at: new Date().toISOString() }]),
+    );
+
+    const running = await clientOf(fetchFn).runningTasks("api-uuid", ["sweep"]);
+
+    expect(running).toEqual(["sweep"]);
+    expect(calls.some((call) => call.url.includes("task-flush"))).toBe(false);
+  });
+
   it("takes an empty answer of a write as done", async () => {
     const { fetchFn } = recordingFetch(() => new Response("", { status: 200 }));
 

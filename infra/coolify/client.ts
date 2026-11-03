@@ -233,8 +233,10 @@ export class CoolifyClient {
     );
   }
 
-  async runningTasks(uuid: string): Promise<string[]> {
-    const tasks = list(await this.call("GET", ENDPOINTS.tasks(uuid)));
+  async runningTasks(uuid: string, names: readonly string[]): Promise<string[]> {
+    const tasks = list(await this.call("GET", ENDPOINTS.tasks(uuid))).filter((task) =>
+      names.includes(text(task, "name")),
+    );
     const running = await Promise.all(
       tasks.map(async (task) => {
         const executions = list(
