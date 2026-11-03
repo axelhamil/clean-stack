@@ -10,6 +10,7 @@ migrations/                    generated SQL, committed
 src/
   config.ts                    `db`, `DbClient`, `Transaction`, `closeDb()` (ends the pool, called by the api shutdown)
   schema/<topic>.ts            one file per topic (auth, multi-tenant, outbox, audit-log, webhooks, billing, ...), re-exported as `<topic>Schema` from `index.ts`
+  advisory-lock.ts             `lockForTransaction`, `tryLockForTransaction` (transaction scoped advisory lock)
   repositories/track-events.ts `trackEventsOnSuccess`
   services/                    `TransactionService` (the `IUnitOfWork` impl)
   seeds/                       dev seeds
@@ -32,6 +33,7 @@ src/
 - `runOutermost(cb)` always opens its own transaction on its own connection and masks any ambient one, with the same flush and rollback rules. It exists for a library whose transaction must commit on its own (the BetterAuth adapter, `apps/api`): joined to an app run, the library's reads on the pool miss its uncommitted writes and its change no longer commits when it says so.
 - Events collected by a run built without a `FlushHandler` throw `EventsWithoutOutbox` (naming the event types) at flush and roll the unit back. **Why**: a commit that drops its events is a silent audit and integration gap; the api container always passes the outbox enqueue, so only a mis-wired run fails.
 - `ambientTransaction()` is the one accessor for the open transaction (`Option<Transaction>`); `resolveExecutor()` returns it, else `db`; `savepoint(work)` runs `work` on a savepoint of the executor, in its own scope. App code never reads `UnitOfWorkContext` itself, so the unchecked cast to the driver type lives in one place.
+- A lock held until the transaction ends goes through `lockForTransaction(key)` (waits) or `tryLockForTransaction(key)` (gives up, returns `false`), both on `resolveExecutor()`. Outside a run the lock is released at once, so take it inside one. **Why the key and its hash never change**: during a deploy the old and the new instance run side by side, and a different key or hash makes them miss each other's lock.
 - The scope is closed when its run settles, so a promise that outlives the run gets `db`. **Why**: node-postgres does not guard a query on a released client, it may run on a connection another borrower holds.
 - A callback that resolves to a failed `Result` rolls everything back (writes and events) and `run()` resolves to that `Result`; return the failure, never throw a sentinel. Proven against Postgres by `check:uow-rollback` (`apps/api`).
 - A repository's `save`/`create` calls `trackEventsOnSuccess(result, aggregate)`, otherwise the events stay on the aggregate and are silently lost.

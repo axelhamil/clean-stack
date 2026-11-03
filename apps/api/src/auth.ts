@@ -11,7 +11,7 @@ import { stripe } from "@better-auth/stripe";
 import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { AppErrorException, Option } from "@packages/ddd-kit";
-import { ambientTransaction, db, resolveExecutor, sql } from "@packages/drizzle";
+import { ambientTransaction, db, lockForTransaction } from "@packages/drizzle";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
 import { scrubText } from "@packages/sentry-scrub";
@@ -125,9 +125,7 @@ interface SignupUser {
  */
 async function ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Promise<string> {
   return di.ITransactionService.run(async () => {
-    await resolveExecutor().execute(
-      sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
-    );
+    await lockForTransaction(userId);
 
     const emitUserCreated = async () => {
       if (!signupUser) return;

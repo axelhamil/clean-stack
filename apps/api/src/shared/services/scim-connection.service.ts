@@ -1,6 +1,6 @@
 import type { SCIMManagedConnection, SCIMScope } from "@better-auth/scim";
 import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
-import { resolveExecutor, savepoint, sql } from "@packages/drizzle";
+import { lockForTransaction, savepoint } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
 import { findMemberOf, scimProvisionedMembers } from "../../auth-queries";
@@ -227,9 +227,7 @@ export class ScimConnectionService {
     work: () => Promise<Result<T, ScimConnectionError>>,
   ): Promise<Result<T, ScimConnectionError>> {
     return this.uow.run(async () => {
-      await resolveExecutor().execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`scim-connection:${organizationId}`}, 0))`,
-      );
+      await lockForTransaction(`scim-connection:${organizationId}`);
       return work();
     });
   }

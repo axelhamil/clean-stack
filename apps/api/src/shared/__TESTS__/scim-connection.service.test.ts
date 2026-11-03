@@ -19,11 +19,10 @@ mock.module("../../auth", () => ({
   },
 }));
 
-const executor = { execute: async () => undefined };
 const realDrizzle = await import("@packages/drizzle");
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
-  resolveExecutor: () => executor,
+  lockForTransaction: async () => {},
   savepoint: <T>(work: () => Promise<T>) => work(),
 }));
 

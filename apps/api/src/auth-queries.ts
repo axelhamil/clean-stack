@@ -11,6 +11,7 @@ import {
   count,
   desc,
   eq,
+  lockForTransaction,
   lt,
   resolveExecutor,
   schema,
@@ -182,9 +183,7 @@ export async function countActiveMembers(organizationId: string): Promise<number
  * seat and both take it.
  */
 export async function lockSeatsOf(organizationId: string): Promise<void> {
-  await resolveExecutor().execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${`seats:${organizationId}`}, 0))`,
-  );
+  await lockForTransaction(`seats:${organizationId}`);
 }
 
 // ── #8: api-token middleware ──────────────────────────────────────────────

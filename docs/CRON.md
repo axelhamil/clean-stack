@@ -8,7 +8,7 @@ internal endpoints (`POST /internal/<job>`); you wire your own scheduler.
 | Endpoint | Body | What it does |
 |---|---|---|
 | `POST /internal/rgpd-sweep` | `{ batchSize?: number; dryRun?: boolean }` | Wipes accounts whose 7-day grace window has elapsed (`pendingDeletionUntil <= now AND deletedAt IS NULL`). Idempotent, returns `{ processed, succeeded, failed, dryRun, truncated }`. `processed` is `succeeded.length + failed.length`: accounts actually attempted, not the batch size, so a truncated run reports what it really did. Time-budgeted like the retention sweeps below (checked *between* account wipes, never inside one, an account wipe is a single transaction and must never be cut in half), but deliberately holds no lease and its selection query is not `SKIP LOCKED`, so two overlapping runs can pick the same account; the anonymizing update is guarded by `deletedAt IS NULL`, making the wipe itself idempotent so the loser of the race short-circuits without double-wiping. |
-| `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups notification emails that have **come due** into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Due-ness is decided at fan-out, not here, see § Digest windows below. Note: "immediate" frequency means "at the next cron tick", true real-time delivery is handled by the SSE event stream, not email. Holds the `flush-notification-emails` lease (§ Single-flight) and answers `{ skipped: true }` when another run holds it. |
+| `POST /internal/flush-notification-emails` | `{ batchSize?: number; dryRun?: boolean }` | Groups notification emails that have **come due** into per-user/category digests and enqueues them for delivery. Recommended cadence: every minute. Due-ness is decided at fan-out, not here, see § Digest windows below. Note: "immediate" frequency means "at the next cron tick", true real-time delivery is handled by the SSE event stream, not email. Holds a transaction scoped advisory lock for its whole transaction (§ Single-flight) and answers `{ skipped: true }` when another run holds it. |
 | `POST /internal/sweep-admin-impersonations` | `{ batchSize?: number; dryRun?: boolean }` | Deletes impersonation sessions past `expires_at`, one `admin.impersonation.stopped` (`endReason: "expired"`) per row in the same unit of work. Recommended cadence: daily. `deleted` in the response counts ended sessions. |
 | `POST /internal/sweep-admin-approvals` | `{ batchSize?: number; dryRun?: boolean }` | Moves pending four-eyes requests past `expires_at` to `expired`, one `admin.approval.expired` per row. `deleted` in the response counts expired rows. |
 | `POST /internal/sweep-stripe-events` | `{ batchSize?: number; dryRun?: boolean }` | Deletes `stripe_event` rows older than `STRIPE_EVENT_RETENTION_DAYS`. |
@@ -99,16 +99,27 @@ The back office derives a `late` state from the last heartbeat rather than stori
 
 ### Single-flight
 
-Each sweep label holds a lease in `sweep_lock` for the duration of its run, the
-retention sweeps and `flush-notification-emails` alike. A second call for the
-same label while one is running answers `{ skipped: true }` without touching a
-row. The flush takes the lease for a reason its `FOR UPDATE SKIP LOCKED` select
-does not cover: two concurrent runs can never claim the *same* notification, but
-they can each claim *half* of one user's due rows and each mail a digest, no
-duplicate, two emails for a window the user was promised one of. The lease is time-boxed (twice `SWEEP_DEADLINE_MS`), so
-a process killed mid-sweep frees the label on its own rather than wedging it,
-which is why this is a lease row and not a session advisory lock, whose release
-would be tied to a pooled connection.
+Each retention sweep label holds a lease in `sweep_lock` for the duration of its
+run. A second call for the same label while one is running answers
+`{ skipped: true }` without touching a row. The lease is time-boxed (twice
+`SWEEP_DEADLINE_MS`), so a process killed mid-sweep frees the label on its own
+rather than wedging it, which is why this is a lease row and not a session
+advisory lock, whose release would be tied to a pooled connection.
+
+`flush-notification-emails` is single-flight for a reason its
+`FOR UPDATE SKIP LOCKED` select does not cover: two concurrent runs can never
+claim the *same* notification, but they can each claim *half* of one user's due
+rows and each mail a digest, no duplicate, two emails for a window the user was
+promised one of. Unlike a sweep, the flush pages through every due row inside
+one transaction with no deadline, so a time-boxed lease could expire while the
+run still holds its row locks, and the next minute's run would then claim the
+pages the first one had not read yet. The flush therefore takes
+`pg_try_advisory_xact_lock(hashtextextended('flush-notification-emails', 0))` as
+the first statement of that transaction and answers `{ skipped: true }` when it
+is refused. The lock lives exactly as long as the transaction: commit or
+rollback releases it, it never expires under a running flush, and being
+transaction scoped it is safe with a connection pool. Proven against Postgres by
+`check:digest`.
 
 The lease is fenced by an owner token, not just the label. `acquireSweepLease`
 returns a fresh `uuidv7` per acquisition; `releaseSweepLease` deletes by
@@ -267,7 +278,7 @@ caller imports; same canonical-message function the API uses to verify.
 | `bun apps/api/src/cron/sweep.ts` | the retention sweeps, in order | daily |
 | `bun apps/api/src/cron/flush-notification-emails.ts` | `/internal/flush-notification-emails` | every minute |
 
-All three go through `cron/internal-job.ts`: it signs each call, logs one line per route, treats a `skipped` answer (lease held) as success and exits non-zero on an unreachable API, a non-2xx, an unparseable body or a batch error (`rgpd-sweep` with a non-empty `failed`). Any scheduler that can run a command in the api image needs nothing else; one that cannot (a separate GH Actions repo, Inngest) calls `signedInternalFetch` itself.
+All three go through `cron/internal-job.ts`: it signs each call, logs one line per route, treats a `skipped` answer (another run in progress) as success and exits non-zero on an unreachable API, a non-2xx, an unparseable body or a batch error (`rgpd-sweep` with a non-empty `failed`). Any scheduler that can run a command in the api image needs nothing else; one that cannot (a separate GH Actions repo, Inngest) calls `signedInternalFetch` itself.
 
 For ad-hoc curl in dev, mint a signature with a tiny script, don't try to
 build the canonical message by hand from the shell, it's how you ship a

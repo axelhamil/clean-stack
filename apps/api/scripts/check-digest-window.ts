@@ -12,8 +12,8 @@
 // or `flush-notification-emails.route.ts`.
 //
 // WARNING: writes real notification, preference and email_message rows for the
-// seeded account, and takes the real `flush-notification-emails` lease. Local
-// database only, `requireLocalDatabase` enforces it.
+// seeded account, and takes the real `flush-notification-emails` advisory lock.
+// Local database only, `requireLocalDatabase` enforces it.
 
 import { db, sql, TransactionService } from "@packages/drizzle";
 import type { Hono } from "hono";
@@ -79,7 +79,6 @@ const reset = async () => {
     sql`DELETE FROM notification_preference WHERE scope = 'user' AND scope_id = ${userId}`,
   );
   await db.execute(sql`DELETE FROM email_message WHERE to_address = ${email}`);
-  await db.execute(sql`DELETE FROM sweep_lock WHERE label = 'flush-notification-emails'`);
 };
 
 const setFrequency = (category: string, frequency: string) =>
@@ -228,12 +227,9 @@ await fanout(event(6));
 await makeEverythingDue();
 const [a, b] = await Promise.all([flush(), flush()]);
 // The invariant is "one window, one digest", not *how* the loser lost. A run
-// that finds the lease held reports `skipped: true`; one that starts after the
-// winner released reports `skipped: false, flushed: 0`. Both are correct, and
-// which one happens is scheduling, not behaviour: asserting on `skipped` made
-// this check fail on a slower runner while nothing was wrong. The lease's own
-// contention semantics are covered by `check:sweep-lock`, against the same
-// table; what belongs here is that the second run sent nothing.
+// refused the lock reports `skipped: true`; one that starts after the winner
+// committed reports `skipped: false, flushed: 0`. Which one happens is
+// scheduling, so the lock itself is proven on its own below.
 check(
   "exactly one of the two runs did the work, and the other sent nothing",
   [a, b].filter((r) => r.flushed === 1).length === 1 &&
@@ -242,9 +238,30 @@ check(
 );
 check("exactly one extra e-mail", (await enqueued()).length === 4);
 check("a replay sends nothing", (await flush()).flushed === 0);
+
+await fanout(event(8));
+await makeEverythingDue();
+const whileHeld = await db.transaction(async (tx) => {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended('flush-notification-emails', 0))`,
+  );
+  return flush();
+});
+check(
+  "a run started while another transaction holds the lock skips and sends nothing",
+  whileHeld.skipped === true && whileHeld.notifications === 0,
+  whileHeld,
+);
+check("nothing was enqueued while the lock was held", (await enqueued()).length === 4);
+const afterRelease = await flush();
+check(
+  "the lock is released with its transaction, the next run sends the window",
+  afterRelease.flushed === 1 && afterRelease.notifications === 1,
+  afterRelease,
+);
 check(
   "each digest carries its own idempotency key",
-  new Set((await enqueued()).map((e) => e.idempotency_key)).size === 4,
+  new Set((await enqueued()).map((e) => e.idempotency_key)).size === 5,
 );
 
 await reset();

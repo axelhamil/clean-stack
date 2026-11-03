@@ -101,7 +101,7 @@ export async function runInternalJob({ label, paths, heartbeatUrl }: InternalJob
 
     switch (classification.kind) {
       case "skipped":
-        warn(`SKIPPED ${path} in ${elapsed}ms, another run holds the lease`);
+        warn(`SKIPPED ${path} in ${elapsed}ms, another run is in progress`);
         break;
       case "batch-error": {
         const where =

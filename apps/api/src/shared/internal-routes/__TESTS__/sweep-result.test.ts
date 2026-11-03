@@ -42,7 +42,7 @@ describe("classifySweepResult", () => {
     expect(result).toEqual({ kind: "ok" });
   });
 
-  it("classifies a flush that found the lease held as skipped, a success", () => {
+  it("classifies a flush refused by a concurrent run as skipped, a success", () => {
     const flush = { dryRun: false, skipped: true, flushed: 0, notifications: 0 };
     expect(classifySweepResult(flush)).toEqual({ kind: "skipped" });
   });
