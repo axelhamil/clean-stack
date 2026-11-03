@@ -104,6 +104,7 @@ Create the environments `staging` and `production`; restrict the deployment bran
 | Secret | `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` | environment | a Tailscale OAuth client allowed to create ephemeral `tag:ci` nodes that reach the Coolify API |
 | Variable | `VITE_API_URL`, `VITE_APP_URL`, `VITE_ADMIN_URL` | environment | the public `https://` URLs; baked into the bundles and used by the gates |
 | Variable | `VITE_SENTRY_DSN`, `VITE_ADMIN_SENTRY_DSN` | environment | Sentry DSNs of the app and the admin, empty for none |
+| Variable | `VITE_ANALYTICS_SRC` | environment | the analytics script URL the app loads once `analytics` is consented, empty for none |
 | Variable | `COOLIFY_PROJECT_UUID` | repository | section 4 |
 | Variable | `COOLIFY_DEPLOY` | repository | `on` once both environments exist in Coolify; any other value skips every deploy |
 | Secret | `PGBACKREST_REPO1_S3_ENDPOINT`, `PGBACKREST_REPO1_S3_KEY`, `PGBACKREST_REPO1_S3_KEY_SECRET`, `PGBACKREST_REPO1_CIPHER_PASS` | environment `pgbackrest-drill` | the R2 endpoint, a **read-only** R2 key on the backup bucket, the production cipher passphrase (section 13) |

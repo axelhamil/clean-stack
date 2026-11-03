@@ -73,6 +73,7 @@ jobs:
             VITE_API_URL=${{ vars.VITE_API_URL }}
             VITE_ADMIN_URL=${{ vars.VITE_ADMIN_URL }}
             VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}
+            VITE_ANALYTICS_SRC=${{ vars.VITE_ANALYTICS_SRC }}
             VITE_SENTRY_ENVIRONMENT=${{ env.DEPLOY_ENVIRONMENT }}
             VITE_GIT_SHA=${{ github.event.workflow_run.head_sha }}
 
