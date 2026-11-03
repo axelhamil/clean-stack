@@ -1,5 +1,11 @@
 import type { AnyPgColumn, AnyPgTable } from "@packages/drizzle";
-import { ambientTransaction, count, eq, resolveExecutor, sql } from "@packages/drizzle";
+import {
+  ambientTransaction,
+  count,
+  eq,
+  lockForTransaction,
+  resolveExecutor,
+} from "@packages/drizzle";
 import type { QuotaKey } from "../entitlements";
 import { assertQuota } from "../middleware/billing.middleware";
 
@@ -28,9 +34,7 @@ export async function reserveQuota(
     );
   }
 
-  await resolveExecutor().execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${`${orgId}:${key}`}, 0))`,
-  );
+  await lockForTransaction(`${orgId}:${key}`);
   const used = await countFn();
   assertQuota(used, limit);
 }

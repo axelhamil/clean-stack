@@ -24,6 +24,7 @@ export {
 export { migrate } from "drizzle-orm/node-postgres/migrator";
 export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 export { alias } from "drizzle-orm/pg-core";
+export { lockForTransaction, tryLockForTransaction } from "./advisory-lock";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
 export {
   claimedSet,

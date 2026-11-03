@@ -13,6 +13,7 @@ import {
   notificationSchema,
   resolveExecutor,
   sql,
+  tryLockForTransaction,
 } from "@packages/drizzle";
 import { NOTIFICATION_MAP } from "@packages/events";
 import { toLocale } from "@packages/i18n";
@@ -179,11 +180,11 @@ export async function flushDueNotifications({
   // cannot expire under a long run, which a time-boxed lease could.
   const flush = () =>
     di.ITransactionService.run(async (): Promise<FlushOutcome> => {
+      if (!(await tryLockForTransaction(FLUSH_LABEL))) {
+        return { skipped: true, flushed: 0, notifications: 0 };
+      }
+
       const exec = resolveExecutor();
-      const lock = await exec.execute<{ locked: boolean }>(
-        sql`select pg_try_advisory_xact_lock(hashtextextended(${FLUSH_LABEL}, 0)) as locked`,
-      );
-      if (lock.rows[0]?.locked !== true) return { skipped: true, flushed: 0, notifications: 0 };
 
       await exec.execute(sql`SET LOCAL statement_timeout = '30s'`);
       await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
