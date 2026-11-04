@@ -13,7 +13,7 @@ Thanks for stopping by. The flow is short: talk first, code second.
 3. **Fork and branch off `dev`**, name it as you like (`fix/123-short-name` is nice, not required).
 4. **Open your pull request into `dev`** with `Closes #<issue>` in the body. GitHub links it to the issue and closes the issue on merge.
 
-The `PR policy` check turns green once `accepted` is on the pull request or on its linked issue. `main` only receives the release from `dev`, done by the maintainer.
+The `PR policy` check passes when `accepted` is on the pull request or on its linked open issue. A label added to the issue does not rerun the check, so ask the maintainer to rerun it. `main` only receives the release from `dev`, done by the maintainer.
 
 ## Before you push
 
@@ -23,7 +23,7 @@ docker compose up postgres -d && pnpm db:migrate
 pnpm dev
 ```
 
-The `pre-push` hook runs every check (Biome, types, tests, duplication, unused code). If it's green, you're good. Never skip it with `--no-verify`.
+The `pre-push` hook runs every check (Biome, module boundaries, build, types, tests, duplication, unused code). If it's green, you're good. Never skip it with `--no-verify`.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/), lowercase subject: `fix(email): retry after a provider timeout`.
 

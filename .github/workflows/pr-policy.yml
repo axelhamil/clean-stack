@@ -1,7 +1,7 @@
 name: PR policy
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
 
 permissions:
@@ -73,9 +73,10 @@ jobs:
               `query($owner: String!, $repo: String!, $number: Int!) {
                 repository(owner: $owner, name: $repo) {
                   pullRequest(number: $number) {
-                    closingIssuesReferences(first: 10) {
+                    closingIssuesReferences(first: 50) {
                       nodes {
                         number
+                        state
                         repository { nameWithOwner }
                         labels(first: 50) { nodes { name } }
                       }
@@ -89,6 +90,7 @@ jobs:
             const issues = result.repository.pullRequest.closingIssuesReferences.nodes;
             const accepted = issues.find(
               (issue) =>
+                issue.state === 'OPEN' &&
                 issue.repository.nameWithOwner === repository &&
                 issue.labels.nodes.some((label) => label.name === 'accepted'),
             );

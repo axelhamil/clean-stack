@@ -88,8 +88,9 @@ describe("the coolify deploy and rollback workflows", () => {
       group: `deploy-${PRODUCTION_ON_MAIN}`,
       "cancel-in-progress": false,
     });
-    expect(rollbackJob.if).toBe(
-      "inputs.environment == 'staging' || github.ref == 'refs/heads/main'",
+    expect(rollbackJob.needs).toBe("guard");
+    expect(rollback.jobs.guard?.steps.map((step) => step.run).join("\n")).toMatch(
+      /"\$DEPLOY_ENVIRONMENT" = "production" \][\s\S]*"\$REF_NAME" != "main" \][\s\S]*exit 1/,
     );
     expect(rollback.concurrency).toEqual({
       group: `deploy-${expression("inputs.environment")}`,

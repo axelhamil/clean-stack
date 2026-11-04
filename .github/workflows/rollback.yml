@@ -32,9 +32,24 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  guard:
+    name: Check the ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Production rolls back from main only
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$DEPLOY_ENVIRONMENT" = "production" ] && [ "$REF_NAME" != "main" ]; then
+            echo "::error::A production rollback must run from main, this run uses $REF_NAME. Run the workflow again and pick main in the Use workflow from list."
+            exit 1
+          fi
+
   rollback:
     name: Deploy previous images
-    if: inputs.environment == 'staging' || github.ref == 'refs/heads/main'
+    needs: guard
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     timeout-minutes: 60
