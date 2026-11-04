@@ -22,7 +22,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 4 | **C.1 remainder** | Delivered | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Delivered | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 | 6 | **Phase L** | Delivered | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; Postgres backups with PITR and a hardened host | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
-| 7 | **Release-please** | Planned | Replace semantic-release with release-please: a release PR on `main` instead of a bot push | The release becomes a reviewable PR, and nothing pushes to the protected `main` behind its rules |
+| 7 | **Release-please** | Planned | Replace semantic-release with release-please, nixos-forge model: the release PR lives on `dev`, merging it tags and moves `main` to the tag | One merge ships a release, it is reviewed like any PR, and no `dev` to `main` PR is left to forget |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -35,9 +35,10 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 ## Release-please
 
 - **Status**: planned.
-- **Why**: semantic-release commits the changelog and the version straight to `main`, which has to stay open to a bot push while every human goes through a PR. Release-please opens a release PR instead: the version, the changelog and the tag are reviewed and merged like any other change.
-- **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from the last tag, `bump-minor-pre-major`, the changelog sections of today's `releaseRules` (`docs(readme)` keeps its patch); `.github/workflows/release.yml` runs `googleapis/release-please-action` on a push to `main` with a GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`) so the release PR triggers CI; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow and `CONTRIBUTING.md` updated. A version, a `version` field or a tag is never set by hand.
-- **Done when**: a merge of `dev` into `main` opens a release PR, merging it tags and publishes the GitHub release, and the `main` ruleset no longer needs a bypass for a bot.
+- **Why**: semantic-release commits the changelog and the version straight to `main` and needs a separate `dev` to `main` PR to ship. Release-please keeps a release PR open on `dev`: the version, the changelog and the tag are reviewed like any change, and merging that one PR is the release.
+- **Model**: nixos-forge. `target-branch: dev`; merging the release PR creates the tag, then the workflow fast-forwards `main` to that tag. `main` only ever points at a release.
+- **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from the last tag, `bump-minor-pre-major`, changelog sections matching today's `releaseRules` (`docs(readme)` keeps its patch); `.github/workflows/release.yml` runs `googleapis/release-please-action` on a push to `dev` with a GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`) so the release PR triggers CI, then moves `main` when a release is created; the `main` ruleset lets only that bot move it; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow, `CONTRIBUTING.md` and the `PR policy` base rule updated. A version, a `version` field or a tag is never set by hand.
+- **Done when**: a push to `dev` keeps one release PR up to date, merging it tags, publishes the GitHub release and moves `main` to the tag, and the production deploy follows `main` as today.
 
 ---
 
