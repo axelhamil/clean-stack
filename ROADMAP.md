@@ -22,12 +22,27 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 4 | **C.1 remainder** | Delivered | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Delivered | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 | 6 | **Phase L** | Delivered | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; Postgres backups with PITR and a hardened host | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
+| 7 | **Release-please** | Planned | Replace semantic-release with release-please, nixos-forge model: the release PR lives on `dev`, merging it tags and moves `main` to the tag | One merge ships a release, it is reviewed like any PR, and no `dev` to `main` PR is left to forget |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
 **Cut and not coming back**: marketing site (E.2), status page and SLO dashboards (D.1), SOC2 checklist (D.4), generated OpenAPI spec and Scalar UI (D.2: the generation is cut, not the documentation, since `/api/v1` is documented by hand in [`docs/PUBLIC-API.md`](docs/PUBLIC-API.md), which a three-route surface keeps honest more cheaply than a generator), Capacitor shell (F.1), feature flags (F.2), GPC (A.7), NIS2 readiness, and the per-phase "deferred" micro-items. Each was a per-clone decision, a third-party service to wire, or an ambition with no substrate to exercise it. Git history has the specs if one becomes real.
 
 **Out of scope**: HIPAA tooling, real-time WebSocket bus, third-party app marketplace, A/B testing framework, IAB TCF v2.2.
+
+---
+
+## Release-please
+
+- **Status**: planned.
+- **Why**: semantic-release commits the changelog and the version straight to `main` and needs a separate `dev` to `main` PR to ship. Release-please keeps a release PR open on `dev`: the version, the changelog and the tag are reviewed like any change, and merging that one PR is the release.
+- **Model**: nixos-forge, two lanes and one `CHANGELOG.md`.
+  - Release: release-please on `dev` (`target-branch: dev`) keeps one release PR open; merging it creates the tag, then the workflow pushes the release commit to `main` with the bot token, so the production deploy triggers.
+  - Hotfix: a `hotfix/*` branch cut from `main` and merged into `main`; a second release-please run on `main` opens a patch release PR; merging it tags, adds its own section to `CHANGELOG.md`, publishes its GitHub release and deploys, without shipping what waits on `dev`.
+  - Sync: a `sync-dev` workflow merges every push to `main` back into `dev` with the same bot, so the hotfix, the changelog and the manifest reach `dev` and the next push to `main` stays a fast-forward.
+- **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from the last tag, `bump-minor-pre-major`, changelog sections matching today's `releaseRules` (`docs(readme)` keeps its patch); `.github/workflows/release.yml` runs `googleapis/release-please-action` on a push to `dev` with a GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`) so the release PR triggers CI, then moves `main` when a release is created; the `main` ruleset lets only that bot move it; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow, `CONTRIBUTING.md` and the `PR policy` base rule updated. A version, a `version` field or a tag is never set by hand.
+- **Risk to prove first**: release-please walks the history back to the last tag. After a sync, `feat` commits made on `dev` before the hotfix tag may be read as already released and miss the next changelog. A sandbox repo proves it (a `feat` on `dev`, a hotfix on `main`, the sync, then the release PR); if it bites, `last-release-sha` pins the last commit `dev` released.
+- **Done when**: a push to `dev` keeps one release PR up to date and merging it tags, publishes and moves `main`; a hotfix on `main` ships its own patch release without `dev`; after the sync, the next `dev` release lists every commit once, hotfix excluded.
 
 ---
 

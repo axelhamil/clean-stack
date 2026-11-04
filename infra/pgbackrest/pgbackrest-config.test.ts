@@ -187,7 +187,10 @@ describe("the monthly drill workflow", () => {
     expect(crons[0]?.slice(2)).toEqual([expect.stringMatching(/^([1-9]|1\d|2[0-8])$/), "*", "*"]);
     expect(workflow.on.workflow_dispatch).toBeDefined();
     expect(workflow.jobs.drill?.if).toBe(
-      "github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || vars.PGBACKREST_DRILL_ENABLED == 'true')",
+      "(github.event_name == 'schedule' && vars.PGBACKREST_DRILL_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
+    );
+    expect(workflow.jobs.drill?.steps[0]?.with?.ref).toBe(
+      `\${{ github.event_name == 'schedule' && 'main' || github.ref }}`,
     );
   });
 

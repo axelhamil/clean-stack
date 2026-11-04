@@ -1,0 +1,32 @@
+name: Integration
+description: Suggest a provider (email, payment, storage...).
+labels: ["integration", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: The maintainer picks the providers. Tell us about yours, and please wait for `accepted` before writing an adapter.
+  - type: input
+    id: service
+    attributes:
+      label: Service and docs link
+      placeholder: Acme Mail, https://docs.acme.dev
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this one
+    validations:
+      required: true
+  - type: checkboxes
+    id: criteria
+    attributes:
+      label: What it offers
+      description: Check what applies. Links to the trust page or DPA help a lot.
+      options:
+        - label: SOC 2
+        - label: GDPR with a public DPA
+        - label: EU data region
+        - label: Batch API
+        - label: Idempotency key
+        - label: HTML and text sent together (email only)

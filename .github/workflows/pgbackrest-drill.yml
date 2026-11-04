@@ -23,7 +23,7 @@ env:
 jobs:
   drill:
     name: Restore the latest backup and one PITR point on a scratch instance
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'schedule' || vars.PGBACKREST_DRILL_ENABLED == 'true')
+    if: (github.event_name == 'schedule' && vars.PGBACKREST_DRILL_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: pgbackrest-drill
     timeout-minutes: 180
@@ -41,6 +41,8 @@ jobs:
       IMAGE: clean-stack/postgres-pgbackrest:drill
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
 
       - name: Ping the start
         if: env.HEARTBEAT_URL_PGBACKREST_DRILL != ''
