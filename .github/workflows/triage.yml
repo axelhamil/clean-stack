@@ -2,7 +2,7 @@ name: Triage
 
 on:
   issues:
-    types: [labeled, unlabeled, assigned, unassigned, closed, reopened, edited]
+    types: [labeled, unlabeled, assigned, unassigned, closed, reopened]
   pull_request_target:
     types: [labeled]
 
@@ -49,6 +49,9 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            const WAIT_MS = 150_000;
+            const POLL_MS = 10_000;
+            const deadline = Date.now() + WAIT_MS;
             const repository = `${context.repo.owner}/${context.repo.repo}`;
             const result = await github.graphql(
               `query($owner: String!, $repo: String!, $number: Int!) {
@@ -92,11 +95,22 @@ jobs:
                 continue;
               }
 
-              if (run.status !== 'completed') {
-                core.info(`PR policy run ${run.id} for #${pull.number} is still ${run.status}, skipped.`);
+              let status = run.status;
+              while (status !== 'completed' && Date.now() < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+                const { data: latest } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id: run.id });
+                status = latest.status;
+              }
+
+              if (status !== 'completed') {
+                core.warning(`PR policy run ${run.id} for #${pull.number} is still ${status} after the wait, not rerun.`);
                 continue;
               }
 
-              await github.rest.actions.reRunWorkflow({ ...context.repo, run_id: run.id });
-              core.info(`Reran PR policy run ${run.id} for #${pull.number}.`);
+              try {
+                await github.rest.actions.reRunWorkflow({ ...context.repo, run_id: run.id });
+                core.info(`Reran PR policy run ${run.id} for #${pull.number}.`);
+              } catch (error) {
+                core.warning(`Could not rerun PR policy run ${run.id} for #${pull.number}: ${error.message}`);
+              }
             }

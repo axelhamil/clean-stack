@@ -105,11 +105,12 @@ jobs:
             const openIssues = current.closingIssuesReferences.nodes.filter(
               (issue) => issue.state === 'OPEN' && issue.repository.nameWithOwner === repository,
             );
-            const triaged = openIssues.find((issue) => isAccepted(issue) && hasType(issue) && isAssigned(issue));
+            const isTriaged = (issue) => isAccepted(issue) && hasType(issue) && isAssigned(issue);
+            const allTriaged = openIssues.length > 0 && openIssues.every(isTriaged);
             const isExternal = !TRUSTED.includes(current.authorAssociation);
 
-            if (triaged) {
-              core.info(`Closes triaged issue #${triaged.number}.`);
+            if (allTriaged) {
+              core.info(`Closes triaged issues ${openIssues.map((issue) => `#${issue.number}`).join(', ')}.`);
             } else if (isExternal && isAccepted(current)) {
               core.info('External pull request accepted by a maintainer.');
             } else if (openIssues.length === 0) {
@@ -119,7 +120,7 @@ jobs:
                   : 'This pull request must close an open issue of this repository: add `Closes #N` to its body.',
               );
             } else {
-              for (const issue of openIssues) {
+              for (const issue of openIssues.filter((candidate) => !isTriaged(candidate))) {
                 const gaps = [];
                 if (!isAccepted(issue)) gaps.push('the `accepted` label');
                 if (!hasType(issue)) gaps.push(`a type label (${typeList})`);

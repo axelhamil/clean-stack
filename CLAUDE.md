@@ -63,11 +63,11 @@ pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semanti
 
 Every change, by anyone, follows the same flow. **Why**: the issue history is the project log, and an untriaged issue tells nothing in it.
 
-1. Before any change, find or open the issue and triage it: one type label (`bug`, `enhancement`, `integration`, `documentation`, `maintenance`), `accepted`, an assignee.
-2. Branch off `dev` as `<type>/<issue>-<slug>`.
+1. Before any change, find or open the issue and triage it: one type label (the list is `TYPE_LABELS` in `.github/workflows/pr-policy.yml`), `accepted`, an assignee.
+2. Branch off `dev` as `<conventional-commit-type>/<issue>-<slug>`, for example `fix/123-email-retry`.
 3. Open the PR into `dev` with `Closes #N`, the same type label and an assignee.
 
-The `linked-issue` check enforces it on every PR. Only bots and the `dev` to `main` release are exempt.
+The `linked-issue` check enforces it on every PR: every open issue the PR closes must be triaged, and there must be at least one. Bots and the `dev` to `main` release are exempt. An external contributor (not owner, member or collaborator) may skip the issue when `accepted` is set on the PR itself; the type label and the assignee stay required. The `dev` ruleset lets admins bypass the required checks: that is for emergencies only, never a normal path.
 
 ## Release flow
 
