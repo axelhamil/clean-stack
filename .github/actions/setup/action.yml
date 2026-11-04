@@ -1,0 +1,30 @@
+name: Setup toolchain
+description: Node, pnpm and Bun at the pinned versions, the pnpm store cache and a frozen install.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version-file: .nvmrc
+        package-manager-cache: false
+
+    - uses: pnpm/action-setup@v4
+
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.4.4
+
+    - name: Resolve pnpm store
+      shell: bash
+      run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+    - uses: actions/cache@v4
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-${{ runner.os }}-
+
+    - name: Install
+      shell: bash
+      run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent

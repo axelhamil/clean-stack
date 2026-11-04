@@ -6,6 +6,9 @@ on:
   push:
     branches: [dev, main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -15,6 +18,37 @@ env:
   HUSKY: 0
 
 jobs:
+  checks:
+    # Same commands, same order as .husky/pre-push, so a push that skipped the
+    # local hook cannot reach a green PR. The real-database checks live in a11y.
+    name: Pre-push chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup
+
+      - name: Biome
+        run: pnpm ci:check
+
+      - name: Check module boundaries
+        run: pnpm check:boundaries
+
+      - name: Bootstrap env files
+        # The hook relies on the local .env files; the api tests validate the env at import.
+        run: pnpm bootstrap
+
+      - name: Build, type-check and unit tests
+        run: pnpm turbo run build type-check test --output-logs=errors-only
+
+      - name: Duplication
+        run: pnpm check:duplication
+
+      - name: Unused code
+        run: pnpm check:unused
+
   a11y:
     name: Accessibility gate
     runs-on: ubuntu-latest
@@ -57,32 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          package-manager-cache: false
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
-
-      - name: Resolve pnpm store
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-${{ runner.os }}-
-
-      - name: Install
-        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
-
-      - name: Check module boundaries
-        run: pnpm check:boundaries
+      - uses: ./.github/actions/setup
 
       - name: Bootstrap env files
         run: pnpm bootstrap
@@ -291,29 +300,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          package-manager-cache: false
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
-
-      - name: Resolve pnpm store
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-${{ runner.os }}-
-
-      - name: Install
-        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
+      - uses: ./.github/actions/setup
 
       - name: Bootstrap env files
         run: pnpm bootstrap
