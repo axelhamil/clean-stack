@@ -36,9 +36,13 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 - **Status**: planned.
 - **Why**: semantic-release commits the changelog and the version straight to `main` and needs a separate `dev` to `main` PR to ship. Release-please keeps a release PR open on `dev`: the version, the changelog and the tag are reviewed like any change, and merging that one PR is the release.
-- **Model**: nixos-forge. `target-branch: dev`; merging the release PR creates the tag, then the workflow pushes the release commit to `main` with the bot token, so the production deploy triggers. A `sync-dev` workflow merges every push to `main` back into `dev` with the same bot, so a hotfix landed on `main` is in `dev` before the next release and the push to `main` stays a fast-forward.
+- **Model**: nixos-forge, two lanes and one `CHANGELOG.md`.
+  - Release: release-please on `dev` (`target-branch: dev`) keeps one release PR open; merging it creates the tag, then the workflow pushes the release commit to `main` with the bot token, so the production deploy triggers.
+  - Hotfix: a `hotfix/*` branch cut from `main` and merged into `main`; a second release-please run on `main` opens a patch release PR; merging it tags, adds its own section to `CHANGELOG.md`, publishes its GitHub release and deploys, without shipping what waits on `dev`.
+  - Sync: a `sync-dev` workflow merges every push to `main` back into `dev` with the same bot, so the hotfix, the changelog and the manifest reach `dev` and the next push to `main` stays a fast-forward.
 - **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from the last tag, `bump-minor-pre-major`, changelog sections matching today's `releaseRules` (`docs(readme)` keeps its patch); `.github/workflows/release.yml` runs `googleapis/release-please-action` on a push to `dev` with a GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`) so the release PR triggers CI, then moves `main` when a release is created; the `main` ruleset lets only that bot move it; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow, `CONTRIBUTING.md` and the `PR policy` base rule updated. A version, a `version` field or a tag is never set by hand.
-- **Done when**: a push to `dev` keeps one release PR up to date, merging it tags, publishes the GitHub release and moves `main` to the tag, and the production deploy follows `main` as today.
+- **Risk to prove first**: release-please walks the history back to the last tag. After a sync, `feat` commits made on `dev` before the hotfix tag may be read as already released and miss the next changelog. A sandbox repo proves it (a `feat` on `dev`, a hotfix on `main`, the sync, then the release PR); if it bites, `last-release-sha` pins the last commit `dev` released.
+- **Done when**: a push to `dev` keeps one release PR up to date and merging it tags, publishes and moves `main`; a hotfix on `main` ships its own patch release without `dev`; after the sync, the next `dev` release lists every commit once, hotfix excluded.
 
 ---
 
