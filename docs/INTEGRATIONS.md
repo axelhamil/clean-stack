@@ -63,7 +63,9 @@ Hard bounces are filtered **provider-side and automatically**: Resend's domain-s
 
 ### Idempotency
 
-`Idempotency-Key` is **per batch request** (not per recipient). The worker derives a key from the chunk's claim window; callers can pass `options.idempotencyKey` which the queue service fans out as `${key}/${index}` per recipient.
+`Idempotency-Key` is **per batch request** (not per recipient). The worker sends each chunk (up to 100 emails) in one batch call. Before the call, it stores `batch_key` (the sha256 of the chunk's row ids) on every row of the chunk. The key sent to Resend is the sha256 of `batch_key` and of the entries actually sent. On a retryable failure (timeout, 429, 5xx, 409 `concurrent_idempotent_requests`) the whole chunk gets one shared retry delay. The replay sends the same rows with the same content, so the same key, and Resend returns the original response instead of sending again, within its 24 h key window. If the content changed in between (sender, template), the key changes too: at worst one duplicate, never a lost email. `EMAIL_DEAD_REPLAY_WINDOW_HOURS` cannot exceed 24 for that reason. Callers can pass `options.idempotencyKey`, which the queue service fans out as `${key}#${index}` per recipient.
+
+**Known limit.** Two workers that claim at the same moment can split one batch: each one skips the rows the other has locked. The split rows then form a new set, with a new key. The risk is one duplicate, and only if the original request had already been accepted by Resend.
 
 ### DNS hardening (mandatory before sending in production)
 
