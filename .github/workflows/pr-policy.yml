@@ -1,0 +1,109 @@
+name: PR policy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  base-branch:
+    name: base-branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Only the release PR from dev may target main
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$BASE_REF" != "main" ]; then
+            echo "Base is $BASE_REF, nothing to check."
+            exit 0
+          fi
+
+          if [ "$HEAD_REF" = "dev" ] && [ "$HEAD_REPO" = "$REPOSITORY" ]; then
+            echo "Release PR from $REPOSITORY:dev to main."
+            exit 0
+          fi
+
+          echo "::error::Pull requests target dev. main only receives the release PR from $REPOSITORY:dev. Change the base branch of this PR to dev."
+          exit 1
+
+  linked-issue:
+    name: linked-issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - name: Require the accepted label on the PR or its linked issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const isTrusted = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association);
+            const isBot = pr.user.type === 'Bot';
+            const isRelease = pr.base.ref === 'main' && pr.head.ref === 'dev' && pr.head.repo?.full_name === repository;
+            const isAcceptedPr = pr.labels.some((label) => label.name === 'accepted');
+
+            if (isTrusted || isBot || isRelease || isAcceptedPr) {
+              core.info('Exempt from the linked issue rule.');
+              return;
+            }
+
+            const result = await github.graphql(
+              `query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    closingIssuesReferences(first: 10) {
+                      nodes {
+                        number
+                        repository { nameWithOwner }
+                        labels(first: 50) { nodes { name } }
+                      }
+                    }
+                  }
+                }
+              }`,
+              { owner: context.repo.owner, repo: context.repo.repo, number: pr.number },
+            );
+
+            const issues = result.repository.pullRequest.closingIssuesReferences.nodes;
+            const accepted = issues.find(
+              (issue) =>
+                issue.repository.nameWithOwner === repository &&
+                issue.labels.nodes.some((label) => label.name === 'accepted'),
+            );
+
+            if (accepted) {
+              core.info(`Linked to accepted issue #${accepted.number}.`);
+              return;
+            }
+
+            const message = [
+              'Thanks for the pull request. It needs the `accepted` label before it can be merged.',
+              'Small fix: nothing to do, a maintainer will review it and add the label to this pull request.',
+              'Bigger change: open an issue with a template, wait for `accepted` on it, then add `Closes #N` to this pull request.',
+              'See https://github.com/axelhamil/clean-stack/blob/dev/CONTRIBUTING.md',
+            ].join('\n');
+
+            await core.summary.addRaw(message, true).write();
+            core.setFailed(message);

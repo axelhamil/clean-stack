@@ -1,0 +1,25 @@
+name: Bug
+description: Something is broken.
+labels: ["bug", "needs-triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you expected, what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1. pnpm dev
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      render: shell

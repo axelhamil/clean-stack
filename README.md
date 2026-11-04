@@ -11,7 +11,7 @@ Auth, multi-tenant, email, storage already wired. You clone, you write business 
 
 ---
 
-> **Status: work in progress.** This boilerplate is under active iteration. No support, no SLA, no public issue queue.
+> **Status: work in progress.** This boilerplate is under active iteration. No support, no SLA. Issues and pull requests follow [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 
@@ -24,7 +24,7 @@ Two ways to run it. Pick one.
 **Prerequisites**: [Bun 1.4+](https://bun.com/docs/installation), [Node 26.13+](https://nodejs.org), [pnpm 12](https://pnpm.io/installation), [Docker with Compose v2](https://docs.docker.com/compose/install/).
 
 ```bash
-git clone https://github.com/axelhamil/clean-stack my-saas
+git clone --branch main https://github.com/axelhamil/clean-stack my-saas
 cd my-saas
 pnpm install
 pnpm bootstrap          # copies .env.example → .env in each workspace
@@ -54,7 +54,7 @@ No Bun, no Node, no pnpm on your host. Everything runs in containers (api + app 
 > [v1 (`docker-compose`, hyphen) is EOL since June 2023](https://docs.docker.com/compose/migrate/): always use `docker compose` (space).
 
 ```bash
-git clone https://github.com/axelhamil/clean-stack my-saas
+git clone --branch main https://github.com/axelhamil/clean-stack my-saas
 cd my-saas
 bash scripts/bootstrap.sh              # copies .env.example → .env in each workspace
 docker compose up --watch              # api runs migrations on boot, then starts
@@ -358,6 +358,12 @@ pnpm db:push            # dev schema push
 pnpm db:migrate         # prod-style migration
 pnpm db:studio          # Drizzle Studio
 ```
+
+---
+
+## Contributing
+
+Contributions are welcome through an issue first. The flow, the checks and what we decline are in [`CONTRIBUTING.md`](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md), and report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md).
 
 ---
 
