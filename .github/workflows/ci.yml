@@ -6,6 +6,9 @@ on:
   push:
     branches: [dev, main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,13 +29,6 @@ jobs:
       - uses: actions/checkout@v5
 
       - uses: ./.github/actions/setup
-
-      - name: Restore the Turborepo cache
-        uses: actions/cache@v4
-        with:
-          path: .turbo/cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: turbo-${{ runner.os }}-
 
       - name: Biome
         run: pnpm ci:check

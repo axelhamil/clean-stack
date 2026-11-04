@@ -51,7 +51,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 - **Status**: delivered.
 - **Why**: the pre-push chain ran only in the local Husky hook, so a fork or a `--no-verify` push reached a green PR with broken lint, types or tests.
-- **Scope**: a `Pre-push chain` job in `.github/workflows/ci.yml` runs the hook's commands in its order (Biome, module boundaries, build, type-check, unit tests, jscpd, knip) with a local Turborepo cache; the real-database checks stay in the accessibility jobs; the toolchain setup is shared through `.github/actions/setup`.
+- **Scope**: a `Pre-push chain` job in `.github/workflows/ci.yml` runs the hook's commands in its order (Biome, module boundaries, build, type-check, unit tests, jscpd, knip); the real-database checks stay in the accessibility jobs; the toolchain setup is shared through `.github/actions/setup`.
 - **Done when**: every PR and push to `dev` and `main` runs the job, and it is a required check.
 
 ---
