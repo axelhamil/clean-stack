@@ -56,6 +56,8 @@ export const envSchema = z
     AUTH_COOKIE_DOMAIN: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM: z.string().optional(),
+    EMAIL_PROVIDER: z.enum(["resend", "notify"]).default("resend"),
+    NOTIFY_API_KEY: z.string().optional(),
     INTERNAL_SIGNING_KEY: z.string().min(32).optional(),
     INTERNAL_AUTH_LAYERS: z
       .string()

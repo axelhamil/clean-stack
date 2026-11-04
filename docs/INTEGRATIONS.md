@@ -14,7 +14,11 @@ see [`CRON.md`](./CRON.md).
 
 ## 1. Resend, email delivery queue + templates
 
-**Phase D.5 changed the delivery model.** `IEmailService` (`QueuedEmailService`) no longer calls Resend directly, every send enqueues one or more rows in the `email_message` table (inside the caller's transaction when it runs in a `uow.run()`). `EmailDeliveryWorker` polls every 2 s, claims up to 300 pending rows (`FOR UPDATE SKIP LOCKED`, 120 s claim window), groups by `(kind, template)`, chunks to 100, and sends each chunk via `resend.batch.send`. Batch cap is 100 emails/request against a **10 req/s per team** Resend ceiling. This makes fan-out (RGPD wipe sweep, org announcements, D.3 digests) safe under the rate limit: N recipients → ⌈N/100⌉ HTTP calls, not N.
+**Phase D.5 changed the delivery model.** `IEmailService` (`QueuedEmailService`) no longer calls the email provider directly, every send enqueues one or more rows in the `email_message` table (inside the caller's transaction when it runs in a `uow.run()`). `EmailDeliveryWorker` polls every 2 s, claims up to 300 pending rows (`FOR UPDATE SKIP LOCKED`, 120 s claim window), groups by `(kind, template)`, chunks to 100, and delivers each chunk through the configured provider (`EMAIL_PROVIDER`, default `resend`: `resend.batch.send`; optional `notify`: `POST https://notify.cx/api/email/send`). With Resend, batch cap is 100 emails/request against a **10 req/s per team** ceiling. This makes fan-out (RGPD wipe sweep, org announcements, D.3 digests) safe under rate limits: N recipients → ⌈N/100⌉ HTTP calls with Resend, or N single-send calls with Notify.
+
+### Optional: Notify
+
+Set `EMAIL_PROVIDER=notify` and `NOTIFY_API_KEY` ([Notify](https://notify.cx/docs)). `RESEND_FROM` remains the `from` address for rendered templates. Resend stays the default when `EMAIL_PROVIDER` is unset or `resend`. Keep `TEMPLATE_IDS` entries empty when using Notify (dashboard template IDs are Resend-only).
 
 ### Template rendering (Phase D.5, in-repo React Email)
 
@@ -241,7 +245,7 @@ fast on missing/invalid values.
   `/internal/*` request signing. Never sent on the wire.
 - `INTERNAL_AUTH_LAYERS`: `signature` (default) or `signature,private-network`
   when the scheduler calls on loopback or a private mesh (Coolify, Fly) for defense-in-depth.
-- `RESEND_API_KEY`. Template IDs live in `TEMPLATE_IDS` in code (see §1), not env.
+- `RESEND_API_KEY`. Template IDs live in `TEMPLATE_IDS` in code (see §1), not env. Optional alternative: `EMAIL_PROVIDER=notify` + `NOTIFY_API_KEY` (Notify).
 - `S3_*` env vars (see §3).
 
 ### RGPD knobs (defaults work)

@@ -214,14 +214,22 @@ docker compose --profile storage up -d         # start SeaweedFS + bucket init
 
 The S3 client is provider-agnostic ([`region: "auto"`, `forcePathStyle: true`](https://orm.drizzle.team/docs)). Anything S3-compatible works: R2, AWS S3, Backblaze B2, Wasabi, Scaleway, Tigris.
 
-### Email: Resend (optional)
+### Email: Resend (default) or Notify (optional)
 
-Resend is **optional everywhere**: without `RESEND_API_KEY` (or with unconfigured template IDs), email sends are logged at `warn` and the app boots normally; verification, magic-link, password-reset and org-invitation mails simply don't deliver. Wire it before relying on any email flow in prod.
+Email is **optional everywhere**: without a provider API key, sends are logged and the app boots normally; verification, magic-link, password-reset and org-invitation mails simply don't deliver. Wire a provider before relying on any email flow in prod.
+
+| | Resend (default) | Notify (opt-in) |
+|---|---|---|
+| **Select** | `EMAIL_PROVIDER=resend` (default) + `RESEND_API_KEY` | `EMAIL_PROVIDER=notify` + `NOTIFY_API_KEY` |
+| **Docs** | [`resend`](https://resend.com/docs) | [`notify.cx`](https://notify.cx/docs) |
+| **From address** | `RESEND_FROM` | same `RESEND_FROM` env |
+| **Templates** | in-repo React Email (default) or dashboard IDs in `TEMPLATE_IDS` | in-repo React Email only |
+
+Resend details:
 
 | | |
 |---|---|
 | **SDK** | [`resend`](https://resend.com/docs) |
-| **Templates** | dashboard-managed, retry + idempotency, provider-side suppression |
 | **DNS prereq prod** | SPF + DKIM (3 CNAMEs) + DMARC: see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md#email) |
 | **EU region** | supported via `region: "eu-west-1"` in adapter config |
 

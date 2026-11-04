@@ -19,6 +19,8 @@
     "AUTH_COOKIE_DOMAIN",
     "BETTER_AUTH_*",
     "RESEND_*",
+    "EMAIL_PROVIDER",
+    "NOTIFY_*",
     "INTERNAL_*",
     "RGPD_*",
     "S3_*",

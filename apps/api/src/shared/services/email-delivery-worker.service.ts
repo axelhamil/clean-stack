@@ -12,6 +12,7 @@ import type { Logger } from "../logger";
 import type { EmailFailure, EmailMessageRecord, IEmailQueue } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import { notifyBatchSender } from "./notify-batch-sender.service";
 
 export const EMAIL_BATCH_CHUNK_SIZE = 100;
 const POLL_INTERVAL_MS = 2_000;
@@ -38,19 +39,22 @@ export const TEMPLATE_IDS: Record<string, string> = {
 };
 
 type BatchEntry = Record<string, unknown>;
-type BatchResult = {
+
+export type { BatchEntry };
+export type BatchResult = {
   data: Array<{ id: string }> | null;
   errors?: Array<{ index: number; message: string }>;
   error: null | { statusCode?: number; message: string };
 };
+interface BatchSender {
+  batchSend(entries: BatchEntry[], idempotencyKey: Option<string>): Promise<BatchResult>;
+}
+
+export type { BatchSender };
 export interface EmailDeliveryOptions {
   leaseSeconds: number;
   deadRetrySeconds: number;
   deadReplayWindowHours: number;
-}
-
-interface BatchSender {
-  batchSend(entries: BatchEntry[], idempotencyKey: Option<string>): Promise<BatchResult>;
 }
 
 interface ResendBatchClient {
@@ -93,13 +97,7 @@ export class EmailDeliveryWorker {
     sender?: BatchSender,
     private readonly clock: Clock = monotonicClock,
   ) {
-    this.sender =
-      sender ??
-      resendBatchSender(
-        env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null,
-        instrumentation,
-        logger,
-      );
+    this.sender = sender ?? defaultEmailBatchSender(instrumentation, logger);
     this.claimLimit =
       Math.min(MAX_CHUNKS_PER_CLAIM, unitsWithinLease(options.leaseSeconds, CHUNK_BUDGET)) *
       EMAIL_BATCH_CHUNK_SIZE;
@@ -399,4 +397,16 @@ export function resendBatchSender(
       );
     },
   };
+}
+
+function defaultEmailBatchSender(instrumentation: IInstrumentation, logger: Logger): BatchSender {
+  if (env.EMAIL_PROVIDER === "notify") {
+    return notifyBatchSender(env.NOTIFY_API_KEY ?? null, instrumentation, logger);
+  }
+
+  return resendBatchSender(
+    env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null,
+    instrumentation,
+    logger,
+  );
 }
