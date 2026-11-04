@@ -23,6 +23,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 5 | **Phase K** | Delivered | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 | 6 | **Phase L** | Delivered | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; Postgres backups with PITR and a hardened host | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
 | 7 | **Release-please** | Planned | Replace semantic-release with release-please, nixos-forge model: the release PR lives on `dev`, merging it tags and moves `main` to the tag | One merge ships a release, it is reviewed like any PR, and no `dev` to `main` PR is left to forget |
+| 8 | **CI parity** | Delivered | CI replays the pre-push chain (lint, types, unit tests, build, duplication, unused code) on every PR and push to `dev` and `main` | A fork that skips the local hook must not get a green PR |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
@@ -43,6 +44,15 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 - **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from the last tag, `bump-minor-pre-major`, changelog sections matching today's `releaseRules` (`docs(readme)` keeps its patch); `.github/workflows/release.yml` runs `googleapis/release-please-action` on a push to `dev` with a GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`) so the release PR triggers CI, then moves `main` when a release is created; the `main` ruleset lets only that bot move it; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow, `CONTRIBUTING.md` and the `PR policy` base rule updated. A version, a `version` field or a tag is never set by hand.
 - **Risk to prove first**: release-please walks the history back to the last tag. After a sync, `feat` commits made on `dev` before the hotfix tag may be read as already released and miss the next changelog. A sandbox repo proves it (a `feat` on `dev`, a hotfix on `main`, the sync, then the release PR); if it bites, `last-release-sha` pins the last commit `dev` released.
 - **Done when**: a push to `dev` keeps one release PR up to date and merging it tags, publishes and moves `main`; a hotfix on `main` ships its own patch release without `dev`; after the sync, the next `dev` release lists every commit once, hotfix excluded.
+
+---
+
+## CI parity
+
+- **Status**: delivered.
+- **Why**: the pre-push chain ran only in the local Husky hook, so a fork or a `--no-verify` push reached a green PR with broken lint, types or tests.
+- **Scope**: a `Pre-push chain` job in `.github/workflows/ci.yml` runs the hook's commands in its order (Biome, module boundaries, build, type-check, unit tests, jscpd, knip) with a local Turborepo cache; the real-database checks stay in the accessibility jobs; the toolchain setup is shared through `.github/actions/setup`.
+- **Done when**: every PR and push to `dev` and `main` runs the job, and it is a required check.
 
 ---
 

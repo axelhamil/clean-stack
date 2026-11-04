@@ -23,7 +23,7 @@ docker compose up postgres -d && pnpm db:migrate
 pnpm dev
 ```
 
-The `pre-push` hook runs every check (Biome, module boundaries, build, types, tests, duplication, unused code). If it's green, you're good. Never skip it with `--no-verify`.
+The `pre-push` hook runs every check (Biome, module boundaries, build, types, tests, duplication, unused code). If it's green, you're good. Never skip it with `--no-verify`: CI replays the same chain on every pull request anyway.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/), lowercase subject: `fix(email): retry after a provider timeout`.
 
