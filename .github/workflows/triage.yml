@@ -1,0 +1,102 @@
+name: Triage
+
+on:
+  issues:
+    types: [labeled, unlabeled, assigned, unassigned, closed, reopened, edited]
+  pull_request_target:
+    types: [labeled]
+
+permissions: {}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  drop-needs-triage:
+    name: drop-needs-triage
+    if: github.event.action == 'labeled' && github.event.label.name == 'accepted'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Remove needs-triage once accepted
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const number = context.payload.issue?.number ?? context.payload.pull_request.number;
+
+            try {
+              await github.rest.issues.removeLabel({ ...context.repo, issue_number: number, name: 'needs-triage' });
+              core.info(`Removed needs-triage from #${number}.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.info(`#${number} had no needs-triage label.`);
+            }
+
+  rerun-pr-policy:
+    name: rerun-pr-policy
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Rerun PR policy on the pull requests that close this issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const result = await github.graphql(
+              `query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) {
+                    closedByPullRequestsReferences(first: 50, includeClosedPrs: false) {
+                      nodes {
+                        number
+                        state
+                        headRefOid
+                        repository { nameWithOwner }
+                      }
+                    }
+                  }
+                }
+              }`,
+              { owner: context.repo.owner, repo: context.repo.repo, number: context.payload.issue.number },
+            );
+
+            const pulls = result.repository.issue.closedByPullRequestsReferences.nodes.filter(
+              (pull) => pull.state === 'OPEN' && pull.repository.nameWithOwner === repository,
+            );
+
+            if (pulls.length === 0) {
+              core.info('No open pull request closes this issue.');
+              return;
+            }
+
+            for (const pull of pulls) {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                ...context.repo,
+                workflow_id: 'pr-policy.yml',
+                event: 'pull_request_target',
+                head_sha: pull.headRefOid,
+                per_page: 1,
+              });
+              const run = data.workflow_runs[0];
+
+              if (!run) {
+                core.warning(`No PR policy run found for #${pull.number}.`);
+                continue;
+              }
+
+              if (run.status !== 'completed') {
+                core.info(`PR policy run ${run.id} for #${pull.number} is still ${run.status}, skipped.`);
+                continue;
+              }
+
+              await github.rest.actions.reRunWorkflow({ ...context.repo, run_id: run.id });
+              core.info(`Reran PR policy run ${run.id} for #${pull.number}.`);
+            }

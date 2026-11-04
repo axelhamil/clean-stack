@@ -59,6 +59,16 @@ pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semanti
 - Opt-in profiles: `--profile storage` (SeaweedFS, host port `8333`), `--profile sso` (Keycloak, host port `8080`, see `docs/SSO-LOCAL.md`).
 - After a schema change: `pnpm db:push` (dev, non-interactive) or `db:generate && db:migrate` (prod-style). `db:push` applies the schema only and skips the data steps of migrations, so a local account that needs one (an existing admin who is not listed in `PLATFORM_ADMIN_IDS` gets no staff row) needs `db:migrate` or the env list.
 
+## Work tracking
+
+Every change, by anyone, follows the same flow. **Why**: the issue history is the project log, and an untriaged issue tells nothing in it.
+
+1. Before any change, find or open the issue and triage it: one type label (`bug`, `enhancement`, `integration`, `documentation`, `maintenance`), `accepted`, an assignee.
+2. Branch off `dev` as `<type>/<issue>-<slug>`.
+3. Open the PR into `dev` with `Closes #N`, the same type label and an assignee.
+
+The `linked-issue` check enforces it on every PR. Only bots and the `dev` to `main` release are exempt.
+
 ## Release flow
 
 Two-branch model. **`main` = released; `dev` = integration.** Every merge to `main` triggers semantic-release.
