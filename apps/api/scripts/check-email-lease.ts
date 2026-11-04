@@ -3,7 +3,7 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-email-lease");
 
 import { uuidv7 } from "@packages/ddd-kit";
-import { db, emailSchema, eq, like } from "@packages/drizzle";
+import { db, emailSchema, eq, inArray, like } from "@packages/drizzle";
 import type { EmailClaimRequest, EmailMessageRecord } from "../src/shared/ports/email-queue.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";
@@ -71,8 +71,8 @@ async function main(): Promise<void> {
   await claimed({ limit: 1 });
   const claimSql = spans.find((name) => name.includes('from "due"')) ?? "";
   await step(
-    "the claim locks both CTEs with for update skip locked and settles them in one update",
-    claimSql.match(/for update skip locked/g)?.length === 2 &&
+    "the claim locks its three CTEs with for update skip locked and settles them in one update",
+    claimSql.match(/for update skip locked/g)?.length === 3 &&
       claimSql.includes("union all") &&
       /update "email_message" set .* from "due"/.test(claimSql),
     claimSql,
@@ -224,6 +224,73 @@ async function main(): Promise<void> {
       afterRelease.status === "pending" &&
       reclaimedAfterRelease?.attempts === 4,
     { afterRelease, reclaimed: reclaimedAfterRelease?.attempts },
+  );
+
+  await cleanup();
+  const backlog = await seed(120);
+  const batchIds = backlog.slice(99, 102);
+  await db
+    .update(em)
+    .set({ batchKey: `${PROBE}-batch` })
+    .where(inArray(em.id, batchIds));
+  const acrossLimit = ids(await claimed({ limit: 100 }));
+  await step(
+    "a claim whose limit cuts a failed batch pulls the rest of the batch in the same claim",
+    batchIds.every((id) => acrossLimit.includes(id)) && acrossLimit.length === 102,
+    { claimed: acrossLimit.length, batch: batchIds.filter((id) => acrossLimit.includes(id)) },
+  );
+
+  await cleanup();
+  const [heldId = "", lostId = ""] = await seed(2);
+  const toAssign = await claimed();
+  const leaseOf = (id: string) => toAssign.find((record) => record.id === id)?.attempts ?? -1;
+  const assigned = await queue.assignBatch(
+    [
+      { id: heldId, attempts: leaseOf(heldId) },
+      { id: lostId, attempts: leaseOf(lostId) - 1 },
+    ],
+    `${PROBE}-key`,
+  );
+  const [afterHeld, afterLost] = [await rowOf(heldId), await rowOf(lostId)];
+  await step(
+    "the batch key is written before the send, only on the rows this worker still leases",
+    assigned.isSuccess &&
+      assigned
+        .getValue()
+        .map((lease) => lease.id)
+        .join() === heldId &&
+      afterHeld.batchKey === `${PROBE}-key` &&
+      afterLost.batchKey === null,
+    { held: afterHeld.batchKey, lost: afterLost.batchKey },
+  );
+  await queue.markFailed(
+    { id: heldId, attempts: leaseOf(heldId) },
+    { lastError: "HTTP 503", status: "pending", retryAfterSeconds: 0 },
+  );
+  const afterFailure = await rowOf(heldId);
+  await step(
+    "a retryable failure keeps the batch key so the replay rebuilds the same batch",
+    afterFailure.batchKey === `${PROBE}-key` && afterFailure.status === "pending",
+    afterFailure,
+  );
+
+  await cleanup();
+  const deadBatch = { status: "dead" as const, batchKey: `${PROBE}-dead-batch` };
+  const [oldestId = ""] = await seed(1, {
+    ...deadBatch,
+    nextAttemptAt: new Date(Date.now() - 2 * HOUR_MS),
+    createdAt: new Date(Date.now() - 3 * HOUR_MS),
+  });
+  const [youngestId = ""] = await seed(1, {
+    ...deadBatch,
+    nextAttemptAt: new Date(Date.now() - HOUR_MS),
+    createdAt: new Date(Date.now() - HOUR_MS),
+  });
+  const deadReplay = ids(await claimed({ deadReplayWindowHours: 2 }));
+  await step(
+    "a dead batch straddling the replay window edge is replayed whole, never split",
+    deadReplay.includes(oldestId) && deadReplay.includes(youngestId) && deadReplay.length === 2,
+    deadReplay,
   );
 
   await cleanup();

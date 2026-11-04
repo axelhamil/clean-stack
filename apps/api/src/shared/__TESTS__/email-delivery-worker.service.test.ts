@@ -12,6 +12,7 @@ import type {
   EmailMessageRecord,
   IEmailQueue,
 } from "../ports/email-queue.port";
+import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 import { enqueuedEvents } from "./enqueued-events";
@@ -20,16 +21,15 @@ import { enqueuedEvents } from "./enqueued-events";
 // on rendered content (only on which row got claimed/sent), so exercising the real
 // renderer is both cheaper than a stub and closer to what ships.
 
-const { EmailDeliveryWorker, chunkIdempotencyKey, resendBatchSender } = await import(
-  "../services/email-delivery-worker.service"
-);
+const { EmailDeliveryWorker, chunkBatchKey, chunkIdempotencyKey, groupRows, resendBatchSender } =
+  await import("../services/email-delivery-worker.service");
 
 const OPTIONS = { leaseSeconds: 120, deadRetrySeconds: 21_600, deadReplayWindowHours: 24 };
 
 type BatchResult = {
   data: Array<{ id: string }> | null;
   errors?: Array<{ index: number; message: string }>;
-  error: null | { statusCode?: number; message: string };
+  error: null | { statusCode?: number; message: string; name?: string };
 };
 
 const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
@@ -45,6 +45,7 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
   nextAttemptAt: Option.none<Date>(),
   lastError: Option.none<string>(),
   idempotencyKey: Option.none<string>(),
+  batchKey: Option.none<string>(),
   createdAt: new Date("2026-08-04T00:00:00Z"),
   ...over,
 });
@@ -53,8 +54,9 @@ const logger = mockPort<Logger>();
 let queue: PortMock<IEmailQueue>;
 let outbox: PortMock<IOutboxRepository>;
 let uow: UnitOfWorkMock;
-let batch: (entries: unknown[]) => Promise<BatchResult>;
+let batch: (entries: unknown[], idempotencyKey: Option<string>) => Promise<BatchResult>;
 let failedIn: unknown[];
+let assigned: Map<string, string>;
 let now: number;
 
 const accepted = async (entries: unknown[]): Promise<BatchResult> => ({
@@ -66,20 +68,26 @@ function claims(rows: EmailMessageRecord[]): void {
   queue.claim.mockResolvedValue(Result.ok(rows));
 }
 
-function worker(options = OPTIONS, clock = () => now) {
+function worker(
+  options = OPTIONS,
+  clock = () => now,
+  instrumentation: IInstrumentation = new NoOpInstrumentation(),
+) {
   return new EmailDeliveryWorker(
     queue,
     outbox,
     uow.unitOfWork,
     logger,
-    new NoOpInstrumentation(),
+    instrumentation,
     options,
-    { batchSend: (entries) => batch(entries) },
+    { batchSend: (entries, idempotencyKey) => batch(entries, idempotencyKey) },
     clock,
   );
 }
 
 const failures = (): EmailFailure[] => queue.markFailed.mock.calls.map(([, failure]) => failure);
+const failureById = () =>
+  Object.fromEntries(queue.markFailed.mock.calls.map(([lease, failure]) => [lease.id, failure]));
 const sentIds = () => queue.markSent.mock.calls.flatMap(([leases]) => leases.map(({ id }) => id));
 
 beforeEach(() => {
@@ -88,7 +96,12 @@ beforeEach(() => {
   uow = mockUnitOfWork();
   batch = accepted;
   failedIn = [];
+  assigned = new Map();
   now = 0;
+  queue.assignBatch.mockImplementation(async (leases: EmailLease[], batchKey: string) => {
+    for (const { id } of leases) assigned.set(id, batchKey);
+    return Result.ok(leases);
+  });
   queue.markSent.mockImplementation(async (leases: EmailLease[]) => Result.ok(leases));
   queue.markFailed.mockImplementation(async () => {
     failedIn.push(UnitOfWorkContext.transaction());
@@ -325,7 +338,7 @@ describe("EmailDeliveryWorker.start", () => {
       logger,
       instrumentation,
       OPTIONS,
-      { batchSend: (entries) => batch(entries) },
+      { batchSend: (entries, idempotencyKey) => batch(entries, idempotencyKey) },
     );
 
     await subject.start();
@@ -366,30 +379,292 @@ describe("resendBatchSender", () => {
       message: "email batch send timed out after 10ms",
     });
   });
+
+  it("passes the provider error name through so the worker can tell idempotency conflicts apart", async () => {
+    const client = {
+      batch: {
+        send: async () => ({
+          data: null,
+          error: {
+            message: "still processing",
+            statusCode: 409,
+            name: "concurrent_idempotent_requests",
+          },
+        }),
+      },
+    };
+
+    const result = await resendBatchSender(client, new NoOpInstrumentation(), logger).batchSend(
+      [{ to: "a@x.test" }],
+      Option.some("key"),
+    );
+
+    expect(result.error).toEqual({
+      statusCode: 409,
+      message: "still processing",
+      name: "concurrent_idempotent_requests",
+    });
+  });
+});
+
+describe("chunkBatchKey", () => {
+  it("is the same for the same rows in any order", async () => {
+    const a = await chunkBatchKey([row({ id: "a" }), row({ id: "b" })]);
+    const b = await chunkBatchKey([row({ id: "b" }), row({ id: "a" })]);
+
+    expect(a).toBe(b);
+  });
+
+  it("changes when one row changes", async () => {
+    const a = await chunkBatchKey([row({ id: "a" }), row({ id: "b" })]);
+    const b = await chunkBatchKey([row({ id: "a" }), row({ id: "c" })]);
+
+    expect(a).not.toBe(b);
+  });
+
+  it("exists even when no row carries an enqueue idempotency key", async () => {
+    const key = await chunkBatchKey([row({ id: "a" })]);
+
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+  });
 });
 
 describe("chunkIdempotencyKey", () => {
-  const keyed = (key: string | null) =>
-    row({ idempotencyKey: key === null ? Option.none<string>() : Option.some(key) });
+  const entries = [
+    { from: "a@x.test", to: "b@x.test", template: { id: "t", variables: { n: 1 } } },
+  ];
 
-  it("distinguishes key sets that differ only past 256 characters", async () => {
-    const prefix = "a".repeat(250);
-    const first = await chunkIdempotencyKey([keyed(`${prefix}-one`), keyed(`${prefix}-two`)]);
-    const second = await chunkIdempotencyKey([keyed(`${prefix}-one`), keyed(`${prefix}-three`)]);
+  it("is the same for the same batch and the same content, whatever the key order", async () => {
+    const a = await chunkIdempotencyKey("batch", entries);
+    const b = await chunkIdempotencyKey("batch", [
+      { template: { variables: { n: 1 }, id: "t" }, to: "b@x.test", from: "a@x.test" },
+    ]);
 
-    expect(first.isSome()).toBe(true);
-    expect(second.isSome()).toBe(true);
-    expect(first.unwrap()).not.toBe(second.unwrap());
+    expect(a).toBe(b);
   });
 
-  it("is order-independent", async () => {
-    const a = await chunkIdempotencyKey([keyed("k1"), keyed("k2")]);
-    const b = await chunkIdempotencyKey([keyed("k2"), keyed("k1")]);
-    expect(a.unwrap()).toBe(b.unwrap());
+  it("changes when the content sent changes under the same batch", async () => {
+    const a = await chunkIdempotencyKey("batch", entries);
+    const b = await chunkIdempotencyKey("batch", [{ ...entries[0], from: "c@x.test" }]);
+
+    expect(a).not.toBe(b);
   });
 
-  it("returns none when any row lacks a key", async () => {
-    const result = await chunkIdempotencyKey([keyed("k1"), keyed(null)]);
-    expect(result.isNone()).toBe(true);
+  it("changes when the batch changes", async () => {
+    const a = await chunkIdempotencyKey("batch", entries);
+    const b = await chunkIdempotencyKey("other", entries);
+
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("groupRows", () => {
+  it("keeps the rows of a failed batch together, apart from rows of the same template", () => {
+    const groups = groupRows([
+      row({ id: "1", batchKey: Option.some("k") }),
+      row({ id: "2" }),
+      row({ id: "3", batchKey: Option.some("k") }),
+    ]);
+
+    expect(groups.map((group) => group.map(({ id }) => id))).toEqual([["1", "3"], ["2"]]);
+  });
+
+  it("never mixes live and dead rows, nor rows with different attempts", () => {
+    const groups = groupRows([
+      row({ id: "1", attempts: 1 }),
+      row({ id: "2", attempts: 6, status: "dead" }),
+      row({ id: "3", attempts: 2 }),
+      row({ id: "4", attempts: 1 }),
+    ]);
+
+    expect(groups.map((group) => group.map(({ id }) => id))).toEqual([["1", "4"], ["2"], ["3"]]);
+  });
+});
+
+describe("EmailDeliveryWorker batch replay", () => {
+  const keys: string[] = [];
+  const unavailable = async (_entries: unknown[], idempotencyKey: Option<string>) => {
+    keys.push(idempotencyKey.unwrapOr("none"));
+    return { data: null, error: { statusCode: 503, message: "down" } };
+  };
+  const rejectedAs = (name: string) => async () => ({
+    data: null,
+    error: { statusCode: 409, message: name, name },
+  });
+
+  beforeEach(() => {
+    keys.length = 0;
+  });
+
+  it("settles a whole-chunk retryable failure once for every row", async () => {
+    const chunk = [row({ id: "1" }), row({ id: "2" }), row({ id: "3" })];
+    claims(chunk);
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    expect(new Set(failures().map((f) => f.status))).toEqual(new Set(["pending"]));
+    expect(
+      new Set(failures().map((f) => (f.status === "failed" ? 0 : f.retryAfterSeconds))).size,
+    ).toBe(1);
+  });
+
+  it("persists the batch key on every row of the chunk before the provider sees it", async () => {
+    const chunk = [row({ id: "1" }), row({ id: "2" })];
+    claims(chunk);
+    let persistedAtSend: [string, string][] = [];
+    batch = async (entries) => {
+      persistedAtSend = [...assigned.entries()];
+      return accepted(entries);
+    };
+
+    await worker().drainOnce();
+
+    const batchKey = await chunkBatchKey(chunk);
+    expect(persistedAtSend).toEqual([
+      ["1", batchKey],
+      ["2", batchKey],
+    ]);
+  });
+
+  it("sends nothing and releases the chunk when the batch key cannot be persisted", async () => {
+    claims([row({ id: "1" }), row({ id: "2" })]);
+    queue.assignBatch.mockResolvedValue(
+      Result.fail({ code: "EMAIL_QUEUE_WRITE_FAILED", message: "db down" }),
+    );
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    expect(keys).toEqual([]);
+    expect(queue.release.mock.calls.flatMap(([leases]) => leases.map(({ id }) => id))).toEqual([
+      "1",
+      "2",
+    ]);
+  });
+
+  it("sends nothing when part of the chunk lost its lease before the key was persisted", async () => {
+    claims([row({ id: "1" }), row({ id: "2" })]);
+    queue.assignBatch.mockImplementation(async (leases: EmailLease[]) =>
+      Result.ok(leases.slice(0, 1)),
+    );
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    expect(keys).toEqual([]);
+    expect(failures()).toEqual([]);
+  });
+
+  it("settles every row of the failed chunk in one unit of work so they come due together", async () => {
+    claims([row({ id: "1" }), row({ id: "2" })]);
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    expect(failedIn).toHaveLength(2);
+    expect(failedIn[0]).toBeDefined();
+    expect(failedIn[1]).toBe(failedIn[0]);
+  });
+
+  it("decides a batch's fate from its highest attempts so a batch never splits", async () => {
+    claims([
+      row({ id: "1", attempts: 1, batchKey: Option.some("k") }),
+      row({ id: "2", attempts: 4, batchKey: Option.some("k") }),
+    ]);
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    expect(failures().map((f) => f.status)).toEqual(["dead", "dead"]);
+  });
+
+  it("keeps a fresh row pending when a dead row of the same template fails beside it", async () => {
+    claims([row({ id: "1", attempts: 1 }), row({ id: "2", attempts: 6, status: "dead" })]);
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    expect(failureById()["1"]?.status).toBe("pending");
+    expect(failureById()["2"]?.status).toBe("dead");
+    expect(enqueuedEvents(outbox)).toEqual([]);
+  });
+
+  it("replays a failed batch with the same rows and the same key, apart from other rows", async () => {
+    const chunk = [row({ id: "1" }), row({ id: "2" }), row({ id: "3" })];
+    claims(chunk);
+    batch = unavailable;
+    await worker().drainOnce();
+    const [firstKey = ""] = keys;
+    const requests: Array<{ ids: unknown[]; key: string }> = [];
+    claims([
+      ...chunk.map((r) => ({
+        ...r,
+        attempts: 2,
+        batchKey: Option.fromNullable(assigned.get(r.id)),
+      })),
+      row({ id: "4" }),
+    ]);
+    batch = async (entries, idempotencyKey) => {
+      requests.push({ ids: entries, key: idempotencyKey.unwrapOr("none") });
+      return accepted(entries);
+    };
+
+    await worker().drainOnce();
+
+    expect(requests.map(({ ids, key }) => [ids.length, key])).toEqual([
+      [3, firstKey],
+      [1, expect.any(String)],
+    ]);
+  });
+
+  it("keys the chunk on the rows actually sent and leaves a render failure without a batch key", async () => {
+    const sendable = [row({ id: "2" }), row({ id: "3" })];
+    claims([row({ id: "1", template: Option.some("no_such_template") }), ...sendable]);
+    batch = unavailable;
+
+    await worker().drainOnce();
+
+    const batchKey = await chunkBatchKey(sendable);
+    expect(failures()[0]).toEqual({
+      lastError: expect.stringContaining("render failed"),
+      status: "failed",
+    });
+    expect([...assigned.entries()]).toEqual([
+      ["2", batchKey],
+      ["3", batchKey],
+    ]);
+  });
+
+  it("retries a request the provider is still processing under the same key, a minute later at least", async () => {
+    claims([row({ id: "1" }), row({ id: "2" })]);
+    batch = rejectedAs("concurrent_idempotent_requests");
+
+    await worker().drainOnce();
+
+    expect(failures().map((f) => f.status)).toEqual(["pending", "pending"]);
+    for (const failure of failures()) {
+      expect(failure.status === "pending" && failure.retryAfterSeconds).toBeGreaterThanOrEqual(60);
+    }
+    expect(enqueuedEvents(outbox)).toEqual([]);
+  });
+
+  it("fails loudly when the provider refuses a changed payload under the same key", async () => {
+    const instrumentation = mockInstrumentation();
+    claims([row({ id: "1" })]);
+    batch = rejectedAs("invalid_idempotent_request");
+
+    await worker(OPTIONS, () => now, instrumentation).drainOnce();
+
+    expect(failures()).toEqual([
+      {
+        status: "failed",
+        lastError: expect.stringContaining("invalid_idempotent_request"),
+      },
+    ]);
+    expect(instrumentation.capture).toHaveBeenCalledTimes(1);
+    expect(enqueuedEvents(outbox).map(({ eventType }) => eventType)).toEqual([
+      EventTypes.EMAIL_DELIVERY_EXHAUSTED,
+    ]);
   });
 });

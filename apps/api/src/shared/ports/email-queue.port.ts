@@ -27,6 +27,7 @@ export interface EmailMessageRecord {
   nextAttemptAt: Option<Date>;
   lastError: Option<string>;
   idempotencyKey: Option<string>;
+  batchKey: Option<string>;
   createdAt: Date;
 }
 
@@ -50,6 +51,10 @@ export interface IEmailQueue {
   markSent(
     leases: EmailLease[],
     providerMessageIds: Record<string, string>,
+  ): Promise<Result<EmailLease[], EmailQueueError>>;
+  assignBatch(
+    leases: EmailLease[],
+    batchKey: string,
   ): Promise<Result<EmailLease[], EmailQueueError>>;
   markFailed(lease: EmailLease, failure: EmailFailure): Promise<Result<boolean, EmailQueueError>>;
   release(leases: EmailLease[]): Promise<Result<number, EmailQueueError>>;
